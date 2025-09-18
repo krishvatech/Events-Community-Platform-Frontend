@@ -4,26 +4,53 @@ import AuthToggle from '../components/AuthToggle.jsx';
 import InputField from '../components/InputField.jsx';
 import SocialLogin from '../components/SocialLogin.jsx';
 import FeaturesSection from '../components/FeaturesSection.jsx';
+export const API_BASE =import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
-/**
- * Sign in page containing a hero on the left and authentication form on the right.
- */
 const SignInPage = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Mock login handler
-    alert(`Logged in as ${formData.email}`);
-    // In a real application, call your authentication API here
-    // On success, redirect to dashboard/home page
-    // navigate('/dashboard');
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/login/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Login failed');
+      }
+
+      const data = await response.json();
+
+      // Example: token-based auth
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
+
+      alert(`✅ Login successful. Welcome ${formData.email}`);
+      // Redirect to dashboard
+      window.location.href = '/dashboard';
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
@@ -35,7 +62,7 @@ const SignInPage = () => {
       <div className="flex-1 flex flex-col justify-center p-6 sm:p-12 bg-white">
         <div className="max-w-md w-full mx-auto">
           <h1 className="text-2xl text-gray-800 mb-2 text-center">Welcome Back</h1>
-          <p className="text-sm text-gray-600 mb-6 text-center">Sign in to access your learning journey</p>
+          <p className="text-2sm text-gray-600 mb-6 text-center">Sign in to access your learning journey</p>
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
             <AuthToggle />
             <form onSubmit={handleSubmit}>

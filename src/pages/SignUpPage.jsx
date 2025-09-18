@@ -3,12 +3,14 @@ import HeroSection from '../components/HeroSection.jsx';
 import AuthToggle from '../components/AuthToggle.jsx';
 import InputField from '../components/InputField.jsx';
 import FeaturesSection from '../components/FeaturesSection.jsx';
+import { registerUser } from '../utils/api';
 
 /**
  * Sign up page containing a hero on the left and registration form on the right.
  */
 const SignUpPage = () => {
   const [formData, setFormData] = useState({
+    username: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -16,23 +18,49 @@ const SignUpPage = () => {
     confirmPassword: '',
   });
 
+  // ✅ added
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [ok, setOk] = useState('');
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  // ✅ modified to call backend
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Basic client-side validation
+    setError('');
+    setOk('');
+
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
-    // Mock signup handler
-    alert(`Account created for ${formData.firstName} ${formData.lastName}`);
-    // In a real application, call your registration API here
-  };
 
+    try {
+      setLoading(true);
+      const res = await registerUser({
+        username: formData.username,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+      });
+
+      // res should include { full_name, email, access, refresh, ... }
+      setOk(`Welcome ${res.full_name || res.email}!`);
+      // Optional: persist tokens and redirect
+      // localStorage.setItem('access', res.access);
+      // localStorage.setItem('refresh', res.refresh);
+      // navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left hero section */}
@@ -101,6 +129,8 @@ const SignUpPage = () => {
                 onChange={handleChange}
                 required
               />
+              {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+              {ok && <p className="text-green-600 text-sm mt-2">{ok}</p>}
               <button
                 type="submit"
                 className="w-full py-2 px-4 mt-2 bg-primary hover:bg-primary-dark text-white rounded-md font-medium transition"
