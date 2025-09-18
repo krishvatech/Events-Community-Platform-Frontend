@@ -28,14 +28,14 @@ const SignInPage = () => {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left hero section */}
-      <div className="lg:w-1/2 lg:h-auto h-96">
+      <div className="lg:w-1/2 lg:min-h-screen">
         <HeroSection />
       </div>
       {/* Right form container */}
       <div className="flex-1 flex flex-col justify-center p-6 sm:p-12 bg-white">
         <div className="max-w-md w-full mx-auto">
-          <h1 className="text-2xl font-semibold text-gray-800 mb-2">Welcome Back</h1>
-          <p className="text-sm text-gray-600 mb-6">Sign in to access your learning journey</p>
+          <h1 className="text-2xl text-gray-800 mb-2 text-center">Welcome Back</h1>
+          <p className="text-sm text-gray-600 mb-6 text-center">Sign in to access your learning journey</p>
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
             <AuthToggle />
             <form onSubmit={handleSubmit}>

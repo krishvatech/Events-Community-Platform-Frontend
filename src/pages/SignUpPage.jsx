@@ -36,17 +36,26 @@ const SignUpPage = () => {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left hero section */}
-      <div className="lg:w-1/2 lg:h-auto h-96">
+      <div className="lg:w-1/2 lg:min-h-screen">
         <HeroSection />
       </div>
       {/* Right form container */}
       <div className="flex-1 flex flex-col justify-center p-6 sm:p-12 bg-white">
         <div className="max-w-md w-full mx-auto">
-          <h1 className="text-2xl font-semibold text-gray-800 mb-2">Welcome Back</h1>
-          <p className="text-sm text-gray-600 mb-6">Sign in to access your learning journey</p>
+          <h1 className="text-2xl text-gray-800 mb-2 text-center">Welcome Back</h1>
+          <p className="text-2sm text-gray-600 mb-6 text-center">Sign up to access your learning journey</p>
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
             <AuthToggle />
             <form onSubmit={handleSubmit}>
+              <InputField
+                label="Username"
+                name="username"
+                type="text"
+                placeholder="JohnDoe"
+                value={formData.username}
+                onChange={handleChange}
+                required
+              />
               <div className="flex flex-col sm:flex-row gap-4">
                 <InputField
                   label="First Name"
@@ -99,13 +108,13 @@ const SignUpPage = () => {
                 Create Your Account
               </button>
             </form>
-            <p className="text-xs text-gray-500 mt-4">
+            <p className="text-2xs text-gray-500 mt-4">
               By joining, you agree to our{' '}
-              <a href="#" className="text-primary hover:underline">
+              <a href="#" className="text-primary font-semibold hover:underline">
                 Terms of Service
               </a>{' '}
               and{' '}
-              <a href="#" className="text-primary hover:underline">
+              <a href="#" className="text-primary font-semibold hover:underline">
                 Privacy Policy
               </a>
               .
