@@ -12,7 +12,7 @@ const AuthToggle = () => {
         to="/signin"
         className={({ isActive }) =>
           `flex-1 text-center py-2 text-sm font-medium transition-colors ` +
-          (isActive ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-200')
+          (isActive ? 'bg-primary text-white' : 'text-black-700 hover:bg-gray-200')
         }
       >
         Sign In
@@ -21,7 +21,7 @@ const AuthToggle = () => {
         to="/signup"
         className={({ isActive }) =>
           `flex-1 text-center py-2 text-sm font-medium transition-colors ` +
-          (isActive ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-200')
+          (isActive ? 'bg-primary text-white' : 'text-black-700 hover:bg-gray-200')
         }
       >
         Join Us

@@ -51,7 +51,7 @@ const HeroSection = () => {
             />
           </div>
         </div>
-
+        {/* Description */}
         <p className="mt-6 mx-auto px-3
                max-w-[760px] md:max-w-[820px]
                text-center text-[15px] md:text-[15px]
