@@ -1,3 +1,4 @@
+// src/pages/SignInPage.jsx
 import React, { useState } from 'react';
 import HeroSection from '../components/HeroSection.jsx';
 import AuthToggle from '../components/AuthToggle.jsx';
@@ -6,10 +7,14 @@ import SocialLogin from '../components/SocialLogin.jsx';
 import FeaturesSection from '../components/FeaturesSection.jsx';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate, useLocation } from "react-router-dom";
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
 const SignInPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({ email: '', password: '' });
@@ -56,19 +61,38 @@ const SignInPage = () => {
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Login failed');
+      // Try to parse JSON even on error
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        /* ignore parse errors */
       }
 
-      const data = await response.json();
-      localStorage.setItem('access_token', data.access);
-      localStorage.setItem('refresh_token', data.refresh);
+      if (!response.ok) {
+        const msg = data?.detail || data?.error || response.statusText || 'Login failed';
+        throw new Error(msg);
+      }
+
+      // Save tokens (support both keys)
+      if (data?.access) {
+        localStorage.setItem('access_token', data.access);
+        localStorage.setItem('token', data.access); // for guards checking "token"
+      }
+      if (data?.refresh) {
+        localStorage.setItem('refresh_token', data.refresh);
+      }
+      if (data?.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
 
       toast.success(`✅ Login successful. Welcome ${formData.email}`);
+
+      // Redirect to original target or /dashboard
+      const redirectTo = location.state?.from?.pathname || '/dashboard';
       setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 1500); // wait 1.5s so toast is visible
+        navigate(redirectTo, { replace: true });
+      }, 1200); // lets the toast be visible
     } catch (err) {
       toast.error(`❌ ${err.message || 'Login failed. Please try again.'}`);
     } finally {
@@ -130,7 +154,7 @@ const SignInPage = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2 px-4 bg-primary hover:bg-primary-dark text-white rounded-md font-medium transition"
+                  className="w-full py-2 px-4 bg-primary hover:bg-primary-dark text-white rounded-md font-medium transition disabled:opacity-60"
                 >
                   {loading ? 'Signing in...' : 'Sign Into Your Account'}
                 </button>
@@ -142,8 +166,7 @@ const SignInPage = () => {
         </div>
       </div>
 
-      {/* Toast container */}
-      {/* Toast container in top-center */}
+      {/* Toasts */}
       <ToastContainer
         position="top-center"
         autoClose={2000}
