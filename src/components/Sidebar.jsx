@@ -5,15 +5,14 @@ const Sidebar = () => {
   const [active, setActive] = useState("Dashboard");
 
   const base =
-    "flex items-center gap-3 p-2 rounded-lg font-semibold text-lg transition-colors";
+    "flex items-center gap-3 p-2 rounded-lg font-medium text-base transition-colors";;
 
-  // Inactive: solid dark grey (not washed out), teal on hover
   // Inactive: force solid dark grey
     const inactive =
-    "!text-lg text-neutral-600 dark:text-grey-300 hover:!text-[#1bbbb3]";
+    "!text-medium text-neutral-700 dark:text-grey-300 hover:!text-[#1bbbb3]";
 
     // Active: teal
-    const activeCls = "!text-[#1bbbb3] !opacity-100";
+    const activeCls = "text-[#1bbbb3] font-medium text-base opacity-100";
 
   const linkClasses = (name) =>
     `${base} ${active === name ? activeCls : inactive}`;
@@ -25,7 +24,7 @@ const Sidebar = () => {
       className={linkClasses(name)}
     >
       <svg
-        className="w-6 h-6 flex-shrink-0 !text-inherit !opacity-100"
+        className="w-5 h-5 flex-shrink-0"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -33,7 +32,7 @@ const Sidebar = () => {
         <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeWidth="2"
+            strokeWidth="2.0"
             d={iconPath}
         />
     </svg>

@@ -19,7 +19,7 @@ const Dashboard = () => {
         <div className="flex-1 flex flex-col p-6 md:p-12">
           {/* Welcome */}
           <section className="mb-12">
-            <h1 className="text-4xl font-bold text-neutral-900 dark:text-black mb-4">
+            <h1 className="text-4xl font-bold text-neutral-900 dark:text-black leading-snug mb-4">
               Welcome back, {name}!
             </h1>
             <p className="text-lg text-neutral-600 dark:text-grey-300">
@@ -30,7 +30,7 @@ const Dashboard = () => {
           {/* Top 3 cards */}
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
             {/* Upcoming Events */}
-            <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+            <div className="bg-white dark:bg-background-dark rounded-xl shadow-md p-6 border border-[#1bbbb3]/10 shadow-gray-200">
 
               <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
                 Upcoming Events for You
@@ -69,7 +69,7 @@ const Dashboard = () => {
             </div>
 
            {/* Community Activity */}
-          <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+          <div className="bg-white dark:bg-background-dark rounded-xl shadow-md p-6 border border-[#1bbbb3]/10 shadow-gray-200">
 
             <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
               Recent Community Activity
@@ -125,7 +125,7 @@ const Dashboard = () => {
 
 
             {/* Resources */}
-            <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+            <div className="bg-white dark:bg-background-dark rounded-xl shadow-md p-6 border border-[#1bbbb3]/10 shadow-gray-200">
 
               <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
                 Recommended Resources
@@ -133,19 +133,19 @@ const Dashboard = () => {
               <div className="flex flex-col gap-3">
                 <a
                   href="#"
-                  className="text-neutral-800 dark:text-grey-200 hover:text-primary font-medium"
+                  className="text-neutral-800 dark:text-grey-200 hover:text-[#1bbbb3] font-medium"
                 >
                   Guide to M&A Due Diligence
                 </a>
                 <a
                   href="#"
-                  className="text-neutral-800 dark:text-grey-200 hover:text-primary font-medium"
+                  className="text-neutral-800 dark:text-grey-200 hover:text-[#1bbbb3] font-medium"
                 >
                   Top 5 M&A Trends for 2024
                 </a>
                 <a
                   href="#"
-                  className="text-neutral-800 dark:text-grey-200 hover:text-primary font-medium"
+                  className="text-neutral-800 dark:text-grey-200 hover:text-[#1bbbb3] font-medium"
                 >
                   Webinar: Navigating Deal Complexity
                 </a>
@@ -159,7 +159,7 @@ const Dashboard = () => {
           {/* Bottom 2 cards */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Network */}
-            <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+            <div className="bg-white dark:bg-background-dark rounded-xl shadow-md p-6 border border-[#1bbbb3]/10 shadow-gray-200">
 
               <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
                 Your Network
@@ -202,7 +202,7 @@ const Dashboard = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+            <div className="bg-white dark:bg-background-dark rounded-xl shadow-md p-6 border border-[#1bbbb3]/10 shadow-gray-200">
 
               <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
                 Quick Actions
