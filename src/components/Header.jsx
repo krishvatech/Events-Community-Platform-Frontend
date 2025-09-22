@@ -40,7 +40,7 @@ const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-[#1bbbb3]/10">
+    <header className="sticky top-0 z-50 bg-white/50 backdrop-blur border-b border-[#1bbbb3]/10">
       <div className="mx-auto max-w-7xl h-14 md:h-16 px-3 sm:px-4 lg:px-6 flex items-center justify-between">
         {/* Left: Logo + Brand */}
         <Link to="/" className="flex items-center gap-2">
