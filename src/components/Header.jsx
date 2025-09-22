@@ -23,7 +23,7 @@ const Header = () => {
   const NavA = ({ href, children }) => (
     <a
       href={href}
-      className="px-3 py-1 text-lg font-sm text-gray-500 hover:text-teal-400 transition-colors"
+      className="px-4 py-2 text-base text-gray-500 hover:text-teal-400 transition-colors"
     >
       {children}
     </a>

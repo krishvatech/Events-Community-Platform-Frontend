@@ -35,14 +35,15 @@ const HomePage = () => {
       {/* HERO with your exact image URL + gradient overlay */}
       <section
         id="hero"
-        className="relative min-h-[480px] h-[60vh] flex items-center justify-center text-center text-white bg-cover bg-center"
+        className="relative h-[60vh] min-h-[480px] flex items-center justify-center text-center text-white bg-cover bg-center hero-image-overlay"
         style={{
           backgroundImage:
             `linear-gradient(rgba(17,33,32,0.5), rgba(17,33,32,0.7)), url("https://lh3.googleusercontent.com/aida-public/AB6AXuCERO0mJRa0C5b8nfoEbZ02WYWLNgo1q1K9SdRDbgkWeuFTn9uR-WFnEl4leicScEd1-Nq77ffXT3ZygGPVXuF84_Jqsjx7EjTlVasqorCu40Ue1zQ-iHrokMzCd-WPkMG1OABR1lzOYx8pOC_PXo8xQPlx2uqRHLCOyRyRMegnAWV2gkZlJ9szW7-8z-16SCxoniaJHsxJxaubkZzRyXGiFH6SEHYrSBiM71UGQ4JYW2oSy_BjFesDJoYPo5Hy-1E_I5tqqIMIeA")`
         }}
       >
+        <div class="absolute inset-0 bg-black/30"></div>
         <div className="container mx-auto px-6 z-10">
-          <h1 className="text-4xl md:text-7xl font-semibold leading-tight">
+          <h1 className="text-4xl md:text-6xl font-semibold leading-tight">
             Connect, Collaborate, and Grow Your M&amp;A Network
           </h1>
           <p className="mt-4 text-lg md:text-xl max-w-3xl mx-auto text-white/90">
@@ -95,7 +96,7 @@ const HomePage = () => {
       </section>
 
       {/* Community Highlights */}
-      <section id="community" className="bg-white py-16 md:py-24">
+      <section id="community" className="py-16 md:py-24">
         <div className="container mx-auto px-6">
           <h2 className="text-3xl font-bold text-center">Community Highlights</h2>
           <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
