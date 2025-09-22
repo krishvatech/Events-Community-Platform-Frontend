@@ -8,11 +8,11 @@ const Sidebar = () => {
     "flex items-center gap-3 p-2 rounded-lg font-medium text-base transition-colors";;
 
   // Inactive: force solid dark grey
-    const inactive =
-    "!text-medium text-neutral-700 dark:text-grey-300 hover:!text-[#1bbbb3]";
+   const inactive =
+    "!text-medium text-neutral-700 dark:text-grey-300 hover:!text-[#1bbbb3] hover:bg-[#1bbbb3]/10";
 
     // Active: teal
-    const activeCls = "text-[#1bbbb3] font-medium text-base opacity-100";
+    const activeCls = "text-[#1bbbb3] font-medium text-base opacity-100 hover:bg-[#1bbbb3]/10";
 
   const linkClasses = (name) =>
     `${base} ${active === name ? activeCls : inactive}`;
