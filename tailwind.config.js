@@ -22,3 +22,19 @@ module.exports = {
   },
   plugins: []
 };
+
+export default {
+  content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
+  theme: {
+    extend: {
+      fontFamily: {
+        // alias like your HTML's "font-display"
+        display: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial"],
+        // also make Inter the default "sans" if you want
+        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial"],
+      },
+    },
+  },
+  plugins: [],
+};
+

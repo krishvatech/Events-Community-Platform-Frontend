@@ -7,6 +7,7 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
 
+
 const App = () => (
   <Routes>
     <Route path="/" element={<HomePage />} />

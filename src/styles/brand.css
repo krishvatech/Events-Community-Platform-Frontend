@@ -1,0 +1,14 @@
+:root { --primary-glow: 0 0 15px rgba(27,187,179,.6), 0 0 5px rgba(27,187,179,.8); }
+.btn-glow { position: relative; overflow: hidden; transition: all .3s ease; }
+.btn-glow::before {
+  content:''; position:absolute; top:50%; left:50%; width:0; height:0;
+  background: radial-gradient(circle, rgba(255,255,255,.3) 0%, rgba(255,255,255,0) 70%);
+  border-radius:50%; transform:translate(-50%,-50%); transition:width .4s ease, height .4s ease;
+}
+.btn-glow:hover::before { width:200%; height:200%; }
+.btn-glow:hover { box-shadow: var(--primary-glow); transform: translateY(-2px); }
+
+.card-hover-effect { transition: transform .3s ease, box-shadow .3s ease; }
+.card-hover-effect:hover { transform: translateY(-8px); box-shadow: 0 10px 20px rgba(0,0,0,.1), 0 0 20px rgba(27,187,179,.4); }
+
+.neumorphic-shadow { box-shadow: 4px 4px 8px #d1d9e6, -4px -4px 8px #fff; }

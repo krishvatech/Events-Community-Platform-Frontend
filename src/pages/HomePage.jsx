@@ -1,76 +1,28 @@
-// src/pages/HomePage.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
+import { FaSearch } from "react-icons/fa";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
-import { FaPlay } from "react-icons/fa";
-import {
-  FaCalendarAlt,
-  FaComments,
-  FaHandshake,
-  FaRegNewspaper,
-  FaAddressBook,
-  FaChartLine,
-} from "react-icons/fa";
 
-/* ===== CountUp: 0 -> target (StrictMode safe) ===== */
-const CountUp = ({ to = 0, duration = 1200 }) => {
-  const [val, setVal] = useState(0);
+const SectionTitle = ({ children }) => (
+  <h2 className="text-2xl md:text-3xl font-bold text-neutral-900">{children}</h2>
+);
 
-  useEffect(() => {
-    let rafId;
-    const start = performance.now();
-
-    const tick = (now) => {
-      const p = Math.min((now - start) / duration, 1);
-      setVal(Math.round(p * to));
-      if (p < 1) rafId = requestAnimationFrame(tick);
-    };
-
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId); // StrictMode runs effect twice => safe
-  }, [to, duration]);
-
-  return <>{new Intl.NumberFormat().format(val)}</>;
-};
-
-/* ===== Stat uses CountUp ===== */
-const Stat = ({ value, label, suffix = "" }) => (
-  <div className="text-center">
-    <div className="text-4xl md:text-5xl font-semibold text-gray-800">
-      <CountUp to={value} />
-      {suffix}
+const Card = ({ image, title, desc }) => (
+  <div className="bg-white rounded-2xl border overflow-hidden shadow-sm card-hover-effect">
+    <img src={image} alt={title} className="h-48 w-full object-cover" loading="lazy" />
+    <div className="p-6">
+      <div className="font-semibold text-neutral-900">{title}</div>
+      <p className="mt-2 text-sm text-neutral-600">{desc}</p>
     </div>
-    <div className="text-base md:text-lg text-gray-500">{label}</div>
   </div>
 );
 
-
-// Feature card (color comes from parent)
-const Feature = ({ Icon, title, desc, color = "text-indigo-600" }) => (
-  <div className="bg-white border rounded-2xl p-7 shadow-sm">
-    <Icon className={`${color} text-3xl`} />
-    <h4 className="mt-4 text-lg md:text-xl font-semibold text-gray-900">{title}</h4>
-    <p className="mt-2 text-base text-gray-600">{desc}</p>
-    <a href="#" className="mt-4 inline-block text-base font-medium text-indigo-600 hover:text-indigo-700">
-      Learn more →
-    </a>
-  </div>
-);
-
-
-
-
-/* ===== Highlight stacked item ===== */
-const HighlightItem = ({ Icon, color, title, subtitle }) => (
-  <div className="flex items-start gap-3">
-    <Icon className={`${color} text-2xl shrink-0`} />
-    <div>
-      <div className="text-lg md:text-xl font-semibold text-gray-900 leading-snug">
-        {title}
-      </div>
-      {subtitle && (
-        <div className="text-sm md:text-base text-gray-500">{subtitle}</div>
-      )}
+const MiniCard = ({ image, title, desc }) => (
+  <div className="neumorphic-shadow bg-white rounded-2xl overflow-hidden">
+    <img src={image} alt={title} className="h-64 w-full object-cover" loading="lazy" />
+    <div className="p-5">
+      <div className="font-semibold text-neutral-900">{title}</div>
+      <p className="mt-2 text-sm text-neutral-600">{desc}</p>
     </div>
   </div>
 );
@@ -80,151 +32,118 @@ const HomePage = () => {
     <>
       <Header />
 
-      {/* HERO */}
-      <section id="hero" className="bg-white scroll-mt-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 lg:py-20">
-          <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-gray-900 leading-tight">
-            Build Your Professional{" "}
-            <span className="bg-gradient-to-r from-indigo-600 via-purple-500 to-orange-400 bg-clip-text text-transparent">
-              Community
-            </span>
+      {/* HERO with your exact image URL + gradient overlay */}
+      <section
+        id="hero"
+        className="relative min-h-[480px] h-[60vh] flex items-center justify-center text-center text-white bg-cover bg-center"
+        style={{
+          backgroundImage:
+            `linear-gradient(rgba(17,33,32,0.5), rgba(17,33,32,0.7)), url("https://lh3.googleusercontent.com/aida-public/AB6AXuCERO0mJRa0C5b8nfoEbZ02WYWLNgo1q1K9SdRDbgkWeuFTn9uR-WFnEl4leicScEd1-Nq77ffXT3ZygGPVXuF84_Jqsjx7EjTlVasqorCu40Ue1zQ-iHrokMzCd-WPkMG1OABR1lzOYx8pOC_PXo8xQPlx2uqRHLCOyRyRMegnAWV2gkZlJ9szW7-8z-16SCxoniaJHsxJxaubkZzRyXGiFH6SEHYrSBiM71UGQ4JYW2oSy_BjFesDJoYPo5Hy-1E_I5tqqIMIeA")`
+        }}
+      >
+        <div className="container mx-auto px-6 z-10">
+          <h1 className="text-4xl md:text-7xl font-semibold leading-tight">
+            Connect, Collaborate, and Grow Your M&amp;A Network
           </h1>
-          <p className="mt-5 text-xl md:text-2xl text-gray-600 max-w-3xl">
-            Connect, learn, and grow with IMAA’s comprehensive platform for events,
-            mentoring, and professional development.
+          <p className="mt-4 text-lg md:text-xl max-w-3xl mx-auto text-white/90">
+            IMAA Connect is the premier platform for M&amp;A professionals to
+            discover events, engage with peers, and access valuable resources.
           </p>
+          <a
+            href="#events"
+            className="btn-glow mt-8 inline-flex px-8 py-3 rounded-xl text-lg font-bold bg-teal-600 text-white hover:bg-teal-700"
+          >
+            Explore Events
+          </a>
+        </div>
+      </section>
 
-          <div className="mt-9 flex flex-wrap items-center gap-4">
-            <a
-              href="#cta"
-              className="inline-flex items-center justify-center px-6 py-3.5 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 text-base md:text-lg font-semibold"
-            >
-              Get Started Free
-            </a>
-            <a
-              href="#demo"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl border border-gray-300 hover:bg-gray-50 text-base md:text-lg"
-            >
-              <span>Watch Demo</span>
-              <FaPlay className="text-sm" />
-            </a>
-          </div>
+      {/* Search */}
+      <div className="-mt-8 relative z-20 container mx-auto px-6">
+        <div className="relative rounded-xl bg-white/90 backdrop-blur border border-teal-500/20 shadow-lg">
+          <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-teal-600" />
+          <input
+            type="search"
+            placeholder="Search for events by keyword or location"
+            className="w-full pl-12 pr-4 py-4 rounded-xl bg-transparent outline-none text-neutral-800 placeholder-neutral-500"
+          />
+        </div>
+      </div>
 
-          {/* Stats row */}
-          <div className="mt-12 grid grid-cols-3 gap-8 max-w-2xl">
-            <Stat value={2500} suffix="+" label="Active Members" />
-            <Stat value={150} suffix="+" label="Events Hosted" />
-            <Stat value={95} suffix="%" label="Satisfaction Rate" />
-          </div>
-
-          {/* Highlight card */}
-          <div className="mt-10 rounded-3xl bg-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.15)] border p-6 md:p-7">
-            <div className="space-y-6">
-              <HighlightItem
-                Icon={FaCalendarAlt}
-                color="text-indigo-600"
-                title="Upcoming: Tech Leadership Summit"
-                subtitle="245 registered"
-              />
-              <HighlightItem
-                Icon={FaComments}
-                color="text-orange-500"
-                title="Active Discussions: 89"
-                subtitle="Join the conversation"
-              />
-              <HighlightItem
-                Icon={FaHandshake}
-                color="text-indigo-600"
-                title="156 Mentoring Pairs"
-                subtitle="Growing together"
-              />
-            </div>
+      {/* Featured Events */}
+      <section id="events" className="py-16 md:py-24">
+        <div className="container mx-auto px-6">
+          <h2 className="text-3xl font-bold text-center">Featured Events</h2>
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card
+              image="https://lh3.googleusercontent.com/aida-public/AB6AXuBHKjDgAAMcSOy6ZsGC9_IG-SmJR4XLhvxvQGjuOs4Vuj9EicNWSohpqOz76rcop0_KtYJrD--JYG3XgdfGUjjLTc3VGAcREdHC66b7TYZ4fPy8Y127xDhvRyqXhdIPcLHnc3HOlh5-AMjErYzkAy0kfaaB9WwKYbooqpeoZ6iKUZbT5fdW_JOy4Qxs-rxvaw3uA-K7_vFbg1N1_yZcmCEZ-PISeaU89b1Noeujcgstqz_vZozsyNQS0PlCf6gSc1ZgeVqz2-06iw"
+              title="The Annual M&A Summit"
+              desc="Join industry leaders for a comprehensive discussion on the latest trends and strategies in M&A."
+            />
+            <Card
+              image="https://lh3.googleusercontent.com/aida-public/AB6AXuC7qbyvHcPpq_a2ygXhgDS0hwTjng9aqdknkd-88U7vRbfjLylj6lT-CcfNgN3o22jXfQO2FmQw3EnBy5wkeRmBBqQm2BjmIXNOnU-iy6L2HfsFG83nh8SnY7UmZlHpm5dD83jG9ZK4vbT8BHxf4mOJNny4e_xLTbFFIZLJHgZIQiT5CuXSSiwFgLRlhSJRQfonxdF9g0aS6zi6Ds2T34s6gEVkm2YQt5uI0X_Gn11HdCYl9czQSWyL40jEpHFF7VPUf5K4eV2nmw"
+              title="Networking Mixer for Dealmakers"
+              desc="Connect with fellow M&A professionals in a relaxed and informal setting."
+            />
+            <Card
+              image="https://lh3.googleusercontent.com/aida-public/AB6AXuB_vYOi0Vx1itEKNE1xoWbuGSfhITt0QckUhELW-KUQ5tF-XfqqVlX0EBdPftpzh_lylwhZulVLWeR3fgM65aDuH1GZCZXVlyH5rfhb2uGRl1Tf_EZxDU3hC1HzoAgqKm6HvpGwOXlxtn-ZWs3OFNY6RrIhzQiodfsFp9e0SBGBksjVA6vHjdoOFhwlKF8U4bAPkY7N3RO-nxcaal6XSiEhPcNOwE-lyVZVon33K62EV3zS_9DVE20b4AxVgH70UcScGFiONOGOFQ"
+              title="Advanced Valuation Techniques"
+              desc="Enhance your skills with this hands-on workshop led by experienced valuation experts."
+            />
           </div>
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section id="features" className="bg-slate-50 py-14 lg:py-20 scroll-mt-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 text-center">
-            Everything You Need in One Platform
-            </h2>
-            <p className="mt-4 text-lg md:text-xl text-gray-600 max-w-3xl mx-auto text-center">
-            Streamline your professional community with our comprehensive suite of tools
-            designed for modern networking and learning.
-            </p>
-
-            {/** define once, then map */}
-            {(() => {
-            const FEATURES = [
-                { Icon: FaCalendarAlt,   title: "Event Management",   desc: "Create and host virtual or in-person events with powerful tools." },
-                { Icon: FaComments,      title: "Community Forums",   desc: "Foster discussions with organized forums, categories, and posts." },
-                { Icon: FaHandshake,     title: "Mentoring System",   desc: "Match mentors and mentees with structured program management." },
-                { Icon: FaRegNewspaper,  title: "Content Publishing", desc: "Share knowledge through an integrated blog & article system." },
-                { Icon: FaAddressBook,   title: "Member Directory",   desc: "Discover and connect with advanced search & filtering." },
-                { Icon: FaChartLine,     title: "Analytics Dashboard",desc: "Track engagement and growth with actionable insights." },
-            ];
-            return (
-                <div id="events" className="mt-10 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
-                {FEATURES.map((f, i) => (
-                    <Feature
-                    key={f.title}
-                    Icon={f.Icon}
-                    title={f.title}
-                    desc={f.desc}
-                    color={i % 2 === 0 ? "text-indigo-600" : "text-orange-500"}
-                    />
-                ))}
-                </div>
-            );
-            })()}
-        </div>
-        </section>
-
-      {/* CTA */}
-      <section id="cta" className="py-14 lg:py-20 scroll-mt-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-3xl p-10 md:p-12 text-white bg-gradient-to-r from-indigo-600 via-purple-500 to-orange-400 text-center">
-            <h3 className="text-4xl md:text-5xl font-bold">Ready to Build Your Professional Community?</h3>
-            <p className="mt-3 text-lg md:text-xl text-white/90 max-w-3xl mx-auto">
-              Join thousands of professionals who are already growing their networks,
-              sharing knowledge, and advancing their careers with IMAA Platform.
-            </p>
-            <div className="mt-7 flex flex-wrap justify-center gap-4">
-              <a href="#" className="inline-flex items-center px-6 py-3.5 rounded-2xl bg-white text-blue-700 hover:bg-gray-100 text-base md:text-lg font-semibold">
-                Start Free Trial
-              </a>
-              <a id="demo" href="#" className="inline-flex items-center px-6 py-3.5 rounded-2xl bg-white/10 ring-1 ring-white/30 hover:bg-white/20 text-base md:text-lg font-semibold">
-                Schedule Demo
-              </a>
-            </div>
-            {/* Benefits row (perfectly centered as a group) */}
-            <div className="mt-8 w-fit mx-auto flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-white/90">
-            {["No setup fees", "Cancel anytime", "24/7 support"].map((text) => (
-                <div key={text} className="flex items-center gap-3">
-                <svg
-                    viewBox="0 0 24 24"
-                    className="h-6 w-6"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                >
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M8 12l2.5 2.5L16 9.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span className="text-lg md:text-xl whitespace-nowrap">{text}</span>
-                </div>
-            ))}
-            </div>
+      {/* Community Highlights */}
+      <section id="community" className="bg-white py-16 md:py-24">
+        <div className="container mx-auto px-6">
+          <h2 className="text-3xl font-bold text-center">Community Highlights</h2>
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <MiniCard
+              image="https://lh3.googleusercontent.com/aida-public/AB6AXuDdSPl7HlGanqF5RiHaWSVQ9QI2CYal_9-3lhgFRuUcj0LJ7FyigScYCf42bDup4QYrla0Aln-C46uqeXJhIAksFjdBMKfMlx_XL76mZWGp5BfQfXPY5QK2DoXBXPXXgOu-5o9NfaoHXbPutMkZQKI90QZLq2rz60xJrX6Ai2ZtuTA-p3Z7OmGbaSqKCuLIgLgHHa3cZbj2wjcEa2RzvP2CsMOmz4Ele0pUh4DmzsREvZpWCqFWyomvrXSxSqxYLdpE8Rqhp6NOVw"
+              title="Member Spotlight: Sarah Chen"
+              desc="Learn about Sarah Chen’s journey and insights in the M&A industry."
+            />
+            <MiniCard
+              image="https://lh3.googleusercontent.com/aida-public/AB6AXuCQW-ZoVKENpsFY1tjGkibf08ZkqKxluVLOwsfGJgAXDPQe3ARaxI0Fpq8kvwyPzBs_xUqZ99oTq0tCiEIBdPjYmlXmuJaQ_NNWaJJ4Slt0Is4kMTPG7EBC4DGWIkdkjA4PG8kTikw8UF-U_yf8mdO89_yz10W74VT6tRaEJwPFzMHfhN_pJTYCN4vP9c8p67yFfQrKgTOqNZs_u7vwTAVuNqlWDxuMSUDiOoVQ4RjquGzVTeIuaFu1lUidUFC-Z1pk7-ZY-j9M8A"
+              title="Upcoming Community Meetup"
+              desc="Join us for an informal gathering to discuss current market trends."
+            />
+            <MiniCard
+              image="https://lh3.googleusercontent.com/aida-public/AB6AXuDpUlccQRm1PXSS0loNs-FKCqJTs4a7F_YMYhd-hWRaPT2NmhXcGfJSEbAEXEiV1YJWFOPV2ZFhpmcXmvvCxdK8LvzQevucug9zBpmskeywIkcStxazGqZ6pNPZk3PCYgx7DTh5lMxamy0J8FQ91lyswO3lzn5ReWAmmE9XvkrBuHhhaK3K9f97ozDa_VcaF_Jnhf-cdNxLVeU85fS7w_5zed_VX1KW1lhohLNn2fXdZs4djuNERHa-la-kQoGfpE36EWIB4qn3oQ"
+              title="Ask Me Anything with David Lee"
+              desc="Get your questions answered by David Lee, a seasoned M&A advisor."
+            />
           </div>
         </div>
       </section>
 
-      {/* anchors for header */}
-      <div id="community" className="scroll-mt-24" />
-      <div id="mentoring" className="scroll-mt-24" />
-      <div id="blog" className="scroll-mt-24" />
-      <div id="members" className="scroll-mt-24" />
+      {/* Newsletter */}
+      <section className="py-16 md:py-24">
+        <div className="container mx-auto px-6 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold">
+            Stay Updated with Our Newsletter
+          </h2>
+          <p className="mt-4 text-lg max-w-2xl mx-auto text-neutral-600">
+            Get the latest news, event announcements, and exclusive content delivered straight to your inbox.
+          </p>
+          <form onSubmit={(e) => e.preventDefault()} className="mt-8 max-w-lg mx-auto flex">
+            <input
+              type="email"
+              required
+              placeholder="Enter your email"
+              className="w-full px-4 py-3 rounded-l-xl border border-r-0"
+            />
+            <button type="submit" className="btn-glow px-6 py-3 rounded-r-xl bg-teal-600 text-white font-semibold">
+              Subscribe
+            </button>
+          </form>
+        </div>
+      </section>
+
+      {/* anchors */}
+      <div id="resources" className="scroll-mt-24" />
+      <div id="about" className="scroll-mt-24" />
 
       <Footer />
     </>
