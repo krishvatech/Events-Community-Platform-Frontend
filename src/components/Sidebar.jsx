@@ -42,7 +42,8 @@ const Sidebar = () => {
   );
 
   return (
-    <aside className="w-64 bg-background-light dark:bg-background-dark border-r border-gray-100 dark:border-white/10 p-6 hidden md:block">
+<aside className="w-64 bg-background-light dark:bg-background-dark border-r border-[#1bbbb3]/10 p-6 hidden md:block">
+
 
       <nav className="flex flex-col gap-4">
         <Link name="Dashboard" iconPath="M3 12l2-2m0 0l7-7 7 7M6 7l7-7 7 7">

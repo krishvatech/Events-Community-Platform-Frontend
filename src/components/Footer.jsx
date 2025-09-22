@@ -1,7 +1,7 @@
 import React from "react";
 
 const Footer = () => (
-  <footer className="bg-white border-t border-teal-500/20">
+  <footer className="bg-white border-t border-[#1bbbb3]/10">
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex flex-col md:flex-row items-center justify-between">
         {/* Match mock: footer links at text-base */}

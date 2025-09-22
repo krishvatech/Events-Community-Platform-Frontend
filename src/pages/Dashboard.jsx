@@ -16,8 +16,7 @@ const Dashboard = () => {
         <Sidebar />
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col border-l border-gray-100 dark:border-white/10
-  p-6 md:p-12">
+        <div className="flex-1 flex flex-col p-6 md:p-12">
           {/* Welcome */}
           <section className="mb-12">
             <h1 className="text-4xl font-bold text-neutral-900 dark:text-black mb-4">
@@ -31,8 +30,8 @@ const Dashboard = () => {
           {/* Top 3 cards */}
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
             {/* Upcoming Events */}
-            <div className="bg-white dark:bg-background-dark rounded-xl
-  shadow-sm p-6 border border-gray-200 dark:border-white/10">
+            <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+
               <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
                 Upcoming Events for You
               </h3>
@@ -70,8 +69,8 @@ const Dashboard = () => {
             </div>
 
            {/* Community Activity */}
-          <div className="bg-white dark:bg-background-dark rounded-xl
-  shadow-sm p-6 border border-gray-200 dark:border-white/10">
+          <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+
             <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
               Recent Community Activity
             </h3>
@@ -126,8 +125,8 @@ const Dashboard = () => {
 
 
             {/* Resources */}
-            <div className="bg-white dark:bg-background-dark rounded-xl
-  shadow-sm p-6 border border-gray-200 dark:border-white/10">
+            <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+
               <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
                 Recommended Resources
               </h3>
@@ -160,8 +159,8 @@ const Dashboard = () => {
           {/* Bottom 2 cards */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Network */}
-            <div className="bg-white dark:bg-background-dark rounded-xl
-  shadow-sm p-6 border border-gray-200 dark:border-white/10">
+            <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+
               <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
                 Your Network
               </h3>
@@ -203,8 +202,8 @@ const Dashboard = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-white dark:bg-background-dark rounded-xl
-  shadow-sm p-6 border border-gray-200 dark:border-white/10">
+            <div className="bg-white dark:bg-background-dark rounded-xl shadow-lg p-6 border border-[#1bbbb3]/10 shadow-[#1bbbb3]/10">
+
               <h3 className="text-xl font-bold text-neutral-900 dark:text-black mb-4">
                 Quick Actions
               </h3>
