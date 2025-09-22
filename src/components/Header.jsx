@@ -70,7 +70,10 @@ const Header = () => {
             <>
               <button
                 onClick={signOut}
-                className="h-10 inline-flex items-center justify-center px-4 rounded-xl bg-neutral-900 text-white text-base font-semibold hover:bg-black"
+                className="h-9 inline-flex items-center justify-center px-4 rounded-xl text-base font-semibold
+                          bg-teal-500 text-white
+                          transition-all duration-200 hover:bg-teal-600 hover:-translate-y-0.5
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60"
               >
                 Sign Out
               </button>

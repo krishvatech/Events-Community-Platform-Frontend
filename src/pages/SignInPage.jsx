@@ -92,7 +92,7 @@ const SignInPage = () => {
       const redirectTo = location.state?.from?.pathname || '/dashboard';
       setTimeout(() => {
         navigate(redirectTo, { replace: true });
-      }, 1200); // lets the toast be visible
+      }, 0); // lets the toast be visible
     } catch (err) {
       toast.error(`❌ ${err.message || 'Login failed. Please try again.'}`);
     } finally {
