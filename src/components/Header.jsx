@@ -70,7 +70,7 @@ const Header = () => {
             <>
               <button
                 onClick={signOut}
-                className="h-9 inline-flex items-center justify-center px-4 rounded-xl text-base font-semibold
+                className="btn-glow h-9 inline-flex items-center justify-center px-4 rounded-xl text-base font-semibold
                           bg-teal-500 text-white
                           transition-all duration-200 hover:bg-teal-600 hover:-translate-y-0.5
                           focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60"
@@ -82,7 +82,7 @@ const Header = () => {
             <>
               <Link
                 to="/signin"
-                className="h-9 inline-flex items-center justify-center px-4 rounded-xl text-base font-semibold
+                className="btn-glow h-9 inline-flex items-center justify-center px-4 rounded-xl text-base font-semibold
                           bg-teal-100 text-teal-500 border border-teal-100
                           transition-all duration-200 hover:bg-teal-200 hover:text-teal-600 hover:-translate-y-0.5
                           focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
@@ -91,7 +91,7 @@ const Header = () => {
               </Link>
               <Link
                 to="/signup"
-                className="h-9 inline-flex items-center justify-center px-4 rounded-xl text-base font-semibold
+                className="btn-glow h-9 inline-flex items-center justify-center px-4 rounded-xl text-base font-semibold
                           bg-teal-500 text-white
                           transition-all duration-200 hover:bg-teal-600 hover:-translate-y-0.5
                           focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/60"

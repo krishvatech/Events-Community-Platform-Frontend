@@ -3,7 +3,7 @@ import React from "react";
 
 const Footer = () => (
   <footer className="border-t border-[#1bbbb3]/30">
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-11">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       {/* spacer | centered nav | right icons */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4 md:gap-6">
         
@@ -30,8 +30,10 @@ const Footer = () => (
         </div>
       </div>
 
-      <div className="mt-6 text-center text-sm text-neutral-500">
-        © {new Date().getFullYear()} IMAA Connect. All rights reserved.
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6">
+        <div className="text-center text-sm text-neutral-500">
+          © {new Date().getFullYear()} IMAA Connect. All rights reserved.
+        </div>
       </div>
     </div>
   </footer>
