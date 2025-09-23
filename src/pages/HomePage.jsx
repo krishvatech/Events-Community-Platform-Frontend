@@ -1,11 +1,28 @@
 import React from "react";
-import { FaSearch } from "react-icons/fa";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
+
+// MUI (structure only; Tailwind keeps the visual look)
+import {
+  Container,
+  Grid,
+  Card as MUICard,
+  CardMedia,
+  CardContent,
+  Paper,
+  InputBase,
+  Button,
+  Box,
+} from "@mui/material";
+
+// Keeping your exact search icon for identical visuals
+import { FaSearch } from "react-icons/fa";
 
 const SectionTitle = ({ children }) => (
   <h2 className="text-2xl md:text-3xl font-bold text-neutral-900">{children}</h2>
 );
+
+
 
 const Card = ({ image, title, desc }) => (
   <div className="bg-white rounded-2xl border overflow-hidden shadow-sm card-hover-effect">
@@ -18,13 +35,22 @@ const Card = ({ image, title, desc }) => (
 );
 
 const MiniCard = ({ image, title, desc }) => (
-  <div className="neumorphic-shadow bg-white rounded-2xl overflow-hidden">
-    <img src={image} alt={title} className="h-64 w-full object-cover" loading="lazy" />
-    <div className="p-5">
+  <MUICard
+    elevation={0}
+    className="neumorphic-shadow bg-white rounded-2xl overflow-hidden"
+  >
+    <CardMedia
+      component="img"
+      image={image}
+      alt={title}
+      loading="lazy"
+      className="h-64 w-full object-cover"
+    />
+    <CardContent className="p-5">
       <div className="font-semibold text-neutral-900">{title}</div>
       <p className="mt-2 text-sm text-neutral-600">{desc}</p>
-    </div>
-  </div>
+    </CardContent>
+  </MUICard>
 );
 
 const HomePage = () => {
@@ -37,12 +63,11 @@ const HomePage = () => {
         id="hero"
         className="relative h-[60vh] min-h-[480px] flex items-center justify-center text-center text-white bg-cover bg-center hero-image-overlay"
         style={{
-          backgroundImage:
-            `linear-gradient(rgba(17,33,32,0.5), rgba(17,33,32,0.7)), url("https://lh3.googleusercontent.com/aida-public/AB6AXuCERO0mJRa0C5b8nfoEbZ02WYWLNgo1q1K9SdRDbgkWeuFTn9uR-WFnEl4leicScEd1-Nq77ffXT3ZygGPVXuF84_Jqsjx7EjTlVasqorCu40Ue1zQ-iHrokMzCd-WPkMG1OABR1lzOYx8pOC_PXo8xQPlx2uqRHLCOyRyRMegnAWV2gkZlJ9szW7-8z-16SCxoniaJHsxJxaubkZzRyXGiFH6SEHYrSBiM71UGQ4JYW2oSy_BjFesDJoYPo5Hy-1E_I5tqqIMIeA")`
+          backgroundImage: `linear-gradient(rgba(17,33,32,0.5), rgba(17,33,32,0.7)), url("https://lh3.googleusercontent.com/aida-public/AB6AXuCERO0mJRa0C5b8nfoEbZ02WYWLNgo1q1K9SdRDbgkWeuFTn9uR-WFnEl4leicScEd1-Nq77ffXT3ZygGPVXuF84_Jqsjx7EjTlVasqorCu40Ue1zQ-iHrokMzCd-WPkMG1OABR1lzOYx8pOC_PXo8xQPlx2uqRHLCOyRyRMegnAWV2gkZlJ9szW7-8z-16SCxoniaJHsxJxaubkZzRyXGiFH6SEHYrSBiM71UGQ4JYW2oSy_BjFesDJoYPo5Hy-1E_I5tqqIMIeA")`,
         }}
       >
-        <div class="absolute inset-0 bg-black/30"></div>
-        <div className="container mx-auto px-6 z-10">
+        <div className="absolute inset-0 bg-black/30"></div>
+        <Container maxWidth="lg" disableGutters className="px-6 z-10">
           <h1 className="text-4xl md:text-6xl font-semibold leading-tight">
             Connect, Collaborate, and Grow Your M&amp;A Network
           </h1>
@@ -56,20 +81,25 @@ const HomePage = () => {
           >
             Explore Events
           </a>
-        </div>
+        </Container>
       </section>
 
-      {/* Search */}
-      <div className="-mt-8 relative z-20 container mx-auto px-6">
-        <div className="relative rounded-xl bg-white/90 backdrop-blur border border-teal-500/20 shadow-lg">
+      {/* Search (MUI Paper + InputBase; identical layout/colors via Tailwind classes) */}
+      <Container maxWidth="lg" disableGutters className="-mt-8 relative z-20 px-6">
+        <Paper
+          elevation={0}
+          className="relative rounded-xl bg-white/90 backdrop-blur border border-teal-500/20 shadow-lg"
+        >
           <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-teal-600" />
-          <input
+          <InputBase
             type="search"
             placeholder="Search for events by keyword or location"
             className="w-full pl-12 pr-4 py-4 rounded-xl bg-transparent outline-none text-neutral-800 placeholder-neutral-500"
+            fullWidth
+            inputProps={{ "aria-label": "search events" }}
           />
-        </div>
-      </div>
+        </Paper>
+      </Container>
 
       {/* Featured Events */}
       <section id="events" className="py-16 md:py-24">
@@ -121,25 +151,36 @@ const HomePage = () => {
 
       {/* Newsletter */}
       <section className="py-16 md:py-24">
-        <div className="container mx-auto px-6 text-center">
+        <Container maxWidth="lg" disableGutters className="px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold">
             Stay Updated with Our Newsletter
           </h2>
           <p className="mt-4 text-lg max-w-2xl mx-auto text-neutral-600">
             Get the latest news, event announcements, and exclusive content delivered straight to your inbox.
           </p>
-          <form onSubmit={(e) => e.preventDefault()} className="mt-8 max-w-lg mx-auto flex">
-            <input
-              type="email"
-              required
-              placeholder="Enter your email"
-              className="w-full px-4 py-3 rounded-l-xl border border-r-0"
-            />
-            <button type="submit" className="btn-glow px-6 py-3 rounded-r-xl bg-teal-600 text-white font-semibold">
-              Subscribe
-            </button>
+
+          <form onSubmit={(e) => e.preventDefault()} className="mt-8 max-w-lg mx-auto">
+            <Paper
+              elevation={0}
+              className="flex rounded-xl border border-neutral-200 overflow-hidden"
+            >
+              <InputBase
+                type="email"
+                required
+                placeholder="Enter your email"
+                className="w-full px-4 py-3 rounded-l-xl border border-r-0"
+                inputProps={{ "aria-label": "email" }}
+              />
+              <Button
+                type="submit"
+                disableElevation
+                className="btn-glow px-6 py-3 rounded-none bg-teal-600 text-white font-semibold hover:bg-teal-700"
+              >
+                Subscribe
+              </Button>
+            </Paper>
           </form>
-        </div>
+        </Container>
       </section>
 
       {/* anchors */}
