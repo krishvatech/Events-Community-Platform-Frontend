@@ -102,7 +102,7 @@ const Header = () => {
                 <Button
                   component={Link}
                   to="/signin"
-                  className="btn-glow h-9 px-5 rounded-xl text-base font-semibold bg-teal-100 text-teal-600 border border-teal-100 hover:bg-teal-200 hover:text-teal-700 hover:-translate-y-0.5"
+                  className="btn-glow h-9 px-5 rounded-xl text-base font-semibold bg-teal-100 text-teal-500 border border-teal-100 hover:bg-teal-200 hover:text-teal-700 hover:-translate-y-0.5"
                   variant="text"
                   sx={{ textTransform: "none" }}
                 >
@@ -111,7 +111,7 @@ const Header = () => {
                 <Button
                   component={Link}
                   to="/signup"
-                  className="btn-glow h-9 px-5 rounded-xl text-base font-semibold bg-teal-600 text-white hover:bg-teal-700 hover:-translate-y-0.5"
+                  className="btn-glow h-9 px-5 rounded-xl text-base font-semibold bg-teal-500 text-white hover:bg-teal-700 hover:-translate-y-0.5"
                   disableElevation
                   sx={{ textTransform: "none" }}
                 >
@@ -196,7 +196,7 @@ const Header = () => {
                 component={Link}
                 to="/signin"
                 onClick={() => setOpen(false)}
-                className="h-10 rounded-xl bg-teal-50 text-teal-700 border border-teal-100 text-base font-semibold"
+                className="h-10 rounded-xl bg-teal-50 text-teal-500 border border-teal-100 text-base font-semibold"
                 variant="outlined"
                 sx={{ textTransform: "none" }}
               >
@@ -207,7 +207,7 @@ const Header = () => {
                 component={Link}
                 to="/signup"
                 onClick={() => setOpen(false)}
-                className="h-10 rounded-xl bg-teal-600 text-white text-base font-semibold"
+                className="h-10 rounded-xl bg-teal-500 text-white text-base font-semibold"
                 sx={{ textTransform: "none" }}
               >
                 Join Now
