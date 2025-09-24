@@ -5,6 +5,8 @@ import FeaturesSection from "../components/FeaturesSection.jsx";
 import { registerUser } from "../utils/api";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { useNavigate } from "react-router-dom";
+
 
 import {
   Box,
@@ -27,6 +29,7 @@ const inputSx = {
 };
 
 const SignUpPage = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -66,6 +69,9 @@ const SignUpPage = () => {
 
   const validate = () => {
     const next = {};
+    if (!/^[A-Za-z0-9]{3,20}$/.test(formData.username || "")) {
+      next.username = "3–20 letters/numbers, no spaces";
+    }
     if (!/^[A-Za-z]{3,}$/.test(formData.firstName || "")) {
       next.firstName = "First name must be at least 3 letters";
     }
@@ -94,22 +100,29 @@ const SignUpPage = () => {
     setLoading(true);
     try {
       const username =
-        formData.username ||
+        (formData.username && formData.username.toLowerCase().trim()) ||
         `${(formData.firstName || "user").toLowerCase()}${Date.now()}`;
-      await registerUser({
+
+      const payload = {
         username,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        password: formData.password,
-      });
+        firstName: (formData.firstName || "").trim(),
+        lastName: (formData.lastName || "").trim(),
+        email: (formData.email || "").toLowerCase().trim(),
+        password: formData.password, // don't trim passwords
+      };
+
+      await registerUser(payload);
+
       toast.success("✅ Account created! You can now sign in.");
+      navigate("/signin", { replace: true, state: { email: payload.email, justSignedUp: true } });
+      // ^ change "/signin" to your login route if different
     } catch (err) {
       toast.error(`❌ ${err?.message || "Signup failed"}`);
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <>
@@ -190,6 +203,34 @@ const SignUpPage = () => {
             {/* Form (compact) */}
             <Box component="form" noValidate onSubmit={handleSubmit}>
               <Stack spacing={1.5}>
+                {/* Username */}
+                <Box>
+                  <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 600, color: "#374151", fontSize: 12 }}>
+                    Username
+                  </Typography>
+                  <TextField
+                    name="username"
+                    placeholder="username"
+                    value={formData.username}
+                    onChange={handleChange}
+                    size="small"
+                    error={Boolean(errors.username)}
+                    helperText={errors.username}
+                    fullWidth
+                    sx={{
+                      ...inputSx,
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 0.5,
+                        "& fieldset": { borderColor: "#d1d5db" },       // default
+                        "&:hover fieldset": { borderColor: "#155dfc" }, // hover
+                        "&.Mui-focused fieldset": { borderColor: "#155dfc" }, // focus
+                      },
+                      "& .MuiInputBase-input": { paddingTop: "8px", paddingBottom: "8px", fontSize: 14 },
+                      "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.5 },
+                    }}
+                  />
+                </Box>
+
                 {/* First/Last name row */}
                 <Box
                   sx={{
