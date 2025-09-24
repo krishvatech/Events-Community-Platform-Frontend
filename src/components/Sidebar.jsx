@@ -84,7 +84,12 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 256, zIndex: 1350 },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              borderRadius: 0,   
+              width: 256,
+              
+            },
           }}
         >
           {drawer}
@@ -97,8 +102,9 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: 256,
-              zIndex: 1350,
               position: 'relative',
+              borderRadius: 0,   
+             
             },
           }}
           open

@@ -2,14 +2,27 @@
 import React, { useState } from 'react';
 import HeroSection from '../components/HeroSection.jsx';
 import AuthToggle from '../components/AuthToggle.jsx';
-import InputField from '../components/InputField.jsx';
 import SocialLogin from '../components/SocialLogin.jsx';
 import FeaturesSection from '../components/FeaturesSection.jsx';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { useNavigate, useLocation } from "react-router-dom";
+import { saveLoginPayload } from "../utils/authStorage";
+import { useNavigate, useLocation } from 'react-router-dom';
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  Link,
+  InputAdornment,
+  IconButton,
+  CssBaseline,
+} from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
+
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
 const SignInPage = () => {
   const navigate = useNavigate();
@@ -18,6 +31,7 @@ const SignInPage = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({ email: '', password: '' });
+  const [showPwd, setShowPwd] = useState(false);
 
   const validate = () => {
     let newErrors = { email: '', password: '' };
@@ -61,7 +75,6 @@ const SignInPage = () => {
         body: JSON.stringify(formData),
       });
 
-      // Try to parse JSON even on error
       let data = null;
       try {
         data = await response.json();
@@ -72,12 +85,11 @@ const SignInPage = () => {
       if (!response.ok) {
         const msg = data?.detail || data?.error || response.statusText || 'Login failed';
         throw new Error(msg);
-      }
+      } 
 
-      // Save tokens (support both keys)
       if (data?.access) {
         localStorage.setItem('access_token', data.access);
-        localStorage.setItem('token', data.access); // for guards checking "token"
+        localStorage.setItem('token', data.access);
       }
       if (data?.refresh) {
         localStorage.setItem('refresh_token', data.refresh);
@@ -87,12 +99,12 @@ const SignInPage = () => {
       }
 
       toast.success(`✅ Login successful. Welcome ${formData.email}`);
+      saveLoginPayload(data, { email: formData.email });
 
-      // Redirect to original target or /dashboard
       const redirectTo = location.state?.from?.pathname || '/dashboard';
       setTimeout(() => {
         navigate(redirectTo, { replace: true });
-      }, 0); // lets the toast be visible
+      }, 0);
     } catch (err) {
       toast.error(`❌ ${err.message || 'Login failed. Please try again.'}`);
     } finally {
@@ -102,69 +114,198 @@ const SignInPage = () => {
 
   return (
     <>
-      <div className="min-h-screen flex flex-col lg:flex-row">
-        {/* Left hero section */}
-        <div className="lg:w-1/2 lg:min-h-screen">
+      <CssBaseline />
+
+      <Box
+        component="main"
+        sx={{
+          width: 1,
+          minHeight: '100svh',
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          bgcolor: (t) => t.palette.background.default,
+        }}
+      >
+        {/* LEFT: Hero */}
+        <Box
+          sx={{
+            display: { xs: 'none', md: 'flex' },
+            flexBasis: '50%',
+            flexShrink: 0,
+            alignItems: 'stretch',
+            justifyContent: 'stretch',
+          }}
+        >
           <HeroSection />
-        </div>
+        </Box>
 
-        {/* Right form */}
-        <div className="flex-1 flex flex-col justify-center p-6 sm:p-12 bg-white">
-          <div className="max-w-md w-full mx-auto">
-            <h1 className="text-2xl text-gray-800 mb-2 text-center">Welcome Back</h1>
-            <p className="text-2sm text-gray-600 mb-6 text-center">
-              Sign in to access your learning journey
-            </p>
+        {/* RIGHT: Form */}
+        <Box
+          sx={{
+            flexGrow: 1,
+            width: { xs: '100%', md: '50%' },
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: { xs: 3, md: 6 },
+            bgcolor: '#fff',
+          }}
+        >
+          <Box sx={{ width: '100%', maxWidth: 480 }}>
+            {/* Heading */}
+            <Box sx={{ textAlign: 'center', mb: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 400, letterSpacing: '-0.2px' }}>
+                Welcome Back
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                Sign in to access your learning journey
+              </Typography>
+            </Box>
 
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-              <AuthToggle />
-              <form onSubmit={handleSubmit} noValidate>
-                {/* Email */}
-                <InputField
-                  label="Email Address"
+            {/* Card */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: { xs: 2.5, md: 3 },
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow:
+                  '0 12px 28px rgba(22,93,255,0.10), 0 2px 6px rgba(0,0,0,0.05)',
+              }}
+            >
+              {/* Tabs */}
+              <Box sx={{ mb: 2 }}>
+                <AuthToggle />
+              </Box>
+
+              {/* Form */}
+              <Box component="form" noValidate onSubmit={handleSubmit}>
+                <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490 ,fontSize:13}}>
+                  Email Address
+                </Typography>
+                <TextField
+                  size="small"
                   name="email"
                   type="text"
-                  placeholder="your@email.com"
+                  placeholder="your@gmail.com"
                   value={formData.email}
                   onChange={handleChange}
+                  fullWidth
+                  error={Boolean(errors.email)}
+                  helperText={errors.email}
+                  sx={{
+                    mb: 1.5,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 1,
+                      '& fieldset': {
+                        borderColor: '#d1d5db', // default border color (gray-300)
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#155dfc', // hover color
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#155dfc', // focus color (your brand blue)
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      fontSize: 12,
+                      '::placeholder': {
+                        fontSize: 14,
+                        opacity: 0.6,
+                      },
+                    },
+                  }}
                 />
-                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
 
-                {/* Password */}
-                <InputField
-                  label="Password"
+
+                <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490 ,fontSize:13}}>
+                  Password
+                </Typography>
+                <TextField
+                  size="small"
                   name="password"
-                  type="password"
-                  placeholder="Enter your password"
+                  type={showPwd ? 'text' : 'password'}
+                  placeholder="your password"
                   value={formData.password}
                   onChange={handleChange}
+                  fullWidth
+                  error={Boolean(errors.password)}
+                  helperText={errors.password}
+                  sx={{
+                    mb: 1.5,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 1,
+                      '& fieldset': {
+                        borderColor: '#d1d5db', // default border color (gray)
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#155dfc', // hover border color
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#155dfc', // focused border color
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      fontSize: 12,
+                      '::placeholder': {
+                        fontSize: 14,
+                        opacity: 0.6,
+                      },
+                    },
+                  }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton edge="end" onClick={() => setShowPwd((v) => !v)}>
+                          {showPwd ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
                 />
-                {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
 
-                <div className="flex justify-end mb-4">
-                  <button
+                <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
+                  <Link
+                    component="button"
                     type="button"
-                    className="text-xs text-primary hover:underline"
-                    onClick={() => toast.info('Password recovery is not implemented yet.')}
+                    variant="body2"
+                    underline="none"
+                    sx={{ fontSize: 14, color: '#155dfc' ,fontWeight:600}}
+                    onClick={() =>
+                      toast.info('Password recovery is not implemented yet.')
+                    }
                   >
                     Forgot password?
-                  </button>
-                </div>
+                  </Link>
+                </Box>
 
-                <button
+                <Button
                   type="submit"
+                  fullWidth
+                  size="large"
+                  variant="contained"
                   disabled={loading}
-                  className="w-full py-2 px-4 bg-primary hover:bg-primary-dark text-white rounded-md font-medium transition disabled:opacity-60"
+                  sx={{ py: 1, fontWeight: 600, borderRadius: 1 ,bgcolor: '#2c6af0ff','&:hover': { bgcolor: '#165DFF' },color:'white',fontSize:12}}
                 >
                   {loading ? 'Signing in...' : 'Sign Into Your Account'}
-                </button>
-              </form>
-              <SocialLogin />
-            </div>
-            <FeaturesSection />
-          </div>
-        </div>
-      </div>
+                </Button>
+              </Box>
+
+              {/* Social */}
+              <Box sx={{ mt: 2 }}>
+                <SocialLogin />
+              </Box>
+            </Paper>
+
+            {/* Features */}
+            <Box sx={{ mt: 3 }}>
+              <FeaturesSection />
+            </Box>
+          </Box>
+        </Box>
+      </Box>
 
       {/* Toasts */}
       <ToastContainer

@@ -56,9 +56,13 @@ const Header = () => {
     <AppBar
       position="sticky"
       elevation={0}
-      color="transparent"
-      sx={{ backdropFilter: "blur(6px)" }}
-      className="top-0 z-50 bg-white/50 border-b border-[#1bbbb3]/10"
+      sx={{
+        bgcolor: 'background.paper',               // ⬅️ opaque header (no see-through)
+        borderBottom: '1px solid rgba(27,187,179,0.10)',
+        zIndex: (t) => t.zIndex.drawer + 2,        // ⬅️ always above any Drawer
+        backdropFilter: 'none',
+      }}
+      // className="top-0 z-50 bg-white border-b border-[#1bbbb3]/10"
     >
       <Toolbar disableGutters className="h-14 md:h-16">
         {/* 3-column flex so the nav stays truly centered */}

@@ -22,6 +22,7 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import Sidebar from '../components/Sidebar';
+import { getUserName } from "../utils/authStorage";
 import { CustomRegisterIcon,CustomDiscussionIcon,CustomAccessIcon,CustomProfile} from "../components/CustomIcons"; 
 const theme = createTheme({
   palette: {
@@ -52,6 +53,7 @@ const Dashboard = () => {
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const handleDrawerToggle = () => setMobileOpen((v) => !v);
+  const name = getUserName(); // reads from sessionStorage
   return (
     <ThemeProvider theme={theme}>
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -74,7 +76,7 @@ const Dashboard = () => {
                 variant="h1"
                 sx={{ mb: 2, color: 'text.primary', fontSize:36, textAlign: { xs: 'center', md: 'left' } }}
               >
-                Welcome back, [User Name]!
+                Welcome back{ name ? `, ${name}!` : "!"}
               </Typography>
               <Typography variant="h6" sx={{ color: 'text.secondary',fontSize:18, textAlign: { xs: 'center', md: 'left' } }}>
                 Here's a summary of your activity and upcoming opportunities.

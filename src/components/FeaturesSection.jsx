@@ -1,49 +1,81 @@
-import React from 'react';
-import { FaBookOpen, FaNetworkWired, FaCalendarAlt } from 'react-icons/fa';
+// src/components/FeaturesSection.jsx
+import React from "react";
+import { Box, Paper, Typography } from "@mui/material";
+import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
+import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
+import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
 
-/**
- * Displays a set of feature cards below the authentication card.
- */
-const FeaturesSection = () => {
-  const features = [
-    {
-      title: 'Continuous Learning',
-      description: 'Keep your knowledge up‑to‑date with new content.',
-      icon: FaBookOpen,
-      color: 'text-blue-600',
-    },
-    {
-      title: 'Professional Network',
-      description: 'Connect with peers and industry experts.',
-      icon: FaNetworkWired,
-      color: 'text-green-600',
-    },
-    {
-      title: 'Exclusive Events',
-      description: 'Participate in transformative events.',
-      icon: FaCalendarAlt,
-      color: 'text-purple-600',
-    },
-  ];
+const FEATURES = [
+  {
+    title: "Continuous Learning",
+    // desc: "Keep your knowledge up-to-date with new content.",
+    Icon: MenuBookRoundedIcon,
+    color: "#2E5BFF",
+    tint: "rgba(46,91,255,0.14)",
+  },
+  {
+    title: "Professional Network",
+    // desc: "Connect with peers and industry experts.",
+    Icon: AccountTreeRoundedIcon,
+    color: "#00C853",
+    tint: "rgba(0,200,83,0.14)",
+  },
+  {
+    title: "Exclusive Events",
+    // desc: "Participate in transformative events.",
+    Icon: EventAvailableRoundedIcon,
+    color: "#AA00FF",
+    tint: "rgba(170,0,255,0.14)",
+  },
+];
 
+export default function FeaturesSection() {
   return (
-    <div className="mt-12 grid gap-4 sm:grid-cols-3">
-      {features.map(({ title, description, icon: Icon, color }, index) => (
-        <div
-          key={index}
-          className="flex flex-col items-center text-center p-4 rounded-lg border border-gray-200 shadow-sm bg-white"
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)" },
+        gap: 2,
+      }}
+    >
+      {FEATURES.map(({ title, desc, Icon, color, tint }) => (
+        <Paper
+          key={title}
+          elevation={0}
+          sx={{
+            p: 2.25,
+            borderRadius: 1,                 // small, not pill
+            border: "1px solid #E6EAF2",
+            boxShadow: "0 8px 20px rgba(15,23,42,0.06)",
+            bgcolor: "#fff",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+          }}
         >
-          <div
-            className={`p-3 rounded-full bg-gray-100 mb-2 ${color} text-xl flex items-center justify-center`}
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              display: "grid",
+              placeItems: "center",
+              backgroundColor: tint,
+              mb: 1.25,
+            }}
           >
-            <Icon />
-          </div>
-          <h3 className="font-semibold text-sm mb-1">{title}</h3>
-          <p className="text-xs text-gray-600">{description}</p>
-        </div>
-      ))}
-    </div>
-  );
-};
+            <Icon sx={{ fontSize: 24, color }} />
+          </Box>
 
-export default FeaturesSection;
+          <Typography variant="subtitle1" fontWeight={400} fontSize={14} color="Grey">
+            {title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {desc}
+          </Typography>
+        </Paper>
+      ))}
+    </Box>
+  );
+}
