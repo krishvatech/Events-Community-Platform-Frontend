@@ -23,7 +23,6 @@ import GroupsIcon from "@mui/icons-material/Groups";
 import { FormControl, Select, MenuItem } from "@mui/material";
 
 
-
 // ————————————————————————————————————————
 // Static demo events
 // ————————————————————————————————————————
@@ -621,6 +620,8 @@ export default function EventsPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [view, setView] = useState("grid"); // 'grid' | 'list'
   const [dateRange, setDateRange] = useState(""); // "",
+  const [topic, setTopic] = useState("");   // or "Topic/Industry" if you prefer
+  const [format, setFormat] = useState(""); // or "Event Format"
 
 
   const selectSx = {
@@ -751,8 +752,10 @@ export default function EventsPage() {
 
           <FormControl size="small">
             <Select
-              value={"Date Range"}              // ← fallback so text shows
+              value={dateRange}              // ← fallback so text shows
               onChange={(e) => setDateRange(e.target.value)}
+              displayEmpty
+              renderValue={(v) => v || 'Date Range'}
               MenuProps={selectMenuProps}
               sx={{
                 ...selectSx,
@@ -760,7 +763,7 @@ export default function EventsPage() {
                 '& .MuiSelect-select': { opacity: 1, color: 'inherit', textIndent: 0 },
               }}
             >
-              <MenuItem value="Date Range">Date Range</MenuItem>
+              <MenuItem value="">Date Range</MenuItem>
               <MenuItem value="this_week">This Week</MenuItem>
               <MenuItem value="this_month">This Month</MenuItem>
               <MenuItem value="next_90_days">Next 90 days</MenuItem> {/* ← unique */}
@@ -769,24 +772,42 @@ export default function EventsPage() {
 
 
           {/* Topic/Industry */}
-          <select className="h-12 px-4 rounded-xl border border-slate-200 bg-white text-sm min-w-[180px]">
-            <option>Topic/Industry</option>
-            <option>M&A Strategy</option>
-            <option>Leadership</option>
-            <option>Private Equity</option>
-            <option>Due Diligence</option>
-            <option>Strategy</option>
-            <option>Workshop</option>
-          </select>
+          <FormControl size="small">
+             <Select
+               value={topic}
+               onChange={(e) => setTopic(e.target.value)}
+               displayEmpty
+               renderValue={(v) => v || 'Topic/Industry'}
+               MenuProps={selectMenuProps}
+               sx={selectSx}
+             >
+               <MenuItem value="">Topic/Industry</MenuItem>
+               <MenuItem value="M&A Strategy">M&A Strategy</MenuItem>
+               <MenuItem value="Leadership">Leadership</MenuItem>
+               <MenuItem value="Private Equity">Private Equity</MenuItem>
+               <MenuItem value="Due Diligence">Due Diligence</MenuItem>
+               <MenuItem value="Strategy">Strategy</MenuItem>
+               <MenuItem value="Workshop">Workshop</MenuItem>
+             </Select>
+          </FormControl>
 
           {/* Event Format */}
-          <select className="h-12 px-4 rounded-xl border border-slate-200 bg-white text-sm min-w-[160px]">
-            <option>Event Format</option>
-            <option>In-Person</option>
-            <option>Virtual</option>
-            <option>Hybrid</option>
-            <option>Workshop</option>
-          </select>
+          <FormControl size="small">
+             <Select
+               value={format}
+               onChange={(e) => setFormat(e.target.value)}
+               displayEmpty
+               renderValue={(v) => v || 'Event Format'}
+               MenuProps={selectMenuProps}
+               sx={selectSx}
+             >
+               <MenuItem value="">Event Format</MenuItem>
+               <MenuItem value="In-Person">In-Person</MenuItem>
+               <MenuItem value="Virtual">Virtual</MenuItem>
+               <MenuItem value="Hybrid">Hybrid</MenuItem>
+               <MenuItem value="Workshop">Workshop</MenuItem>
+             </Select>
+          </FormControl>
 
           {/* Advanced toggle */}
           <button
