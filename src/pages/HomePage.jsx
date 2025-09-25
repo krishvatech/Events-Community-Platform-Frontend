@@ -118,7 +118,7 @@ const HomePage = () => {
       </Container>
 
       {/* Featured Events */}
-      <section id="community" className="py-16 md:py-24">
+      <section id="Events" className="py-16 md:py-24">
         <Container maxWidth="lg" disableGutters className="px-6">
           <h2 className="text-3xl font-bold text-center">Featured Events</h2>
           <Grid container spacing={6} className="mt-12">

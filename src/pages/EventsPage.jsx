@@ -206,6 +206,142 @@ const EVENTS = [
     price: 99,
     registration_url: "/signup",
   },
+  {
+    id: "ai-ma-summit-2025",
+    title: "AI & Mergers Summit 2025",
+    description:
+      "Explore the intersection of artificial intelligence and merger & acquisition strategy with top operators and coaches.",
+    image:
+      "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=1600&auto=format&fit=crop",
+    start: "2025-03-15T09:00:00",
+    end: "2025-03-15T17:00:00",
+    location: "New York, NY",
+    topics: ["M&A Strategy", "In-Person"],
+    attendees: 450,
+    price: 899,
+    registration_url: "/signup",
+  },
+  {
+    id: "global-ma-leaders-forum",
+    title: "Global M&A Leaders Forum",
+    description:
+      "Connect with top M&A professionals and learn about the latest integration trends, governance, and cross-border tactics.",
+    image:
+      "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1600&auto=format&fit=crop",
+    start: "2025-03-22T10:00:00",
+    end: "2025-03-22T18:00:00",
+    location: "London, UK",
+    topics: ["Leadership", "Hybrid"],
+    attendees: 680,
+    price: 1299,
+    registration_url: "/signup",
+  },
+  {
+    id: "corp-strategy-masterclass",
+    title: "Corporate Strategy Masterclass",
+    description:
+      "Deep dive into advanced corporate strategy frameworks and their real-world implementation in M&A contexts.",
+    image:
+      "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?q=80&w=1600&auto=format&fit=crop",
+    start: "2025-04-05T14:00:00",
+    end: "2025-04-05T20:00:00",
+    location: "Singapore",
+    topics: ["Strategy", "In-Person"],
+    attendees: 200,
+    price: 649,
+    registration_url: "/signup",
+  },
+  {
+    id: "deal-making-excellence",
+    title: "Deal Making Excellence Workshop",
+    description:
+      "Master the art of successful deal negotiation and execution with hands-on case studies and expert guidance.",
+    image:
+      "https://images.unsplash.com/photo-1557425493-6f90ae4659fc?q=80&w=1600&auto=format&fit=crop",
+    start: "2025-04-12T09:00:00",
+    end: "2025-04-12T16:00:00",
+    location: "Virtual",
+    topics: ["Workshop", "Online"],
+    attendees: 320,
+    price: 399,
+    registration_url: "/signup",
+  },
+  {
+    id: "private-equity-summit",
+    title: "Private Equity Summit",
+    description:
+      "Comprehensive conference focusing on private equity trends, value creation, and portfolio strategy.",
+    image:
+      "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?q=80&w=1600&auto=format&fit=crop",
+    start: "2025-04-20T08:30:00",
+    end: "2025-04-20T18:30:00",
+    location: "Chicago, IL",
+    topics: ["Private Equity", "In-Person"],
+    attendees: 520,
+    price: 1099,
+    registration_url: "/signup",
+  },
+  {
+    id: "financial-dd-intensive",
+    title: "Financial Due Diligence Intensive",
+    description:
+      "Intensive training on financial due diligence processes and risk assessment for transactions.",
+    image:
+      "https://images.unsplash.com/photo-1518085250887-2f903c200fee?q=80&w=1600&auto=format&fit=crop",
+    start: "2025-05-08T09:00:00",
+    end: "2025-05-08T17:00:00",
+    location: "Boston, MA",
+    topics: ["Due Diligence", "In-Person"],
+    attendees: 150,
+    price: 799,
+    registration_url: "/signup",
+  },
+  // extra to reach 12 for pagination demo
+  {
+    id: "cross-border-ma-bootcamp",
+    title: "Cross-Border M&A Bootcamp",
+    description:
+      "Tactics for navigating regulatory environments and cultural challenges in cross-border deals.",
+    image:
+      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1600&auto=format&fit=crop",
+    start: "2025-05-20T09:00:00",
+    end: "2025-05-20T17:00:00",
+    location: "Toronto, Canada",
+    topics: ["Governance", "In-Person"],
+    attendees: 180,
+    price: 699,
+    registration_url: "/signup",
+  },
+  {
+    id: "integration-strategy-lab",
+    title: "Post-Merger Integration Strategy Lab",
+    description:
+      "Hands-on lab for building integration roadmaps and tracking value creation.",
+    image:
+      "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1600&auto=format&fit=crop",
+    start: "2025-06-02T10:00:00",
+    end: "2025-06-02T17:00:00",
+    location: "Munich, Germany",
+    topics: ["Integration", "Workshop"],
+    attendees: 140,
+    price: 549,
+    registration_url: "/signup",
+  },
+  {
+    id: "valuation-modeling-mastery",
+    title: "Valuation & Modeling Mastery",
+    description:
+      "Practical DCF, comps, and LBO modeling patterns used by leading PE funds.",
+    image:
+      "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?q=80&w=1600&auto=format&fit=crop",
+    start: "2025-06-15T09:30:00",
+    end: "2025-06-15T18:00:00",
+    location: "Austin, TX",
+    topics: ["Valuation", "In-Person"],
+    attendees: 260,
+    price: 899,
+    registration_url: "/signup",
+  },
 ];
 
 // ————————————————————————————————————————
@@ -238,7 +374,9 @@ function EventCard({ ev }) {
   return (
     <MUICard
       elevation={0}
-      className="rounded-2xl border border-[#E8EEF2] shadow-sm hover:shadow-md transition-shadow bg-white"
+      className="group rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
+                 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5
+                 hover:border-teal-200 overflow-hidden"
     >
       {/* Media with overlay badges */}
       <Box className="relative">
@@ -246,10 +384,16 @@ function EventCard({ ev }) {
           <img
             src={ev.image}
             alt={ev.title}
-            className="w-full h-56 md:h-64 object-cover rounded-t-2xl"
+            className="w-full h-56 md:h-64 object-cover
+                        transition-transform duration-700 ease-out          /* smooth & slow */
+                        group-hover:scale-105                               /* zoom on card hover */
+                        will-change-transform"
           />
         ) : (
-          <div className="w-full h-56 md:h-64 grid place-items-center text-neutral-400 bg-neutral-100 rounded-t-2xl">
+          <div className="w-full h-56 md:h-64 object-cover
+                        transition-transform duration-700 ease-out          /* smooth & slow */
+                        group-hover:scale-105                               /* zoom on card hover */
+                        will-change-transform">
             No image
           </div>
         )}
@@ -267,7 +411,7 @@ function EventCard({ ev }) {
       </Box>
 
       <CardContent className="p-6">
-        <h3 className="text-2xl font-semibold text-neutral-900 leading-snug">
+        <h3 className="text-2xl font-semibold  hover:text-teal-700 text-neutral-900 leading-snug">
           {ev.title}
         </h3>
         {ev.description && (
@@ -353,7 +497,9 @@ function EventRow({ ev }) {
   return (
     <MUICard
       elevation={0}
-      className="rounded-2xl border border-[#E8EEF2] shadow-sm hover:shadow-md transition-shadow bg-white overflow-hidden"
+      className="group rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
+                 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5
+                 hover:border-teal-200 overflow-hidden overflow-hidden"
     >
       <div className="md:flex">
         {/* Image / badges */}
@@ -362,10 +508,14 @@ function EventRow({ ev }) {
             <img
               src={ev.image}
               alt={ev.title}
-              className="w-full h-44 md:h-full object-cover"
+              className="w-full h-44 md:h-full object-cover
+                         transform-gpu transition-transform duration-700 ease-out
+                         group-hover:scale-105 will-change-transform"
             />
           ) : (
-            <div className="w-full h-44 md:h-full grid place-items-center text-neutral-400 bg-neutral-100">
+            <div className="w-full h-44 md:h-full object-cover
+                         transform-gpu transition-transform duration-700 ease-out
+                         group-hover:scale-105 will-change-transform">
               No image
             </div>
           )}
