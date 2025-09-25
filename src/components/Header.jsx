@@ -83,7 +83,7 @@ const Header = () => {
             className="hidden md:flex flex-1 items-center justify-center"
           >
             <div className="flex items-center gap-6 md:gap-8">
-              <NavA href="/#events">Events</NavA>
+              <NavA href="/events">Events</NavA>
               <NavA href="/#community">Community</NavA>
               <NavA href="/#resources">Resources</NavA>
               <NavA href="/#about">About Us</NavA>
@@ -165,7 +165,7 @@ const Header = () => {
 
           <List>
             {[
-              { href: "/#events", label: "Events" },
+              { href: "/events", label: "Events" },
               { href: "/#community", label: "Community" },
               { href: "/#resources", label: "Resources" },
               { href: "/#about", label: "About Us" },
