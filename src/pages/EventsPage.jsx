@@ -20,6 +20,9 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PlaceIcon from "@mui/icons-material/Place";
 import GroupsIcon from "@mui/icons-material/Groups";
+import { FormControl, Select, MenuItem } from "@mui/material";
+
+
 
 // ————————————————————————————————————————
 // Static demo events
@@ -617,6 +620,43 @@ export default function EventsPage() {
   const [page, setPage] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [view, setView] = useState("grid"); // 'grid' | 'list'
+  const [dateRange, setDateRange] = useState(""); // "",
+
+
+  const selectSx = {
+   height: 42,                       // 12 * 4px
+   borderRadius: 1,                 // rounded-xl
+   bgcolor: "white",
+   minWidth: 190,
+   "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
+   "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#CBD5E1" },
+   "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+     borderColor: "primary.main",
+     borderWidth: 2,
+   },
+   "& .MuiSelect-icon": { color: "text.secondary" },
+ };
+
+ const selectMenuProps = {
+   PaperProps: {
+     elevation: 8,
+     sx: {
+       mt: 0.5,
+       borderRadius: 1,
+       minWidth: 220,
+       boxShadow: "0 12px 28px rgba(16,24,40,.12)",
+       "& .MuiMenuItem-root": {
+         py: 1.25,
+         px: 2,
+         borderRadius: 1,
+         "&.Mui-selected, &.Mui-selected:hover": { bgcolor: "grey.100" },
+         "&:hover": { bgcolor: "grey.100" },
+        fontSize:13,
+       },
+     },
+   },
+ };
+  
 
   const pageCount = Math.max(1, Math.ceil(EVENTS.length / PAGE_SIZE));
   const pageItems = useMemo(() => {
@@ -709,12 +749,24 @@ export default function EventsPage() {
             />
           </div>
 
-          {/* Date Range */}
-          <select className="h-12 px-4 rounded-xl border border-slate-200 bg-white text-sm min-w-[160px]">
-            <option>Date Range</option>
-            <option>This Month</option>
-            <option>Next 90 days</option>
-          </select>
+          <FormControl size="small">
+            <Select
+              value={"Date Range"}              // ← fallback so text shows
+              onChange={(e) => setDateRange(e.target.value)}
+              MenuProps={selectMenuProps}
+              sx={{
+                ...selectSx,
+                // make sure styles don’t hide the text
+                '& .MuiSelect-select': { opacity: 1, color: 'inherit', textIndent: 0 },
+              }}
+            >
+              <MenuItem value="Date Range">Date Range</MenuItem>
+              <MenuItem value="this_week">This Week</MenuItem>
+              <MenuItem value="this_month">This Month</MenuItem>
+              <MenuItem value="next_90_days">Next 90 days</MenuItem> {/* ← unique */}
+            </Select>
+          </FormControl>
+
 
           {/* Topic/Industry */}
           <select className="h-12 px-4 rounded-xl border border-slate-200 bg-white text-sm min-w-[180px]">
@@ -738,7 +790,7 @@ export default function EventsPage() {
 
           {/* Advanced toggle */}
           <button
-            onClick={() => setShowAdvanced((v) => !v)}
+            onClick={() => setShowAdvanced(v => !v)} 
             type="button"
             className="h-12 px-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white text-sm"
           >
@@ -776,12 +828,12 @@ export default function EventsPage() {
       </Container>
 
       {/* Results */}
-      <Container id="events" maxWidth="lg" className="mt-8 mb-16">
+      <Container id="events" maxWidth="xl" className="mt-8 mb-16">
         {showAdvanced ? (
-          <Grid container spacing={3}>
+          <Grid container spacing={4} sx={{ alignItems: 'flex-start' }}>
             {/* LEFT: Advanced Filters panel */}
-            <Grid item xs={12} md={3}>
-              <div className="rounded-2xl bg-[#0d2046] text-white p-6 sticky top-24">
+            <Grid size={{ xs: 12, lg: 3 }} sx={{ minWidth: 300, flexShrink: 0 }}>
+              <div className="rounded-2xl bg-[#0d2046] text-white p-6 sticky top-24 h-fit hidden lg:block">
                 <div className="flex items-center gap-2 mb-6">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <path d="M3 5h18M8 12h8M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -886,29 +938,29 @@ export default function EventsPage() {
             </Grid>
 
             {/* RIGHT: heading + cards/list */}
-            <Grid item xs={12} md={9}>
-              <div className="mb-4">
+            <Grid size={{ xs: 12, lg: 9 }} sx={{ flex: 1, minWidth: 0 }}>
+              <div className="w-full">
                 <h2 className="text-3xl font-bold">Upcoming Events</h2>
                 <p className="text-neutral-600 mt-1">{EVENTS.length} events found</p>
               </div>
 
               {view === "grid" ? (
-                <Grid container spacing={3}>
-                  {pageItems.map((ev) => (
-                    <Grid key={ev.id} item xs={12} md={4}>
-                      <EventCard ev={ev} />
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <Grid container spacing={3} direction="column">
-                  {pageItems.map((ev) => (
-                    <Grid key={ev.id} item xs={12}>
-                      <EventRow ev={ev} />
-                    </Grid>
-                  ))}
-                </Grid>
-              )}
+                 <Grid container spacing={3}>
+                   {pageItems.map((ev) => (
+                     <Grid key={ev.id} size={{ xs: 12, md: 4 }}>
+                       <EventCard ev={ev} />
+                     </Grid>
+                   ))}
+                 </Grid>
+               ) : (
+                 <Grid container spacing={3} direction="column">
+                   {pageItems.map((ev) => (
+                     <Grid key={ev.id} size={12}>
+                       <EventRow ev={ev} />
+                     </Grid>
+                   ))}
+                 </Grid>
+               )}
             </Grid>
           </Grid>
         ) : (
@@ -919,22 +971,23 @@ export default function EventsPage() {
             </div>
 
             {view === "grid" ? (
-              <Grid container spacing={3}>
-                {pageItems.map((ev) => (
-                  <Grid key={ev.id} size={4}>
-                    <EventCard ev={ev} />
-                  </Grid>
-                ))}
-              </Grid>
-            ) : (
-              <Grid container spacing={3} direction="column">
-                {pageItems.map((ev) => (
-                  <Grid key={ev.id} item xs={12}>
-                    <EventRow ev={ev} />
-                  </Grid>
-                ))}
-              </Grid>
-            )}
+             <Grid container spacing={3}>
+               {pageItems.map((ev) => (
+                 <Grid key={ev.id} size={{ xs: 12, md: 4 }}>
+                   <EventCard ev={ev} />
+                 </Grid>
+               ))}
+             </Grid>
+           ) : (
+             <Grid container spacing={3} direction="column">
+               {pageItems.map((ev) => (
+                 <Grid key={ev.id} size={12}>
+                   <EventRow ev={ev} />
+                 </Grid>
+               ))}
+             </Grid>
+           )}
+
           </>
         )}
 

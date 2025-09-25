@@ -92,7 +92,7 @@ const HomePage = () => {
             discover events, engage with peers, and access valuable resources.
           </p>
           <a
-            href="#events"
+            href="/events"
             className="btn-glow mt-8 inline-flex px-8 py-3 rounded-xl text-lg font-bold bg-teal-600 text-white hover:bg-teal-700"
           >
             Explore Events
