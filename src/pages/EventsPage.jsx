@@ -752,6 +752,7 @@ export default function EventsPage() {
 
           <FormControl size="small">
             <Select
+              label="Date Range"
               value={dateRange}              // ← fallback so text shows
               onChange={(e) => setDateRange(e.target.value)}
               displayEmpty
@@ -763,7 +764,7 @@ export default function EventsPage() {
                 '& .MuiSelect-select': { opacity: 1, color: 'inherit', textIndent: 0 },
               }}
             >
-              <MenuItem value="">Date Range</MenuItem>
+              {/* <MenuItem value="">Date Range</MenuItem> */}
               <MenuItem value="this_week">This Week</MenuItem>
               <MenuItem value="this_month">This Month</MenuItem>
               <MenuItem value="next_90_days">Next 90 days</MenuItem> {/* ← unique */}
@@ -774,6 +775,7 @@ export default function EventsPage() {
           {/* Topic/Industry */}
           <FormControl size="small">
              <Select
+                label="Topic/Industry"
                value={topic}
                onChange={(e) => setTopic(e.target.value)}
                displayEmpty
@@ -781,7 +783,6 @@ export default function EventsPage() {
                MenuProps={selectMenuProps}
                sx={selectSx}
              >
-               <MenuItem value="">Topic/Industry</MenuItem>
                <MenuItem value="M&A Strategy">M&A Strategy</MenuItem>
                <MenuItem value="Leadership">Leadership</MenuItem>
                <MenuItem value="Private Equity">Private Equity</MenuItem>
@@ -794,6 +795,7 @@ export default function EventsPage() {
           {/* Event Format */}
           <FormControl size="small">
              <Select
+               label="Event Format"
                value={format}
                onChange={(e) => setFormat(e.target.value)}
                displayEmpty
@@ -801,7 +803,6 @@ export default function EventsPage() {
                MenuProps={selectMenuProps}
                sx={selectSx}
              >
-               <MenuItem value="">Event Format</MenuItem>
                <MenuItem value="In-Person">In-Person</MenuItem>
                <MenuItem value="Virtual">Virtual</MenuItem>
                <MenuItem value="Hybrid">Hybrid</MenuItem>
