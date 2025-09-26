@@ -331,6 +331,8 @@ export default function EventsPage() {
   const FORMATS_URL = `${EVENTS_URL}formats/`; // /api/events/formats/
   const [formats, setFormats] = useState([]);
   const [selectedFormats, setSelectedFormats] = useState([]);
+  const [selectedTopics, setSelectedTopics] = useState([]);
+
 
 
   useEffect(() => {
@@ -345,7 +347,8 @@ export default function EventsPage() {
         const url = new URL(EVENTS_URL);
         url.searchParams.set("limit", String(PAGE_SIZE));
         url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
-        if (topic)  url.searchParams.set("category", topic);
+        const topicsToSend = selectedTopics.length ? selectedTopics : (topic ? [topic] : []);
+        topicsToSend.forEach((t) => url.searchParams.append("category", t));
         if (dateRange) url.searchParams.set("date_range", dateRange);
         const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
         fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
@@ -363,7 +366,7 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [page, topic, format, selectedFormats, dateRange]);
+  }, [page, topic, format, selectedFormats, selectedTopics, dateRange]);
 
 
   useEffect(() => {
@@ -625,8 +628,8 @@ export default function EventsPage() {
         {showAdvanced ? (
           <Grid container spacing={4} sx={{ alignItems: 'flex-start' }}>
             {/* LEFT: Advanced Filters panel */}
-            <Grid size={{ xs: 12, lg: 3 }} sx={{ minWidth: 300, flexShrink: 0 }}>
-              <div className="rounded-2xl bg-[#0d2046] text-white p-6 sticky top-24 h-fit hidden lg:block">
+            <Grid size={{ xs: 12, lg: 3 }} sx={{ minWidth: { xs: 'auto', lg: 300 }, flexShrink: 0 }}>
+              <div className="rounded-2xl bg-[#0d2046] text-white p-6 lg:sticky lg:top-24 h-fit block">
                 <div className="flex items-center gap-2 mb-6">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <path d="M3 5h18M8 12h8M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -688,13 +691,25 @@ export default function EventsPage() {
                         <input
                             type="checkbox"
                             className="h-4 w-4 rounded border-white/30 bg-transparent"
-                            checked={topic === x}
-                            onChange={(e) => setTopic(e.target.checked ? x : "")}
+                            checked={selectedTopics.includes(x)}
+                            onChange={(e) =>
+                              setSelectedTopics((prev) =>
+                                e.target.checked ? [...prev, x] : prev.filter((v) => v !== x)
+                              )
+                            }
                           />
 
                         <span>{x}</span>
                       </label>
                     ))}
+                    {/* quick "clear all" */}
+                    {selectedTopics.length > 0 && (
+                      <button type="button" className="mt-2 text-xs underline text-white/70"
+                              onClick={() => setSelectedTopics([])}>
+                        Clear all
+                      </button>
+                    )}
+
                   </div>
                 </div>
 
@@ -745,6 +760,11 @@ export default function EventsPage() {
                 <button className="w-full h-11 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-semibold">
                   Apply Filters
                 </button>
+
+                <button className="w-full h-11 px-2 rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white-200 mt-3">
+                  Clear Filters
+                </button>
+
               </div>
             </Grid>
 

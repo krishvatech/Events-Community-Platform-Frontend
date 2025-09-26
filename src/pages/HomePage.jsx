@@ -121,22 +121,22 @@ const HomePage = () => {
       <section id="Events" className="py-16 md:py-24">
         <Container maxWidth="lg" disableGutters className="px-6">
           <h2 className="text-3xl font-bold text-center">Featured Events</h2>
-          <Grid container spacing={6} className="mt-12">
-            <Grid size={4}>
+          <Grid container spacing={{ xs: 3, md: 6 }} className="mt-12">
+            <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
               <FeaturedCard
                 image="https://lh3.googleusercontent.com/aida-public/AB6AXuBHKjDgAAMcSOy6ZsGC9_IG-SmJR4XLhvxvQGjuOs4Vuj9EicNWSohpqOz76rcop0_KtYJrD--JYG3XgdfGUjjLTc3VGAcREdHC66b7TYZ4fPy8Y127xDhvRyqXhdIPcLHnc3HOlh5-AMjErYzkAy0kfaaB9WwKYbooqpeoZ6iKUZbT5fdW_JOy4Qxs-rxvaw3uA-K7_vFbg1N1_yZcmCEZ-PISeaU89b1Noeujcgstqz_vZozsyNQS0PlCf6gSc1ZgeVqz2-06iw"
                 title="The Annual M&A Summit"
                 desc="Join industry leaders for a comprehensive discussion on the latest trends and strategies in M&A."
               />
             </Grid>
-            <Grid size={4}>
+            <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
               <FeaturedCard
                 image="https://lh3.googleusercontent.com/aida-public/AB6AXuC7qbyvHcPpq_a2ygXhgDS0hwTjng9aqdknkd-88U7vRbfjLylj6lT-CcfNgN3o22jXfQO2FmQw3EnBy5wkeRmBBqQm2BjmIXNOnU-iy6L2HfsFG83nh8SnY7UmZlHpm5dD83jG9ZK4vbT8BHxf4mOJNny4e_xLTbFFIZLJHgZIQiT5CuXSSiwFgLRlhSJRQfonxdF9g0aS6zi6Ds2T34s6gEVkm2YQt5uI0X_Gn11HdCYl9czQSWyL40jEpHFF7VPUf5K4eV2nmw"
                 title="Networking Mixer for Dealmakers"
                 desc="Connect with fellow M&A professionals in a relaxed and informal setting."
               />
             </Grid>
-            <Grid size={4}>
+            <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
               <FeaturedCard
                 image="https://lh3.googleusercontent.com/aida-public/AB6AXuB_vYOi0Vx1itEKNE1xoWbuGSfhITt0QckUhELW-KUQ5tF-XfqqVlX0EBdPftpzh_lylwhZulVLWeR3fgM65aDuH1GZCZXVlyH5rfhb2uGRl1Tf_EZxDU3hC1HzoAgqKm6HvpGwOXlxtn-ZWs3OFNY6RrIhzQiodfsFp9e0SBGBksjVA6vHjdoOFhwlKF8U4bAPkY7N3RO-nxcaal6XSiEhPcNOwE-lyVZVon33K62EV3zS_9DVE20b4AxVgH70UcScGFiONOGOFQ"
                 title="Advanced Valuation Techniques"
@@ -151,22 +151,22 @@ const HomePage = () => {
       <section id="community" className="py-16 md:py-24">
         <Container maxWidth="lg" disableGutters className="px-6">
           <h2 className="text-3xl font-bold text-center">Community Highlights</h2>
-          <Grid container spacing={6} className="mt-12">
-            <Grid size={4}>
+          <Grid container spacing={{ xs: 3, md: 6 }} className="mt-12">
+            <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
               <MiniCard
                 image="https://lh3.googleusercontent.com/aida-public/AB6AXuDdSPl7HlGanqF5RiHaWSVQ9QI2CYal_9-3lhgFRuUcj0LJ7FyigScYCf42bDup4QYrla0Aln-C46uqeXJhIAksFjdBMKfMlx_XL76mZWGp5BfQfXPY5QK2DoXBXPXXgOu-5o9NfaoHXbPutMkZQKI90QZLq2rz60xJrX6Ai2ZtuTA-p3Z7OmGbaSqKCuLIgLgHHa3cZbj2wjcEa2RzvP2CsMOmz4Ele0pUh4DmzsREvZpWCqFWyomvrXSxSqxYLdpE8Rqhp6NOVw"
                 title="Member Spotlight: Sarah Chen"
                 desc="Learn about Sarah Chen’s journey and insights in the M&A industry."
               />
             </Grid>
-            <Grid size={4}>
+            <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
               <MiniCard
                 image="https://lh3.googleusercontent.com/aida-public/AB6AXuCQW-ZoVKENpsFY1tjGkibf08ZkqKxluVLOwsfGJgAXDPQe3ARaxI0Fpq8kvwyPzBs_xUqZ99oTq0tCiEIBdPjYmlXmuJaQ_NNWaJJ4Slt0Is4kMTPG7EBC4DGWIkdkjA4PG8kTikw8UF-U_yf8mdO89_yz10W74VT6tRaEJwPFzMHfhN_pJTYCN4vP9c8p67yFfQrKgTOqNZs_u7vwTAVuNqlWDxuMSUDiOoVQ4RjquGzVTeIuaFu1lUidUFC-Z1pk7-ZY-j9M8A"
                 title="Upcoming Community Meetup"
                 desc="Join us for an informal gathering to discuss current market trends."
               />
             </Grid>
-            <Grid size={4}>
+            <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
               <MiniCard
                 image="https://lh3.googleusercontent.com/aida-public/AB6AXuDpUlccQRm1PXSS0loNs-FKCqJTs4a7F_YMYhd-hWRaPT2NmhXcGfJSEbAEXEiV1YJWFOPV2ZFhpmcXmvvCxdK8LvzQevucug9zBpmskeywIkcStxazGqZ6pNPZk3PCYgx7DTh5lMxamy0J8FQ91lyswO3lzn5ReWAmmE9XvkrBuHhhaK3K9f97ozDa_VcaF_Jnhf-cdNxLVeU85fS7w_5zed_VX1KW1lhohLNn2fXdZs4djuNERHa-la-kQoGfpE36EWIB4qn3oQ"
                 title="Ask Me Anything with David Lee"
