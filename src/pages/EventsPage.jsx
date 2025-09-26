@@ -2,7 +2,7 @@
 // Public Events listing page — static only (no API / dynamic fetch).
 // Reuses existing Header/Footer and our MUI + Tailwind setup.
 
-import React, { useMemo, useState } from "react";
+import React, {useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
@@ -24,329 +24,6 @@ import { FormControl, Select, MenuItem } from "@mui/material";
 
 
 // ————————————————————————————————————————
-// Static demo events
-// ————————————————————————————————————————
-const EVENTS = [
-  {
-    id: "ai-ma-summit-2025",
-    title: "AI & Mergers Summit 2025",
-    description:
-      "Explore the intersection of artificial intelligence and merger & acquisition strategy with top operators and coaches.",
-    image:
-      "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-03-15T09:00:00",
-    end: "2025-03-15T17:00:00",
-    location: "New York, NY",
-    topics: ["M&A Strategy", "In-Person"],
-    attendees: 450,
-    price: 899,
-    registration_url: "/signup",
-  },
-  {
-    id: "global-ma-leaders-forum",
-    title: "Global M&A Leaders Forum",
-    description:
-      "Connect with top M&A professionals and learn about the latest integration trends, governance, and cross-border tactics.",
-    image:
-      "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-03-22T10:00:00",
-    end: "2025-03-22T18:00:00",
-    location: "London, UK",
-    topics: ["Leadership", "Hybrid"],
-    attendees: 680,
-    price: 1299,
-    registration_url: "/signup",
-  },
-  {
-    id: "corp-strategy-masterclass",
-    title: "Corporate Strategy Masterclass",
-    description:
-      "Deep dive into advanced corporate strategy frameworks and their real-world implementation in M&A contexts.",
-    image:
-      "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-04-05T14:00:00",
-    end: "2025-04-05T20:00:00",
-    location: "Singapore",
-    topics: ["Strategy", "In-Person"],
-    attendees: 200,
-    price: 649,
-    registration_url: "/signup",
-  },
-  {
-    id: "deal-making-excellence",
-    title: "Deal Making Excellence Workshop",
-    description:
-      "Master the art of successful deal negotiation and execution with hands-on case studies and expert guidance.",
-    image:
-      "https://images.unsplash.com/photo-1557425493-6f90ae4659fc?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-04-12T09:00:00",
-    end: "2025-04-12T16:00:00",
-    location: "Virtual",
-    topics: ["Workshop", "Online"],
-    attendees: 320,
-    price: 399,
-    registration_url: "/signup",
-  },
-  {
-    id: "private-equity-summit",
-    title: "Private Equity Summit",
-    description:
-      "Comprehensive conference focusing on private equity trends, value creation, and portfolio strategy.",
-    image:
-      "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-04-20T08:30:00",
-    end: "2025-04-20T18:30:00",
-    location: "Chicago, IL",
-    topics: ["Private Equity", "In-Person"],
-    attendees: 520,
-    price: 1099,
-    registration_url: "/signup",
-  },
-  {
-    id: "financial-dd-intensive",
-    title: "Financial Due Diligence Intensive",
-    description:
-      "Intensive training on financial due diligence processes and risk assessment for transactions.",
-    image:
-      "https://images.unsplash.com/photo-1518085250887-2f903c200fee?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-05-08T09:00:00",
-    end: "2025-05-08T17:00:00",
-    location: "Boston, MA",
-    topics: ["Due Diligence", "In-Person"],
-    attendees: 150,
-    price: 799,
-    registration_url: "/signup",
-  },
-  // extra to reach 12 for pagination demo
-  {
-    id: "cross-border-ma-bootcamp",
-    title: "Cross-Border M&A Bootcamp",
-    description:
-      "Tactics for navigating regulatory environments and cultural challenges in cross-border deals.",
-    image:
-      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-05-20T09:00:00",
-    end: "2025-05-20T17:00:00",
-    location: "Toronto, Canada",
-    topics: ["Governance", "In-Person"],
-    attendees: 180,
-    price: 699,
-    registration_url: "/signup",
-  },
-  {
-    id: "integration-strategy-lab",
-    title: "Post-Merger Integration Strategy Lab",
-    description:
-      "Hands-on lab for building integration roadmaps and tracking value creation.",
-    image:
-      "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-06-02T10:00:00",
-    end: "2025-06-02T17:00:00",
-    location: "Munich, Germany",
-    topics: ["Integration", "Workshop"],
-    attendees: 140,
-    price: 549,
-    registration_url: "/signup",
-  },
-  {
-    id: "valuation-modeling-mastery",
-    title: "Valuation & Modeling Mastery",
-    description:
-      "Practical DCF, comps, and LBO modeling patterns used by leading PE funds.",
-    image:
-      "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-06-15T09:30:00",
-    end: "2025-06-15T18:00:00",
-    location: "Austin, TX",
-    topics: ["Valuation", "In-Person"],
-    attendees: 260,
-    price: 899,
-    registration_url: "/signup",
-  },
-  {
-    id: "legal-dd-workshop",
-    title: "Legal Due Diligence Workshop",
-    description:
-      "Spot contractual red flags and mitigate exposure in complex transactions.",
-    image:
-      "https://images.unsplash.com/photo-1587620962725-abab7fe55159?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-07-01T09:00:00",
-    end: "2025-07-01T16:00:00",
-    location: "Remote",
-    topics: ["Legal & Compliance", "Online"],
-    attendees: 110,
-    price: 349,
-    registration_url: "/signup",
-  },
-  {
-    id: "sell-side-readiness",
-    title: "Sell-Side Readiness Clinic",
-    description:
-      "Prepare management teams, clean data rooms, and streamline the process for bidders.",
-    image:
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-07-10T11:00:00",
-    end: "2025-07-10T17:30:00",
-    location: "Dubai, UAE",
-    topics: ["Process", "Hybrid"],
-    attendees: 175,
-    price: 599,
-    registration_url: "/signup",
-  },
-  {
-    id: "networking-evening-ma",
-    title: "M&A Professionals Networking Evening",
-    description:
-      "Meet dealmakers from banks, funds, and corporates in a relaxed setting.",
-    image:
-      "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-07-22T18:30:00",
-    end: "2025-07-22T21:30:00",
-    location: "Bengaluru, India",
-    topics: ["Networking", "In-Person"],
-    attendees: 220,
-    price: 99,
-    registration_url: "/signup",
-  },
-  {
-    id: "ai-ma-summit-2025",
-    title: "AI & Mergers Summit 2025",
-    description:
-      "Explore the intersection of artificial intelligence and merger & acquisition strategy with top operators and coaches.",
-    image:
-      "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-03-15T09:00:00",
-    end: "2025-03-15T17:00:00",
-    location: "New York, NY",
-    topics: ["M&A Strategy", "In-Person"],
-    attendees: 450,
-    price: 899,
-    registration_url: "/signup",
-  },
-  {
-    id: "global-ma-leaders-forum",
-    title: "Global M&A Leaders Forum",
-    description:
-      "Connect with top M&A professionals and learn about the latest integration trends, governance, and cross-border tactics.",
-    image:
-      "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-03-22T10:00:00",
-    end: "2025-03-22T18:00:00",
-    location: "London, UK",
-    topics: ["Leadership", "Hybrid"],
-    attendees: 680,
-    price: 1299,
-    registration_url: "/signup",
-  },
-  {
-    id: "corp-strategy-masterclass",
-    title: "Corporate Strategy Masterclass",
-    description:
-      "Deep dive into advanced corporate strategy frameworks and their real-world implementation in M&A contexts.",
-    image:
-      "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-04-05T14:00:00",
-    end: "2025-04-05T20:00:00",
-    location: "Singapore",
-    topics: ["Strategy", "In-Person"],
-    attendees: 200,
-    price: 649,
-    registration_url: "/signup",
-  },
-  {
-    id: "deal-making-excellence",
-    title: "Deal Making Excellence Workshop",
-    description:
-      "Master the art of successful deal negotiation and execution with hands-on case studies and expert guidance.",
-    image:
-      "https://images.unsplash.com/photo-1557425493-6f90ae4659fc?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-04-12T09:00:00",
-    end: "2025-04-12T16:00:00",
-    location: "Virtual",
-    topics: ["Workshop", "Online"],
-    attendees: 320,
-    price: 399,
-    registration_url: "/signup",
-  },
-  {
-    id: "private-equity-summit",
-    title: "Private Equity Summit",
-    description:
-      "Comprehensive conference focusing on private equity trends, value creation, and portfolio strategy.",
-    image:
-      "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-04-20T08:30:00",
-    end: "2025-04-20T18:30:00",
-    location: "Chicago, IL",
-    topics: ["Private Equity", "In-Person"],
-    attendees: 520,
-    price: 1099,
-    registration_url: "/signup",
-  },
-  {
-    id: "financial-dd-intensive",
-    title: "Financial Due Diligence Intensive",
-    description:
-      "Intensive training on financial due diligence processes and risk assessment for transactions.",
-    image:
-      "https://images.unsplash.com/photo-1518085250887-2f903c200fee?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-05-08T09:00:00",
-    end: "2025-05-08T17:00:00",
-    location: "Boston, MA",
-    topics: ["Due Diligence", "In-Person"],
-    attendees: 150,
-    price: 799,
-    registration_url: "/signup",
-  },
-  // extra to reach 12 for pagination demo
-  {
-    id: "cross-border-ma-bootcamp",
-    title: "Cross-Border M&A Bootcamp",
-    description:
-      "Tactics for navigating regulatory environments and cultural challenges in cross-border deals.",
-    image:
-      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-05-20T09:00:00",
-    end: "2025-05-20T17:00:00",
-    location: "Toronto, Canada",
-    topics: ["Governance", "In-Person"],
-    attendees: 180,
-    price: 699,
-    registration_url: "/signup",
-  },
-  {
-    id: "integration-strategy-lab",
-    title: "Post-Merger Integration Strategy Lab",
-    description:
-      "Hands-on lab for building integration roadmaps and tracking value creation.",
-    image:
-      "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-06-02T10:00:00",
-    end: "2025-06-02T17:00:00",
-    location: "Munich, Germany",
-    topics: ["Integration", "Workshop"],
-    attendees: 140,
-    price: 549,
-    registration_url: "/signup",
-  },
-  {
-    id: "valuation-modeling-mastery",
-    title: "Valuation & Modeling Mastery",
-    description:
-      "Practical DCF, comps, and LBO modeling patterns used by leading PE funds.",
-    image:
-      "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?q=80&w=1600&auto=format&fit=crop",
-    start: "2025-06-15T09:30:00",
-    end: "2025-06-15T18:00:00",
-    location: "Austin, TX",
-    topics: ["Valuation", "In-Person"],
-    attendees: 260,
-    price: 899,
-    registration_url: "/signup",
-  },
-];
-
-// ————————————————————————————————————————
 // Helpers
 // ————————————————————————————————————————
 function priceStr(p) {
@@ -365,7 +42,30 @@ function truncate(text, n = 120) {
   if (!text) return "";
   return text.length > n ? text.slice(0, n - 1) + "…" : text;
 }
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
+const EVENTS_URL = `${API_BASE}/events/`;
 
+function humanizeFormat(fmt = "") {
+  return fmt.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function toCard(ev) {
+  // map backend fields to the fields your UI already uses
+  return {
+    id: ev.id,
+    title: ev.title,
+    description: ev.description,
+    image: ev.preview_image,                 // URLField on your model
+    start: ev.start_time,                    // DateTimeField
+    end: ev.end_time,                        // DateTimeField
+    location: ev.location,
+    topics: [ev.category, humanizeFormat(ev.format)].filter(Boolean), // ["Strategy", "In-Person"]
+    attendees: ev.attending_count,
+    price: ev.price,
+    registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
+  };
+}
 // ————————————————————————————————————————
 // Card (thumbnail view)
 // ————————————————————————————————————————
@@ -622,7 +322,38 @@ export default function EventsPage() {
   const [dateRange, setDateRange] = useState(""); // "",
   const [topic, setTopic] = useState("");   // or "Topic/Industry" if you prefer
   const [format, setFormat] = useState(""); // or "Event Format"
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [total, setTotal] = useState(0);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        setLoading(true);
+        const headers = { "Content-Type": "application/json" };
+        const token = localStorage.getItem("access");
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const url = new URL(EVENTS_URL);
+        url.searchParams.set("limit", String(PAGE_SIZE));
+        url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
+
+        const res = await fetch(url, { headers, signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        setEvents((data.results || []).map(toCard));
+        setTotal(Number(data.count ?? (data.results || []).length));
+      } catch (e) {
+        if (e.name !== "AbortError") setError(String(e?.message || e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [page]);
 
   const selectSx = {
    height: 42,                       // 12 * 4px
@@ -659,11 +390,13 @@ export default function EventsPage() {
  };
   
 
-  const pageCount = Math.max(1, Math.ceil(EVENTS.length / PAGE_SIZE));
-  const pageItems = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return EVENTS.slice(start, start + PAGE_SIZE);
-  }, [page]);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  
+  useEffect(() => {
+    // if the total dropped (e.g., 4 items total), don’t stay on page 2
+    const pc = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (page > pc) setPage(pc);
+  }, [total]);  
 
   const handlePageChange = (_e, value) => {
     setPage(value);
@@ -752,7 +485,6 @@ export default function EventsPage() {
 
           <FormControl size="small">
             <Select
-              label="Date Range"
               value={dateRange}              // ← fallback so text shows
               onChange={(e) => setDateRange(e.target.value)}
               displayEmpty
@@ -764,7 +496,7 @@ export default function EventsPage() {
                 '& .MuiSelect-select': { opacity: 1, color: 'inherit', textIndent: 0 },
               }}
             >
-              {/* <MenuItem value="">Date Range</MenuItem> */}
+              <MenuItem value="">Date Range</MenuItem>
               <MenuItem value="this_week">This Week</MenuItem>
               <MenuItem value="this_month">This Month</MenuItem>
               <MenuItem value="next_90_days">Next 90 days</MenuItem> {/* ← unique */}
@@ -775,7 +507,6 @@ export default function EventsPage() {
           {/* Topic/Industry */}
           <FormControl size="small">
              <Select
-                label="Topic/Industry"
                value={topic}
                onChange={(e) => setTopic(e.target.value)}
                displayEmpty
@@ -783,6 +514,7 @@ export default function EventsPage() {
                MenuProps={selectMenuProps}
                sx={selectSx}
              >
+               <MenuItem value="">Topic/Industry</MenuItem>
                <MenuItem value="M&A Strategy">M&A Strategy</MenuItem>
                <MenuItem value="Leadership">Leadership</MenuItem>
                <MenuItem value="Private Equity">Private Equity</MenuItem>
@@ -795,7 +527,6 @@ export default function EventsPage() {
           {/* Event Format */}
           <FormControl size="small">
              <Select
-               label="Event Format"
                value={format}
                onChange={(e) => setFormat(e.target.value)}
                displayEmpty
@@ -803,6 +534,7 @@ export default function EventsPage() {
                MenuProps={selectMenuProps}
                sx={selectSx}
              >
+               <MenuItem value="">Event Format</MenuItem>
                <MenuItem value="In-Person">In-Person</MenuItem>
                <MenuItem value="Virtual">Virtual</MenuItem>
                <MenuItem value="Hybrid">Hybrid</MenuItem>
@@ -963,12 +695,17 @@ export default function EventsPage() {
             <Grid size={{ xs: 12, lg: 9 }} sx={{ flex: 1, minWidth: 0 }}>
               <div className="w-full">
                 <h2 className="text-3xl font-bold">Upcoming Events</h2>
-                <p className="text-neutral-600 mt-1">{EVENTS.length} events found</p>
+                <p className="text-neutral-600 mt-1">
+                    {loading ? "Loading…" : `${total} events found`}
+                  </p>
+                  {error && (
+                    <p className="mt-2 text-red-600 text-sm">Failed to load events: {error}</p>
+                  )}
               </div>
 
               {view === "grid" ? (
                  <Grid container spacing={3}>
-                   {pageItems.map((ev) => (
+                   {events.map((ev) => (
                      <Grid key={ev.id} size={{ xs: 12, md: 4 }}>
                        <EventCard ev={ev} />
                      </Grid>
@@ -976,7 +713,7 @@ export default function EventsPage() {
                  </Grid>
                ) : (
                  <Grid container spacing={3} direction="column">
-                   {pageItems.map((ev) => (
+                   {events.map((ev) => (
                      <Grid key={ev.id} size={12}>
                        <EventRow ev={ev} />
                      </Grid>
@@ -989,12 +726,17 @@ export default function EventsPage() {
           <>
             <div className="mb-4">
               <h2 className="text-3xl font-bold">Upcoming Events</h2>
-              <p className="text-neutral-600 mt-1">{EVENTS.length} events found</p>
+              <p className="text-neutral-600 mt-1">
+                {loading ? "Loading…" : `${total} events found`}
+              </p>
+              {error && (
+                <p className="mt-2 text-red-600 text-sm">Failed to load events: {error}</p>
+              )}
             </div>
 
             {view === "grid" ? (
              <Grid container spacing={3}>
-               {pageItems.map((ev) => (
+               {events.map((ev) => (
                  <Grid key={ev.id} size={{ xs: 12, md: 4 }}>
                    <EventCard ev={ev} />
                  </Grid>
@@ -1002,7 +744,7 @@ export default function EventsPage() {
              </Grid>
            ) : (
              <Grid container spacing={3} direction="column">
-               {pageItems.map((ev) => (
+               {events.map((ev) => (
                  <Grid key={ev.id} size={12}>
                    <EventRow ev={ev} />
                  </Grid>
