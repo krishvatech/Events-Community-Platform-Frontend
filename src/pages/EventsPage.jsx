@@ -326,6 +326,12 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
+  const CATEGORIES_URL = `${EVENTS_URL}categories/`; // /api/events/categories/
+  const [categories, setCategories] = useState([]);
+  const FORMATS_URL = `${EVENTS_URL}formats/`; // /api/events/formats/
+  const [formats, setFormats] = useState([]);
+  const [selectedFormats, setSelectedFormats] = useState([]);
+
 
   useEffect(() => {
     const controller = new AbortController();
@@ -339,6 +345,10 @@ export default function EventsPage() {
         const url = new URL(EVENTS_URL);
         url.searchParams.set("limit", String(PAGE_SIZE));
         url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
+        if (topic)  url.searchParams.set("category", topic);
+        if (dateRange) url.searchParams.set("date_range", dateRange);
+        const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
+        fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
 
         const res = await fetch(url, { headers, signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -353,7 +363,35 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [page]);
+  }, [page, topic, format, selectedFormats, dateRange]);
+
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(CATEGORIES_URL, { signal: ctrl.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setCategories(Array.isArray(data?.results) ? data.results : []);
+      } catch (_) {}
+    })();
+    return () => ctrl.abort();
+  }, []);
+
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(FORMATS_URL, { signal: ctrl.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setFormats(Array.isArray(data?.results) ? data.results : []);
+      } catch (_) {}
+    })();
+    return () => ctrl.abort();
+  }, []);
 
   const selectSx = {
    height: 42,                       // 12 * 4px
@@ -397,6 +435,11 @@ export default function EventsPage() {
     const pc = Math.max(1, Math.ceil(total / PAGE_SIZE));
     if (page > pc) setPage(pc);
   }, [total]);  
+
+  useEffect(() => {
+  setPage(1);
+}, [topic, format]);
+
 
   const handlePageChange = (_e, value) => {
     setPage(value);
@@ -485,6 +528,7 @@ export default function EventsPage() {
 
           <FormControl size="small">
             <Select
+              label="Date Range"
               value={dateRange}              // ← fallback so text shows
               onChange={(e) => setDateRange(e.target.value)}
               displayEmpty
@@ -496,10 +540,10 @@ export default function EventsPage() {
                 '& .MuiSelect-select': { opacity: 1, color: 'inherit', textIndent: 0 },
               }}
             >
-              <MenuItem value="">Date Range</MenuItem>
-              <MenuItem value="this_week">This Week</MenuItem>
-              <MenuItem value="this_month">This Month</MenuItem>
-              <MenuItem value="next_90_days">Next 90 days</MenuItem> {/* ← unique */}
+              
+              <MenuItem value="This Week">This Week</MenuItem>
+              <MenuItem value="This Month">This Month</MenuItem>
+              <MenuItem value="Next 90 days">Next 90 days</MenuItem> {/* ← unique */}
             </Select>
           </FormControl>
 
@@ -514,13 +558,10 @@ export default function EventsPage() {
                MenuProps={selectMenuProps}
                sx={selectSx}
              >
-               <MenuItem value="">Topic/Industry</MenuItem>
-               <MenuItem value="M&A Strategy">M&A Strategy</MenuItem>
-               <MenuItem value="Leadership">Leadership</MenuItem>
-               <MenuItem value="Private Equity">Private Equity</MenuItem>
-               <MenuItem value="Due Diligence">Due Diligence</MenuItem>
-               <MenuItem value="Strategy">Strategy</MenuItem>
-               <MenuItem value="Workshop">Workshop</MenuItem>
+               
+                {categories.map((c) => (
+                  <MenuItem key={c} value={c}>{c}</MenuItem>
+                ))}
              </Select>
           </FormControl>
 
@@ -534,11 +575,9 @@ export default function EventsPage() {
                MenuProps={selectMenuProps}
                sx={selectSx}
              >
-               <MenuItem value="">Event Format</MenuItem>
-               <MenuItem value="In-Person">In-Person</MenuItem>
-               <MenuItem value="Virtual">Virtual</MenuItem>
-               <MenuItem value="Hybrid">Hybrid</MenuItem>
-               <MenuItem value="Workshop">Workshop</MenuItem>
+                  {formats.map((f) => (
+                    <MenuItem key={f} value={f}>{f}</MenuItem>
+                  ))}
              </Select>
           </FormControl>
 
@@ -644,16 +683,15 @@ export default function EventsPage() {
                     Topic/Industry
                   </div>
                   <div className="space-y-3 text-white/90">
-                    {[
-                      "M&A Strategy",
-                      "Due Diligence",
-                      "Private Equity",
-                      "Investment Banking",
-                      "Corporate Finance",
-                      "Legal & Compliance",
-                    ].map((x) => (
+                    {categories.map((x) => (
                       <label key={x} className="flex items-center gap-3">
-                        <input type="checkbox" className="h-4 w-4 rounded border-white/30 bg-transparent" />
+                        <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-white/30 bg-transparent"
+                            checked={topic === x}
+                            onChange={(e) => setTopic(e.target.checked ? x : "")}
+                          />
+
                         <span>{x}</span>
                       </label>
                     ))}
@@ -664,12 +702,31 @@ export default function EventsPage() {
                 <div className="mb-6">
                   <div className="text-teal-300 font-semibold mb-2">Event Format</div>
                   <div className="space-y-3 text-white/90">
-                    {["In-Person", "Virtual", "Hybrid", "Workshop", "Networking"].map((x) => (
+                    {formats.map((x) => (
                       <label key={x} className="flex items-center gap-3">
-                        <input type="checkbox" className="h-4 w-4 rounded border-white/30 bg-transparent" />
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-white/30 bg-transparent"
+                          checked={selectedFormats.includes(x)}
+                          onChange={(e) =>
+                            setSelectedFormats((prev) =>
+                              e.target.checked ? [...prev, x] : prev.filter((v) => v !== x)
+                            )
+                          }
+                        />
                         <span>{x}</span>
                       </label>
                     ))}
+                    {/* quick "clear all" */}
+                    {selectedFormats.length > 0 && (
+                      <button
+                        type="button"
+                        className="mt-2 text-xs underline text-white/70"
+                        onClick={() => setSelectedFormats([])}
+                      >
+                        Clear all
+                      </button>
+                    )}
                   </div>
                 </div>
 
