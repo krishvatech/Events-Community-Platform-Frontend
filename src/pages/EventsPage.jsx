@@ -25,6 +25,7 @@ import dayjs from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { Slider } from "@mui/material";
 
 
 
@@ -352,6 +353,8 @@ export default function EventsPage() {
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedTopics, setSelectedTopics] = useState([]);
+  const [maxPrice, setMaxPrice] = useState(5000);
+  const [priceRange, setPriceRange] = useState([0, maxPrice || 0]);
 
 
   useEffect(() => {
@@ -360,6 +363,32 @@ export default function EventsPage() {
     .then(d => setLocations(d?.results || []))
     .catch(() => setLocations([]));
 }, []);
+
+  useEffect(() => {
+  const ctrl = new AbortController();
+  (async () => {
+    try {
+      const url = new URL(`${EVENTS_URL}max-price/`);
+      // same params you already send for the list:
+      const topicsToSend = selectedTopics.length ? selectedTopics : (topic ? [topic] : []);
+      topicsToSend.forEach((t) => url.searchParams.append("category", t));
+      if (dateRange) url.searchParams.set("date_range", dateRange);
+      if (selectedLocation) url.searchParams.set("location", selectedLocation);
+      const startISO = dmyToISO(startDMY);
+      const endISO   = dmyToISO(endDMY);
+      if (startISO) url.searchParams.set("start_date", startISO);
+      if (endISO)   url.searchParams.set("end_date", endISO);
+      const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
+      fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
+      if (q) url.searchParams.set("search", q);
+
+      const r = await fetch(url, { signal: ctrl.signal });
+      const d = await r.json();
+      if (typeof d?.max_price !== "undefined") setMaxPrice(Number(d.max_price) || 0);
+    } catch (_) {}
+  })();
+  return () => ctrl.abort();
+}, [topic, selectedTopics, format, selectedFormats, dateRange, startDMY, endDMY, selectedLocation, q]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -373,6 +402,8 @@ export default function EventsPage() {
         const url = new URL(EVENTS_URL);
         url.searchParams.set("limit", String(PAGE_SIZE));
         url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
+        url.searchParams.set("min_price", String(priceRange[0]));
+        url.searchParams.set("max_price", String(priceRange[1]));
         const topicsToSend = selectedTopics.length ? selectedTopics : (topic ? [topic] : []);
         topicsToSend.forEach((t) => url.searchParams.append("category", t));
         if (dateRange) url.searchParams.set("date_range", dateRange);
@@ -399,7 +430,7 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [page, topic, format, selectedFormats, selectedTopics,dateRange, startDMY, endDMY,selectedLocation,q]);
+  }, [page, topic, format, selectedFormats, selectedTopics,dateRange, startDMY, endDMY,selectedLocation,q,priceRange]);
 
   useEffect(() => { setPage(1); }, [topic, format,selectedTopics, dateRange, startDMY, endDMY,selectedLocation]);
 
@@ -476,6 +507,10 @@ export default function EventsPage() {
   useEffect(() => {
   setPage(1);
 }, [topic, format,q]);
+
+    useEffect(() => {
+  setPriceRange(([min]) => [Math.min(min, Number(maxPrice) || 0), Number(maxPrice) || 0]);
+}, [maxPrice]);
 
 
   const handlePageChange = (_e, value) => {
@@ -833,10 +868,23 @@ export default function EventsPage() {
                   <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
                     <span>$</span> Price Range
                   </div>
-                  <input type="range" className="w-full accent-white" />
+                  <Slider
+                    value={priceRange}
+                    onChange={(_, v) => setPriceRange(v)}
+                    valueLabelDisplay="auto"
+                    min={0}
+                    max={Math.max(0, Number(maxPrice) || 0)}
+                    sx={{
+                      // light track/thumb on dark card
+                      '& .MuiSlider-thumb': { bgcolor: 'white' },
+                      '& .MuiSlider-track': { bgcolor: 'white' },
+                      '& .MuiSlider-rail': { opacity: 0.3 },
+                    }}
+                  />
+
                   <div className="flex justify-between text-sm mt-1 text-white/80">
-                    <span>$0</span>
-                    <span>$5,000+</span>
+                    <span>{priceStr(priceRange[0])}</span>
+                    <span>{priceStr(priceRange[1])}+</span>
                   </div>
                 </div>
 
@@ -844,9 +892,26 @@ export default function EventsPage() {
                   Apply Filters
                 </button>
 
-                <button className="w-full h-11 px-2 rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10 mt-3">
+                <button
+                  type="button"
+                  className="w-full h-11 px-2 rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10 mt-3"
+                  onClick={() => {
+                    setQ("");                // search box
+                    setDateRange("");        // top Date Range select
+                    setStartDMY("");         // advanced start date
+                    setEndDMY("");           // advanced end date
+                    setSelectedLocation(""); // Location select
+                    setTopic("");            // top Topic/Industry (single)
+                    setSelectedTopics([]);   // advanced Topic checkboxes (multi)
+                    setFormat("");           // top Event Format (single)
+                    setSelectedFormats([]);  // advanced Format checkboxes (multi)
+                    setPriceRange([0, Number(maxPrice) || 0]); // price slider (min→0, max→DB max)
+                    setPage(1);              // go back to first page
+                  }}
+                >
                   Clear Filters
                 </button>
+
 
               </div>
             </Grid>
