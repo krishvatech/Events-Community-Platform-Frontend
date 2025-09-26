@@ -21,6 +21,11 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PlaceIcon from "@mui/icons-material/Place";
 import GroupsIcon from "@mui/icons-material/Groups";
 import { FormControl, Select, MenuItem } from "@mui/material";
+import dayjs from "dayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+
 
 
 // ————————————————————————————————————————
@@ -38,6 +43,16 @@ function priceStr(p) {
     return `$${p}`;
   }
 }
+
+
+function dmyToISO(s = "") {
+  const [dd, mm, yyyy] = s.split("-").map(Number);
+  if (!dd || !mm || !yyyy) return "";
+  // use UTC so timezone can't shift the date
+  return new Date(Date.UTC(yyyy, mm - 1, dd)).toISOString().slice(0, 10);
+}
+
+
 function truncate(text, n = 120) {
   if (!text) return "";
   return text.length > n ? text.slice(0, n - 1) + "…" : text;
@@ -331,9 +346,20 @@ export default function EventsPage() {
   const FORMATS_URL = `${EVENTS_URL}formats/`; // /api/events/formats/
   const [formats, setFormats] = useState([]);
   const [selectedFormats, setSelectedFormats] = useState([]);
+  const [startDMY, setStartDMY] = useState(""); // "dd-mm-yyyy"
+  const [endDMY, setEndDMY]   = useState("");   // "dd-mm-yyyy"
+  const [q, setQ] = useState("");
+  const [locations, setLocations] = useState([]);
+  const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedTopics, setSelectedTopics] = useState([]);
 
 
+  useEffect(() => {
+  fetch(`${EVENTS_URL}locations/`)
+    .then(r => r.json())
+    .then(d => setLocations(d?.results || []))
+    .catch(() => setLocations([]));
+}, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -350,8 +376,15 @@ export default function EventsPage() {
         const topicsToSend = selectedTopics.length ? selectedTopics : (topic ? [topic] : []);
         topicsToSend.forEach((t) => url.searchParams.append("category", t));
         if (dateRange) url.searchParams.set("date_range", dateRange);
+        if (selectedLocation) url.searchParams.set("location", selectedLocation);
+
+        const startISO = dmyToISO(startDMY);
+        const endISO   = dmyToISO(endDMY);
+        if (startISO) url.searchParams.set("start_date", startISO);
+        if (endISO)   url.searchParams.set("end_date", endISO);
         const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
         fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
+        if (q) url.searchParams.set("search", q);   // matches title, location, topic (if backend search_fields include them)
 
         const res = await fetch(url, { headers, signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -366,8 +399,9 @@ export default function EventsPage() {
       }
     })();
     return () => controller.abort();
-  }, [page, topic, format, selectedFormats, selectedTopics, dateRange]);
+  }, [page, topic, format, selectedFormats, selectedTopics,dateRange, startDMY, endDMY,selectedLocation,q]);
 
+  useEffect(() => { setPage(1); }, [topic, format,selectedTopics, dateRange, startDMY, endDMY,selectedLocation]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -441,7 +475,7 @@ export default function EventsPage() {
 
   useEffect(() => {
   setPage(1);
-}, [topic, format]);
+}, [topic, format,q]);
 
 
   const handlePageChange = (_e, value) => {
@@ -526,6 +560,8 @@ export default function EventsPage() {
               type="text"
               placeholder="Search events by keyword..."
               className="w-full h-12 pl-12 pr-4 rounded-xl border border-slate-200 bg-white outline-none"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
             />
           </div>
 
@@ -628,8 +664,8 @@ export default function EventsPage() {
         {showAdvanced ? (
           <Grid container spacing={4} sx={{ alignItems: 'flex-start' }}>
             {/* LEFT: Advanced Filters panel */}
-            <Grid size={{ xs: 12, lg: 3 }} sx={{ minWidth: { xs: 'auto', lg: 300 }, flexShrink: 0 }}>
-              <div className="rounded-2xl bg-[#0d2046] text-white p-6 lg:sticky lg:top-24 h-fit block">
+            <Grid size={{ xs: 12, lg: 3 }} sx={{ minWidth: 300, flexShrink: 0 }}>
+              <div className="rounded-2xl bg-[#0d2046] text-white p-6 sticky top-24 h-fit hidden lg:block">
                 <div className="flex items-center gap-2 mb-6">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <path d="M3 5h18M8 12h8M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -639,43 +675,85 @@ export default function EventsPage() {
 
                 {/* Date Range */}
                 <div className="mb-5">
-                  <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
-                      <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" />
-                    </svg>
-                    Date Range
-                  </div>
-                  <input
-                    placeholder="dd-mm-yyyy"
-                    className="w-full h-11 px-3 rounded-xl bg-white/10 border border-white/20 placeholder-white/70 outline-none mb-3"
-                  />
-                  <input
-                    placeholder="dd-mm-yyyy"
-                    className="w-full h-11 px-3 rounded-xl bg-white/10 border border-white/20 placeholder-white/70 outline-none"
-                  />
+                <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+                    <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                  Date Range
                 </div>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker
+                className="text-white bg-teal-500"
+                  label={null}
+                  value={startDMY ? dayjs(dmyToISO(startDMY)) : null}   // use your helper
+                  onChange={(v) => { setStartDMY(v ? v.format("DD-MM-YYYY") : ""); setDateRange(""); }}
+                  format="DD-MM-YYYY"
+                  slotProps={{
+                    textField: {
+                      placeholder: "dd-mm-yyyy",
+                      size: "small",
+                      sx: {
+                        "& .MuiOutlinedInput-root": {
+                          height: 44,
+                          background: "rgba(255, 255, 255, 0.1)",
+                          borderRadius: 12,
+                          color: "#fff",
+                        },
+                        "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,.2)" },
+                        "& .MuiInputBase-input::placeholder": { color: "rgba(243, 240, 240, 0.7)" },
+                        mb: 1.5,
+                      },
+                    },
+                  }}
+                />
+
+                <DatePicker
+                  className="text-white bg-teal-500"
+                  label={null}
+                  value={endDMY ? dayjs(dmyToISO(endDMY)) : null}
+                  onChange={(v) => { setEndDMY(v ? v.format("DD-MM-YYYY") : ""); setDateRange(""); }}
+                  format="DD-MM-YYYY"
+                  slotProps={{
+                    textField: {
+                      placeholder: "dd-mm-yyyy",
+                      size: "small",
+                      sx: {
+                        "& .MuiOutlinedInput-root": {
+                          height: 44,
+                          background: "rgba(255,255,255,.1)",
+                          borderRadius: 12,
+                          color: "#fff",
+                        },
+                        "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,.2)" },
+                        "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,.7)" },
+                      },
+                    },
+                  }}
+                />
+                </LocalizationProvider>
+              </div>
 
                 {/* Location */}
-                <div className="mb-5">
-                  <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M12 22s7-7 7-11a7 7 0 1 0-14 0c0 4 7 11 7 11Z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      />
-                      <circle cx="12" cy="11" r="2.5" stroke="currentColor" strokeWidth="2" />
-                    </svg>
-                    Location
-                  </div>
-                  <select className="w-full h-11 px-3 rounded-xl bg-white/10 border border-white/20 outline-none">
-                    <option className="bg-white text-black">Select location</option>
-                    <option className="bg-white text-black">New York, NY</option>
-                    <option className="bg-white text-black">London, UK</option>
-                    <option className="bg-white text-black">Singapore</option>
-                  </select>
-                </div>
+                <FormControl size="small" className="w-full sm:w-[250px] mb-4 sm:mb-5">
+                    <Select
+                      value={selectedLocation}
+                      onChange={(e) => setSelectedLocation(e.target.value)}
+                      displayEmpty
+                      renderValue={(v) => v || 'Location'}
+                      MenuProps={selectMenuProps}
+                      sx={{ ...selectSx, '& .MuiSelect-select': { px: 2.5, py: 2.25 } }}
+                    >
+                      {/* allow clearing back to 'Location' */}
+                      <MenuItem value="">
+                        <em>Location</em>
+                      </MenuItem>
+
+                      {locations.map((loc) => (
+                        <MenuItem key={loc} value={loc}>{loc}</MenuItem>
+                      ))}
+                    </Select>
+                </FormControl>
 
                 {/* Topic/Industry */}
                 <div className="mb-6">
@@ -702,20 +780,17 @@ export default function EventsPage() {
                         <span>{x}</span>
                       </label>
                     ))}
-                    {/* quick "clear all" */}
-                    {selectedTopics.length > 0 && (
-                      <button type="button" className="mt-2 text-xs underline text-white/70"
-                              onClick={() => setSelectedTopics([])}>
-                        Clear all
-                      </button>
-                    )}
-
                   </div>
                 </div>
 
                 {/* Event Format */}
                 <div className="mb-6">
-                  <div className="text-teal-300 font-semibold mb-2">Event Format</div>
+                  <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                    Event Format
+                  </div>
                   <div className="space-y-3 text-white/90">
                     {formats.map((x) => (
                       <label key={x} className="flex items-center gap-3">
@@ -760,11 +835,6 @@ export default function EventsPage() {
                 <button className="w-full h-11 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-semibold">
                   Apply Filters
                 </button>
-
-                <button className="w-full h-11 px-2 rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white-200 mt-3">
-                  Clear Filters
-                </button>
-
               </div>
             </Grid>
 
