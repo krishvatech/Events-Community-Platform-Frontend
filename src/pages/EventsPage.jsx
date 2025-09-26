@@ -780,6 +780,14 @@ export default function EventsPage() {
                         <span>{x}</span>
                       </label>
                     ))}
+                    {/* quick "clear all" */}
+                    {selectedTopics.length > 0 && (
+                      <button type="button" className="mt-2 text-xs underline text-white/70"
+                              onClick={() => setSelectedTopics([])}>
+                        Clear all
+                      </button>
+                    )}
+
                   </div>
                 </div>
 
@@ -835,6 +843,11 @@ export default function EventsPage() {
                 <button className="w-full h-11 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-semibold">
                   Apply Filters
                 </button>
+
+                <button className="w-full h-11 px-2 rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10 mt-3">
+                  Clear Filters
+                </button>
+
               </div>
             </Grid>
 
