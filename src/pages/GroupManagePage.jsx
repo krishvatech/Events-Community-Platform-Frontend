@@ -16,6 +16,8 @@ import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import PollRoundedIcon from "@mui/icons-material/PollRounded";
 import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 
 
 // ---- API helpers (reuse same pattern as GroupsAdmin.jsx) ----
@@ -357,6 +359,211 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }
     );
 }
 
+// ---- Add Sub-group Dialog (same UI as Create Group) ----
+function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
+  const token = getToken();
+
+  const [name, setName] = React.useState("");
+  const [slug, setSlug] = React.useState("");
+  const [description, setDescription] = React.useState("");
+  const [visibility, setVisibility] = React.useState("public");  // public | private
+  const [joinPolicy, setJoinPolicy] = React.useState("open");    // open | approval | invite
+  const [imageFile, setImageFile] = React.useState(null);
+  const [localPreview, setLocalPreview] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+  const [errors, setErrors] = React.useState({});
+
+  const slugify = (s) =>
+    (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  const onNameChange = (v) => {
+    setName(v);
+    // mirror Create Group behavior: auto-fill slug (hidden)
+    if (!slug || slug === slugify(name)) setSlug(slugify(v));
+  };
+
+  const onPickFile = (file) => {
+    if (!file) return;
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setLocalPreview(String(e.target?.result || ""));
+    reader.readAsDataURL(file);
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!name.trim()) e.name = "Required";
+    if (!slug.trim()) e.slug = "Required";
+    if (!description.trim()) e.description = "Required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const submit = async () => {
+    if (!parentGroup || !validate()) return;
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("name", name.trim());
+      fd.append("slug", slug.trim());
+      fd.append("description", description.trim());
+      fd.append("visibility", visibility);
+      fd.append("join_policy", joinPolicy);
+      fd.append("parent_id", String(parentGroup.id));
+      // send community_id if you have it (works with your backend shape)
+      if (parentGroup?.community?.id) fd.append("community_id", String(parentGroup.community.id));
+      if (parentGroup?.community_id)  fd.append("community_id", String(parentGroup.community_id));
+      if (imageFile) fd.append("cover_image", imageFile, imageFile.name);
+
+      const res = await fetch(`${API_ROOT}/groups/`, {
+        method: "POST",
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: fd,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          json?.detail ||
+          Object.entries(json || {})
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+            .join(" | ") ||
+          `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      onCreated?.({ ...json, _cache: Date.now() });
+      // reset form
+      setName(""); setSlug(""); setDescription("");
+      setVisibility("public"); setJoinPolicy("open");
+      setImageFile(null); setLocalPreview("");
+      onClose?.();
+    } catch (e) {
+      alert(String(e?.message || e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
+      <DialogTitle className="font-extrabold">Create Sub-group</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body2" className="text-slate-500 mb-4">
+          *Required fields are marked with an asterisk
+        </Typography>
+
+        <Box className="flex items-start gap-3 mb-4">
+          <Avatar sx={{ bgcolor: "#10b8a6", width: 40, height: 40 }} />
+          <TextField
+            label="Group Name *"
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            fullWidth
+            error={!!errors.name}
+            helperText={errors.name}
+            className="mb-3"
+          />
+        </Box>
+
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 md:col-span-7">
+            <TextField
+              label="Description *"
+              multiline minRows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              fullWidth className="mb-3"
+              error={!!errors.description} helperText={errors.description}
+            />
+
+            <TextField
+              label="Visibility"
+              select fullWidth className="mb-3"
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value)}
+            >
+              <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
+              <MenuItem value="private">Private (invite-only)</MenuItem>
+            </TextField>
+
+            <TextField
+              label="Join Policy"
+              select fullWidth className="mb-3"
+              value={joinPolicy}
+              onChange={(e) => setJoinPolicy(e.target.value)}
+            >
+              <MenuItem value="open">Open (join instantly)</MenuItem>
+              <MenuItem value="approval">Approval required</MenuItem>
+              <MenuItem value="invite">Invite-only</MenuItem>
+            </TextField>
+
+            {/* hidden slug like Create Group */}
+            <Box sx={{ display: "none" }}>
+              <TextField
+                label="Slug *"
+                value={slug}
+                onChange={(e) => setSlug(slugify(e.target.value))}
+                error={!!errors.slug}
+                helperText={errors.slug}
+              />
+            </Box>
+          </div>
+
+          <div className="col-span-12 md:col-span-5">
+            <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+            <Typography variant="caption" className="text-slate-500 block mb-2">
+              Recommended 650×365px • Max 50 MB
+            </Typography>
+
+            <Box
+              className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+              sx={{ height: 200, position: "relative", overflow: "hidden" }}
+            >
+              {localPreview ? (
+                <img src={localPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <Stack alignItems="center" spacing={1}>
+                  <ImageRoundedIcon />
+                  <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
+                </Stack>
+              )}
+              <input
+                id="subgroup-cover-input"
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => onPickFile(e.target.files?.[0] || null)}
+              />
+            </Box>
+
+            <Stack direction="row" spacing={1} className="mt-2">
+              <label htmlFor="subgroup-cover-input">
+                <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                  Upload
+                </Button>
+              </label>
+            </Stack>
+          </div>
+        </div>
+      </DialogContent>
+
+      <DialogActions className="px-6 py-4">
+        <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>
+        <Button
+          onClick={submit}
+          disabled={submitting}
+          variant="contained"
+          className="rounded-xl"
+          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+        >
+          Create
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
 
 // ---- Main page ----
 export default function GroupManagePage() {
@@ -375,6 +582,45 @@ export default function GroupManagePage() {
     const [addOpen, setAddOpen] = React.useState(false);
     const [memMenuAnchor, setMemMenuAnchor] = React.useState(null);
     const [activeMember, setActiveMember] = React.useState(null);
+    // Sub-groups state
+    const [subgroups, setSubgroups] = React.useState([]);
+    const [subLoading, setSubLoading] = React.useState(true);
+    const [subError, setSubError] = React.useState("");
+    const [addSubOpen, setAddSubOpen] = React.useState(false);
+    // Load sub-groups (tries multiple URL patterns; first that works wins)
+    const fetchSubgroups = React.useCallback(async () => {
+    if (!group?.id) return;
+    setSubLoading(true); setSubError("");
+    const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+    const candidates = [
+        `${API_ROOT}/groups/${idOrSlug}/subgroups/`,
+        `${API_ROOT}/groups/?parent_id=${group.id}`,
+        `${API_ROOT}/groups/?parent=${group.id}`,
+        `${API_ROOT}/groups/?parent_slug=${encodeURIComponent(group.slug || idOrSlug)}`
+    ];
+    let rows = null, lastErr = null;
+    for (const url of candidates) {
+        try {
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        rows = Array.isArray(json) ? json : (Array.isArray(json?.results) ? json.results : []);
+        if (Array.isArray(rows)) break;
+        } catch (e) {
+        lastErr = e;
+        }
+    }
+    if (!Array.isArray(rows)) {
+        setSubgroups([]);
+        setSubError(lastErr ? String(lastErr.message || lastErr) : "Unable to load sub-groups");
+    } else {
+        setSubgroups(rows);
+    }
+    setSubLoading(false);
+    }, [group, idOrSlug, token]);
+
+    React.useEffect(() => { if (group) fetchSubgroups(); }, [group, fetchSubgroups]);
+
     const [busyUserId, setBusyUserId] = React.useState(null);
     // Posts tab state
     const [posts, setPosts] = React.useState([]);
@@ -517,7 +763,7 @@ export default function GroupManagePage() {
 
     // Load posts only when Posts tab is active (saves calls)
     React.useEffect(() => {
-        if (tab === 3) fetchPosts();
+        if (tab === 4) fetchPosts();
     }, [tab, fetchPosts]);
 
     // Helpers for poll options
@@ -783,6 +1029,7 @@ export default function GroupManagePage() {
                 <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
                     <Tab label="Overview" />
                     <Tab label="Members" />
+                    <Tab label="Sub-groups" />
                     <Tab label="Settings" />
                     <Tab label="Posts" />
                 </Tabs>
@@ -935,8 +1182,74 @@ export default function GroupManagePage() {
                         </Paper>
                     )}
 
-
+                    {/* Sub-groups tab */}
                     {tab === 2 && (
+                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                        <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
+                        {canModerate && (
+                            <Button
+                                variant="contained"
+                                className="rounded-xl"
+                                sx={{ textTransform: "none", backgroundColor: "#10b981", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                onClick={() => setAddSubOpen(true)}
+                                startIcon={<AddRoundedIcon />}
+                            >
+                                Add sub-group
+                            </Button>
+                        )}
+                        </Stack>
+
+                        {subLoading ? (
+                        <LinearProgress />
+                        ) : subError ? (
+                        <Alert severity="error">{subError}</Alert>
+                        ) : subgroups.length === 0 ? (
+                        <Typography className="text-slate-500">No sub-groups yet.</Typography>
+                        ) : (
+                        <Stack spacing={1.5}>
+                            {subgroups.map((sg) => (
+                            <Paper key={sg.id || sg.slug} variant="outlined" className="p-2 rounded-xl">
+                                <Stack direction="row" alignItems="center" spacing={2} justifyContent="space-between">
+                                <Stack direction="row" alignItems="center" spacing={2}>
+                                    <Avatar
+                                    variant="circular"
+                                    src={bust(sg.cover_image)}
+                                    alt={sg.name || "Group"}
+                                    >
+                                    {(sg.name || "?").charAt(0).toUpperCase()}
+                                    </Avatar>
+                                    <Box>
+                                    <Typography className="font-semibold">{sg.name}</Typography>
+                                    <Typography variant="caption" className="text-slate-500">
+                                        {(sg.visibility === "private" ? "Private" : "Public")} • {(sg.member_count ?? sg.members_count ?? 0)} members
+                                    </Typography>
+                                    </Box>
+                                </Stack>
+                                <Button
+                                    size="small"
+                                    variant="text"
+                                    endIcon={<OpenInNewRoundedIcon />}
+                                    onClick={() => navigate(`/groups/${sg.slug || sg.id}`)}
+                                >
+                                    Open
+                                </Button>
+                                </Stack>
+                            </Paper>
+                            ))}
+                        </Stack>
+                        )}
+
+                        <AddSubgroupDialog
+                        open={addSubOpen}
+                        onClose={() => setAddSubOpen(false)}
+                        parentGroup={group}
+                        onCreated={(g) => { setSubgroups((prev) => [g, ...prev]); }}
+                        />
+                    </Paper>
+                    )}
+
+                    {tab === 3 && (
                         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                             <Typography variant="h6" className="font-semibold mb-1">Settings</Typography>
                             <Typography className="text-slate-500 mb-3">
@@ -958,7 +1271,7 @@ export default function GroupManagePage() {
                         </Paper>
                     )}
 
-                    {tab === 3 && (
+                    {tab === 4 && (
                         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                             <Stack spacing={2}>
                                 <Typography variant="h6" className="font-semibold">Posts</Typography>
