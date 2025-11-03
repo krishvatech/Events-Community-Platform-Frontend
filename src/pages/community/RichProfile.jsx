@@ -113,13 +113,17 @@ export default function RichProfile() {
     }
     (async () => {
       try {
-        const r = await fetch(`${API_BASE}/friends/status/${userId}/`, {
+        const r = await fetch(`${API_BASE}/friends/status/?user_id=${userId}`, {
           headers: { ...tokenHeader(), Accept: "application/json" },
           credentials: "include",
         });
         const d = await r.json().catch(() => ({}));
         if (!alive) return;
-        setFriendStatus(d?.status || "none");
+        const map = {
+         incoming_pending: "pending_incoming",
+         outgoing_pending: "pending_outgoing",
+       };
+       setFriendStatus(map[d?.status] || d?.status || "none");
       } catch {
         if (!alive) return;
         setFriendStatus("none");
@@ -358,33 +362,35 @@ export default function RichProfile() {
                     {/* Right-side actions */}
                     {!isMe && (
                       <Box sx={{ mt: 1.5, display: "flex", justifyContent: "flex-end", ml: "auto", gap: 1 }}>
-                        {/* If friends -> show "Connections" button (your requirement) */}
-                        {friendLoading ? (
-                          <Button variant="outlined" size="small" disabled>Loading…</Button>
-                        ) : friendStatus === "friends" ? (
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            sx={{ textTransform: "none", borderRadius: 2 }}
-                            onClick={openConnections}
-                          >
-                            Connections
-                          </Button>
-                        ) : friendStatus === "pending_outgoing" ? (
-                          <Button variant="outlined" size="small" disabled>Request sent</Button>
-                        ) : friendStatus === "pending_incoming" ? (
-                          <Button variant="outlined" size="small" disabled>Pending your approval</Button>
-                        ) : friendStatus === "none" ? (
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={sendFriendRequest}
-                            disabled={friendSubmitting}
-                            sx={{ textTransform: "none", borderRadius: 2 }}
-                          >
-                            {friendSubmitting ? "Sending…" : "Add Friend"}
-                          </Button>
-                        ) : null}
+                        {friendLoading && (
+                         <Button variant="outlined" size="small" disabled>Loading…</Button>
+                       )}
+                       {!friendLoading && friendStatus === "friends" && (
+                         <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+                           Your Friend
+                         </Button>
+                       )}
+                       {!friendLoading && friendStatus === "pending_outgoing" && (
+                         <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+                           Request sent
+                         </Button>
+                       )}
+                       {!friendLoading && friendStatus === "pending_incoming" && (
+                         <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+                           Pending your approval
+                         </Button>
+                       )}
+                       {!friendLoading && friendStatus === "none" && (
+                         <Button
+                           variant="contained"
+                           size="small"
+                           onClick={sendFriendRequest}
+                           disabled={friendSubmitting}
+                           sx={{ textTransform: "none", borderRadius: 2 }}
+                         >
+                           {friendSubmitting ? "Sending…" : "Add Friend"}
+                         </Button>
+                       )}
                       </Box>
                     )}
                   </Box>
