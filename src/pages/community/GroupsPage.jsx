@@ -1,9 +1,11 @@
 // src/pages/community/GroupsPage.jsx
 import * as React from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, Grid, IconButton, InputAdornment, MenuItem, Paper, Select, Stack,
-  TextField, Typography, Card, CardContent, CardActions, CardHeader, Tooltip
+  TextField, Typography, Card, CardContent, CardActions, CardHeader, Tooltip,
+  Tabs, Tab
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
@@ -14,24 +16,41 @@ import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
 
-function GroupRow({ g, onJoin }) {
+function GroupRow({ g, onJoin, showJoin = true }) {
   const isPrivate = (g.visibility || "").toLowerCase() === "private";
+  const groupPath = `/community/group/${g.slug || g.id}`;
   return (
     <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 3, borderColor: "#e2e8f0" }}>
       <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
         {/* Left: image + texts */}
         <Stack direction="row" spacing={2} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
           <Avatar
+            component={RouterLink}
+            to={groupPath}
             src={g.avatar || g.cover}
             sx={{ width: 56, height: 56, borderRadius: 2 }}
+            aria-label={`Open ${g.name} group`}
           >
             {g.name?.[0]}
           </Avatar>
 
           <Box sx={{ minWidth: 0 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+            <Typography
+              component={RouterLink}
+              to={groupPath}
+              variant="subtitle1"
+              sx={{
+                fontWeight: 700,
+                lineHeight: 1.2,
+                textDecoration: "none",
+                color: "inherit",
+                "&:hover": { textDecoration: "underline" },
+              }}
+              aria-label={`Open ${g.name} group`}
+            >
               {g.name}
             </Typography>
+
 
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5, flexWrap: "wrap" }}>
               {/* member count */}
@@ -52,16 +71,18 @@ function GroupRow({ g, onJoin }) {
           </Box>
         </Stack>
 
-        {/* Right: Join / Request */}
-        <Button
-          size="small"
-          variant="contained"
-          onClick={() => onJoin?.(g)}
-        >
-          {isPrivate ? "Request to join" : "Join"}
-        </Button>
+        {/* Right: Join / Request (hidden for "My groups") */}
+        {showJoin && (
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => onJoin?.(g)}
+          >
+            {isPrivate ? "Request to join" : "Join"}
+          </Button>
+        )}
       </Stack>
-    </Paper>
+    </Paper >
   );
 }
 
@@ -124,18 +145,65 @@ export default function GroupsPage({
   user, stats, tags = [],
 }) {
   const [q, setQ] = React.useState("");
-  const [visibility, setVisibility] = React.useState("Public");
+  const [visibility, setVisibility] = React.useState("All");
   const [sortBy, setSortBy] = React.useState("recent");
   const [open, setOpen] = React.useState(false);
 
   const [groups, setGroups] = React.useState(() => initialGroups ?? demoGroups());
 
+  const [tab, setTab] = React.useState("explore"); // "explore" | "mine"
+
+  // Decide if the current user has joined a group.
+  // Works with several common backend shapes (pick any that you return).
+  const isJoined = React.useCallback(
+    (g) => {
+      const lc = (v) => (v || "").toLowerCase();
+      const roles = ["owner", "admin", "moderator", "member"];
+      const statuses = ["approved", "member", "joined", "active"];
+      return Boolean(
+        g?.is_member || g?.am_i_member || g?.joined || g?.isJoined ||
+        roles.includes(lc(g?.my_role)) || roles.includes(lc(g?.role)) ||
+        statuses.includes(lc(g?.membership_status)) ||
+        roles.includes(lc(g?.membership?.role)) ||
+        statuses.includes(lc(g?.membership?.status)) ||
+        (Array.isArray(g?.members) && user?.id &&
+          g.members.some((m) => m?.id === user.id))
+      );
+    },
+    [user?.id]
+  );
+
+  const handleJoin = async (g) => {
+    try {
+      await onJoinGroup?.(g); // your existing backend join
+    } finally {
+      // optimistic local update so Explore hides it right away
+      setGroups((curr) =>
+        curr.map((it) =>
+          it.id === g.id
+            ? { ...it, is_member: true, membership_status: "joined", my_role: it.my_role ?? "member" }
+            : it
+        )
+      );
+    }
+  };
+
+
   const filtered = React.useMemo(() => {
     let arr = [...groups];
+    if (tab === "mine") {
+      // only my groups
+      arr = arr.filter(isJoined);
+    } else {
+      // explore => hide groups I've already joined
+      arr = arr.filter((g) => !isJoined(g));
+    }
     const t = q.trim().toLowerCase();
     if (t) arr = arr.filter((g) => g.name.toLowerCase().includes(t) || g.description?.toLowerCase().includes(t));
-    if (visibility !== "All") {
-      arr = arr.filter((g) => g.visibility === visibility.toLowerCase());
+    if (tab !== "mine" && visibility !== "All") {
+      arr = arr.filter(
+        (g) => (g.visibility || "").toLowerCase() === visibility.toLowerCase()
+      );
     }
     if (sortBy === "recent") {
       arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -143,7 +211,7 @@ export default function GroupsPage({
       arr.sort((a, b) => (b.member_count || 0) - (a.member_count || 0));
     }
     return arr;
-  }, [groups, q, visibility, sortBy]);
+  }, [groups, q, visibility, sortBy, tab, isJoined]);
 
   const handleCreate = (payload, memberIds) => {
     setGroups((curr) => [payload, ...curr]);
@@ -178,11 +246,22 @@ export default function GroupsPage({
                 <MenuItem value="members">Most members</MenuItem>
               </TextField>
             </Stack>
+            <Divider sx={{ my: 1.25 }} />
+            <Tabs
+              value={tab}
+              onChange={(_, v) => setTab(v)}
+              variant="fullWidth"
+              textColor="primary"
+              indicatorColor="primary"
+            >
+              <Tab value="explore" label="Explore groups" />
+              <Tab value="mine" label="My groups" />
+            </Tabs>
           </Paper>
 
           <Stack spacing={1.25}>
             {filtered.map((g) => (
-              <GroupRow key={g.id} g={g} onJoin={onJoinGroup} />
+              <GroupRow key={g.id} g={g} onJoin={handleJoin} showJoin={tab !== "mine"} />
             ))}
             {filtered.length === 0 && (
               <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
@@ -222,6 +301,7 @@ function demoGroups() {
       visibility: "public",
       join_policy: "open",
       member_count: 312,
+      is_member: true,
       tags: ["Charter", "Alumni"],
       cover: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&q=80&auto=format&fit=crop",
       created_at: new Date(now - 600000).toISOString(),

@@ -19,12 +19,12 @@ import LiveMeetingPage from "./pages/LiveMeetingPage.jsx";
 import Footer from "./components/Footer.jsx";
 import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
 import ProfilePage from "./pages/ProfilePage.jsx";
-import RichProfile from "./pages/RichProfile.jsx";
 import ConversationPage from "./pages/ConversationPage.jsx";
 import MessagesDirectory from "./pages/MessagesDirectory.jsx";
 import ResourceDetails from "./pages/ResourceDetails.jsx";
 import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
+import RichProfile from "./pages/community/RichProfile.jsx";
 
 
 const AppShell = () => {
@@ -74,7 +74,8 @@ const AppShell = () => {
         {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
         <Route path="/resource/:id" element={<RequireAuth><ResourceDetails /></RequireAuth>} />
         {/* ADD THIS ROUTE FOR RICH PROFILE */}
-        <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} />
+        {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
+        <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

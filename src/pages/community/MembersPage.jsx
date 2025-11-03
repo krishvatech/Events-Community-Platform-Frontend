@@ -1,8 +1,27 @@
 // src/pages/community/MembersPage.jsx
-import * as React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Avatar, Box, Button, Chip, Grid, IconButton, InputAdornment, MenuItem, Paper, Stack,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip, Typography
+  Avatar,
+  Badge,
+  Box,
+  Grid,
+  InputAdornment,
+  LinearProgress,
+  Pagination,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography,
+  Button,
+  IconButton,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import MailOutlineOutlinedIcon from "@mui/icons-material/MailOutlineOutlined";
@@ -11,182 +30,379 @@ import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
 
-function MemberRow({ m, onOpen, onMessage }) {
+// ---- API base + auth header (copied from MessagesDirectory) ----
+const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
+const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
+
+const tokenHeader = () => {
+  const t =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("access") ||
+    localStorage.getItem("jwt");
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+
+function MemberRow({ u, unread, onOpenProfile, onMessage }) {
+  const name =
+    u?.profile?.full_name ||
+    `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
+    u?.email;
+  const company = u?.company_from_experience ?? "—";
+  const title = u?.position_from_experience ?? "—";
+
   return (
     <TableRow hover>
       <TableCell width={56}>
-        <Avatar src={m.avatar} alt={m.name} />
+        <Badge
+          overlap="circular"
+          variant="dot"
+          color="error"
+          invisible={!unread}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Avatar
+            sx={{ width: 36, height: 36, cursor: "pointer" }}
+            onClick={() => onOpenProfile?.(u)}
+          >
+            {(name || "?").slice(0, 1).toUpperCase()}
+          </Avatar>
+        </Badge>
       </TableCell>
+
       <TableCell>
-        <Stack>
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>{m.name}</Typography>
+        <Stack onClick={() => onOpenProfile?.(u)} sx={{ cursor: "pointer" }}>
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {name}
+          </Typography>
           <Typography variant="caption" color="text.secondary">
-            {m.title} {m.company ? `· ${m.company}` : ""}
+            {u?.email}
           </Typography>
         </Stack>
       </TableCell>
+
       <TableCell>
-        <Stack direction="row" spacing={0.5} flexWrap="wrap">
-          {(m.tags || []).map((t) => <Chip key={t} size="small" label={t} />)}
-        </Stack>
+        <Typography variant="body2">{company}</Typography>
       </TableCell>
-      <TableCell>{m.group || "-"}</TableCell>
-      <TableCell align="right">
+
+      <TableCell>
+        <Typography variant="body2">{title}</Typography>
+      </TableCell>
+
+      <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
         <Tooltip title="Open profile">
-          <IconButton size="small" onClick={() => onOpen?.(m)}>
+          <IconButton size="small" onClick={() => onOpenProfile?.(u)}>
             <OpenInNewOutlinedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Message">
-          <IconButton size="small" onClick={() => onMessage?.(m)}>
-            <MailOutlineOutlinedIcon fontSize="small" />
-          </IconButton>
+          <Button
+            size="small"
+            variant="contained"
+            sx={{ textTransform: "none", borderRadius: 2, ml: 1 }}
+            startIcon={<MailOutlineOutlinedIcon />}
+            onClick={onMessage}
+          >
+            Message
+          </Button>
         </Tooltip>
       </TableCell>
     </TableRow>
   );
 }
 
-export default function MembersPage({
-  members: initialMembers,
-  groups = ["All", "Charter Holders", "EMEA Chapter", "Cohort 2024 Online"],
-  onOpenProfile = (m) => { },
-  onMessage = (m) => { },
-  user, stats, tags = [],
-}) {
-  const [q, setQ] = React.useState("");
-  const [group, setGroup] = React.useState("All");
-  const [sortBy, setSortBy] = React.useState("az");
-  const [members, setMembers] = React.useState(() => initialMembers ?? demoMembers());
+export default function MembersPage({ user, stats, tags = [] }) {
+  const navigate = useNavigate();
 
-  const filtered = React.useMemo(() => {
-    let arr = [...members];
-    const t = q.trim().toLowerCase();
-    if (t) {
-      arr = arr.filter(
-        (m) =>
-          m.name.toLowerCase().includes(t) ||
-          m.title?.toLowerCase().includes(t) ||
-          m.company?.toLowerCase().includes(t)
+  // ---- state
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [users, setUsers] = useState([]);
+  const [q, setQ] = useState("");
+
+  // pagination
+  const [page, setPage] = useState(1);
+  const ROWS_PER_PAGE = 5;
+
+  // unread-by-user map (like MessagesDirectory)
+  const [unreadByUser, setUnreadByUser] = useState({});
+  const pollRef = useRef(null);
+
+  // me
+  const me = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  }, []);
+
+  // ---- load users (try /users/roster/ else fallback /users/?limit=500)
+  useEffect(() => {
+    let alive = true;
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        async function fetchUsers(url) {
+          const res = await fetch(url, {
+            headers: tokenHeader(),
+            signal: ctrl.signal,
+            credentials: "include",
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+          return Array.isArray(json) ? json : json?.results ?? [];
+        }
+
+        let list = [];
+        try {
+          list = await fetchUsers(`${API_BASE}/users/roster/`);
+        } catch {
+          list = await fetchUsers(`${API_BASE}/users/?limit=500`);
+        }
+
+        if (!alive) return;
+        setUsers(list.filter((u) => u.id !== me?.id));
+      } catch (e) {
+        if (e?.name !== "AbortError")
+          setError(e?.message || "Failed to load users");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+      ctrl.abort();
+    };
+  }, [me?.id]);
+
+  // ---- poll conversations to compute unread badge per user (same logic as MessagesDirectory)
+  useEffect(() => {
+    function pickOther(conv) {
+      if (conv?.other_user) return conv.other_user;
+      if (Array.isArray(conv?.users_detail))
+        return conv.users_detail.find((u) => u?.id !== me?.id);
+      const otherId = Array.isArray(conv?.users)
+        ? conv.users.find((id) => id !== me?.id)
+        : conv?.other_user_id;
+      return otherId ? { id: otherId } : undefined;
+    }
+    function lastMeta(conv) {
+      const lm = conv?.last_message || {};
+      return {
+        ts: lm.created_at || conv?.updated_at || conv?.created_at,
+        sender: lm.sender || lm.sender_id || conv?.last_sender_id,
+      };
+    }
+    async function fetchConversations() {
+      try {
+        const res = await fetch(
+          `${API_BASE}/messaging/conversations/?limit=200`,
+          { headers: tokenHeader(), credentials: "include" }
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) return;
+        const list = Array.isArray(json) ? json : json?.results ?? [];
+        const map = {};
+        for (const c of list) {
+          const other = pickOther(c);
+          const otherId = other?.id;
+          if (!otherId) continue;
+          const { ts, sender } = lastMeta(c);
+          const seen = localStorage.getItem(`conv_read_${c.id}`) || "";
+          const isUnread =
+            ts &&
+            sender &&
+            sender !== me?.id &&
+            (!seen || new Date(ts) > new Date(seen));
+          if (isUnread) map[otherId] = true;
+        }
+        setUnreadByUser(map);
+      } catch {}
+    }
+    fetchConversations();
+    pollRef.current = setInterval(fetchConversations, 5000);
+    return () => pollRef.current && clearInterval(pollRef.current);
+  }, [me?.id]);
+
+  // ---- filtering (text only)
+  const filtered = useMemo(() => {
+    const s = (q || "").toLowerCase().trim();
+    return users.filter((u) => {
+      const fn = (u.first_name || "").toLowerCase();
+      const ln = (u.last_name || "").toLowerCase();
+      const em = (u.email || "").toLowerCase();
+      const full = (u.profile?.full_name || "").toLowerCase();
+      const company = (u.company_from_experience || "").toLowerCase();
+      const title = (u.position_from_experience || "").toLowerCase();
+      return (
+        !s ||
+        fn.includes(s) ||
+        ln.includes(s) ||
+        em.includes(s) ||
+        full.includes(s) ||
+        company.includes(s) ||
+        title.includes(s)
       );
-    }
-    if (group !== "All") {
-      arr = arr.filter((m) => m.group === group);
-    }
-    if (sortBy === "az") arr.sort((a, b) => a.name.localeCompare(b.name));
-    if (sortBy === "recent") arr.sort((a, b) => new Date(b.joined_at) - new Date(a.joined_at));
-    return arr;
-  }, [members, q, group, sortBy]);
+    });
+  }, [users, q]);
 
+  // ---- pagination
+  useEffect(() => setPage(1), [q]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
+  const startIdx = (page - 1) * ROWS_PER_PAGE;
+  const current = filtered.slice(startIdx, startIdx + ROWS_PER_PAGE);
+
+  // ---- actions
+  async function startChat(recipientId) {
+    try {
+      const r = await fetch(`${API_BASE}/messaging/conversations/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        body: JSON.stringify({ recipient_id: recipientId }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.detail || "Failed to start conversation");
+      const id = data?.id || data?.conversation?.id || data?.pk;
+      if (id) localStorage.setItem(`conv_read_${id}`, new Date().toISOString());
+      navigate(`/account/messages/${id}`);
+    } catch (e) {
+      alert(e?.message || "Failed to start conversation");
+    }
+  }
+
+  const handleOpenProfile = (m) => {
+    const id = m?.id ?? m?.user_id ?? m?.pk;
+    if (!id) return;
+    navigate(`/community/rich-profile/${id}`, { state: { user: m } });
+  };
+
+  // ---- UI
   return (
     <Grid container spacing={2}>
-      {/* Center: table */}
+      {/* Center column */}
       <Grid item xs={12} md={9}>
-        <Paper sx={{ p: 1.5, mb: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }}>
+        <Paper
+          sx={{ p: 1.5, mb: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3 }}
+        >
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            alignItems={{ xs: "stretch", sm: "center" }}
+          >
             <TextField
-              size="small" placeholder="Search members" fullWidth
-              value={q} onChange={(e) => setQ(e.target.value)}
-              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+              size="small"
+              placeholder="Search by name, email, company, or title…"
+              fullWidth
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
             />
-            <TextField
-              select size="small" label="Group" value={group}
-              onChange={(e) => setGroup(e.target.value)} sx={{ minWidth: 180 }}
-            >
-              {groups.map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
-            </TextField>
-            <TextField
-              select size="small" label="Sort" value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)} sx={{ minWidth: 160 }}
-            >
-              <MenuItem value="az">A–Z</MenuItem>
-              <MenuItem value="recent">Recently joined</MenuItem>
-            </TextField>
           </Stack>
         </Paper>
 
-        <TableContainer component={Paper} sx={{ border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell />
-                <TableCell>Name</TableCell>
-                <TableCell>Expertise</TableCell>
-                <TableCell>Group</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filtered.map((m) => (
-                <MemberRow
-                  key={m.id}
-                  m={m}
-                  onOpen={onOpenProfile}
-                  onMessage={onMessage}
-                />
-              ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5}>
-                    <Typography variant="body2" color="text.secondary">
-                      No members match your filters.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        {loading && <LinearProgress />}
+
+        {!loading && error && (
+          <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+            <Typography color="error">⚠️ {error}</Typography>
+          </Paper>
+        )}
+
+        {!loading && !error && (
+          <>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              justifyContent="space-between"
+              spacing={1}
+              sx={{ mb: 1 }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Showing{" "}
+                {filtered.length === 0
+                  ? "0"
+                  : `${startIdx + 1}–${Math.min(
+                      startIdx + ROWS_PER_PAGE,
+                      filtered.length
+                    )}`}{" "}
+                of {filtered.length} members
+              </Typography>
+              <Pagination
+                count={pageCount}
+                page={page}
+                onChange={(_, v) => setPage(v)}
+                size="small"
+                shape="rounded"
+                siblingCount={0}
+              />
+            </Stack>
+
+            <TableContainer
+              component={Paper}
+              sx={{ border: `1px solid ${BORDER}`, borderRadius: 3 }}
+            >
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell />
+                    <TableCell>Member</TableCell>
+                    <TableCell>Company</TableCell>
+                    <TableCell>Job Title</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {current.map((u) => (
+                    <MemberRow
+                      key={u.id}
+                      u={u}
+                      unread={!!unreadByUser[u.id]}
+                      onOpenProfile={() => handleOpenProfile(u)}
+                      onMessage={() => startChat(u.id)}
+                    />
+                  ))}
+
+                  {filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                        <Typography>No users match your search.</Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <Stack alignItems="center" sx={{ mt: 2 }}>
+              <Pagination
+                count={pageCount}
+                page={page}
+                onChange={(_, v) => setPage(v)}
+                size="small"
+                shape="rounded"
+                siblingCount={0}
+              />
+            </Stack>
+          </>
+        )}
       </Grid>
-      {/* Right: Profile (sticky like left sidebar) */}
+
+      {/* Right sticky profile (unchanged) */}
       <Grid item xs={12} md={3} sx={{ display: { xs: "none", md: "block" } }}>
-        <Box
-          sx={{
-            position: "sticky",
-            top: 88,            // adjust if your header is taller/shorter (e.g., 72–104)
-            alignSelf: "flex-start"
-          }}
-        >
+        <Box sx={{ position: "sticky", top: 88, alignSelf: "flex-start" }}>
           <CommunityProfileCard user={user} stats={stats} tags={tags} />
         </Box>
       </Grid>
     </Grid>
   );
-}
-
-/* ---------------- Demo data ---------------- */
-function demoMembers() {
-  const now = Date.now();
-  return [
-    {
-      id: "u1",
-      name: "Anita Sharma",
-      title: "M&A Analyst",
-      company: "IMAA",
-      group: "EMEA Chapter",
-      tags: ["Valuation", "PE"],
-      avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=80&q=80&auto=format&fit=crop",
-      joined_at: new Date(now - 1000 * 60 * 60 * 24 * 5).toISOString(),
-    },
-    {
-      id: "u2",
-      name: "Kenji Watanabe",
-      title: "Associate",
-      company: "Sakura Capital",
-      group: "Charter Holders",
-      tags: ["Diligence", "Carve-outs"],
-      avatar: "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=80&q=80&auto=format&fit=crop",
-      joined_at: new Date(now - 1000 * 60 * 60 * 24 * 11).toISOString(),
-    },
-    {
-      id: "u3",
-      name: "Aisha Khan",
-      title: "Analyst",
-      company: "HBR Ventures",
-      group: "Cohort 2024 Online",
-      tags: ["Integration", "PMO"],
-      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&q=80&auto=format&fit=crop",
-      joined_at: new Date(now - 1000 * 60 * 60 * 24 * 2).toISOString(),
-    },
-  ];
 }

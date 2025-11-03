@@ -2,12 +2,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-    Avatar, Box, Button, Card, CardContent, CardHeader, Container, LinearProgress,
-    List, ListItem, ListItemText, Paper, Stack, Typography
+    Avatar,
+    Box,
+    Button,
+    Card,
+    CardContent,
+    CardHeader,
+    Container,
+    LinearProgress,
+    List,
+    ListItem,
+    ListItemText,
+    Paper,
+    Stack,
+    Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import AccountHero from "../components/AccountHero.jsx";
-import AccountSidebar from "../components/AccountSidebar.jsx";
+import CommunitySidebar from "../../components/CommunitySideBar.jsx";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -32,7 +43,10 @@ const Section = ({ title, children, action }) => (
     </Card>
 );
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+];
 const toMonthYear = (d) => {
     if (!d) return "";
     const [y, m] = String(d).split("-");
@@ -57,7 +71,8 @@ function pickBestExperience(exps = []) {
 }
 
 export default function RichProfile() {
-    const { id } = useParams();
+    // IMPORTANT: use :userId from /community/rich-profile/:userId
+    const { userId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -69,9 +84,13 @@ export default function RichProfile() {
     const [loadingExtras, setLoadingExtras] = useState(true);
 
     const me = useMemo(() => {
-        try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+        try {
+            return JSON.parse(localStorage.getItem("user") || "{}");
+        } catch {
+            return {};
+        }
     }, []);
-    const isMe = String(me?.id || "") === String(id || "");
+    const isMe = String(me?.id || "") === String(userId || "");
 
     // --- FRIEND BUTTON state & effects ---
     const [friendStatus, setFriendStatus] = useState(isMe ? "self" : "none"); // self | none | pending_outgoing | pending_incoming | friends
@@ -80,10 +99,14 @@ export default function RichProfile() {
 
     useEffect(() => {
         let alive = true;
-        if (isMe) { setFriendStatus("self"); setFriendLoading(false); return; }
+        if (isMe) {
+            setFriendStatus("self");
+            setFriendLoading(false);
+            return;
+        }
         (async () => {
             try {
-                const r = await fetch(`${API_BASE}/friends/status/${id}/`, {
+                const r = await fetch(`${API_BASE}/friends/status/${userId}/`, {
                     headers: { ...tokenHeader(), Accept: "application/json" },
                     credentials: "include",
                 });
@@ -98,19 +121,24 @@ export default function RichProfile() {
             }
         })();
         return () => { alive = false; };
-    }, [API_BASE, id, isMe]);
+    }, [userId, isMe]);
 
     const sendFriendRequest = async () => {
         try {
             setFriendSubmitting(true);
             const r = await fetch(`${API_BASE}/friends/request/`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...tokenHeader(),
+                    Accept: "application/json",
+                },
                 credentials: "include",
-                body: JSON.stringify({ to_user_id: Number(id) }),
+                body: JSON.stringify({ to_user_id: Number(userId) }),
             });
             const d = await r.json().catch(() => ({}));
-            if (!r.ok && r.status !== 200) throw new Error(d?.detail || "Failed to send request");
+            if (!r.ok && r.status !== 200)
+                throw new Error(d?.detail || "Failed to send request");
             setFriendStatus(d?.status || "pending_outgoing");
         } catch (e) {
             alert(e?.message || "Failed to send friend request");
@@ -123,19 +151,26 @@ export default function RichProfile() {
     useEffect(() => {
         let alive = true;
         (async () => {
-            if (userItem) { setLoadingBase(false); return; }
+            if (userItem) {
+                setLoadingBase(false);
+                return;
+            }
             try {
-                const r = await fetch(`${API_BASE}/users/roster/`, { headers: tokenHeader(), credentials: "include" });
-                const data = await r.json().catch(() => ([]));
+                const r = await fetch(`${API_BASE}/users/roster/`, {
+                    headers: tokenHeader(),
+                    credentials: "include",
+                });
+                const data = await r.json().catch(() => []);
                 const list = Array.isArray(data) ? data : data?.results || [];
-                const found = list.find((x) => String(x.id) === String(id));
+                const found = list.find((x) => String(x.id) === String(userId));
                 if (alive) setUserItem(found || null);
             } catch { }
-            finally { if (alive) setLoadingBase(false); }
+            finally {
+                if (alive) setLoadingBase(false);
+            }
         })();
         return () => { alive = false; };
-    }, [API_BASE, id, userItem]);
-
+    }, [userId, userItem]);
 
     // load experiences + educations (public-first)
     useEffect(() => {
@@ -145,14 +180,19 @@ export default function RichProfile() {
 
             const tryJSON = async (url) => {
                 try {
-                    const r = await fetch(url, { headers: tokenHeader(), credentials: "include" });
+                    const r = await fetch(url, {
+                        headers: tokenHeader(),
+                        credentials: "include",
+                    });
                     if (!r.ok) return null;
                     return await r.json().catch(() => null);
-                } catch { return null; }
+                } catch {
+                    return null;
+                }
             };
 
             // 1) Public-for-all endpoint (new backend action)
-            let j = await tryJSON(`${API_BASE}/users/${id}/profile/`);
+            let j = await tryJSON(`${API_BASE}/users/${userId}/profile/`);
 
             // 2) Fallback to "me" endpoints only if we’re looking at ourselves
             if (!j && isMe) {
@@ -162,7 +202,10 @@ export default function RichProfile() {
                         tryJSON(`${API_BASE}/auth/me/experiences/`),
                         tryJSON(`${API_BASE}/auth/me/educations/`),
                     ]);
-                    j = { experiences: Array.isArray(e1) ? e1 : [], educations: Array.isArray(e2) ? e2 : [] };
+                    j = {
+                        experiences: Array.isArray(e1) ? e1 : [],
+                        educations: Array.isArray(e2) ? e2 : [],
+                    };
                 }
             }
 
@@ -175,7 +218,7 @@ export default function RichProfile() {
             setLoadingExtras(false);
         })();
         return () => { alive = false; };
-    }, [API_BASE, id, isMe]);
+    }, [userId, isMe]);
 
     const fullName = useMemo(() => {
         const u = userItem || {};
@@ -189,57 +232,25 @@ export default function RichProfile() {
 
     const currentExp = useMemo(() => pickBestExperience(experiences), [experiences]);
 
-    const companyFromRoster = userItem?.company_from_experience || userItem?.profile?.company || "";
-    const titleFromRoster = userItem?.position_from_experience || userItem?.profile?.job_title || userItem?.profile?.role || "";
+    const companyFromRoster =
+        userItem?.company_from_experience || userItem?.profile?.company || "";
+    const titleFromRoster =
+        userItem?.position_from_experience ||
+        userItem?.profile?.job_title ||
+        userItem?.profile?.role ||
+        "";
 
     return (
         <div className="min-h-screen bg-slate-50">
-            <AccountHero
-                actions={
-                    <Box sx={{ display: "flex", gap: 1.25 }}>
-                        {/* NEW Back button */}
-                        <Button
-                            variant="outlined"
-                            startIcon={<ArrowBackIcon />}
-                            onClick={() => navigate(-1)}
-                            sx={{ textTransform: "none", borderRadius: 2 }}
-                        >
-                            Back
-                        </Button>
-
-                        <Button
-                            variant="contained"
-                            onClick={async () => {
-                                try {
-                                    const r = await fetch(`${API_BASE}/messaging/conversations/`, {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json", ...tokenHeader() },
-                                        credentials: "include",
-                                        body: JSON.stringify({ recipient_id: Number(id) }),
-                                    });
-                                    const data = await r.json().catch(() => ({}));
-                                    if (!r.ok) throw new Error(data?.detail || "Failed to start conversation");
-                                    const convId = data?.id || data?.conversation?.id || data?.pk;
-                                    if (convId) localStorage.setItem(`conv_read_${convId}`, new Date().toISOString());
-                                    navigate(`/account/messages/${convId}`);
-                                } catch (e) {
-                                    alert(e?.message || "Failed to start conversation");
-                                }
-                            }}
-                            sx={{ textTransform: "none", borderRadius: 2 }}
-                        >
-                            Message
-                        </Button>
-                    </Box>
-                }
-            />
-
             <Container maxWidth="lg" sx={{ py: 3 }}>
                 <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6">
-                    <aside><AccountSidebar stickyTop={96} /></aside>
+                    <aside>
+                        {/* Community sidebar (as requested) */}
+                        <CommunitySidebar stickyTop={96} />
+                    </aside>
 
                     <main>
-                        {(loadingBase) && <LinearProgress />}
+                        {loadingBase && <LinearProgress />}
 
                         {!loadingBase && (
                             <Stack spacing={2.5}>
@@ -250,24 +261,49 @@ export default function RichProfile() {
                                             {(fullName || "?").slice(0, 1).toUpperCase()}
                                         </Avatar>
                                         <Box sx={{ minWidth: 0 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700 }} className="truncate">
+                                            <Typography
+                                                variant="h6"
+                                                sx={{ fontWeight: 700 }}
+                                                className="truncate"
+                                            >
                                                 {fullName}
                                             </Typography>
-                                            <Typography variant="body2" color="text.secondary" className="truncate">
-                                                {(currentExp?.position || titleFromRoster || "—")} · {(currentExp?.community_name || companyFromRoster || "—")}
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                                className="truncate"
+                                            >
+                                                {(currentExp?.position || titleFromRoster || "—")} ·{" "}
+                                                {(currentExp?.community_name || companyFromRoster || "—")}
                                             </Typography>
                                         </Box>
-                                        {/* >>> Add Friend button (placed AFTER the header content, aligned right) */}
+
+                                        {/* Add Friend button */}
                                         {!isMe && (
-                                            <Box sx={{ mt: 1.5, display: "flex", justifyContent: "flex-end" }}>
+                                            <Box
+                                                sx={{
+                                                    mt: 1.5,
+                                                    display: "flex",
+                                                    justifyContent: "flex-end",
+                                                    ml: "auto",
+                                                }}
+                                            >
                                                 {friendLoading ? (
-                                                    <Button variant="outlined" size="small" disabled>Loading…</Button>
+                                                    <Button variant="outlined" size="small" disabled>
+                                                        Loading…
+                                                    </Button>
                                                 ) : friendStatus === "friends" ? (
-                                                    <Button variant="outlined" size="small" disabled>Friends</Button>
+                                                    <Button variant="outlined" size="small" disabled>
+                                                        Friends
+                                                    </Button>
                                                 ) : friendStatus === "pending_outgoing" ? (
-                                                    <Button variant="outlined" size="small" disabled>Request sent</Button>
+                                                    <Button variant="outlined" size="small" disabled>
+                                                        Request sent
+                                                    </Button>
                                                 ) : friendStatus === "pending_incoming" ? (
-                                                    <Button variant="outlined" size="small" disabled>Pending your approval</Button>
+                                                    <Button variant="outlined" size="small" disabled>
+                                                        Pending your approval
+                                                    </Button>
                                                 ) : (
                                                     <Button
                                                         variant="contained"
@@ -281,28 +317,58 @@ export default function RichProfile() {
                                                 )}
                                             </Box>
                                         )}
-                                        {/* <<< end Add Friend button */}
                                     </Box>
-
                                 </Paper>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                                     <Section title="About">
                                         <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>Email:</Typography>
-                                            <Typography variant="body2">{userItem?.email || "—"}</Typography>
+                                            <Typography
+                                                variant="subtitle2"
+                                                color="text.secondary"
+                                                sx={{ width: 120 }}
+                                            >
+                                                Email:
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                {userItem?.email || "—"}
+                                            </Typography>
                                         </Box>
                                         <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>Company:</Typography>
-                                            <Typography variant="body2">{currentExp?.community_name || companyFromRoster || "—"}</Typography>
+                                            <Typography
+                                                variant="subtitle2"
+                                                color="text.secondary"
+                                                sx={{ width: 120 }}
+                                            >
+                                                Company:
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                {currentExp?.community_name || companyFromRoster || "—"}
+                                            </Typography>
                                         </Box>
                                         <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>Job Title:</Typography>
-                                            <Typography variant="body2">{currentExp?.position || titleFromRoster || "—"}</Typography>
+                                            <Typography
+                                                variant="subtitle2"
+                                                color="text.secondary"
+                                                sx={{ width: 120 }}
+                                            >
+                                                Job Title:
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                {currentExp?.position || titleFromRoster || "—"}
+                                            </Typography>
                                         </Box>
                                         <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>Location:</Typography>
-                                            <Typography variant="body2">{userItem?.profile?.location || "—"}</Typography>
+                                            <Typography
+                                                variant="subtitle2"
+                                                color="text.secondary"
+                                                sx={{ width: 120 }}
+                                            >
+                                                Location:
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                {userItem?.profile?.location || "—"}
+                                            </Typography>
                                         </Box>
                                     </Section>
 
@@ -313,11 +379,17 @@ export default function RichProfile() {
                                         <Typography variant="body2" color="text.secondary">
                                             {currentExp?.community_name || companyFromRoster || "—"}
                                         </Typography>
-                                        {(currentExp?.start_date || currentExp?.end_date || currentExp?.currently_work_here) && (
-                                            <Typography variant="caption" color="text.secondary">
-                                                {rangeText(currentExp?.start_date, currentExp?.end_date, currentExp?.currently_work_here)}
-                                            </Typography>
-                                        )}
+                                        {(currentExp?.start_date ||
+                                            currentExp?.end_date ||
+                                            currentExp?.currently_work_here) && (
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {rangeText(
+                                                        currentExp?.start_date,
+                                                        currentExp?.end_date,
+                                                        currentExp?.currently_work_here
+                                                    )}
+                                                </Typography>
+                                            )}
                                     </Section>
                                 </div>
 
@@ -329,13 +401,21 @@ export default function RichProfile() {
                                             {experiences.map((x) => (
                                                 <ListItem key={x.id} disableGutters sx={{ py: 0.5 }}>
                                                     <ListItemText
-                                                        primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                            {x.position || "—"} — {x.community_name || "—"}
-                                                        </Typography>}
-                                                        secondary={<Typography variant="caption" color="text.secondary">
-                                                            {rangeText(x.start_date, x.end_date, x.currently_work_here)}
-                                                            {x.location ? ` · ${x.location}` : ""}
-                                                        </Typography>}
+                                                        primary={
+                                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                                {x.position || "—"} — {x.community_name || "—"}
+                                                            </Typography>
+                                                        }
+                                                        secondary={
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {rangeText(
+                                                                    x.start_date,
+                                                                    x.end_date,
+                                                                    x.currently_work_here
+                                                                )}
+                                                                {x.location ? ` · ${x.location}` : ""}
+                                                            </Typography>
+                                                        }
                                                     />
                                                 </ListItem>
                                             ))}
@@ -357,13 +437,17 @@ export default function RichProfile() {
                                             {educations.map((e) => (
                                                 <ListItem key={e.id} disableGutters sx={{ py: 0.5 }}>
                                                     <ListItemText
-                                                        primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                            {e.degree || "—"} — {e.school || "—"}
-                                                        </Typography>}
-                                                        secondary={<Typography variant="caption" color="text.secondary">
-                                                            {rangeText(e.start_date, e.end_date, false)}
-                                                            {e.field_of_study ? ` · ${e.field_of_study}` : ""}
-                                                        </Typography>}
+                                                        primary={
+                                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                                {e.degree || "—"} — {e.school || "—"}
+                                                            </Typography>
+                                                        }
+                                                        secondary={
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {rangeText(e.start_date, e.end_date, false)}
+                                                                {e.field_of_study ? ` · ${e.field_of_study}` : ""}
+                                                            </Typography>
+                                                        }
                                                     />
                                                 </ListItem>
                                             ))}
