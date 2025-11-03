@@ -1,48 +1,142 @@
 // src/pages/community/NotificationsPage.jsx
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Avatar, Badge, Box, Button, Chip, Divider, Grid, IconButton,
-  List, ListItem, ListItemAvatar, ListItemText, MenuItem, Paper, Stack,
-  TextField, Typography
+  Avatar, Badge, Box, Button, Chip, Grid, IconButton,
+  List, ListItem, ListItemAvatar, ListItemText, Paper, Stack,
+  TextField, Typography, Switch, FormControlLabel, MenuItem, Select
 } from "@mui/material";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
 import MarkEmailUnreadOutlinedIcon from "@mui/icons-material/MarkEmailUnreadOutlined";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
 
+/* ---------------------- helpers ---------------------- */
 function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
 }
-
 function groupByDay(items) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
   const groups = { Today: [], Yesterday: [], Earlier: [] };
   for (const it of items) {
-    const d = new Date(it.created_at); const dd = new Date(d); dd.setHours(0, 0, 0, 0);
-    if (dd >= today) groups.Today.push(it);
-    else if (dd >= yesterday) groups.Yesterday.push(it);
+    const d0 = new Date(it.created_at); const d = new Date(d0); d.setHours(0,0,0,0);
+    if (d >= today) groups.Today.push(it);
+    else if (d >= yesterday) groups.Yesterday.push(it);
     else groups.Earlier.push(it);
   }
   return groups;
 }
-
+const KIND_LABEL = {
+  mention: "Mentions",
+  comment: "Comments",
+  reaction: "Reactions",
+  follow: "Follows",
+  event: "Events",
+  system: "System",
+  friend_request: "Requests",
+  connection_request: "Requests",
+};
 function kindChip(kind) {
-  const map = { mention: "Mentions", comment: "Comments", reaction: "Reactions", follow: "Follows", event: "Events", system: "System" };
-  return map[kind] || "Other";
+  return KIND_LABEL[kind] || "Other";
 }
 
-function NotificationRow({ item, onOpen, onToggleRead }) {
+/* ------------------- row with actions ------------------- */
+function NotificationRow({
+  item,
+  onOpen,
+  onToggleRead,
+  onAcceptRequest,
+  onDeclineRequest,
+  onFollowBack,
+}) {
   const unread = !item.is_read;
+
+  const ActionsByKind = () => {
+    // LinkedIn-style connection/friend request
+    if (item.kind === "friend_request" || item.kind === "connection_request") {
+      if (item.state === "accepted") {
+        return (
+          <Chip
+            size="small"
+            color="success"
+            icon={<CheckCircleOutlineIcon />}
+            label="Accepted"
+            sx={{ ml: 1 }}
+          />
+        );
+      }
+      if (item.state === "declined") {
+        return (
+          <Chip
+            size="small"
+            color="default"
+            icon={<HighlightOffIcon />}
+            label="Declined"
+            sx={{ ml: 1 }}
+          />
+        );
+      }
+      return (
+        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => onAcceptRequest?.(item.id)}
+            disabled={!!item._busy}
+            sx={{ textTransform: "none", borderRadius: 2 }}
+            startIcon={<CheckCircleOutlineIcon />}
+          >
+            Accept
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => onDeclineRequest?.(item.id)}
+            disabled={!!item._busy}
+            sx={{ textTransform: "none", borderRadius: 2 }}
+            startIcon={<HighlightOffIcon />}
+          >
+            Decline
+          </Button>
+        </Stack>
+      );
+    }
+
+    // Follow
+    if (item.kind === "follow") {
+      return item.following_back ? (
+        <Chip size="small" variant="outlined" label="Following" sx={{ ml: 1 }} />
+      ) : (
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={() => onFollowBack?.(item.id)}
+          disabled={!!item._busy}
+          sx={{ textTransform: "none", borderRadius: 2, mt: 1 }}
+          startIcon={<PersonAddAlt1Icon />}
+        >
+          Follow back
+        </Button>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <Paper
       elevation={0}
       sx={{
-        p: 1.25, mb: 1,
+        p: 1.25,
+        mb: 1,
         border: `1px solid ${BORDER}`,
         borderRadius: 2,
         bgcolor: unread ? "#f6fffe" : "background.paper",
@@ -50,9 +144,13 @@ function NotificationRow({ item, onOpen, onToggleRead }) {
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <ListItemAvatar sx={{ minWidth: 48 }}>
-          <Avatar src={item.actor?.avatar} alt={item.actor?.name} />
+          <Avatar src={item.actor?.avatar} alt={item.actor?.name}>
+            {(item.actor?.name || "S").slice(0, 1).toUpperCase()}
+          </Avatar>
         </ListItemAvatar>
+
         <Box sx={{ flex: 1, minWidth: 0 }}>
+          {/* headline */}
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
               {item.actor?.name || "System"}
@@ -62,27 +160,42 @@ function NotificationRow({ item, onOpen, onToggleRead }) {
               <Chip size="small" label={item.context.group} variant="outlined" />
             )}
           </Stack>
-          {item.description && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+
+          {/* description */}
+          {item.description ? (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block" }}
+            >
               {item.description}
             </Typography>
-          )}
+          ) : null}
 
+          {/* meta */}
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.75 }}>
             <Chip size="small" label={kindChip(item.kind)} />
             <Typography variant="caption" color="text.secondary">
               {formatWhen(item.created_at)}
             </Typography>
           </Stack>
+
+          {/* kind-specific actions (accept/decline, follow back) */}
+          <ActionsByKind />
         </Box>
 
+        {/* general actions */}
         <Stack direction="row" spacing={0.5}>
           <IconButton
             size="small"
             title={unread ? "Mark as read" : "Mark as unread"}
             onClick={() => onToggleRead?.(item.id, !unread)}
           >
-            {unread ? <MarkEmailReadOutlinedIcon fontSize="small" /> : <MarkEmailUnreadOutlinedIcon fontSize="small" />}
+            {unread ? (
+              <MarkEmailReadOutlinedIcon fontSize="small" />
+            ) : (
+              <MarkEmailUnreadOutlinedIcon fontSize="small" />
+            )}
           </IconButton>
           <IconButton size="small" title="Open" onClick={() => onOpen?.(item)}>
             <OpenInNewOutlinedIcon fontSize="small" />
@@ -93,68 +206,52 @@ function NotificationRow({ item, onOpen, onToggleRead }) {
   );
 }
 
+/* ------------------- main page component ------------------- */
 export default function NotificationsPage({
-  // Optional data; uses demo if not provided
   items: initialItems,
-  // Filters
-  kinds = ["All", "Mentions", "Comments", "Reactions", "Follows", "Events", "System"],
-  // Callbacks
-  onOpen = (item) => { },                 // open notification target (event/post/profile)
-  onMarkRead = (ids) => { },              // persist read state
-  onMarkAllRead = () => { },              // persist mark all
-  // Realtime
-  websocketUrl,                          // optional ws(s)://... to receive {type:"notification", item:{...}}
-  // Left column (optional)
+  // optional external callbacks if you wire up your API later:
+  onOpen,
+  onMarkRead,
+  onMarkAllRead,
+  onRespondRequest, // (id, "accepted"|"declined")
+  onFollowBackUser, // (id)
   user, stats, tags = [],
 }) {
+  const navigate = useNavigate();
   const [items, setItems] = React.useState(() => initialItems ?? demoNotifications());
   const [showOnlyUnread, setShowOnlyUnread] = React.useState(false);
   const [kind, setKind] = React.useState("All");
-  const [from, setFrom] = React.useState(""); // yyyy-mm-dd
-  const [to, setTo] = React.useState("");
 
-  // Realtime prepend
-  React.useEffect(() => {
-    if (!websocketUrl) return;
-    const ws = new WebSocket(websocketUrl);
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg?.type === "notification" && msg.item) {
-          setItems((curr) => [msg.item, ...curr]);
-        }
-      } catch { }
-    };
-    return () => ws.close();
-  }, [websocketUrl]);
-
+  // derived
   const unreadCount = React.useMemo(() => items.filter((i) => !i.is_read).length, [items]);
 
   const filtered = React.useMemo(() => {
     let arr = [...items];
     if (showOnlyUnread) arr = arr.filter((i) => !i.is_read);
     if (kind !== "All") {
-      const k = kind.toLowerCase().slice(0, -1); // "Mentions" -> "mention"
-      arr = arr.filter((i) => i.kind === k);
-    }
-    if (from) {
-      const ts = new Date(from).getTime();
-      arr = arr.filter((i) => new Date(i.created_at).getTime() >= ts);
-    }
-    if (to) {
-      const ts = new Date(to).getTime();
-      arr = arr.filter((i) => new Date(i.created_at).getTime() <= ts);
+      const k = kind.toLowerCase(); // "Requests", "Follows" etc.
+      // normalize for mapping
+      const norm = {
+        requests: ["friend_request", "connection_request"],
+        follows: ["follow"],
+        mentions: ["mention"],
+        comments: ["comment"],
+        reactions: ["reaction"],
+        events: ["event"],
+        system: ["system"],
+      };
+      const keys = norm[k] || [k.slice(0, -1)];
+      arr = arr.filter((i) => keys.includes(i.kind));
     }
     arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     return arr;
-  }, [items, showOnlyUnread, kind, from, to]);
+  }, [items, showOnlyUnread, kind]);
 
   const grouped = groupByDay(filtered);
 
+  /* ---------- actions: optimistic mock handlers ---------- */
   const handleToggleRead = (id, nowRead) => {
-    setItems((curr) =>
-      curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i))
-    );
+    setItems((curr) => curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i)));
     onMarkRead?.([id]);
   };
 
@@ -165,13 +262,51 @@ export default function NotificationsPage({
     onMarkAllRead?.(ids);
   };
 
+  const handleOpen = (n) => {
+    if (onOpen) return onOpen(n);
+    // default: smart routes by context mock
+    const ctx = n.context || {};
+    if (ctx.profile_user_id) return navigate(`/community/rich-profile/${ctx.profile_user_id}`);
+    if (ctx.eventId) return navigate(`/events/${ctx.eventId}`);
+    if (ctx.postId) return navigate(`/feed/post/${ctx.postId}`);
+    if (ctx.groupSlug) return navigate(`/groups/${ctx.groupSlug}`);
+    // fallback
+    return;
+  };
+
+  const updateItem = (id, patch) =>
+    setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+
+  const handleAcceptRequest = async (id) => {
+    updateItem(id, { _busy: true });
+    // simulate API with small delay
+    await sleep(500);
+    updateItem(id, { state: "accepted", is_read: true, _busy: false });
+    onRespondRequest?.(id, "accepted");
+  };
+
+  const handleDeclineRequest = async (id) => {
+    updateItem(id, { _busy: true });
+    await sleep(400);
+    updateItem(id, { state: "declined", is_read: true, _busy: false });
+    onRespondRequest?.(id, "declined");
+  };
+
+  const handleFollowBack = async (id) => {
+    updateItem(id, { _busy: true });
+    await sleep(350);
+    updateItem(id, { following_back: true, _busy: false, is_read: true });
+    onFollowBackUser?.(id);
+  };
+
   return (
     <Grid container spacing={2}>
-      {/* Center: Notifications list */}
+      {/* center column */}
       <Grid item xs={12} md={9}>
+        {/* header */}
         <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 2 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between">
+            <Stack direction="row" spacing={1.25} alignItems="center">
               <Badge badgeContent={unreadCount} color="primary">
                 <NotificationsNoneOutlinedIcon />
               </Badge>
@@ -180,7 +315,28 @@ export default function NotificationsPage({
               </Typography>
               <Chip size="small" label={`${unreadCount} unread`} />
             </Stack>
-            <Stack direction="row" spacing={1}>
+
+            <Stack direction="row" spacing={1} alignItems="center">
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showOnlyUnread}
+                    onChange={(e) => setShowOnlyUnread(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="Unread only"
+              />
+              <Select
+                size="small"
+                value={kind}
+                onChange={(e) => setKind(e.target.value)}
+                sx={{ minWidth: 140 }}
+              >
+                {["All", "Requests", "Follows", "Mentions", "Comments", "Reactions", "Events", "System"].map((k) => (
+                  <MenuItem key={k} value={k}>{k}</MenuItem>
+                ))}
+              </Select>
               <Button
                 size="small"
                 variant="outlined"
@@ -193,8 +349,8 @@ export default function NotificationsPage({
           </Stack>
         </Paper>
 
-        {/* Today / Yesterday / Earlier groups */}
-        {["Today", "Yesterday", "Earlier"].map((section) => (
+        {/* day groups */}
+        {["Today", "Yesterday", "Earlier"].map((section) =>
           grouped[section]?.length ? (
             <Box key={section} sx={{ mb: 2 }}>
               <Typography variant="overline" sx={{ color: "text.secondary" }}>
@@ -205,26 +361,23 @@ export default function NotificationsPage({
                   <ListItem key={it.id} disableGutters sx={{ px: 0 }}>
                     <NotificationRow
                       item={it}
-                      onOpen={(n) => onOpen?.(n)}
+                      onOpen={handleOpen}
                       onToggleRead={handleToggleRead}
+                      onAcceptRequest={handleAcceptRequest}
+                      onDeclineRequest={handleDeclineRequest}
+                      onFollowBack={handleFollowBack}
                     />
                   </ListItem>
                 ))}
               </List>
             </Box>
           ) : null
-        ))}
+        )}
       </Grid>
 
-      {/* Right: Profile (sticky like left sidebar) */}
+      {/* right column */}
       <Grid item xs={12} md={3} sx={{ display: { xs: "none", md: "block" } }}>
-        <Box
-          sx={{
-            position: "sticky",
-            top: 88,            // adjust if your header is taller/shorter (e.g., 72–104)
-            alignSelf: "flex-start"
-          }}
-        >
+        <Box sx={{ position: "sticky", top: 88, alignSelf: "flex-start" }}>
           <CommunityProfileCard user={user} stats={stats} tags={tags} />
         </Box>
       </Grid>
@@ -232,36 +385,65 @@ export default function NotificationsPage({
   );
 }
 
-/** Demo notifications (used if you don't pass items prop) */
+/* ------------------- mock data + utils ------------------- */
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 function demoNotifications() {
   const now = Date.now();
   return [
+    // connection / friend request (pending -> Accept / Decline)
+    {
+      id: "req1",
+      kind: "friend_request",
+      state: "pending", // "accepted" | "declined" | "pending"
+      title: "sent you a connection request",
+      description: "“Let’s connect and collaborate on M&A deals.”",
+      created_at: new Date(now - 1000 * 60 * 6).toISOString(),
+      is_read: false,
+      actor: {
+        name: "Kiran Patel",
+        avatar:
+          "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=80&q=80&auto=format&fit=crop",
+      },
+      context: { profile_user_id: 1023 },
+    },
+
+    // follow (with Follow back button)
+    {
+      id: "fol1",
+      kind: "follow",
+      title: "started following you",
+      description: "",
+      created_at: new Date(now - 1000 * 60 * 30).toISOString(),
+      is_read: false,
+      following_back: false,
+      actor: {
+        name: "Ravi Shah",
+        avatar:
+          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&q=80&auto=format&fit=crop",
+      },
+      context: { profile_user_id: 1089 },
+    },
+
+    // mention
     {
       id: "n1",
       kind: "mention",
       title: "mentioned you in a comment",
       description: "“Great point about carve-outs, @you!”",
-      created_at: new Date(now - 1000 * 60 * 15).toISOString(),
-      is_read: false,
-      actor: {
-        name: "Aisha Khan",
-        avatar: "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=80&q=80&auto=format&fit=crop",
-      },
-      context: { group: "EMEA Chapter", postId: "p4" },
-    },
-    {
-      id: "n2",
-      kind: "comment",
-      title: "commented on your post",
-      description: "“Can you share the valuation sheet?”",
       created_at: new Date(now - 1000 * 60 * 45).toISOString(),
       is_read: false,
       actor: {
-        name: "Kenji Watanabe",
-        avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&q=80&auto=format&fit=crop",
+        name: "Aisha Khan",
+        avatar:
+          "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=80&q=80&auto=format&fit=crop",
       },
-      context: { group: "Charter Holders", postId: "p2" },
+      context: { group: "EMEA Chapter", postId: "p4" },
     },
+
+    // event
     {
       id: "n3",
       kind: "event",
@@ -269,9 +451,15 @@ function demoNotifications() {
       description: "Legal Due Diligence Workshop · Today 6:30 PM IST",
       created_at: new Date(now - 1000 * 60 * 120).toISOString(),
       is_read: true,
-      actor: { name: "IMAA Events", avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=80&q=80&auto=format&fit=crop" },
+      actor: {
+        name: "IMAA Events",
+        avatar:
+          "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=80&q=80&auto=format&fit=crop",
+      },
       context: { group: "Charter Holders", eventId: 9 },
     },
+
+    // reaction
     {
       id: "n4",
       kind: "reaction",
@@ -279,19 +467,15 @@ function demoNotifications() {
       description: "“Welcome to all new members!” got new likes",
       created_at: new Date(now - 1000 * 60 * 180).toISOString(),
       is_read: false,
-      actor: { name: "Yara Costa", avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&q=80&auto=format&fit=crop" },
+      actor: {
+        name: "Yara Costa",
+        avatar:
+          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&q=80&auto=format&fit=crop",
+      },
       context: { group: "EMEA Chapter", postId: "p1" },
     },
-    {
-      id: "n5",
-      kind: "follow",
-      title: "started following you",
-      description: "",
-      created_at: new Date(now - 1000 * 60 * 400).toISOString(),
-      is_read: true,
-      actor: { name: "Lena Hoff", avatar: "https://images.unsplash.com/photo-1544006659-f0b21884ce1d?w=80&q=80&auto=format&fit=crop" },
-      context: {},
-    },
+
+    // system
     {
       id: "n6",
       kind: "system",
@@ -302,6 +486,8 @@ function demoNotifications() {
       actor: { name: "System" },
       context: {},
     },
+
+    // comment
     {
       id: "n7",
       kind: "comment",
@@ -309,8 +495,29 @@ function demoNotifications() {
       description: "“Sharing the deck here.”",
       created_at: new Date(now - 1000 * 60 * 1400).toISOString(),
       is_read: false,
-      actor: { name: "Anita Sharma", avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=80&q=80&auto=format&fit=crop" },
+      actor: {
+        name: "Anita Sharma",
+        avatar:
+          "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=80&q=80&auto=format&fit=crop",
+      },
       context: { group: "Cohort 2024 Online", postId: "p7" },
+    },
+
+    // another connection request already accepted (for UI state)
+    {
+      id: "req2",
+      kind: "connection_request",
+      state: "accepted",
+      title: "sent you a connection request",
+      description: "",
+      created_at: new Date(now - 1000 * 60 * 2000).toISOString(),
+      is_read: true,
+      actor: {
+        name: "Elena Petrova",
+        avatar:
+          "https://images.unsplash.com/photo-1544006659-f0b21884ce1d?w=80&q=80&auto=format&fit=crop",
+      },
+      context: { profile_user_id: 1201 },
     },
   ];
 }
