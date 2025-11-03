@@ -255,11 +255,11 @@ export default function RichProfile() {
   const [connQ, setConnQ] = useState("");
 
   const displayName = (u) =>
-    u?.profile?.full_name ||
-    `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
-    u?.username ||
-    u?.email ||
-    `User ${u?.id || ""}`.trim();
+   u?.username ||
+   u?.profile?.full_name ||
+   `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
+   u?.email ||
+   `User ${u?.id || ""}`.trim();
 
   async function startChat(recipientId) {
     try {
@@ -279,27 +279,31 @@ export default function RichProfile() {
     }
   }
 
+  function normalizeFriendShape(x) {
+  const u = x?.user || x?.friend || x?.friend_user || x?.other_user || x?.target || x;
+  return {
+    id: u?.id ?? x?.id,
+    username: u?.username ?? x?.username ?? "",
+    email: u?.email ?? x?.email ?? "",
+    first_name: u?.first_name ?? x?.first_name ?? "",
+    last_name: u?.last_name ?? x?.last_name ?? "",
+    profile: u?.profile ?? x?.profile ?? null,
+  };
+}
+
   // Try a few likely endpoints; adjust to your backend path if needed.
   async function fetchFriendList(targetUserId) {
-    const candidatePaths = [
-      `${API_BASE}/friends/${targetUserId}/`,           // e.g., GET list of a user's friends
-      `${API_BASE}/friends/list/${targetUserId}/`,      // alt
-      `${API_BASE}/friendships/${targetUserId}/friends/`,
-      `${API_BASE}/friends?user_id=${targetUserId}`,    // query variant
-    ];
-    for (const url of candidatePaths) {
-      try {
+    const url = `${API_BASE}/friends/of/?user_id=${targetUserId}`;
+    try {
         const r = await fetch(url, { headers: tokenHeader(), credentials: "include" });
         const j = await r.json().catch(() => null);
-        if (r.ok && j) {
-          // Support either {results: []} or [] shape.
-          const arr = Array.isArray(j) ? j : j.results || j.friends || [];
-          if (Array.isArray(arr)) return arr;
-        }
-      } catch {}
+        if (!r.ok || !j) return [];
+        const arr = Array.isArray(j) ? j : j.results || j.friends || [];
+        return Array.isArray(arr) ? arr.map(normalizeFriendShape) : [];
+    } catch {
+        return [];
     }
-    return [];
-  }
+    }
 
   const openConnections = async () => {
     setConnOpen(true);
@@ -366,10 +370,25 @@ export default function RichProfile() {
                          <Button variant="outlined" size="small" disabled>Loading…</Button>
                        )}
                        {!friendLoading && friendStatus === "friends" && (
-                         <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-                           Your Friend
-                         </Button>
-                       )}
+                        <>
+                            <Button
+                            variant="outlined"
+                            size="small"
+                            disabled
+                            sx={{ textTransform: "none", borderRadius: 2 }}
+                            >
+                            Your Friend
+                            </Button>
+                            <Button
+                            variant="contained"
+                            size="small"
+                            onClick={openConnections}
+                            sx={{ textTransform: "none", borderRadius: 2 }}
+                            >
+                            Connections
+                            </Button>
+                        </>
+                        )}
                        {!friendLoading && friendStatus === "pending_outgoing" && (
                          <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
                            Request sent
