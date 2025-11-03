@@ -18,6 +18,18 @@ import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
 
+
+const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
+const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
+const tokenHeader = () => {
+  const t =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("access") ||
+    localStorage.getItem("jwt");
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+
 /* ---------------------- helpers ---------------------- */
 function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
@@ -218,7 +230,7 @@ export default function NotificationsPage({
   user, stats, tags = [],
 }) {
   const navigate = useNavigate();
-  const [items, setItems] = React.useState(() => initialItems ?? demoNotifications());
+  const [items, setItems] = React.useState([]);
   const [showOnlyUnread, setShowOnlyUnread] = React.useState(false);
   const [kind, setKind] = React.useState("All");
 
@@ -249,18 +261,75 @@ export default function NotificationsPage({
 
   const grouped = groupByDay(filtered);
 
-  /* ---------- actions: optimistic mock handlers ---------- */
-  const handleToggleRead = (id, nowRead) => {
-    setItems((curr) => curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i)));
-    onMarkRead?.([id]);
-  };
+  React.useEffect(() => {
+  let alive = true;
+  (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/notifications/`, {
+        headers: { ...tokenHeader(), Accept: "application/json" },
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => []);
+      const raw = Array.isArray(j) ? j : j?.results || [];
 
-  const handleMarkAllRead = () => {
-    const ids = items.filter((i) => !i.is_read).map((i) => i.id);
-    if (!ids.length) return;
-    setItems((curr) => curr.map((i) => ({ ...i, is_read: true })));
-    onMarkAllRead?.(ids);
-  };
+      // map API -> UI shape the page already expects
+      const mapped = raw.map((n) => ({
+        id: n.id,
+        kind: n.kind,               // "friend_request"
+        state: n.state || "",       // "pending" | "accepted" | "declined" | "canceled"
+        title: n.title || "",
+        description: n.description || "",
+        created_at: n.created_at,
+        is_read: !!n.is_read,
+        actor: {
+          name: n.actor?.display_name || n.actor?.username || n.actor?.email || "User",
+          avatar: n.actor?.avatar || "",
+        },
+        // for "open profile" + friend-request actions:
+        context: {
+          friend_request_id: n.data?.friend_request_id,
+          // for the recipient: go to the sender’s profile
+          profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
+        },
+      }));
+
+      if (alive) setItems(mapped);
+    } catch {
+      // ignore; keep empty list
+    }
+  })();
+  return () => { alive = false; };
+}, []);
+
+
+const apiMarkRead = async (ids = []) => {
+  if (!ids.length) return;
+  try {
+    await fetch(`${API_BASE}/notifications/mark-read/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ ids }),
+    });
+  } catch {
+    // non-blocking
+  }
+};
+
+  /* ---------- actions: optimistic mock handlers ---------- */
+  const handleToggleRead = async (id, nowRead) => {
+  // optimistic UI
+  setItems((curr) => curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i)));
+  // backend only supports "mark as read" right now
+  if (nowRead) await apiMarkRead([id]);
+};
+
+const handleMarkAllRead = async () => {
+  const ids = items.filter((i) => !i.is_read).map((i) => i.id);
+  if (!ids.length) return;
+  setItems((curr) => curr.map((i) => ({ ...i, is_read: true })));
+  await apiMarkRead(ids);
+};
 
   const handleOpen = (n) => {
     if (onOpen) return onOpen(n);
@@ -275,22 +344,49 @@ export default function NotificationsPage({
   };
 
   const updateItem = (id, patch) =>
-    setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
-  const handleAcceptRequest = async (id) => {
-    updateItem(id, { _busy: true });
-    // simulate API with small delay
-    await sleep(500);
-    updateItem(id, { state: "accepted", is_read: true, _busy: false });
-    onRespondRequest?.(id, "accepted");
-  };
+const handleAcceptRequest = async (id) => {
+  const n = items.find((x) => x.id === id);
+  const frId = n?.context?.friend_request_id;
+  if (!frId) return;
+  updateItem(id, { _busy: true });
+  try {
+    const r = await fetch(`${API_BASE}/friend-requests/${frId}/accept/`, {
+      method: "POST",
+      headers: { ...tokenHeader(), Accept: "application/json" },
+      credentials: "include",
+    });
+    updateItem(id, {
+      _busy: false,
+      is_read: true,
+      state: r.ok ? "accepted" : n.state,
+    });
+  } catch {
+    updateItem(id, { _busy: false });
+  }
+};
 
-  const handleDeclineRequest = async (id) => {
-    updateItem(id, { _busy: true });
-    await sleep(400);
-    updateItem(id, { state: "declined", is_read: true, _busy: false });
-    onRespondRequest?.(id, "declined");
-  };
+const handleDeclineRequest = async (id) => {
+  const n = items.find((x) => x.id === id);
+  const frId = n?.context?.friend_request_id;
+  if (!frId) return;
+  updateItem(id, { _busy: true });
+  try {
+    const r = await fetch(`${API_BASE}/friend-requests/${frId}/decline/`, {
+      method: "POST",
+      headers: { ...tokenHeader(), Accept: "application/json" },
+      credentials: "include",
+    });
+    updateItem(id, {
+      _busy: false,
+      is_read: true,
+      state: r.ok ? "declined" : n.state,
+    });
+  } catch {
+    updateItem(id, { _busy: false });
+  }
+};
 
   const handleFollowBack = async (id) => {
     updateItem(id, { _busy: true });
@@ -299,6 +395,8 @@ export default function NotificationsPage({
     onFollowBackUser?.(id);
   };
 
+
+  
   return (
     <Grid container spacing={2}>
       {/* center column */}
