@@ -579,6 +579,14 @@ export default function GroupManagePage() {
     const isChildGroup = Boolean(group?.parent_id || group?.parent?.id || group?.parent);
     // Show Sub-groups tab only on top-level groups
     const showSubgroupsTab = !isChildGroup;
+    // Default to "Overview" whenever /groups/:idOrSlug changes (main or sub)
+    React.useEffect(() => {
+    setTab(0);
+    }, [idOrSlug]);
+    // If this is a child group, never allow tab index 2 (Sub-groups)
+    React.useEffect(() => {
+    if (!showSubgroupsTab && tab === 2) setTab(0);
+    }, [showSubgroupsTab, tab]);
     const [editOpen, setEditOpen] = React.useState(false);
     const [members, setMembers] = React.useState([]);
     const [memLoading, setMemLoading] = React.useState(true);
@@ -623,7 +631,9 @@ export default function GroupManagePage() {
     setSubLoading(false);
     }, [group, idOrSlug, token]);
 
-    React.useEffect(() => { if (group) fetchSubgroups(); }, [group, fetchSubgroups]);
+    React.useEffect(() => {
+        if (group && showSubgroupsTab) fetchSubgroups();
+    }, [group, showSubgroupsTab, fetchSubgroups]);
 
     const [busyUserId, setBusyUserId] = React.useState(null);
     // Posts tab state
