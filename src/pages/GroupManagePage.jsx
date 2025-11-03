@@ -575,6 +575,10 @@ export default function GroupManagePage() {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
     const [group, setGroup] = React.useState(null);
+    // Is this group a child (has a parent)?
+    const isChildGroup = Boolean(group?.parent_id || group?.parent?.id || group?.parent);
+    // Show Sub-groups tab only on top-level groups
+    const showSubgroupsTab = !isChildGroup;
     const [editOpen, setEditOpen] = React.useState(false);
     const [members, setMembers] = React.useState([]);
     const [memLoading, setMemLoading] = React.useState(true);
@@ -1029,7 +1033,12 @@ export default function GroupManagePage() {
                 <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
                     <Tab label="Overview" />
                     <Tab label="Members" />
-                    <Tab label="Sub-groups" />
+                    {showSubgroupsTab ? (
+                        <Tab label="Sub-groups" />
+                    ) : (
+                        // keep index #2 but hide it so other tabs keep their indices
+                        <Tab sx={{ display: "none" }} disabled />
+                    )}
                     <Tab label="Settings" />
                     <Tab label="Posts" />
                 </Tabs>
@@ -1183,7 +1192,7 @@ export default function GroupManagePage() {
                     )}
 
                     {/* Sub-groups tab */}
-                    {tab === 2 && (
+                    {showSubgroupsTab && tab === 2 && (
                     <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                         <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                         <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
