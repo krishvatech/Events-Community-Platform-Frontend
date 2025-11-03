@@ -5,7 +5,7 @@ import {
   Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, Grid, IconButton, InputAdornment, MenuItem, Paper, Select, Stack,
   TextField, Typography, Card, CardContent, CardActions, CardHeader, Tooltip,
-  Tabs, Tab
+  Tabs, Tab,LinearProgress, Alert
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
@@ -15,6 +15,15 @@ import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
+
+const API_ROOT = (import.meta.env.VITE_API_ROOT || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+function authHeader() {
+  const token =
+    localStorage.getItem("access") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 function GroupRow({ g, onJoin, showJoin = true }) {
   const isPrivate = (g.visibility || "").toLowerCase() === "private";
@@ -149,7 +158,9 @@ export default function GroupsPage({
   const [sortBy, setSortBy] = React.useState("recent");
   const [open, setOpen] = React.useState(false);
 
-  const [groups, setGroups] = React.useState(() => initialGroups ?? demoGroups());
+  const [groups, setGroups] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
 
   const [tab, setTab] = React.useState("explore"); // "explore" | "mine"
 
@@ -190,33 +201,65 @@ export default function GroupsPage({
 
 
   const filtered = React.useMemo(() => {
-    let arr = [...groups];
-    if (tab === "mine") {
-      // only my groups
-      arr = arr.filter(isJoined);
-    } else {
-      // explore => hide groups I've already joined
-      arr = arr.filter((g) => !isJoined(g));
-    }
-    const t = q.trim().toLowerCase();
-    if (t) arr = arr.filter((g) => g.name.toLowerCase().includes(t) || g.description?.toLowerCase().includes(t));
-    if (tab !== "mine" && visibility !== "All") {
-      arr = arr.filter(
-        (g) => (g.visibility || "").toLowerCase() === visibility.toLowerCase()
-      );
-    }
-    if (sortBy === "recent") {
-      arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    } else if (sortBy === "members") {
-      arr.sort((a, b) => (b.member_count || 0) - (a.member_count || 0));
-    }
-    return arr;
-  }, [groups, q, visibility, sortBy, tab, isJoined]);
-
+  let arr = [...groups]; // Trust backend: "mine" already = joined; "explore" = discoverable
+  const t = q.trim().toLowerCase();
+  if (t) {
+    arr = arr.filter(
+      (g) =>
+        g.name?.toLowerCase().includes(t) ||
+        g.description?.toLowerCase().includes(t)
+    );
+  }
+  if (tab !== "mine" && visibility !== "All") {
+    arr = arr.filter(
+      (g) => (g.visibility || "").toLowerCase() === visibility.toLowerCase()
+    );
+  }
+  if (sortBy === "recent") {
+    arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  } else if (sortBy === "members") {
+    arr.sort((a, b) => (b.member_count || 0) - (a.member_count || 0));
+  }
+  return arr;
+}, [groups, q, visibility, sortBy, tab]);
   const handleCreate = (payload, memberIds) => {
     setGroups((curr) => [payload, ...curr]);
     onCreateGroup?.(payload, memberIds);
   };
+
+  async function loadTabData(nextTab = tab) {
+  setLoading(true);
+  setError("");
+  try {
+    // Use your backend endpoints
+    // "mine" = joined groups; "explore" = discoverable groups
+    const endpoint = nextTab === "mine" ? "groups/joined/" : "groups/explore/";
+    const r = await fetch(`${API_ROOT}/${endpoint}`, {
+      headers: {
+        Accept: "application/json",
+        ...authHeader(),
+      },
+    });
+    // handle unauthorized
+    if (r.status === 401) {
+      throw new Error("Please log in to see your groups.");
+    }
+    const d = await r.json().catch(() => ({}));
+    const list = Array.isArray(d) ? d : d.results || [];
+    setGroups(list);
+  } catch (e) {
+    setError(e?.message || "Failed to load groups");
+    setGroups([]);
+  } finally {
+    setLoading(false);
+  }
+}
+
+
+  React.useEffect(() => {
+  loadTabData(tab);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [tab]);
 
   return (
     <Grid container spacing={2}>
@@ -259,6 +302,14 @@ export default function GroupsPage({
             </Tabs>
           </Paper>
 
+          {loading && (
+            <Paper sx={{ p: 1.5, mb: 1.25, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+              <LinearProgress />
+            </Paper>
+          )}
+          {!loading && error && (
+            <Alert severity="error" sx={{ mb: 1.25 }}>{error}</Alert>
+          )}
           <Stack spacing={1.25}>
             {filtered.map((g) => (
               <GroupRow key={g.id} g={g} onJoin={handleJoin} showJoin={tab !== "mine"} />
