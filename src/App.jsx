@@ -1,30 +1,87 @@
 // src/App.jsx
+
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import HomePage from "./pages/HomePage.jsx";        // if you added it
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Toolbar } from "@mui/material";
+import Header from "./components/Header.jsx";
+import HomePage from "./pages/HomePage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
 import SignUpPage from "./pages/SignUpPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
-import EventsPage from "./pages/EventsPage.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
+import GuestOnly from "./components/PublicGate.jsx";
+import EventsPage from "./pages/EventsPage.jsx";
+import ActivityPage from "./pages/ActivityPage.jsx";
+import CartPage from "./pages/CartPage.jsx";
+import MyEventsPage from "./pages/MyEventsPage.jsx";
+import EventDetailsPage from "./pages/EventDetailsPage.jsx";
+import LiveMeetingPage from "./pages/LiveMeetingPage.jsx";
+import Footer from "./components/Footer.jsx";
+import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
+import ProfilePage from "./pages/ProfilePage.jsx";
+import RichProfile from "./pages/RichProfile.jsx";
+import ConversationPage from "./pages/ConversationPage.jsx";
+import MessagesDirectory from "./pages/MessagesDirectory.jsx";
+import ResourceDetails from "./pages/ResourceDetails.jsx";
+import CommunityHubPage from "./pages/CommunityHubPage.jsx";
+import GroupManagePage from "./pages/GroupManagePage";
 
 
-const App = () => (
-  <Routes>
-    <Route path="/" element={<HomePage />} />
-    <Route path="/events" element={<EventsPage />} />
-    <Route path="/signin" element={<SignInPage />} />
-    <Route path="/signup" element={<SignUpPage />} />
-    <Route
-      path="/dashboard"
-      element={
-        <RequireAuth>
-          <Dashboard />
-        </RequireAuth>
-      }
-    />
-    <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>
-);
+const AppShell = () => {
+  const location = useLocation();
+  
+  // Hide header & footer on auth pages and live meeting routes
+  const hideChrome =
+    location.pathname === "/signin" ||
+    location.pathname === "/signup" ||
+    location.pathname === "/live" ||
+    location.pathname.startsWith("/live/");
 
-export default App;
+  return (
+    <>
+      {!hideChrome && (
+        <>
+          <Header />
+          {/* Spacer under fixed header */}
+          <Toolbar />
+        </>
+      )}
+
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
+        <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
+        <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+        <Route path="/events" element={<EventsPage />} />
+        <Route path="/events/:id" element={<EventDetailsPage />} />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/community" element={<CommunityHubPage />} />
+        <Route path="/groups/:idOrSlug" element={<GroupManagePage />} />
+        
+        {/* My Events list and details */}
+        <Route path="/myevents" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
+        <Route path="/myevents/:id" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
+        
+        {/* LIVE meeting page — no header/footer */}
+        <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />
+        
+        <Route path="/account" element={<RequireAuth><ActivityPage /></RequireAuth>} />
+        <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+        <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
+        <Route path="/account/messages" element={<RequireAuth><MessagesDirectory /></RequireAuth>} />
+        <Route path="/account/messages/:conversationId" element={<RequireAuth><ConversationPage /></RequireAuth>} />
+        
+        {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
+        <Route path="/resource/:id" element={<RequireAuth><ResourceDetails /></RequireAuth>} />
+        {/* ADD THIS ROUTE FOR RICH PROFILE */}
+        <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} />
+        
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+
+      {!hideChrome && typeof Footer !== "undefined" && <Footer />}
+    </>
+  );
+};
+
+export default AppShell;

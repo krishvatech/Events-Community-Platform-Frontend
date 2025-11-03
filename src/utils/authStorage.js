@@ -22,3 +22,20 @@ export function getUserName() {
 export function clearLogin() {
   sessionStorage.clear();
 }
+
+export function clearAuth() {
+  try {
+    // localStorage variants you use
+    localStorage.removeItem("token");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("loginPayload");
+
+    // sessionStorage variants you use
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("access");
+    sessionStorage.removeItem("refresh");
+    sessionStorage.removeItem("user");
+  } catch {}
+}

@@ -1,0 +1,1386 @@
+// src/pages/GroupManagePage.jsx
+import React from "react";
+import {
+    Alert, Avatar, Box, Button, Chip, Container, Dialog, DialogActions, DialogContent,
+    DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
+    TextField, Typography,
+    IconButton, Menu, ListItemIcon, ListItemText
+} from "@mui/material";
+import { useParams, useNavigate } from "react-router-dom";
+import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
+import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
+import PollRoundedIcon from "@mui/icons-material/PollRounded";
+import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
+import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
+
+
+// ---- API helpers (reuse same pattern as GroupsAdmin.jsx) ----
+const RAW = import.meta.env.VITE_API_BASE_URL || "";
+const BASE = RAW.replace(/\/+$/, "");
+const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
+const API_ORIGIN = BASE.replace(/\/api$/, "") || BASE;
+
+const toAbs = (u) => {
+    if (!u) return u;
+    if (/^https?:\/\//i.test(u)) return u;
+    const p = u.startsWith("/") ? u : `/${u}`;
+    return `${API_ORIGIN}${p}`;
+};
+const bust = (url, key) => {
+    if (!url) return url;
+    const u = toAbs(url);
+    const sep = u.includes("?") ? "&" : "?";
+    const k = key ?? Date.now();
+    return `${u}${sep}v=${encodeURIComponent(k)}`;
+};
+const getToken = () =>
+    localStorage.getItem("token") ||
+    localStorage.getItem("access") ||
+    localStorage.getItem("access_token") ||
+    "";
+
+const ROLE_BADGE_CONFIG = {
+    owner: { label: "Owner", className: "bg-slate-200 text-slate-700" },
+    admin: { label: "Admin", className: "bg-teal-50 text-teal-700" },
+    moderator: { label: "Moderator", className: "bg-sky-50 text-sky-700" },
+    member: { label: "Member", className: "bg-slate-100 text-slate-700" },
+};
+const RoleBadge = ({ role }) => {
+    const cfg = ROLE_BADGE_CONFIG[role] || ROLE_BADGE_CONFIG.member;
+    return <Chip size="small" label={cfg.label} className={cfg.className} />;
+};
+
+
+// ---- Edit Dialog (inline, smaller version) ----
+function EditGroupDialog({ open, group, onClose, onUpdated }) {
+    const token = getToken();
+    const [name, setName] = React.useState("");
+    const [description, setDescription] = React.useState("");
+    const [visibility, setVisibility] = React.useState("public");
+    const [imageFile, setImageFile] = React.useState(null);
+    const [localPreview, setLocalPreview] = React.useState("");
+    const [removeImage, setRemoveImage] = React.useState(false);
+    const [submitting, setSubmitting] = React.useState(false);
+    const [errors, setErrors] = React.useState({});
+
+    React.useEffect(() => {
+        if (!group) return;
+        setName(group.name || "");
+        setDescription(group.description || "");
+        setVisibility(group.visibility || "public");
+        setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
+        setImageFile(null);
+        setRemoveImage(false);
+        setErrors({});
+    }, [group]);
+
+    const onPickFile = (file) => {
+        if (!file) return;
+        setImageFile(file);
+        setRemoveImage(false);
+        const reader = new FileReader();
+        reader.onload = (e) => setLocalPreview(String(e.target?.result || ""));
+        reader.readAsDataURL(file);
+    };
+
+    const validate = () => {
+        const e = {};
+        if (!name.trim()) e.name = "Required";
+        if (!description.trim()) e.description = "Required";
+        setErrors(e);
+        return Object.keys(e).length === 0;
+    };
+
+    const submit = async () => {
+        if (!group || !validate()) return;
+        setSubmitting(true);
+        try {
+            const fd = new FormData();
+            fd.append("name", name.trim());
+            fd.append("description", description.trim());
+            fd.append("visibility", visibility);
+            if (imageFile) fd.append("cover_image", imageFile, imageFile.name);
+            if (removeImage) fd.append("remove_cover_image", "1"); // backend clears it
+
+            const idOrSlug = group.slug || group.id;
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
+                method: "PATCH",
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: fd,
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const msg =
+                    json?.detail ||
+                    Object.entries(json)
+                        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+                        .join(" | ") ||
+                    `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+            onUpdated?.({ ...json, _cache: Date.now() }); // cache-bust for images
+            onClose?.();
+        } catch (e) {
+            setErrors((prev) => ({ ...prev, __all__: String(e?.message || e) }));
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    if (!group) return null;
+
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
+            <DialogTitle className="font-extrabold">Edit Group</DialogTitle>
+            <DialogContent dividers>
+                {errors.__all__ && <Alert severity="error" className="mb-3">{errors.__all__}</Alert>}
+
+                <Box className="flex items-start gap-3 mb-4">
+                    <Avatar sx={{ bgcolor: "#10b8a6", width: 40, height: 40 }} />
+                    <TextField
+                        label="Group Name *"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        fullWidth
+                        error={!!errors.name}
+                        helperText={errors.name}
+                        className="mb-3"
+                    />
+                </Box>
+
+                <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
+                    <Grid xs={12} md={7}>
+                        <TextField
+                            label="Description *"
+                            multiline minRows={3}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            fullWidth className="mb-3"
+                            error={!!errors.description} helperText={errors.description}
+                        />
+                        <TextField
+                            label="Visibility"
+                            select fullWidth className="mb-3"
+                            value={visibility}
+                            onChange={(e) => setVisibility(e.target.value)}
+                        >
+                            <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
+                            <MenuItem value="private">Private (invite-only)</MenuItem>
+                        </TextField>
+                    </Grid>
+
+                    <Grid xs={12} md={5}>
+                        <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+                        <Typography variant="caption" className="text-slate-500 block mb-2">
+                            Recommended 650×365px • Max 50 MB
+                        </Typography>
+
+                        <Box
+                            className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                            sx={{ height: 200, position: "relative", overflow: "hidden" }}
+                        >
+                            {localPreview ? (
+                                <img
+                                    src={localPreview}
+                                    alt="cover"
+                                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                                />
+                            ) : (
+                                <Stack alignItems="center" spacing={1}>
+                                    <ImageRoundedIcon />
+                                    <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
+                                </Stack>
+                            )}
+                            <input
+                                id="group-edit-image-file"
+                                type="file"
+                                accept="image/*"
+                                style={{ display: "none" }}
+                                onChange={(e) => onPickFile(e.target.files?.[0])}
+                            />
+                        </Box>
+
+                        <Stack direction="row" spacing={1} className="mt-2">
+                            <label htmlFor="group-edit-image-file">
+                                <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                                    Upload
+                                </Button>
+                            </label>
+                            <Button
+                                size="small"
+                                variant="text"
+                                onClick={() => { setRemoveImage(true); setImageFile(null); setLocalPreview(""); }}
+                            >
+                                Remove
+                            </Button>
+                        </Stack>
+                    </Grid>
+                </Grid>
+            </DialogContent>
+            <DialogActions className="px-6 py-4">
+                <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>
+                <Button
+                    onClick={submit}
+                    disabled={submitting}
+                    variant="contained"
+                    className="rounded-xl"
+                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                >
+                    Save
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
+
+function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }) {
+    const token = getToken();
+    const [q, setQ] = React.useState("");
+    const [rows, setRows] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState("");
+    const [selected, setSelected] = React.useState(new Set());
+
+    const toggle = (id) => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    };
+
+    const fetchUsers = React.useCallback(async () => {
+        setLoading(true); setError("");
+        try {
+            // If you have a different user search endpoint, swap URL below.
+            const res = await fetch(`${API_ROOT}/users-lookup/?search=${encodeURIComponent(q)}&limit=30`, {
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+            const json = await res.json().catch(() => ([]));
+            if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+            const exist = new Set(existingIds || []);
+            const filtered = (Array.isArray(json) ? json : []).filter(u => !exist.has(u.id));
+            setRows(filtered);
+        } catch (e) {
+            setError(String(e?.message || e));
+            setRows([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [q, token, existingIds]);
+
+    React.useEffect(() => { if (open) fetchUsers(); }, [open, fetchUsers]);
+
+    const submit = async () => {
+        if (selected.size === 0) return;
+        await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/add-members/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ user_ids: Array.from(selected) }),
+        });
+        onAdded?.(selected.size);
+        onClose?.();
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
+            <DialogTitle className="font-extrabold">Add members</DialogTitle>
+            <DialogContent dividers>
+                <TextField
+                    placeholder="Search users…"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    fullWidth
+                    size="small"
+                    className="mb-3"
+                    onKeyDown={(e) => { if (e.key === 'Enter') fetchUsers(); }}
+                />
+
+                {loading ? (
+                    <>
+                        <LinearProgress />
+                        <Typography className="mt-2 text-slate-500">Searching…</Typography>
+                    </>
+                ) : error ? (
+                    <Alert severity="error">{error}</Alert>
+                ) : rows.length === 0 ? (
+                    <Typography className="text-slate-500">No users found.</Typography>
+                ) : (
+                    <Stack spacing={1} divider={<Divider />}>
+                        {rows.map((u) => {
+                            const checked = selected.has(u.id);
+                            return (
+                                <Stack
+                                    key={u.id}
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={2}
+                                    className="py-2 cursor-pointer hover:bg-slate-50 rounded-lg px-1"
+                                    onClick={() => toggle(u.id)}
+                                >
+                                    <input type="checkbox" checked={checked} readOnly />
+                                    <Avatar src={toAbs(u.avatar)}>
+                                        {(u.name || u.email || "U").slice(0, 1).toUpperCase()}
+                                    </Avatar>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography className="font-medium">{u.name || u.email || u.id}</Typography>
+                                        {u.email && <Typography variant="caption" className="text-slate-500">{u.email}</Typography>}
+                                    </Box>
+                                </Stack>
+                            );
+                        })}
+                    </Stack>
+                )}
+            </DialogContent>
+
+            <DialogActions sx={{ position: 'sticky', bottom: 0, background: 'white' }} className="px-6 py-4">
+                <Typography sx={{ flex: 1 }} className="text-slate-600">
+                    {selected.size} selected
+                </Typography>
+                <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
+                <Button
+                    onClick={submit}
+                    disabled={selected.size === 0}
+                    variant="contained"
+                    className="rounded-xl"
+                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                >
+                    Add {selected.size > 0 ? `(${selected.size})` : ""}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
+
+// ---- Main page ----
+export default function GroupManagePage() {
+    const { idOrSlug } = useParams();
+    const navigate = useNavigate();
+    const token = getToken();
+
+    const [tab, setTab] = React.useState(0);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState("");
+    const [group, setGroup] = React.useState(null);
+    const [editOpen, setEditOpen] = React.useState(false);
+    const [members, setMembers] = React.useState([]);
+    const [memLoading, setMemLoading] = React.useState(true);
+    const [memError, setMemError] = React.useState("");
+    const [addOpen, setAddOpen] = React.useState(false);
+    const [memMenuAnchor, setMemMenuAnchor] = React.useState(null);
+    const [activeMember, setActiveMember] = React.useState(null);
+    const [busyUserId, setBusyUserId] = React.useState(null);
+    // Posts tab state
+    const [posts, setPosts] = React.useState([]);
+    const [postsLoading, setPostsLoading] = React.useState(true);
+    const [postsError, setPostsError] = React.useState("");
+
+    // Compose state
+    const [postType, setPostType] = React.useState("text"); // text | image | link | poll | event
+    const [postText, setPostText] = React.useState("");
+    const [postImageFile, setPostImageFile] = React.useState(null);
+    const [postLinkUrl, setPostLinkUrl] = React.useState("");
+    const [pollQuestion, setPollQuestion] = React.useState("");
+    const [pollOptions, setPollOptions] = React.useState(["", ""]); // at least two
+    const [eventTitle, setEventTitle] = React.useState("");
+    const [eventStart, setEventStart] = React.useState("");
+    const [eventEnd, setEventEnd] = React.useState("");
+    const [creating, setCreating] = React.useState(false);
+
+    // ==== Post actions UI state (add-only) ====
+    const [postMenuAnchor, setPostMenuAnchor] = React.useState(null);
+    const [activePost, setActivePost] = React.useState(null);
+    const [editPostOpen, setEditPostOpen] = React.useState(false);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
+
+    // Moderation gate (same roles as canPost; separate for clarity)
+    const canModerate = ["owner", "admin", "moderator"].includes(group?.current_user_role || "member");
+
+    // Per-post menu open/close
+    const openPostMenu = (evt, post) => {
+        if (!post) return;
+        const fid = Number(post.feed_item_id ?? post.id);
+        if (!Number.isInteger(fid)) {
+            alert("Cannot moderate this item (missing feed item id).");
+            return;
+        }
+        const isHidden = Boolean(post.hidden ?? post.is_hidden);
+        setActivePost({ ...post, _feed_item_id: fid, hidden: isHidden, is_hidden: isHidden });
+        setPostMenuAnchor(evt.currentTarget);
+    };
+    const closePostMenu = () => { setPostMenuAnchor(null); /* keep activePost for edit form */ };
+
+    // Hide/Unhide
+    const toggleHidePost = async (post) => {
+        if (!post) return;
+        const postId = Number(post._feed_item_id ?? post.feed_item_id ?? post.id);
+        if (!Number.isInteger(postId)) { alert("Invalid item id"); return; }
+
+        const isHidden = Boolean(post.hidden ?? post.is_hidden);
+        const endpoint = isHidden ? "unhide-post" : "hide-post";
+
+        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/moderation/${endpoint}/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ id: postId })
+        });
+        if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            alert(j?.detail || `HTTP ${res.status}`);
+            return;
+        }
+        await fetchPosts();
+        setPostMenuAnchor(null);
+    };
+
+    // Delete
+    const deletePost = async () => {
+        if (!activePost) return;
+        const postId = Number(activePost._feed_item_id ?? activePost.feed_item_id ?? activePost.id);
+        if (!Number.isInteger(postId)) { alert("Invalid item id"); return; }
+
+        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/moderation/delete-post/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ id: postId })
+        });
+        if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            alert(j?.detail || `HTTP ${res.status}`);
+            return;
+        }
+        setDeleteConfirmOpen(false);
+        await fetchPosts();
+        setPostMenuAnchor(null);
+        };
+
+
+    // Gate: only owner/admin/moderator can post (server should also enforce)
+    const canPost = ["owner", "admin", "moderator"].includes(group?.current_user_role || "member");
+
+    // GET posts for this group
+    const fetchPosts = React.useCallback(async () => {
+        if (!idOrSlug) return;
+        setPostsLoading(true); setPostsError("");
+        try {
+            const [resPosts, resPolls] = await Promise.all([
+                fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
+                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                }),
+                fetch(`${API_ROOT}/groups/${idOrSlug}/polls/`, {
+                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                }),
+            ]);
+            const postsJson = await resPosts.json().catch(() => ([]));
+            const pollsJson = await resPolls.json().catch(() => ([]));
+            const byFeedItemId = new Map(
+                (Array.isArray(postsJson) ? postsJson : []).map(it => [Number(it.id), it])
+            );
+            if (!resPosts.ok) throw new Error(postsJson?.detail || `HTTP ${resPosts.status}`);
+            if (!resPolls.ok) throw new Error(pollsJson?.detail || `HTTP ${resPolls.status}`);
+
+            // Map polls to the same shape your UI expects for display
+            const pollsAsPosts = (Array.isArray(pollsJson) ? pollsJson : []).map(p => {
+                const fid = Number(p.feed_item_id ?? p.id);
+                const match = byFeedItemId.get(fid);
+                const isHidden = Boolean(match?.hidden ?? match?.is_hidden);
+                return {
+                    id: fid,
+                feed_item_id: p.feed_item_id ?? null,
+                    type: "poll",
+                    created_at: p.created_at,
+                    created_by: p.created_by,             // if your serializer returns this
+                    question: p.question,
+                    options: (p.options || []).map(o => o.text),
+                    // carry hidden flags so the menu shows "Unhide"
+                    hidden: isHidden,
+                    is_hidden: isHidden,
+                };
+            });
+
+            const merged = [...(Array.isArray(postsJson) ? postsJson : []), ...pollsAsPosts]
+                .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+            setPosts(merged);
+        } catch (e) {
+            setPostsError(String(e?.message || e));
+            setPosts([]);
+        } finally {
+            setPostsLoading(false);
+        }
+    }, [idOrSlug, token]);
+
+    // Load posts only when Posts tab is active (saves calls)
+    React.useEffect(() => {
+        if (tab === 3) fetchPosts();
+    }, [tab, fetchPosts]);
+
+    // Helpers for poll options
+    const updatePollOption = (idx, val) => {
+        setPollOptions((prev) => {
+            const copy = [...prev];
+            copy[idx] = val;
+            return copy;
+        });
+    };
+    const addPollOption = () => setPollOptions((prev) => [...prev, ""]);
+    const removePollOption = (idx) => setPollOptions((prev) => prev.filter((_, i) => i !== idx));
+
+    // CREATE post
+    const createPost = async () => {
+        try {
+            setCreating(true);
+
+            // Decide payload by type
+            if (postType === "image") {
+                const fd = new FormData();
+                fd.append("type", "image");
+                if (postText) fd.append("text", postText.trim());
+                if (postImageFile) fd.append("image", postImageFile, postImageFile.name);
+                const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
+                    method: "POST",
+                    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    body: fd,
+                });
+                if (!res.ok) {
+                    const j = await res.json().catch(() => ({}));
+                    throw new Error(j?.detail || `HTTP ${res.status}`);
+                }
+            } else if (postType === "link") {
+                const payload = { type: "link", url: postLinkUrl.trim(), text: postText.trim() };
+                const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                    const j = await res.json().catch(() => ({}));
+                    throw new Error(j?.detail || `HTTP ${res.status}`);
+                }
+            } else if (postType === "poll") {
+                const payload = {
+                    question: pollQuestion.trim(),
+                    options: pollOptions.map(o => o.trim()).filter(Boolean),
+                    // Optional extras if/when you add UI controls:
+                    // allows_multiple: true/false,
+                    // is_anonymous: true/false,
+                    // ends_at: new Date(...).toISOString(),
+                };
+                const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/polls/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                    const j = await res.json().catch(() => ({}));
+                    throw new Error(j?.detail || `HTTP ${res.status}`);
+                }
+            } else if (postType === "event") {
+                const payload = {
+                    type: "event",
+                    title: eventTitle.trim(),
+                    starts_at: eventStart ? new Date(eventStart).toISOString() : null,
+                    ends_at: eventEnd ? new Date(eventEnd).toISOString() : null,
+                    text: postText.trim() || undefined,
+                };
+                const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                    const j = await res.json().catch(() => ({}));
+                    throw new Error(j?.detail || `HTTP ${res.status}`);
+                }
+            } else {
+                // text
+                const payload = { type: "text", text: postText.trim() };
+                const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                    const j = await res.json().catch(() => ({}));
+                    throw new Error(j?.detail || `HTTP ${res.status}`);
+                }
+            }
+
+            // Reset minimal fields
+            setPostText(""); setPostImageFile(null); setPostLinkUrl("");
+            setPollQuestion(""); setPollOptions(["", ""]);
+            setEventTitle(""); setEventStart(""); setEventEnd("");
+
+            await fetchPosts(); // refresh
+        } catch (e) {
+            alert(`Failed to post: ${e?.message || e}`);
+        } finally {
+            setCreating(false);
+        }
+    };
+
+
+    // Owner id (used to lock Owner row)
+    const ownerId = group?.created_by?.id ?? null;
+
+    // action menu handlers
+    const openMemberMenu = (evt, m) => { setActiveMember(m); setMemMenuAnchor(evt.currentTarget); };
+    const closeMemberMenu = () => { setActiveMember(null); setMemMenuAnchor(null); };
+
+    const setRole = async (userId, role) => {
+        setBusyUserId(userId);
+        try {
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/set-role/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({ user_id: userId, role }),
+            });
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error(json?.detail || `HTTP ${res.status}`);
+            }
+            await fetchMembers();   // refresh list after role change
+        } catch (e) {
+            console.error(e);
+            alert(`Failed to update role: ${e?.message || e}`);
+        } finally {
+            setBusyUserId(null);
+            closeMemberMenu();
+        }
+    };
+
+    const removeMember = async (userId) => {
+        setBusyUserId(userId);
+        try {
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/remove-member/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({ user_id: userId }),
+            });
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error(json?.detail || `HTTP ${res.status}`);
+            }
+            await fetchMembers();   // refresh after removal
+        } catch (e) {
+            console.error(e);
+            alert(`Failed to remove: ${e?.message || e}`);
+        } finally {
+            setBusyUserId(null);
+            closeMemberMenu();
+        }
+    };
+
+
+    const fetchGroup = React.useCallback(async () => {
+        setLoading(true); setError("");
+        try {
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+            setGroup(json);
+        } catch (e) {
+            setError(String(e?.message || e));
+            setGroup(null);
+        } finally {
+            setLoading(false);
+        }
+    }, [idOrSlug, token]);
+
+    React.useEffect(() => { fetchGroup(); }, [fetchGroup]);
+
+
+    const fetchMembers = React.useCallback(async () => {
+        if (!idOrSlug) return;
+        setMemLoading(true); setMemError("");
+        try {
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/members/`, {
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+            const json = await res.json().catch(() => ([]));
+            if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+            setMembers(Array.isArray(json) ? json : []);
+        } catch (e) {
+            setMemError(String(e?.message || e));
+            setMembers([]);
+        } finally {
+            setMemLoading(false);
+        }
+    }, [idOrSlug, token]);
+
+    // Call members fetch when group is loaded/changed
+    React.useEffect(() => { if (group) fetchMembers(); }, [group, fetchMembers]);
+
+    const onUpdated = (updated) => setGroup(updated);
+
+    return (
+        <Container maxWidth="lg" disableGutters className="py-0">
+            {/* Cover banner */}
+            <Box sx={{ position: "relative", width: "100%", height: 220, background: "#E5E7EB" }}>
+                {group?.cover_image && (
+                    <img
+                        src={bust(group.cover_image, group.updated_at || group._cache)}
+                        alt={group?.name || "cover"}
+                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                )}
+                <Box
+                    sx={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.0) 50%, rgba(0,0,0,0.35) 100%)",
+                    }}
+                />
+                <Box sx={{ position: "absolute", left: 24, bottom: 16, right: 24, display: "flex", alignItems: "flex-end", gap: 2 }}>
+                    <Avatar sx={{ width: 64, height: 64, bgcolor: "#10b8a6", border: "3px solid white" }}>
+                        {(group?.name || "G").slice(0, 1).toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flex: 1, color: "white" }}>
+                        <Typography variant="h5" className="font-extrabold">{group?.name || "Group"}</Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <Chip
+                                size="small"
+                                label={group?.visibility === "private" ? "Private" : "Public"}
+                                className={group?.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
+                            />
+                            {typeof group?.member_count === "number" && (
+                                <Typography variant="body2">{group.member_count} members</Typography>
+                            )}
+                        </Stack>
+                    </Box>
+
+                    <Stack direction="row" spacing={1}>
+                        <Button
+                            startIcon={<EditNoteRoundedIcon />}
+                            onClick={() => setEditOpen(true)}
+                            variant="contained"
+                            className="rounded-xl"
+                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                        >
+                            Edit
+                        </Button>
+                        <Button
+                            onClick={() => navigate(-1)}
+                            variant="outlined"
+                            className="rounded-xl"
+                            sx={{ textTransform: "none", color: "#0ea5a4", borderColor: "#0ea5a4" }}
+                        >
+                            Back
+                        </Button>
+                    </Stack>
+                </Box>
+            </Box>
+
+            {/* Tabs */}
+            <Paper elevation={0} className="rounded-none">
+                <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
+                    <Tab label="Overview" />
+                    <Tab label="Members" />
+                    <Tab label="Settings" />
+                    <Tab label="Posts" />
+                </Tabs>
+            </Paper>
+
+            {/* Content */}
+            {loading ? (
+                <Box className="p-8"><LinearProgress /><Typography className="mt-3 text-slate-500">Loading…</Typography></Box>
+            ) : error ? (
+                <Box className="p-8"><Alert severity="error">{error}</Alert></Box>
+            ) : !group ? (
+                <Box className="p-8"><Alert severity="warning">Group not found.</Alert></Box>
+            ) : (
+                <Box className="p-6">
+                    {tab === 0 && (
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={8}>
+                                <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                    <Typography variant="h6" className="font-semibold mb-1">About</Typography>
+                                    <Typography className="text-slate-600 whitespace-pre-line">
+                                        {group.description || "No description"}
+                                    </Typography>
+                                </Paper>
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                    <Typography variant="h6" className="font-semibold mb-2">Details</Typography>
+                                    <Stack spacing={1} className="text-slate-600">
+                                        <div><b>Visibility:</b> {group.visibility}</div>
+                                        {group.created_by?.name && <div><b>Owner:</b> {group.created_by.name}</div>}
+                                        {group.created_at && <div><b>Created:</b> {new Date(group.created_at).toLocaleString()}</div>}
+                                        {group.updated_at && <div><b>Updated:</b> {new Date(group.updated_at).toLocaleString()}</div>}
+                                    </Stack>
+                                </Paper>
+                            </Grid>
+                        </Grid>
+                    )}
+
+                    {tab === 1 && (
+                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                <Typography variant="h6" className="font-semibold">Members</Typography>
+                                {group?.visibility === "private" && (
+                                    <Button
+                                        variant="contained"
+                                        className="rounded-xl"
+                                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                        onClick={() => setAddOpen(true)}
+                                    >
+                                        Add members
+                                    </Button>
+                                )}
+                            </Stack>
+
+                            {memLoading ? (
+                                <><LinearProgress /><Typography className="mt-2 text-slate-500">Loading members…</Typography></>
+                            ) : memError ? (
+                                <Alert severity="error">{memError}</Alert>
+                            ) : members.length === 0 ? (
+                                <Typography className="text-slate-500">No members yet.</Typography>
+                            ) : (
+                                <>
+                                    <Stack divider={<Divider />} spacing={1}>
+                                        {members
+                                            .slice()
+                                            .sort((a, b) => {
+                                                // Owner → Admin → Moderator → Member → Name
+                                                const rank = { owner: 0, admin: 1, moderator: 2, member: 3 };
+                                                const ar = (a.user?.id === ownerId) ? 0 : (rank[a.role] ?? 99);
+                                                const br = (b.user?.id === ownerId) ? 0 : (rank[b.role] ?? 99);
+                                                if (ar !== br) return ar - br;
+                                                return (a.user?.name || "").localeCompare(b.user?.name || "");
+                                            })
+                                            .map((m) => {
+                                                const isOwnerRow = ownerId && Number(m.user.id) === Number(ownerId);
+                                                const role = isOwnerRow ? "owner" : m.role;
+                                                const disabled = busyUserId === m.user.id || isOwnerRow;
+                                                return (
+                                                    <Stack key={m.user.id} direction="row" alignItems="center" spacing={2} className="py-2">
+                                                        <Avatar src={toAbs(m.user.avatar)}>{(m.user.name || "U").slice(0, 1).toUpperCase()}</Avatar>
+                                                        <Box sx={{ flex: 1 }}>
+                                                            <Typography className="font-medium">{m.user.name || m.user.email || m.user.id}</Typography>
+                                                            {m.user.email && (
+                                                                <Typography variant="caption" className="text-slate-500">{m.user.email}</Typography>
+                                                            )}
+                                                        </Box>
+
+                                                        <RoleBadge role={role} />
+
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={(e) => openMemberMenu(e, m)}
+                                                            disabled={disabled}
+                                                            title={isOwnerRow ? "Owner actions are locked" : "Manage role / remove"}
+                                                        >
+                                                            <MoreVertRoundedIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Stack>
+                                                );
+                                            })}
+                                    </Stack>
+
+                                    {/* Per-member action menu */}
+                                    <Menu
+                                        anchorEl={memMenuAnchor}
+                                        open={Boolean(memMenuAnchor)}
+                                        onClose={closeMemberMenu}
+                                        elevation={2}
+                                    >
+                                        {activeMember && (
+                                            <>
+                                                <MenuItem
+                                                    onClick={() => setRole(activeMember.user.id, "admin")}
+                                                    disabled={activeMember.user.id === ownerId || activeMember.role === "admin"}
+                                                >
+                                                    <ListItemIcon>🛡️</ListItemIcon>
+                                                    <ListItemText>Make Admin</ListItemText>
+                                                </MenuItem>
+
+                                                <MenuItem
+                                                    onClick={() => setRole(activeMember.user.id, "moderator")}
+                                                    disabled={activeMember.user.id === ownerId || activeMember.role === "moderator"}
+                                                >
+                                                    <ListItemIcon>🔧</ListItemIcon>
+                                                    <ListItemText>Make Moderator</ListItemText>
+                                                </MenuItem>
+
+                                                <MenuItem
+                                                    onClick={() => setRole(activeMember.user.id, "member")}
+                                                    disabled={activeMember.user.id === ownerId || activeMember.role === "member"}
+                                                >
+                                                    <ListItemIcon>👤</ListItemIcon>
+                                                    <ListItemText>Make Member</ListItemText>
+                                                </MenuItem>
+
+                                                <Divider />
+
+                                                <MenuItem
+                                                    onClick={() => removeMember(activeMember.user.id)}
+                                                    disabled={activeMember.user.id === ownerId}
+                                                >
+                                                    <ListItemIcon>🗑️</ListItemIcon>
+                                                    <ListItemText>Remove from Group</ListItemText>
+                                                </MenuItem>
+                                            </>
+                                        )}
+                                    </Menu>
+                                </>
+                            )}
+                        </Paper>
+                    )}
+
+
+                    {tab === 2 && (
+                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                            <Typography variant="h6" className="font-semibold mb-1">Settings</Typography>
+                            <Typography className="text-slate-500 mb-3">
+                                Update visibility, manage tags/subgroups, or delete the group (wire endpoints as needed).
+                            </Typography>
+                            <Stack direction="row" spacing={1}>
+                                <Button
+                                    variant="contained"
+                                    className="rounded-xl"
+                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                    onClick={() => setEditOpen(true)}
+                                >
+                                    Edit Details
+                                </Button>
+                                <Button variant="outlined" className="rounded-xl" sx={{ textTransform: "none" }} disabled>
+                                    Delete Group (wire)
+                                </Button>
+                            </Stack>
+                        </Paper>
+                    )}
+
+                    {tab === 3 && (
+                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                            <Stack spacing={2}>
+                                <Typography variant="h6" className="font-semibold">Posts</Typography>
+
+                                {!canPost ? (
+                                    <Alert severity="info">
+                                        Only the <b>Owner</b>, <b>Admins</b>, and <b>Moderators</b> can create posts in this group.
+                                    </Alert>
+                                ) : (
+                                    <Paper elevation={0} className="rounded-xl border border-slate-200 p-3">
+                                        <Stack spacing={2}>
+                                            <Stack direction="row" spacing={2} alignItems="center">
+                                                <TextField
+                                                    label="Post Type"
+                                                    select size="small" sx={{ minWidth: 200 }}
+                                                    value={postType}
+                                                    onChange={(e) => setPostType(e.target.value)}
+                                                >
+                                                    <MenuItem value="text">Text</MenuItem>
+                                                    <MenuItem value="image">Image</MenuItem>
+                                                    <MenuItem value="link">Link</MenuItem>
+                                                    <MenuItem value="poll">Poll</MenuItem>
+                                                    <MenuItem value="event">Event</MenuItem>
+                                                </TextField>
+
+                                                <Button
+                                                    variant="contained"
+                                                    onClick={createPost}
+                                                    disabled={creating || (postType === "text" && !postText.trim()) || (postType === "image" && !postImageFile)}
+                                                    startIcon={<SendRoundedIcon />}
+                                                    className="rounded-xl"
+                                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                >
+                                                    Post
+                                                </Button>
+                                            </Stack>
+
+                                            {/* Dynamic fields */}
+                                            {postType === "text" && (
+                                                <TextField
+                                                    label="Write something…"
+                                                    multiline minRows={3} fullWidth
+                                                    value={postText}
+                                                    onChange={(e) => setPostText(e.target.value)}
+                                                />
+                                            )}
+
+                                            {postType === "image" && (
+                                                <>
+                                                    <TextField
+                                                        label="Caption (optional)"
+                                                        fullWidth
+                                                        value={postText}
+                                                        onChange={(e) => setPostText(e.target.value)}
+                                                    />
+                                                    <Stack direction="row" spacing={1} alignItems="center">
+                                                        <label htmlFor="post-image-file">
+                                                            <Button component="span" size="small" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
+                                                                Choose image
+                                                            </Button>
+                                                        </label>
+                                                        <input
+                                                            id="post-image-file"
+                                                            type="file"
+                                                            accept="image/*"
+                                                            style={{ display: "none" }}
+                                                            onChange={(e) => setPostImageFile(e.target.files?.[0] || null)}
+                                                        />
+                                                        <Typography variant="body2" className="text-slate-600">
+                                                            {postImageFile ? postImageFile.name : "No file selected"}
+                                                        </Typography>
+                                                    </Stack>
+                                                </>
+                                            )}
+
+                                            {postType === "link" && (
+                                                <>
+                                                    <TextField
+                                                        label="URL"
+                                                        fullWidth
+                                                        value={postLinkUrl}
+                                                        onChange={(e) => setPostLinkUrl(e.target.value)}
+                                                        placeholder="https://example.com"
+                                                    />
+                                                    <TextField
+                                                        label="Comment (optional)"
+                                                        fullWidth
+                                                        value={postText}
+                                                        onChange={(e) => setPostText(e.target.value)}
+                                                    />
+                                                </>
+                                            )}
+
+                                            {postType === "poll" && (
+                                                <>
+                                                    <TextField
+                                                        label="Poll question"
+                                                        fullWidth
+                                                        value={pollQuestion}
+                                                        onChange={(e) => setPollQuestion(e.target.value)}
+                                                    />
+                                                    <Stack spacing={1}>
+                                                        {pollOptions.map((opt, idx) => (
+                                                            <Stack key={idx} direction="row" spacing={1} alignItems="center">
+                                                                <TextField
+                                                                    label={`Option ${idx + 1}`}
+                                                                    fullWidth
+                                                                    value={opt}
+                                                                    onChange={(e) => updatePollOption(idx, e.target.value)}
+                                                                />
+                                                                {pollOptions.length > 2 && (
+                                                                    <Button size="small" onClick={() => removePollOption(idx)}>Remove</Button>
+                                                                )}
+                                                            </Stack>
+                                                        ))}
+                                                        <Button size="small" onClick={addPollOption} startIcon={<PollRoundedIcon />}>
+                                                            Add option
+                                                        </Button>
+                                                    </Stack>
+                                                </>
+                                            )}
+
+                                            {postType === "event" && (
+                                                <>
+                                                    <TextField
+                                                        label="Event title"
+                                                        fullWidth
+                                                        value={eventTitle}
+                                                        onChange={(e) => setEventTitle(e.target.value)}
+                                                    />
+                                                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                                                        <TextField
+                                                            label="Starts at"
+                                                            type="datetime-local"
+                                                            value={eventStart}
+                                                            onChange={(e) => setEventStart(e.target.value)}
+                                                            InputLabelProps={{ shrink: true }}
+                                                            fullWidth
+                                                        />
+                                                        <TextField
+                                                            label="Ends at"
+                                                            type="datetime-local"
+                                                            value={eventEnd}
+                                                            onChange={(e) => setEventEnd(e.target.value)}
+                                                            InputLabelProps={{ shrink: true }}
+                                                            fullWidth
+                                                        />
+                                                    </Stack>
+                                                    <TextField
+                                                        label="Description (optional)"
+                                                        multiline minRows={2} fullWidth
+                                                        value={postText}
+                                                        onChange={(e) => setPostText(e.target.value)}
+                                                    />
+                                                </>
+                                            )}
+                                        </Stack>
+                                    </Paper>
+                                )}
+
+                                {/* Posts list */}
+                                {postsLoading ? (
+                                    <>
+                                        <LinearProgress />
+                                        <Typography className="mt-2 text-slate-500">Loading posts…</Typography>
+                                    </>
+                                ) : postsError ? (
+                                    <Alert severity="error">{postsError}</Alert>
+                                ) : posts.length === 0 ? (
+                                    <Typography className="text-slate-500">No posts yet.</Typography>
+                                ) : (
+                                    <Stack spacing={2}>
+                                        {posts.map((p) => (
+                                            <Paper key={p.id} elevation={0} className="rounded-xl border border-slate-200 p-3">
+                                                <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
+                                                    <Chip size="small" label={String(p.type || "text").toUpperCase()} />
+                                                    <Typography variant="caption" className="text-slate-500">
+                                                        {p.created_by?.name || p.created_by?.email || "User"} • {p.created_at ? new Date(p.created_at).toLocaleString() : ""}
+                                                    </Typography>
+                                                </Stack>
+
+                                                {/* Render by type */}
+                                                {/* footer actions at end of post (not for polls) */}
+                                                {canModerate && ["text","poll"].includes(p.type) && (
+                                                <Stack direction="row" justifyContent="flex-end" className="mt-2">
+                                                    <IconButton size="small" onClick={(e) => openPostMenu(e, p)} title="More">
+                                                    <MoreVertRoundedIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Stack>
+                                                )}
+
+                                                {p.type === "image" ? (
+                                                    <>
+                                                        {p.text && <Typography className="mb-2">{p.text}</Typography>}
+                                                        {p.image && (
+                                                            <img
+                                                                alt="post"
+                                                                src={toAbs(p.image)}
+                                                                style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12 }}
+                                                            />
+                                                        )}
+                                                    </>
+                                                ) : p.type === "link" ? (
+                                                    <>
+                                                        {p.text && <Typography className="mb-1">{p.text}</Typography>}
+                                                        {p.url && (
+                                                            <a href={toAbs(p.url)} target="_blank" rel="noreferrer" style={{ color: "#0ea5a4" }}>
+                                                                <LinkRoundedIcon fontSize="small" /> {p.url}
+                                                            </a>
+                                                        )}
+                                                    </>
+                                                ) : p.type === "poll" ? (
+                                                    <>
+                                                        <Typography className="mb-1 font-medium">{p.question}</Typography>
+                                                        <Stack spacing={0.5}>
+                                                            {(p.options || []).map((o, i) => (
+                                                                <Chip key={i} size="small" label={o} className="bg-slate-100 text-slate-700 w-fit" />
+                                                            ))}
+                                                        </Stack>
+                                                    </>
+                                                ) : p.type === "event" ? (
+                                                    <>
+                                                        <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
+                                                            <EventNoteRoundedIcon fontSize="small" />
+                                                            <Typography className="font-medium">{p.title}</Typography>
+                                                        </Stack>
+                                                        <Typography variant="caption" className="text-slate-600">
+                                                            {p.starts_at ? new Date(p.starts_at).toLocaleString() : ""} — {p.ends_at ? new Date(p.ends_at).toLocaleString() : ""}
+                                                        </Typography>
+                                                        {p.text && <Typography className="mt-1">{p.text}</Typography>}
+                                                    </>
+                                                ) : (
+                                                    <Typography>{p.text}</Typography>
+                                                )}
+                                            </Paper>
+
+                                        ))}
+                                    </Stack>
+                                )}
+                            </Stack>
+                        </Paper>
+                    )}
+
+                </Box>
+            )}
+
+            {/* Edit dialog */}
+            <EditGroupDialog
+                open={editOpen}
+                group={group}
+                onClose={() => setEditOpen(false)}
+                onUpdated={(g) => { setEditOpen(false); setGroup(g); }}
+            />
+            <AddMembersDialog
+                open={addOpen}
+                onClose={() => setAddOpen(false)}
+                groupIdOrSlug={idOrSlug}
+                existingIds={members.map(m => m.user.id)}
+                onAdded={async (n) => {
+                    await fetchMembers();                         // refresh list
+                    setGroup((prev) => prev ? {
+                        ...prev,         // bump visible count
+                        member_count: (prev.member_count || 0) + n
+                    } : prev);
+                }}
+            />
+            {/* Per-post actions menu */}
+            <Menu anchorEl={postMenuAnchor} open={Boolean(postMenuAnchor)} onClose={closePostMenu}>
+                <MenuItem onClick={() => toggleHidePost(activePost)} disabled={!activePost}>
+                    <ListItemIcon>👁️</ListItemIcon>
+                    <ListItemText>
+                        {(activePost?.hidden ?? activePost?.is_hidden) ? "Unhide" : "Hide"}
+                    </ListItemText>
+                </MenuItem>
+
+                <MenuItem onClick={() => { setEditPostOpen(true); closePostMenu(); }} disabled={!activePost}>
+                    <ListItemIcon>✏️</ListItemIcon>
+                    <ListItemText>Edit</ListItemText>
+                </MenuItem>
+
+                <MenuItem onClick={() => { setDeleteConfirmOpen(true); }} disabled={!activePost}>
+                    <ListItemIcon>🗑️</ListItemIcon>
+                    <ListItemText>Delete</ListItemText>
+                </MenuItem>
+            </Menu>
+
+            {/* Delete confirmation dialog */}
+            <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+                <DialogTitle>Delete this post?</DialogTitle>
+                <DialogContent>
+                    <Typography>This action can’t be undone. The post will be permanently removed for this group.</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+                    <Button onClick={deletePost} color="error" variant="contained" sx={{ textTransform: "none" }}>
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Edit Post dialog */}
+            <Dialog open={editPostOpen} onClose={() => setEditPostOpen(false)} fullWidth maxWidth="sm">
+                <DialogTitle>Edit Post</DialogTitle>
+                <DialogContent>
+                    {activePost?.type === "text" && (
+                        <TextField
+                            label="Text"
+                            fullWidth
+                            multiline minRows={3}
+                            value={activePost?.text || ""}
+                            onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
+                            className="mt-2"
+                        />
+                    )}
+
+                    {activePost?.type === "link" && (
+                        <>
+                            <TextField
+                                label="Text (optional)"
+                                fullWidth
+                                multiline minRows={2}
+                                value={activePost?.text || ""}
+                                onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
+                                className="mt-2"
+                            />
+                            <TextField
+                                label="URL"
+                                fullWidth
+                                value={activePost?.url || ""}
+                                onChange={(e) => setActivePost({ ...activePost, url: e.target.value })}
+                                className="mt-2"
+                            />
+                        </>
+                    )}
+
+                    {activePost?.type === "event" && (
+                        <>
+                            <TextField
+                                label="Title"
+                                fullWidth
+                                value={activePost?.title || ""}
+                                onChange={(e) => setActivePost({ ...activePost, title: e.target.value })}
+                                className="mt-2"
+                            />
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} className="mt-2">
+                                <TextField
+                                    label="Starts at"
+                                    type="datetime-local"
+                                    value={activePost?.starts_at ? activePost.starts_at.slice(0, 16) : ""}
+                                    onChange={(e) => setActivePost({ ...activePost, starts_at: e.target.value })}
+                                    InputLabelProps={{ shrink: true }}
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Ends at"
+                                    type="datetime-local"
+                                    value={activePost?.ends_at ? activePost.ends_at.slice(0, 16) : ""}
+                                    onChange={(e) => setActivePost({ ...activePost, ends_at: e.target.value })}
+                                    InputLabelProps={{ shrink: true }}
+                                    fullWidth
+                                />
+                            </Stack>
+                            <TextField
+                                label="Description"
+                                fullWidth
+                                multiline minRows={2}
+                                value={activePost?.text || ""}
+                                onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
+                                className="mt-2"
+                            />
+                        </>
+                    )}
+
+                    {activePost?.type === "image" && (
+                        <TextField
+                            label="Caption"
+                            fullWidth
+                            multiline minRows={2}
+                            value={activePost?.text || ""}
+                            onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
+                            className="mt-2"
+                        />
+                    )}
+
+                    {activePost?.type === "poll" && (
+                        <Alert severity="info" className="mt-2">
+                            Editing polls is not enabled here. You can still Hide/Unhide or Delete.
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setEditPostOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+                    <Button
+                        onClick={async () => {
+                            if (!activePost) return;
+                            // Adjust endpoint if your backend differs
+                            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/${activePost.id}/`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                body: JSON.stringify(
+                                    activePost.type === "text" ? { text: activePost.text } :
+                                        activePost.type === "link" ? { text: activePost.text, url: activePost.url } :
+                                            activePost.type === "event" ? { title: activePost.title, text: activePost.text, starts_at: activePost.starts_at, ends_at: activePost.ends_at } :
+                                                activePost.type === "image" ? { text: activePost.text } :
+                                                    {}
+                                )
+                            });
+                            if (!res.ok) {
+                                const j = await res.json().catch(() => ({}));
+                                alert(j?.detail || `HTTP ${res.status}`);
+                                return;
+                            }
+                            setEditPostOpen(false);
+                            await fetchPosts();
+                        }}
+                        variant="contained"
+                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                    >
+                        Save
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+        </Container>
+    );
+}

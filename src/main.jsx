@@ -12,7 +12,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import theme from './muiTheme';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  // <React.StrictMode>
+  <React.StrictMode>
     <StyledEngineProvider injectFirst>
       <ThemeProvider theme={theme}>
         {/* Keep Tailwind look exactly the same; CssBaseline only normalizes defaults */}
@@ -22,5 +22,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </BrowserRouter>
       </ThemeProvider>
     </StyledEngineProvider>
-  // </React.StrictMode>
+  </React.StrictMode>
 );

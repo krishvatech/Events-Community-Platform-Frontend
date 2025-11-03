@@ -20,9 +20,132 @@ import {
   IconButton,
   CssBaseline,
 } from '@mui/material';
+
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
+
+/* ───────────────────────── helpers (no CSS changes) ───────────────────────── */
+
+const truthy = (v) => {
+  if (v === true || v === 1) return true;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    return ["true", "1", "yes", "y", "on"].includes(s);
+  }
+  return false;
+};
+
+const hasRoleName = (arr, names) =>
+  Array.isArray(arr) && arr.some(r => {
+    const n = String(r?.name ?? r ?? "").toLowerCase();
+    return names.some(x => n.includes(x));
+  });
+
+/** Deep check: does object contain any admin/staff flags anywhere */
+const deepHasFlag = (obj, keys = ["is_staff","isSuperuser","is_superuser","is_admin","staff","admin","isStaff"]) => {
+  const seen = new Set();
+  const stack = [obj];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (cur && typeof cur === "object" && !seen.has(cur)) {
+      seen.add(cur);
+      for (const k of Object.keys(cur)) {
+        const v = cur[k];
+        // key-based truthy
+        if (keys.includes(k) && truthy(v)) return true;
+        // array roles/groups/permissions
+        if (["roles","groups","permissions"].includes(k) && hasRoleName(v, ["admin","staff"])) return true;
+        // nested
+        if (v && typeof v === "object") stack.push(v);
+      }
+    }
+  }
+  return false;
+};
+
+const isStaffUser = (u) =>
+  !!(
+    truthy(u?.is_staff) ||
+    truthy(u?.isSuperuser) ||
+    truthy(u?.is_superuser) ||
+    truthy(u?.is_admin) ||
+    truthy(u?.staff) ||
+    truthy(u?.isStaff) ||
+    (u?.role && String(u.role).toLowerCase() === "admin") ||
+    truthy(u?.user?.is_staff) ||
+    truthy(u?.user?.is_superuser) ||
+    hasRoleName(u?.groups, ["admin","staff"]) ||
+    hasRoleName(u?.roles, ["admin","staff"]) ||
+    hasRoleName(u?.permissions, ["admin","staff"]) ||
+    deepHasFlag(u) // ← deep fallback
+  );
+
+const decodeJwtPayload = (token) => {
+  try {
+    const b64 = (token.split(".")[1] || "").replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(b64));
+  } catch { return null; }
+};
+
+const fetchJSON = async (url, headers = {}) => {
+  try {
+    const r = await fetch(url, { headers, credentials: "include" });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+};
+
+const fetchWithManyAuthStyles = async (url, access) => {
+  const headerSets = [
+    { Authorization: `Bearer ${access}`, Accept: "application/json" },
+    { Authorization: `JWT ${access}`,    Accept: "application/json" },
+    { Authorization: `Token ${access}`,  Accept: "application/json" },
+  ];
+  for (const h of headerSets) {
+    const obj = await fetchJSON(url, h);
+    if (obj) return obj;
+  }
+  return null;
+};
+
+/** Try hard to resolve current user with staff flags */
+const resolveCurrentUser = async (access, fallbackEmail) => {
+  // 1) Common "me" endpoints
+  const meCandidates = [
+    `${API_BASE}/auth/users/me/`, // Djoser
+    `${API_BASE}/users/me/`,      // custom
+    `${API_BASE}/auth/me/`,
+    `${API_BASE}/me/`,
+  ];
+  for (const url of meCandidates) {
+    const u = await fetchWithManyAuthStyles(url, access);
+    if (u) return u;
+  }
+
+  // 2) If JWT has user_id, try by id
+  const payload = decodeJwtPayload(access);
+  const uid = payload?.user_id || payload?.id;
+  if (uid) {
+    const byId = [
+      `${API_BASE}/users/${uid}/`,
+      `${API_BASE}/auth/users/${uid}/`,
+    ];
+    for (const url of byId) {
+      const u = await fetchWithManyAuthStyles(url, access);
+      if (u) return u;
+    }
+  }
+
+  // 3) Fallback to JWT claims (sometimes include roles)
+  if (payload) return payload;
+
+  // 4) Last resort
+  const name = (fallbackEmail || "").split("@")[0] || "Member";
+  return { first_name: name, email: fallbackEmail };
+};
+
+/* ───────────────────────── end helpers ────────────────────────────────────── */
 
 const SignInPage = () => {
   const navigate = useNavigate();
@@ -76,16 +199,12 @@ const SignInPage = () => {
       });
 
       let data = null;
-      try {
-        data = await response.json();
-      } catch {
-        /* ignore parse errors */
-      }
+      try { data = await response.json(); } catch { /* ignore */ }
 
       if (!response.ok) {
         const msg = data?.detail || data?.error || response.statusText || 'Login failed';
         throw new Error(msg);
-      } 
+      }
 
       if (data?.access) {
         localStorage.setItem('access_token', data.access);
@@ -94,17 +213,35 @@ const SignInPage = () => {
       if (data?.refresh) {
         localStorage.setItem('refresh_token', data.refresh);
       }
-      if (data?.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-      }
 
+      // Resolve the user with staff info (response.user → /me → by id → JWT → fallback)
+      let userObj = data?.user ?? null;
+      if (!userObj && data?.access) {
+        userObj = await resolveCurrentUser(data.access, formData.email);
+      }
+      localStorage.setItem("user", JSON.stringify(userObj || {}));
+
+      // Toast + persist auth bits
       toast.success(`✅ Login successful. Welcome ${formData.email}`);
       saveLoginPayload(data, { email: formData.email });
 
-      const redirectTo = location.state?.from?.pathname || '/dashboard';
-      setTimeout(() => {
-        navigate(redirectTo, { replace: true });
-      }, 0);
+      // Decide destination
+      const params = new URLSearchParams(location.search);
+      const intended = params.get("next") || location.state?.from?.pathname || "/events";
+
+      // TEMP: one-time debug (you can comment this out)
+      console.log("redirect check", { userObj, goDashboard: isStaffUser(userObj), intended });
+
+      // Staff → dashboard (hard redirect so nothing else can override it)
+      if (isStaffUser(userObj)) {
+        window.location.replace("/dashboard");
+        return;
+      }
+
+      // Non-staff → intended
+      navigate(intended, { replace: true });
+      return;
+
     } catch (err) {
       toast.error(`❌ ${err.message || 'Login failed. Please try again.'}`);
     } finally {
@@ -199,26 +336,16 @@ const SignInPage = () => {
                     mb: 1.5,
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 1,
-                      '& fieldset': {
-                        borderColor: '#d1d5db', // default border color (gray-300)
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#155dfc', // hover color
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: '#155dfc', // focus color (your brand blue)
-                      },
+                      '& fieldset': { borderColor: '#d1d5db' },
+                      '&:hover fieldset': { borderColor: '#155dfc' },
+                      '&.Mui-focused fieldset': { borderColor: '#155dfc' },
                     },
                     '& .MuiInputBase-input': {
                       fontSize: 12,
-                      '::placeholder': {
-                        fontSize: 14,
-                        opacity: 0.6,
-                      },
+                      '::placeholder': { fontSize: 14, opacity: 0.6 },
                     },
                   }}
                 />
-
 
                 <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490 ,fontSize:13}}>
                   Password
@@ -237,22 +364,13 @@ const SignInPage = () => {
                     mb: 1.5,
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 1,
-                      '& fieldset': {
-                        borderColor: '#d1d5db', // default border color (gray)
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#155dfc', // hover border color
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: '#155dfc', // focused border color
-                      },
+                      '& fieldset': { borderColor: '#d1d5db' },
+                      '&:hover fieldset': { borderColor: '#155dfc' },
+                      '&.Mui-focused fieldset': { borderColor: '#155dfc' },
                     },
                     '& .MuiInputBase-input': {
                       fontSize: 12,
-                      '::placeholder': {
-                        fontSize: 14,
-                        opacity: 0.6,
-                      },
+                      '::placeholder': { fontSize: 14, opacity: 0.6 },
                     },
                   }}
                   InputProps={{
@@ -273,9 +391,7 @@ const SignInPage = () => {
                     variant="body2"
                     underline="none"
                     sx={{ fontSize: 14, color: '#155dfc' ,fontWeight:600}}
-                    onClick={() =>
-                      toast.info('Password recovery is not implemented yet.')
-                    }
+                    onClick={() => toast.info('Password recovery is not implemented yet.')}
                   >
                     Forgot password?
                   </Link>

@@ -3,7 +3,7 @@
 // Reuses existing Header/Footer and our MUI + Tailwind setup.
 
 import React, {useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
 import {
@@ -26,8 +26,16 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { Slider } from "@mui/material";
+import Drawer from "@mui/material/Drawer";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
+const EVENTS_URL = `${API_BASE}/events/`;
+const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 
+const todayISO = () => dayjs().format("YYYY-MM-DD");
 
 // ————————————————————————————————————————
 // Helpers
@@ -45,6 +53,78 @@ function priceStr(p) {
   }
 }
 
+function authHeaders() {
+  const t =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("access");
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+async function addToCart(eventId, qty = 1) {
+  try {
+    const res = await fetch(`${API_BASE}/cart/items/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+      },
+      body: JSON.stringify({ event_id: eventId, quantity: qty }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      alert(`Add to cart failed (${res.status}): ${text}`);
+      return null;
+    }
+    const item = await res.json();
+
+   // refresh badge count from server
+   try {
+     const r2 = await fetch(`${API_BASE}/cart/count/`, { headers: authHeaders() });
+     const d2 = await r2.json();
+     localStorage.setItem("cart_count", String(d2?.count ?? 0));
+     window.dispatchEvent(new Event("cart:update"));
+   } catch {}
+
+    return item;
+  } catch {
+    alert("Could not add to cart. Please try again.");
+    return null;
+  }
+}
+function bumpCartCount(qty = 1) {
+  const prev = Number(localStorage.getItem("cart_count") || "0");
+  const next = prev + qty;
+  localStorage.setItem("cart_count", String(next));
+  // notify any listeners (e.g., Header)
+  window.dispatchEvent(new Event("cart:update"));
+}
+
+const toSlug = (s) => String(s).trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+
+function presetRangeISO(preset) {
+  const t = dayjs();
+  switch (preset) {
+    case "This Month":
+      return {
+        start: t.format("YYYY-MM-DD"),
+        end: t.endOf("month").format("YYYY-MM-DD"),
+      };
+    case "This Week":
+      return {
+        start: t.format("YYYY-MM-DD"),
+        end: t.endOf("week").format("YYYY-MM-DD"),
+      };
+    case "Next 90 days":
+      return {
+        start: t.format("YYYY-MM-DD"),
+        end: t.add(90, "day").format("YYYY-MM-DD"),
+      };
+    default:
+      return { start: "", end: "" };
+  }
+}
 
 function dmyToISO(s = "") {
   const [dd, mm, yyyy] = s.split("-").map(Number);
@@ -58,9 +138,21 @@ function truncate(text, n = 120) {
   if (!text) return "";
   return text.length > n ? text.slice(0, n - 1) + "…" : text;
 }
-const API_BASE =
-  (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
-const EVENTS_URL = `${API_BASE}/events/`;
+
+// API_BASE may be like http://127.0.0.1:8000/api
+// const API_BASE = RAW_BASE.replace(/\/+$/, "");
+// Origin without the /api suffix
+const API_ORIGIN = API_BASE.replace(/\/api$/, "");
+
+const toAbs = (u) => {
+  if (!u) return u;
+  // already absolute?
+  if (/^https?:\/\//i.test(u)) return u;
+  // ensure leading slash then join to origin
+  const p = u.startsWith("/") ? u : `/${u}`;
+  return `${API_ORIGIN}${p}`;
+};
+
 
 function humanizeFormat(fmt = "") {
   return fmt.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -76,8 +168,8 @@ function toCard(ev) {
     start: ev.start_time,                    // DateTimeField
     end: ev.end_time,                        // DateTimeField
     location: ev.location,
-    topics: [ev.category, humanizeFormat(ev.format)].filter(Boolean), // ["Strategy", "In-Person"]
-    attendees: ev.attending_count,
+    topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
+    attendees: Number(ev.attending_count ?? ev.registrations_count ?? 0),
     price: ev.price,
     registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
   };
@@ -86,34 +178,71 @@ function toCard(ev) {
 // Card (thumbnail view)
 // ————————————————————————————————————————
 function EventCard({ ev }) {
-  const startDate = new Date(ev.start);
-  const endDate = ev.end ? new Date(ev.end) : undefined;
+  const navigate = useNavigate();
+
+  const handleRegisterCard = async () => {
+    const token =
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("access");
+    if (!token) {
+      navigate("/signin");
+      return;
+    }
+
+    // FREE: create EventRegistration immediately
+    if (Number(ev.price) === 0) {
+      const res = await fetch(`${EVENTS_URL}${ev.id}/register/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+      });
+      if (!res.ok) {
+        const msg = await res.text();
+        alert(`Registration failed (${res.status}): ${msg}`);
+        return;
+      }
+      // locally mark as registered and bump the shown count
+      setRegisteredIds(prev => new Set([...prev, ev.id]));
+      setRawEvents(prev =>
+        (prev || []).map(e =>
+          e.id === ev.id
+            ? {
+                ...e,
+                // bump whichever field is present so toCard() shows the new number
+                registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1,
+              }
+            : e
+        )
+      );
+      return;
+    }
+
+    // PAID: keep add-to-cart (registration will be created after successful checkout)
+    const item = await addToCart(ev.id);
+    if (item) {
+      bumpCartCount(1);
+      navigate("/cart");
+    }
+  };
 
   return (
     <MUICard
       elevation={0}
-      className="group rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
-                 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5
-                 hover:border-teal-200 overflow-hidden"
+      className="group h-full w-full flex flex-col rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
+                transition-all duration-300 hover:shadow-xl hover:-translate-y-2.5
+                hover:ring-1 hover:ring-teal-200 overflow-hidden cursor-pointer"
     >
-      {/* Media with overlay badges */}
-      <Box className="relative">
+      {/* MEDIA */}
+      <Box className="relative w-full h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px] overflow-hidden">
         {ev.image ? (
           <img
-            src={ev.image}
+            src={toAbs(ev.image)}
             alt={ev.title}
-            className="w-full h-56 md:h-64 object-cover
-                        transition-transform duration-700 ease-out          /* smooth & slow */
-                        group-hover:scale-105                               /* zoom on card hover */
-                        will-change-transform"
+            loading="lazy"
+            className="absolute inset-0 block w-full h-full object-cover object-center"
           />
         ) : (
-          <div className="w-full h-56 md:h-64 object-cover
-                        transition-transform duration-700 ease-out          /* smooth & slow */
-                        group-hover:scale-105                               /* zoom on card hover */
-                        will-change-transform">
-            No image
-          </div>
+          <div className="absolute inset-0 w-full h-full bg-slate-100" />
         )}
 
         {ev.topics?.[0] && (
@@ -128,79 +257,79 @@ function EventCard({ ev }) {
         )}
       </Box>
 
-      <CardContent className="p-6">
-        <h3 className="text-2xl font-semibold  hover:text-teal-700 text-neutral-900 leading-snug">
+      <CardContent className="p-4 sm:p-5 md:p-6 flex-1 flex flex-col min-h-[260px] sm:min-h-[280px] md:min-h-[300px]">
+        <h3 className="text-xl sm:text-2xl font-semibold text-neutral-900 leading-snug two-line">
           {ev.title}
         </h3>
+
         {ev.description && (
-          <p className="mt-2 text-neutral-600 text-sm leading-relaxed">
-            {truncate(ev.description, 160)}
-          </p>
+          <p className="mt-2 text-neutral-600 text-sm three-line">{ev.description}</p>
         )}
 
-        <div className="mt-4 space-y-2 text-neutral-800 text-sm">
+        <div className="mt-4 space-y-2 text-neutral-800 text-sm meta-rows sm:min-h-[88px] md:min-h-[96px]">
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-2">
               <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-              <span>
-                {new Date(ev.start).toLocaleDateString(undefined, {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
+              {new Date(ev.start).toLocaleDateString(undefined, {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
             {ev.end && (
-              <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-2">
                 <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                <span>
-                  {new Date(ev.start).toLocaleTimeString(undefined, {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}{" "}
-                  -{" "}
-                  {new Date(ev.end).toLocaleTimeString(undefined, {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
+                {new Date(ev.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}{" "}
+                – {new Date(ev.end).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+              </span>
             )}
           </div>
 
           {ev.location && (
             <div className="flex items-center gap-2">
               <PlaceIcon fontSize="small" className="text-teal-700" />
-              <span>{ev.location}</span>
+              <span className="truncate">{ev.location}</span>
             </div>
           )}
 
-          {!!ev.attendees && (
+          {Number.isFinite(ev.attendees) && (
             <div className="flex items-center gap-2">
               <GroupsIcon fontSize="small" className="text-teal-700" />
-              <span>{ev.attendees} attending</span>
+              <span>{ev.attendees} registered</span>
             </div>
           )}
         </div>
 
-        <Divider className="my-5" />
+        <div className="mt-auto" />
+      </CardContent>
 
-        <div className="flex items-center justify-between">
-          <div className="text-xl font-semibold text-neutral-900">
-            {priceStr(ev.price)}
-          </div>
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t p-6">
+        <div className="text-xl font-semibold text-neutral-900">{priceStr(ev.price)}</div>
+
+        {ev.isRegistered ? (
+          <Button
+            variant="contained"
+            size="large"
+            disabled
+            className="normal-case rounded-full px-5 bg-emerald-500/80"
+            title="You are already registered for this event"
+          >
+            Registered
+          </Button>
+        ) : (
           <Button
             variant="contained"
             size="large"
             color="primary"
-            component={Link}
-            to={ev.registration_url}
+            onClick={handleRegisterCard}
             className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
           >
             Register Now
           </Button>
-        </div>
-      </CardContent>
+        )}
+      </div>
+
     </MUICard>
   );
 }
@@ -209,6 +338,46 @@ function EventCard({ ev }) {
 // Row (details/list view)
 // ————————————————————————————————————————
 function EventRow({ ev }) {
+  const navigate = useNavigate();
+
+  const handleRegisterRow = async () => {
+    const token =
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("access");
+    if (!token) {
+      navigate("/signin");
+      return;
+    }
+
+    if (Number(ev.price) === 0) {
+      const res = await fetch(`${EVENTS_URL}${ev.id}/register/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+      });
+      if (!res.ok) {
+        const msg = await res.text();
+        alert(`Registration failed (${res.status}): ${msg}`);
+        return;
+      }
+      setRegisteredIds(prev => new Set([...prev, ev.id]));
+      setRawEvents(prev =>
+        (prev || []).map(e =>
+          e.id === ev.id
+            ? { ...e, registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1 }
+            : e
+        )
+      );
+      return;
+    }
+
+    const item = await addToCart(ev.id);
+    if (item) {
+      bumpCartCount(1);
+      navigate("/cart");
+    }
+  };
+
   const startDate = new Date(ev.start);
   const endDate = ev.end ? new Date(ev.end) : undefined;
 
@@ -217,25 +386,19 @@ function EventRow({ ev }) {
       elevation={0}
       className="group rounded-2xl border border-[#E8EEF2] bg-white shadow-sm
                  transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5
-                 hover:border-teal-200 overflow-hidden overflow-hidden"
+                 hover:ring-1 hover:ring-teal-200 overflow-hidden overflow-hidden"
     >
       <div className="md:flex">
         {/* Image / badges */}
         <div className="relative md:w-2/5">
           {ev.image ? (
             <img
-              src={ev.image}
+              src={toAbs(ev.image)}
               alt={ev.title}
-              className="w-full h-44 md:h-full object-cover
-                         transform-gpu transition-transform duration-700 ease-out
-                         group-hover:scale-105 will-change-transform"
+              className="w-full h-44 md:h-full object-cover transform-gpu transition-transform duration-700 ease-out group-hover:scale-105 will-change-transform"
             />
           ) : (
-            <div className="w-full h-44 md:h-full object-cover
-                         transform-gpu transition-transform duration-700 ease-out
-                         group-hover:scale-105 will-change-transform">
-              No image
-            </div>
+            <div className="w-full h-44 md:h-full object-cover">No image</div>
           )}
 
           {ev.topics?.[0] && (
@@ -276,15 +439,8 @@ function EventRow({ ev }) {
                 {ev.end && (
                   <span className="inline-flex items-center gap-2">
                     <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                    {startDate.toLocaleTimeString(undefined, {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}{" "}
-                    -{" "}
-                    {endDate?.toLocaleTimeString(undefined, {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
+                    {startDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} -{" "}
+                    {endDate?.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                   </span>
                 )}
 
@@ -295,10 +451,10 @@ function EventRow({ ev }) {
                   </span>
                 )}
 
-                {!!ev.attendees && (
+                {Number.isFinite(ev.attendees) && (
                   <span className="inline-flex items-center gap-2">
                     <GroupsIcon fontSize="small" className="text-teal-700" />
-                    {ev.attendees} attending
+                    {ev.attendees} registered
                   </span>
                 )}
               </div>
@@ -309,17 +465,29 @@ function EventRow({ ev }) {
             </div>
 
             <div className="shrink-0">
-              <Button
-                variant="contained"
-                size="large"
-                color="primary"
-                component={Link}
-                to={ev.registration_url}
-                className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
-              >
-                Register Now
-              </Button>
+              {ev.isRegistered ? (
+                <Button
+                  variant="contained"
+                  size="large"
+                  disabled
+                  className="normal-case rounded-full px-5 bg-emerald-500/80"
+                  title="You are already registered for this event"
+                >
+                  Registered
+                </Button>
+              ) : (
+                <Button
+                  variant="contained"
+                  size="large"
+                  color="primary"
+                  onClick={handleRegisterRow}
+                  className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
+                >
+                  Register Now
+                </Button>
+              )}
             </div>
+
           </div>
         </CardContent>
       </div>
@@ -327,10 +495,15 @@ function EventRow({ ev }) {
   );
 }
 
+
 // ————————————————————————————————————————
 // Page
 // ————————————————————————————————————————
 export default function EventsPage() {
+  // which events the logged-in user has registered for
+  const [registeredIds, setRegisteredIds] = useState(new Set());
+  // raw events payload coming from the server (we'll enrich it with the "registered" flag)
+  const [rawEvents, setRawEvents] = useState([]);
   const PAGE_SIZE = 9; // 9 items per page
   const [page, setPage] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -355,14 +528,66 @@ export default function EventsPage() {
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [maxPrice, setMaxPrice] = useState(5000);
   const [priceRange, setPriceRange] = useState([0, maxPrice || 0]);
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
+  const [openSelect, setOpenSelect] = useState(null);
+  const getOpenProps = (name) => ({
+    open: openSelect === name,
+    onOpen: () => setOpenSelect(name),
+    onClose: () => setOpenSelect(null),
+  });
+
+  // ✅ TOP-LEVEL: build UI objects with the isRegistered flag
+useEffect(() => {
+  setEvents(
+    (rawEvents || []).map(ev => {
+      const ui = toCard(ev);
+      return { ...ui, isRegistered: registeredIds.has(ev.id) };
+    })
+  );
+}, [rawEvents, registeredIds]);
 
 
   useEffect(() => {
-  fetch(`${EVENTS_URL}locations/`)
+  fetch(`${EVENTS_URL}locations/`, { headers: authHeaders() })
     .then(r => r.json())
     .then(d => setLocations(d?.results || []))
     .catch(() => setLocations([]));
 }, []);
+
+// Get my registrations (only if logged-in)
+// /api/event-registrations/mine/?limit=1000 returns [{ id, event: { id, ... }, ... }, ...]
+useEffect(() => {
+  const token =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("access");
+
+  // if not logged-in, clear any old state
+  if (!token) {
+    setRegisteredIds(new Set());
+    return;
+  }
+
+  const ctrl = new AbortController();
+  (async () => {
+    try {
+      const url = new URL(`${API_BASE}/event-registrations/mine/`);
+      url.searchParams.set("limit", "1000"); // plenty for typical accounts
+      const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const items = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      const ids = new Set(items.map(x => (x?.event?.id ?? x?.event_id)).filter(Boolean));
+      setRegisteredIds(ids);
+    } catch {
+      setRegisteredIds(new Set()); // fallback: treat as none
+    }
+  })();
+  return () => ctrl.abort();
+}, []); // run once on page load
+
 
   useEffect(() => {
   const ctrl = new AbortController();
@@ -374,15 +599,19 @@ export default function EventsPage() {
       topicsToSend.forEach((t) => url.searchParams.append("category", t));
       if (dateRange) url.searchParams.set("date_range", dateRange);
       if (selectedLocation) url.searchParams.set("location", selectedLocation);
-      const startISO = dmyToISO(startDMY);
-      const endISO   = dmyToISO(endDMY);
+      const preset   = presetRangeISO(dateRange);
+      const startISO = dmyToISO(startDMY) || preset.start || todayISO();
+      const endISO   = dmyToISO(endDMY)   || preset.end || "";
+      url.searchParams.set("exclude_ended", "1");
+      
       if (startISO) url.searchParams.set("start_date", startISO);
       if (endISO)   url.searchParams.set("end_date", endISO);
       const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
       fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
+      
       if (q) url.searchParams.set("search", q);
 
-      const r = await fetch(url, { signal: ctrl.signal });
+      const r = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
       const d = await r.json();
       if (typeof d?.max_price !== "undefined") setMaxPrice(Number(d.max_price) || 0);
     } catch (_) {}
@@ -396,7 +625,10 @@ export default function EventsPage() {
       try {
         setLoading(true);
         const headers = { "Content-Type": "application/json" };
-        const token = localStorage.getItem("access");
+        const token =
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("access"); // last for backwards compat
         if (token) headers.Authorization = `Bearer ${token}`;
 
         const url = new URL(EVENTS_URL);
@@ -404,24 +636,27 @@ export default function EventsPage() {
         url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
         url.searchParams.set("min_price", String(priceRange[0]));
         url.searchParams.set("max_price", String(priceRange[1]));
+        url.searchParams.set("ordering", "start_time");
         const topicsToSend = selectedTopics.length ? selectedTopics : (topic ? [topic] : []);
         topicsToSend.forEach((t) => url.searchParams.append("category", t));
         if (dateRange) url.searchParams.set("date_range", dateRange);
         if (selectedLocation) url.searchParams.set("location", selectedLocation);
 
-        const startISO = dmyToISO(startDMY);
-        const endISO   = dmyToISO(endDMY);
+        const preset   = presetRangeISO(dateRange);
+        const startISO = dmyToISO(startDMY) || preset.start || todayISO();  
+        const endISO   = dmyToISO(endDMY)   || preset.end || "";
         if (startISO) url.searchParams.set("start_date", startISO);
         if (endISO)   url.searchParams.set("end_date", endISO);
+        url.searchParams.set("exclude_ended", "1");
         const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
         fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
         if (q) url.searchParams.set("search", q);   // matches title, location, topic (if backend search_fields include them)
 
-        const res = await fetch(url, { headers, signal: controller.signal });
+        const res = await fetch(url, { headers: { ...headers, ...authHeaders() }, signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-        setEvents((data.results || []).map(toCard));
+        setRawEvents(data.results || []);
         setTotal(Number(data.count ?? (data.results || []).length));
       } catch (e) {
         if (e.name !== "AbortError") setError(String(e?.message || e));
@@ -438,34 +673,70 @@ export default function EventsPage() {
     const ctrl = new AbortController();
     (async () => {
       try {
-        const res = await fetch(CATEGORIES_URL, { signal: ctrl.signal });
+        // Build a categories URL that only returns topics having future/ongoing events
+        const url = new URL(CATEGORIES_URL);
+        const preset   = presetRangeISO(dateRange);
+        const startISO = dmyToISO(startDMY) || preset.start || todayISO();
+        const endISO   = dmyToISO(endDMY)   || preset.end || "";
+
+        // mirror the list filters so “past-only” topics drop out
+        url.searchParams.set("exclude_ended", "1"); // hide topics with only ended events
+        if (startISO) url.searchParams.set("start_date", startISO);
+        if (endISO)   url.searchParams.set("end_date", endISO);
+        if (dateRange) url.searchParams.set("date_range", dateRange);
+        if (selectedLocation) url.searchParams.set("location", selectedLocation);
+
+        
+        if (q) url.searchParams.set("search", q);
+
+        const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setCategories(Array.isArray(data?.results) ? data.results : []);
       } catch (_) {}
     })();
     return () => ctrl.abort();
-  }, []);
+  }, [dateRange, startDMY, endDMY, selectedLocation, format, selectedFormats, q]);
 
 
   useEffect(() => {
-    const ctrl = new AbortController();
-    (async () => {
-      try {
-        const res = await fetch(FORMATS_URL, { signal: ctrl.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setFormats(Array.isArray(data?.results) ? data.results : []);
-      } catch (_) {}
-    })();
-    return () => ctrl.abort();
-  }, []);
+  const ctrl = new AbortController();
+  (async () => {
+    try {
+      const url = new URL(FORMATS_URL);
+      const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
+      const payload = await res.json();
 
+      // Accept many payload shapes then normalize to slugs
+      const arr =
+        Array.isArray(payload?.results) ? payload.results :
+        Array.isArray(payload?.formats) ? payload.formats :
+        Array.isArray(payload)          ? payload :
+        [];
+
+      const values = arr
+        .map(f => typeof f === "string"
+          ? toSlug(f)
+          : toSlug(f?.value ?? f?.slug ?? f?.name ?? "")
+        )
+        .filter(Boolean);
+
+      const distinct = Array.from(new Set(values));
+      setFormats(distinct.length ? distinct : ["in_person", "online", "hybrid"]);
+    } catch {
+      // optionally keep a fallback
+      // setFormats(["in_person", "online", "hybrid"]);
+    }
+  })();
+  return () => ctrl.abort();
+}, [dateRange, startDMY, endDMY, selectedLocation, q]);
+
+  
   const selectSx = {
    height: 42,                       // 12 * 4px
    borderRadius: 1,                 // rounded-xl
    bgcolor: "white",
-   minWidth: 190,
+   minWidth: { xs: 200, sm: 190, lg: 160 },
    "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#CBD5E1" },
    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
@@ -476,24 +747,39 @@ export default function EventsPage() {
  };
 
  const selectMenuProps = {
-   PaperProps: {
-     elevation: 8,
-     sx: {
-       mt: 0.5,
-       borderRadius: 1,
-       minWidth: 220,
-       boxShadow: "0 12px 28px rgba(16,24,40,.12)",
-       "& .MuiMenuItem-root": {
-         py: 1.25,
-         px: 2,
-         borderRadius: 1,
-         "&.Mui-selected, &.Mui-selected:hover": { bgcolor: "grey.100" },
-         "&:hover": { bgcolor: "grey.100" },
-        fontSize:13,
-       },
-     },
-   },
- };
+  // render in a portal so it won’t be clipped by parent containers
+  disablePortal: false,
+  container: () => document.body,
+
+  // position
+  anchorOrigin:    { vertical: "bottom", horizontal: "left" },
+  transformOrigin: { vertical: "top",    horizontal: "left" },
+  marginThreshold: 0,
+
+  // IMPORTANT: keep body from scrolling when the menu is open
+  disableScrollLock: false,
+
+  PaperProps: {
+    elevation: 8,
+    // prevent wheel/touch inside the menu from bubbling to window
+    onWheel: (e) => e.stopPropagation(),
+    onTouchMove: (e) => e.stopPropagation(),
+    sx: {
+      zIndex: 2100,
+      mt: 0.5,
+      maxHeight: "60vh",
+      overflowY: "auto",
+      borderRadius: 1,
+      minWidth: 220,
+      boxShadow: "0 12px 28px rgba(16,24,40,.12)",
+      "& .MuiMenuItem-root": {
+        py: 1.25, px: 2, borderRadius: 1, fontSize: 13,
+        "&.Mui-selected, &.Mui-selected:hover": { bgcolor: "grey.100" },
+        "&:hover": { bgcolor: "grey.100" },
+      },
+    },
+  },
+};
   
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -511,6 +797,22 @@ export default function EventsPage() {
     useEffect(() => {
   setPriceRange(([min]) => [Math.min(min, Number(maxPrice) || 0), Number(maxPrice) || 0]);
 }, [maxPrice]);
+
+
+  useEffect(() => {
+  const close = () => setOpenSelect(null);
+  const onPageScroll = () => close();
+  const onResize = () => close();
+
+  window.addEventListener("scroll", onPageScroll, { passive: true });
+  window.addEventListener("resize", onResize);
+
+  return () => {
+    window.removeEventListener("scroll", onPageScroll);
+    window.removeEventListener("resize", onResize);
+  };
+}, []);
+
 
 
   const handlePageChange = (_e, value) => {
@@ -576,140 +878,519 @@ export default function EventsPage() {
             </section>  
 
       {/* Top filters / controls bar */}
-      <Container maxWidth="lg" className="mt-6">
-        <div className="w-full flex flex-wrap items-center gap-3 p-3 bg-[#F7FAFC] rounded-xl border border-slate-200">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[240px]">
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+      <Container maxWidth={false} disableGutters className="mt-6 px-4 sm:px-6">
+        <div className="w-full rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 overflow-visible">
+          {/* Responsive grid: 1 col on xs, 2 cols on sm, 12-col layout on lg+ */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+
+            {/* Search (full width on all, 4 cols on lg) */}
+            <div className="col-span-1 lg:col-span-3">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
+                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search events by keyword..."
+                  className="w-full h-11 pl-12 pr-4 rounded-xl border border-slate-200 bg-white outline-none"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
                 />
-              </svg>
-            </span>
-            <input
-              type="text"
-              placeholder="Search events by keyword..."
-              className="w-full h-12 pl-12 pr-4 rounded-xl border border-slate-200 bg-white outline-none"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </div>
+              </div>
+            </div>
 
-          <FormControl size="small">
-            <Select
-              label="Date Range"
-              value={dateRange}              // ← fallback so text shows
-              onChange={(e) => setDateRange(e.target.value)}
-              displayEmpty
-              renderValue={(v) => v || 'Date Range'}
-              MenuProps={selectMenuProps}
-              sx={{
-                ...selectSx,
-                // make sure styles don’t hide the text
-                '& .MuiSelect-select': { opacity: 1, color: 'inherit', textIndent: 0 },
-              }}
-            >
-              
-              <MenuItem value="This Week">This Week</MenuItem>
-              <MenuItem value="This Month">This Month</MenuItem>
-              <MenuItem value="Next 90 days">Next 90 days</MenuItem> {/* ← unique */}
-            </Select>
-          </FormControl>
+            {/* Date Range (2 cols on lg) */}
+            <div className="col-span-1 lg:col-span-2">
+              <FormControl fullWidth size="small">
+                <Select
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value)}
+                  displayEmpty
+                  renderValue={(v) => v || "Date Range"}
+                  MenuProps={selectMenuProps}
+                  {...getOpenProps("date")}
+                  sx={{
+                    ...selectSx,
+                    "& .MuiOutlinedInput-root": { height: 44, borderRadius: 12 },
+                    "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" },
+                  }}
+                >
+                  <MenuItem value="This Week">This Week</MenuItem>
+                  <MenuItem value="This Month">This Month</MenuItem>
+                  <MenuItem value="Next 90 days">Next 90 days</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
 
-
-          {/* Topic/Industry */}
-          <FormControl size="small">
-             <Select
-               value={topic}
-               onChange={(e) => setTopic(e.target.value)}
-               displayEmpty
-               renderValue={(v) => v || 'Topic/Industry'}
-               MenuProps={selectMenuProps}
-               sx={selectSx}
-             >
-               
-                {categories.map((c) => (
-                  <MenuItem key={c} value={c}>{c}</MenuItem>
-                ))}
-             </Select>
-          </FormControl>
-
-          {/* Event Format */}
-          <FormControl size="small">
-             <Select
-               value={format}
-               onChange={(e) => setFormat(e.target.value)}
-               displayEmpty
-               renderValue={(v) => v || 'Event Format'}
-               MenuProps={selectMenuProps}
-               sx={selectSx}
-             >
-                  {formats.map((f) => (
-                    <MenuItem key={f} value={f}>{f}</MenuItem>
+            {/* Topic/Industry (2 cols on lg) */}
+            <div className="col-span-1 lg:col-span-2">
+              <FormControl fullWidth size="small">
+                <Select
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  displayEmpty
+                  renderValue={(v) => v || "Topic/Industry"}
+                  MenuProps={selectMenuProps}
+                  {...getOpenProps("topic")}
+                  sx={{
+                    ...selectSx,
+                    "& .MuiOutlinedInput-root": { height: 44, borderRadius: 12 },
+                    "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" },
+                  }}
+                >
+                  {categories.map((c) => (
+                    <MenuItem key={c} value={c}>{c}</MenuItem>
                   ))}
-             </Select>
-          </FormControl>
+                </Select>
+              </FormControl>
+            </div>
 
-          {/* Advanced toggle */}
-          <button
-            onClick={() => setShowAdvanced(v => !v)} 
-            type="button"
-            className="h-12 px-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white text-sm"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-slate-600">
-              <path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            Advanced
-          </button>
+            {/* Event Format (2 cols on lg) */}
+            <div className="col-span-1 lg:col-span-2">
+              <FormControl fullWidth size="small">
+                <Select
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value)}
+                  displayEmpty
+                  renderValue={(v) => v || "Event Format"}
+                  MenuProps={selectMenuProps}
+                  {...getOpenProps("format")}
+                  sx={{ ...selectSx, "& .MuiOutlinedInput-root": { height: 44, borderRadius: 12 },
+                        "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" } }}
+                >
+                  {(formats || []).map((f, idx) => (
+                    <MenuItem key={`${f}-${idx}`} value={f}>{f}</MenuItem>
+                  ))}
+                </Select>
 
-          {/* View toggle (now functional) */}
-          <div className="ml-auto flex items-center border border-slate-200 rounded-xl overflow-hidden">
-            <button
-              aria-label="Thumbnail view"
-              onClick={() => setView("grid")}
-              className={`px-3 py-2 ${view === "grid" ? "bg-[#0b0b23] text-white" : "bg-white text-slate-800"}`}
+              </FormControl>
+            </div>
+
+            {/* Advanced (full width on xs/sm; 1 col on lg) */}
+            <div className="col-span-1 lg:col-span-2">
+              <button
+                onClick={() => setShowAdvanced((v) => !v)}
+                type="button"
+                className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-slate-600">
+                  <path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                Advanced
+              </button>
+            </div>
+
+            {/* View toggle — always visible, 50/50 on all breakpoints */}
+            {/* View toggle — hidden on mobile, 50/50 on sm+ */}
+            <div
+              className="hidden sm:block sm:col-span-2 lg:col-span-1 min-w-0"
+              aria-hidden={false} // hidden only on xs due to Tailwind
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="3" y="3" width="8" height="8" rx="1"></rect>
-                <rect x="13" y="3" width="8" height="8" rx="1"></rect>
-                <rect x="3" y="13" width="8" height="8" rx="1"></rect>
-                <rect x="13" y="13" width="8" height="8" rx="1"></rect>
-              </svg>
-            </button>
-            <button
-              aria-label="Details list view"
-              onClick={() => setView("list")}
-              className={`px-3 py-2 border-l border-slate-200 ${view === "list" ? "bg-[#0b0b23] text-white" : "bg-white text-slate-800"}`}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
+              <div className="flex w-full h-11 rounded-xl overflow-hidden border border-slate-200 bg-white">
+                <button
+                  aria-label="Grid view"
+                  onClick={() => setView('grid')}
+                  className={`flex-1 h-full grid place-items-center
+                    ${view === 'grid' ? 'bg-[#0b0b23] text-white' : 'bg-white text-slate-800'}`}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="3" y="3" width="8" height="8" rx="1" />
+                    <rect x="13" y="3" width="8" height="8" rx="1" />
+                    <rect x="3" y="13" width="8" height="8" rx="1" />
+                    <rect x="13" y="13" width="8" height="8" rx="1" />
+                  </svg>
+                </button>
+
+                <button
+                  aria-label="List view"
+                  onClick={() => setView('list')}
+                  className={`flex-1 h-full grid place-items-center border-l border-slate-200
+                    ${view === 'list' ? 'bg-[#0b0b23] text-white' : 'bg-white text-slate-800'}`}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+
+
           </div>
         </div>
       </Container>
 
       {/* Results */}
-      <Container id="events" maxWidth="xl" className="mt-8 mb-16">
-        {showAdvanced ? (
-          <Grid container spacing={4} sx={{ alignItems: 'flex-start' }}>
-            {/* LEFT: Advanced Filters panel */}
-            <Grid size={{ xs: 12, lg: 3 }} sx={{ minWidth: 300, flexShrink: 0 }}>
-              <div className="rounded-2xl bg-[#0d2046] text-white p-6 sticky top-24 h-fit hidden lg:block">
-                <div className="flex items-center gap-2 mb-6">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path d="M3 5h18M8 12h8M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  <span className="text-lg font-semibold">Advanced Filters</span>
-                </div>
+      <Container id="events" maxWidth={false} disableGutters className="mt-8 mb-16 px-4 sm:px-6">
+        <Grid container spacing={4} sx={{ alignItems: "flex-start" }}>
+          {/* LEFT: Advanced Filters — desktop only */}
+          {isDesktop && showAdvanced && (
+            <Grid
+              item
+              xs={12}
+              lg={2}
+              sx={{
+                minWidth: 240,
+                maxWidth: 280,
+                flexShrink: 0,
+                display: { xs: "none", lg: "block" },
+              }}
+            >
+              <div className="sticky top-24 h-fit">
+                <div className="rounded-2xl bg-[#0d2046] text-white p-6">
+                  <div className="flex items-center gap-2 mb-6">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M3 5h18M8 12h8M10 19h4"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <span className="text-lg font-semibold">Advanced Filters</span>
+                  </div>
 
-                {/* Date Range */}
-                <div className="mb-5">
+                  {/* Date Range */}
+                  <div className="mb-5">
+                    <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <rect
+                          x="3"
+                          y="4"
+                          width="18"
+                          height="18"
+                          rx="2"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
+                        <path
+                          d="M16 2v4M8 2v4M3 10h18"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
+                      </svg>
+                      Date Range
+                    </div>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <DatePicker
+                        className="text-white bg-teal-500"
+                        label={null}
+                        value={startDMY ? dayjs(dmyToISO(startDMY)) : null}
+                        onChange={(v) => {
+                          setStartDMY(v ? v.format("DD-MM-YYYY") : "");
+                          setDateRange("");
+                        }}
+                        format="DD-MM-YYYY"
+                        slotProps={{
+                          textField: {
+                            placeholder: "dd-mm-yyyy",
+                            size: "small",
+                            sx: {
+                              "& .MuiOutlinedInput-root": {
+                                height: 44,
+                                background: "rgba(255, 255, 255, 0.1)",
+                                borderRadius: 12,
+                                color: "#fff",
+                              },
+                              "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: "rgba(255,255,255,.2)",
+                              },
+                              "& .MuiInputBase-input::placeholder": {
+                                color: "rgba(243, 240, 240, 0.7)",
+                              },
+                              mb: 1.5,
+                            },
+                          },
+                        }}
+                      />
+
+                      <DatePicker
+                        className="text-white bg-teal-500"
+                        label={null}
+                        value={endDMY ? dayjs(dmyToISO(endDMY)) : null}
+                        onChange={(v) => {
+                          setEndDMY(v ? v.format("DD-MM-YYYY") : "");
+                          setDateRange("");
+                        }}
+                        format="DD-MM-YYYY"
+                        slotProps={{
+                          textField: {
+                            placeholder: "dd-mm-yyyy",
+                            size: "small",
+                            sx: {
+                              "& .MuiOutlinedInput-root": {
+                                height: 44,
+                                background: "rgba(255,255,255,.1)",
+                                borderRadius: 12,
+                                color: "#fff",
+                              },
+                              "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: "rgba(255,255,255,.2)",
+                              },
+                              "& .MuiInputBase-input::placeholder": {
+                                color: "rgba(255,255,255,.7)",
+                              },
+                            },
+                          },
+                        }}
+                      />
+                    </LocalizationProvider>
+                  </div>
+
+                  {/* Location */}
+                  <FormControl size="small" className="w-full sm:w-[250px] mb-4 sm:mb-5">
+                    <Select
+                      value={selectedLocation}
+                      onChange={(e) => setSelectedLocation(e.target.value)}
+                      displayEmpty
+                      renderValue={(v) => v || "Location"}
+                      MenuProps={selectMenuProps}
+                      {...getOpenProps("location")}
+                      sx={{
+                        ...selectSx,
+                        "& .MuiSelect-select": { px: 2.5, py: 2.25 },
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>Location</em>
+                      </MenuItem>
+                      {locations.map((loc) => (
+                        <MenuItem key={loc} value={loc}>
+                          {loc}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {/* Topic/Industry */}
+                  <div className="mb-6">
+                    <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M4 7h16M4 12h16M4 17h16"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      Topic/Industry
+                    </div>
+                    <div className="space-y-3 text-white/90">
+                      {categories.map((x) => (
+                        <label key={x} className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-white/30 bg-transparent"
+                            checked={selectedTopics.includes(x)}
+                            onChange={(e) =>
+                              setSelectedTopics((prev) =>
+                                e.target.checked
+                                  ? [...prev, x]
+                                  : prev.filter((v) => v !== x)
+                              )
+                            }
+                          />
+                          <span>{x}</span>
+                        </label>
+                      ))}
+                      {selectedTopics.length > 0 && (
+                        <button
+                          type="button"
+                          className="mt-2 text-xs underline text-white/70"
+                          onClick={() => setSelectedTopics([])}
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Event Format */}
+                  <div className="mb-6">
+                    <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M4 7h16M4 12h16M4 17h16"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      Event Format
+                    </div>
+                    <div className="space-y-3 text-white/90">
+                      {formats.map((x) => (
+                        <label key={x} className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-white/30 bg-transparent"
+                            checked={selectedFormats.includes(x)}
+                            onChange={(e) =>
+                              setSelectedFormats((prev) =>
+                                e.target.checked
+                                  ? [...prev, x]
+                                  : prev.filter((v) => v !== x)
+                              )
+                            }
+                          />
+                          <span>{x}</span>
+                        </label>
+                      ))}
+                      {selectedFormats.length > 0 && (
+                        <button
+                          type="button"
+                          className="mt-2 text-xs underline text-white/70"
+                          onClick={() => setSelectedFormats([])}
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Price (visual) */}
+                  <div className="mb-6">
+                    <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                      <span>$</span> Price Range
+                    </div>
+                    <Slider
+                      value={priceRange}
+                      onChange={(_, v) => setPriceRange(v)}
+                      valueLabelDisplay="auto"
+                      min={0}
+                      max={Math.max(0, Number(maxPrice) || 0)}
+                      sx={{
+                        "& .MuiSlider-thumb": { bgcolor: "white" },
+                        "& .MuiSlider-track": { bgcolor: "white" },
+                        "& .MuiSlider-rail": { opacity: 0.3 },
+                      }}
+                    />
+                    <div className="flex justify-between text-sm mt-1 text-white/80">
+                      <span>{priceStr(priceRange[0])}</span>
+                      <span>{priceStr(priceRange[1])}+</span>
+                    </div>
+                  </div>
+
+                  <button className="w-full h-11 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-semibold">
+                    Apply Filters
+                  </button>
+
+                  <button
+                    type="button"
+                    className="w-full h-11 px-2 rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10 mt-3"
+                    onClick={() => {
+                      setQ("");
+                      setDateRange("");
+                      setStartDMY("");
+                      setEndDMY("");
+                      setSelectedLocation("");
+                      setTopic("");
+                      setSelectedTopics([]);
+                      setFormat("");
+                      setSelectedFormats([]);
+                      setPriceRange([0, Number(maxPrice) || 0]);
+                      setPage(1);
+                    }}
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            </Grid>
+          )}
+
+          {/* RIGHT: heading + cards/list */}
+          <Grid
+            item
+            xs={12}
+            lg={showAdvanced && isDesktop ? 10 : 12}
+            sx={{ flex: 1, minWidth: 0 }}
+          >
+            <div className="w-full">
+              <h2 className="text-3xl font-bold">Upcoming Events</h2>
+              <p className="text-neutral-600 mt-1">
+                {loading ? "Loading…" : `${total} events found`}
+              </p>
+              {error && (
+                <p className="mt-2 text-red-600 text-sm">
+                  Failed to load events: {error}
+                </p>
+              )}
+            </div>
+
+            {view === "grid" ? (
+              <Box
+                sx={{
+                  mt: 3,
+                  display: "grid",
+                  gap: 3,
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0,1fr))",
+                    md: "repeat(3, minmax(0,1fr))",
+                    lg: "repeat(3, minmax(0,1fr))",
+                  },
+                }}
+              >
+                {events.map((ev) => (
+                  <Box key={ev.id}>
+                    <EventCard ev={ev} />
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+              <Grid container spacing={3} direction="column">
+                {events.map((ev) => (
+                  <Grid item key={ev.id} xs={12}>
+                    <EventRow ev={ev} />
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </Grid>
+        </Grid>
+
+        {/* Mobile/Tablet FULL-SCREEN Advanced Filters */}
+        {!isDesktop && (
+          <Drawer
+            anchor="left"
+            variant="temporary"
+            open={showAdvanced}
+            onClose={() => setShowAdvanced(false)}
+            ModalProps={{ keepMounted: true }}
+            PaperProps={{
+              sx: {
+                width: '100%',          // not 100vw (avoids overshoot)
+                maxWidth: '100%',
+                height: '100dvh',       // better on mobile than 100vh
+                bgcolor: '#0d2046',
+                color: 'white',
+                borderRadius: 0,
+                boxSizing: 'border-box', // include border in width
+                overflowX: 'clip',       // hide any stray overflow
+              },
+            }}
+          >
+            {/* Top bar */}
+            <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-[#0d2046] border-b border-white/10 w-full">
+              <span className="text-lg font-semibold">Advanced Filters</span>
+              <Button size="small" variant="outlined" onClick={() => setShowAdvanced(false)}>
+                Close
+              </Button>
+            </div>
+
+            {/* Scrollable content */}
+            <div
+              className="p-4 overflow-y-auto w-full"
+              style={{ height: 'calc(100dvh - 112px)', overflowX: 'clip' }}
+            >
+              {/* --- your existing fields unchanged --- */}
+
+              {/* Date Range */}
+              <div className="mb-5">
                 <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
@@ -718,266 +1399,169 @@ export default function EventsPage() {
                   Date Range
                 </div>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker
-                className="text-white bg-teal-500"
-                  label={null}
-                  value={startDMY ? dayjs(dmyToISO(startDMY)) : null}   // use your helper
-                  onChange={(v) => { setStartDMY(v ? v.format("DD-MM-YYYY") : ""); setDateRange(""); }}
-                  format="DD-MM-YYYY"
-                  slotProps={{
-                    textField: {
-                      placeholder: "dd-mm-yyyy",
-                      size: "small",
-                      sx: {
-                        "& .MuiOutlinedInput-root": {
-                          height: 44,
-                          background: "rgba(255, 255, 255, 0.1)",
-                          borderRadius: 12,
-                          color: "#fff",
+                  <DatePicker
+                    className="text-white bg-teal-500"
+                    label={null}
+                    value={startDMY ? dayjs(dmyToISO(startDMY)) : null}
+                    onChange={(v) => { setStartDMY(v ? v.format('DD-MM-YYYY') : ''); setDateRange(''); }}
+                    format="DD-MM-YYYY"
+                    slotProps={{
+                      textField: {
+                        placeholder: 'dd-mm-yyyy',
+                        size: 'small',
+                        sx: {
+                          '& .MuiOutlinedInput-root': { height: 44, background: 'rgba(255,255,255,.1)', borderRadius: 12, color: '#fff' },
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,.2)' },
+                          '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,.7)' },
+                          mb: 1.5,
                         },
-                        "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,.2)" },
-                        "& .MuiInputBase-input::placeholder": { color: "rgba(243, 240, 240, 0.7)" },
-                        mb: 1.5,
                       },
-                    },
-                  }}
-                />
-
-                <DatePicker
-                  className="text-white bg-teal-500"
-                  label={null}
-                  value={endDMY ? dayjs(dmyToISO(endDMY)) : null}
-                  onChange={(v) => { setEndDMY(v ? v.format("DD-MM-YYYY") : ""); setDateRange(""); }}
-                  format="DD-MM-YYYY"
-                  slotProps={{
-                    textField: {
-                      placeholder: "dd-mm-yyyy",
-                      size: "small",
-                      sx: {
-                        "& .MuiOutlinedInput-root": {
-                          height: 44,
-                          background: "rgba(255,255,255,.1)",
-                          borderRadius: 12,
-                          color: "#fff",
+                    }}
+                  />
+                  <DatePicker
+                    className="text-white bg-teal-500"
+                    label={null}
+                    value={endDMY ? dayjs(dmyToISO(endDMY)) : null}
+                    onChange={(v) => { setEndDMY(v ? v.format('DD-MM-YYYY') : ''); setDateRange(''); }}
+                    format="DD-MM-YYYY"
+                    slotProps={{
+                      textField: {
+                        placeholder: 'dd-mm-yyyy',
+                        size: 'small',
+                        sx: {
+                          '& .MuiOutlinedInput-root': { height: 44, background: 'rgba(255,255,255,.1)', borderRadius: 12, color: '#fff' },
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,.2)' },
+                          '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,.7)' },
                         },
-                        "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,.2)" },
-                        "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,.7)" },
                       },
-                    },
-                  }}
-                />
+                    }}
+                  />
                 </LocalizationProvider>
               </div>
 
-                {/* Location */}
-                <FormControl size="small" className="w-full sm:w-[250px] mb-4 sm:mb-5">
-                    <Select
-                      value={selectedLocation}
-                      onChange={(e) => setSelectedLocation(e.target.value)}
-                      displayEmpty
-                      renderValue={(v) => v || 'Location'}
-                      MenuProps={selectMenuProps}
-                      sx={{ ...selectSx, '& .MuiSelect-select': { px: 2.5, py: 2.25 } }}
-                    >
-                      {/* allow clearing back to 'Location' */}
-                      <MenuItem value="">
-                        <em>Location</em>
-                      </MenuItem>
-
-                      {locations.map((loc) => (
-                        <MenuItem key={loc} value={loc}>{loc}</MenuItem>
-                      ))}
-                    </Select>
-                </FormControl>
-
-                {/* Topic/Industry */}
-                <div className="mb-6">
-                  <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                    Topic/Industry
-                  </div>
-                  <div className="space-y-3 text-white/90">
-                    {categories.map((x) => (
-                      <label key={x} className="flex items-center gap-3">
-                        <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-white/30 bg-transparent"
-                            checked={selectedTopics.includes(x)}
-                            onChange={(e) =>
-                              setSelectedTopics((prev) =>
-                                e.target.checked ? [...prev, x] : prev.filter((v) => v !== x)
-                              )
-                            }
-                          />
-
-                        <span>{x}</span>
-                      </label>
-                    ))}
-                    {/* quick "clear all" */}
-                    {selectedTopics.length > 0 && (
-                      <button type="button" className="mt-2 text-xs underline text-white/70"
-                              onClick={() => setSelectedTopics([])}>
-                        Clear all
-                      </button>
-                    )}
-
-                  </div>
-                </div>
-
-                {/* Event Format */}
-                <div className="mb-6">
-                  <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                    Event Format
-                  </div>
-                  <div className="space-y-3 text-white/90">
-                    {formats.map((x) => (
-                      <label key={x} className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-white/30 bg-transparent"
-                          checked={selectedFormats.includes(x)}
-                          onChange={(e) =>
-                            setSelectedFormats((prev) =>
-                              e.target.checked ? [...prev, x] : prev.filter((v) => v !== x)
-                            )
-                          }
-                        />
-                        <span>{x}</span>
-                      </label>
-                    ))}
-                    {/* quick "clear all" */}
-                    {selectedFormats.length > 0 && (
-                      <button
-                        type="button"
-                        className="mt-2 text-xs underline text-white/70"
-                        onClick={() => setSelectedFormats([])}
-                      >
-                        Clear all
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Price (visual) */}
-                <div className="mb-6">
-                  <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
-                    <span>$</span> Price Range
-                  </div>
-                  <Slider
-                    value={priceRange}
-                    onChange={(_, v) => setPriceRange(v)}
-                    valueLabelDisplay="auto"
-                    min={0}
-                    max={Math.max(0, Number(maxPrice) || 0)}
-                    sx={{
-                      // light track/thumb on dark card
-                      '& .MuiSlider-thumb': { bgcolor: 'white' },
-                      '& .MuiSlider-track': { bgcolor: 'white' },
-                      '& .MuiSlider-rail': { opacity: 0.3 },
-                    }}
-                  />
-
-                  <div className="flex justify-between text-sm mt-1 text-white/80">
-                    <span>{priceStr(priceRange[0])}</span>
-                    <span>{priceStr(priceRange[1])}+</span>
-                  </div>
-                </div>
-
-                <button className="w-full h-11 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-semibold">
-                  Apply Filters
-                </button>
-
-                <button
-                  type="button"
-                  className="w-full h-11 px-2 rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10 mt-3"
-                  onClick={() => {
-                    setQ("");                // search box
-                    setDateRange("");        // top Date Range select
-                    setStartDMY("");         // advanced start date
-                    setEndDMY("");           // advanced end date
-                    setSelectedLocation(""); // Location select
-                    setTopic("");            // top Topic/Industry (single)
-                    setSelectedTopics([]);   // advanced Topic checkboxes (multi)
-                    setFormat("");           // top Event Format (single)
-                    setSelectedFormats([]);  // advanced Format checkboxes (multi)
-                    setPriceRange([0, Number(maxPrice) || 0]); // price slider (min→0, max→DB max)
-                    setPage(1);              // go back to first page
-                  }}
+              {/* Location */}
+              <FormControl size="small" className="w-full sm:w-[250px] mb-4 sm:mb-5">
+                <Select
+                  value={selectedLocation}
+                  onChange={(e) => setSelectedLocation(e.target.value)}
+                  displayEmpty
+                  renderValue={(v) => v || 'Location'}
+                  MenuProps={selectMenuProps}
+                  sx={{ ...selectSx, '& .MuiSelect-select': { px: 2.5, py: 2.25 } }}
                 >
-                  Clear Filters
-                </button>
+                  <MenuItem value="">
+                    <em>Location</em>
+                  </MenuItem>
+                  {locations.map((loc) => (
+                    <MenuItem key={loc} value={loc}>{loc}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-
-              </div>
-            </Grid>
-
-            {/* RIGHT: heading + cards/list */}
-            <Grid size={{ xs: 12, lg: 9 }} sx={{ flex: 1, minWidth: 0 }}>
-              <div className="w-full">
-                <h2 className="text-3xl font-bold">Upcoming Events</h2>
-                <p className="text-neutral-600 mt-1">
-                    {loading ? "Loading…" : `${total} events found`}
-                  </p>
-                  {error && (
-                    <p className="mt-2 text-red-600 text-sm">Failed to load events: {error}</p>
+              {/* Topic/Industry */}
+              <div className="mb-6">
+                <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  Topic/Industry
+                </div>
+                <div className="space-y-3 text-white/90">
+                  {categories.map((x) => (
+                    <label key={x} className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-white/30 bg-transparent"
+                        checked={selectedTopics.includes(x)}
+                        onChange={(e) =>
+                          setSelectedTopics((prev) => e.target.checked ? [...prev, x] : prev.filter((v) => v !== x))
+                        }
+                      />
+                      <span>{x}</span>
+                    </label>
+                  ))}
+                  {selectedTopics.length > 0 && (
+                    <button type="button" className="mt-2 text-xs underline text-white/70" onClick={() => setSelectedTopics([])}>
+                      Clear all
+                    </button>
                   )}
+                </div>
               </div>
 
-              {view === "grid" ? (
-                 <Grid container spacing={3}>
-                   {events.map((ev) => (
-                     <Grid key={ev.id} size={{ xs: 12, md: 4 }}>
-                       <EventCard ev={ev} />
-                     </Grid>
-                   ))}
-                 </Grid>
-               ) : (
-                 <Grid container spacing={3} direction="column">
-                   {events.map((ev) => (
-                     <Grid key={ev.id} size={12}>
-                       <EventRow ev={ev} />
-                     </Grid>
-                   ))}
-                 </Grid>
-               )}
-            </Grid>
-          </Grid>
-        ) : (
-          <>
-            <div className="mb-4">
-              <h2 className="text-3xl font-bold">Upcoming Events</h2>
-              <p className="text-neutral-600 mt-1">
-                {loading ? "Loading…" : `${total} events found`}
-              </p>
-              {error && (
-                <p className="mt-2 text-red-600 text-sm">Failed to load events: {error}</p>
-              )}
+              {/* Event Format */}
+              <div className="mb-6">
+                <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  Event Format
+                </div>
+                <div className="space-y-3 text-white/90">
+                  {formats.map((x) => (
+                    <label key={x} className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-white/30 bg-transparent"
+                        checked={selectedFormats.includes(x)}
+                        onChange={(e) =>
+                          setSelectedFormats((prev) => e.target.checked ? [...prev, x] : prev.filter((v) => v !== x))
+                        }
+                      />
+                      <span>{x}</span>
+                    </label>
+                  ))}
+                  {selectedFormats.length > 0 && (
+                    <button type="button" className="mt-2 text-xs underline text-white/70" onClick={() => setSelectedFormats([])}>
+                      Clear all
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Price (visual) */}
+              <div className="mb-6">
+                <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                  <span>$</span> Price Range
+                </div>
+                <Slider
+                  value={priceRange}
+                  onChange={(_, v) => setPriceRange(v)}
+                  valueLabelDisplay="auto"
+                  min={0}
+                  max={Math.max(0, Number(maxPrice) || 0)}
+                  sx={{
+                    '& .MuiSlider-thumb': { bgcolor: 'white' },
+                    '& .MuiSlider-track': { bgcolor: 'white' },
+                    '& .MuiSlider-rail': { opacity: 0.3 },
+                  }}
+                />
+                <div className="flex justify-between text-sm mt-1 text-white/80">
+                  <span>{priceStr(priceRange[0])}</span>
+                  <span>{priceStr(priceRange[1])}+</span>
+                </div>
+              </div>
+              {/* --- /fields --- */}
             </div>
 
-            {view === "grid" ? (
-             <Grid container spacing={3}>
-               {events.map((ev) => (
-                 <Grid key={ev.id} size={{ xs: 12, md: 4 }}>
-                   <EventCard ev={ev} />
-                 </Grid>
-               ))}
-             </Grid>
-           ) : (
-             <Grid container spacing={3} direction="column">
-               {events.map((ev) => (
-                 <Grid key={ev.id} size={12}>
-                   <EventRow ev={ev} />
-                 </Grid>
-               ))}
-             </Grid>
-           )}
-
-          </>
+            {/* Bottom action bar (no left/right offsets) */}
+            <div className="sticky bottom-0 w-full bg-[#0d2046] border-t border-white/10 p-3 flex gap-2">
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={() => {
+                  setQ(''); setDateRange(''); setStartDMY(''); setEndDMY('');
+                  setSelectedLocation(''); setTopic(''); setSelectedTopics([]);
+                  setFormat(''); setSelectedFormats([]);
+                  setPriceRange([0, Number(maxPrice) || 0]); setPage(1);
+                }}
+              >
+                Clear
+              </Button>
+              <Button fullWidth variant="contained" onClick={() => setShowAdvanced(false)}>
+                Apply
+              </Button>
+            </div>
+          </Drawer>
         )}
 
         {/* Pagination */}
@@ -993,8 +1577,6 @@ export default function EventsPage() {
           />
         </Box>
       </Container>
-
-      <Footer />
     </>
   );
 }

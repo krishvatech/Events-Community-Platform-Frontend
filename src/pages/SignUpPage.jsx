@@ -82,8 +82,7 @@ const SignUpPage = () => {
     if (!emailRegex.test(formData.email || "")) {
       next.email = "Enter a valid email address";
     }
-    const strongPwd =
-      /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    const strongPwd = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])[^\s]{8,}$/;
     if (!strongPwd.test(formData.password || "")) {
       next.password = "Min 8 chars, 1 uppercase, 1 number, 1 special";
     }
@@ -94,8 +93,45 @@ const SignUpPage = () => {
     return Object.keys(next).length === 0;
   };
 
+  const normalizeApiErrors = (err) => {
+    const data = err?.response?.data ?? err?.data ?? {};
+    const fieldErrors = {};
+    const items = [];
+
+    const add = (field, message) => {
+      const msg = Array.isArray(message) ? message.join(" ") : String(message);
+      if (field && field !== "non_field_errors") {
+        // friendlier messages
+        let pretty = msg;
+        if (/unique/i.test(msg) && field === "email")    pretty = "Email already is exists";
+        if (/unique/i.test(msg) && field === "username") pretty = "Username already taken";
+
+        fieldErrors[field] = pretty;
+        items.push(`${field[0].toUpperCase() + field.slice(1)}: ${pretty}`);
+      } else {
+        items.push(msg);
+      }
+    };
+
+    if (data && typeof data === "object") {
+      if (data.detail) add(null, data.detail);
+      Object.entries(data).forEach(([k, v]) => {
+        if (k === "detail") return;
+        if (v && typeof v === "object" && !Array.isArray(v)) {
+          Object.entries(v).forEach(([k2, v2]) => add(k2, v2)); // nested dict
+        } else {
+          add(k, v);
+        }
+      });
+    } else {
+      add(null, err?.message || "Signup failed");
+    }
+    return { fieldErrors, items };
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrors({});  
     if (!validate()) return;
     setLoading(true);
     try {
@@ -117,8 +153,23 @@ const SignUpPage = () => {
       navigate("/signin", { replace: true, state: { email: payload.email, justSignedUp: true } });
       // ^ change "/signin" to your login route if different
     } catch (err) {
-      toast.error(`❌ ${err?.message || "Signup failed"}`);
-    } finally {
+        const { fieldErrors, items } = normalizeApiErrors(err);
+
+        if (Object.keys(fieldErrors).length) {
+          setErrors((prev) => ({ ...prev, ...fieldErrors })); // inline field errors
+        }
+
+        toast.error(
+          <div>
+            <strong>Could not create account</strong>
+            <ul style={{ margin: "6px 0 0 18px" }}>
+              {items.map((t, i) => (
+                <li key={i}>{t}</li>
+              ))}
+            </ul>
+          </div>
+        );
+      } finally {
       setLoading(false);
     }
   };
@@ -209,6 +260,7 @@ const SignUpPage = () => {
                     Username
                   </Typography>
                   <TextField
+                    label="Username"
                     name="username"
                     placeholder="username"
                     value={formData.username}
@@ -298,6 +350,7 @@ const SignUpPage = () => {
                     Email Address
                   </Typography>
                   <TextField
+                    label="Email Address"
                     name="email"
                     type="email"
                     placeholder="your@email.com"
