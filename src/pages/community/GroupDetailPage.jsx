@@ -60,12 +60,18 @@ export default function GroupDetailPage() {
 
   const [tab, setTab] = React.useState("chat");
   const [group, setGroup] = React.useState(null);
+  const isChildGroup = Boolean(group?.parent_id || group?.parent?.id || group?.parent);
+  const showSubgroupsTab = true; // only show on top-level groups
   const [members, setMembers] = React.useState([]);
   const [messages, setMessages] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [sending, setSending] = React.useState(false);
   const [text, setText] = React.useState("");
   const [error, setError] = React.useState("");
+  // sub-groups
+  const [subgroups, setSubgroups] = React.useState([]);
+  const [subLoading, setSubLoading] = React.useState(true);
+  const [subError, setSubError] = React.useState("");
 
   // token storage (adjust to your app)
   const token = window.localStorage.getItem("token");
@@ -140,6 +146,53 @@ export default function GroupDetailPage() {
     return () => { abort = true; };
   }, [idOrSlug, token, USE_MOCK]);
 
+  const fetchSubgroups = React.useCallback(async () => {
+    if (!group) return;
+    setSubLoading(true); setSubError("");
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+
+      const enc = encodeURIComponent(idOrSlug);
+      const candidates = [
+        `${API_ROOT}/groups/${enc}/subgroups/`,
+        group?.id ? `${API_ROOT}/groups/?parent_id=${group.id}` : null,
+        group?.id ? `${API_ROOT}/groups/?parent=${group.id}` : null,
+        `${API_ROOT}/groups/?parent_slug=${enc}`,
+      ].filter(Boolean);
+
+      let rows = null, lastErr = null;
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { headers });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          rows = Array.isArray(json) ? json : (Array.isArray(json?.results) ? json.results : []);
+          if (Array.isArray(rows)) break;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      if (!Array.isArray(rows)) {
+        setSubgroups([]);
+        setSubError(lastErr ? String(lastErr.message || lastErr) : "Unable to load sub-groups");
+      } else {
+        setSubgroups(rows);
+      }
+    } catch (e) {
+      setSubgroups([]);
+      setSubError(String(e?.message || e));
+    } finally {
+      setSubLoading(false);
+    }
+  }, [API_ROOT, group, idOrSlug, token]);
+
+  // trigger fetch once group is loaded
+  React.useEffect(() => { if (group && showSubgroupsTab) fetchSubgroups(); }, [group, showSubgroupsTab, fetchSubgroups]);
+  
   // ---- Send message (HTTP; swap to WS if you already use sockets) ----------
   const sendMessage = async () => {
     const content = text.trim();
@@ -320,6 +373,7 @@ export default function GroupDetailPage() {
             >
               <Tab value="chat" label="Chat" />
               <Tab value="members" label="Members" />
+              {showSubgroupsTab && <Tab value="subgroups" label="Sub-groups" />}
               <Tab value="overview" label="Overview" />
             </Tabs>
             <Divider />
@@ -399,6 +453,53 @@ export default function GroupDetailPage() {
                       </ListItem>
                     ))}
                   </List>
+                )}
+              </Box>
+            )}
+
+            {/* SUB-GROUPS TAB */}
+            {tab === "subgroups" && showSubgroupsTab && (
+              <Box sx={{ p: 2 }}>
+                {subLoading ? (
+                  <Typography color="text.secondary">Loading sub-groups…</Typography>
+                ) : subError ? (
+                  <Typography color="error">{subError}</Typography>
+                ) : subgroups.length === 0 ? (
+                  <Typography color="text.secondary">No sub-groups yet.</Typography>
+                ) : (
+                  <Stack spacing={1.5}>
+                    {subgroups.map((sg) => (
+                      <Paper key={sg.id || sg.slug} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between">
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <Avatar
+                              src={sg.cover_image || sg.avatar}
+                              alt={sg.name}
+                              sx={{ width: 40, height: 40 }}
+                            >
+                              {(sg.name || "?")[0]?.toUpperCase()}
+                            </Avatar>
+                            <Box>
+                              <Typography fontWeight={600}>{sg.name}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {((sg.visibility || "").toLowerCase() === "private" ? "Private" : "Public")}
+                                {" • "}
+                                {(sg.member_count ?? sg.members_count ?? 0)} members
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          <Button
+                            size="small"
+                            variant="text"
+                            onClick={() => navigate(`/groups/${sg.slug || sg.id}`)}
+                          >
+                            Open
+                          </Button>
+                        </Stack>
+                      </Paper>
+                    ))}
+                  </Stack>
                 )}
               </Box>
             )}
