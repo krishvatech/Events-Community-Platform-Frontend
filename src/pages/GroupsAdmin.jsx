@@ -2,16 +2,15 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Avatar, Box, Button, Chip, CircularProgress, Container, Grid, LinearProgress,
+  Avatar, Box, Button, Chip, LinearProgress,
   MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Dialog,
-  DialogTitle, DialogContent, DialogActions, InputAdornment
+  DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 
 // ---- API helpers (same style as your Dashboard.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -48,6 +47,10 @@ const slugify = (s) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+// Pretty label for the chip
+const labelJoinPolicy = (v) =>
+  v === "approval" ? "Approval" : v === "invite" ? "Invite" : "Open";
+
 // ---- Create Group Dialog ----
 function CreateGroupDialog({ open, onClose, onCreated }) {
   const token = getToken();
@@ -56,13 +59,12 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
   const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [visibility, setVisibility] = React.useState("public"); // public | private
+  const [joinPolicy, setJoinPolicy] = React.useState("open");    // open | invite | approval   <-- NEW
   const [imageFile, setImageFile] = React.useState(null);
   const [localPreview, setLocalPreview] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
   const [errors, setErrors] = React.useState({});
-
-
 
   const onNameChange = (v) => {
     setName(v);
@@ -94,10 +96,10 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
       fd.append("name", name.trim());
       fd.append("slug", slug.trim());
       fd.append("description", description.trim());
-      fd.append("visibility", visibility); // your backend can map this to enum/boolean
+      fd.append("visibility", visibility);
+      fd.append("join_policy", joinPolicy); // <-- NEW
       if (imageFile) fd.append("cover_image", imageFile, imageFile.name);
 
-      // POST /api/groups/
       const res = await fetch(`${API_ROOT}/groups/`, {
         method: "POST",
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -117,6 +119,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
       setToast({ open: true, type: "success", msg: "Group created" });
       onClose?.();
       setName(""); setSlug(""); setDescription(""); setVisibility("public");
+      setJoinPolicy("open"); // reset  <-- NEW
       setImageFile(null); setLocalPreview("");
     } catch (e) {
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
@@ -147,8 +150,8 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
             />
           </Box>
 
-          <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
-            <Grid xs={12} md={7}>
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12 md:col-span-7">
               <TextField
                 label="Description *"
                 multiline minRows={3}
@@ -167,13 +170,24 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
                 <MenuItem value="private">Private (invite-only)</MenuItem>
               </TextField>
 
-              {/* hidden slug field, mirroring your events UI approach */}
+              {/* NEW: Join Policy */}
+              <TextField
+                label="Join Policy"
+                select fullWidth className="mb-3"
+                value={joinPolicy} onChange={(e) => setJoinPolicy(e.target.value)}
+              >
+                <MenuItem value="open">Open (join instantly)</MenuItem>
+                <MenuItem value="approval">Approval required</MenuItem>
+                <MenuItem value="invite">Invite-only</MenuItem>
+              </TextField>
+
+              {/* hidden slug field */}
               <Box sx={{ display: "none" }}>
                 <TextField label="Slug *" value={slug} onChange={(e) => setSlug(slugify(e.target.value))} />
               </Box>
-            </Grid>
+            </div>
 
-            <Grid xs={12} md={5}>
+            <div className="col-span-12 md:col-span-5">
               <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
               <Typography variant="caption" className="text-slate-500 block mb-2">
                 Recommended 650×365px • Max 50 MB
@@ -207,8 +221,8 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
                   </Button>
                 </label>
               </Stack>
-            </Grid>
-          </Grid>
+            </div>
+          </div>
         </DialogContent>
         <DialogActions className="px-6 py-4">
           <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>
@@ -247,6 +261,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [visibility, setVisibility] = React.useState("public");
+  const [joinPolicy, setJoinPolicy] = React.useState("open"); // <-- NEW
   const [imageFile, setImageFile] = React.useState(null);
   const [localPreview, setLocalPreview] = React.useState("");
   const [removeImage, setRemoveImage] = React.useState(false);
@@ -258,6 +273,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     setName(group.name || "");
     setDescription(group.description || "");
     setVisibility(group.visibility || "public");
+    setJoinPolicy(group.join_policy || "open"); // <-- NEW
     setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
     setImageFile(null);
     setRemoveImage(false);
@@ -285,78 +301,70 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     if (!group || !validate()) return;
     setSubmitting(true);
     try {
-        const fd = new FormData();
-        fd.append("name", name.trim());
-        fd.append("description", description.trim());
-        fd.append("visibility", visibility);
+      const fd = new FormData();
+      fd.append("name", name.trim());
+      fd.append("description", description.trim());
+      fd.append("visibility", visibility);
+      fd.append("join_policy", joinPolicy); // <-- NEW
 
-        // Only send one intent: replace OR remove
-        if (imageFile && !removeImage) fd.append("cover_image", imageFile, imageFile.name);
-        if (removeImage) fd.append("remove_cover_image", "1");
+      if (imageFile && !removeImage) fd.append("cover_image", imageFile, imageFile.name);
+      if (removeImage) fd.append("remove_cover_image", "1");
 
-        const idOrSlug = group.slug || group.id;
+      const idOrSlug = group.slug || group.id;
 
-        // ---- PATCH ----
-        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
+      const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
         method: "PATCH",
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: fd,
-        });
+      });
 
-        // Some backends return 200 with JSON, some 204 No Content, some partial JSON
-        let updated;
-        if (res.status === 204) {
+      let updated;
+      if (res.status === 204) {
         const getRes = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
-            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         });
         updated = await getRes.json();
-        } else {
+      } else {
         updated = await res.json().catch(() => ({}));
         if (!res.ok) {
-            const msg =
+          const msg =
             updated?.detail ||
             Object.entries(updated)
-                .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
-                .join(" | ") ||
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+              .join(" | ") ||
             `HTTP ${res.status}`;
-            throw new Error(msg);
+          throw new Error(msg);
         }
-        }
+      }
 
-        // If an image was uploaded but the PATCH payload doesn't include the fresh URL,
-        // do a quick GET to fetch the final object that has the new cover_image.
-        if (imageFile && (!updated?.cover_image || updated.cover_image === group.cover_image)) {
+      if (imageFile && (!updated?.cover_image || updated.cover_image === group.cover_image)) {
         try {
-            const fresh = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
+          const fresh = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            });
-            if (fresh.ok) updated = await fresh.json();
-        } catch {
-            // ignore; we'll still update optimistically
-        }
-        }
+          });
+          if (fresh.ok) updated = await fresh.json();
+        } catch {}
+      }
 
-        // Defensive merge so we never lose the previous image URL if the server omits it
-        const merged = {
+      const merged = {
         ...group,
         ...updated,
         cover_image: updated?.cover_image ?? (removeImage ? null : group.cover_image),
-        _cache: Date.now(), // cache-buster so <img> src changes immediately
-        };
+        _cache: Date.now(),
+      };
 
-        onUpdated?.(merged);
-        onClose?.();
+      onUpdated?.(merged);
+      onClose?.();
 
-        // Cleanup local dialog state / preview
-        setImageFile(null);
-        setRemoveImage(false);
-        setLocalPreview(merged.cover_image ? toAbs(merged.cover_image) : "");
+      setImageFile(null);
+      setRemoveImage(false);
+      setLocalPreview(merged.cover_image ? toAbs(merged.cover_image) : "");
     } catch (e) {
-        setErrors((prev) => ({ ...prev, __all__: String(e?.message || e) }));
+      setErrors((prev) => ({ ...prev, __all__: String(e?.message || e) }));
     } finally {
-        setSubmitting(false);
+      setSubmitting(false);
     }
-    };
+  };
 
   if (!group) return null;
 
@@ -381,8 +389,8 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
           />
         </Box>
 
-        <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
-          <Grid xs={12} md={7}>
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 md:col-span-7">
             <TextField
               label="Description *"
               multiline minRows={3}
@@ -400,9 +408,20 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
               <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
               <MenuItem value="private">Private (invite-only)</MenuItem>
             </TextField>
-          </Grid>
 
-          <Grid xs={12} md={5}>
+            {/* NEW: Join Policy */}
+            <TextField
+              label="Join Policy"
+              select fullWidth className="mb-3"
+              value={joinPolicy} onChange={(e) => setJoinPolicy(e.target.value)}
+            >
+              <MenuItem value="open">Open (join instantly)</MenuItem>
+              <MenuItem value="approval">Approval required</MenuItem>
+              <MenuItem value="invite">Invite-only</MenuItem>
+            </TextField>
+          </div>
+
+          <div className="col-span-12 md:col-span-5">
             <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
             <Typography variant="caption" className="text-slate-500 block mb-2">
               Recommended 650×365px • Max 50 MB
@@ -443,8 +462,8 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                 Remove
               </Button>
             </Stack>
-          </Grid>
-        </Grid>
+          </div>
+        </div>
       </DialogContent>
       <DialogActions className="px-6 py-4">
         <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>
@@ -468,25 +487,31 @@ function GroupCard({ g, onOpen, onEdit }) {
     <Paper elevation={0} className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden">
       <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
         {g.cover_image ? (
-            <img
-                key={g._cache || g.updated_at}
-                src={bust(g.cover_image, g._cache || g.updated_at)}
-                alt={g.name}
-                loading="lazy"
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-            />
-            ) : (
-            <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
-            )}
+          <img
+            key={g._cache || g.updated_at}
+            src={bust(g.cover_image, g._cache || g.updated_at)}
+            alt={g.name}
+            loading="lazy"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
+        )}
       </Box>
 
       <Box className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <Chip
-            size="small"
-            label={g.visibility === "private" ? "Private" : "Public"}
-            className={g.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
-          />
+          <div className="flex items-center gap-1.5">
+            <Chip
+              size="small"
+              label={g.visibility === "private" ? "Private" : "Public"}
+              className={g.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
+            />
+            {/* NEW: join policy chip */}
+            {g.join_policy && (
+              <Chip size="small" label={labelJoinPolicy(g.join_policy)} className="bg-slate-100 text-slate-700" />
+            )}
+          </div>
           {typeof g.member_count === "number" && (
             <span className="text-xs text-slate-500">{g.member_count} members</span>
           )}
@@ -554,7 +579,6 @@ export default function GroupsAdmin() {
     (async () => {
       setLoading(true);
       try {
-        // GET /api/groups/?created_by=me  (mirrors your events fetch pattern)
         const res = await fetch(`${API_ROOT}/groups/?created_by=me`, {
           headers: {
             "Content-Type": "application/json",
@@ -598,14 +622,14 @@ export default function GroupsAdmin() {
   const onCreated = (g) => setGroups((prev) => [g, ...prev]);
 
   const navigate = useNavigate();
-    const onOpen = (g) => {
+  const onOpen = (g) => {
     const id = g?.slug || g?.id;
     if (!id) return;
     navigate(`/groups/${id}`);
-    };
+  };
 
   return (
-    <Container maxWidth="lg" disableGutters className="py-6 sm:py-8">
+    <div className="max-w-screen-lg mx-auto py-6 sm:py-8">
       {/* Header */}
       <Box className="flex items-center gap-3 mb-4">
         <Avatar sx={{ bgcolor: "#0ea5a4" }}>{(user?.first_name || "A")[0].toUpperCase()}</Avatar>
@@ -672,30 +696,30 @@ export default function GroupsAdmin() {
         </Paper>
       ) : (
         <Box sx={{ flexGrow: 1 }}>
-          <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 8, md: 12 }}>
+          <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-2 md:gap-3">
             {filtered.map((g) => (
-              <Grid key={g.id || g.slug} xs={4} sm={4} md={4}>
+              <div key={g.id || g.slug} className="col-span-4">
                 <GroupCard
-                    g={g}
-                    onOpen={onOpen}
-                    onEdit={(grp) => { setEditing(grp); setEditOpen(true); }}
+                  g={g}
+                  onOpen={onOpen}
+                  onEdit={(grp) => { setEditing(grp); setEditOpen(true); }}
                 />
-              </Grid>
+              </div>
             ))}
-          </Grid>
+          </div>
         </Box>
       )}
 
       {/* Create Group Dialog */}
-        <CreateGroupDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={onCreated} />
+      <CreateGroupDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={onCreated} />
 
-        {/* 👇 NEW: Edit Group Dialog */}
-        <EditGroupDialog
-            open={editOpen}
-            group={editing}
-            onClose={() => { setEditOpen(false); setEditing(null); }}
-            onUpdated={onUpdated}
-        />
-        </Container>
+      {/* Edit Group Dialog */}
+      <EditGroupDialog
+        open={editOpen}
+        group={editing}
+        onClose={() => { setEditOpen(false); setEditing(null); }}
+        onUpdated={onUpdated}
+      />
+    </div>
   );
 }
