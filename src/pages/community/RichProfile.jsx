@@ -25,6 +25,9 @@ import {
   IconButton,
   ListItemAvatar,
   Divider,
+  Chip,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -103,6 +106,10 @@ export default function RichProfile() {
   const [friendStatus, setFriendStatus] = useState(isMe ? "self" : "none"); // self | none | pending_outgoing | pending_incoming | friends
   const [friendLoading, setFriendLoading] = useState(!isMe);
   const [friendSubmitting, setFriendSubmitting] = useState(false);
+
+  const [mutual, setMutual] = useState([]);
+  const [mutualCount, setMutualCount] = useState(0);
+  const [connTab, setConnTab] = useState("all"); // "all" | "mutual"
 
   useEffect(() => {
     let alive = true;
@@ -305,23 +312,51 @@ export default function RichProfile() {
     }
     }
 
+    async function fetchMutualList(targetUserId) {
+        if (!targetUserId || String(targetUserId) === String(me?.id || "")) return [];
+        try {
+            const r = await fetch(`${API_BASE}/friends/mutual/?user_id=${targetUserId}`, {
+            headers: tokenHeader(),
+            credentials: "include",
+            });
+            const j = await r.json().catch(() => []);
+            const arr = Array.isArray(j) ? j : j.results || j.friends || [];
+            return Array.isArray(arr) ? arr.map(normalizeFriendShape) : [];
+        } catch {
+            return [];
+        }
+        }
   const openConnections = async () => {
     setConnOpen(true);
     setConnLoading(true);
-    const list = await fetchFriendList(userId);
+    const [list, mutualList] = await Promise.all([
+    fetchFriendList(userId),
+    fetchMutualList(userId),
+    ]);
     setConnections(list);
+    setMutual(mutualList);
+    setMutualCount(mutualList.length);
     setConnLoading(false);
   };
 
-  const filteredConnections = useMemo(() => {
-    const s = (connQ || "").toLowerCase().trim();
-    if (!s) return connections;
-    return connections.filter((u) => {
-      const name = (displayName(u) || "").toLowerCase();
-      const email = (u?.email || "").toLowerCase();
-      return name.includes(s) || email.includes(s);
-    });
-  }, [connections, connQ]);
+  const filterList = (arr) => {
+  const s = (connQ || "").toLowerCase().trim();
+  if (!s) return arr;
+  return arr.filter((u) => {
+    const name = (displayName(u) || "").toLowerCase();
+    const email = (u?.email || "").toLowerCase();
+    return name.includes(s) || email.includes(s);
+  });
+};
+
+const filteredConnections = useMemo(
+  () => filterList(connections),
+  [connections, connQ]
+);
+const filteredMutual = useMemo(
+  () => filterList(mutual),
+  [mutual, connQ]
+);
 
   /* ========================= */
 
@@ -379,6 +414,13 @@ export default function RichProfile() {
                             >
                             Your Friend
                             </Button>
+                            {!!mutualCount && (
+                                <Chip
+                                label={`${mutualCount} mutual`}
+                                size="small"
+                                sx={{ alignSelf: "center" }}
+                                />
+                            )}
                             <Button
                             variant="contained"
                             size="small"
@@ -549,6 +591,14 @@ export default function RichProfile() {
           Connections
         </DialogTitle>
         <DialogContent dividers>
+          <Tabs
+            value={connTab}
+            onChange={(e, v) => setConnTab(v)}
+            sx={{ mb: 1 }}
+            >
+            <Tab value="all" label={`All (${connections.length})`} />
+            <Tab value="mutual" label={`Mutual (${mutual.length})`} />
+            </Tabs>
           <TextField
             fullWidth
             size="small"
@@ -568,13 +618,13 @@ export default function RichProfile() {
             <LinearProgress />
           ) : (
             <>
-              {filteredConnections.length === 0 ? (
+              { (connTab === "mutual" ? filteredMutual : filteredConnections).length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   No connections found.
                 </Typography>
               ) : (
                 <List dense sx={{ py: 0 }}>
-                  {filteredConnections.map((f, idx) => {
+                  {(connTab === "mutual" ? filteredMutual : filteredConnections).map((f, idx) => {
                     const name = displayName(f);
                     return (
                       <React.Fragment key={f.id || idx}>
