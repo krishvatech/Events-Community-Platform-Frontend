@@ -126,7 +126,7 @@ export default function RichProfile() {
     const sendFriendRequest = async () => {
         try {
             setFriendSubmitting(true);
-            const r = await fetch(`${API_BASE}/friends/request/`, {
+            const r = await fetch(`${API_BASE}/friend-requests/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -134,7 +134,7 @@ export default function RichProfile() {
                     Accept: "application/json",
                 },
                 credentials: "include",
-                body: JSON.stringify({ to_user_id: Number(userId) }),
+                body: JSON.stringify({ to_user: Number(userId) }),
             });
             const d = await r.json().catch(() => ({}));
             if (!r.ok && r.status !== 200)
