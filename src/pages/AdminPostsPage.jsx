@@ -1,5 +1,6 @@
 // src/pages/AdminPostsPage.jsx
 import * as React from "react";
+import { useParams } from "react-router-dom";
 import {
   Avatar,
   Box,
@@ -28,8 +29,7 @@ import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import LinkIcon from "@mui/icons-material/Link";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 
-const API_ROOT = (import.meta.env.VITE_API_ROOT || "/api").replace(/\/$/, "");
-
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 function getToken() {
   return (
     localStorage.getItem("token") ||
@@ -57,7 +57,14 @@ function PostCard({ item }) {
             Admin • {new Date(item.created_at || Date.now()).toLocaleString()}
           </Typography>
         </Stack>
-
+        {item.community?.name && (
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Community: ${item.community.name}`}
+            sx={{ mb: 1 }}
+          />
+        )}
         {kind === "text" && (
           <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
             {item.text || ""}
@@ -166,7 +173,7 @@ function PostCard({ item }) {
 }
 
 // ------- create dialog -------
-function CreatePostDialog({ open, onClose, onCreated }) {
+function CreatePostDialog({ open, onClose, onCreated, communityId }) {
   // types: text | image | link | poll  (event removed)
   const [type, setType] = React.useState("text");
 
@@ -227,95 +234,88 @@ function CreatePostDialog({ open, onClose, onCreated }) {
   };
 
   const handleCreate = async () => {
-    const base = {
-      type,
-      tags: tags
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    };
-    const tokenHeaders = authHeader();
+  if (!communityId) {
+    setToast({ open: true, type: "error", msg: "No community selected yet." });
+    return;
+  }
+  const tokenHeaders = authHeader();
+  const COMMUNITY_CREATE_URL = `${API_ROOT}/communities/${communityId}/posts/create/`;
 
-    try {
-      let res, created;
+  try {
+    let res, payload;
 
-      if (type === "image") {
-        const fd = new FormData();
-        fd.append("type", "image");
-        fd.append("caption", caption || "");
-        fd.append("image", imageFile, imageFile.name);
-        base.tags.forEach((t) => fd.append("tags", t));
-        res = await fetch(`${API_ROOT}/posts/`, {
-          method: "POST",
-          headers: tokenHeaders,
-          body: fd,
-        });
-        created = res.ok
-          ? await res.json()
-          : {
-              id: `local-${Date.now()}`,
-              created_at: new Date().toISOString(),
-              ...base,
-              caption,
-              image_preview: imagePreview,
-            };
-      } else if (type === "link") {
-        const payload = { ...base, url: linkUrl, title: linkTitle || undefined, description: linkDesc || undefined };
-        res = await fetch(`${API_ROOT}/posts/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...tokenHeaders },
-          body: JSON.stringify(payload),
-        });
-        created = res.ok
-          ? await res.json()
-          : { id: `local-${Date.now()}`, created_at: new Date().toISOString(), ...payload };
-      } else if (type === "poll") {
-        const payload = {
-          ...base,
-          question,
-          options: pollOptions.map((o) => o.trim()).filter(Boolean),
-        };
-        res = await fetch(`${API_ROOT}/posts/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...tokenHeaders },
-          body: JSON.stringify(payload),
-        });
-        created = res.ok
-          ? await res.json()
-          : { id: `local-${Date.now()}`, created_at: new Date().toISOString(), ...payload };
-      } else {
-        // text
-        const payload = { ...base, text };
-        res = await fetch(`${API_ROOT}/posts/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...tokenHeaders },
-          body: JSON.stringify(payload),
-        });
-        created = res.ok
-          ? await res.json()
-          : { id: `local-${Date.now()}`, created_at: new Date().toISOString(), ...payload };
-      }
-
-      onCreated?.(created);
-      onClose?.();
-    } catch {
-      onCreated?.({
-        id: `local-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        ...base,
-        text,
-        caption,
-        url: linkUrl,
-        title: linkTitle,
-        description: linkDesc,
-        question,
-        options: pollOptions.filter(Boolean),
-        image_preview: imagePreview,
+    if (type === "image") {
+      // multipart for S3 upload
+      const fd = new FormData();
+      fd.append("type", "image");
+      fd.append("image", imageFile);                 // ← file
+      if (caption) fd.append("caption", caption);
+      const tagList = tags.split(",").map(s=>s.trim()).filter(Boolean);
+      tagList.forEach(t => fd.append("tags", t));
+      res = await fetch(COMMUNITY_CREATE_URL, {
+        method: "POST",
+        headers: { ...tokenHeaders },               // DO NOT set Content-Type manually
+        body: fd,
       });
-      onClose?.();
-      setToast({ open: true, type: "error", msg: "Saved locally (API not available)." });
+    } else if (type === "link") {
+      payload = {
+        type: "link",
+        url: linkUrl.trim(),
+        title: linkTitle.trim() || undefined,
+        description: linkDesc.trim() || undefined,
+        tags: tags.split(",").map(s=>s.trim()).filter(Boolean),
+      };
+      res = await fetch(COMMUNITY_CREATE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeaders },
+        body: JSON.stringify(payload),
+      });
+    } else if (type === "poll") {
+      payload = {
+        type: "poll",
+        question,
+        options: pollOptions.map(o=>o.trim()).filter(Boolean),
+        tags: tags.split(",").map(s=>s.trim()).filter(Boolean),
+      };
+      res = await fetch(COMMUNITY_CREATE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeaders },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      // text
+      payload = { type: "text", content: text, tags: tags.split(",").map(s=>s.trim()).filter(Boolean) };
+      res = await fetch(COMMUNITY_CREATE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeaders },
+        body: JSON.stringify(payload),
+      });
     }
-  };
+
+    const created = res.ok
+      ? await res.json()
+      : { id: `local-${Date.now()}`, created_at: new Date().toISOString(), type, text };
+
+    onCreated?.(created);   // list will show instantly
+    onClose?.();
+  } catch (e) {
+    onCreated?.({
+      id: `local-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      type,
+      text,
+      caption,
+      url: linkUrl,
+      title: linkTitle,
+      description: linkDesc,
+      question,
+      options: pollOptions.filter(Boolean),
+      image_preview: imagePreview,
+    });
+    onClose?.();
+    setToast({ open: true, type: "error", msg: "Saved locally (API not available)." });
+  }
+};
 
   const Row = ({ children }) => (
     <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
@@ -486,7 +486,7 @@ function CreatePostDialog({ open, onClose, onCreated }) {
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
-          <Button onClick={handleCreate} variant="contained" disabled={!canCreate()}>
+          <Button onClick={handleCreate} variant="contained" disabled={!canCreate() || !communityId}>
             Create
           </Button>
         </DialogActions>
@@ -512,17 +512,42 @@ function CreatePostDialog({ open, onClose, onCreated }) {
 
 // ------- page -------
 export default function AdminPostsPage() {
+  const { id: routeCommunityId } = useParams();
+  const [activeCommunityId, setActiveCommunityId] = React.useState(null);
   const [search, setSearch] = React.useState("");
   const [items, setItems] = React.useState([]);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [loadingErr, setLoadingErr] = React.useState("");
 
+  React.useEffect(() => {
+    if (routeCommunityId) {
+      setActiveCommunityId(routeCommunityId);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch(`${API_ROOT}/communities/`, {
+          headers: { Accept: "application/json", ...authHeader() },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+     if (list.length > 0) {
+       setActiveCommunityId(String(list[0].id)); // first community
+     }
+      } catch {
+        // ignore; user might not belong to any community yet
+      }
+    })();
+  }, [routeCommunityId]);
+
   const load = React.useCallback(async () => {
     setLoadingErr("");
     try {
-      const url = new URL(`${API_ROOT}/posts/`, window.location.origin);
+      if (!activeCommunityId) return; // don’t call until we know the community
+      const url = new URL(`${API_ROOT}/communities/${activeCommunityId}/posts/`, API_ROOT);
       if (search.trim()) url.searchParams.set("search", search.trim());
-      const res = await fetch(url.pathname + url.search, {
+      const res = await fetch(url.toString(), {
         headers: { Accept: "application/json", ...authHeader() },
       });
       if (res.ok) {
@@ -536,11 +561,11 @@ export default function AdminPostsPage() {
       setItems([]);
       setLoadingErr("Network error");
     }
-  }, [search]);
+  }, [search,activeCommunityId]);
 
   React.useEffect(() => {
-    load();
-  }, [load]);
+    if (activeCommunityId) load();
+  }, [load,activeCommunityId]);
 
   const handleCreated = (p) => setItems((prev) => [p, ...prev]);
 
@@ -555,7 +580,13 @@ export default function AdminPostsPage() {
               <Typography color="text.secondary">Publish community-wide updates from the dashboard.</Typography>
             </Box>
           </Stack>
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreateOpen(true)} sx={{ borderRadius: 2 }}>
+          <Button
+              variant="contained"
+              startIcon={<AddRoundedIcon />}
+              onClick={() => setCreateOpen(true)}
+              sx={{ borderRadius: 2 }}
+              disabled={!activeCommunityId}   // ← guard
+            >
             Create Post
           </Button>
         </Stack>
@@ -603,7 +634,12 @@ export default function AdminPostsPage() {
         </Box>
       </Container>
 
-      <CreatePostDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={handleCreated} />
+      <CreatePostDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={handleCreated}
+        communityId={activeCommunityId}
+      />
     </Box>
   );
 }
