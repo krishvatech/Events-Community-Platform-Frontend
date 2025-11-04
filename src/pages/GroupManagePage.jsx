@@ -628,9 +628,9 @@ export default function GroupManagePage() {
     };
     // ---- Join Request API endpoints (tweak these 3 if your backend differs) ----
     const API = {
-        list: (gid) => `${API_ROOT}/groups/${gid}/pending-requests/`,
-        approve: (gid, id) => `${API_ROOT}/groups/${gid}/approve-member-requests/${id}/`,
-        reject: (gid, id) => `${API_ROOT}/groups/${gid}/reject-member-requests/${id}/`,
+        list: (gid) => `${API_ROOT}/groups/${gid}/member-requests/`,
+        approve: (gid, id) => `${API_ROOT}/groups/${gid}/member-requests/approve/${id}/`,
+        reject: (gid, id) => `${API_ROOT}/groups/${gid}/member-requests/reject/${id}/`,
     };
 
     // ---- Notifications tab data ----
