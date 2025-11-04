@@ -312,10 +312,10 @@ function PostCard({ post, onReact, onOpenPost, onPollVote }) {
 // ---- MAIN PAGE (All / My Groups + Search) ----
 export default function LiveFeedPage({
   posts: initialPosts,
-  onOpenPost = () => {},
-  onOpenEvent = () => {},
-  onCreatePost = () => {},
-  onReact = () => {},
+  onOpenPost = () => { },
+  onOpenEvent = () => { },
+  onCreatePost = () => { },
+  onReact = () => { },
   websocketUrl,
   user,
   stats,
@@ -343,8 +343,20 @@ export default function LiveFeedPage({
   // Build initial URL based on scope + search
   const buildFeedPath = React.useCallback((sc, q) => {
     const params = new URLSearchParams();
-    if (sc === "mine") params.set("mine", "true");
-    if (q && q.trim()) params.set("q", q.trim());
+
+    // "My Groups" works whether your backend uses mine=true OR scope=member_groups
+    if (sc === "mine") {
+      params.set("mine", "true");
+      params.set("scope", "member_groups");
+    }
+
+    // Send BOTH aliases so DRF SearchFilter (search=) or your custom (q=) will work
+    const qTrim = (q || "").trim();
+    if (qTrim) {
+      params.set("q", qTrim);
+      params.set("search", qTrim);
+    }
+
     const qs = params.toString();
     return `activity/feed/${qs ? `?${qs}` : ""}`;
   }, []);
@@ -397,7 +409,7 @@ export default function LiveFeedPage({
           // optional: if a search is active, only prepend when it matches dq (skipped here)
           setPosts((curr) => [msg.post, ...curr]);
         }
-      } catch {}
+      } catch { }
     };
     return () => ws.close();
   }, [websocketUrl, scope]);
@@ -440,11 +452,28 @@ export default function LiveFeedPage({
 
   // If scope is 'mine' and backend didn’t support ?mine=true, fallback to client filter.
   const displayPosts = React.useMemo(() => {
-    if (scope === "mine") {
-      return posts.filter((p) => !!p.group_id);
+    // scope filter first
+    let arr = scope === "mine" ? posts.filter((p) => !!p.group_id) : posts;
+
+    // client-side search fallback (works even if API ignores q/search)
+    const needle = (dq || "").trim().toLowerCase();
+    if (needle) {
+      const toText = (v) => (v ? String(v).toLowerCase() : "");
+      arr = arr.filter((p) => {
+        const haystack = [
+          p.text,
+          p.group,
+          p.author?.name,
+          p.url_title,
+          p.url_desc,
+          p.event?.title,
+          p.event?.where,
+        ].map(toText).join(" ");
+        return haystack.includes(needle);
+      });
     }
-    return posts;
-  }, [posts, scope]);
+    return arr;
+  }, [posts, scope, dq]);
 
   return (
     <Grid container spacing={2}>
@@ -452,54 +481,26 @@ export default function LiveFeedPage({
       <Grid item xs={12} md={9}>
         <Box sx={{ width: "100%", maxWidth: { md: 680 }, mx: "auto" }}>
           {/* Scope toggle */}
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 1 }} alignItems="center">
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 2 }} alignItems="center">
             <Stack direction="row" spacing={1}>
-              <Chip
-                label="All"
-                color={scope === "all" ? "primary" : "default"}
-                variant={scope === "all" ? "filled" : "outlined"}
-                onClick={() => setScope("all")}
-              />
-              <Chip
-                label="My Groups"
-                color={scope === "mine" ? "primary" : "default"}
-                variant={scope === "mine" ? "filled" : "outlined"}
-                onClick={() => setScope("mine")}
-              />
+              <Chip label="All" color={scope === "all" ? "primary" : "default"} variant={scope === "all" ? "filled" : "outlined"} onClick={() => setScope("all")} />
+              <Chip label="My Groups" color={scope === "mine" ? "primary" : "default"} variant={scope === "mine" ? "filled" : "outlined"} onClick={() => setScope("mine")} />
             </Stack>
 
-            {/* Search box */}
             <Box sx={{ flex: 1, width: "100%" }}>
               <TextField
                 fullWidth
                 size="small"
                 placeholder="Search posts, events, resources…"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => setQuery(e.target.value)}     // debounced by dq
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    // trigger immediately with current text (not debounced)
-                    loadFeed(buildFeedPath(scope, query), false);
-                  }
+                  if (e.key === "Enter") loadFeed(buildFeedPath(scope, query), false); // optional: immediate refresh
                 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
+                InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>) }}
+                type="search"
               />
             </Box>
-            <Button
-              variant="outlined"
-              onClick={() => loadFeed(buildFeedPath(scope, query), false)}
-              disabled={loading}
-              startIcon={<SearchIcon />}
-              sx={{ whiteSpace: "nowrap" }}
-            >
-              Search
-            </Button>
           </Stack>
 
           {/* (Composer kept commented; leave as-is to avoid changing other UI) */}
