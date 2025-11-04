@@ -3,8 +3,9 @@ import React from "react";
 import {
     Alert, Avatar, Box, Button, Chip, Container, Dialog, DialogActions, DialogContent,
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
-    TextField, Typography,
-    IconButton, Menu, ListItemIcon, ListItemText
+    TextField, Typography, Switch, FormControlLabel, CircularProgress,
+    List, ListItem, ListItemAvatar, ListItemText, ButtonGroup,
+    IconButton, Menu, ListItemIcon
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
@@ -579,6 +580,10 @@ export default function GroupManagePage() {
     const isChildGroup = Boolean(group?.parent_id || group?.parent?.id || group?.parent);
     // Show Sub-groups tab only on top-level groups
     const showSubgroupsTab = !isChildGroup;
+    // Show Notifications tab only when Public + Approval
+    const showNotificationsTab = (group?.visibility === "public") && (group?.join_policy === "approval");
+    // Keep indexes stable: Overview=0, Members=1, Sub-groups=2, Settings=3, Posts=4, Notifications=5
+    const NOTIF_TAB_INDEX = 5;
     // Default to "Overview" whenever /groups/:idOrSlug changes (main or sub)
     React.useEffect(() => {
     setTab(0);
@@ -595,10 +600,89 @@ export default function GroupManagePage() {
     const [memMenuAnchor, setMemMenuAnchor] = React.useState(null);
     const [activeMember, setActiveMember] = React.useState(null);
     // Sub-groups state
-    const [subgroups, setSubgroups] = React.useState([]);
-    const [subLoading, setSubLoading] = React.useState(true);
-    const [subError, setSubError] = React.useState("");
-    const [addSubOpen, setAddSubOpen] = React.useState(false);
+        const [subgroups, setSubgroups] = React.useState([]);
+        const [subLoading, setSubLoading] = React.useState(true);
+        const [subError, setSubError] = React.useState("");
+        const [addSubOpen, setAddSubOpen] = React.useState(false);
+
+        // ----- Notifications tab (local-only settings) -----
+        const [notifyEnabled, setNotifyEnabled] = React.useState(true);
+        const [notifyRecipients, setNotifyRecipients] = React.useState("owners_admins");
+
+        // Load saved prefs per group from localStorage
+        React.useEffect(() => {
+            if (!group?.id) return;
+            try {
+                const saved = JSON.parse(localStorage.getItem(`group_notify_${group.id}`) || "{}");
+                if (typeof saved.enabled === "boolean") setNotifyEnabled(!!saved.enabled);
+                if (saved.recipients) setNotifyRecipients(saved.recipients);
+            } catch {}
+        }, [group?.id]);
+
+        const saveNotify = () => {
+            if (!group?.id) return;
+            localStorage.setItem(
+                `group_notify_${group.id}`,
+                JSON.stringify({ enabled: notifyEnabled, recipients: notifyRecipients })
+            );
+        };
+        // ---- Join Request API endpoints (tweak these 3 if your backend differs) ----
+        const API = {
+            list:     (gid) => `${API_ROOT}/groups/${gid}/join-requests/?status=pending`,
+            approve:  (gid, id) => `${API_ROOT}/groups/${gid}/join-requests/${id}/approve/`,
+            reject:   (gid, id) => `${API_ROOT}/groups/${gid}/join-requests/${id}/reject/`,
+        };
+
+        // ---- Notifications tab data ----
+        const [reqs, setReqs] = React.useState([]);
+        const [reqsLoading, setReqsLoading] = React.useState(false);
+        const [reqsError, setReqsError] = React.useState("");
+
+        // tiny helper to format dates
+        const fmtWhen = (s) => {
+            try {
+                const d = new Date(s);
+                return d.toLocaleString();
+            } catch { return ""; }
+        };
+
+            const fetchRequests = React.useCallback(async () => {
+                if (!group?.id) return;
+                setReqsLoading(true);
+                setReqsError("");
+                try {
+                    const r = await fetch(API.list(group.id), {
+                        headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    });
+                    const d = await r.json().catch(() => ({}));
+                    if (!r.ok) throw new Error(d?.detail || "Failed to load join requests");
+                    // allow both paginated and non-paginated responses
+                    const items = Array.isArray(d?.results) ? d.results : (Array.isArray(d) ? d : []);
+                    setReqs(items);
+                } catch (e) {
+                    setReqsError(e?.message || "Failed to load join requests");
+                } finally {
+                    setReqsLoading(false);
+                }
+            }, [group?.id, token]);
+
+            const takeAction = async (id, action) => {
+                try {
+                    const url = action === "approve" ? API.approve(group.id, id) : API.reject(group.id, id);
+                    const r = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                        body: "{}",
+                    });
+                    if (!r.ok) {
+                        const d = await r.json().catch(() => ({}));
+                        throw new Error(d?.detail || `Failed to ${action}`);
+                    }
+                    setReqs((prev) => prev.filter((x) => (x.id ?? x.pk) !== id));
+                } catch (e) {
+                    alert(e?.message || `Failed to ${action}`);
+                }
+            };
     // Load sub-groups (tries multiple URL patterns; first that works wins)
     const fetchSubgroups = React.useCallback(async () => {
     if (!group?.id) return;
@@ -779,6 +863,11 @@ export default function GroupManagePage() {
     React.useEffect(() => {
         if (tab === 4) fetchPosts();
     }, [tab, fetchPosts]);
+
+        // auto-load join requests when landing on Notifications tab
+        React.useEffect(() => {
+            if (showNotificationsTab && tab === NOTIF_TAB_INDEX) fetchRequests();
+        }, [showNotificationsTab, tab, fetchRequests]);
 
     // Helpers for poll options
     const updatePollOption = (idx, val) => {
@@ -1051,6 +1140,7 @@ export default function GroupManagePage() {
                     )}
                     <Tab label="Settings" />
                     <Tab label="Posts" />
+                    {showNotificationsTab && <Tab label="Notifications" />}
                 </Tabs>
             </Paper>
 
@@ -1533,6 +1623,75 @@ export default function GroupManagePage() {
                             </Stack>
                         </Paper>
                     )}
+
+                                                                                {showNotificationsTab && tab === NOTIF_TAB_INDEX && (
+                                                                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                                                                        <Stack spacing={2}>
+                                                                                            <Typography variant="h6" className="font-semibold">Notifications</Typography>
+
+                                                                                            {!!reqsError && <Alert severity="error">{reqsError}</Alert>}
+
+                                                                                            {reqsLoading ? (
+                                                                                                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                                                                                                    <CircularProgress />
+                                                                                                </Box>
+                                                                                            ) : reqs.length === 0 ? (
+                                                                                                <Alert severity="info">No notifications — there are no pending join requests.</Alert>
+                                                                                            ) : (
+                                                                                                <List sx={{ width: "100%" }}>
+                                                                                                    {reqs.map((r) => {
+                                                                                                        const id = r.id ?? r.pk; // tolerate pk/id
+                                                                                                        const u  = r.user || r.requester || r.member || {};
+                                                                                                        const name = u.full_name || u.name || u.username || "Member";
+                                                                                                        const avatar = u.avatar || u.photo_url || null;
+                                                                                                        const when = r.created_at || r.requested_at || r.createdAt;
+
+                                                                                                        return (
+                                                                                                            <ListItem
+                                                                                                                key={id}
+                                                                                                                divider
+                                                                                                                secondaryAction={
+                                                                                                                    <ButtonGroup variant="outlined" size="small">
+                                                                                                                        <Button
+                                                                                                                            color="success"
+                                                                                                                            onClick={() => takeAction(id, "approve")}
+                                                                                                                            disabled={reqsLoading}
+                                                                                                                        >
+                                                                                                                            Approve
+                                                                                                                        </Button>
+                                                                                                                        <Button
+                                                                                                                            color="error"
+                                                                                                                            onClick={() => takeAction(id, "reject")}
+                                                                                                                            disabled={reqsLoading}
+                                                                                                                        >
+                                                                                                                            Reject
+                                                                                                                        </Button>
+                                                                                                                    </ButtonGroup>
+                                                                                                                }
+                                                                                                            >
+                                                                                                                <ListItemAvatar>
+                                                                                                                    <Avatar src={avatar || undefined}>
+                                                                                                                        {name?.[0]?.toUpperCase() || "U"}
+                                                                                                                    </Avatar>
+                                                                                                                </ListItemAvatar>
+                                                                                                                <ListItemText
+                                                                                                                    primary={<span><b>{name}</b> requested to join this group</span>}
+                                                                                                                    secondary={when ? `Requested on ${fmtWhen(when)}` : null}
+                                                                                                                />
+                                                                                                            </ListItem>
+                                                                                                        );
+                                                                                                    })}
+                                                                                                </List>
+                                                                                            )}
+
+                                                                                            <Stack direction="row" spacing={1}>
+                                                                                                <Button variant="outlined" onClick={fetchRequests} disabled={reqsLoading}>
+                                                                                                    Refresh
+                                                                                                </Button>
+                                                                                            </Stack>
+                                                                                        </Stack>
+                                                                                    </Paper>
+                                                                                )}
 
                 </Box>
             )}
