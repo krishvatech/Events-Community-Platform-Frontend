@@ -478,13 +478,6 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
               </Stack>
             )}
 
-            <TextField
-              label="Tags (comma-separated)"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="news, launch, update"
-              fullWidth
-            />
           </Stack>
         </DialogContent>
         <DialogActions>
