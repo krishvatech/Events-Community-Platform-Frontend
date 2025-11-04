@@ -45,9 +45,8 @@ import { useParams } from "react-router-dom";
 
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
-const API_BASE = import.meta?.env?.VITE_API_BASE
-  ? import.meta.env.VITE_API_BASE.replace(/\/$/, "")
-  : "";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+
 
 /* ---------------- helpers ---------------- */
 function authHeaders(extra = {}) {
@@ -73,6 +72,7 @@ function timeAgo(iso) {
 
 /* ---------------- PostComposer (Text, Image, Link, Poll) ---------------- */
 function PostComposer({ communityId, onPosted }) {
+  const [audience] = React.useState("friends"); 
   const [tab, setTab] = React.useState("text"); // text | image | link | poll
   const [content, setContent] = React.useState("");
   const [linkUrl, setLinkUrl] = React.useState("");
@@ -101,33 +101,36 @@ function PostComposer({ communityId, onPosted }) {
 
   async function createPost() {
     // Keep endpoints unchanged: expects POST /api/communities/{id}/posts/create
-    const url = `${API_BASE}/api/communities/${communityId}/posts/create`;
+    const url = `${API_BASE}/communities/${communityId}/posts/create/`;
     setSubmitting(true);
     try {
       let res;
       if (tab === "image") {
         const fd = new FormData();
         fd.append("type", "image");
-        if (content.trim()) fd.append("content", content.trim());
-        images.forEach((f) => fd.append("files", f));
+        if (content.trim()) fd.append("caption", content.trim()); // backend expects 'caption'
+        if (!images.length) throw new Error("Please select an image");
+        fd.append("image", images[0]); // backend expects single 'image'
         res = await fetch(url, {
           method: "POST",
           headers: authHeaders(),
           body: fd,
         });
       } else {
-        const body = { type: tab };
-        if (tab === "text") body.content = content.trim();
+        const body = { type: tab, visibility: "friends" }; // or use your audience state
+        if (tab === "text") {
+          body.content = content.trim();
+        }
         if (tab === "link") {
-          body.link_url = linkUrl.trim();
-          if (content.trim()) body.content = content.trim();
+          body.url = linkUrl.trim();                     // backend expects 'url'
+          if (content.trim()) body.description = content.trim(); // optional
         }
         if (tab === "poll") {
-          body.poll_options = pollOptions
+          body.question = content.trim();               // backend expects 'question'
+          body.options = pollOptions
             .map((x) => x.trim())
             .filter(Boolean)
-            .slice(0, 10);
-          if (content.trim()) body.content = content.trim();
+            .slice(0, 10);                              // backend expects 'options'
         }
         res = await fetch(url, {
           method: "POST",
@@ -279,7 +282,7 @@ function PostComposer({ communityId, onPosted }) {
         )}
       </CardContent>
       <CardActions sx={{ px: 2, pb: 2 }}>
-        <Button variant="contained" endIcon={<SendRoundedIcon />} onClick={createPost} disabled={!canSubmit || submitting}>
+        <Button variant="contained" endIcon={<SendRoundedIcon />} onClick={createPost} disabled={!communityId || !canSubmit || submitting}>
           Post
         </Button>
         {submitting && (
@@ -298,7 +301,7 @@ function FeedList({ communityId, filter }) {
   const [loading, setLoading] = React.useState(false);
 
   // Keep your feed endpoint untouched; adjust only if your query params differ
-  const endpoint = `${API_BASE}/api/feed/?scope=community&community=${communityId}&filter=${filter}`;
+  const endpoint = `${API_BASE}/feed/?scope=community&community=${communityId}&filter=${filter}`;
 
   async function load() {
     setLoading(true);
@@ -428,7 +431,23 @@ function FeedList({ communityId, filter }) {
 export default function HomePage() {
   // Expect route like: /community/:communityId/home
   const params = useParams();
-  const communityId = params.communityId || params.id;
+  const fromRouteId = params.communityId || params.id || null;
+  const [activeCommunityId, setActiveCommunityId] = React.useState(fromRouteId);
+
+  React.useEffect(() => {
+    if (fromRouteId) { setActiveCommunityId(fromRouteId); return; }
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/communities/`, {
+          headers: authHeaders({ Accept: "application/json" }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.results || []);
+        if (list.length) setActiveCommunityId(String(list[0].id));
+      } catch {}
+    })();
+  }, [fromRouteId]);
 
   const [filter, setFilter] = React.useState("all"); // all | friends | mine
   const [refreshNonce, setRefreshNonce] = React.useState(0);
@@ -441,7 +460,7 @@ export default function HomePage() {
         {/* CENTER — Composer + Feed */}
         <Grid item xs={12} md={6} lg={6}>
           <Stack spacing={2}>
-            <PostComposer communityId={communityId} onPosted={handlePosted} />
+            <PostComposer communityId={activeCommunityId} onPosted={handlePosted} />
 
             <Card variant="outlined" sx={{ borderRadius: 3 }}>
               <CardContent sx={{ pb: 1 }}>
@@ -468,8 +487,8 @@ export default function HomePage() {
               <Divider />
               <CardContent>
                 <FeedList
-                  key={`${communityId}-${filter}-${refreshNonce}`}
-                  communityId={communityId}
+                  key={`${activeCommunityId}-${filter}-${refreshNonce}`}
+                  communityId={activeCommunityId}
                   filter={filter}
                 />
               </CardContent>
@@ -479,7 +498,7 @@ export default function HomePage() {
 
         {/* RIGHT — Community Profile Card */}
         <Grid item xs={12} md={3} lg={3}>
-          <CommunityProfileCard communityId={communityId} />
+          <CommunityProfileCard communityId={activeCommunityId} />
         </Grid>
       </Grid>
     </Box>
