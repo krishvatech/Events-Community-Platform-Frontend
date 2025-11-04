@@ -45,6 +45,15 @@ function authHeader() {
 
 const BORDER = "#e5e7eb";
 
+// Stable Row wrapper (top-level, memoized)
+const Row = React.memo(function Row({ children }) {
+  return (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
+      {children}
+    </Stack>
+  );
+});
+
 // ------- card renderer -------
 function PostCard({ item }) {
   const kind = (item.type || "text").toLowerCase();
@@ -234,98 +243,92 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
   };
 
   const handleCreate = async () => {
-  if (!communityId) {
-    setToast({ open: true, type: "error", msg: "No community selected yet." });
-    return;
-  }
-  const tokenHeaders = authHeader();
-  const COMMUNITY_CREATE_URL = `${API_ROOT}/communities/${communityId}/posts/create/`;
-
-  try {
-    let res, payload;
-
-    if (type === "image") {
-      // multipart for S3 upload
-      const fd = new FormData();
-      fd.append("type", "image");
-      fd.append("image", imageFile);                 // ← file
-      if (caption) fd.append("caption", caption);
-      const tagList = tags.split(",").map(s=>s.trim()).filter(Boolean);
-      tagList.forEach(t => fd.append("tags", t));
-      res = await fetch(COMMUNITY_CREATE_URL, {
-        method: "POST",
-        headers: { ...tokenHeaders },               // DO NOT set Content-Type manually
-        body: fd,
-      });
-    } else if (type === "link") {
-      payload = {
-        type: "link",
-        url: linkUrl.trim(),
-        title: linkTitle.trim() || undefined,
-        description: linkDesc.trim() || undefined,
-        tags: tags.split(",").map(s=>s.trim()).filter(Boolean),
-      };
-      res = await fetch(COMMUNITY_CREATE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...tokenHeaders },
-        body: JSON.stringify(payload),
-      });
-    } else if (type === "poll") {
-      payload = {
-        type: "poll",
-        question,
-        options: pollOptions.map(o=>o.trim()).filter(Boolean),
-        tags: tags.split(",").map(s=>s.trim()).filter(Boolean),
-      };
-      res = await fetch(COMMUNITY_CREATE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...tokenHeaders },
-        body: JSON.stringify(payload),
-      });
-    } else {
-      // text
-      payload = { type: "text", content: text, tags: tags.split(",").map(s=>s.trim()).filter(Boolean) };
-      res = await fetch(COMMUNITY_CREATE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...tokenHeaders },
-        body: JSON.stringify(payload),
-      });
+    if (!communityId) {
+      setToast({ open: true, type: "error", msg: "No community selected yet." });
+      return;
     }
+    const tokenHeaders = authHeader();
+    const COMMUNITY_CREATE_URL = `${API_ROOT}/communities/${communityId}/posts/create/`;
 
-    const created = res.ok
-      ? await res.json()
-      : { id: `local-${Date.now()}`, created_at: new Date().toISOString(), type, text };
+    try {
+      let res, payload;
 
-    onCreated?.(created);   // list will show instantly
-    onClose?.();
-  } catch (e) {
-    onCreated?.({
-      id: `local-${Date.now()}`,
-      created_at: new Date().toISOString(),
-      type,
-      text,
-      caption,
-      url: linkUrl,
-      title: linkTitle,
-      description: linkDesc,
-      question,
-      options: pollOptions.filter(Boolean),
-      image_preview: imagePreview,
-    });
-    onClose?.();
-    setToast({ open: true, type: "error", msg: "Saved locally (API not available)." });
-  }
-};
+      if (type === "image") {
+        // multipart for S3 upload
+        const fd = new FormData();
+        fd.append("type", "image");
+        fd.append("image", imageFile);                 // ← file
+        if (caption) fd.append("caption", caption);
+        const tagList = tags.split(",").map(s => s.trim()).filter(Boolean);
+        tagList.forEach(t => fd.append("tags", t));
+        res = await fetch(COMMUNITY_CREATE_URL, {
+          method: "POST",
+          headers: { ...tokenHeaders },               // DO NOT set Content-Type manually
+          body: fd,
+        });
+      } else if (type === "link") {
+        payload = {
+          type: "link",
+          url: linkUrl.trim(),
+          title: linkTitle.trim() || undefined,
+          description: linkDesc.trim() || undefined,
+          tags: tags.split(",").map(s => s.trim()).filter(Boolean),
+        };
+        res = await fetch(COMMUNITY_CREATE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...tokenHeaders },
+          body: JSON.stringify(payload),
+        });
+      } else if (type === "poll") {
+        payload = {
+          type: "poll",
+          question,
+          options: pollOptions.map(o => o.trim()).filter(Boolean),
+          tags: tags.split(",").map(s => s.trim()).filter(Boolean),
+        };
+        res = await fetch(COMMUNITY_CREATE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...tokenHeaders },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // text
+        payload = { type: "text", content: text, tags: tags.split(",").map(s => s.trim()).filter(Boolean) };
+        res = await fetch(COMMUNITY_CREATE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...tokenHeaders },
+          body: JSON.stringify(payload),
+        });
+      }
 
-  const Row = ({ children }) => (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
-      {children}
-    </Stack>
-  );
+      const created = res.ok
+        ? await res.json()
+        : { id: `local-${Date.now()}`, created_at: new Date().toISOString(), type, text };
+
+      onCreated?.(created);   // list will show instantly
+      onClose?.();
+    } catch (e) {
+      onCreated?.({
+        id: `local-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        type,
+        text,
+        caption,
+        url: linkUrl,
+        title: linkTitle,
+        description: linkDesc,
+        question,
+        options: pollOptions.filter(Boolean),
+        image_preview: imagePreview,
+      });
+      onClose?.();
+      setToast({ open: true, type: "error", msg: "Saved locally (API not available)." });
+    }
+  };
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth keepMounted>
         <DialogTitle>Create Post</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
@@ -532,9 +535,9 @@ export default function AdminPostsPage() {
         if (!res.ok) return;
         const data = await res.json();
         const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
-     if (list.length > 0) {
-       setActiveCommunityId(String(list[0].id)); // first community
-     }
+        if (list.length > 0) {
+          setActiveCommunityId(String(list[0].id)); // first community
+        }
       } catch {
         // ignore; user might not belong to any community yet
       }
@@ -561,11 +564,11 @@ export default function AdminPostsPage() {
       setItems([]);
       setLoadingErr("Network error");
     }
-  }, [search,activeCommunityId]);
+  }, [search, activeCommunityId]);
 
   React.useEffect(() => {
     if (activeCommunityId) load();
-  }, [load,activeCommunityId]);
+  }, [load, activeCommunityId]);
 
   const handleCreated = (p) => setItems((prev) => [p, ...prev]);
 
@@ -581,12 +584,12 @@ export default function AdminPostsPage() {
             </Box>
           </Stack>
           <Button
-              variant="contained"
-              startIcon={<AddRoundedIcon />}
-              onClick={() => setCreateOpen(true)}
-              sx={{ borderRadius: 2 }}
-              disabled={!activeCommunityId}   // ← guard
-            >
+            variant="contained"
+            startIcon={<AddRoundedIcon />}
+            onClick={() => setCreateOpen(true)}
+            sx={{ borderRadius: 2 }}
+            disabled={!activeCommunityId}   // ← guard
+          >
             Create Post
           </Button>
         </Stack>
@@ -607,7 +610,6 @@ export default function AdminPostsPage() {
             sx={{ width: { xs: "100%", sm: 360 } }}
             onKeyDown={(e) => e.key === "Enter" && load()}
           />
-          <Button variant="outlined" onClick={load}>Search</Button>
         </Stack>
 
         <Box>
