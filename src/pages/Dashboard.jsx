@@ -42,6 +42,7 @@ import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import { IconButton, InputAdornment } from "@mui/material";
+import AdminPostsPage from "./AdminPostsPage.jsx";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -1346,6 +1347,8 @@ export default function Dashboard() {
           <Grid size={{ xs: 12, md: 9 }}>
             {active === "events" ? (
               <AdminEvents />
+            ) : active === "posts" ? (
+              <AdminPostsPage />
             ) : active === "resources" ? (
               <MyResourcesAdmin />
             ) : active === "groups" ? (

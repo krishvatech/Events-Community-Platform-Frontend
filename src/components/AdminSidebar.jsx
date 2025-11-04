@@ -26,6 +26,7 @@ import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 
 // Map to your custom icons when available
 const DashboardIcon   = CI?.CustomDashboardIcon   ?? DashboardRoundedIcon;
@@ -38,6 +39,7 @@ const MembersIcon     = CI?.CustomCommunityIcon   ?? PeopleAltRoundedIcon;
 const SubsIcon        = CI?.CustomSubscriptionsIcon ?? AutorenewRoundedIcon;
 const NotifsIcon      = CI?.CustomNotificationsIcon ?? NotificationsNoneRoundedIcon;
 const SettingsIcon    = CI?.CustomSettingsIcon    ?? SettingsRoundedIcon;
+const PostsIcon = CI?.CustomPostsIcon ?? ArticleOutlinedIcon;
 
 // Palette to match your UI
 const TEAL        = "#14b8b1";   // active
@@ -75,6 +77,7 @@ export default function AdminSidebar({
   const defaultItems = [
     { key: "dashboard",    label: "Activity",       Icon: DashboardIcon },
     { key: "events",       label: "My Events",      Icon: EventIcon },
+    { key: "posts",     label: "Posts",       Icon: PostsIcon },
     { key: "resources",    label: "My Resources",   Icon: ResourceIcon },
     { key: "recordings",   label: "My Recordings",  Icon: RecordingsIcon },
     { key: "messages",     label: "Messages",       Icon: MessagesIcon },
