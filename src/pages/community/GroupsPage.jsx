@@ -258,23 +258,20 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
           Accept: "application/json",
           ...authHeader(),
         },
-        body: JSON.stringify({}), // no body needed
+        body: JSON.stringify({}),
       });
 
       if (r.status === 401) throw new Error("Please log in to join.");
-      // optional: const data = await r.json().catch(() => ({}));
 
-      setGroups((curr) =>
-        curr.map((it) =>
-          it.id === g.id
-            ? {
-              ...it,
-              is_member: path === "join-group" ? true : !!it.is_member,
-              membership_status: path === "join-group" ? "joined" : "pending",
-            }
-            : it
-        )
-      );
+      // 🔁 Hard reload immediately after success
+      if (r.ok) {
+        window.location.reload();
+        return;
+      }
+
+      // If backend returns non-OK but not 401, show error
+      const payload = await r.json().catch(() => ({}));
+      throw new Error(payload?.detail || "Failed to join group");
     } catch (e) {
       setError(e?.message || "Failed to join group");
     }

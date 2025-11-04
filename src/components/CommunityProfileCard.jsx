@@ -37,9 +37,9 @@ function initials(name = "") {
 // ---- helpers for data wiring (single-file) ----
 // Support BOTH env names used across your app.
 const RAW_BASE = (
-  import.meta?.env?.VITE_API_BASE ??
   import.meta?.env?.VITE_API_BASE_URL ??
-  ""
+  window.API_BASE_URL ??
+  "http://127.0.0.1:8000/api"   // <-- safe local fallback
 ).trim();
 
 function joinApi(url) {
@@ -234,15 +234,15 @@ export default function CommunityProfileCard({
           // build candidate endpoints — many backends differ, so try a few
           const candidateGroupEndpoints = targetId
             ? [
-              `/api/groups/?member_id=${targetId}&page_size=50`,
+              `/api/groups/joined-group/?user_id=${targetId}&page_size=50`,
               `/api/users/${targetId}/groups/?page_size=50`,
-              `/api/groups/members/?user_id=${targetId}&page_size=50`,
+              `/api/groups/?member_id=${targetId}&page_size=50`,
               `/api/groups/joined/?user_id=${targetId}&page_size=50`,
-              `/api/groups/joined/?page_size=50&user=${targetId}`,
+              `/api/groups/members/?user_id=${targetId}&page_size=50`,
             ]
             : [
+              "/api/groups/joined-group/?page_size=50",
               "/api/groups/joined/?page_size=50",
-              "/api/groups/?page_size=50",
               "/api/groups/?page_size=50",
             ];
 
@@ -332,6 +332,10 @@ export default function CommunityProfileCard({
     };
   }, [userProp, me]);
 
+  // ✅ Show only 3 items on the card; dialogs use full arrays
+  const groupsPreview = React.useMemo(() => (groups || []).slice(0, 3), [groups]);
+  const friendsPreview = React.useMemo(() => (friends || []).slice(0, 3), [friends]);
+
   return (
     <>
       <Stack spacing={2.25}>
@@ -393,7 +397,7 @@ export default function CommunityProfileCard({
           <SectionHeader title="Your Groups" onViewAll={handleOpenGroups} viewAllText="View all" />
 
           <Stack spacing={1.25} mt={1}>
-            {(groups || []).map((c) => (
+            {(groupsPreview || []).map((c) => (
               <Stack key={c.id} direction="row" spacing={1.25} alignItems="center">
                 <Avatar
                   variant="rounded"
@@ -452,7 +456,7 @@ export default function CommunityProfileCard({
           <SectionHeader title="Your friends" onViewAll={handleOpenFriends} viewAllText="View all" />
 
           <Stack spacing={1.25} mt={1}>
-            {(friends || []).map((f) => (
+            {(friendsPreview || []).map((f) => (
               <Stack key={f.id} direction="row" spacing={1.25} alignItems="center">
                 <Avatar src={f.avatarUrl} alt={f.name} sx={{ width: 28, height: 28 }} />
                 <Typography
