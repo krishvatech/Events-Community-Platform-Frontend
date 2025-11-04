@@ -628,9 +628,9 @@ export default function GroupManagePage() {
         };
         // ---- Join Request API endpoints (tweak these 3 if your backend differs) ----
         const API = {
-            list:     (gid) => `${API_ROOT}/groups/${gid}/join-requests/?status=pending`,
-            approve:  (gid, id) => `${API_ROOT}/groups/${gid}/join-requests/${id}/approve/`,
-            reject:   (gid, id) => `${API_ROOT}/groups/${gid}/join-requests/${id}/reject/`,
+            list:     (gid) => `${API_ROOT}/groups/${gid}/pending-requests/`,
+            approve:  (gid, id) => `${API_ROOT}/groups/${gid}/approve-member-requests/${id}/`,
+            reject:   (gid, id) => `${API_ROOT}/groups/${gid}/reject-member-requests/${id}/`,
         };
 
         // ---- Notifications tab data ----
@@ -647,24 +647,37 @@ export default function GroupManagePage() {
         };
 
             const fetchRequests = React.useCallback(async () => {
-                if (!group?.id) return;
-                setReqsLoading(true);
-                setReqsError("");
-                try {
-                    const r = await fetch(API.list(group.id), {
-                        headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                    });
-                    const d = await r.json().catch(() => ({}));
-                    if (!r.ok) throw new Error(d?.detail || "Failed to load join requests");
-                    // allow both paginated and non-paginated responses
-                    const items = Array.isArray(d?.results) ? d.results : (Array.isArray(d) ? d : []);
-                    setReqs(items);
-                } catch (e) {
-                    setReqsError(e?.message || "Failed to load join requests");
-                } finally {
-                    setReqsLoading(false);
-                }
-            }, [group?.id, token]);
+  if (!group?.id) return;
+  setReqsLoading(true);
+  setReqsError("");
+  try {
+    const r = await fetch(API.list(group.id), {
+      headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d?.detail || "Failed to load join requests");
+
+    // Support all shapes: array | {results: []} | {requests: []}
+    let items = [];
+    if (Array.isArray(d)) items = d;
+    else if (Array.isArray(d?.results)) items = d.results;
+    else if (Array.isArray(d?.requests)) items = d.requests;
+
+    // Ensure each item has an id + created_at so UI + actions work
+    const normalized = items.map((it, i) => ({
+      ...it,
+      id: it.id ?? it.pk ?? it.user?.id ?? i,           // use user.id if no request id
+      created_at: it.created_at || it.requested_at || it.joined_at || it.createdAt,
+      user: it.user || it.requester || it.member || it, // keep a 'user' field
+    }));
+
+    setReqs(normalized);
+  } catch (e) {
+    setReqsError(e?.message || "Failed to load join requests");
+  } finally {
+    setReqsLoading(false);
+  }
+}, [group?.id, token]);
 
             const takeAction = async (id, action) => {
                 try {
