@@ -37,6 +37,17 @@ function GroupGridCard({ g, onJoin }) {
   const groupPath = `/community/group/${g.slug || g.id}`;
   const members = g.member_count ?? g.members_count ?? g.members?.length ?? 0;
 
+  // NEW: join-policy helpers
+  const visibility = (g.visibility || "").toLowerCase();
+  const jp = (g.join_policy || "").toLowerCase();
+  const isApproval =
+    visibility === "public" && (jp === "public_approval" || jp === "approval");
+  const pending = (g.membership_status || "").toLowerCase() === "pending";
+  const joined =
+    (g.membership_status || "").toLowerCase() === "joined" || !!g.is_member;
+
+  const ctaText = joined ? "Joined" : pending ? "Request pending" : (isApproval ? "Request to join" : "Join");
+
   return (
     <Card
       variant="outlined"
@@ -85,9 +96,9 @@ function GroupGridCard({ g, onJoin }) {
           variant="contained"
           onClick={() => onJoin?.(g)}
           sx={{ textTransform: "none" }}
-          disabled={(g.membership_status || "").toLowerCase() === "pending"}
+          disabled={pending || joined}
         >
-          {(g.membership_status || "").toLowerCase() === "pending" ? "Request pending" : "Join"}
+          {ctaText}
         </Button>
 
         <Button
@@ -231,16 +242,44 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
   }, []);
 
   const handleJoin = async (g) => {
+    const visibility = (g.visibility || "").toLowerCase();
+    const jp = (g.join_policy || "").toLowerCase();
+
+    // public+open => /join-group/
+    // public+approval => /join-group/request/
+    const isApproval = visibility === "public" && (jp === "public_approval" || jp === "approval");
+    const path = isApproval ? "join-group/request" : "join-group";
+
     try {
-      await onJoinGroup?.(g);
-    } finally {
+      const r = await fetch(`${API_ROOT}/groups/${g.id}/${path}/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify({}), // no body needed
+      });
+
+      if (r.status === 401) throw new Error("Please log in to join.");
+      // optional: const data = await r.json().catch(() => ({}));
+
       setGroups((curr) =>
         curr.map((it) =>
-          it.id === g.id ? { ...it, is_member: true, membership_status: "joined" } : it
+          it.id === g.id
+            ? {
+              ...it,
+              is_member: path === "join-group" ? true : !!it.is_member,
+              membership_status: path === "join-group" ? "joined" : "pending",
+            }
+            : it
         )
       );
+    } catch (e) {
+      setError(e?.message || "Failed to join group");
     }
   };
+
 
   const clearAll = () => {
     setQ("");
