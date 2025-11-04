@@ -16,7 +16,7 @@ import { useParams, useNavigate } from "react-router-dom";
 // ⬇️ same sidebar component used in CommunityHub/Groups pages
 import CommunitySideBar from "../../components/CommunitySideBar.jsx"; // :contentReference[oaicite:1]{index=1}
 
-const API_ROOT = import.meta.env.VITE_API_ROOT || "/api";
+const API_ROOT = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /* ----------------------------- MOCK GENERATOR ----------------------------- */
 function demoData(id = "demo") {
@@ -272,7 +272,7 @@ export default function GroupDetailPage() {
           <Typography variant="h6" sx={{ mb: 1 }}>Couldn’t load this group</Typography>
           <Typography sx={{ whiteSpace: "pre-wrap" }} color="text.secondary">{error}</Typography>
           <Typography sx={{ mt: 1.5 }} variant="body2" color="text.secondary">
-            Tip: check <code>VITE_API_ROOT</code>, auth token, and that the slug/id exists.
+            Tip: check <code>VITE_API_BASE_URL</code>, auth token, and that the slug/id exists.
           </Typography>
         </Paper>
       </Box>

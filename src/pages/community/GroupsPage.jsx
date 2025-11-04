@@ -21,7 +21,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
-const API_ROOT = (import.meta.env.VITE_API_ROOT || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 
 function authHeader() {
   const token =
