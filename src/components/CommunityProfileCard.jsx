@@ -34,51 +34,276 @@ function initials(name = "") {
   return (first + second).toUpperCase();
 }
 
+// ---- helpers for data wiring (single-file) ----
+// Support BOTH env names used across your app.
+const RAW_BASE = (
+  import.meta?.env?.VITE_API_BASE ??
+  import.meta?.env?.VITE_API_BASE_URL ??
+  ""
+).trim();
+
+function joinApi(url) {
+  if (/^https?:\/\//i.test(url)) return url; // already absolute
+  if (!RAW_BASE) return url; // rely on dev proxy if no base given
+
+  const base = RAW_BASE.replace(/\/$/, "");
+  const startsWithApi = url.startsWith("/api");
+  const baseEndsWithApi = /\/api$/i.test(base);
+
+  if (baseEndsWithApi && startsWithApi) {
+    return `${base}${url.slice(4)}`;
+  }
+  return `${base}${url}`;
+}
+
+function authHeaders() {
+  const candidates = ["access", "access_token", "accessToken", "jwt", "JWT", "token"];
+  const token = candidates.map((k) => localStorage.getItem(k)).find(Boolean);
+  return token
+    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+    : { "Content-Type": "application/json" };
+}
+
+async function getJson(url) {
+  const full = joinApi(url);
+  const res = await fetch(full, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} @ ${full}`);
+  return res.json();
+}
+
+// Try multiple endpoints, return first success
+async function getJsonOneOf(urls) {
+  let lastErr;
+  for (const u of urls) {
+    try {
+      return await getJson(u);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("All candidate URLs failed");
+}
+
+function buildName(u = {}) {
+  if (!u || typeof u !== "object") return "";
+  const full =
+    u.profile?.full_name ||
+    u.display_name ||
+    `${u.first_name || ""} ${u.last_name || ""}`.trim();
+  if (full) return full;
+  return u.username || u.email || "User";
+}
+
+function pickAvatar(u) {
+  // Defensive: if the object is falsy, return empty string
+  if (!u || typeof u !== "object") return "";
+  return (
+    u.avatar ||
+    u.avatar_url ||
+    u.profile?.avatar ||
+    u.profile?.image_url ||
+    u.profile?.photo ||
+    ""
+  );
+}
+
+// ------------------------------------------------
+
 export default function CommunityProfileCard({
-  user = {
-    name: "Mathews",
-    status: "Active",
-    avatarUrl: "",
-  },
+  // If 'user' prop is passed (object with id or fields) we will show that user's groups/friends.
+  user: userProp,
+  communities: communitiesProp,
+  friends: friendsProp,
 
-  // groups (aka communities) list for the right rail
-  communities = [
-    { id: 1, name: "Nature Lovers", code: "NL", color: "#FFEAA7", subscribed: true },
-    { id: 2, name: "Green Reads & Reels", code: "GR", color: "#E5E7EB", subscribed: true },
-    { id: 3, name: "Inspired by Nature", code: "IN", color: "#FFD6D6", subscribed: true },
-  ],
-
-  friends = [
-    {
-      id: 1,
-      name: "Christine Robertson",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=128&q=80&auto=format&fit=crop",
-    },
-    {
-      id: 2,
-      name: "James Fox",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=128&q=80&auto=format&fit=crop",
-    },
-    {
-      id: 3,
-      name: "Almanda Backenberg",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=128&q=80&auto=format&fit=crop",
-    },
-  ],
-
-  onMessage = () => {},
-  onMore = () => {},
+  onMessage = () => { },
+  onMore = () => { },
   onCommunityUnsubscribe = (c) => console.log("Unsubscribe:", c),
 
-  // We’ll still call these if you pass them, but we also open the local dialog.
+  // Optional callbacks invoked when user opens the dialogs
   onViewAllCommunities,
   onViewAllFriends,
 }) {
   const [openGroups, setOpenGroups] = React.useState(false);
   const [openFriends, setOpenFriends] = React.useState(false);
+
+  const [me, setMe] = React.useState(null);
+  const [groups, setGroups] = React.useState(() =>
+    Array.isArray(communitiesProp) ? communitiesProp : []
+  );
+  const [friends, setFriends] = React.useState(() =>
+    Array.isArray(friendsProp) ? friendsProp : []
+  );
+  const [loading, setLoading] = React.useState(true);
+
+  // Helper: normalize group rows to {id, name, code, color, subscribed}
+  function normalizeGroups(rows = []) {
+    return (rows || []).map((row) => {
+      // handle when API returns group object or nested object
+      const g = row.group || row || {};
+      const name = g.name || g.title || g.display_name || g.slug || "Group";
+      return {
+        id: g.id || g.pk || `${name}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        code: (g.slug && g.slug.slice(0, 2).toUpperCase()) || initials(name),
+        color: g.color || "#F1F5F9",
+        subscribed: !!(g.subscribed || g.is_member || g.member_status === "active"),
+      };
+    });
+  }
+
+  function normalizeFriends(rows = [], meId) {
+    const arr = (rows || []).filter(Boolean); // drop null/undefined
+    return arr
+      .map((row) => {
+        let other = null;
+        if (row.id && (row.email || row.first_name || row.username)) {
+          other = row;
+        } else if (row.friend) other = row.friend;
+        else if (row.user) other = row.user;
+        else if (row.user1 && row.user2) {
+          other = row.user1?.id === meId ? row.user2 : row.user1;
+        } else if (row.to_user) other = row.to_user;
+        else if (row.requestor) other = row.requestor;
+        else other = row;
+        if (!other || !other.id) return null;
+        return {
+          id: other.id,
+          name: buildName(other),
+          avatarUrl: pickAvatar(other),
+        };
+      })
+      .filter(Boolean);
+  }
+
+
+  // Fetch live data for: me (or target user), joined groups, friends
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+
+        // If userProp passed and has usable fields, prefer it.
+        const targetId = userProp?.id ?? userProp?.pk;
+        let targetUser = null;
+        if (userProp && !targetId) {
+          // userProp exists but no id — treat it as preloaded user object
+          targetUser = userProp;
+        }
+
+        // 1) Load user data (either userProp if complete, or fetch by id, else fallback to /me)
+        try {
+          if (targetId) {
+            // try multiple endpoints to fetch the user if needed
+            try {
+              targetUser = await getJsonOneOf([
+                `/api/users/${targetId}/`,
+                `/api/users/detail/${targetId}/`,
+                `/api/profile/${targetId}/`,
+              ]);
+            } catch {
+              // swallow; leave targetUser as userProp if present
+              targetUser = targetUser || { id: targetId };
+            }
+          } else if (!targetUser) {
+            // no target passed: fetch /me
+            try {
+              targetUser = await getJson("/api/users/me/");
+            } catch {
+              // if /api/users/me/ fails, try common alt
+              try {
+                targetUser = await getJson("/api/me/");
+              } catch {
+                targetUser = null;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("profile load failed:", e);
+        }
+
+        // store me for subsequent normalization (some friend rows need me.id)
+        if (!mounted) return;
+        setMe(targetUser);
+
+        // 2) Joined groups for the target user
+        let groupsRaw = [];
+        if (Array.isArray(communitiesProp) && communitiesProp.length > 0) {
+          groupsRaw = communitiesProp;
+        } else {
+          // build candidate endpoints — many backends differ, so try a few
+          const candidateGroupEndpoints = targetId
+            ? [
+              `/api/groups/?member_id=${targetId}&page_size=50`,
+              `/api/users/${targetId}/groups/?page_size=50`,
+              `/api/groups/members/?user_id=${targetId}&page_size=50`,
+              `/api/groups/joined/?user_id=${targetId}&page_size=50`,
+              `/api/groups/joined/?page_size=50&user=${targetId}`,
+            ]
+            : [
+              "/api/groups/joined/?page_size=50",
+              "/api/groups/?page_size=50",
+              "/api/groups/?page_size=50",
+            ];
+
+          try {
+            const g = await getJsonOneOf(candidateGroupEndpoints);
+            groupsRaw =
+              Array.isArray(g?.results) ? g.results : Array.isArray(g) ? g : [];
+          } catch (e) {
+            // fail soft — keep any prop content visible
+            console.warn("group fetch failed:", e);
+            groupsRaw = [];
+          }
+        }
+        const groupsNorm = normalizeGroups(groupsRaw);
+
+        // 3) Friends list for the target user
+        let friendsRaw = [];
+        if (Array.isArray(friendsProp) && friendsProp.length > 0) {
+          friendsRaw = friendsProp;
+        } else {
+          // candidate friend endpoints (varies by backend)
+          const candidateFriendEndpoints = targetId
+            ? [
+              `/api/friends/?user_id=${targetId}&page_size=100`,
+              `/api/users/${targetId}/friends/?page_size=100`,
+              `/api/friendships/?user_id=${targetId}&page_size=100`,
+              `/api/friends/?page_size=100&user=${targetId}`,
+              `/api/friendships/?page_size=100&user=${targetId}`,
+              `/api/friends/?page_size=100`, // fallback – might return ALL friends (server may filter)
+            ]
+            : [
+              "/api/friends/?page_size=100",
+              "/api/friendships/?page_size=100",
+              "/api/friends/?limit=100",
+            ];
+
+          try {
+            const f = await getJsonOneOf(candidateFriendEndpoints);
+            friendsRaw = Array.isArray(f?.results) ? f.results : Array.isArray(f) ? f : [];
+          } catch (e) {
+            console.warn("friend fetch failed:", e);
+            friendsRaw = [];
+          }
+        }
+        const friendsNorm = normalizeFriends(friendsRaw, targetUser?.id);
+
+        if (!mounted) return;
+        setGroups(groupsNorm);
+        setFriends(friendsNorm);
+      } catch (e) {
+        console.error("CommunityProfileCard (fetch):", e);
+        // fail soft – keep any props content visible
+      } finally {
+        mounted && setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+    // Re-run when userProp, communitiesProp or friendsProp change
+  }, [userProp, communitiesProp, friendsProp]);
 
   const handleOpenGroups = () => {
     onViewAllCommunities?.();
@@ -88,6 +313,24 @@ export default function CommunityProfileCard({
     onViewAllFriends?.();
     setOpenFriends(true);
   };
+
+  const userDisplay = React.useMemo(() => {
+    // prefer passed userProp (so parent can override name/avatar), else derive from me (fetched)
+    if (userProp) {
+      return {
+        name: buildName(userProp),
+        status: userProp.status || "Active",
+        avatarUrl: pickAvatar(userProp),
+      };
+    }
+    const name = buildName(me);
+    const avatarUrl = pickAvatar(me);
+    return {
+      name: name || "User",
+      status: (me && (me.status || me.profile?.status)) || "Active",
+      avatarUrl,
+    };
+  }, [userProp, me]);
 
   return (
     <>
@@ -104,21 +347,21 @@ export default function CommunityProfileCard({
         >
           <Stack spacing={1.25} alignItems="center">
             <Avatar
-              src={user.avatarUrl}
-              alt={user.name}
+              src={userDisplay.avatarUrl}
+              alt={userDisplay.name}
               sx={{ width: 72, height: 72, bgcolor: "#1abc9c", fontWeight: 700 }}
             >
-              {user.avatarUrl ? null : initials(user.name)}
+              {userDisplay.avatarUrl ? null : initials(userDisplay.name)}
             </Avatar>
 
             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: SLATE_700 }}>
-              {user.name}
+              {userDisplay.name}
             </Typography>
 
-            {!!user.status && (
+            {!!userDisplay.status && (
               <Chip
                 size="small"
-                label={user.status}
+                label={userDisplay.status}
                 variant="filled"
                 sx={{
                   bgcolor: "#E6F9EE",
@@ -150,7 +393,7 @@ export default function CommunityProfileCard({
           <SectionHeader title="Your Groups" onViewAll={handleOpenGroups} viewAllText="View all" />
 
           <Stack spacing={1.25} mt={1}>
-            {communities.map((c) => (
+            {(groups || []).map((c) => (
               <Stack key={c.id} direction="row" spacing={1.25} alignItems="center">
                 <Avatar
                   variant="rounded"
@@ -196,6 +439,11 @@ export default function CommunityProfileCard({
                 </Box>
               </Stack>
             ))}
+            {!loading && (!groups || groups.length === 0) && (
+              <Typography variant="body2" color="text.secondary">
+                No groups to show.
+              </Typography>
+            )}
           </Stack>
         </Paper>
 
@@ -204,7 +452,7 @@ export default function CommunityProfileCard({
           <SectionHeader title="Your friends" onViewAll={handleOpenFriends} viewAllText="View all" />
 
           <Stack spacing={1.25} mt={1}>
-            {friends.map((f) => (
+            {(friends || []).map((f) => (
               <Stack key={f.id} direction="row" spacing={1.25} alignItems="center">
                 <Avatar src={f.avatarUrl} alt={f.name} sx={{ width: 28, height: 28 }} />
                 <Typography
@@ -217,6 +465,11 @@ export default function CommunityProfileCard({
                 </Typography>
               </Stack>
             ))}
+            {!loading && (!friends || friends.length === 0) && (
+              <Typography variant="body2" color="text.secondary">
+                No friends to show.
+              </Typography>
+            )}
           </Stack>
         </Paper>
       </Stack>
@@ -226,7 +479,7 @@ export default function CommunityProfileCard({
         <DialogTitle sx={{ fontWeight: 800 }}>Your Groups</DialogTitle>
         <DialogContent dividers>
           <List disablePadding>
-            {communities.map((c, idx) => (
+            {(groups || []).map((c, idx) => (
               <React.Fragment key={c.id || idx}>
                 <ListItemButton disableRipple>
                   <ListItemAvatar>
@@ -260,10 +513,10 @@ export default function CommunityProfileCard({
                     </Button>
                   )}
                 </ListItemButton>
-                {idx < communities.length - 1 && <Divider component="li" />}
+                {idx < (groups?.length || 0) - 1 && <Divider component="li" />}
               </React.Fragment>
             ))}
-            {communities.length === 0 && (
+            {!loading && (!groups || groups.length === 0) && (
               <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
                 No groups to show.
               </Typography>
@@ -280,7 +533,7 @@ export default function CommunityProfileCard({
         <DialogTitle sx={{ fontWeight: 800 }}>Your friends</DialogTitle>
         <DialogContent dividers>
           <List disablePadding>
-            {friends.map((f, idx) => (
+            {(friends || []).map((f, idx) => (
               <React.Fragment key={f.id || idx}>
                 <ListItemButton disableRipple>
                   <ListItemAvatar>
@@ -299,10 +552,10 @@ export default function CommunityProfileCard({
                     Message
                   </Button>
                 </ListItemButton>
-                {idx < friends.length - 1 && <Divider component="li" />}
+                {idx < (friends?.length || 0) - 1 && <Divider component="li" />}
               </React.Fragment>
             ))}
-            {friends.length === 0 && (
+            {!loading && (!friends || friends.length === 0) && (
               <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
                 No friends to show.
               </Typography>
