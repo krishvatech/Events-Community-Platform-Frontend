@@ -32,6 +32,7 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
+import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import CommunitySidebar from "../../components/CommunitySideBar.jsx";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -106,6 +107,43 @@ export default function RichProfile() {
   const [friendStatus, setFriendStatus] = useState(isMe ? "self" : "none"); // self | none | pending_outgoing | pending_incoming | friends
   const [friendLoading, setFriendLoading] = useState(!isMe);
   const [friendSubmitting, setFriendSubmitting] = useState(false);
+  // Per-row friendship status inside Connections dialog
+  const [connFriendStatus, setConnFriendStatus] = useState({}); // { [userId]: "friends" | "pending_outgoing" | "pending_incoming" | "none" }
+  const [connSubmitting, setConnSubmitting] = useState({});     // { [userId]: boolean }
+
+  async function fetchFriendStatus(targetId) {
+    try {
+      const r = await fetch(`${API_BASE}/friends/status/?user_id=${targetId}`, {
+        headers: { ...tokenHeader(), Accept: "application/json" },
+        credentials: "include",
+      });
+      const d = await r.json().catch(() => ({}));
+      // backend may return incoming_pending/outgoing_pending — normalize:
+      const map = { incoming_pending: "pending_incoming", outgoing_pending: "pending_outgoing" };
+      return (map[d?.status] || d?.status || "none").toLowerCase();
+    } catch {
+      return "none";
+    }
+  }
+
+  async function sendFriendRequestTo(targetId) {
+    try {
+      setConnSubmitting((m) => ({ ...m, [targetId]: true }));
+      const r = await fetch(`${API_BASE}/friend-requests/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ to_user: Number(targetId) }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok && r.status !== 200) throw new Error(d?.detail || "Failed to send request");
+      setConnFriendStatus((m) => ({ ...m, [targetId]: (d?.status || "pending_outgoing").toLowerCase() }));
+    } catch (e) {
+      alert(e?.message || "Failed to send friend request");
+    } finally {
+      setConnSubmitting((m) => ({ ...m, [targetId]: false }));
+    }
+  }
 
   const [mutual, setMutual] = useState([]);
   const [mutualCount, setMutualCount] = useState(0);
@@ -327,17 +365,27 @@ export default function RichProfile() {
         }
         }
   const openConnections = async () => {
-    setConnOpen(true);
-    setConnLoading(true);
-    const [list, mutualList] = await Promise.all([
+  setConnOpen(true);
+  setConnLoading(true);
+  const [list, mutualList] = await Promise.all([
     fetchFriendList(userId),
     fetchMutualList(userId),
-    ]);
-    setConnections(list);
-    setMutual(mutualList);
-    setMutualCount(mutualList.length);
-    setConnLoading(false);
-  };
+  ]);
+  setConnections(list);
+  setMutual(mutualList);
+  setMutualCount(mutualList.length);
+
+  // Preload friendship status for everyone we might show
+  const ids = Array.from(new Set([...list, ...mutualList].map((x) => String(x?.id)).filter(Boolean)));
+  const missing = ids.filter((id) => connFriendStatus[id] === undefined && String(id) !== String(me?.id || ""));
+  if (missing.length) {
+    const entries = await Promise.all(
+      missing.map(async (id) => [id, await fetchFriendStatus(id)])
+    );
+    setConnFriendStatus((m) => ({ ...m, ...Object.fromEntries(entries) }));
+  }
+  setConnLoading(false);
+};
 
   const filterList = (arr) => {
   const s = (connQ || "").toLowerCase().trim();
@@ -642,14 +690,50 @@ const filteredMutual = useMemo(
                               >
                                 <OpenInNewOutlinedIcon fontSize="small" />
                               </IconButton>
-                              <Button
-                                size="small"
-                                variant="contained"
-                                sx={{ textTransform: "none", borderRadius: 2 }}
-                                onClick={() => startChat(f.id)}
-                              >
-                                Message
-                              </Button>
+
+                              {String(f.id) === String(me?.id || "") ? (
+                                // self row → show a neutral chip instead of hiding the action area
+                                <Chip label="You" size="small" />
+                              ) : (() => {
+                                const status = (connFriendStatus[String(f.id)] || "none").toLowerCase();
+                                if (status === "friends") {
+                                  return (
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      sx={{ textTransform: "none", borderRadius: 2 }}
+                                      onClick={() => startChat(f.id)}
+                                    >
+                                      Message
+                                    </Button>
+                                  );
+                                }
+                                if (status === "pending_outgoing") {
+                                  return (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      disabled
+                                      sx={{ textTransform: "none", borderRadius: 2 }}
+                                    >
+                                      Request pending
+                                    </Button>
+                                  );
+                                }
+                                // not friends → Add friend
+                                return (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<PersonAddAlt1RoundedIcon />}
+                                    sx={{ textTransform: "none", borderRadius: 2 }}
+                                    disabled={!!connSubmitting[f.id]}
+                                    onClick={() => sendFriendRequestTo(f.id)}
+                                  >
+                                    {connSubmitting[f.id] ? "Sending…" : "Add friend"}
+                                  </Button>
+                                );
+                              })()}
                             </Stack>
                           }
                         >

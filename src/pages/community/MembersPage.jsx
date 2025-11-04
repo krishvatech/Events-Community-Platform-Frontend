@@ -26,6 +26,7 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import MailOutlineOutlinedIcon from "@mui/icons-material/MailOutlineOutlined";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
+import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
@@ -43,13 +44,14 @@ const tokenHeader = () => {
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
-function MemberRow({ u, unread, onOpenProfile, onMessage }) {
+function MemberRow({ u, unread, friendStatus, onOpenProfile, onMessage, onAddFriend }) {
   const name =
     u?.profile?.full_name ||
     `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
     u?.email;
   const company = u?.company_from_experience ?? "—";
-  const title = u?.position_from_experience ?? "—";
+  const title = u?.position_from_experience || u?.profile?.job_title || u?.job_title || "—";
+  const status = (friendStatus || "").toLowerCase();
 
   return (
     <TableRow hover>
@@ -95,17 +97,38 @@ function MemberRow({ u, unread, onOpenProfile, onMessage }) {
             <OpenInNewOutlinedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Message">
+        {status === "friends" ? (
+          <Tooltip title="Message">
+            <Button
+              size="small"
+              variant="contained"
+              sx={{ textTransform: "none", borderRadius: 2, ml: 1 }}
+              startIcon={<MailOutlineOutlinedIcon />}
+              onClick={onMessage}
+            >
+              Message
+            </Button>
+          </Tooltip>
+        ) : status === "pending_outgoing" ? (
           <Button
             size="small"
-            variant="contained"
+            variant="outlined"
             sx={{ textTransform: "none", borderRadius: 2, ml: 1 }}
-            startIcon={<MailOutlineOutlinedIcon />}
-            onClick={onMessage}
+            disabled
           >
-            Message
+            Request pending
           </Button>
-        </Tooltip>
+        ) : (
+          <Button
+            size="small"
+            variant="outlined"
+            sx={{ textTransform: "none", borderRadius: 2, ml: 1 }}
+            startIcon={<PersonAddAlt1RoundedIcon />}
+            onClick={onAddFriend}
+          >
+            Add friend
+          </Button>
+        )}
       </TableCell>
     </TableRow>
   );
@@ -120,6 +143,7 @@ export default function MembersPage({ user, stats, tags = [] }) {
   const [users, setUsers] = useState([]);
   const [q, setQ] = useState("");
 
+
   // pagination
   const [page, setPage] = useState(1);
   const ROWS_PER_PAGE = 5;
@@ -127,6 +151,9 @@ export default function MembersPage({ user, stats, tags = [] }) {
   // unread-by-user map (like MessagesDirectory)
   const [unreadByUser, setUnreadByUser] = useState({});
   const pollRef = useRef(null);
+
+  // friendship status cache: { [userId]: "friends" | "pending_outgoing" | "pending_incoming" | "none" }
+  const [friendStatusByUser, setFriendStatusByUser] = useState({});
 
   // me
   const me = useMemo(() => {
@@ -136,6 +163,36 @@ export default function MembersPage({ user, stats, tags = [] }) {
       return {};
     }
   }, []);
+
+  async function fetchFriendStatus(id) {
+    const r = await fetch(`${API_BASE}/friends/status/?user_id=${id}`, {
+      headers: tokenHeader(),
+      credentials: "include",
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d?.detail || `Failed status for ${id}`);
+    // Expecting {status: "..."}; fall back to "none"
+    return (d?.status || d?.friendship || "none").toLowerCase();
+  }
+
+  
+
+  async function sendFriendRequest(id) {
+    try {
+      const r = await fetch(`${API_BASE}/friend-requests/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        credentials: "include",
+        body: JSON.stringify({ to_user: Number(id) }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d?.detail || "Failed to send request");
+      // Mark as pending_outgoing in the cache
+      setFriendStatusByUser((m) => ({ ...m, [id]: "pending_outgoing" }));
+    } catch (e) {
+      alert(e?.message || "Failed to send friend request");
+    }
+  }
 
   // ---- load users (try /users/roster/ else fallback /users/?limit=500)
   useEffect(() => {
@@ -255,7 +312,32 @@ export default function MembersPage({ user, stats, tags = [] }) {
   const pageCount = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
   const startIdx = (page - 1) * ROWS_PER_PAGE;
   const current = filtered.slice(startIdx, startIdx + ROWS_PER_PAGE);
-
+  // Load statuses for the users shown on the current page (and not already cached)
+  useEffect(() => {
+   const idsToLoad = current
+     .map((u) => u.id)
+     .filter((id) => friendStatusByUser[id] === undefined);
+   if (idsToLoad.length === 0) return;
+   let alive = true;
+   (async () => {
+     try {
+       const entries = await Promise.all(
+         idsToLoad.map(async (id) => {
+           try {
+             const s = await fetchFriendStatus(id);
+             return [id, s];
+           } catch {
+             return [id, "none"];
+           }
+         })
+       );
+       if (!alive) return;
+       setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
+     } catch {}
+   })();
+   return () => { alive = false; };
+ }, [current, friendStatusByUser]);
+  // trigger friend-status loading for the current page
   // ---- actions
   async function startChat(recipientId) {
     try {
@@ -337,14 +419,6 @@ export default function MembersPage({ user, stats, tags = [] }) {
                     )}`}{" "}
                 of {filtered.length} members
               </Typography>
-              <Pagination
-                count={pageCount}
-                page={page}
-                onChange={(_, v) => setPage(v)}
-                size="small"
-                shape="rounded"
-                siblingCount={0}
-              />
             </Stack>
 
             <TableContainer
@@ -367,8 +441,10 @@ export default function MembersPage({ user, stats, tags = [] }) {
                       key={u.id}
                       u={u}
                       unread={!!unreadByUser[u.id]}
+                      friendStatus={friendStatusByUser[u.id]}
                       onOpenProfile={() => handleOpenProfile(u)}
                       onMessage={() => startChat(u.id)}
+                      onAddFriend={() => sendFriendRequest(u.id)}
                     />
                   ))}
 
