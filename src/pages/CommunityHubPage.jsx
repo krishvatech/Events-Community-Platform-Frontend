@@ -34,32 +34,7 @@ export default function CommunityHubPage() {
   const title = titleMap[view] || "Community";
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, py: 2, maxWidth: 1280, mx: "auto" }}>
-      {/* Title bar */}
-      <Paper
-        elevation={0}
-        sx={{
-          mb: 2,
-          p: 2,
-          border: theme => `1px solid ${theme.palette.divider}`,
-          borderRadius: 3,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-        }}
-      >
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>{title}</Typography>
-        <IconButton
-          sx={{ display: { xs: "inline-flex", md: "none" } }}
-          onClick={() => setNavOpen(true)}
-          aria-label="Open navigation"
-        >
-          <MenuRoundedIcon />
-        </IconButton>
-      </Paper>
-
+    <Box sx={{ px: { xs: 2, md: 3 }, py: 2, maxWidth: 1480, mx: "auto" }}>
       {/* Mobile drawer for the left nav */}
       <Drawer
         open={navOpen}
