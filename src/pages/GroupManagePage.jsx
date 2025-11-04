@@ -752,6 +752,9 @@ export default function GroupManagePage() {
     }, [group, showSubgroupsTab, fetchSubgroups]);
 
     const [busyUserId, setBusyUserId] = React.useState(null);
+    const [roleErrorOpen, setRoleErrorOpen] = React.useState(false);
+    const [roleErrorMsg, setRoleErrorMsg] = React.useState("");
+
     // Posts tab state
     const [posts, setPosts] = React.useState([]);
     const [postsLoading, setPostsLoading] = React.useState(true);
@@ -774,6 +777,10 @@ export default function GroupManagePage() {
     const [activePost, setActivePost] = React.useState(null);
     const [editPostOpen, setEditPostOpen] = React.useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
+    // Member removal confirm (new)
+    const [removeMemberOpen, setRemoveMemberOpen] = React.useState(false);
+    const [removeMemberTarget, setRemoveMemberTarget] = React.useState(null);
+
 
     // Moderation gate (same roles as canPost; separate for clarity)
     const canModerate = ["owner", "admin", "moderator"].includes(group?.current_user_role || "member");
@@ -1028,7 +1035,8 @@ export default function GroupManagePage() {
             await fetchMembers();   // refresh list after role change
         } catch (e) {
             console.error(e);
-            alert(`Failed to update role: ${e?.message || e}`);
+            setRoleErrorMsg(`Failed to update role: ${e?.message || e}`);
+            setRoleErrorOpen(true);
         } finally {
             setBusyUserId(null);
             closeMemberMenu();
@@ -1313,12 +1321,13 @@ export default function GroupManagePage() {
                                                 <Divider />
 
                                                 <MenuItem
-                                                    onClick={() => removeMember(activeMember.user.id)}
+                                                    onClick={() => { setRemoveMemberTarget(activeMember); setRemoveMemberOpen(true); }}
                                                     disabled={activeMember.user.id === ownerId}
                                                 >
                                                     <ListItemIcon>🗑️</ListItemIcon>
                                                     <ListItemText>Remove from Group</ListItemText>
                                                 </MenuItem>
+
                                             </>
                                         )}
                                     </Menu>
@@ -1752,6 +1761,71 @@ export default function GroupManagePage() {
                     } : prev);
                 }}
             />
+
+            {/* Role assign — error modal */}
+            <Dialog
+                open={roleErrorOpen}
+                onClose={() => setRoleErrorOpen(false)}
+                fullWidth
+                maxWidth="xs"
+                PaperProps={{ sx: { borderRadius: 3 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Couldn’t update role</DialogTitle>
+                <DialogContent>
+                    <Alert severity="error" sx={{ my: 1 }}>
+                        {roleErrorMsg || "Something went wrong while assigning the role."}
+                    </Alert>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setRoleErrorOpen(false)}
+                        variant="contained"
+                        sx={{ textTransform: "none" }}
+                    >
+                        OK
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Remove member — confirmation */}
+            <Dialog
+                open={removeMemberOpen}
+                onClose={() => setRemoveMemberOpen(false)}
+                fullWidth
+                maxWidth="xs"
+                PaperProps={{ sx: { borderRadius: 3 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Remove member?</DialogTitle>
+                <DialogContent>
+                    <Typography sx={{ mb: 1.5 }}>
+                        {removeMemberTarget?.user?.name || removeMemberTarget?.user?.email || "This member"} will be
+                        removed from the group and will lose access to posts and updates.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRemoveMemberOpen(false)} sx={{ textTransform: "none" }}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        sx={{ textTransform: "none" }}
+                        disabled={
+                            !!removeMemberTarget &&
+                            busyUserId === (removeMemberTarget.user?.id ?? removeMemberTarget.userId)
+                        }
+                        onClick={() => {
+                            const id = removeMemberTarget?.user?.id ?? removeMemberTarget?.userId;
+                            if (!id) return;
+                            setRemoveMemberOpen(false);          // close modal first
+                            removeMember(id);                    // uses your existing function
+                        }}
+                    >
+                        Remove
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+
             {/* Per-post actions menu */}
             <Menu anchorEl={postMenuAnchor} open={Boolean(postMenuAnchor)} onClose={closePostMenu}>
                 <MenuItem onClick={() => toggleHidePost(activePost)} disabled={!activePost}>
