@@ -281,7 +281,7 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }
 
     const submit = async () => {
         if (selected.size === 0) return;
-        await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/add-members/`, {
+        await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/members/add-member/`, {
             method: "POST",
             headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: JSON.stringify({ user_ids: Array.from(selected) }),
@@ -801,7 +801,7 @@ export default function GroupManagePage() {
         const isHidden = Boolean(post.hidden ?? post.is_hidden);
         const endpoint = isHidden ? "unhide-post" : "hide-post";
 
-        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/moderation/${endpoint}/`, {
+        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/${endpoint}/`, {
             method: "POST",
             headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: JSON.stringify({ id: postId })
@@ -821,7 +821,7 @@ export default function GroupManagePage() {
         const postId = Number(activePost._feed_item_id ?? activePost.feed_item_id ?? activePost.id);
         if (!Number.isInteger(postId)) { alert("Invalid item id"); return; }
 
-        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/moderation/delete-post/`, {
+        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/delete-post/`, {
             method: "POST",
             headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: JSON.stringify({ id: postId })
@@ -1038,7 +1038,7 @@ export default function GroupManagePage() {
     const removeMember = async (userId) => {
         setBusyUserId(userId);
         try {
-            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/remove-member/`, {
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/members/remove-member/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                 body: JSON.stringify({ user_id: userId }),

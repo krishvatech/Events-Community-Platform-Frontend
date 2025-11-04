@@ -202,7 +202,7 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
     setLoading(true);
     setError("");
     try {
-      const r = await fetch(`${API_ROOT}/groups/explore/`, {
+      const r = await fetch(`${API_ROOT}/groups/explore-groups/`, {
         headers: { Accept: "application/json", ...authHeader() },
       });
       if (r.status === 401) throw new Error("Please log in to see groups.");
