@@ -15,6 +15,11 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
+import HourglassBottomRoundedIcon from "@mui/icons-material/HourglassBottomRounded";
+import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
+
 
 const BORDER = "#e2e8f0";
 
@@ -39,7 +44,7 @@ function groupByDay(items) {
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
   const groups = { Today: [], Yesterday: [], Earlier: [] };
   for (const it of items) {
-    const d0 = new Date(it.created_at); const d = new Date(d0); d.setHours(0,0,0,0);
+    const d0 = new Date(it.created_at); const d = new Date(d0); d.setHours(0, 0, 0, 0);
     if (d >= today) groups.Today.push(it);
     else if (d >= yesterday) groups.Yesterday.push(it);
     else groups.Earlier.push(it);
@@ -75,26 +80,11 @@ function NotificationRow({
     // LinkedIn-style connection/friend request
     if (item.kind === "friend_request" || item.kind === "connection_request") {
       if (item.state === "accepted") {
-        return (
-          <Chip
-            size="small"
-            color="success"
-            icon={<CheckCircleOutlineIcon />}
-            label="Accepted"
-            sx={{ ml: 1 }}
-          />
-        );
+        return null;
       }
+
       if (item.state === "declined") {
-        return (
-          <Chip
-            size="small"
-            color="default"
-            icon={<HighlightOffIcon />}
-            label="Declined"
-            sx={{ ml: 1 }}
-          />
-        );
+        return null;
       }
       return (
         <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
@@ -149,6 +139,8 @@ function NotificationRow({
       sx={{
         p: 1.25,
         mb: 1,
+        width: 1,                 // ⬅ make each row same width as header
+        boxSizing: "border-box",
         border: `1px solid ${BORDER}`,
         borderRadius: 2,
         bgcolor: unread ? "#f6fffe" : "background.paper",
@@ -197,21 +189,110 @@ function NotificationRow({
         </Box>
 
         {/* general actions */}
-        <Stack direction="row" spacing={0.5}>
-          <IconButton
-            size="small"
-            title={unread ? "Mark as read" : "Mark as unread"}
-            onClick={() => onToggleRead?.(item.id, !unread)}
-          >
-            {unread ? (
-              <MarkEmailReadOutlinedIcon fontSize="small" />
-            ) : (
-              <MarkEmailUnreadOutlinedIcon fontSize="small" />
-            )}
-          </IconButton>
-          <IconButton size="small" title="Open" onClick={() => onOpen?.(item)}>
-            <OpenInNewOutlinedIcon fontSize="small" />
-          </IconButton>
+        <Stack spacing={0.5} alignItems="flex-end">
+          {/* icons row (unchanged behavior) */}
+          <Stack direction="row" spacing={0.5}>
+            <IconButton
+              size="small"
+              title={unread ? "Mark as read" : "Mark as unread"}
+              onClick={() => onToggleRead?.(item.id, !unread)}
+            >
+              {unread ? (
+                <MarkEmailReadOutlinedIcon fontSize="small" />
+              ) : (
+                <MarkEmailUnreadOutlinedIcon fontSize="small" />
+              )}
+            </IconButton>
+
+            <IconButton size="small" title="Open" onClick={() => onOpen?.(item)}>
+              <OpenInNewOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+
+          {/* status pill for ALL cases */}
+          {(() => {
+            const s = (item.state || "").toLowerCase();
+            if (!s) return null; // no state => no pill
+
+            const common = {
+              size: "small",
+              variant: "outlined",
+              sx: {
+                mt: 0.5,
+                height: 24,
+                borderRadius: "999px",
+                fontWeight: 600,
+                "& .MuiChip-label": { px: 0.5, pt: "1px" },
+              },
+            };
+
+            if (s === "accepted" || s === "approved") {
+              return (
+                <Chip
+                  {...common}
+                  icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />}
+                  label="Accepted"
+                  sx={{
+                    ...common.sx,
+                    bgcolor: "#e6f4ea",
+                    borderColor: "#e6f4ea",
+                    color: "#1a7f37",
+                    "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 },
+                  }}
+                />
+              );
+            }
+
+            if (s === "declined" || s === "rejected") {
+              return (
+                <Chip
+                  {...common}
+                  icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />}
+                  label="Declined"
+                  sx={{
+                    ...common.sx,
+                    bgcolor: "#fde7e9",
+                    borderColor: "#fde7e9",
+                    color: "#b42318",
+                    "& .MuiChip-icon": { color: "#b42318", mr: 0.5 },
+                  }}
+                />
+              );
+            }
+
+            if (s === "pending" || s === "requested" || s === "waiting" || s === "sent") {
+              return (
+                <Chip
+                  {...common}
+                  icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />}
+                  label={s === "sent" ? "Sent" : "Pending"}
+                  sx={{
+                    ...common.sx,
+                    bgcolor: "#eef2f6",
+                    borderColor: "#eef2f6",
+                    color: "#374151",
+                    "& .MuiChip-icon": { color: "#374151", mr: 0.5 },
+                  }}
+                />
+              );
+            }
+
+            // fallback: show the raw state
+            return (
+              <Chip
+                {...common}
+                icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />}
+                label={item.state}
+                sx={{
+                  ...common.sx,
+                  bgcolor: "#f3f4f6",
+                  borderColor: "#f3f4f6",
+                  color: "#111827",
+                  "& .MuiChip-icon": { color: "#6b7280", mr: 0.5 },
+                }}
+              />
+            );
+          })()}
         </Stack>
       </Stack>
     </Paper>
@@ -262,74 +343,74 @@ export default function NotificationsPage({
   const grouped = groupByDay(filtered);
 
   React.useEffect(() => {
-  let alive = true;
-  (async () => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/notifications/`, {
+          headers: { ...tokenHeader(), Accept: "application/json" },
+          credentials: "include",
+        });
+        const j = await r.json().catch(() => []);
+        const raw = Array.isArray(j) ? j : j?.results || [];
+
+        // map API -> UI shape the page already expects
+        const mapped = raw.map((n) => ({
+          id: n.id,
+          kind: n.kind,               // "friend_request"
+          state: n.state || "",       // "pending" | "accepted" | "declined" | "canceled"
+          title: n.title || "",
+          description: n.description || "",
+          created_at: n.created_at,
+          is_read: !!n.is_read,
+          actor: {
+            name: n.actor?.display_name || n.actor?.username || n.actor?.email || "User",
+            avatar: n.actor?.avatar || "",
+          },
+          // for "open profile" + friend-request actions:
+          context: {
+            friend_request_id: n.data?.friend_request_id,
+            // for the recipient: go to the sender’s profile
+            profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
+          },
+        }));
+
+        if (alive) setItems(mapped);
+      } catch {
+        // ignore; keep empty list
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+
+  const apiMarkRead = async (ids = []) => {
+    if (!ids.length) return;
     try {
-      const r = await fetch(`${API_BASE}/notifications/`, {
-        headers: { ...tokenHeader(), Accept: "application/json" },
+      await fetch(`${API_BASE}/notifications/mark-read/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
         credentials: "include",
+        body: JSON.stringify({ ids }),
       });
-      const j = await r.json().catch(() => []);
-      const raw = Array.isArray(j) ? j : j?.results || [];
-
-      // map API -> UI shape the page already expects
-      const mapped = raw.map((n) => ({
-        id: n.id,
-        kind: n.kind,               // "friend_request"
-        state: n.state || "",       // "pending" | "accepted" | "declined" | "canceled"
-        title: n.title || "",
-        description: n.description || "",
-        created_at: n.created_at,
-        is_read: !!n.is_read,
-        actor: {
-          name: n.actor?.display_name || n.actor?.username || n.actor?.email || "User",
-          avatar: n.actor?.avatar || "",
-        },
-        // for "open profile" + friend-request actions:
-        context: {
-          friend_request_id: n.data?.friend_request_id,
-          // for the recipient: go to the sender’s profile
-          profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
-        },
-      }));
-
-      if (alive) setItems(mapped);
     } catch {
-      // ignore; keep empty list
+      // non-blocking
     }
-  })();
-  return () => { alive = false; };
-}, []);
-
-
-const apiMarkRead = async (ids = []) => {
-  if (!ids.length) return;
-  try {
-    await fetch(`${API_BASE}/notifications/mark-read/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ ids }),
-    });
-  } catch {
-    // non-blocking
-  }
-};
+  };
 
   /* ---------- actions: optimistic mock handlers ---------- */
   const handleToggleRead = async (id, nowRead) => {
-  // optimistic UI
-  setItems((curr) => curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i)));
-  // backend only supports "mark as read" right now
-  if (nowRead) await apiMarkRead([id]);
-};
+    // optimistic UI
+    setItems((curr) => curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i)));
+    // backend only supports "mark as read" right now
+    if (nowRead) await apiMarkRead([id]);
+  };
 
-const handleMarkAllRead = async () => {
-  const ids = items.filter((i) => !i.is_read).map((i) => i.id);
-  if (!ids.length) return;
-  setItems((curr) => curr.map((i) => ({ ...i, is_read: true })));
-  await apiMarkRead(ids);
-};
+  const handleMarkAllRead = async () => {
+    const ids = items.filter((i) => !i.is_read).map((i) => i.id);
+    if (!ids.length) return;
+    setItems((curr) => curr.map((i) => ({ ...i, is_read: true })));
+    await apiMarkRead(ids);
+  };
 
   const handleOpen = (n) => {
     if (onOpen) return onOpen(n);
@@ -344,49 +425,49 @@ const handleMarkAllRead = async () => {
   };
 
   const updateItem = (id, patch) =>
-  setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
-const handleAcceptRequest = async (id) => {
-  const n = items.find((x) => x.id === id);
-  const frId = n?.context?.friend_request_id;
-  if (!frId) return;
-  updateItem(id, { _busy: true });
-  try {
-    const r = await fetch(`${API_BASE}/friend-requests/${frId}/accept/`, {
-      method: "POST",
-      headers: { ...tokenHeader(), Accept: "application/json" },
-      credentials: "include",
-    });
-    updateItem(id, {
-      _busy: false,
-      is_read: true,
-      state: r.ok ? "accepted" : n.state,
-    });
-  } catch {
-    updateItem(id, { _busy: false });
-  }
-};
+  const handleAcceptRequest = async (id) => {
+    const n = items.find((x) => x.id === id);
+    const frId = n?.context?.friend_request_id;
+    if (!frId) return;
+    updateItem(id, { _busy: true });
+    try {
+      const r = await fetch(`${API_BASE}/friend-requests/${frId}/accept/`, {
+        method: "POST",
+        headers: { ...tokenHeader(), Accept: "application/json" },
+        credentials: "include",
+      });
+      updateItem(id, {
+        _busy: false,
+        is_read: true,
+        state: r.ok ? "accepted" : n.state,
+      });
+    } catch {
+      updateItem(id, { _busy: false });
+    }
+  };
 
-const handleDeclineRequest = async (id) => {
-  const n = items.find((x) => x.id === id);
-  const frId = n?.context?.friend_request_id;
-  if (!frId) return;
-  updateItem(id, { _busy: true });
-  try {
-    const r = await fetch(`${API_BASE}/friend-requests/${frId}/decline/`, {
-      method: "POST",
-      headers: { ...tokenHeader(), Accept: "application/json" },
-      credentials: "include",
-    });
-    updateItem(id, {
-      _busy: false,
-      is_read: true,
-      state: r.ok ? "declined" : n.state,
-    });
-  } catch {
-    updateItem(id, { _busy: false });
-  }
-};
+  const handleDeclineRequest = async (id) => {
+    const n = items.find((x) => x.id === id);
+    const frId = n?.context?.friend_request_id;
+    if (!frId) return;
+    updateItem(id, { _busy: true });
+    try {
+      const r = await fetch(`${API_BASE}/friend-requests/${frId}/decline/`, {
+        method: "POST",
+        headers: { ...tokenHeader(), Accept: "application/json" },
+        credentials: "include",
+      });
+      updateItem(id, {
+        _busy: false,
+        is_read: true,
+        state: r.ok ? "declined" : n.state,
+      });
+    } catch {
+      updateItem(id, { _busy: false });
+    }
+  };
 
   const handleFollowBack = async (id) => {
     updateItem(id, { _busy: true });
@@ -396,14 +477,22 @@ const handleDeclineRequest = async (id) => {
   };
 
 
-  
+
   return (
     <Grid container spacing={2}>
       {/* center column */}
       <Grid item xs={12} md={9}>
         {/* header */}
         <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 2 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between">
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, // ← equal widths from sm+
+              alignItems: "center",
+              columnGap: 1,
+              rowGap: 1,
+            }}
+          >
             <Stack direction="row" spacing={1.25} alignItems="center">
               <Badge badgeContent={unreadCount} color="primary">
                 <NotificationsNoneOutlinedIcon />
@@ -414,7 +503,7 @@ const handleDeclineRequest = async (id) => {
               <Chip size="small" label={`${unreadCount} unread`} />
             </Stack>
 
-            <Stack direction="row" spacing={1} alignItems="center">
+            <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: "flex-start", sm: "flex-end" }}>
               <FormControlLabel
                 control={
                   <Switch
@@ -444,7 +533,7 @@ const handleDeclineRequest = async (id) => {
                 Mark all read
               </Button>
             </Stack>
-          </Stack>
+          </Box>
         </Paper>
 
         {/* day groups */}
@@ -486,136 +575,4 @@ const handleDeclineRequest = async (id) => {
 /* ------------------- mock data + utils ------------------- */
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-function demoNotifications() {
-  const now = Date.now();
-  return [
-    // connection / friend request (pending -> Accept / Decline)
-    {
-      id: "req1",
-      kind: "friend_request",
-      state: "pending", // "accepted" | "declined" | "pending"
-      title: "sent you a connection request",
-      description: "“Let’s connect and collaborate on M&A deals.”",
-      created_at: new Date(now - 1000 * 60 * 6).toISOString(),
-      is_read: false,
-      actor: {
-        name: "Kiran Patel",
-        avatar:
-          "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=80&q=80&auto=format&fit=crop",
-      },
-      context: { profile_user_id: 1023 },
-    },
-
-    // follow (with Follow back button)
-    {
-      id: "fol1",
-      kind: "follow",
-      title: "started following you",
-      description: "",
-      created_at: new Date(now - 1000 * 60 * 30).toISOString(),
-      is_read: false,
-      following_back: false,
-      actor: {
-        name: "Ravi Shah",
-        avatar:
-          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&q=80&auto=format&fit=crop",
-      },
-      context: { profile_user_id: 1089 },
-    },
-
-    // mention
-    {
-      id: "n1",
-      kind: "mention",
-      title: "mentioned you in a comment",
-      description: "“Great point about carve-outs, @you!”",
-      created_at: new Date(now - 1000 * 60 * 45).toISOString(),
-      is_read: false,
-      actor: {
-        name: "Aisha Khan",
-        avatar:
-          "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=80&q=80&auto=format&fit=crop",
-      },
-      context: { group: "EMEA Chapter", postId: "p4" },
-    },
-
-    // event
-    {
-      id: "n3",
-      kind: "event",
-      title: "event starts soon",
-      description: "Legal Due Diligence Workshop · Today 6:30 PM IST",
-      created_at: new Date(now - 1000 * 60 * 120).toISOString(),
-      is_read: true,
-      actor: {
-        name: "IMAA Events",
-        avatar:
-          "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=80&q=80&auto=format&fit=crop",
-      },
-      context: { group: "Charter Holders", eventId: 9 },
-    },
-
-    // reaction
-    {
-      id: "n4",
-      kind: "reaction",
-      title: "liked your post",
-      description: "“Welcome to all new members!” got new likes",
-      created_at: new Date(now - 1000 * 60 * 180).toISOString(),
-      is_read: false,
-      actor: {
-        name: "Yara Costa",
-        avatar:
-          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&q=80&auto=format&fit=crop",
-      },
-      context: { group: "EMEA Chapter", postId: "p1" },
-    },
-
-    // system
-    {
-      id: "n6",
-      kind: "system",
-      title: "policy update",
-      description: "We’ve updated our community guidelines.",
-      created_at: new Date(now - 1000 * 60 * 900).toISOString(),
-      is_read: true,
-      actor: { name: "System" },
-      context: {},
-    },
-
-    // comment
-    {
-      id: "n7",
-      kind: "comment",
-      title: "replied to your comment",
-      description: "“Sharing the deck here.”",
-      created_at: new Date(now - 1000 * 60 * 1400).toISOString(),
-      is_read: false,
-      actor: {
-        name: "Anita Sharma",
-        avatar:
-          "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=80&q=80&auto=format&fit=crop",
-      },
-      context: { group: "Cohort 2024 Online", postId: "p7" },
-    },
-
-    // another connection request already accepted (for UI state)
-    {
-      id: "req2",
-      kind: "connection_request",
-      state: "accepted",
-      title: "sent you a connection request",
-      description: "",
-      created_at: new Date(now - 1000 * 60 * 2000).toISOString(),
-      is_read: true,
-      actor: {
-        name: "Elena Petrova",
-        avatar:
-          "https://images.unsplash.com/photo-1544006659-f0b21884ce1d?w=80&q=80&auto=format&fit=crop",
-      },
-      context: { profile_user_id: 1201 },
-    },
-  ];
 }
