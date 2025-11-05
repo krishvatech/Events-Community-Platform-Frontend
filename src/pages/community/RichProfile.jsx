@@ -74,6 +74,150 @@ const rangeText = (s, e, cur) => {
   return (start || end) ? `${start} - ${end || ""}` : "";
 };
 
+/* --------------------------------------------------------------------------
+ * Mock posts and helpers for the Posts tab. In a real app you would fetch
+ * these from your backend. Posts include support for text, link, image and
+ * poll types. The timeAgo helper returns a human‑friendly relative time.
+ */
+const MOCK_POSTS = [
+  {
+    id: 1,
+    type: "text",
+    content: "Hello from Rich Profile!",
+    created_at: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
+  },
+  {
+    id: 2,
+    type: "link",
+    content: "Check out our blog",
+    link: "https://example.com",
+    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
+  },
+  {
+    id: 3,
+    type: "image",
+    content: "Our new design",
+    images: [
+      "https://images.unsplash.com/photo-1503264116251-35a269479413?auto=format&fit=crop&w=600&q=60",
+    ],
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+  },
+  {
+    id: 4,
+    type: "poll",
+    content: "Which JavaScript framework do you prefer?",
+    options: ["React", "Vue", "Angular", "Svelte"],
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+  },
+];
+
+function timeAgo(date) {
+  if (!date) return "";
+  const diff = (Date.now() - new Date(date).getTime()) / 1000;
+  if (diff < 60) return `${Math.floor(diff)}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+// Post card component used in the Posts tab. Shows the post content and a
+// bottom row with mutual connections and a friend button (if not friends).
+function RichPostCard({ post, fullName, mutualCount, friendStatus, friendSubmitting, handleAddFriend }) {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 2 }}>
+      <CardHeader
+        avatar={
+          <Avatar sx={{ width: 40, height: 40 }}>
+            {(fullName || "?").slice(0, 1).toUpperCase()}
+          </Avatar>
+        }
+        title={<Typography fontWeight={600}>{fullName || "User"}</Typography>}
+        subheader={timeAgo(post.created_at)}
+      />
+      <CardContent sx={{ pt: 0 }}>
+        {post.content && (
+          <Typography sx={{ whiteSpace: "pre-wrap" }}>{post.content}</Typography>
+        )}
+        {post.type === "link" && post.link && (
+          <Button
+            size="small"
+            href={post.link}
+            target="_blank"
+            rel="noreferrer"
+            sx={{ mt: 1 }}
+          >
+            {post.link}
+          </Button>
+        )}
+        {post.type === "image" && Array.isArray(post.images) && post.images.length > 0 && (
+          <Stack spacing={1} direction="row" sx={{ mt: 1 }} flexWrap="wrap">
+            {post.images.map((src, idx) => (
+              <Box key={idx} sx={{ width: "100%", maxWidth: 200, borderRadius: 1, overflow: "hidden" }}>
+                <img
+                  src={src}
+                  alt={`post-img-${idx}`}
+                  style={{ width: "100%", height: "auto", display: "block" }}
+                />
+              </Box>
+            ))}
+          </Stack>
+        )}
+        {post.type === "poll" && Array.isArray(post.options) && post.options.length > 0 && (
+          <List dense sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+            {post.options.map((opt, idx) => (
+              <ListItem key={idx} disableGutters sx={{ px: 1 }}>
+                <ListItemAvatar>
+                  <Avatar sx={{ width: 28, height: 28 }}>{idx + 1}</Avatar>
+                </ListItemAvatar>
+                <ListItemText primary={opt} />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </CardContent>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          px: 2,
+          pb: 2,
+        }}
+      >
+        {mutualCount > 0 && (
+          <Chip label={`${mutualCount} mutual`} size="small" />
+        )}
+        {friendStatus !== "self" && (
+          friendStatus === "none" ? (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<PersonAddAlt1RoundedIcon />}
+              disabled={friendSubmitting}
+              onClick={handleAddFriend}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+            >
+              {friendSubmitting ? "Sending…" : "Add Friend"}
+            </Button>
+          ) : friendStatus === "pending_outgoing" ? (
+            <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+              Request sent
+            </Button>
+          ) : friendStatus === "pending_incoming" ? (
+            <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+              Pending your approval
+            </Button>
+          ) : friendStatus === "friends" ? (
+            <Button variant="contained" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+              Your Friend
+            </Button>
+          ) : null
+        )}
+      </Box>
+    </Card>
+  );
+}
+
 function pickBestExperience(exps = []) {
   if (!Array.isArray(exps) || !exps.length) return null;
   const current = exps.find((e) => e?.currently_work_here);
@@ -148,6 +292,35 @@ export default function RichProfile() {
   const [mutual, setMutual] = useState([]);
   const [mutualCount, setMutualCount] = useState(0);
   const [connTab, setConnTab] = useState("all"); // "all" | "mutual"
+
+  // --- POSTS & TAB STATE ---
+  // In this rich profile we show two tabs: Posts and About. Posts are mocked
+  // locally. When integrating with a backend, replace MOCK_POSTS with
+  // fetched posts for this user. The tab state controls which tab is active.
+  const [tab, setTab] = useState(0);
+  const [posts, setPosts] = useState(MOCK_POSTS);
+
+  // Preload mutual connections count for displaying on posts. This effect
+  // fetches the mutual friends list once when the component mounts (or when
+  // the viewed userId changes) and stores the count in state. Without this
+  // call, mutualCount will remain zero unless the user opens the connections
+  // dialog.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const mutualList = await fetchMutualList(userId);
+        if (!alive) return;
+        setMutual(mutualList);
+        setMutualCount((mutualList || []).length);
+      } catch {
+        // ignore errors; leave mutual count unchanged
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
 
   useEffect(() => {
     let alive = true;
@@ -505,128 +678,173 @@ const filteredMutual = useMemo(
                   </Box>
                 </Paper>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  <Section title="About">
-                    <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                        Email:
-                      </Typography>
-                      <Typography variant="body2">{userItem?.email || "—"}</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                        Company:
-                      </Typography>
-                      <Typography variant="body2">
-                        {currentExp?.community_name || companyFromRoster || "—"}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                        Job Title:
-                      </Typography>
-                      <Typography variant="body2">
-                        {currentExp?.position || titleFromRoster || "—"}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                        Location:
-                      </Typography>
-                      <Typography variant="body2">
-                        {userItem?.profile?.location || "—"}
-                      </Typography>
-                    </Box>
-                  </Section>
-
-                  <Section title="Current role">
-                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      {currentExp?.position || titleFromRoster || "—"}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {currentExp?.community_name || companyFromRoster || "—"}
-                    </Typography>
-                    {(currentExp?.start_date ||
-                      currentExp?.end_date ||
-                      currentExp?.currently_work_here) && (
-                      <Typography variant="caption" color="text.secondary">
-                        {rangeText(
-                          currentExp?.start_date,
-                          currentExp?.end_date,
-                          currentExp?.currently_work_here
-                        )}
-                      </Typography>
-                    )}
-                  </Section>
-                </div>
-
-                <Section title="Experience">
-                  {loadingExtras ? (
-                    <LinearProgress />
-                  ) : experiences.length ? (
-                    <List dense disablePadding>
-                      {experiences.map((x) => (
-                        <ListItem key={x.id} disableGutters sx={{ py: 0.5 }}>
-                          <ListItemText
-                            primary={
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {x.position || "—"} — {x.community_name || "—"}
-                              </Typography>
-                            }
-                            secondary={
-                              <Typography variant="caption" color="text.secondary">
-                                {rangeText(
-                                  x.start_date,
-                                  x.end_date,
-                                  x.currently_work_here
-                                )}
-                                {x.location ? ` · ${x.location}` : ""}
-                              </Typography>
-                            }
+                {/*
+                  Replace the legacy about/role/experience/education sections with a
+                  card containing two tabs: Posts and About. Posts show a
+                  feed of the user’s posts, including mutual connection
+                  count and a friend button. About mirrors the prior sections
+                  (About, Current role, Experience, Education) for viewing.
+                */}
+                <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                  <Tabs
+                    value={tab}
+                    onChange={(e, v) => setTab(v)}
+                    indicatorColor="primary"
+                    textColor="primary"
+                    variant="fullWidth"
+                  >
+                    <Tab label="Posts" />
+                    <Tab label="About" />
+                  </Tabs>
+                  <Divider />
+                  {tab === 0 && (
+                    <CardContent>
+                      <Stack spacing={2}>
+                        {posts.map((post) => (
+                          <RichPostCard
+                            key={post.id}
+                            post={post}
+                            fullName={fullName}
+                            mutualCount={mutualCount}
+                            friendStatus={friendStatus}
+                            friendSubmitting={friendSubmitting}
+                            handleAddFriend={sendFriendRequest}
                           />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      {isMe
-                        ? "You haven’t added any experience yet."
-                        : "This member hasn’t shared experience publicly yet."}
-                    </Typography>
+                        ))}
+                      </Stack>
+                    </CardContent>
                   )}
-                </Section>
+                  {tab === 1 && (
+                    <CardContent>
+                      <Stack spacing={2.5}>
+                        {/* About section */}
+                        <Section title="About">
+                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                              Email:
+                            </Typography>
+                            <Typography variant="body2">{userItem?.email || "—"}</Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                              Company:
+                            </Typography>
+                            <Typography variant="body2">
+                              {currentExp?.community_name || companyFromRoster || "—"}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                              Job Title:
+                            </Typography>
+                            <Typography variant="body2">
+                              {currentExp?.position || titleFromRoster || "—"}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                              Location:
+                            </Typography>
+                            <Typography variant="body2">
+                              {userItem?.profile?.location || "—"}
+                            </Typography>
+                          </Box>
+                        </Section>
 
-                <Section title="Education">
-                  {loadingExtras ? (
-                    <LinearProgress />
-                  ) : educations.length ? (
-                    <List dense disablePadding>
-                      {educations.map((e) => (
-                        <ListItem key={e.id} disableGutters sx={{ py: 0.5 }}>
-                          <ListItemText
-                            primary={
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {e.degree || "—"} — {e.school || "—"}
-                              </Typography>
-                            }
-                            secondary={
-                              <Typography variant="caption" color="text.secondary">
-                                {rangeText(e.start_date, e.end_date, false)}
-                                {e.field_of_study ? ` · ${e.field_of_study}` : ""}
-                              </Typography>
-                            }
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      {isMe
-                        ? "You haven’t added any education yet."
-                        : "This member hasn’t shared education publicly yet."}
-                    </Typography>
+                        {/* Current role section */}
+                        <Section title="Current role">
+                          <Typography variant="body2" sx={{ mb: 0.5 }}>
+                            {currentExp?.position || titleFromRoster || "—"}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {currentExp?.community_name || companyFromRoster || "—"}
+                          </Typography>
+                          {(currentExp?.start_date ||
+                            currentExp?.end_date ||
+                            currentExp?.currently_work_here) && (
+                            <Typography variant="caption" color="text.secondary">
+                              {rangeText(
+                                currentExp?.start_date,
+                                currentExp?.end_date,
+                                currentExp?.currently_work_here
+                              )}
+                            </Typography>
+                          )}
+                        </Section>
+
+                        {/* Experience section */}
+                        <Section title="Experience">
+                          {loadingExtras ? (
+                            <LinearProgress />
+                          ) : experiences.length ? (
+                            <List dense disablePadding>
+                              {experiences.map((x) => (
+                                <ListItem key={x.id} disableGutters sx={{ py: 0.5 }}>
+                                  <ListItemText
+                                    primary={
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                        {x.position || "—"} — {x.community_name || "—"}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <Typography variant="caption" color="text.secondary">
+                                        {rangeText(
+                                          x.start_date,
+                                          x.end_date,
+                                          x.currently_work_here
+                                        )}
+                                        {x.location ? ` · ${x.location}` : ""}
+                                      </Typography>
+                                    }
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              {isMe
+                                ? "You haven’t added any experience yet."
+                                : "This member hasn’t shared experience publicly yet."}
+                            </Typography>
+                          )}
+                        </Section>
+
+                        {/* Education section */}
+                        <Section title="Education">
+                          {loadingExtras ? (
+                            <LinearProgress />
+                          ) : educations.length ? (
+                            <List dense disablePadding>
+                              {educations.map((e) => (
+                                <ListItem key={e.id} disableGutters sx={{ py: 0.5 }}>
+                                  <ListItemText
+                                    primary={
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                        {e.degree || "—"} — {e.school || "—"}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <Typography variant="caption" color="text.secondary">
+                                        {rangeText(e.start_date, e.end_date, false)}
+                                        {e.field_of_study ? ` · ${e.field_of_study}` : ""}
+                                      </Typography>
+                                    }
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              {isMe
+                                ? "You haven’t added any education yet."
+                                : "This member hasn’t shared education publicly yet."}
+                            </Typography>
+                          )}
+                        </Section>
+                      </Stack>
+                    </CardContent>
                   )}
-                </Section>
+                </Card>
               </Stack>
             )}
           </main>
