@@ -344,19 +344,18 @@ export default function LiveFeedPage({
   const buildFeedPath = React.useCallback((sc, q) => {
     const params = new URLSearchParams();
 
-    // "My Groups" works whether your backend uses mine=true OR scope=member_groups
     if (sc === "mine") {
-      params.set("mine", "true");
-      params.set("scope", "member_groups");
+      params.set("mine","true");
+      params.set("scope","member_groups");
+    } else {
+      params.set("scope","home");          // ← ensure union feed is returned
     }
 
-    // Send BOTH aliases so DRF SearchFilter (search=) or your custom (q=) will work
     const qTrim = (q || "").trim();
     if (qTrim) {
       params.set("q", qTrim);
       params.set("search", qTrim);
     }
-
     const qs = params.toString();
     return `activity/feed/${qs ? `?${qs}` : ""}`;
   }, []);
