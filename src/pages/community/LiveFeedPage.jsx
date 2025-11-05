@@ -61,8 +61,23 @@ function useDebounced(value, delay = 400) {
 
 // ---- FEED MAPPER (adds group_id globally) ----
 function mapFeedItem(item) {
-  const m = item?.metadata || {};
-  const displayName = item.actor_name || item.actor_username || `User #${item.actor_id}`;
+  // --- Robust metadata parsing (handles string or object) ---
+  const rawMeta = item?.metadata;
+  let m = {};
+  if (rawMeta) {
+    if (typeof rawMeta === "string") {
+      try { m = JSON.parse(rawMeta); } catch { m = {}; }
+    } else if (typeof rawMeta === "object") {
+      m = rawMeta;
+    }
+  }
+
+  // Normalize verb (some serializers use different keys)
+  const verb = String(item?.verb || item?.action || item?.activity || "").toLowerCase();
+  const isEventVerb = verb.includes("event"); // covers "created event", "updated event", etc.
+
+  const displayName =
+    item.actor_name || item.actor_username || `User #${item.actor_id}`;
 
   const base = {
     id: item.id,
@@ -84,16 +99,24 @@ function mapFeedItem(item) {
     group_avatar: m.group_cover_url || "",
     group: m.group_name || (m.group_id ? `Group #${m.group_id}` : "—"),
     visibility: m.visibility || item.visibility || null,
-    metrics: { likes: 0, comments: 0, shares: 0 },
+    metrics: {
+      likes: Number(m.likes ?? 0),
+      comments: Number(m.comments ?? 0),
+      shares: Number(m.shares ?? 0),
+    },
   };
 
   if (m.is_hidden || m.is_deleted) return null;
+
   const t = (m.type || "").toLowerCase();
 
-  if (t === "image") {
+  // ---- Image post ----
+  if (t === "image" || m.image) {
     return { ...base, type: "image", text: m.text || "", image_url: m.image };
   }
-  if (t === "poll") {
+
+  // ---- Poll post ----
+  if (t === "poll" || Array.isArray(m.options)) {
     return {
       ...base,
       type: "poll",
@@ -109,7 +132,9 @@ function mapFeedItem(item) {
       is_closed: Boolean(m.is_closed),
     };
   }
-  if (t === "link") {
+
+  // ---- Link post ----
+  if (t === "link" || m.url) {
     return {
       ...base,
       type: "link",
@@ -119,20 +144,38 @@ function mapFeedItem(item) {
       url_desc: m.url_desc,
     };
   }
-  if (t === "event" || t === "event_update") {
+
+  // ---- Event post ----
+  // Treat as event if:
+  // - type hints event, OR
+  // - verb mentions "event", OR
+  // - obvious event fields exist (start_time / event_title / event_id), OR
+  // - there is a title and the verb hints event.
+  const hasEventFields = !!(
+    m.start_time ||
+    m.event_title ||
+    m.event_id ||
+    (m.title && isEventVerb)
+  );
+
+  if (t === "event" || t === "event_update" || isEventVerb || hasEventFields) {
     return {
       ...base,
       type: "event",
-      text: m.text || m.summary || "",
+      text: m.description || m.summary || m.text || "",
       event: {
+        id: m.event_id ?? item.target_object_id ?? null,
         title: m.event_title || m.title || "Event",
-        when: m.new_time || m.time || "",
-        where: m.venue || "",
+        when: m.start_time || m.new_time || m.time || "",
+        where: m.venue || m.location || "",
       },
     };
   }
+
+  // ---- Default: text post ----
   return { ...base, type: "text", text: m.text || m.content || "" };
 }
+
 
 // ---- POLL UI ----
 function PollBlock({ post, onVote }) {
@@ -221,21 +264,20 @@ function EventBlock({ post, onOpen }) {
         {post.event?.title}
       </Typography>
       <Typography variant="caption" color="text.secondary">
-        {post.event?.when} · {post.event?.where}
+        {post.event?.when ? new Date(post.event.when).toLocaleString() : ""}{post.event?.where ? ` · ${post.event.where}` : ""}
       </Typography>
       {post.text && <Typography variant="body2" sx={{ mt: 1 }}>{post.text}</Typography>}
       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
         <Button size="small" variant="contained" onClick={onOpen} startIcon={<ThumbUpAltOutlinedIcon />}>
           View Event
         </Button>
-        <Button size="small" variant="outlined">RSVP</Button>
       </Stack>
     </Paper>
   );
 }
 
 // ---- POST CARD ----
-function PostCard({ post, onReact, onOpenPost, onPollVote }) {
+function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const [local, setLocal] = React.useState(post);
   React.useEffect(() => { setLocal(post); }, [post]);
   const inc = (k) => {
@@ -308,7 +350,7 @@ const headingTitle = post.group_id
         )}
 
         {post.type === "event" && (
-          <EventBlock post={post} onOpen={() => onOpenPost?.(post.id)} />
+          <EventBlock post={post} onOpen={() => onOpenEvent?.(post.event?.id || post.id)} />
         )}
       </Box>
 
@@ -339,6 +381,7 @@ export default function LiveFeedPage({
   onCreatePost = () => { },
   onReact = () => { },
   websocketUrl,
+  communityId,       
   user,
   stats,
   tags = [],
@@ -364,23 +407,25 @@ export default function LiveFeedPage({
 
   // Build initial URL based on scope + search
   const buildFeedPath = React.useCallback((sc, q) => {
-    const params = new URLSearchParams();
+  const params = new URLSearchParams();
 
-    if (sc === "mine") {
-      params.set("mine","true");
-      params.set("scope","member_groups");
-    } else {
-      params.set("scope","home");          // ← ensure union feed is returned
-    }
+  if (sc === "mine") {
+    params.set("mine", "true");
+    params.set("scope", "member_groups");
+  } else {
+    params.set("scope", "home"); // server does union: feed + events
+  }
 
-    const qTrim = (q || "").trim();
-    if (qTrim) {
-      params.set("q", qTrim);
-      params.set("search", qTrim);
-    }
-    const qs = params.toString();
-    return `activity/feed/${qs ? `?${qs}` : ""}`;
-  }, []);
+  if (communityId) params.set("community_id", String(communityId)); // 👈 add this
+
+  const qTrim = (q || "").trim();
+  if (qTrim) {
+    params.set("q", qTrim);
+    params.set("search", qTrim);
+  }
+  const qs = params.toString();
+  return `activity/feed/${qs ? `?${qs}` : ""}`;
+}, [communityId]);
 
   // Load a page (absolute or relative DRF next)
   async function loadFeed(url, append = false) {
@@ -427,10 +472,13 @@ export default function LiveFeedPage({
         const msg = JSON.parse(evt.data);
         if (msg?.type === "new_post" && msg.post) {
           if (scope === "mine" && !(msg.post?.group_id)) return; // respect scope
-          // optional: if a search is active, only prepend when it matches dq (skipped here)
-          setPosts((curr) => [msg.post, ...curr]);
+          // If backend already shaped the post (has .type), use it as-is; else map it.
+          const incoming = msg.post?.type ? msg.post : mapFeedItem(msg.post);
+          if (!incoming) return;
+          // De-dup if the same id is already present (e.g., appears later via HTTP page load)
+          setPosts((curr) => [incoming, ...curr.filter((p) => p.id !== incoming.id)]);
         }
-      } catch { }
+      } catch {}
     };
     return () => ws.close();
   }, [websocketUrl, scope]);
@@ -541,7 +589,7 @@ export default function LiveFeedPage({
                 key={p.id}
                 post={p}
                 onReact={onReact}
-                onOpenPost={onOpenPost}
+                onOpenEvent={onOpenEvent}
                 onPollVote={(post, optionId) => voteOnPoll(post, optionId)}
               />
             ))
