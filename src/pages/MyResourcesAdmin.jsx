@@ -54,55 +54,49 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
   const [tagInput, setTagInput] = useState("");
   const [uploading, setUploading] = useState(false);
 
- useEffect(() => {
-  if (initial) {
-    console.log("Initial data:", initial);
-    
-    // Extract event ID - handle null case
-    let eventId = "";
-    if (initial.event_id) {
-      eventId = initial.event_id;
-    } else if (initial.event && typeof initial.event === 'object') {
-      eventId = initial.event.id;
-    } else if (initial.event) {
-      eventId = initial.event;
+  useEffect(() => {
+    if (initial) {
+      // Always keep event_id as a string for the <Select>
+      const eventIdRaw = initial?.event_id ?? initial?.event?.id ?? initial?.event ?? "";
+      const eventId = eventIdRaw ? String(eventIdRaw) : "";
+
+      const dt = initial.publish_at ? new Date(initial.publish_at) : null;
+      const publishNow = initial.is_published || !dt;
+      const dStr = dt ? dt.toISOString().slice(0, 10) : "";
+      const tStr = dt ? dt.toISOString().slice(11, 16) : "";
+
+      setForm({
+        title: initial.title || "",
+        description: initial.description || "",
+        type: initial.type || "file",
+        event_id: eventId,         // ← string
+        file: null,
+        link_url: initial.link_url || "",
+        video_url: initial.video_url || "",
+        tags: initial.tags || [],
+        publishNow,
+        publishDate: dStr,
+        publishTime: tStr,
+        is_published: !!initial.is_published,
+      });
+    } else {
+      setForm({
+        title: "",
+        description: "",
+        type: "file",
+        event_id: "",              // ← string
+        file: null,
+        link_url: "",
+        video_url: "",
+        tags: [],
+        publishNow: true,
+        publishDate: "",
+        publishTime: "",
+        is_published: false,
+      });
     }
-    // If still empty, leave it empty so user can select
-    const dt = initial.publish_at ? new Date(initial.publish_at) : null;
-    const publishNow = initial.is_published || !dt;
-    const dStr = dt ? dt.toISOString().slice(0, 10) : "";
-    const tStr = dt ? dt.toISOString().slice(11, 16) : "";
-    setForm({
-      title: initial.title || "",
-      description: initial.description || "",
-      type: initial.type || "file",
-      event_id: eventId,  // Will be "" if null
-      file: null,
-      link_url: initial.link_url || "",
-      video_url: initial.video_url || "",
-      tags: initial.tags || [],
-      publishNow,
-      publishDate: dStr,
-      publishTime: tStr,
-      is_published: initial.is_published || false,
-    });
-  } else {
-    setForm({
-      title: "",
-      description: "",
-      type: "file",
-      event_id: "",
-      file: null,
-      link_url: "",
-      video_url: "",
-      tags: [],
-      publishNow: true,
-      publishDate: "",
-      publishTime: "",
-      is_published: false,
-    });
-  }
-}, [initial, open]);
+  }, [initial, open]);
+
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -159,69 +153,67 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
   }
 
   setUploading(true);
-  try {
-    const token = localStorage.getItem("access_token");
-    
-    // Get the selected event's community_id
-    const selectedEvent = events.find(e => String(e.id) === String(form.event_id));
+try {
+  const token = localStorage.getItem("access_token");
 
+  // 1) Find the selected event
+  const selectedEvent = events.find(e => String(e.id) === String(form.event_id));
 
-    // This extracts from the API response shape guaranteed by your serializer
-    const orgId = selectedEvent?.community;
-    const formData = new FormData();
-    if (orgId !== null && Number.isInteger(orgId)) {
-      formData.append('communityid', String(orgId));
-    } else {
-      console.log('Selected Event:', selectedEvent);
-      alert("No valid community id found for the selected event. Please check your event data.");
-      return;
-    }
-    
-    
-    
-    formData.append("title", form.title);
-    formData.append("description", form.description);
-    formData.append("type", form.type);
-    formData.append("event", form.event_id);
-    
-    // CRITICAL FIX: Add community_id from the selected event
-    formData.append("community_id", String(orgId));
-    
-    if (form.publishNow) {
-     formData.append("is_published", "true");
-    } else {
+  // 2) Resolve community id from various possible shapes
+  const rawCommunityId =
+    selectedEvent?.community_id ??
+    selectedEvent?.communityId ??
+    selectedEvent?.community?.id ??
+    selectedEvent?.community; // if backend returns a plain id as "community"
+
+  if (!selectedEvent || !rawCommunityId) {
+    alert("No valid community_id found for the selected event. Please check your /events response.");
+    setUploading(false);
+    return;
+  }
+
+  // 3) Build FormData with the CORRECT keys expected by DRF
+  const formData = new FormData();
+  formData.append("community_id", String(rawCommunityId));  // ✅ correct key
+  formData.append("event_id", String(form.event_id));       // ✅ correct key
+
+  formData.append("title", form.title);
+  formData.append("description", form.description);
+  formData.append("type", form.type);
+
+  if (form.publishNow) {
+    formData.append("is_published", "true");
+  } else {
     const iso = new Date(`${form.publishDate}T${form.publishTime}:00`).toISOString();
     formData.append("is_published", "false");
     formData.append("publish_at", iso);
-    }
-    
-    if (form.type === "file" && form.file) {
-      formData.append("file", form.file);
-    } else if (form.type === "link") {
-      formData.append("link_url", form.link_url);
-    } else if (form.type === "video") {
-      formData.append("video_url", form.video_url);
-    }
+  }
 
-    if (form.tags.length > 0) {
-      form.tags.forEach(tag => formData.append("tags", tag));
-    }
+  if (form.type === "file" && form.file) {
+    formData.append("file", form.file);
+  }
+  if (form.type === "link") {
+    formData.append("link_url", form.link_url);
+  }
+  if (form.type === "video") {
+    formData.append("video_url", form.video_url);
+  }
 
-    const config = {
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "multipart/form-data",
-      },
-    };
+  form.tags.forEach(tag => formData.append("tags", tag));
 
-    if (initial) {
-      await axios.patch(`${API}/content/resources/${initial.id}/`, formData, config);
-    } else {
-      await axios.post(`${API}/content/resources/`, formData, config);
-    }
+  // Let axios set the multipart boundary for you
+  const config = { headers: { Authorization: `Bearer ${token}` } };
 
-    onSaved();
-    onClose();
+  if (initial) {
+    await axios.patch(`${API}/content/resources/${initial.id}/`, formData, config);
+  } else {
+    await axios.post(`${API}/content/resources/`, formData, config);
+  }
+
+  onSaved();
+  onClose();
+
+
   } catch (error) {
     console.error("Error saving resource:", error);
     
@@ -244,8 +236,8 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
     
     alert(`Failed to ${initial ? "update" : "create"} resource:\n${errorMsg}`);
   } finally {
-    setUploading(false);
-  }
+  setUploading(false);
+}
 };
 
   return (
@@ -290,19 +282,17 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
               Select Event
             </Typography>
             <Select
-              value={form.event_id}
-              onChange={(e) => handleChange("event_id", e.target.value)}
-              displayEmpty
-            >
-              <MenuItem value="" disabled>
-                Choose an event
-              </MenuItem>
-              {events.map((event) => (
-                <MenuItem key={event.id} value={String(event.id)}>
-                  {event.title || event.name}
-                </MenuItem>
-              ))}
-            </Select>
+  value={String(form.event_id)}
+  onChange={(e) => handleChange("event_id", String(e.target.value))}
+  displayEmpty
+>
+  <MenuItem value="" disabled>Choose an event</MenuItem>
+  {events.map((ev) => (
+    <MenuItem key={ev.id} value={String(ev.id)}>
+      {ev.title || ev.name}
+    </MenuItem>
+  ))}
+</Select>
             {/* Show current file info when editing */}
             {initial && initial.file && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
