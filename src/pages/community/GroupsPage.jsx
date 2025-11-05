@@ -21,6 +21,15 @@ import SearchIcon from "@mui/icons-material/Search";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
+const JOIN_BTN_SX = {
+  textTransform: "none",
+  whiteSpace: "nowrap", // keep label on one line (Request to join)
+  minWidth: 124,        // same visual width for Join / Request to join
+  px: 2.25,
+  fontWeight: 600,
+  borderRadius: 2,      // keep your current look; use 999 for pill
+};
+
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 
 function authHeader() {
@@ -52,6 +61,7 @@ function GroupGridCard({ g, onJoin }) {
     <Card
       variant="outlined"
       sx={{
+        width: "80%",
         borderRadius: 3,
         overflow: "hidden",
         borderColor: BORDER,
@@ -93,14 +103,15 @@ function GroupGridCard({ g, onJoin }) {
       <CardActions sx={{ pt: 0, pb: 2, px: 2 }}>
         <Button
           size="small"
+          color="primary"
           variant="contained"
           onClick={() => onJoin?.(g)}
-          sx={{ textTransform: "none" }}
+          sx={JOIN_BTN_SX}
           disabled={pending || joined}
+          title={ctaText}
         >
           {ctaText}
         </Button>
-
         <Button
           size="small"
           variant="outlined"
@@ -305,7 +316,7 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
 
   return (
     <Box sx={{ width: "100%", maxWidth: 1200, mx: "auto" }}>
-      <Grid container spacing={2}>
+      <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 8, md: 12 }}>
         {/* LEFT: header + filters + grid */}
         <Grid item xs={12} md={8}>
           {/* Big header like your mock */}
@@ -400,9 +411,9 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
           )}
 
           {/* 3-column grid */}
-          <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 8, md: 12 }}>
+          <Grid container spacing={{ xs: 1, md: 1 }} columns={{ xs: 4, sm: 8, md: 12 }}>
             {filtered.map((g) => (
-              <Grid key={g.id} size={{ xs: 2, sm: 4, md: 4 }}>
+              <Grid key={g.id} item size={{ xs: 4, sm: 4, md: 4 }}>
                 <GroupGridCard g={g} onJoin={handleJoin} />
               </Grid>
             ))}
