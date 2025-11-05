@@ -234,15 +234,13 @@ export default function CommunityProfileCard({
           // build candidate endpoints — many backends differ, so try a few
           const candidateGroupEndpoints = targetId
             ? [
-              `/api/groups/joined-group/?user_id=${targetId}&page_size=50`,
+              `/api/groups/joined-groups/?user_id=${targetId}`,
               `/api/users/${targetId}/groups/?page_size=50`,
               `/api/groups/?member_id=${targetId}&page_size=50`,
-              `/api/groups/joined/?user_id=${targetId}&page_size=50`,
               `/api/groups/members/?user_id=${targetId}&page_size=50`,
             ]
             : [
-              "/api/groups/joined-group/?page_size=50",
-              "/api/groups/joined/?page_size=50",
+              "/api/groups/joined-groups/",
               "/api/groups/?page_size=50",
             ];
 
