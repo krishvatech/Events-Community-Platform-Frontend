@@ -400,9 +400,9 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
           )}
 
           {/* 3-column grid */}
-          <Grid container spacing={2}>
+          <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 8, md: 12 }}>
             {filtered.map((g) => (
-              <Grid key={g.id} item size={4}>
+              <Grid key={g.id} size={{ xs: 2, sm: 4, md: 4 }}>
                 <GroupGridCard g={g} onJoin={handleJoin} />
               </Grid>
             ))}
