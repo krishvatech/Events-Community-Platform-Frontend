@@ -257,7 +257,8 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
         // multipart for S3 upload
         const fd = new FormData();
         fd.append("type", "image");
-        fd.append("image", imageFile);                 // ← file
+        fd.append("image", imageFile);                // ← file
+        fd.append("visibility", "community");
         if (caption) fd.append("caption", caption);
         const tagList = tags.split(",").map(s => s.trim()).filter(Boolean);
         tagList.forEach(t => fd.append("tags", t));
@@ -273,6 +274,7 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
           title: linkTitle.trim() || undefined,
           description: linkDesc.trim() || undefined,
           tags: tags.split(",").map(s => s.trim()).filter(Boolean),
+          visibility: "community",
         };
         res = await fetch(COMMUNITY_CREATE_URL, {
           method: "POST",
@@ -285,6 +287,7 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
           question,
           options: pollOptions.map(o => o.trim()).filter(Boolean),
           tags: tags.split(",").map(s => s.trim()).filter(Boolean),
+          visibility: "community",
         };
         res = await fetch(COMMUNITY_CREATE_URL, {
           method: "POST",
@@ -293,7 +296,11 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
         });
       } else {
         // text
-        payload = { type: "text", content: text, tags: tags.split(",").map(s => s.trim()).filter(Boolean) };
+        payload = { type: "text",
+          content: text,
+          tags: tags.split(",").map(s => s.trim()).filter(Boolean),
+          visibility: "community",
+         };
         res = await fetch(COMMUNITY_CREATE_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...tokenHeaders },
