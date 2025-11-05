@@ -19,6 +19,7 @@ import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import AdminSidebar from "../components/AdminSidebar";
 
 
 // ---- API helpers (reuse same pattern as GroupsAdmin.jsx) ----
@@ -177,7 +178,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     </Grid>
 
                     <Grid xs={12} md={5}>
-                        <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+                        <Typography variant="subtitle1" className="font-semibold">Group Photo</Typography>
                         <Typography variant="caption" className="text-slate-500 block mb-2">
                             Recommended 650×365px • Max 50 MB
                         </Typography>
@@ -511,7 +512,7 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
                     </div>
 
                     <div className="col-span-12 md:col-span-5">
-                        <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+                        <Typography variant="subtitle1" className="font-semibold">Group Photo</Typography>
                         <Typography variant="caption" className="text-slate-500 block mb-2">
                             Recommended 650×365px • Max 50 MB
                         </Typography>
@@ -1114,874 +1115,887 @@ export default function GroupManagePage() {
     const onUpdated = (updated) => setGroup(updated);
 
     return (
-        <Container maxWidth="lg" disableGutters className="py-0">
-            {/* Cover banner */}
-            <Box sx={{ position: "relative", width: "100%", height: 220, background: "#E5E7EB" }}>
-                {group?.cover_image && (
-                    <img
-                        src={bust(group.cover_image, group.updated_at || group._cache)}
-                        alt={group?.name || "cover"}
-                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                )}
-                <Box
-                    sx={{
-                        position: "absolute",
-                        inset: 0,
-                        background: "linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.0) 50%, rgba(0,0,0,0.35) 100%)",
-                    }}
-                />
-                <Box sx={{ position: "absolute", left: 24, bottom: 16, right: 24, display: "flex", alignItems: "flex-end", gap: 2 }}>
-                    <Avatar sx={{ width: 64, height: 64, bgcolor: "#10b8a6", border: "3px solid white" }}>
-                        {(group?.name || "G").slice(0, 1).toUpperCase()}
-                    </Avatar>
-                    <Box sx={{ flex: 1, color: "white" }}>
-                        <Typography variant="h5" className="font-extrabold">{group?.name || "Group"}</Typography>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Chip
-                                size="small"
-                                label={group?.visibility === "private" ? "Private" : "Public"}
-                                className={group?.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
-                            />
-                            {typeof group?.member_count === "number" && (
-                                <Typography variant="body2">{group.member_count} members</Typography>
-                            )}
-                        </Stack>
+        <div className="max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0">
+            <div className="grid grid-cols-12 gap-4">
+                {/* LEFT: Admin sidebar (hidden on small screens, sticky on desktop) */}
+                <aside className="hidden lg:block col-span-3">
+                    <Box sx={{ position: "sticky", top: 88 /* match Dashboard.jsx header offset */ }}>
+                        {/* If your Dashboard passes a prop, reuse it (e.g., active="groups") */}
+                        <AdminSidebar active="groups" />
+                        {/* OR whatever prop name/value your Dashboard uses */}
                     </Box>
+                </aside>
 
-                    <Stack direction="row" spacing={1}>
-                        <Button
-                            startIcon={<EditNoteRoundedIcon />}
-                            onClick={() => setEditOpen(true)}
-                            variant="contained"
-                            className="rounded-xl"
-                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                        >
-                            Edit
-                        </Button>
-                        <Button
-                            onClick={() => navigate(-1)}
-                            variant="outlined"
-                            className="rounded-xl"
-                            sx={{ textTransform: "none", color: "#0ea5a4", borderColor: "#0ea5a4" }}
-                        >
-                            Back
-                        </Button>
-                    </Stack>
-                </Box>
-            </Box>
+                {/* RIGHT: your original page content unchanged */}
+                <main className="col-span-12 lg:col-span-9">
+                    {/* ↓↓↓ PASTE everything that was inside your <Container> here ↓↓↓ */}
+                    <Container maxWidth="lg" disableGutters className="py-0">
+                        {/* Cover banner */}
+                        {/* Header (no cover image) */}
+                        <Box sx={{ px: 3, py: 2 }}>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                                <Stack direction="row" alignItems="center" spacing={2}>
+                                    <Avatar
+                                        sx={{ width: 64, height: 64, bgcolor: "#10b8a6", border: "3px solid white" }}
+                                        src={group?.cover_image ? bust(group.cover_image, group.updated_at || group._cache) : undefined}
+                                        alt={group?.name || "Group"}
+                                    >
+                                        {(group?.name || "G").slice(0, 1).toUpperCase()}
+                                    </Avatar>
 
-            {/* Tabs */}
-            <Paper elevation={0} className="rounded-none">
-                <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
-                    <Tab label="Overview" />
-                    <Tab label="Members" />
-                    {showSubgroupsTab ? (
-                        <Tab label="Sub-groups" />
-                    ) : (
-                        // keep index #2 but hide it so other tabs keep their indices
-                        <Tab sx={{ display: "none" }} disabled />
-                    )}
-                    <Tab label="Settings" />
-                    <Tab label="Posts" />
-                    {showNotificationsTab && <Tab label="Notifications" />}
-                </Tabs>
-            </Paper>
+                                    <Box>
+                                        <Typography variant="h5" className="font-extrabold">{group?.name || "Group"}</Typography>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Chip
+                                                size="small"
+                                                label={group?.visibility === "private" ? "Private" : "Public"}
+                                                className={group?.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
+                                            />
+                                            {typeof group?.member_count === "number" && (
+                                                <Typography variant="body2">{group.member_count} members</Typography>
+                                            )}
+                                        </Stack>
+                                    </Box>
+                                </Stack>
 
-            {/* Content */}
-            {loading ? (
-                <Box className="p-8"><LinearProgress /><Typography className="mt-3 text-slate-500">Loading…</Typography></Box>
-            ) : error ? (
-                <Box className="p-8"><Alert severity="error">{error}</Alert></Box>
-            ) : !group ? (
-                <Box className="p-8"><Alert severity="warning">Group not found.</Alert></Box>
-            ) : (
-                <Box className="p-6">
-                    {tab === 0 && (
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} md={8}>
-                                <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                                    <Typography variant="h6" className="font-semibold mb-1">About</Typography>
-                                    <Typography className="text-slate-600 whitespace-pre-line">
-                                        {group.description || "No description"}
-                                    </Typography>
-                                </Paper>
-                            </Grid>
-                            <Grid item xs={12} md={4}>
-                                <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                                    <Typography variant="h6" className="font-semibold mb-2">Details</Typography>
-                                    <Stack spacing={1} className="text-slate-600">
-                                        <div><b>Visibility:</b> {group.visibility}</div>
-                                        {group.created_by?.name && <div><b>Owner:</b> {group.created_by.name}</div>}
-                                        {group.created_at && <div><b>Created:</b> {new Date(group.created_at).toLocaleString()}</div>}
-                                        {group.updated_at && <div><b>Updated:</b> {new Date(group.updated_at).toLocaleString()}</div>}
-                                    </Stack>
-                                </Paper>
-                            </Grid>
-                        </Grid>
-                    )}
-
-                    {tab === 1 && (
-                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                            <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
-                                <Typography variant="h6" className="font-semibold">Members</Typography>
-                                {group?.visibility === "private" && (
+                                <Stack direction="row" spacing={1}>
                                     <Button
+                                        startIcon={<EditNoteRoundedIcon />}
+                                        onClick={() => setEditOpen(true)}
                                         variant="contained"
                                         className="rounded-xl"
                                         sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                        onClick={() => setAddOpen(true)}
                                     >
-                                        Add members
+                                        Edit
                                     </Button>
-                                )}
-                            </Stack>
-
-                            {memLoading ? (
-                                <><LinearProgress /><Typography className="mt-2 text-slate-500">Loading members…</Typography></>
-                            ) : memError ? (
-                                <Alert severity="error">{memError}</Alert>
-                            ) : members.length === 0 ? (
-                                <Typography className="text-slate-500">No members yet.</Typography>
-                            ) : (
-                                <>
-                                    <Stack divider={<Divider />} spacing={1}>
-                                        {members
-                                            .slice()
-                                            .sort((a, b) => {
-                                                // Owner → Admin → Moderator → Member → Name
-                                                const rank = { owner: 0, admin: 1, moderator: 2, member: 3 };
-                                                const ar = (a.user?.id === ownerId) ? 0 : (rank[a.role] ?? 99);
-                                                const br = (b.user?.id === ownerId) ? 0 : (rank[b.role] ?? 99);
-                                                if (ar !== br) return ar - br;
-                                                return (a.user?.name || "").localeCompare(b.user?.name || "");
-                                            })
-                                            .map((m) => {
-                                                const isOwnerRow = ownerId && Number(m.user.id) === Number(ownerId);
-                                                const role = isOwnerRow ? "owner" : m.role;
-                                                const disabled = busyUserId === m.user.id || isOwnerRow;
-                                                return (
-                                                    <Stack key={m.user.id} direction="row" alignItems="center" spacing={2} className="py-2">
-                                                        <Avatar src={toAbs(m.user.avatar)}>{(m.user.name || "U").slice(0, 1).toUpperCase()}</Avatar>
-                                                        <Box sx={{ flex: 1 }}>
-                                                            <Typography className="font-medium">{m.user.name || m.user.email || m.user.id}</Typography>
-                                                            {m.user.email && (
-                                                                <Typography variant="caption" className="text-slate-500">{m.user.email}</Typography>
-                                                            )}
-                                                        </Box>
-
-                                                        <RoleBadge role={role} />
-
-                                                        <IconButton
-                                                            size="small"
-                                                            onClick={(e) => openMemberMenu(e, m)}
-                                                            disabled={disabled}
-                                                            title={isOwnerRow ? "Owner actions are locked" : "Manage role / remove"}
-                                                        >
-                                                            <MoreVertRoundedIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Stack>
-                                                );
-                                            })}
-                                    </Stack>
-
-                                    {/* Per-member action menu */}
-                                    <Menu
-                                        anchorEl={memMenuAnchor}
-                                        open={Boolean(memMenuAnchor)}
-                                        onClose={closeMemberMenu}
-                                        elevation={2}
-                                    >
-                                        {activeMember && (
-                                            <>
-                                                <MenuItem
-                                                    onClick={() => setRole(activeMember.user.id, "admin")}
-                                                    disabled={activeMember.user.id === ownerId || activeMember.role === "admin"}
-                                                >
-                                                    <ListItemIcon>🛡️</ListItemIcon>
-                                                    <ListItemText>Make Admin</ListItemText>
-                                                </MenuItem>
-
-                                                <MenuItem
-                                                    onClick={() => setRole(activeMember.user.id, "moderator")}
-                                                    disabled={activeMember.user.id === ownerId || activeMember.role === "moderator"}
-                                                >
-                                                    <ListItemIcon>🔧</ListItemIcon>
-                                                    <ListItemText>Make Moderator</ListItemText>
-                                                </MenuItem>
-
-                                                <MenuItem
-                                                    onClick={() => setRole(activeMember.user.id, "member")}
-                                                    disabled={activeMember.user.id === ownerId || activeMember.role === "member"}
-                                                >
-                                                    <ListItemIcon>👤</ListItemIcon>
-                                                    <ListItemText>Make Member</ListItemText>
-                                                </MenuItem>
-
-                                                <Divider />
-
-                                                <MenuItem
-                                                    onClick={() => { setRemoveMemberTarget(activeMember); setRemoveMemberOpen(true); }}
-                                                    disabled={activeMember.user.id === ownerId}
-                                                >
-                                                    <ListItemIcon>🗑️</ListItemIcon>
-                                                    <ListItemText>Remove from Group</ListItemText>
-                                                </MenuItem>
-
-                                            </>
-                                        )}
-                                    </Menu>
-                                </>
-                            )}
-                        </Paper>
-                    )}
-
-                    {/* Sub-groups tab */}
-                    {showSubgroupsTab && tab === 2 && (
-                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                            <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
-                                <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
-                                {canModerate && (
                                     <Button
-                                        variant="contained"
+                                        onClick={() => navigate(-1)}
+                                        variant="outlined"
                                         className="rounded-xl"
-                                        sx={{ textTransform: "none", backgroundColor: "#10b981", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                        onClick={() => setAddSubOpen(true)}
-                                        startIcon={<AddRoundedIcon />}
+                                        sx={{ textTransform: "none", color: "#0ea5a4", borderColor: "#0ea5a4" }}
                                     >
-                                        Add sub-group
+                                        Back
                                     </Button>
-                                )}
-                            </Stack>
-
-                            {subLoading ? (
-                                <LinearProgress />
-                            ) : subError ? (
-                                <Alert severity="error">{subError}</Alert>
-                            ) : subgroups.length === 0 ? (
-                                <Typography className="text-slate-500">No sub-groups yet.</Typography>
-                            ) : (
-                                <Stack spacing={1.5}>
-                                    {subgroups.map((sg) => (
-                                        <Paper key={sg.id || sg.slug} variant="outlined" className="p-2 rounded-xl">
-                                            <Stack direction="row" alignItems="center" spacing={2} justifyContent="space-between">
-                                                <Stack direction="row" alignItems="center" spacing={2}>
-                                                    <Avatar
-                                                        variant="circular"
-                                                        src={bust(sg.cover_image)}
-                                                        alt={sg.name || "Group"}
-                                                    >
-                                                        {(sg.name || "?").charAt(0).toUpperCase()}
-                                                    </Avatar>
-                                                    <Box>
-                                                        <Typography className="font-semibold">{sg.name}</Typography>
-                                                        <Typography variant="caption" className="text-slate-500">
-                                                            {(sg.visibility === "private" ? "Private" : "Public")} • {(sg.member_count ?? sg.members_count ?? 0)} members
-                                                        </Typography>
-                                                    </Box>
-                                                </Stack>
-                                                <Button
-                                                    size="small"
-                                                    variant="text"
-                                                    endIcon={<OpenInNewRoundedIcon />}
-                                                    onClick={() => navigate(`/groups/${sg.slug || sg.id}`)}
-                                                >
-                                                    Open
-                                                </Button>
-                                            </Stack>
-                                        </Paper>
-                                    ))}
                                 </Stack>
-                            )}
-
-                            <AddSubgroupDialog
-                                open={addSubOpen}
-                                onClose={() => setAddSubOpen(false)}
-                                parentGroup={group}
-                                onCreated={(g) => { setSubgroups((prev) => [g, ...prev]); }}
-                            />
-                        </Paper>
-                    )}
-
-                    {tab === 3 && (
-                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                            <Typography variant="h6" className="font-semibold mb-1">Settings</Typography>
-                            <Typography className="text-slate-500 mb-3">
-                                Update visibility, manage tags/subgroups, or delete the group (wire endpoints as needed).
-                            </Typography>
-                            <Stack direction="row" spacing={1}>
-                                <Button
-                                    variant="contained"
-                                    className="rounded-xl"
-                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                    onClick={() => setEditOpen(true)}
-                                >
-                                    Edit Details
-                                </Button>
-                                <Button variant="outlined" className="rounded-xl" sx={{ textTransform: "none" }} disabled>
-                                    Delete Group (wire)
-                                </Button>
                             </Stack>
-                        </Paper>
-                    )}
+                        </Box>
 
-                    {tab === 4 && (
-                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                            <Stack spacing={2}>
-                                <Typography variant="h6" className="font-semibold">Posts</Typography>
 
-                                {!canPost ? (
-                                    <Alert severity="info">
-                                        Only the <b>Owner</b>, <b>Admins</b>, and <b>Moderators</b> can create posts in this group.
-                                    </Alert>
+                        {/* Tabs */}
+                        <Paper elevation={0} className="rounded-none">
+                            <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
+                                <Tab label="Overview" />
+                                <Tab label="Members" />
+                                {showSubgroupsTab ? (
+                                    <Tab label="Sub-groups" />
                                 ) : (
-                                    <Paper elevation={0} className="rounded-xl border border-slate-200 p-3">
-                                        <Stack spacing={2}>
-                                            <Stack direction="row" spacing={2} alignItems="center">
-                                                <TextField
-                                                    label="Post Type"
-                                                    select size="small" sx={{ minWidth: 200 }}
-                                                    value={postType}
-                                                    onChange={(e) => setPostType(e.target.value)}
-                                                >
-                                                    <MenuItem value="text">Text</MenuItem>
-                                                    <MenuItem value="image">Image</MenuItem>
-                                                    <MenuItem value="link">Link</MenuItem>
-                                                    <MenuItem value="poll">Poll</MenuItem>
-                                                    <MenuItem value="event">Event</MenuItem>
-                                                </TextField>
+                                    // keep index #2 but hide it so other tabs keep their indices
+                                    <Tab sx={{ display: "none" }} disabled />
+                                )}
+                                <Tab label="Settings" />
+                                <Tab label="Posts" />
+                                {showNotificationsTab && <Tab label="Notifications" />}
+                            </Tabs>
+                        </Paper>
 
+                        {/* Content */}
+                        {loading ? (
+                            <Box className="p-8"><LinearProgress /><Typography className="mt-3 text-slate-500">Loading…</Typography></Box>
+                        ) : error ? (
+                            <Box className="p-8"><Alert severity="error">{error}</Alert></Box>
+                        ) : !group ? (
+                            <Box className="p-8"><Alert severity="warning">Group not found.</Alert></Box>
+                        ) : (
+                            <Box className="p-6">
+                                {tab === 0 && (
+                                    <Grid container spacing={3}>
+                                        <Grid item xs={12} md={8}>
+                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                                <Typography variant="h6" className="font-semibold mb-1">About</Typography>
+                                                <Typography className="text-slate-600 whitespace-pre-line">
+                                                    {group.description || "No description"}
+                                                </Typography>
+                                            </Paper>
+                                        </Grid>
+                                        <Grid item xs={12} md={4}>
+                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                                <Typography variant="h6" className="font-semibold mb-2">Details</Typography>
+                                                <Stack spacing={1} className="text-slate-600">
+                                                    <div><b>Visibility:</b> {group.visibility}</div>
+                                                    {group.created_by?.name && <div><b>Owner:</b> {group.created_by.name}</div>}
+                                                    {group.created_at && <div><b>Created:</b> {new Date(group.created_at).toLocaleString()}</div>}
+                                                    {group.updated_at && <div><b>Updated:</b> {new Date(group.updated_at).toLocaleString()}</div>}
+                                                </Stack>
+                                            </Paper>
+                                        </Grid>
+                                    </Grid>
+                                )}
+
+                                {tab === 1 && (
+                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                            <Typography variant="h6" className="font-semibold">Members</Typography>
+                                            {group?.visibility === "private" && (
                                                 <Button
                                                     variant="contained"
-                                                    onClick={createPost}
-                                                    disabled={creating || (postType === "text" && !postText.trim()) || (postType === "image" && !postImageFile)}
-                                                    startIcon={<SendRoundedIcon />}
                                                     className="rounded-xl"
                                                     sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                    onClick={() => setAddOpen(true)}
                                                 >
-                                                    Post
+                                                    Add members
                                                 </Button>
-                                            </Stack>
-
-                                            {/* Dynamic fields */}
-                                            {postType === "text" && (
-                                                <TextField
-                                                    label="Write something…"
-                                                    multiline minRows={3} fullWidth
-                                                    value={postText}
-                                                    onChange={(e) => setPostText(e.target.value)}
-                                                />
                                             )}
+                                        </Stack>
 
-                                            {postType === "image" && (
-                                                <>
-                                                    <TextField
-                                                        label="Caption (optional)"
-                                                        fullWidth
-                                                        value={postText}
-                                                        onChange={(e) => setPostText(e.target.value)}
-                                                    />
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <label htmlFor="post-image-file">
-                                                            <Button component="span" size="small" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
-                                                                Choose image
-                                                            </Button>
-                                                        </label>
-                                                        <input
-                                                            id="post-image-file"
-                                                            type="file"
-                                                            accept="image/*"
-                                                            style={{ display: "none" }}
-                                                            onChange={(e) => setPostImageFile(e.target.files?.[0] || null)}
-                                                        />
-                                                        <Typography variant="body2" className="text-slate-600">
-                                                            {postImageFile ? postImageFile.name : "No file selected"}
-                                                        </Typography>
-                                                    </Stack>
-                                                </>
+                                        {memLoading ? (
+                                            <><LinearProgress /><Typography className="mt-2 text-slate-500">Loading members…</Typography></>
+                                        ) : memError ? (
+                                            <Alert severity="error">{memError}</Alert>
+                                        ) : members.length === 0 ? (
+                                            <Typography className="text-slate-500">No members yet.</Typography>
+                                        ) : (
+                                            <>
+                                                <Stack divider={<Divider />} spacing={1}>
+                                                    {members
+                                                        .slice()
+                                                        .sort((a, b) => {
+                                                            // Owner → Admin → Moderator → Member → Name
+                                                            const rank = { owner: 0, admin: 1, moderator: 2, member: 3 };
+                                                            const ar = (a.user?.id === ownerId) ? 0 : (rank[a.role] ?? 99);
+                                                            const br = (b.user?.id === ownerId) ? 0 : (rank[b.role] ?? 99);
+                                                            if (ar !== br) return ar - br;
+                                                            return (a.user?.name || "").localeCompare(b.user?.name || "");
+                                                        })
+                                                        .map((m) => {
+                                                            const isOwnerRow = ownerId && Number(m.user.id) === Number(ownerId);
+                                                            const role = isOwnerRow ? "owner" : m.role;
+                                                            const disabled = busyUserId === m.user.id || isOwnerRow;
+                                                            return (
+                                                                <Stack key={m.user.id} direction="row" alignItems="center" spacing={2} className="py-2">
+                                                                    <Avatar src={toAbs(m.user.avatar)}>{(m.user.name || "U").slice(0, 1).toUpperCase()}</Avatar>
+                                                                    <Box sx={{ flex: 1 }}>
+                                                                        <Typography className="font-medium">{m.user.name || m.user.email || m.user.id}</Typography>
+                                                                        {m.user.email && (
+                                                                            <Typography variant="caption" className="text-slate-500">{m.user.email}</Typography>
+                                                                        )}
+                                                                    </Box>
+
+                                                                    <RoleBadge role={role} />
+
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        onClick={(e) => openMemberMenu(e, m)}
+                                                                        disabled={disabled}
+                                                                        title={isOwnerRow ? "Owner actions are locked" : "Manage role / remove"}
+                                                                    >
+                                                                        <MoreVertRoundedIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </Stack>
+                                                            );
+                                                        })}
+                                                </Stack>
+
+                                                {/* Per-member action menu */}
+                                                <Menu
+                                                    anchorEl={memMenuAnchor}
+                                                    open={Boolean(memMenuAnchor)}
+                                                    onClose={closeMemberMenu}
+                                                    elevation={2}
+                                                >
+                                                    {activeMember && (
+                                                        <>
+                                                            <MenuItem
+                                                                onClick={() => setRole(activeMember.user.id, "admin")}
+                                                                disabled={activeMember.user.id === ownerId || activeMember.role === "admin"}
+                                                            >
+                                                                <ListItemIcon>🛡️</ListItemIcon>
+                                                                <ListItemText>Make Admin</ListItemText>
+                                                            </MenuItem>
+
+                                                            <MenuItem
+                                                                onClick={() => setRole(activeMember.user.id, "moderator")}
+                                                                disabled={activeMember.user.id === ownerId || activeMember.role === "moderator"}
+                                                            >
+                                                                <ListItemIcon>🔧</ListItemIcon>
+                                                                <ListItemText>Make Moderator</ListItemText>
+                                                            </MenuItem>
+
+                                                            <MenuItem
+                                                                onClick={() => setRole(activeMember.user.id, "member")}
+                                                                disabled={activeMember.user.id === ownerId || activeMember.role === "member"}
+                                                            >
+                                                                <ListItemIcon>👤</ListItemIcon>
+                                                                <ListItemText>Make Member</ListItemText>
+                                                            </MenuItem>
+
+                                                            <Divider />
+
+                                                            <MenuItem
+                                                                onClick={() => { setRemoveMemberTarget(activeMember); setRemoveMemberOpen(true); }}
+                                                                disabled={activeMember.user.id === ownerId}
+                                                            >
+                                                                <ListItemIcon>🗑️</ListItemIcon>
+                                                                <ListItemText>Remove from Group</ListItemText>
+                                                            </MenuItem>
+
+                                                        </>
+                                                    )}
+                                                </Menu>
+                                            </>
+                                        )}
+                                    </Paper>
+                                )}
+
+                                {/* Sub-groups tab */}
+                                {showSubgroupsTab && tab === 2 && (
+                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                            <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
+                                            {canModerate && (
+                                                <Button
+                                                    variant="contained"
+                                                    className="rounded-xl"
+                                                    sx={{ textTransform: "none", backgroundColor: "#10b981", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                    onClick={() => setAddSubOpen(true)}
+                                                    startIcon={<AddRoundedIcon />}
+                                                >
+                                                    Add sub-group
+                                                </Button>
                                             )}
+                                        </Stack>
 
-                                            {postType === "link" && (
-                                                <>
-                                                    <TextField
-                                                        label="URL"
-                                                        fullWidth
-                                                        value={postLinkUrl}
-                                                        onChange={(e) => setPostLinkUrl(e.target.value)}
-                                                        placeholder="https://example.com"
-                                                    />
-                                                    <TextField
-                                                        label="Comment (optional)"
-                                                        fullWidth
-                                                        value={postText}
-                                                        onChange={(e) => setPostText(e.target.value)}
-                                                    />
-                                                </>
-                                            )}
-
-                                            {postType === "poll" && (
-                                                <>
-                                                    <TextField
-                                                        label="Poll question"
-                                                        fullWidth
-                                                        value={pollQuestion}
-                                                        onChange={(e) => setPollQuestion(e.target.value)}
-                                                    />
-                                                    <Stack spacing={1}>
-                                                        {pollOptions.map((opt, idx) => (
-                                                            <Stack key={idx} direction="row" spacing={1} alignItems="center">
-                                                                <TextField
-                                                                    label={`Option ${idx + 1}`}
-                                                                    fullWidth
-                                                                    value={opt}
-                                                                    onChange={(e) => updatePollOption(idx, e.target.value)}
-                                                                />
-                                                                {pollOptions.length > 2 && (
-                                                                    <Button size="small" onClick={() => removePollOption(idx)}>Remove</Button>
-                                                                )}
+                                        {subLoading ? (
+                                            <LinearProgress />
+                                        ) : subError ? (
+                                            <Alert severity="error">{subError}</Alert>
+                                        ) : subgroups.length === 0 ? (
+                                            <Typography className="text-slate-500">No sub-groups yet.</Typography>
+                                        ) : (
+                                            <Stack spacing={1.5}>
+                                                {subgroups.map((sg) => (
+                                                    <Paper key={sg.id || sg.slug} variant="outlined" className="p-2 rounded-xl">
+                                                        <Stack direction="row" alignItems="center" spacing={2} justifyContent="space-between">
+                                                            <Stack direction="row" alignItems="center" spacing={2}>
+                                                                <Avatar
+                                                                    variant="circular"
+                                                                    src={bust(sg.cover_image)}
+                                                                    alt={sg.name || "Group"}
+                                                                >
+                                                                    {(sg.name || "?").charAt(0).toUpperCase()}
+                                                                </Avatar>
+                                                                <Box>
+                                                                    <Typography className="font-semibold">{sg.name}</Typography>
+                                                                    <Typography variant="caption" className="text-slate-500">
+                                                                        {(sg.visibility === "private" ? "Private" : "Public")} • {(sg.member_count ?? sg.members_count ?? 0)} members
+                                                                    </Typography>
+                                                                </Box>
                                                             </Stack>
-                                                        ))}
-                                                        <Button size="small" onClick={addPollOption} startIcon={<PollRoundedIcon />}>
-                                                            Add option
-                                                        </Button>
+                                                            <Button
+                                                                size="small"
+                                                                variant="text"
+                                                                endIcon={<OpenInNewRoundedIcon />}
+                                                                onClick={() => navigate(`/groups/${sg.slug || sg.id}`)}
+                                                            >
+                                                                Open
+                                                            </Button>
+                                                        </Stack>
+                                                    </Paper>
+                                                ))}
+                                            </Stack>
+                                        )}
+
+                                        <AddSubgroupDialog
+                                            open={addSubOpen}
+                                            onClose={() => setAddSubOpen(false)}
+                                            parentGroup={group}
+                                            onCreated={(g) => { setSubgroups((prev) => [g, ...prev]); }}
+                                        />
+                                    </Paper>
+                                )}
+
+                                {tab === 3 && (
+                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                        <Typography variant="h6" className="font-semibold mb-1">Settings</Typography>
+                                        <Typography className="text-slate-500 mb-3">
+                                            Update visibility, manage tags/subgroups, or delete the group (wire endpoints as needed).
+                                        </Typography>
+                                        <Stack direction="row" spacing={1}>
+                                            <Button
+                                                variant="contained"
+                                                className="rounded-xl"
+                                                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                onClick={() => setEditOpen(true)}
+                                            >
+                                                Edit Details
+                                            </Button>
+                                            <Button variant="outlined" className="rounded-xl" sx={{ textTransform: "none" }} disabled>
+                                                Delete Group (wire)
+                                            </Button>
+                                        </Stack>
+                                    </Paper>
+                                )}
+
+                                {tab === 4 && (
+                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                        <Stack spacing={2}>
+                                            <Typography variant="h6" className="font-semibold">Posts</Typography>
+
+                                            {!canPost ? (
+                                                <Alert severity="info">
+                                                    Only the <b>Owner</b>, <b>Admins</b>, and <b>Moderators</b> can create posts in this group.
+                                                </Alert>
+                                            ) : (
+                                                <Paper elevation={0} className="rounded-xl border border-slate-200 p-3">
+                                                    <Stack spacing={2}>
+                                                        <Stack direction="row" spacing={2} alignItems="center">
+                                                            <TextField
+                                                                label="Post Type"
+                                                                select size="small" sx={{ minWidth: 200 }}
+                                                                value={postType}
+                                                                onChange={(e) => setPostType(e.target.value)}
+                                                            >
+                                                                <MenuItem value="text">Text</MenuItem>
+                                                                <MenuItem value="image">Image</MenuItem>
+                                                                <MenuItem value="link">Link</MenuItem>
+                                                                <MenuItem value="poll">Poll</MenuItem>
+                                                                <MenuItem value="event">Event</MenuItem>
+                                                            </TextField>
+
+                                                            <Button
+                                                                variant="contained"
+                                                                onClick={createPost}
+                                                                disabled={creating || (postType === "text" && !postText.trim()) || (postType === "image" && !postImageFile)}
+                                                                startIcon={<SendRoundedIcon />}
+                                                                className="rounded-xl"
+                                                                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                            >
+                                                                Post
+                                                            </Button>
+                                                        </Stack>
+
+                                                        {/* Dynamic fields */}
+                                                        {postType === "text" && (
+                                                            <TextField
+                                                                label="Write something…"
+                                                                multiline minRows={3} fullWidth
+                                                                value={postText}
+                                                                onChange={(e) => setPostText(e.target.value)}
+                                                            />
+                                                        )}
+
+                                                        {postType === "image" && (
+                                                            <>
+                                                                <TextField
+                                                                    label="Caption (optional)"
+                                                                    fullWidth
+                                                                    value={postText}
+                                                                    onChange={(e) => setPostText(e.target.value)}
+                                                                />
+                                                                <Stack direction="row" spacing={1} alignItems="center">
+                                                                    <label htmlFor="post-image-file">
+                                                                        <Button component="span" size="small" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
+                                                                            Choose image
+                                                                        </Button>
+                                                                    </label>
+                                                                    <input
+                                                                        id="post-image-file"
+                                                                        type="file"
+                                                                        accept="image/*"
+                                                                        style={{ display: "none" }}
+                                                                        onChange={(e) => setPostImageFile(e.target.files?.[0] || null)}
+                                                                    />
+                                                                    <Typography variant="body2" className="text-slate-600">
+                                                                        {postImageFile ? postImageFile.name : "No file selected"}
+                                                                    </Typography>
+                                                                </Stack>
+                                                            </>
+                                                        )}
+
+                                                        {postType === "link" && (
+                                                            <>
+                                                                <TextField
+                                                                    label="URL"
+                                                                    fullWidth
+                                                                    value={postLinkUrl}
+                                                                    onChange={(e) => setPostLinkUrl(e.target.value)}
+                                                                    placeholder="https://example.com"
+                                                                />
+                                                                <TextField
+                                                                    label="Comment (optional)"
+                                                                    fullWidth
+                                                                    value={postText}
+                                                                    onChange={(e) => setPostText(e.target.value)}
+                                                                />
+                                                            </>
+                                                        )}
+
+                                                        {postType === "poll" && (
+                                                            <>
+                                                                <TextField
+                                                                    label="Poll question"
+                                                                    fullWidth
+                                                                    value={pollQuestion}
+                                                                    onChange={(e) => setPollQuestion(e.target.value)}
+                                                                />
+                                                                <Stack spacing={1}>
+                                                                    {pollOptions.map((opt, idx) => (
+                                                                        <Stack key={idx} direction="row" spacing={1} alignItems="center">
+                                                                            <TextField
+                                                                                label={`Option ${idx + 1}`}
+                                                                                fullWidth
+                                                                                value={opt}
+                                                                                onChange={(e) => updatePollOption(idx, e.target.value)}
+                                                                            />
+                                                                            {pollOptions.length > 2 && (
+                                                                                <Button size="small" onClick={() => removePollOption(idx)}>Remove</Button>
+                                                                            )}
+                                                                        </Stack>
+                                                                    ))}
+                                                                    <Button size="small" onClick={addPollOption} startIcon={<PollRoundedIcon />}>
+                                                                        Add option
+                                                                    </Button>
+                                                                </Stack>
+                                                            </>
+                                                        )}
+
+                                                        {postType === "event" && (
+                                                            <>
+                                                                <TextField
+                                                                    label="Event title"
+                                                                    fullWidth
+                                                                    value={eventTitle}
+                                                                    onChange={(e) => setEventTitle(e.target.value)}
+                                                                />
+                                                                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                                                                    <TextField
+                                                                        label="Starts at"
+                                                                        type="datetime-local"
+                                                                        value={eventStart}
+                                                                        onChange={(e) => setEventStart(e.target.value)}
+                                                                        InputLabelProps={{ shrink: true }}
+                                                                        fullWidth
+                                                                    />
+                                                                    <TextField
+                                                                        label="Ends at"
+                                                                        type="datetime-local"
+                                                                        value={eventEnd}
+                                                                        onChange={(e) => setEventEnd(e.target.value)}
+                                                                        InputLabelProps={{ shrink: true }}
+                                                                        fullWidth
+                                                                    />
+                                                                </Stack>
+                                                                <TextField
+                                                                    label="Description (optional)"
+                                                                    multiline minRows={2} fullWidth
+                                                                    value={postText}
+                                                                    onChange={(e) => setPostText(e.target.value)}
+                                                                />
+                                                            </>
+                                                        )}
                                                     </Stack>
-                                                </>
+                                                </Paper>
                                             )}
 
-                                            {postType === "event" && (
+                                            {/* Posts list */}
+                                            {postsLoading ? (
                                                 <>
-                                                    <TextField
-                                                        label="Event title"
-                                                        fullWidth
-                                                        value={eventTitle}
-                                                        onChange={(e) => setEventTitle(e.target.value)}
-                                                    />
-                                                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                                                        <TextField
-                                                            label="Starts at"
-                                                            type="datetime-local"
-                                                            value={eventStart}
-                                                            onChange={(e) => setEventStart(e.target.value)}
-                                                            InputLabelProps={{ shrink: true }}
-                                                            fullWidth
-                                                        />
-                                                        <TextField
-                                                            label="Ends at"
-                                                            type="datetime-local"
-                                                            value={eventEnd}
-                                                            onChange={(e) => setEventEnd(e.target.value)}
-                                                            InputLabelProps={{ shrink: true }}
-                                                            fullWidth
-                                                        />
-                                                    </Stack>
-                                                    <TextField
-                                                        label="Description (optional)"
-                                                        multiline minRows={2} fullWidth
-                                                        value={postText}
-                                                        onChange={(e) => setPostText(e.target.value)}
-                                                    />
+                                                    <LinearProgress />
+                                                    <Typography className="mt-2 text-slate-500">Loading posts…</Typography>
                                                 </>
+                                            ) : postsError ? (
+                                                <Alert severity="error">{postsError}</Alert>
+                                            ) : posts.length === 0 ? (
+                                                <Typography className="text-slate-500">No posts yet.</Typography>
+                                            ) : (
+                                                <Stack spacing={2}>
+                                                    {posts.map((p) => (
+                                                        <Paper key={p.id} elevation={0} className="rounded-xl border border-slate-200 p-3">
+                                                            <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
+                                                                <Chip size="small" label={String(p.type || "text").toUpperCase()} />
+                                                                <Typography variant="caption" className="text-slate-500">
+                                                                    {p.created_by?.name || p.created_by?.email || "User"} • {p.created_at ? new Date(p.created_at).toLocaleString() : ""}
+                                                                </Typography>
+                                                            </Stack>
+
+                                                            {/* Render by type */}
+                                                            {/* footer actions at end of post (not for polls) */}
+                                                            {canModerate && ["text", "poll"].includes(p.type) && (
+                                                                <Stack direction="row" justifyContent="flex-end" className="mt-2">
+                                                                    <IconButton size="small" onClick={(e) => openPostMenu(e, p)} title="More">
+                                                                        <MoreVertRoundedIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </Stack>
+                                                            )}
+
+                                                            {p.type === "image" ? (
+                                                                <>
+                                                                    {p.text && <Typography className="mb-2">{p.text}</Typography>}
+                                                                    {p.image && (
+                                                                        <img
+                                                                            alt="post"
+                                                                            src={toAbs(p.image)}
+                                                                            style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12 }}
+                                                                        />
+                                                                    )}
+                                                                </>
+                                                            ) : p.type === "link" ? (
+                                                                <>
+                                                                    {p.text && <Typography className="mb-1">{p.text}</Typography>}
+                                                                    {p.url && (
+                                                                        <a href={toAbs(p.url)} target="_blank" rel="noreferrer" style={{ color: "#0ea5a4" }}>
+                                                                            <LinkRoundedIcon fontSize="small" /> {p.url}
+                                                                        </a>
+                                                                    )}
+                                                                </>
+                                                            ) : p.type === "poll" ? (
+                                                                <>
+                                                                    <Typography className="mb-1 font-medium">{p.question}</Typography>
+                                                                    <Stack spacing={0.5}>
+                                                                        {(p.options || []).map((o, i) => (
+                                                                            <Chip key={i} size="small" label={o} className="bg-slate-100 text-slate-700 w-fit" />
+                                                                        ))}
+                                                                    </Stack>
+                                                                </>
+                                                            ) : p.type === "event" ? (
+                                                                <>
+                                                                    <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
+                                                                        <EventNoteRoundedIcon fontSize="small" />
+                                                                        <Typography className="font-medium">{p.title}</Typography>
+                                                                    </Stack>
+                                                                    <Typography variant="caption" className="text-slate-600">
+                                                                        {p.starts_at ? new Date(p.starts_at).toLocaleString() : ""} — {p.ends_at ? new Date(p.ends_at).toLocaleString() : ""}
+                                                                    </Typography>
+                                                                    {p.text && <Typography className="mt-1">{p.text}</Typography>}
+                                                                </>
+                                                            ) : (
+                                                                <Typography>{p.text}</Typography>
+                                                            )}
+                                                        </Paper>
+
+                                                    ))}
+                                                </Stack>
                                             )}
                                         </Stack>
                                     </Paper>
                                 )}
 
-                                {/* Posts list */}
-                                {postsLoading ? (
+                                {showNotificationsTab && tab === NOTIF_TAB_INDEX && (
+                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                        <Stack spacing={2}>
+                                            <Typography variant="h6" className="font-semibold">Notifications</Typography>
+
+                                            {!!reqsError && <Alert severity="error">{reqsError}</Alert>}
+
+                                            {reqsLoading ? (
+                                                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                                                    <CircularProgress />
+                                                </Box>
+                                            ) : reqs.length === 0 ? (
+                                                <Alert severity="info">No notifications — there are no pending join requests.</Alert>
+                                            ) : (
+                                                <List sx={{ width: "100%" }}>
+                                                    {reqs.map((r) => {
+                                                        const id = r.id ?? r.pk; // tolerate pk/id
+                                                        const u = r.user || r.requester || r.member || {};
+                                                        const name = u.full_name || u.name || u.username || "Member";
+                                                        const avatar = u.avatar || u.photo_url || null;
+                                                        const when = r.created_at || r.requested_at || r.createdAt;
+
+                                                        return (
+                                                            <ListItem
+                                                                key={id}
+                                                                divider
+                                                                secondaryAction={
+                                                                    <ButtonGroup variant="outlined" size="small">
+                                                                        <Button
+                                                                            color="success"
+                                                                            onClick={() => takeAction(id, "approve")}
+                                                                            disabled={reqsLoading}
+                                                                        >
+                                                                            Approve
+                                                                        </Button>
+                                                                        <Button
+                                                                            color="error"
+                                                                            onClick={() => takeAction(id, "reject")}
+                                                                            disabled={reqsLoading}
+                                                                        >
+                                                                            Reject
+                                                                        </Button>
+                                                                    </ButtonGroup>
+                                                                }
+                                                            >
+                                                                <ListItemAvatar>
+                                                                    <Avatar src={avatar || undefined}>
+                                                                        {name?.[0]?.toUpperCase() || "U"}
+                                                                    </Avatar>
+                                                                </ListItemAvatar>
+                                                                <ListItemText
+                                                                    primary={<span><b>{name}</b> requested to join this group</span>}
+                                                                    secondary={when ? `Requested on ${fmtWhen(when)}` : null}
+                                                                />
+                                                            </ListItem>
+                                                        );
+                                                    })}
+                                                </List>
+                                            )}
+
+                                            <Stack direction="row" spacing={1}>
+                                                <Button variant="outlined" onClick={fetchRequests} disabled={reqsLoading}>
+                                                    Refresh
+                                                </Button>
+                                            </Stack>
+                                        </Stack>
+                                    </Paper>
+                                )}
+
+                            </Box>
+                        )}
+
+                        {/* Edit dialog */}
+                        <EditGroupDialog
+                            open={editOpen}
+                            group={group}
+                            onClose={() => setEditOpen(false)}
+                            onUpdated={(g) => { setEditOpen(false); setGroup(g); }}
+                        />
+                        <AddMembersDialog
+                            open={addOpen}
+                            onClose={() => setAddOpen(false)}
+                            groupIdOrSlug={idOrSlug}
+                            existingIds={members.map(m => m.user.id)}
+                            onAdded={async (n) => {
+                                await fetchMembers();                         // refresh list
+                                setGroup((prev) => prev ? {
+                                    ...prev,         // bump visible count
+                                    member_count: (prev.member_count || 0) + n
+                                } : prev);
+                            }}
+                        />
+
+                        {/* Role assign — error modal */}
+                        <Dialog
+                            open={roleErrorOpen}
+                            onClose={() => setRoleErrorOpen(false)}
+                            fullWidth
+                            maxWidth="xs"
+                            PaperProps={{ sx: { borderRadius: 3 } }}
+                        >
+                            <DialogTitle sx={{ fontWeight: 800 }}>Couldn’t update role</DialogTitle>
+                            <DialogContent>
+                                <Alert severity="error" sx={{ my: 1 }}>
+                                    {roleErrorMsg || "Something went wrong while assigning the role."}
+                                </Alert>
+                            </DialogContent>
+                            <DialogActions>
+                                <Button
+                                    onClick={() => setRoleErrorOpen(false)}
+                                    variant="contained"
+                                    sx={{ textTransform: "none" }}
+                                >
+                                    OK
+                                </Button>
+                            </DialogActions>
+                        </Dialog>
+                        {/* Remove member — confirmation */}
+                        <Dialog
+                            open={removeMemberOpen}
+                            onClose={() => setRemoveMemberOpen(false)}
+                            fullWidth
+                            maxWidth="xs"
+                            PaperProps={{ sx: { borderRadius: 3 } }}
+                        >
+                            <DialogTitle sx={{ fontWeight: 800 }}>Remove member?</DialogTitle>
+                            <DialogContent>
+                                <Typography sx={{ mb: 1.5 }}>
+                                    {removeMemberTarget?.user?.name || removeMemberTarget?.user?.email || "This member"} will be
+                                    removed from the group and will lose access to posts and updates.
+                                </Typography>
+                            </DialogContent>
+                            <DialogActions>
+                                <Button onClick={() => setRemoveMemberOpen(false)} sx={{ textTransform: "none" }}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="error"
+                                    sx={{ textTransform: "none" }}
+                                    disabled={
+                                        !!removeMemberTarget &&
+                                        busyUserId === (removeMemberTarget.user?.id ?? removeMemberTarget.userId)
+                                    }
+                                    onClick={() => {
+                                        const id = removeMemberTarget?.user?.id ?? removeMemberTarget?.userId;
+                                        if (!id) return;
+                                        setRemoveMemberOpen(false);          // close modal first
+                                        removeMember(id);                    // uses your existing function
+                                    }}
+                                >
+                                    Remove
+                                </Button>
+                            </DialogActions>
+                        </Dialog>
+
+
+                        {/* Per-post actions menu */}
+                        <Menu anchorEl={postMenuAnchor} open={Boolean(postMenuAnchor)} onClose={closePostMenu}>
+                            <MenuItem onClick={() => toggleHidePost(activePost)} disabled={!activePost}>
+                                <ListItemIcon>👁️</ListItemIcon>
+                                <ListItemText>
+                                    {(activePost?.hidden ?? activePost?.is_hidden) ? "Unhide" : "Hide"}
+                                </ListItemText>
+                            </MenuItem>
+
+                            <MenuItem onClick={() => { setEditPostOpen(true); closePostMenu(); }} disabled={!activePost}>
+                                <ListItemIcon>✏️</ListItemIcon>
+                                <ListItemText>Edit</ListItemText>
+                            </MenuItem>
+
+                            <MenuItem onClick={() => { setDeleteConfirmOpen(true); }} disabled={!activePost}>
+                                <ListItemIcon>🗑️</ListItemIcon>
+                                <ListItemText>Delete</ListItemText>
+                            </MenuItem>
+                        </Menu>
+
+                        {/* Delete confirmation dialog */}
+                        <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+                            <DialogTitle>Delete this post?</DialogTitle>
+                            <DialogContent>
+                                <Typography>This action can’t be undone. The post will be permanently removed for this group.</Typography>
+                            </DialogContent>
+                            <DialogActions>
+                                <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+                                <Button onClick={deletePost} color="error" variant="contained" sx={{ textTransform: "none" }}>
+                                    Delete
+                                </Button>
+                            </DialogActions>
+                        </Dialog>
+                        {/* Edit Post dialog */}
+                        <Dialog open={editPostOpen} onClose={() => setEditPostOpen(false)} fullWidth maxWidth="sm">
+                            <DialogTitle>Edit Post</DialogTitle>
+                            <DialogContent>
+                                {activePost?.type === "text" && (
+                                    <TextField
+                                        label="Text"
+                                        fullWidth
+                                        multiline minRows={3}
+                                        value={activePost?.text || ""}
+                                        onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
+                                        className="mt-2"
+                                    />
+                                )}
+
+                                {activePost?.type === "link" && (
                                     <>
-                                        <LinearProgress />
-                                        <Typography className="mt-2 text-slate-500">Loading posts…</Typography>
+                                        <TextField
+                                            label="Text (optional)"
+                                            fullWidth
+                                            multiline minRows={2}
+                                            value={activePost?.text || ""}
+                                            onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
+                                            className="mt-2"
+                                        />
+                                        <TextField
+                                            label="URL"
+                                            fullWidth
+                                            value={activePost?.url || ""}
+                                            onChange={(e) => setActivePost({ ...activePost, url: e.target.value })}
+                                            className="mt-2"
+                                        />
                                     </>
-                                ) : postsError ? (
-                                    <Alert severity="error">{postsError}</Alert>
-                                ) : posts.length === 0 ? (
-                                    <Typography className="text-slate-500">No posts yet.</Typography>
-                                ) : (
-                                    <Stack spacing={2}>
-                                        {posts.map((p) => (
-                                            <Paper key={p.id} elevation={0} className="rounded-xl border border-slate-200 p-3">
-                                                <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
-                                                    <Chip size="small" label={String(p.type || "text").toUpperCase()} />
-                                                    <Typography variant="caption" className="text-slate-500">
-                                                        {p.created_by?.name || p.created_by?.email || "User"} • {p.created_at ? new Date(p.created_at).toLocaleString() : ""}
-                                                    </Typography>
-                                                </Stack>
-
-                                                {/* Render by type */}
-                                                {/* footer actions at end of post (not for polls) */}
-                                                {canModerate && ["text", "poll"].includes(p.type) && (
-                                                    <Stack direction="row" justifyContent="flex-end" className="mt-2">
-                                                        <IconButton size="small" onClick={(e) => openPostMenu(e, p)} title="More">
-                                                            <MoreVertRoundedIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Stack>
-                                                )}
-
-                                                {p.type === "image" ? (
-                                                    <>
-                                                        {p.text && <Typography className="mb-2">{p.text}</Typography>}
-                                                        {p.image && (
-                                                            <img
-                                                                alt="post"
-                                                                src={toAbs(p.image)}
-                                                                style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12 }}
-                                                            />
-                                                        )}
-                                                    </>
-                                                ) : p.type === "link" ? (
-                                                    <>
-                                                        {p.text && <Typography className="mb-1">{p.text}</Typography>}
-                                                        {p.url && (
-                                                            <a href={toAbs(p.url)} target="_blank" rel="noreferrer" style={{ color: "#0ea5a4" }}>
-                                                                <LinkRoundedIcon fontSize="small" /> {p.url}
-                                                            </a>
-                                                        )}
-                                                    </>
-                                                ) : p.type === "poll" ? (
-                                                    <>
-                                                        <Typography className="mb-1 font-medium">{p.question}</Typography>
-                                                        <Stack spacing={0.5}>
-                                                            {(p.options || []).map((o, i) => (
-                                                                <Chip key={i} size="small" label={o} className="bg-slate-100 text-slate-700 w-fit" />
-                                                            ))}
-                                                        </Stack>
-                                                    </>
-                                                ) : p.type === "event" ? (
-                                                    <>
-                                                        <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
-                                                            <EventNoteRoundedIcon fontSize="small" />
-                                                            <Typography className="font-medium">{p.title}</Typography>
-                                                        </Stack>
-                                                        <Typography variant="caption" className="text-slate-600">
-                                                            {p.starts_at ? new Date(p.starts_at).toLocaleString() : ""} — {p.ends_at ? new Date(p.ends_at).toLocaleString() : ""}
-                                                        </Typography>
-                                                        {p.text && <Typography className="mt-1">{p.text}</Typography>}
-                                                    </>
-                                                ) : (
-                                                    <Typography>{p.text}</Typography>
-                                                )}
-                                            </Paper>
-
-                                        ))}
-                                    </Stack>
-                                )}
-                            </Stack>
-                        </Paper>
-                    )}
-
-                    {showNotificationsTab && tab === NOTIF_TAB_INDEX && (
-                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                            <Stack spacing={2}>
-                                <Typography variant="h6" className="font-semibold">Notifications</Typography>
-
-                                {!!reqsError && <Alert severity="error">{reqsError}</Alert>}
-
-                                {reqsLoading ? (
-                                    <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                                        <CircularProgress />
-                                    </Box>
-                                ) : reqs.length === 0 ? (
-                                    <Alert severity="info">No notifications — there are no pending join requests.</Alert>
-                                ) : (
-                                    <List sx={{ width: "100%" }}>
-                                        {reqs.map((r) => {
-                                            const id = r.id ?? r.pk; // tolerate pk/id
-                                            const u = r.user || r.requester || r.member || {};
-                                            const name = u.full_name || u.name || u.username || "Member";
-                                            const avatar = u.avatar || u.photo_url || null;
-                                            const when = r.created_at || r.requested_at || r.createdAt;
-
-                                            return (
-                                                <ListItem
-                                                    key={id}
-                                                    divider
-                                                    secondaryAction={
-                                                        <ButtonGroup variant="outlined" size="small">
-                                                            <Button
-                                                                color="success"
-                                                                onClick={() => takeAction(id, "approve")}
-                                                                disabled={reqsLoading}
-                                                            >
-                                                                Approve
-                                                            </Button>
-                                                            <Button
-                                                                color="error"
-                                                                onClick={() => takeAction(id, "reject")}
-                                                                disabled={reqsLoading}
-                                                            >
-                                                                Reject
-                                                            </Button>
-                                                        </ButtonGroup>
-                                                    }
-                                                >
-                                                    <ListItemAvatar>
-                                                        <Avatar src={avatar || undefined}>
-                                                            {name?.[0]?.toUpperCase() || "U"}
-                                                        </Avatar>
-                                                    </ListItemAvatar>
-                                                    <ListItemText
-                                                        primary={<span><b>{name}</b> requested to join this group</span>}
-                                                        secondary={when ? `Requested on ${fmtWhen(when)}` : null}
-                                                    />
-                                                </ListItem>
-                                            );
-                                        })}
-                                    </List>
                                 )}
 
-                                <Stack direction="row" spacing={1}>
-                                    <Button variant="outlined" onClick={fetchRequests} disabled={reqsLoading}>
-                                        Refresh
-                                    </Button>
-                                </Stack>
-                            </Stack>
-                        </Paper>
-                    )}
+                                {activePost?.type === "event" && (
+                                    <>
+                                        <TextField
+                                            label="Title"
+                                            fullWidth
+                                            value={activePost?.title || ""}
+                                            onChange={(e) => setActivePost({ ...activePost, title: e.target.value })}
+                                            className="mt-2"
+                                        />
+                                        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} className="mt-2">
+                                            <TextField
+                                                label="Starts at"
+                                                type="datetime-local"
+                                                value={activePost?.starts_at ? activePost.starts_at.slice(0, 16) : ""}
+                                                onChange={(e) => setActivePost({ ...activePost, starts_at: e.target.value })}
+                                                InputLabelProps={{ shrink: true }}
+                                                fullWidth
+                                            />
+                                            <TextField
+                                                label="Ends at"
+                                                type="datetime-local"
+                                                value={activePost?.ends_at ? activePost.ends_at.slice(0, 16) : ""}
+                                                onChange={(e) => setActivePost({ ...activePost, ends_at: e.target.value })}
+                                                InputLabelProps={{ shrink: true }}
+                                                fullWidth
+                                            />
+                                        </Stack>
+                                        <TextField
+                                            label="Description"
+                                            fullWidth
+                                            multiline minRows={2}
+                                            value={activePost?.text || ""}
+                                            onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
+                                            className="mt-2"
+                                        />
+                                    </>
+                                )}
 
-                </Box>
-            )}
+                                {activePost?.type === "image" && (
+                                    <TextField
+                                        label="Caption"
+                                        fullWidth
+                                        multiline minRows={2}
+                                        value={activePost?.text || ""}
+                                        onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
+                                        className="mt-2"
+                                    />
+                                )}
 
-            {/* Edit dialog */}
-            <EditGroupDialog
-                open={editOpen}
-                group={group}
-                onClose={() => setEditOpen(false)}
-                onUpdated={(g) => { setEditOpen(false); setGroup(g); }}
-            />
-            <AddMembersDialog
-                open={addOpen}
-                onClose={() => setAddOpen(false)}
-                groupIdOrSlug={idOrSlug}
-                existingIds={members.map(m => m.user.id)}
-                onAdded={async (n) => {
-                    await fetchMembers();                         // refresh list
-                    setGroup((prev) => prev ? {
-                        ...prev,         // bump visible count
-                        member_count: (prev.member_count || 0) + n
-                    } : prev);
-                }}
-            />
-
-            {/* Role assign — error modal */}
-            <Dialog
-                open={roleErrorOpen}
-                onClose={() => setRoleErrorOpen(false)}
-                fullWidth
-                maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 3 } }}
-            >
-                <DialogTitle sx={{ fontWeight: 800 }}>Couldn’t update role</DialogTitle>
-                <DialogContent>
-                    <Alert severity="error" sx={{ my: 1 }}>
-                        {roleErrorMsg || "Something went wrong while assigning the role."}
-                    </Alert>
-                </DialogContent>
-                <DialogActions>
-                    <Button
-                        onClick={() => setRoleErrorOpen(false)}
-                        variant="contained"
-                        sx={{ textTransform: "none" }}
-                    >
-                        OK
-                    </Button>
-                </DialogActions>
-            </Dialog>
-            {/* Remove member — confirmation */}
-            <Dialog
-                open={removeMemberOpen}
-                onClose={() => setRemoveMemberOpen(false)}
-                fullWidth
-                maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 3 } }}
-            >
-                <DialogTitle sx={{ fontWeight: 800 }}>Remove member?</DialogTitle>
-                <DialogContent>
-                    <Typography sx={{ mb: 1.5 }}>
-                        {removeMemberTarget?.user?.name || removeMemberTarget?.user?.email || "This member"} will be
-                        removed from the group and will lose access to posts and updates.
-                    </Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setRemoveMemberOpen(false)} sx={{ textTransform: "none" }}>
-                        Cancel
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        sx={{ textTransform: "none" }}
-                        disabled={
-                            !!removeMemberTarget &&
-                            busyUserId === (removeMemberTarget.user?.id ?? removeMemberTarget.userId)
-                        }
-                        onClick={() => {
-                            const id = removeMemberTarget?.user?.id ?? removeMemberTarget?.userId;
-                            if (!id) return;
-                            setRemoveMemberOpen(false);          // close modal first
-                            removeMember(id);                    // uses your existing function
-                        }}
-                    >
-                        Remove
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-
-            {/* Per-post actions menu */}
-            <Menu anchorEl={postMenuAnchor} open={Boolean(postMenuAnchor)} onClose={closePostMenu}>
-                <MenuItem onClick={() => toggleHidePost(activePost)} disabled={!activePost}>
-                    <ListItemIcon>👁️</ListItemIcon>
-                    <ListItemText>
-                        {(activePost?.hidden ?? activePost?.is_hidden) ? "Unhide" : "Hide"}
-                    </ListItemText>
-                </MenuItem>
-
-                <MenuItem onClick={() => { setEditPostOpen(true); closePostMenu(); }} disabled={!activePost}>
-                    <ListItemIcon>✏️</ListItemIcon>
-                    <ListItemText>Edit</ListItemText>
-                </MenuItem>
-
-                <MenuItem onClick={() => { setDeleteConfirmOpen(true); }} disabled={!activePost}>
-                    <ListItemIcon>🗑️</ListItemIcon>
-                    <ListItemText>Delete</ListItemText>
-                </MenuItem>
-            </Menu>
-
-            {/* Delete confirmation dialog */}
-            <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-                <DialogTitle>Delete this post?</DialogTitle>
-                <DialogContent>
-                    <Typography>This action can’t be undone. The post will be permanently removed for this group.</Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
-                    <Button onClick={deletePost} color="error" variant="contained" sx={{ textTransform: "none" }}>
-                        Delete
-                    </Button>
-                </DialogActions>
-            </Dialog>
-            {/* Edit Post dialog */}
-            <Dialog open={editPostOpen} onClose={() => setEditPostOpen(false)} fullWidth maxWidth="sm">
-                <DialogTitle>Edit Post</DialogTitle>
-                <DialogContent>
-                    {activePost?.type === "text" && (
-                        <TextField
-                            label="Text"
-                            fullWidth
-                            multiline minRows={3}
-                            value={activePost?.text || ""}
-                            onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
-                            className="mt-2"
-                        />
-                    )}
-
-                    {activePost?.type === "link" && (
-                        <>
-                            <TextField
-                                label="Text (optional)"
-                                fullWidth
-                                multiline minRows={2}
-                                value={activePost?.text || ""}
-                                onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
-                                className="mt-2"
-                            />
-                            <TextField
-                                label="URL"
-                                fullWidth
-                                value={activePost?.url || ""}
-                                onChange={(e) => setActivePost({ ...activePost, url: e.target.value })}
-                                className="mt-2"
-                            />
-                        </>
-                    )}
-
-                    {activePost?.type === "event" && (
-                        <>
-                            <TextField
-                                label="Title"
-                                fullWidth
-                                value={activePost?.title || ""}
-                                onChange={(e) => setActivePost({ ...activePost, title: e.target.value })}
-                                className="mt-2"
-                            />
-                            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} className="mt-2">
-                                <TextField
-                                    label="Starts at"
-                                    type="datetime-local"
-                                    value={activePost?.starts_at ? activePost.starts_at.slice(0, 16) : ""}
-                                    onChange={(e) => setActivePost({ ...activePost, starts_at: e.target.value })}
-                                    InputLabelProps={{ shrink: true }}
-                                    fullWidth
-                                />
-                                <TextField
-                                    label="Ends at"
-                                    type="datetime-local"
-                                    value={activePost?.ends_at ? activePost.ends_at.slice(0, 16) : ""}
-                                    onChange={(e) => setActivePost({ ...activePost, ends_at: e.target.value })}
-                                    InputLabelProps={{ shrink: true }}
-                                    fullWidth
-                                />
-                            </Stack>
-                            <TextField
-                                label="Description"
-                                fullWidth
-                                multiline minRows={2}
-                                value={activePost?.text || ""}
-                                onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
-                                className="mt-2"
-                            />
-                        </>
-                    )}
-
-                    {activePost?.type === "image" && (
-                        <TextField
-                            label="Caption"
-                            fullWidth
-                            multiline minRows={2}
-                            value={activePost?.text || ""}
-                            onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
-                            className="mt-2"
-                        />
-                    )}
-
-                    {activePost?.type === "poll" && (
-                        <Alert severity="info" className="mt-2">
-                            Editing polls is not enabled here. You can still Hide/Unhide or Delete.
-                        </Alert>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setEditPostOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
-                    <Button
-                        onClick={async () => {
-                            if (!activePost) return;
-                            // Adjust endpoint if your backend differs
-                            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/${activePost.id}/`, {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                                body: JSON.stringify(
-                                    activePost.type === "text" ? { text: activePost.text } :
-                                        activePost.type === "link" ? { text: activePost.text, url: activePost.url } :
-                                            activePost.type === "event" ? { title: activePost.title, text: activePost.text, starts_at: activePost.starts_at, ends_at: activePost.ends_at } :
-                                                activePost.type === "image" ? { text: activePost.text } :
-                                                    {}
-                                )
-                            });
-                            if (!res.ok) {
-                                const j = await res.json().catch(() => ({}));
-                                alert(j?.detail || `HTTP ${res.status}`);
-                                return;
-                            }
-                            setEditPostOpen(false);
-                            await fetchPosts();
-                        }}
-                        variant="contained"
-                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                    >
-                        Save
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-        </Container>
+                                {activePost?.type === "poll" && (
+                                    <Alert severity="info" className="mt-2">
+                                        Editing polls is not enabled here. You can still Hide/Unhide or Delete.
+                                    </Alert>
+                                )}
+                            </DialogContent>
+                            <DialogActions>
+                                <Button onClick={() => setEditPostOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
+                                <Button
+                                    onClick={async () => {
+                                        if (!activePost) return;
+                                        // Adjust endpoint if your backend differs
+                                        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/${activePost.id}/`, {
+                                            method: "PATCH",
+                                            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                            body: JSON.stringify(
+                                                activePost.type === "text" ? { text: activePost.text } :
+                                                    activePost.type === "link" ? { text: activePost.text, url: activePost.url } :
+                                                        activePost.type === "event" ? { title: activePost.title, text: activePost.text, starts_at: activePost.starts_at, ends_at: activePost.ends_at } :
+                                                            activePost.type === "image" ? { text: activePost.text } :
+                                                                {}
+                                            )
+                                        });
+                                        if (!res.ok) {
+                                            const j = await res.json().catch(() => ({}));
+                                            alert(j?.detail || `HTTP ${res.status}`);
+                                            return;
+                                        }
+                                        setEditPostOpen(false);
+                                        await fetchPosts();
+                                    }}
+                                    variant="contained"
+                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                >
+                                    Save
+                                </Button>
+                            </DialogActions>
+                        </Dialog>
+                    </Container>
+                    {/* ↑↑↑ END of pasted original content ↑↑↑ */}
+                </main>
+            </div>
+        </div>
     );
+
 }

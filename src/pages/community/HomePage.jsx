@@ -461,38 +461,6 @@ export default function HomePage() {
         <Grid item xs={12} md={6} lg={6}>
           <Stack spacing={2}>
             <PostComposer communityId={activeCommunityId} onPosted={handlePosted} />
-
-            <Card variant="outlined" sx={{ borderRadius: 3 }}>
-              <CardContent sx={{ pb: 1 }}>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  flexWrap="wrap"
-                  gap={1}
-                >
-                  <Typography variant="h6">Feed</Typography>
-                  <ToggleButtonGroup
-                    value={filter}
-                    exclusive
-                    onChange={(_, v) => v && setFilter(v)}
-                    size="small"
-                  >
-                    <ToggleButton value="all">All</ToggleButton>
-                    <ToggleButton value="friends">Friends</ToggleButton>
-                    <ToggleButton value="mine">My Posts</ToggleButton>
-                  </ToggleButtonGroup>
-                </Stack>
-              </CardContent>
-              <Divider />
-              <CardContent>
-                <FeedList
-                  key={`${activeCommunityId}-${filter}-${refreshNonce}`}
-                  communityId={activeCommunityId}
-                  filter={filter}
-                />
-              </CardContent>
-            </Card>
           </Stack>
         </Grid>
 
