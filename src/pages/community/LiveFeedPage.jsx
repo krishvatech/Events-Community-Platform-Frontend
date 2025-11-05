@@ -68,9 +68,22 @@ function mapFeedItem(item) {
     id: item.id,
     created_at: item.created_at,
     author: { name: displayName, avatar: item.actor_avatar || "" },
+    community_id: item.community_id ?? m.community_id ?? null,
+    community_avatar: m.community_cover_url || "",
+    community:
+      m.community_name ||
+      m.community?.name ||
+      item.community_name ||
+      item.community?.name ||
+      m.community_title ||
+      item.community_title ||
+      ((item.community_id ?? m.community_id)
+        ? `Community #${item.community_id ?? m.community_id}`
+        : ""),
     group_id: item.group_id ?? m.group_id ?? null,
     group_avatar: m.group_cover_url || "",
     group: m.group_name || (m.group_id ? `Group #${m.group_id}` : "—"),
+    visibility: m.visibility || item.visibility || null,
     metrics: { likes: 0, comments: 0, shares: 0 },
   };
 
@@ -231,16 +244,25 @@ function PostCard({ post, onReact, onOpenPost, onPollVote }) {
     onReact?.(post.id, k, next.metrics[k]);
   };
 
+const headingTitle = post.group_id
+    ? (post.group || (post.group_id ? `Group #${post.group_id}` : "—"))
+    : (post.visibility === "community"
+        ? (post.community || (post.community_id ? `Community #${post.community_id}` : "—"))
+        : (post.author?.name || "—"));
   return (
     <Paper key={post.id} elevation={0} sx={{ p: 2, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
       {/* Header */}
       <Stack direction="row" spacing={1.5} alignItems="center">
-        <Avatar src={post.group_avatar || post.author?.avatar} alt={post.group} />
+        <Avatar src={post.group_avatar || post.author?.avatar} alt={headingTitle} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>{post.group}</Typography>
-          <Typography variant="caption" color="text.secondary" noWrap>
-            {post.author.name} · {formatWhen(post.created_at)}
-          </Typography>
+
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          {headingTitle}
+        </Typography>
+
+        <Typography variant="caption" color="text.secondary" noWrap>
+          {post.author?.name} · {formatWhen(post.created_at)}
+        </Typography>
         </Box>
         {post.type === "event" && <Chip size="small" color="primary" label="Event" variant="outlined" />}
         {post.type === "poll" && <Chip size="small" label="Poll" variant="outlined" />}
