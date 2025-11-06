@@ -63,7 +63,7 @@ function GroupGridCard({ g, onJoin }) {
     <Card
       variant="outlined"
       sx={{
-        width: 232,
+        width: 282,
         borderRadius: 3,
         overflow: "hidden",
         borderColor: BORDER,
@@ -320,132 +320,132 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
       <Box sx={{ display: "flex", gap: 3, px: { xs: 2, sm: 2, md: 3 }, maxWidth: "1100px", mx: "auto" }}>
         {/* LEFT: Main content */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-        <TopicHeader title={headerTitle} previews={previews} extraCount={extraCount} />
+          <TopicHeader title={headerTitle} previews={previews} extraCount={extraCount} />
 
-        {/* Filter bar */}
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={1.5}
-          alignItems={{ xs: "stretch", md: "center" }}
-          sx={{ mb: 1.5 }}
-        >
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="caption" color="text.secondary">
-              Search for Groups
-            </Typography>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Search a name or a keyword"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
+          {/* Filter bar */}
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            spacing={1.5}
+            alignItems={{ xs: "stretch", md: "center" }}
+            sx={{ mb: 1.5 }}
+          >
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Search for Groups
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search a name or a keyword"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+
+            <Button
+              variant="contained"
+              onClick={clearAll}
+              sx={{
+                whiteSpace: "nowrap",
+                alignSelf: { xs: "flex-end", md: "flex-end" },
+                height: 'fit-content',
+                mt: { xs: 0, md: 2.5 }
               }}
-            />
-          </Box>
+            >
+              Clear all Filters
+            </Button>
+          </Stack>
 
-          <Button
-            variant="contained"
-            onClick={clearAll}
-            sx={{ 
-              whiteSpace: "nowrap", 
-              alignSelf: { xs: "flex-end", md: "flex-end" },
-              height: 'fit-content',
-              mt: { xs: 0, md: 2.5 }
-            }}
-          >
-            Clear all Filters
-          </Button>
-        </Stack>
+          {/* Posts / Groups toggle */}
+          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
+            <Button
+              size="small"
+              variant={typeTab === "posts" ? "contained" : "outlined"}
+              onClick={() => setTypeTab("posts")}
+              sx={{ textTransform: "none" }}
+            >
+              Posts
+            </Button>
+            <Button
+              size="small"
+              variant={typeTab === "groups" ? "contained" : "outlined"}
+              onClick={() => setTypeTab("groups")}
+              sx={{ textTransform: "none" }}
+            >
+              Groups
+            </Button>
+          </Stack>
 
-        {/* Posts / Groups toggle */}
-        <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
-          <Button
-            size="small"
-            variant={typeTab === "posts" ? "contained" : "outlined"}
-            onClick={() => setTypeTab("posts")}
-            sx={{ textTransform: "none" }}
-          >
-            Posts
-          </Button>
-          <Button
-            size="small"
-            variant={typeTab === "groups" ? "contained" : "outlined"}
-            onClick={() => setTypeTab("groups")}
-            sx={{ textTransform: "none" }}
-          >
-            Groups
-          </Button>
-        </Stack>
-
-        {/* Loading / error */}
-        {loading && (
-          <Paper sx={{ p: 1.5, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-            <LinearProgress />
-          </Paper>
-        )}
-        {!loading && error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {/* 3-column grid */}
-        <Grid container spacing={2}>
-          {paginatedGroups.map((g) => (
-            <Grid key={g.id} item xs={12} sm={6} md={4}>
-              <GroupGridCard g={g} onJoin={handleJoin} />
-            </Grid>
-          ))}
-
-          {!loading && paginatedGroups.length === 0 && (
-            <Grid item xs={12}>
-              <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-                <Typography variant="body2" color="text.secondary">
-                  No groups match your filters.
-                </Typography>
-              </Paper>
-            </Grid>
+          {/* Loading / error */}
+          {loading && (
+            <Paper sx={{ p: 1.5, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+              <LinearProgress />
+            </Paper>
           )}
-        </Grid>
+          {!loading && error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
 
-        {/* Pagination */}
-        {!loading && totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-            <Pagination 
-              count={totalPages} 
-              page={currentPage} 
-              onChange={handlePageChange}
-              color="primary"
-              size="large"
-              showFirstButton
-              showLastButton
-            />
-          </Box>
-        )}
-      </Box>
+          {/* 3-column grid */}
+          <Grid container spacing={2}>
+            {paginatedGroups.map((g) => (
+              <Grid key={g.id} item xs={12} sm={6} md={4}>
+                <GroupGridCard g={g} onJoin={handleJoin} />
+              </Grid>
+            ))}
 
-      {/* RIGHT: Sidebar - sticky */}
-      <Box
-        sx={{
-          width: 300,
-          display: { xs: "none", md: "block" },
-          position: "sticky",
-          top: 20,
-          height: "fit-content",
-          flexShrink: 0,
-        }}
-      >
-        <Stack spacing={2}>
-          <CommunityProfileCard user={user} />
-        </Stack>
+            {!loading && paginatedGroups.length === 0 && (
+              <Grid item xs={12}>
+                <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No groups match your filters.
+                  </Typography>
+                </Paper>
+              </Grid>
+            )}
+          </Grid>
+
+          {/* Pagination */}
+          {!loading && totalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+              <Pagination
+                count={totalPages}
+                page={currentPage}
+                onChange={handlePageChange}
+                color="primary"
+                size="large"
+                showFirstButton
+                showLastButton
+              />
+            </Box>
+          )}
+        </Box>
+
+        {/* RIGHT: Sidebar - sticky */}
+        <Box
+          sx={{
+            width: 150,           // ← match md=3 column (~25% of 1100px)
+            display: { xs: "none", md: "block" },
+            position: "sticky",
+            top: 88,              // ← same sticky offset as Notifications
+            height: "fit-content",
+            flexShrink: 0,
+          }}
+        >
+          <Stack spacing={2}>
+            <CommunityProfileCard user={user} />
+          </Stack>
+        </Box>
       </Box>
-    </Box>
     </Box>
   );
 }

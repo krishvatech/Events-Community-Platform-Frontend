@@ -13,7 +13,13 @@ import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CommunitySidebar from "../../components/CommunitySideBar.jsx";
+import CommunityRightRailLayout from "../../components/layout/CommunityRightRailLayout.jsx";
 
+const BORDER = "#e2e8f0";
+
+// -----------------------------------------------------------------------------
+// Keep helpers local (mirrors your HomePage style). No imports from your code.
+// -----------------------------------------------------------------------------
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 const getToken = () =>
   localStorage.getItem("token") ||
@@ -33,16 +39,18 @@ const timeAgo = (date) => {
   return `${Math.floor(diff / 86400)}d ago`;
 };
 
+// -----------------------------------------------------------------------------
+// Minimal PostCard (local) so we don't touch your existing files
+// -----------------------------------------------------------------------------
 function PostCard({ post }) {
   return (
-    <Card variant="outlined" sx={{ borderRadius: 3, transition: "box-shadow 0.2s", "&:hover": { boxShadow: "0 2px 8px rgba(0,0,0,0.1)" } }}>
+    <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
       <CardHeader
         avatar={<Avatar src={post.actor_avatar || ""}>{(post.actor_name || "U").slice(0, 1)}</Avatar>}
         title={<Typography fontWeight={600}>{post.actor_name || "Member"}</Typography>}
         subheader={timeAgo(post.created_at)}
-        sx={{ pb: 1 }}
       />
-      <CardContent sx={{ pt: 0, "&:last-child": { pb: 2 } }}>
+      <CardContent sx={{ pt: 0 }}>
         {post.content && (
           <Typography sx={{ whiteSpace: "pre-wrap" }}>{post.content}</Typography>
         )}
@@ -90,6 +98,7 @@ function PostCard({ post }) {
   );
 }
 
+// Shape feed rows into UI posts (works with a few backend styles)
 function shapePost(row) {
   const m = row?.metadata || {};
   const type = (row?.type || m.type || "text").toLowerCase();
@@ -107,6 +116,9 @@ function shapePost(row) {
   return { ...base, content: row.content || m.text || "" };
 }
 
+// -----------------------------------------------------------------------------
+// Tabs content
+// -----------------------------------------------------------------------------
 function ChatTab({ groupId }) {
   const [messages, setMessages] = React.useState([]);
   const [text, setText] = React.useState("");
@@ -174,9 +186,12 @@ function ChatTab({ groupId }) {
 
   return (
     <Stack spacing={2}>
-      <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
         <CardContent sx={{ p: 0 }}>
-          <Box ref={listRef} sx={{ maxHeight: 420, overflowY: "auto", p: 2 }}>
+          <Box
+            ref={listRef}
+            sx={{ maxHeight: 420, overflowY: "auto", p: 2 }}
+          >
             {loading ? (
               <Stack direction="row" alignItems="center" justifyContent="center" sx={{ py: 4 }}>
                 <CircularProgress size={24} />
@@ -187,7 +202,7 @@ function ChatTab({ groupId }) {
               <Stack spacing={1.25}>
                 {messages.map((m) => (
                   <Stack key={m.id} direction="row" spacing={1.25} alignItems="flex-start">
-                    <Avatar src={m.user?.avatar || ""} sx={{ width: 36, height: 36, flexShrink: 0 }}>
+                    <Avatar src={m.user?.avatar || ""} sx={{ width: 36, height: 36 }}>
                       {(m.user?.name || "U").slice(0, 1)}
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
@@ -325,10 +340,10 @@ function MembersTab({ groupId }) {
         onChange={(e) => setQuery(e.target.value)}
         InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }}
       />
-      <Grid container spacing={{ xs: 1.5, sm: 2, md: 2.5 }}>
+      <Grid container spacing={2}>
         {pageItems.map((m) => (
           <Grid key={m.id} item xs={12} sm={6} md={4} lg={3}>
-            <Card variant="outlined" sx={{ borderRadius: 2, height: "100%", transition: "transform 0.2s, box-shadow 0.2s", "&:hover": { transform: "translateY(-2px)", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" } }}>
+            <Card variant="outlined" sx={{ borderRadius: 2, borderColor: BORDER }}>
               <CardHeader
                 avatar={<Avatar src={m.avatar}>{(m.name || "M").slice(0, 1)}</Avatar>}
                 title={<Typography fontWeight={600} variant="body1">{m.name}</Typography>}
@@ -339,7 +354,7 @@ function MembersTab({ groupId }) {
           </Grid>
         ))}
       </Grid>
-      <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between" spacing={2}>
+      <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between">
         <Typography variant="body2" color="text.secondary">
           Showing {filtered.length === 0 ? 0 : startIdx + 1}–{Math.min(startIdx + perPage, filtered.length)} of {filtered.length}
         </Typography>
@@ -360,35 +375,55 @@ function MembersTab({ groupId }) {
 function OverviewTab({ group }) {
   if (!group) return null;
   return (
-    <Grid container spacing={2}>
-      <Grid item xs={12} md={8}>
-        <Card variant="outlined" sx={{ borderRadius: 3 }}>
-          <CardHeader title="About this group" />
+    <Grid container spacing={3}>
+      <Grid item xs={12} md={7}>
+        <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
+          <CardHeader
+            title={
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                About this group
+              </Typography>
+            }
+          />
           <CardContent sx={{ pt: 0 }}>
-            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
               {group.description || group.about || "No description yet."}
             </Typography>
           </CardContent>
         </Card>
       </Grid>
-      <Grid item xs={12} md={4}>
-        <Card variant="outlined" sx={{ borderRadius: 3 }}>
-          <CardHeader title="Group info" />
+      <Grid item xs={12} md={5}>
+        <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
+          <CardHeader
+            title={
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                Group info
+              </Typography>
+            }
+          />
           <CardContent sx={{ pt: 0 }}>
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-              <Typography variant="body2" color="text.secondary">Members</Typography>
-              <Typography variant="body2">{group.member_count ?? group.members_count ?? "—"}</Typography>
-            </Box>
-            <Divider />
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-              <Typography variant="body2" color="text.secondary">Visibility</Typography>
-              <Typography variant="body2">{(group.visibility || "private").toString()}</Typography>
-            </Box>
-            <Divider />
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-              <Typography variant="body2" color="text.secondary">Created</Typography>
-              <Typography variant="body2">{(group.created_at && new Date(group.created_at).toLocaleDateString()) || "—"}</Typography>
-            </Box>
+            <Stack spacing={1} divider={<Divider />}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
+                <Typography variant="body2" color="text.secondary">Members</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {group.member_count ?? group.members_count ?? "—"}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
+                <Typography variant="body2" color="text.secondary">Visibility</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, textTransform: "capitalize" }}>
+                  {(group.visibility || "private").toString()}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
+                <Typography variant="body2" color="text.secondary">Created</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {(group.created_at && new Date(group.created_at).toLocaleDateString()) || "—"}
+                </Typography>
+              </Box>
+            </Stack>
           </CardContent>
         </Card>
       </Grid>
@@ -396,11 +431,25 @@ function OverviewTab({ group }) {
   );
 }
 
+// -----------------------------------------------------------------------------
+// Page
+// -----------------------------------------------------------------------------
 export default function GroupDetailsPage() {
   const { groupId } = useParams();
-  const [tab, setTab] = React.useState(0);
+  const [tab, setTab] = React.useState(3); // Default to Overview tab
   const [group, setGroup] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
+  const [me, setMe] = React.useState(null);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_ROOT}/users/me/`, {
+          headers: { ...authHeader(), accept: "application/json" },
+        });
+        if (res.ok) setMe(await res.json());
+      } catch { }
+    })();
+  }, []);
 
   const fetchGroup = React.useCallback(async () => {
     setLoading(true);
@@ -433,67 +482,115 @@ export default function GroupDetailsPage() {
   React.useEffect(() => { fetchGroup(); }, [fetchGroup]);
 
   return (
-    <Box sx={{
-      px: { xs: 1.5, sm: 2, md: 3, lg: 4 },
-      py: { xs: 2, sm: 2, md: 3 },
-      maxWidth: 1400,
-      mx: "auto",
-      minHeight: "100vh",
-    }}>
-      <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
-        {/* Sidebar */}
-        <Grid item xs={12} md={3}>
-          <Box sx={{ position: { md: "sticky" }, top: { md: 24 }, display: "flex", flexDirection: "column", gap: 2 }}>
-            <CommunitySidebar active="groups" />
-          </Box>
-        </Grid>
+    <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
+      <Box sx={{ display: "flex", gap: 3, px: { xs: 2, sm: 2, md: 3 }, maxWidth: "1200px", mx: "auto" }}>
+        {/* LEFT: Community sidebar (sticky on desktop) */}
+        <Box
+          sx={{
+            width: 280,
+            display: { xs: "none", md: "block" },
+            position: "sticky",
+            top: 88,
+            height: "fit-content",
+            flexShrink: 0,
+          }}
+        >
+          <CommunitySidebar active="groups" />
+        </Box>
 
-        {/* Main Content */}
-        <Grid item xs={12} md={9}>
-          {/* Header */}
-          <Card variant="outlined" sx={{ borderRadius: 3, p: { xs: 1.5, sm: 2 }, mb: { xs: 2, md: 2.5 }, boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 1.5, sm: 2 }} alignItems={{ xs: "flex-start", sm: "center" }}>
-              <Avatar src={group?.avatar || ""} sx={{ width: 72, height: 72, flexShrink: 0 }}>
-                {(group?.name || "G").slice(0, 1)}
-              </Avatar>
-              <Box flex={1}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  {loading ? "Loading…" : (group?.name || "Group")}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {loading ? "" : `${group?.member_count ?? 0} members`}
-                </Typography>
-              </Box>
-            </Stack>
+        {/* RIGHT: Group content */}
+        <CommunityRightRailLayout user={me}>
+          {/* Header Card */}
+          <Card
+            variant="outlined"
+            sx={{
+              borderRadius: 3,
+              borderColor: BORDER,
+              mb: 3,
+              overflow: "visible"
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2.5}
+                alignItems={{ xs: "flex-start", sm: "center" }}
+              >
+                <Avatar
+                  src={group?.avatar || ""}
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    bgcolor: "#e0f2fe",
+                    color: "#0284c7",
+                    fontSize: "2rem",
+                    fontWeight: 600
+                  }}
+                >
+                  {(group?.name || "G").slice(0, 1)}
+                </Avatar>
+                <Box flex={1}>
+                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    {loading ? "Loading…" : (group?.name || "Group")}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {loading ? "" : `${group?.member_count ?? 0} members`}
+                  </Typography>
+                </Box>
+              </Stack>
+            </CardContent>
           </Card>
 
-          {/* Tabs */}
-          <Card variant="outlined" sx={{ borderRadius: 3, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", overflow: "hidden" }}>
-            <Tabs
-              value={tab}
-              onChange={(_, v) => setTab(v)}
-              variant="scrollable"
-              allowScrollButtonsMobile
-              sx={{
-                "& .MuiTabs-indicator": { height: 3 },
-                "& .MuiTab-root": { py: 1.5, textTransform: "none", fontSize: "0.95rem" },
-              }}
-            >
-              <Tab icon={<ChatBubbleOutlineRoundedIcon />} iconPosition="start" label="Chat" />
-              <Tab icon={<ArticleOutlinedIcon />} iconPosition="start" label="Posts" />
-              <Tab icon={<PeopleOutlineRoundedIcon />} iconPosition="start" label="Members" />
-              <Tab icon={<InfoOutlinedIcon />} iconPosition="start" label="Overview" />
-            </Tabs>
-            <Divider />
-            <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 2.5 }, "&:last-child": { pb: { xs: 1.5, sm: 2, md: 2.5 } } }}>
+          {/* Tabs Card */}
+          <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
+            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+              <Tabs
+                value={tab}
+                onChange={(_, v) => setTab(v)}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                sx={{
+                  px: 2,
+                  "& .MuiTab-root": {
+                    textTransform: "none",
+                    minHeight: 64,
+                    fontWeight: 500,
+                  }
+                }}
+              >
+                <Tab
+                  icon={<ChatBubbleOutlineRoundedIcon />}
+                  iconPosition="start"
+                  label="CHAT"
+                />
+                <Tab
+                  icon={<ArticleOutlinedIcon />}
+                  iconPosition="start"
+                  label="POSTS"
+                />
+                <Tab
+                  icon={<PeopleOutlineRoundedIcon />}
+                  iconPosition="start"
+                  label="MEMBERS"
+                />
+                <Tab
+                  icon={<InfoOutlinedIcon />}
+                  iconPosition="start"
+                  label="OVERVIEW"
+                />
+              </Tabs>
+            </Box>
+
+            <CardContent sx={{ p: 3 }}>
               {tab === 0 && <ChatTab groupId={groupId} />}
               {tab === 1 && <PostsTab groupId={groupId} />}
               {tab === 2 && <MembersTab groupId={groupId} />}
               {tab === 3 && <OverviewTab group={group} />}
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </CommunityRightRailLayout>
+      </Box>
     </Box>
   );
 }
