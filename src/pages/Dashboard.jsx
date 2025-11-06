@@ -143,7 +143,7 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "");
 const toISO = (v) => (v ? new Date(v).toISOString() : null);
 
-function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
+function CreateEventDialog({ open, onClose, onCreated, communityId = "16" }) {
   const token = getToken();
 
   // Event fields

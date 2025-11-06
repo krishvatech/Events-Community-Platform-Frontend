@@ -25,6 +25,15 @@ const ORIGIN = String(RAW_BASE).trim().replace(/\/+$/, "");
 const API_BASE = /\/api(\/|$)/i.test(ORIGIN) ? ORIGIN : `${ORIGIN}/api`;
 const API_ORIGIN = API_BASE.replace(/\/api(\/|$)/i, "");
 
+
+function toMediaUrl(p) {
+  if (!p) return "";
+  try { return new URL(p).toString(); } catch {}
+  const rel = String(p).replace(/^\/+/, "");
+  // if backend already serves under /media/, keep it; else prefix /media/
+  return `${API_ORIGIN}/${rel.startsWith("media/") ? rel : `media/${rel}`}`;
+}
+
 function toApiUrl(pathOrUrl) {
   if (!pathOrUrl) return API_BASE;
   try {
@@ -158,6 +167,26 @@ function mapFeedItem(item) {
     (m.title && isEventVerb)
   );
 
+  // ---- Resource (file/link) post ----
+  if (
+    t === "resource" || t === "file" || t === "link" || t === "video" ||
+    m.file || m.file_url || m.link_url || m.video_url
+  ) {
+    return {
+      ...base,
+      type: "resource",
+      text: m.description || m.text || "",
+      resource: {
+        title: m.title || "Resource",
+        file_url: toMediaUrl(m.file_url || m.file || ""),
+        link_url: m.link_url || null,
+        video_url: toMediaUrl(m.video_url || ""),
+        event_id: m.event_id ?? item.target_object_id ?? null,
+        event_title: m.event_title || m.title || null,
+      },
+    };
+  }
+
   if (t === "event" || t === "event_update" || isEventVerb || hasEventFields) {
     return {
       ...base,
@@ -276,6 +305,69 @@ function EventBlock({ post, onOpen }) {
   );
 }
 
+function ResourceBlock({ post, onOpenEvent }) {
+  const r = post.resource || {};
+  const hasVideo = !!r.video_url;
+  const primaryHref = r.link_url || r.file_url || r.video_url;
+
+  // simple detectors for YouTube/Vimeo
+  const ytId = (r.video_url || "").match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1];
+  const vmId = (r.video_url || "").match(/vimeo\.com\/(\d+)/)?.[1];
+  const ytEmbed = ytId ? `https://www.youtube.com/embed/${ytId}` : null;
+  const vmEmbed = vmId ? `https://player.vimeo.com/video/${vmId}` : null;
+  const canIframe = !!(ytEmbed || vmEmbed);
+  const iframeSrc = ytEmbed || vmEmbed;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: "#e2e8f0", bgcolor: "#fafafa" }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+        {r.title}
+      </Typography>
+
+      {post.text && <Typography variant="body2" sx={{ mt: 1 }}>{post.text}</Typography>}
+
+      {/* VIDEO RENDERING */}
+      {hasVideo && (
+        <Box sx={{ mt: 1 }}>
+          {canIframe ? (
+            <Box
+              component="iframe"
+              src={iframeSrc}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              sx={{ width: "100%", height: 360, border: 0, borderRadius: 8 }}
+              title={r.title}
+            />
+          ) : (
+            <Box
+              component="video"
+              src={r.video_url}
+              controls
+              preload="metadata"
+              sx={{ width: "100%", maxHeight: 420, borderRadius: 2, border: "1px solid #e2e8f0", mt: 0.5 }}
+            />
+          )}
+        </Box>
+      )}
+
+      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+        {primaryHref && (
+          <Button
+            size="small"
+            variant="contained"
+            component="a"
+            href={primaryHref}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {hasVideo ? "Watch Video" : r.link_url ? "Open Link" : "View File"}
+          </Button>
+        )}
+      </Stack>
+    </Paper>
+  );
+}
+
 // ---- POST CARD ----
 function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const [local, setLocal] = React.useState(post);
@@ -311,6 +403,13 @@ const headingTitle = post.group_id
         {post.type === "link" && <Chip size="small" label="Link" variant="outlined" />}
         {post.type === "image" && <Chip size="small" label="Image" variant="outlined" />}
         {post.type === "text" && <Chip size="small" label="Post" variant="outlined" />}
+        {post.type === "resource" && (
+          <Chip
+            size="small"
+            label={post.resource?.video_url ? "Video" : "Resource"}
+            variant="outlined"
+          />
+        )}
       </Stack>
 
       {/* Body */}
@@ -319,6 +418,10 @@ const headingTitle = post.group_id
           <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
             {post.text}
           </Typography>
+        )}
+
+        {post.type === "resource" && (
+          <ResourceBlock post={post} onOpenEvent={onOpenEvent} />
         )}
 
         {post.type === "image" && (
