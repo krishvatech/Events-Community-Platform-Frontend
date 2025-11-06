@@ -35,6 +35,13 @@ const tokenHeader = () => {
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
+const emitUnreadCount = (count) => {
+  try {
+    window.dispatchEvent(new CustomEvent("notify:unread", { detail: { count } }));
+    localStorage.setItem("unread_notifications", String(count));
+  } catch {}
+};
+
 /* ---------------------- helpers ---------------------- */
 function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
@@ -343,74 +350,100 @@ export default function NotificationsPage({
   const grouped = groupByDay(filtered);
 
   React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const r = await fetch(`${API_BASE}/notifications/`, {
-          headers: { ...tokenHeader(), Accept: "application/json" },
-          credentials: "include",
-        });
-        const j = await r.json().catch(() => []);
-        const raw = Array.isArray(j) ? j : j?.results || [];
+  let alive = true;
+  (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/notifications/`, {
+        headers: { ...tokenHeader(), Accept: "application/json" },
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => []);
+      const raw = Array.isArray(j) ? j : j?.results || [];
 
-        // map API -> UI shape the page already expects
-        const mapped = raw.map((n) => ({
-          id: n.id,
-          kind: n.kind,               // "friend_request"
-          state: n.state || "",       // "pending" | "accepted" | "declined" | "canceled"
-          title: n.title || "",
-          description: n.description || "",
-          created_at: n.created_at,
-          is_read: !!n.is_read,
-          actor: {
-            name: n.actor?.display_name || n.actor?.username || n.actor?.email || "User",
-            avatar: n.actor?.avatar || "",
-          },
-          // for "open profile" + friend-request actions:
-          context: {
-            friend_request_id: n.data?.friend_request_id,
-            // for the recipient: go to the sender’s profile
-            profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
-          },
-        }));
+      const mapped = raw.map((n) => ({
+        id: n.id,
+        kind: n.kind,
+        state: n.state || "",
+        title: n.title || "",
+        description: n.description || "",
+        created_at: n.created_at,
+        is_read: !!n.is_read,
+        actor: {
+          name: n.actor?.display_name || n.actor?.username || n.actor?.email || "User",
+          avatar: n.actor?.avatar || "",
+        },
+        context: {
+          friend_request_id: n.data?.friend_request_id,
+          profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
+        },
+      }));
 
-        if (alive) setItems(mapped);
-      } catch {
-        // ignore; keep empty list
+      if (!alive) return;
+      setItems(mapped);
+
+      // 🔔 mark-all-read-on-open (optimistic)
+      const idsToMark = mapped.filter((i) => !i.is_read).map((i) => i.id);
+      if (idsToMark.length) {
+        setItems((curr) =>
+          curr.map((i) => (idsToMark.includes(i.id) ? { ...i, is_read: true } : i))
+        );
+        try {
+          await fetch(`${API_BASE}/notifications/mark-read/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...tokenHeader(),
+              Accept: "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({ ids: idsToMark }),
+          });
+        } catch {}
       }
-    })();
-    return () => { alive = false; };
-  }, []);
-
+      // sidebar bell → 0
+      emitUnreadCount(0);
+    } catch {
+      /* ignore */
+    }
+  })();
+  return () => {
+    alive = false;
+  };
+}, []);
 
   const apiMarkRead = async (ids = []) => {
-    if (!ids.length) return;
-    try {
-      await fetch(`${API_BASE}/notifications/mark-read/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ ids }),
-      });
-    } catch {
-      // non-blocking
-    }
-  };
+  if (!ids.length) return;
+  try {
+    await fetch(`${API_BASE}/notifications/mark-read/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ ids }),
+    });
+  } catch {}
+};
 
   /* ---------- actions: optimistic mock handlers ---------- */
   const handleToggleRead = async (id, nowRead) => {
-    // optimistic UI
-    setItems((curr) => curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i)));
-    // backend only supports "mark as read" right now
-    if (nowRead) await apiMarkRead([id]);
-  };
+  setItems((curr) => {
+    const next = curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i));
+    emitUnreadCount(next.filter((x) => !x.is_read).length);
+    return next;
+  });
+  // backend only supports "mark as read"
+  if (nowRead) await apiMarkRead([id]);
+};
 
   const handleMarkAllRead = async () => {
-    const ids = items.filter((i) => !i.is_read).map((i) => i.id);
-    if (!ids.length) return;
-    setItems((curr) => curr.map((i) => ({ ...i, is_read: true })));
-    await apiMarkRead(ids);
-  };
+  const ids = items.filter((i) => !i.is_read).map((i) => i.id);
+  if (!ids.length) return;
+  setItems((curr) => {
+    const next = curr.map((i) => ({ ...i, is_read: true }));
+    emitUnreadCount(0);
+    return next;
+  });
+  await apiMarkRead(ids);
+};
 
   const handleOpen = (n) => {
     if (onOpen) return onOpen(n);
