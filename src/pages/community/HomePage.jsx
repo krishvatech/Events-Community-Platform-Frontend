@@ -1,5 +1,6 @@
 // src/pages/account/HomePage.jsx
 import * as React from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Avatar,
   Box,
@@ -382,7 +383,16 @@ function MyGroups({ groups }) {
             <ListItem alignItems="flex-start" secondaryAction={<Chip label={`${g.member_count ?? 0} members`} size="small" />}>
               <ListItemAvatar><Avatar>{(g.name || "").slice(0, 1)}</Avatar></ListItemAvatar>
               <ListItemText
-                primary={<Typography fontWeight={600}>{g.name}</Typography>}
+                primary={
+                  <Typography
+                    fontWeight={600}
+                    component={RouterLink}
+                    to={`/community/groups/${g.id}`}
+                    style={{ textDecoration: "none", color: "inherit" }}
+                  >
+                    {g.name}
+                  </Typography>
+                }
                 secondary={g.description && (
                   <Typography variant="body2" color="text.secondary" sx={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {g.description}
@@ -594,6 +604,7 @@ export default function HomePage() {
   const [friends, setFriends] = React.useState([]);
   const [friendCount, setFriendCount] = React.useState(0); // ← ADD THIS
 
+
   // ---- Fetch my posts (paginated) ----
   const fetchMyPosts = React.useCallback(async () => {
     try {
@@ -608,27 +619,27 @@ export default function HomePage() {
   }, []);
 
   const fetchMyFriends = React.useCallback(async () => {
-  const candidates = [
-    `${API_ROOT}/relationships/friends/`,
-    `${API_ROOT}/friends/`,
-    `${API_ROOT}/users/friends/`,
-    `${API_ROOT}/accounts/friends/`,
-  ];
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-      const total = Number(data?.count ?? rows.length) || 0;
-      setFriends(rows.map(normalizeFriend).filter(Boolean));
-      setFriendCount(total);
-      return;
-    } catch { /* try next */ }
-  }
-  setFriends([]);
-  setFriendCount(0);
-}, []);
+    const candidates = [
+      `${API_ROOT}/relationships/friends/`,
+      `${API_ROOT}/friends/`,
+      `${API_ROOT}/users/friends/`,
+      `${API_ROOT}/accounts/friends/`,
+    ];
+    for (const url of candidates) {
+      try {
+        const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+        const total = Number(data?.count ?? rows.length) || 0;
+        setFriends(rows.map(normalizeFriend).filter(Boolean));
+        setFriendCount(total);
+        return;
+      } catch { /* try next */ }
+    }
+    setFriends([]);
+    setFriendCount(0);
+  }, []);
 
 
 

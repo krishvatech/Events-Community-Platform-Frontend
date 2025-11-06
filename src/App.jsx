@@ -25,7 +25,7 @@ import ResourceDetails from "./pages/ResourceDetails.jsx";
 import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
 import RichProfile from "./pages/community/RichProfile.jsx";
-
+import GroupDetailsPage from "./pages/community/GroupDetailsPage.jsx";
 
 const AppShell = () => {
   const location = useLocation();
@@ -76,6 +76,7 @@ const AppShell = () => {
         {/* ADD THIS ROUTE FOR RICH PROFILE */}
         {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
         <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
+        <Route path="/community/groups/:groupId" element={<GroupDetailsPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
