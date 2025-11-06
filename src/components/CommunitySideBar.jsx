@@ -139,7 +139,7 @@ React.useEffect(() => {
                 {it.icon}
               </span>
             );
-            const emitKey = ({ live: "live-feed", notify: "notify", feed: "groups" }[it.key]) || it.key;
+            const emitKey = it.key;
           return (
             <ListItem
               key={it.key}
