@@ -23,6 +23,9 @@ import {
   Snackbar,
   Alert,
 } from "@mui/material";
+import { IconButton, Tooltip, CircularProgress, DialogContentText } from "@mui/material";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import SearchIcon from "@mui/icons-material/Search";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
@@ -181,6 +184,281 @@ function PostCard({ item }) {
   );
 }
 
+// ------- edit dialog (reuses your patterns) -------
+function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
+  const kind = (item?.type || "text").toLowerCase();
+
+  // shared fields
+  const [tags, setTags] = React.useState(Array.isArray(item?.tags) ? item.tags.join(", ") : "");
+  const [saving, setSaving] = React.useState(false);
+  const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
+
+  // text
+  const [text, setText] = React.useState(item?.text || "");
+
+  // link
+  const [linkUrl, setLinkUrl] = React.useState(item?.url || item?.link_url || "");
+  const [linkTitle, setLinkTitle] = React.useState(item?.title || item?.link_title || "");
+  const [linkDesc, setLinkDesc] = React.useState(item?.description || item?.link_description || "");
+
+  // image
+  const [caption, setCaption] = React.useState(item?.caption || "");
+  const [imageFile, setImageFile] = React.useState(null);
+  const [imagePreview, setImagePreview] = React.useState("");
+
+  // poll
+  const [question, setQuestion] = React.useState(item?.question || "");
+  const [pollOptions, setPollOptions] = React.useState(
+    Array.isArray(item?.options) ? item.options.map(o => (typeof o === "string" ? o : o?.text || "")) : ["", ""]
+  );
+
+  React.useEffect(() => {
+    if (!open) return;
+    setTags(Array.isArray(item?.tags) ? item.tags.join(", ") : "");
+    setText(item?.text || "");
+    setLinkUrl(item?.url || item?.link_url || "");
+    setLinkTitle(item?.title || item?.link_title || "");
+    setLinkDesc(item?.description || item?.link_description || "");
+    setCaption(item?.caption || "");
+    setImageFile(null);
+    setImagePreview("");
+    setQuestion(item?.question || "");
+    setPollOptions(Array.isArray(item?.options) ? item.options.map(o => (typeof o === "string" ? o : o?.text || "")) : ["", ""]);
+  }, [open, item]);
+
+  const onPickImage = (file) => {
+    setImageFile(file || null);
+    if (file) {
+      const r = new FileReader();
+      r.onload = (ev) => setImagePreview(String(ev.target?.result || ""));
+      r.readAsDataURL(file);
+    } else {
+      setImagePreview("");
+    }
+  };
+
+  const canSave = () => {
+    if (kind === "text") return !!text.trim();
+    if (kind === "link") return !!linkUrl.trim();
+    if (kind === "image") return true; // allow caption-only edits too
+    if (kind === "poll") return !!question.trim() && pollOptions.filter(o => o.trim()).length >= 2;
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!communityId || !item?.id) {
+      setToast({ open: true, type: "error", msg: "Missing community or post id." });
+      return;
+    }
+    // local items fallback
+    if (String(item.id).startsWith("local-")) {
+      onSaved?.({
+        ...item,
+        text, caption, url: linkUrl, title: linkTitle, description: linkDesc,
+        question, options: pollOptions, tags: tags.split(",").map(s => s.trim()).filter(Boolean)
+      });
+      onClose?.();
+      return;
+    }
+
+    setSaving(true);
+    const tokenHeaders = authHeader();
+    const POST_DETAIL_URL = `${API_ROOT}/communities/${communityId}/posts/${item.id}/`;
+
+    try {
+      let res;
+      if (kind === "image" && imageFile) {
+        const fd = new FormData();
+        fd.append("type", "image");
+        fd.append("image", imageFile);
+        if (caption) fd.append("caption", caption);
+        tags.split(",").map(s => s.trim()).filter(Boolean).forEach(t => fd.append("tags", t));
+        res = await fetch(POST_DETAIL_URL, { method: "PATCH", headers: { ...tokenHeaders }, body: fd });
+      } else {
+        const payload = { type: kind, tags: tags.split(",").map(s => s.trim()).filter(Boolean) };
+        if (kind === "text") payload.content = text;
+        if (kind === "image") payload.caption = caption;
+        if (kind === "link") Object.assign(payload, {
+          url: linkUrl.trim(), title: linkTitle.trim() || undefined, description: linkDesc.trim() || undefined
+        });
+        if (kind === "poll") Object.assign(payload, {
+          question, options: pollOptions.map(o => o.trim()).filter(Boolean)
+        });
+
+        res = await fetch(POST_DETAIL_URL, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...tokenHeaders },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      const updated = res?.ok ? await res.json()
+        : { ...item, text, caption, url: linkUrl, title: linkTitle, description: linkDesc, question, options: pollOptions };
+      onSaved?.(updated);
+      onClose?.();
+    } catch {
+      onSaved?.({ ...item, text, caption, url: linkUrl, title: linkTitle, description: linkDesc, question, options: pollOptions });
+      onClose?.();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth keepMounted>
+        <DialogTitle>Edit Post</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {/* kind-specific editors, simplified */}
+            {kind === "text" && (
+              <TextField label="Text" multiline minRows={5} value={text} onChange={e => setText(e.target.value)} fullWidth />
+            )}
+
+            {kind === "image" && (
+              <Stack spacing={1.5}>
+                <Box sx={{ width: "100%", border: `1px dashed ${BORDER}`, borderRadius: 2, p: 2, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 140, bgcolor: "#fafafa" }}>
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="preview" style={{ maxWidth: "100%", maxHeight: 240, borderRadius: 12 }} />
+                  ) : (item.image_url || item.image || item.image_preview) ? (
+                    <img src={item.image_url || item.image || item.image_preview} alt="post" style={{ maxWidth: "100%", maxHeight: 240, borderRadius: 12 }} />
+                  ) : null}
+                </Box>
+                <Row>
+                  <Button component="label" variant="outlined" startIcon={<ImageRoundedIcon />}>
+                    Replace image
+                    <input hidden type="file" accept="image/*" onChange={(e) => onPickImage(e.target.files?.[0] || null)} />
+                  </Button>
+                  <TextField label="Caption" value={caption} onChange={e => setCaption(e.target.value)} fullWidth />
+                </Row>
+              </Stack>
+            )}
+
+            {kind === "link" && (
+              <Stack spacing={1.5}>
+                <TextField label="URL" value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
+                  InputProps={{ startAdornment: (<InputAdornment position="start"><LinkIcon fontSize="small" /></InputAdornment>) }} fullWidth />
+                <Row>
+                  <TextField label="Title" value={linkTitle} onChange={e => setLinkTitle(e.target.value)} fullWidth />
+                </Row>
+                <TextField label="Description" value={linkDesc} onChange={e => setLinkDesc(e.target.value)} multiline minRows={2} fullWidth />
+              </Stack>
+            )}
+
+            {kind === "poll" && (
+              <Stack spacing={1.5}>
+                <TextField label="Question" value={question} onChange={e => setQuestion(e.target.value)} fullWidth />
+                <Stack spacing={1}>
+                  {pollOptions.map((opt, i) => (
+                    <Row key={i}>
+                      <TextField label={`Option ${i + 1}`} value={opt} onChange={e => setPollOptions(p => p.map((x, idx) => idx === i ? e.target.value : x))} fullWidth />
+                      <Button color="error" onClick={() => setPollOptions(p => p.filter((_, idx) => idx !== i))} disabled={pollOptions.length <= 2}>Remove</Button>
+                    </Row>
+                  ))}
+                  <Button onClick={() => setPollOptions(p => [...p, ""])} startIcon={<AddRoundedIcon />}>Add option</Button>
+                </Stack>
+              </Stack>
+            )}
+
+            <TextField label="Tags (comma separated)" value={tags} onChange={e => setTags(e.target.value)} fullWidth />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} variant="contained" disabled={!canSave() || saving}>
+            {saving ? <CircularProgress size={18} /> : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={toast.open} autoHideDuration={2600} onClose={() => setToast(t => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+        <Alert severity={toast.type === "error" ? "error" : "success"} variant="filled" onClose={() => setToast(t => ({ ...t, open: false }))}>
+          {toast.msg}
+        </Alert>
+      </Snackbar>
+    </>
+  );
+}
+
+// ------- delete confirm -------
+function DeleteConfirmDialog({ open, onClose, communityId, item, onDeleted }) {
+  const [busy, setBusy] = React.useState(false);
+  const handleDelete = async () => {
+    if (!communityId || !item?.id) { onDeleted?.(); onClose?.(); return; }
+    if (String(item.id).startsWith("local-")) { onDeleted?.(); onClose?.(); return; }
+
+    setBusy(true);
+    const tokenHeaders = authHeader();
+    const POST_DETAIL_URL = `${API_ROOT}/communities/${communityId}/posts/${item.id}/`;
+    try {
+      await fetch(POST_DETAIL_URL, { method: "DELETE", headers: { ...tokenHeaders } });
+    } catch { }
+    setBusy(false);
+    onDeleted?.();
+    onClose?.();
+  };
+
+  return (
+    <Dialog open={open} onClose={busy ? undefined : onClose}>
+      <DialogTitle>Delete post?</DialogTitle>
+      <DialogContent>
+        <DialogContentText> This action cannot be undone. </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={busy}>Cancel</Button>
+        <Button onClick={handleDelete} color="error" variant="contained" disabled={busy}>
+          {busy ? <CircularProgress size={18} /> : "Delete"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ------- overlay wrapper (no changes to your PostCard) -------
+function PostWithActions({ item, communityId, onUpdated, onDeleted }) {
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [delOpen, setDelOpen] = React.useState(false);
+
+  return (
+    <Box sx={{ position: "relative" }}>
+      <PostCard item={item} />
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}
+      >
+        <Tooltip title="Edit">
+          <IconButton size="small" onClick={() => setEditOpen(true)}>
+            <EditRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Delete">
+          <IconButton size="small" color="error" onClick={() => setDelOpen(true)}>
+            <DeleteOutlineRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+
+      <EditPostDialog
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        item={item}
+        communityId={communityId}
+        onSaved={(u) => onUpdated?.(u)}
+      />
+      <DeleteConfirmDialog
+        open={delOpen}
+        onClose={() => setDelOpen(false)}
+        item={item}
+        communityId={communityId}
+        onDeleted={() => onDeleted?.(item.id)}
+      />
+    </Box>
+  );
+}
+
+
 // ------- create dialog -------
 function CreatePostDialog({ open, onClose, onCreated, communityId }) {
   // types: text | image | link | poll  (event removed)
@@ -296,11 +574,12 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
         });
       } else {
         // text
-        payload = { type: "text",
+        payload = {
+          type: "text",
           content: text,
           tags: tags.split(",").map(s => s.trim()).filter(Boolean),
           visibility: "community",
-         };
+        };
         res = await fetch(COMMUNITY_CREATE_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...tokenHeaders },
@@ -629,8 +908,19 @@ export default function AdminPostsPage() {
           ) : (
             <Stack spacing={2}>
               {items.map((it) => (
-                <PostCard key={it.id || it.created_at} item={it} />
+                <PostWithActions
+                  key={it.id || it.created_at}
+                  item={it}
+                  communityId={activeCommunityId}
+                  onUpdated={(updated) =>
+                    setItems((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+                  }
+                  onDeleted={(id) =>
+                    setItems((prev) => prev.filter((p) => p.id !== id))
+                  }
+                />
               ))}
+
             </Stack>
           )}
         </Box>
