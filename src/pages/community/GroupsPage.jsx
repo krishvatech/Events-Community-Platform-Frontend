@@ -23,11 +23,11 @@ import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 const BORDER = "#e2e8f0";
 const JOIN_BTN_SX = {
   textTransform: "none",
-  whiteSpace: "nowrap", // keep label on one line (Request to join)
-  minWidth: 124,        // same visual width for Join / Request to join
+  whiteSpace: "nowrap",
+  minWidth: 124,
   px: 2.25,
   fontWeight: 600,
-  borderRadius: 2,      // keep your current look; use 999 for pill
+  borderRadius: 2,
 };
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
@@ -46,7 +46,6 @@ function GroupGridCard({ g, onJoin }) {
   const groupPath = `/community/group/${g.slug || g.id}`;
   const members = g.member_count ?? g.members_count ?? g.members?.length ?? 0;
 
-  // NEW: join-policy helpers
   const visibility = (g.visibility || "").toLowerCase();
   const jp = (g.join_policy || "").toLowerCase();
   const isApproval =
@@ -61,15 +60,16 @@ function GroupGridCard({ g, onJoin }) {
     <Card
       variant="outlined"
       sx={{
-        width: "80%",
+        width: 232,
         borderRadius: 3,
         overflow: "hidden",
         borderColor: BORDER,
-        height: "100%",
+        height: 280,
         display: "flex",
         flexDirection: "column",
       }}
     >
+
       <Box
         sx={{
           width: "100%",
@@ -185,19 +185,16 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
 
-  // If you pass ?topic=Something in URL, header uses it; else default
   const headerTitle = params.get("topic") || "Sustainable Living";
 
-  // Filters (visibility removed as requested)
   const [q, setQ] = React.useState("");
   const [locationQ, setLocationQ] = React.useState("");
-  const [typeTab, setTypeTab] = React.useState("groups"); // UI only
+  const [typeTab, setTypeTab] = React.useState("groups");
 
   const [groups, setGroups] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
 
-  // participants preview for header (fallback images)
   const [previews, setPreviews] = React.useState([
     {
       id: 1,
@@ -232,8 +229,6 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
       const list = Array.isArray(d) ? d : d.results || [];
       setGroups(list);
 
-      // If backend ever returns a members preview, plug it in here
-      // looking for list[0].members_preview = [{name, avatarUrl}, ...]
       const mp = list?.[0]?.members_preview;
       if (Array.isArray(mp) && mp.length) {
         setPreviews(mp.slice(0, 3));
@@ -249,15 +244,12 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
 
   React.useEffect(() => {
     loadGroups();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleJoin = async (g) => {
     const visibility = (g.visibility || "").toLowerCase();
     const jp = (g.join_policy || "").toLowerCase();
 
-    // public+open => /join-group/
-    // public+approval => /join-group/request/
     const isApproval = visibility === "public" && (jp === "public_approval" || jp === "approval");
     const path = isApproval ? "join-group/request" : "join-group";
 
@@ -274,13 +266,11 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
 
       if (r.status === 401) throw new Error("Please log in to join.");
 
-      // 🔁 Hard reload immediately after success
       if (r.ok) {
         window.location.reload();
         return;
       }
 
-      // If backend returns non-OK but not 401, show error
       const payload = await r.json().catch(() => ({}));
       throw new Error(payload?.detail || "Failed to join group");
     } catch (e) {
@@ -288,13 +278,11 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
     }
   };
 
-
   const clearAll = () => {
     setQ("");
     setLocationQ("");
   };
 
-  // Local filtering only (no endpoint changes)
   const filtered = React.useMemo(() => {
     const t = q.trim().toLowerCase();
     const loc = locationQ.trim().toLowerCase();
@@ -315,128 +303,136 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
   }, [groups, q, locationQ]);
 
   return (
-    <Box sx={{ width: "100%", maxWidth: 1200, mx: "auto" }}>
-      <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 8, md: 12 }}>
-        {/* LEFT: header + filters + grid */}
-        <Grid item xs={12} md={8}>
-          {/* Big header like your mock */}
-          <TopicHeader title={headerTitle} previews={previews} extraCount={extraCount} />
+    <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
+      <Box sx={{ display: "flex", gap: 3, px: { xs: 2, sm: 2, md: 3 }, maxWidth: "1100px", mx: "auto" }}>
+        {/* LEFT: Main content */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <TopicHeader title={headerTitle} previews={previews} extraCount={extraCount} />
 
-          {/* Filter bar */}
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={1.5}
-            alignItems={{ xs: "stretch", md: "center" }}
-            sx={{ mb: 1.5 }}
+        {/* Filter bar */}
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={1.5}
+          alignItems={{ xs: "stretch", md: "center" }}
+          sx={{ mb: 1.5 }}
+        >
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Search for Groups
+            </Typography>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search a name or a keyword"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Search by location
+            </Typography>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Type and select a location"
+              value={locationQ}
+              onChange={(e) => setLocationQ(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+
+          <Button
+            variant="contained"
+            onClick={clearAll}
+            sx={{ whiteSpace: "nowrap", alignSelf: { xs: "flex-end", md: "flex-end" } }}
           >
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                Search for Groups
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search a name or a keyword"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
+            Clear all Filters
+          </Button>
+        </Stack>
 
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                Search by location
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Type and select a location"
-                value={locationQ}
-                onChange={(e) => setLocationQ(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
+        {/* Posts / Groups toggle */}
+        <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
+          <Button
+            size="small"
+            variant={typeTab === "posts" ? "contained" : "outlined"}
+            onClick={() => setTypeTab("posts")}
+            sx={{ textTransform: "none" }}
+          >
+            Posts
+          </Button>
+          <Button
+            size="small"
+            variant={typeTab === "groups" ? "contained" : "outlined"}
+            onClick={() => setTypeTab("groups")}
+            sx={{ textTransform: "none" }}
+          >
+            Groups
+          </Button>
+        </Stack>
 
-            <Button
-              variant="contained"
-              onClick={clearAll}
-              sx={{ whiteSpace: "nowrap", alignSelf: { xs: "flex-end", md: "flex-end" } }}
-            >
-              Clear all Filters
-            </Button>
-          </Stack>
+        {/* Loading / error */}
+        {loading && (
+          <Paper sx={{ p: 1.5, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+            <LinearProgress />
+          </Paper>
+        )}
+        {!loading && error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-          {/* Posts / Groups toggle (UI only) */}
-          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
-            <Button
-              size="small"
-              variant={typeTab === "posts" ? "contained" : "outlined"}
-              onClick={() => setTypeTab("posts")}
-              sx={{ textTransform: "none" }}
-            >
-              Posts
-            </Button>
-            <Button
-              size="small"
-              variant={typeTab === "groups" ? "contained" : "outlined"}
-              onClick={() => setTypeTab("groups")}
-              sx={{ textTransform: "none" }}
-            >
-              Groups
-            </Button>
-          </Stack>
+        {/* 3-column grid */}
+        <Grid container spacing={2}>
+          {filtered.map((g) => (
+            <Grid key={g.id} item xs={12} sm={6} md={4}>
+              <GroupGridCard g={g} onJoin={handleJoin} />
+            </Grid>
+          ))}
 
-          {/* Loading / error */}
-          {loading && (
-            <Paper sx={{ p: 1.5, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-              <LinearProgress />
-            </Paper>
+          {!loading && filtered.length === 0 && (
+            <Grid item xs={12}>
+              <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+                <Typography variant="body2" color="text.secondary">
+                  No groups match your filters.
+                </Typography>
+              </Paper>
+            </Grid>
           )}
-          {!loading && error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          {/* 3-column grid */}
-          <Grid container spacing={{ xs: 1, md: 1 }} columns={{ xs: 4, sm: 8, md: 12 }}>
-            {filtered.map((g) => (
-              <Grid key={g.id} item size={{ xs: 4, sm: 4, md: 4 }}>
-                <GroupGridCard g={g} onJoin={handleJoin} />
-              </Grid>
-            ))}
-
-            {!loading && filtered.length === 0 && (
-              <Grid item xs={12} md={3}>
-                <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    No groups match your filters.
-                  </Typography>
-                </Paper>
-              </Grid>
-            )}
-          </Grid>
         </Grid>
+      </Box>
 
-        {/* RIGHT: stacked community profile card as in the mock */}
-        <Grid item xs={12} md={4}>
-          <Stack spacing={2}>
-            <CommunityProfileCard user={user} />
-          </Stack>
-        </Grid>
-      </Grid>
+      {/* RIGHT: Sidebar - sticky */}
+      <Box
+        sx={{
+          width: 300,
+          display: { xs: "none", md: "block" },
+          position: "sticky",
+          top: 20,
+          height: "fit-content",
+          flexShrink: 0,
+        }}
+      >
+        <Stack spacing={2}>
+          <CommunityProfileCard user={user} />
+        </Stack>
+      </Box>
+    </Box>
     </Box>
   );
 }
