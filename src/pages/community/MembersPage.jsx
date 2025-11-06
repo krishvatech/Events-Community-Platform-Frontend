@@ -28,6 +28,7 @@ import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import { geoNaturalEarth1 } from "d3-geo";
 
 // Colorful world map + markers with pan/zoom
 import {
@@ -42,8 +43,7 @@ import {
 const BORDER = "#e2e8f0";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
-const geoUrl =
-  "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"; // sharper borders
 
 const tokenHeader = () => {
   const t =
@@ -355,8 +355,32 @@ export default function MembersPage() {
 
   // map controls
   const [showMap, setShowMap] = useState(true);
-  const [usePreview, setUsePreview] = useState(true); // show dots immediately
+  const [usePreview, setUsePreview] = useState(false);
   const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 }); // pan/zoom state
+
+  // Tooltip state
+  const [tip, setTip] = React.useState(null); // { x, y, node }
+
+  // Show / move / hide tooltip
+  const showTip = (evt, node) => {
+    const rect = mapBoxRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTip({
+      x: evt.clientX - rect.left + 10,
+      y: evt.clientY - rect.top + 10,
+      node,
+    });
+  };
+  const moveTip = (evt) => {
+    const rect = mapBoxRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTip((prev) =>
+      prev
+        ? { ...prev, x: evt.clientX - rect.left + 10, y: evt.clientY - rect.top + 10 }
+        : prev
+    );
+  };
+  const hideTip = () => setTip(null);
 
   // pagination
   const [page, setPage] = useState(1);
@@ -366,6 +390,26 @@ export default function MembersPage() {
   const [friendStatusByUser, setFriendStatusByUser] = useState({});
   const [unreadByUser, setUnreadByUser] = useState({});
   const pollRef = useRef(null);
+
+  const mapBoxRef = useRef(null);
+  const [mapSize, setMapSize] = useState({ w: 800, h: 400 });
+  useEffect(() => {
+    const el = mapBoxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setMapSize({ w: Math.max(100, width), h: Math.max(100, height) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Who to show as a person's name
+  const userDisplayName = (u) =>
+    u?.profile?.full_name ||
+    `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
+    u?.email ||
+    `User #${u?.id}`;
 
   const me = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("user") || "{}"); }
@@ -525,7 +569,7 @@ export default function MembersPage() {
       if (!center) continue;
       const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
       if (!byCountry[code]) byCountry[code] = [];
-      byCountry[code].push({ center, isFriend });
+      byCountry[code].push({ center, isFriend, user: u });
     }
     const out = [];
     Object.entries(byCountry).forEach(([code, arr]) => {
@@ -536,22 +580,40 @@ export default function MembersPage() {
         const r = 0.4 * ring;
         const dx = r * Math.cos(angle);
         const dy = r * Math.sin(angle);
-        out.push({ coordinates: [base[0] + dx, base[1] + dy], isFriend: item.isFriend });
+        out.push({
+          coordinates: [base[0] + dx, base[1] + dy],
+          isFriend: item.isFriend,
+          userName: userDisplayName(item.user),
+          countryCode: code,
+        });
       });
     });
     return out;
   }, [filtered, friendStatusByUser]);
 
-  const markers = usePreview
-    ? expandPreviewMarkers().map((m, i) => {
-        const angle = ((i * 40) % 360) * (Math.PI / 180);
-        const ring = Math.floor(i / 9) + 1;
-        const r = 0.4 * ring;
-        const dx = r * Math.cos(angle);
-        const dy = r * Math.sin(angle);
-        return { coordinates: [m.center[0] + dx, m.center[1] + dy], isFriend: m.isFriend };
-      })
-    : liveMarkers;
+  const countryAgg = useMemo(() => {
+  const map = {};
+  for (const u of filtered) {
+    const code = resolveCountryCode(u).toLowerCase();
+    const center = COUNTRY_CENTROIDS[code];
+    if (!center) continue;
+    const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
+    if (!map[code]) {
+      map[code] = {
+        code,
+        center,
+        users: [],
+        friends: 0,
+        label: displayCountry(u) || code.toUpperCase(),
+      };
+    }
+    map[code].users.push(userDisplayName(u));
+    if (isFriend) map[code].friends += 1;
+  }
+  return Object.values(map).map((e) => ({ ...e, total: e.users.length }));
+}, [filtered, friendStatusByUser]);
+
+  const markers = liveMarkers;
 
   // pagination
   useEffect(() => setPage(1), [q]);
@@ -724,9 +786,14 @@ export default function MembersPage() {
             </Stack>
           </Stack>
 
-          <Box sx={{ flex: 1, minHeight: 360 }}>
+          <Box ref={mapBoxRef} sx={{ position: "relative", flex: 1, minHeight: 360, "& svg": { display: "block" } }}>
             {showMap ? (
-              <ComposableMap projection="geoEqualEarth" width={800} height={440}>
+              <ComposableMap
+                  projection={geoNaturalEarth1()}
+                  width={mapSize.w}
+                  height={mapSize.h}
+                  preserveAspectRatio="xMidYMid slice"   // like CSS object-fit: cover
+                >
                 <ZoomableGroup
                   center={mapPos.coordinates}
                   zoom={mapPos.zoom}
@@ -747,24 +814,79 @@ export default function MembersPage() {
                       ))
                     }
                   </Geographies>
+                  {/* Country-level hover (summary tooltip) */}
+                  {countryAgg.map((c) => (
+                    <Marker key={`hover-${c.code}`} coordinates={c.center}
+                    onMouseEnter={(e) =>
+                      showTip(
+                        e,
+                        <div>
+                          <div style={{ fontWeight: 700 }}>{c.label}</div>
+                          <div>{c.total} people{c.friends ? ` • ${c.friends} friends` : ""}</div>
+                          <div style={{ marginTop: 4, opacity: 0.9 }}>
+                            {c.users.slice(0, 6).join(", ")}
+                            {c.total > 6 ? ` +${c.total - 6} more` : ""}
+                          </div>
+                        </div>
+                      )
+                    }
+                    onMouseMove={moveTip}
+                    onMouseLeave={hideTip}
+                    >
+                      {/* big invisible hit circle so hover is easy */}
+                      <circle r={14} fill="transparent" stroke="transparent" style={{ pointerEvents: "all" }} />
+                    </Marker>
+                  ))}
 
                   {markers.map((m, i) => (
-                    <Marker key={i} coordinates={m.coordinates}>
+                    <Marker key={i} coordinates={m.coordinates}
+                    onMouseEnter={(e) => showTip(e, (
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{m.userName}</div>
+                        <div style={{ opacity: 0.85 }}>{m.isFriend ? "Friend" : "Member"}</div>
+                      </div>
+                    ))}
+                    onMouseMove={moveTip}
+                    onMouseLeave={hideTip}>
                       <circle
                         r={3.2}
                         fill={m.isFriend ? "#10b981" : "#ef4444"}
                         stroke="#ffffff"
                         strokeWidth={1}
+                        style={{ pointerEvents: "all" }}
                       />
                     </Marker>
                   ))}
                 </ZoomableGroup>
               </ComposableMap>
+              
             ) : (
               <Stack alignItems="center" justifyContent="center" sx={{ height: "100%", color: "text.secondary" }}>
                 <Typography>Map hidden.</Typography>
               </Stack>
             )}
+            {tip && (
+  <Box
+    sx={{
+      position: "absolute",
+      left: tip.x,
+      top: tip.y,
+      pointerEvents: "none",
+      bgcolor: "rgba(0,0,0,0.92)",
+      color: "#fff",
+      px: 1.25,
+      py: 0.75,
+      borderRadius: 1,
+      fontSize: 12,
+      lineHeight: 1.35,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+      maxWidth: 280,
+      zIndex: 10,
+    }}
+  >
+    {tip.node}
+  </Box>
+)}
           </Box>
         </Paper>
       </Grid>
