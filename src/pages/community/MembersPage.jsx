@@ -1,5 +1,5 @@
 // src/pages/community/MembersPage.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState , useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Avatar,
@@ -22,10 +22,13 @@ import {
   Card,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import MailOutlineOutlinedIcon from "@mui/icons-material/MailOutlineOutlined";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
-import { geoNaturalEarth1 } from "d3-geo";
+import { geoNaturalEarth1,geoCentroid } from "d3-geo";
+import { feature as topoFeature } from "topojson-client";
+import * as isoCountries from "i18n-iso-countries";
+import enLocale from "i18n-iso-countries/langs/en.json";
+isoCountries.registerLocale(enLocale);
 
 // Colorful world map + markers with pan/zoom
 import {
@@ -51,6 +54,14 @@ const tokenHeader = () => {
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
+const normalizeFriendStatus = (s) => {
+  const v = (s || "").toLowerCase();
+  if (["friends", "friend", "accepted", "approve", "approved"].includes(v)) return "friends";
+  if (["pending_outgoing", "outgoing_pending", "requested", "requested_outgoing", "sent", "request_sent"].includes(v)) return "pending_outgoing";
+  if (["pending_incoming", "incoming_pending", "received", "request_received"].includes(v)) return "pending_incoming";
+  return "none";
+};
+
 const isAbort = (e) =>
   e?.name === "AbortError" ||
   /aborted|aborterror|signal is aborted/i.test(e?.message || "");
@@ -67,46 +78,31 @@ const MIN_ZOOM = 1;      // keep world fitting the box; below this panning feels
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 1.35;  // how fast +/- changes
 
-/* ------------ Static country mapping + centroids + flag emoji ------------ */
-const COUNTRY_NAME_TO_ISO2 = {
-  india: "IN", bharat: "IN", hindustan: "IN",
-  "united states": "US", usa: "US", "u.s.": "US", america: "US",
-  "united kingdom": "GB", uk: "GB", england: "GB", scotland: "GB", wales: "GB", "northern ireland": "GB",
-  pakistan: "PK",
-  switzerland: "CH", suisse: "CH", schweiz: "CH", svizzera: "CH",
-  "united arab emirates": "AE", uae: "AE", dubai: "AE", "abu dhabi": "AE",
-  canada: "CA", australia: "AU", italy: "IT", japan: "JP",
-  germany: "DE", france: "FR", spain: "ES", brazil: "BR", mexico: "MX",
-  singapore: "SG", indonesia: "ID", vietnam: "VN", russia: "RU", china: "CN",
-  "south korea": "KR", "republic of korea": "KR", "korea, republic of": "KR",
-  argentina: "AR", "south africa": "ZA", nigeria: "NG", kenya: "KE",
-  turkey: "TR", netherlands: "NL", sweden: "SE", norway: "NO",
-  denmark: "DK", portugal: "PT", poland: "PL", ireland: "IE",
-  "new zealand": "NZ",
-};
 
 function resolveCountryCode(user) {
-  const direct =
+  // First prefer explicit ISO2 if you store it
+  const code =
     user?.profile?.country_code ||
     user?.country_code ||
     user?.countryCode ||
+    user?.profile?.location_country_code ||
     user?.country_code_iso2;
-  if (direct && String(direct).length === 2) return String(direct).toUpperCase();
 
-  const candidates = [
-    user?.profile?.country,
-    user?.country,
-    user?.location_country,
-    user?.profile?.location_country,
-    (user?.profile?.location || "").split(",").slice(-1)[0],
-  ].filter(Boolean);
+  if (code) return String(code).toUpperCase();
 
-  for (const c of candidates) {
-    const code = COUNTRY_NAME_TO_ISO2[norm(c)];
-    if (code) return code.toUpperCase();
-  }
-  return "";
+  // Fallback: convert a country NAME (e.g., "India") to ISO2 (e.g., "IN")
+  const name =
+    user?.profile?.country ||
+    user?.country ||
+    user?.location_country ||
+    user?.profile?.location_country ||
+    user?.profile?.location ||   // <— important if you saved into `location`
+    "";
+
+  const iso2 = name ? isoCountries.getAlpha2Code(String(name), "en") : "";
+  return iso2 ? String(iso2).toUpperCase() : "";
 }
+
 
 function displayCountry(user) {
   return (
@@ -125,21 +121,56 @@ function flagEmojiFromISO2(code) {
   try { return String.fromCodePoint(...pts); } catch { return ""; }
 }
 
-// centroids (lng, lat)
-const COUNTRY_CENTROIDS = {
-  in: [78.9629, 22.5937], gb: [-3.4359, 55.3781], ch: [8.2275, 46.8182],
-  us: [-98.5795, 39.8283], pk: [69.3451, 30.3753], ae: [54.366, 24.455],
-  ca: [-106.3468, 56.1304], au: [133.7751, -25.2744], it: [12.5674, 41.8719],
-  jp: [138.2529, 36.2048], de: [10.4515, 51.1657], fr: [2.2137, 46.2276],
-  es: [-3.7492, 40.4637], br: [-51.9253, -14.235], mx: [-102.5528, 23.6345],
-  sg: [103.8198, 1.3521], id: [113.9213, -0.7893], vn: [108.2772, 14.0583],
-  ru: [105.3188, 61.524], cn: [104.1954, 35.8617], kr: [127.7669, 35.9078],
-  ar: [-63.6167, -38.4161], za: [22.9375, -30.5595], ng: [8.6753, 9.082],
-  ke: [37.9062, 0.0236], tr: [35.2433, 38.9637], nl: [5.2913, 52.1326],
-  se: [18.6435, 60.1282], no: [8.4689, 60.472], dk: [9.5018, 56.2639],
-  pt: [-8.2245, 39.3999], pl: [19.1451, 51.9194], ie: [-8.2439, 53.4129],
-  nz: [170.5, -44.0],
-};
+// normalize names so "Côte d’Ivoire" etc. match reliably
+const normName = (s) =>
+  (s || "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+// name -> [lon, lat]
+
+function useCountryCentroids(geoUrl) {
+  const [centroidsByName, setCentroidsByName] = useState({});
+
+  // load topojson and compute centroids once
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const topo = await (await fetch(geoUrl)).json();
+        const gj = topoFeature(topo, topo.objects.countries);
+        const map = {};
+        for (const f of gj.features) {
+          const name = f?.properties?.name;
+          if (!name) continue;
+          map[normName(name)] = geoCentroid(f); // [lon, lat]
+        }
+        if (alive) setCentroidsByName(map);
+      } catch (e) {
+        console.error("centroids load failed", e);
+      }
+    })();
+    return () => { alive = false; };
+  }, [geoUrl]);
+
+  // iso2 -> [lon, lat]
+  const getCenterForISO2 = useCallback((iso2) => {
+    if (!iso2) return null;
+    const name = isoCountries.getName(String(iso2).toUpperCase(), "en");
+    if (!name) return null;
+    const n = normName(name);
+    if (centroidsByName[n]) return centroidsByName[n];
+    const hit = Object.entries(centroidsByName).find(([k]) => k.includes(n) || n.includes(k));
+    return hit ? hit[1] : null;
+  }, [centroidsByName]);
+
+  return getCenterForISO2;
+}
+
 
 // pastel country fills
 const PALETTE = [
@@ -153,7 +184,7 @@ const countryColor = (name) => {
 };
 
 /* -------------------------- Member card (left) -------------------------- */
-function MemberCard({ u, unread, friendStatus, onOpenProfile, onMessage, onAddFriend }) {
+function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
   const name =
     u?.profile?.full_name ||
     `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
@@ -178,20 +209,12 @@ function MemberCard({ u, unread, friendStatus, onOpenProfile, onMessage, onAddFr
       }}
     >
       <Stack direction="row" spacing={1.5} alignItems="center">
-        <Badge
-          overlap="circular"
-          variant="dot"
-          color="error"
-          invisible={!unread}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        <Avatar
+          sx={{ width: 44, height: 44, cursor: "pointer", bgcolor: "#e2e8f0", color: "#334155", fontWeight: 700 }}
+          onClick={() => onOpenProfile?.(u)}
         >
-          <Avatar
-            sx={{ width: 44, height: 44, cursor: "pointer", bgcolor: "#e2e8f0", color: "#334155", fontWeight: 700 }}
-            onClick={() => onOpenProfile?.(u)}
-          >
-            {(name || "?").slice(0, 1).toUpperCase()}
-          </Avatar>
-        </Badge>
+          {(name || "?").slice(0, 1).toUpperCase()}
+        </Avatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" spacing={1} alignItems="center">
@@ -223,42 +246,31 @@ function MemberCard({ u, unread, friendStatus, onOpenProfile, onMessage, onAddFr
         {/* actions on the right */}
         <Stack direction="row" spacing={1} alignItems="center" flexShrink={0}>
           {status === "friends" ? (
-            <>
               <Tooltip title="Open profile">
                 <IconButton size="small" onClick={() => onOpenProfile?.(u)}>
                   <OpenInNewOutlinedIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
+            ) : status === "pending_outgoing" ? (
               <Button
                 size="small"
-                variant="contained"
+                variant="outlined"
                 sx={{ textTransform: "none", borderRadius: 2 }}
-                startIcon={<MailOutlineOutlinedIcon />}
-                onClick={() => onMessage?.(u)}
+                disabled
               >
-                Message
+                Request pending
               </Button>
-            </>
-          ) : status === "pending_outgoing" ? (
-            <Button
-              size="small"
-              variant="outlined"
-              sx={{ textTransform: "none", borderRadius: 2 }}
-              disabled
-            >
-              Request pending
-            </Button>
-          ) : (
-            <Button
-              size="small"
-              variant="outlined"
-              sx={{ textTransform: "none", borderRadius: 2 }}
-              startIcon={<PersonAddAlt1RoundedIcon />}
-              onClick={() => onAddFriend?.(u)}
-            >
-              Add friend
-            </Button>
-          )}
+            ) : (
+              <Button
+                size="small"
+                variant="outlined"
+                sx={{ textTransform: "none", borderRadius: 2 }}
+                startIcon={<PersonAddAlt1RoundedIcon />}
+                onClick={() => onAddFriend?.(u)}
+              >
+                Add friend
+              </Button>
+            )}
         </Stack>
       </Stack>
     </Card>
@@ -268,6 +280,9 @@ function MemberCard({ u, unread, friendStatus, onOpenProfile, onMessage, onAddFr
 /* ------------------------------ page component ------------------------------ */
 export default function MembersPage() {
   const navigate = useNavigate();
+
+  const getCenterForISO2 = useCountryCentroids(geoUrl);
+
 
   // state
   const [loading, setLoading] = useState(true);
@@ -309,8 +324,6 @@ export default function MembersPage() {
 
   // friend + unread
   const [friendStatusByUser, setFriendStatusByUser] = useState({});
-  const [unreadByUser, setUnreadByUser] = useState({});
-  const pollRef = useRef(null);
 
   const mapBoxRef = useRef(null);
   const [mapSize, setMapSize] = useState({ w: 800, h: 400 });
@@ -344,20 +357,35 @@ export default function MembersPage() {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d?.detail || `Failed status for ${id}`);
-    return (d?.status || d?.friendship || "none").toLowerCase();
+    return normalizeFriendStatus(d?.status || d?.friendship || "none");
   }
 
   async function sendFriendRequest(id) {
-    const r = await fetch(`${API_BASE}/friend-requests/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...tokenHeader() },
-      credentials: "include",
-      body: JSON.stringify({ to_user_id: id }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) { alert(d?.detail || "Failed to send request"); return; }
-    setFriendStatusByUser((m) => ({ ...m, [id]: "pending_outgoing" }));
+    try {
+      const r = await fetch(`${API_BASE}/friend-requests/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...tokenHeader(),
+        },
+        credentials: "include",
+        body: JSON.stringify({ to_user: Number(id) }), // ← key changed
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok && r.status !== 200 && r.status !== 201) {
+        throw new Error(d?.detail || "Failed to send request");
+      }
+
+      // normalize possible variants from API
+      const status = normalizeFriendStatus(d?.status || "pending_outgoing");
+
+      setFriendStatusByUser((m) => ({ ...m, [id]: status }));
+    } catch (e) {
+      alert(e?.message || "Failed to send request");
+    }
   }
+
 
   // data load
   useEffect(() => {
@@ -406,43 +434,7 @@ export default function MembersPage() {
     return () => { alive = false; ctrl.abort(); };
   }, [me?.id]);
 
-  // conversations polling (for unread)
-  useEffect(() => {
-    let alive = true;
 
-    function pickOther(conv) {
-      const otherId = Array.isArray(conv?.users)
-        ? conv.users.find((id) => id !== me?.id)
-        : conv?.other_user_id;
-      return otherId ? { id: otherId } : undefined;
-    }
-    function lastMeta(conv) {
-      const lm = conv?.last_message || {};
-      return { ts: lm.created_at || conv?.updated_at || conv?.created_at, sender: lm.sender || lm.sender_id || conv?.last_sender_id };
-    }
-    async function fetchConversations() {
-      try {
-        const res = await fetch(`${API_BASE}/messaging/conversations/?limit=200`, { headers: tokenHeader(), credentials: "include" });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) return;
-        const list = Array.isArray(json) ? json : json?.results ?? [];
-        const map = {};
-        for (const c of list) {
-          const other = pickOther(c);
-          const otherId = other?.id;
-          if (!otherId) continue;
-          const { ts, sender } = lastMeta(c);
-          const seen = localStorage.getItem(`conv_read_${c.id}`) || "";
-          const isUnread = ts && sender && sender !== me?.id && (!seen || new Date(ts).getTime() > new Date(seen).getTime());
-          if (isUnread) map[otherId] = true;
-        }
-        if (alive) setUnreadByUser(map);
-      } catch {}
-    }
-    fetchConversations();
-    pollRef.current = setInterval(fetchConversations, 5000);
-    return () => { alive = false; if (pollRef.current) clearInterval(pollRef.current); };
-  }, [me?.id]);
 
   // text filter
   const filtered = useMemo(() => {
@@ -485,7 +477,7 @@ export default function MembersPage() {
     const byCountry = {};
     for (const u of filtered) {
       const code = resolveCountryCode(u).toLowerCase();
-      const center = COUNTRY_CENTROIDS[code];
+      const center = getCenterForISO2(code);
       if (!center) continue;
       const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
       if (!byCountry[code]) byCountry[code] = [];
@@ -493,7 +485,7 @@ export default function MembersPage() {
     }
     const out = [];
     Object.entries(byCountry).forEach(([code, arr]) => {
-      const base = COUNTRY_CENTROIDS[code];
+      const base = arr[0].center;
       arr.forEach((item, idx) => {
         const angle = ((idx * 40) % 360) * (Math.PI / 180);
         const ring = Math.floor(idx / 9) + 1;
@@ -515,7 +507,7 @@ export default function MembersPage() {
   const map = {};
   for (const u of filtered) {
     const code = resolveCountryCode(u).toLowerCase();
-    const center = COUNTRY_CENTROIDS[code];
+    const center = getCenterForISO2(code);
     if (!center) continue;
     const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
     if (!map[code]) {
@@ -568,22 +560,6 @@ export default function MembersPage() {
     navigate(`/community/rich-profile/${id}`, { state: { user: m } });
   };
 
-  const startChat = async (id) => {
-    try {
-      const r = await fetch(`${API_BASE}/messaging/conversations/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...tokenHeader() },
-        credentials: "include",
-        body: JSON.stringify({ to_user_id: id }),
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d?.detail || "Failed to start chat");
-      const convId = d?.id || d?.conversation_id;
-      if (convId) navigate(`/messages/${convId}`);
-    } catch (e) {
-      alert(e?.message || "Unable to start chat");
-    }
-  };
 
   // map controls
   const zoomIn = () =>
@@ -641,10 +617,8 @@ export default function MembersPage() {
                 <MemberCard
                   key={u.id}
                   u={u}
-                  unread={!!unreadByUser[u.id]}
                   friendStatus={friendStatusByUser[u.id]}
                   onOpenProfile={handleOpenProfile}
-                  onMessage={() => startChat(u.id)}
                   onAddFriend={() => sendFriendRequest(u.id)}
                 />
               ))}
@@ -654,10 +628,6 @@ export default function MembersPage() {
                   <Typography>No members match your search.</Typography>
                 </Paper>
               )}
-            </Stack>
-
-            <Stack alignItems="center" sx={{ mt: 1 }}>
-              <Pagination count={pageCount} page={page} onChange={(_, p) => setPage(p)} color="primary" size="small" />
             </Stack>
           </>
         )}
@@ -725,7 +695,6 @@ export default function MembersPage() {
                   minZoom={MIN_ZOOM}
                   maxZoom={MAX_ZOOM}
                   onMoveStart={() => hideTip()}       // hide tooltip when you start dragging
-                  onMove={(pos) => setMapPos(pos)}    // update as you drag
                   onMoveEnd={(pos) => setMapPos(pos)} // and when drag ends
                 >
                   <Geographies geography={geoUrl}>

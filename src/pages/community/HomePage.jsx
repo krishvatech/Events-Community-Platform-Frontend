@@ -46,6 +46,9 @@ import EmailIcon from "@mui/icons-material/Email";
 import PlaceIcon from "@mui/icons-material/Place";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import Autocomplete from "@mui/material/Autocomplete";
+import * as isoCountries from "i18n-iso-countries";
+import enLocale from "i18n-iso-countries/langs/en.json";
 
 // -----------------------------------------------------------------------------
 // API helpers
@@ -88,6 +91,30 @@ function mapEducation(item) {
     grade: item.grade || "",
   };
 }
+
+isoCountries.registerLocale(enLocale);
+
+// 🇮🇳 flag from "IN"
+const flagEmoji = (code) =>
+  code
+    .toUpperCase()
+    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt()));
+
+const COUNTRY_OPTIONS = Object.entries(
+  isoCountries.getNames("en", { select: "official" })
+).map(([code, label]) => ({ code, label, emoji: flagEmoji(code) }));
+
+// If your profile stores the country *name* in profile.location,
+// this finds the matching option; if you store ISO2 (like "IN"),
+// it also works by matching code.
+const getSelectedCountry = (profile) => {
+  if (!profile?.location) return null;
+  const byCode = COUNTRY_OPTIONS.find((o) => o.code === profile.location);
+  if (byCode) return byCode;
+  return COUNTRY_OPTIONS.find(
+    (o) => (o.label || "").toLowerCase() === String(profile.location).toLowerCase()
+  ) || null;
+};
 
 async function fetchProfileCore() {
   const r = await fetch(`${API_ROOT}/users/me/`, {
@@ -1410,7 +1437,44 @@ function AboutTab({ profile, groups, onUpdate }) {
             </Grid>
             <TextField label="Job title" value={contactForm.job_title} onChange={(e) => setContactForm({ ...contactForm, job_title: e.target.value })} fullWidth />
             <TextField label="Email" value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} fullWidth />
-            <TextField label="Location" value={contactForm.location} onChange={(e) => setContactForm({ ...contactForm, location: e.target.value })} fullWidth />
+            <Autocomplete
+                size="small"
+                fullWidth
+                options={COUNTRY_OPTIONS}
+                autoHighlight
+                value={getSelectedCountry({ location: contactForm.location })}
+                getOptionLabel={(opt) => opt?.label ?? ""}
+                isOptionEqualToValue={(o, v) => o.code === v.code}
+                onChange={(_, newVal) =>
+                  setContactForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))
+                }
+
+                // ⬇️ show 7 items, then scroll
+                ListboxProps={{
+                  style: {
+                    maxHeight: 36 * 7,   // 36px per option for size="small"; use 48 * 7 for "medium"
+                    overflowY: "auto",
+                    paddingTop: 0,
+                    paddingBottom: 0,
+                  },
+                }}
+
+                renderOption={(props, option) => (
+                  <li {...props} key={option.code}>
+                    <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                    {option.label}
+                  </li>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Location"
+                    placeholder="Select country"
+                    fullWidth
+                    inputProps={{ ...params.inputProps, autoComplete: "new-password" }}
+                  />
+                )}
+              />
             <TextField label="LinkedIn URL" value={contactForm.linkedin} onChange={(e) => setContactForm({ ...contactForm, linkedin: e.target.value })} fullWidth />
           </Stack>
         </DialogContent>
