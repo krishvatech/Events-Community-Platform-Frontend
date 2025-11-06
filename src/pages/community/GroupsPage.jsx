@@ -16,6 +16,7 @@ import {
   LinearProgress,
   Alert,
   Avatar,
+  Pagination,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
@@ -29,6 +30,8 @@ const JOIN_BTN_SX = {
   fontWeight: 600,
   borderRadius: 2,
 };
+
+const ITEMS_PER_PAGE = 6;
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 
@@ -188,8 +191,8 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
   const headerTitle = params.get("topic") || "Sustainable Living";
 
   const [q, setQ] = React.useState("");
-  const [locationQ, setLocationQ] = React.useState("");
   const [typeTab, setTypeTab] = React.useState("groups");
+  const [currentPage, setCurrentPage] = React.useState(1);
 
   const [groups, setGroups] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -280,27 +283,37 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
 
   const clearAll = () => {
     setQ("");
-    setLocationQ("");
+    setCurrentPage(1);
   };
 
   const filtered = React.useMemo(() => {
     const t = q.trim().toLowerCase();
-    const loc = locationQ.trim().toLowerCase();
     return groups.filter((g) => {
       if (t) {
         const hay = `${g.name || ""} ${g.description || ""} ${g.slug || ""}`.toLowerCase();
         if (!hay.includes(t)) return false;
       }
-      if (loc) {
-        const locHay = [g.location_name, g.city, g.state, g.country, g.region, g.address]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        if (!locHay.includes(loc)) return false;
-      }
       return true;
     });
-  }, [groups, q, locationQ]);
+  }, [groups, q]);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [q]);
+
+  // Paginated results
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedGroups = React.useMemo(() => {
+    const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filtered.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
+
+  const handlePageChange = (event, value) => {
+    setCurrentPage(value);
+    // Scroll to top of groups section
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
@@ -336,30 +349,15 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
             />
           </Box>
 
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="caption" color="text.secondary">
-              Search by location
-            </Typography>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Type and select a location"
-              value={locationQ}
-              onChange={(e) => setLocationQ(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Box>
-
           <Button
             variant="contained"
             onClick={clearAll}
-            sx={{ whiteSpace: "nowrap", alignSelf: { xs: "flex-end", md: "flex-end" } }}
+            sx={{ 
+              whiteSpace: "nowrap", 
+              alignSelf: { xs: "flex-end", md: "flex-end" },
+              height: 'fit-content',
+              mt: { xs: 0, md: 2.5 }
+            }}
           >
             Clear all Filters
           </Button>
@@ -399,13 +397,13 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
 
         {/* 3-column grid */}
         <Grid container spacing={2}>
-          {filtered.map((g) => (
+          {paginatedGroups.map((g) => (
             <Grid key={g.id} item xs={12} sm={6} md={4}>
               <GroupGridCard g={g} onJoin={handleJoin} />
             </Grid>
           ))}
 
-          {!loading && filtered.length === 0 && (
+          {!loading && paginatedGroups.length === 0 && (
             <Grid item xs={12}>
               <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
                 <Typography variant="body2" color="text.secondary">
@@ -415,6 +413,21 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
             </Grid>
           )}
         </Grid>
+
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+            <Pagination 
+              count={totalPages} 
+              page={currentPage} 
+              onChange={handlePageChange}
+              color="primary"
+              size="large"
+              showFirstButton
+              showLastButton
+            />
+          </Box>
+        )}
       </Box>
 
       {/* RIGHT: Sidebar - sticky */}
