@@ -12,7 +12,7 @@ import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineR
 import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-
+import CommunitySidebar from "../../components/CommunitySideBar.jsx";
 // -----------------------------------------------------------------------------
 // Keep helpers local (mirrors your HomePage style). No imports from your code.
 // -----------------------------------------------------------------------------
@@ -145,7 +145,7 @@ function ChatTab({ groupId }) {
         setLoading(false);
         setTimeout(scrollToBottom, 50);
         return;
-      } catch {}
+      } catch { }
     }
     setMessages([]);
     setLoading(false);
@@ -174,7 +174,7 @@ function ChatTab({ groupId }) {
         await fetchMessages();
         setSending(false);
         return;
-      } catch {}
+      } catch { }
     }
     setSending(false);
     alert("Couldn’t send message.");
@@ -252,7 +252,7 @@ function PostsTab({ groupId }) {
         setPosts(list.map(shapePost));
         setLoading(false);
         return;
-      } catch {}
+      } catch { }
     }
     setPosts([]);
     setLoading(false);
@@ -308,7 +308,7 @@ function MembersTab({ groupId }) {
         });
         setMembers(normalized);
         return;
-      } catch {}
+      } catch { }
     }
     setMembers([]);
   }, [groupId]);
@@ -341,7 +341,7 @@ function MembersTab({ groupId }) {
           <Grid key={m.id} item xs={12} sm={6} md={4} lg={3}>
             <Card variant="outlined" sx={{ borderRadius: 2 }}>
               <CardHeader
-                avatar={<Avatar src={m.avatar}>{(m.name || "M").slice(0,1)}</Avatar>}
+                avatar={<Avatar src={m.avatar}>{(m.name || "M").slice(0, 1)}</Avatar>}
                 title={<Typography fontWeight={600} variant="body1">{m.name}</Typography>}
                 subheader={<Chip label={m.role} size="small" />}
                 sx={{ pb: 0.5 }}
@@ -438,7 +438,7 @@ export default function GroupDetailsPage() {
         });
         setLoading(false);
         return;
-      } catch {}
+      } catch { }
     }
     setGroup(null);
     setLoading(false);
@@ -448,39 +448,56 @@ export default function GroupDetailsPage() {
 
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 2 }}>
-      {/* Header */}
-      <Card variant="outlined" sx={{ borderRadius: 3, p: 2, mb: 2 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }}>
-          <Avatar src={group?.avatar || ""} sx={{ width: 72, height: 72, mr: { sm: 2 } }}>
-            {(group?.name || "G").slice(0, 1)}
-          </Avatar>
-          <Box flex={1} sx={{ alignSelf: { xs: "flex-start", sm: "center" } }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              {loading ? "Loading…" : (group?.name || "Group")}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {loading ? "" : `${group?.member_count ?? 0} members`}
-            </Typography>
+      <Grid container spacing={2}>
+        {/* LEFT: Community sidebar (sticky on desktop) */}
+        <Grid item xs={12} md={3}>
+          <Box sx={{ position: { md: "sticky" }, top: { md: 16 } }}>
+            {/* Change the prop name/value if your sidebar uses a different API to highlight the current section */}
+            <CommunitySidebar active="groups" />
           </Box>
-        </Stack>
-      </Card>
+        </Grid>
 
-      {/* Tabs */}
-      <Card variant="outlined" sx={{ borderRadius: 3 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
-          <Tab icon={<ChatBubbleOutlineRoundedIcon />} iconPosition="start" label="Chat" />
-          <Tab icon={<ArticleOutlinedIcon />} iconPosition="start" label="Posts" />
-          <Tab icon={<PeopleOutlineRoundedIcon />} iconPosition="start" label="Members" />
-          <Tab icon={<InfoOutlinedIcon />} iconPosition="start" label="Overview" />
-        </Tabs>
-        <Divider />
-        <CardContent>
-          {tab === 0 && <ChatTab groupId={groupId} />}
-          {tab === 1 && <PostsTab groupId={groupId} />}
-          {tab === 2 && <MembersTab groupId={groupId} />}
-          {tab === 3 && <OverviewTab group={group} />}
-        </CardContent>
-      </Card>
+        {/* RIGHT: existing Group header + tabs (unchanged) */}
+        <Grid item xs={12} md={9}>
+          {/* Header */}
+          <Card variant="outlined" sx={{ borderRadius: 3, p: 2, mb: 2 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+            >
+              <Avatar src={group?.avatar || ""} sx={{ width: 72, height: 72, mr: { sm: 2 } }}>
+                {(group?.name || "G").slice(0, 1)}
+              </Avatar>
+              <Box flex={1} sx={{ alignSelf: { xs: "flex-start", sm: "center" } }}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  {loading ? "Loading…" : (group?.name || "Group")}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {loading ? "" : `${group?.member_count ?? 0} members`}
+                </Typography>
+              </Box>
+            </Stack>
+          </Card>
+
+          {/* Tabs */}
+          <Card variant="outlined" sx={{ borderRadius: 3 }}>
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
+              <Tab icon={<ChatBubbleOutlineRoundedIcon />} iconPosition="start" label="Chat" />
+              <Tab icon={<ArticleOutlinedIcon />} iconPosition="start" label="Posts" />
+              <Tab icon={<PeopleOutlineRoundedIcon />} iconPosition="start" label="Members" />
+              <Tab icon={<InfoOutlinedIcon />} iconPosition="start" label="Overview" />
+            </Tabs>
+            <Divider />
+            <CardContent>
+              {tab === 0 && <ChatTab groupId={groupId} />}
+              {tab === 1 && <PostsTab groupId={groupId} />}
+              {tab === 2 && <MembersTab groupId={groupId} />}
+              {tab === 3 && <OverviewTab group={group} />}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
     </Box>
   );
 }
