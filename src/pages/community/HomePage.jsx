@@ -99,16 +99,18 @@ async function fetchProfileCore() {
   return {
     first_name: data.first_name || "",
     last_name: data.last_name || "",
+    email: data.email || "",
     job_title: prof.job_title || "",
     bio: prof.bio || "",
+    location: prof.location || "",
     avatar: prof.avatar || data.avatar || "",
-    // skills may be array or CSV; your parseSkills() already exists in this file:
     skills: Array.isArray(prof.skills) ? prof.skills : parseSkills(prof.skills || ""),
     links: (prof.links && typeof prof.links === "object") ? prof.links : {},
     experience: [],
     education: [],
   };
 }
+
 
 async function fetchProfileExtras() {
   // try combined
@@ -825,13 +827,19 @@ export default function HomePage() {
 
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 2 }}>
-      <Box sx={{ width: "100%", maxWidth: PAGE_MAX_W, mx: "auto" }}>
+      <Box sx={{ width: "100%", maxWidth: "100%", mx: 0 }}>
+
         {/* Header */}
-        <Card variant="outlined" sx={{ borderRadius: 3, p: 2, mb: 2 }}>
+        <Card
+  variant="outlined"
+  className="profileHeaderCard"
+  sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}   // ← forces full width of its container
+>
   <Stack
     direction={{ xs: "column", sm: "row" }}
     spacing={2}
     alignItems={{ xs: "flex-start", sm: "center" }}
+    sx={{ width: "100%", flexWrap: { xs: "wrap", sm: "nowrap" } }}   // ← make inner layout span 100%
   >
     <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72, mr: { sm: 2 } }}>
       {(fullName[0] || "").toUpperCase()}
@@ -960,52 +968,99 @@ async function saveProfileToMe(payload) {
   return json;
 }
 
-function AboutTab({ profile, groups, onUpdate }) {
-  // ... (same as before – retained from your file)
-  // For brevity here, keep your existing AboutTab implementation
-  // If you want me to also wire About to a backend endpoint later, say the word.
-  const [editOpen, setEditOpen] = React.useState(false);
-  const [form, setForm] = React.useState({
-    first_name: profile.first_name || "",
-    last_name: profile.last_name || "",
-    job_title: profile.job_title || "",
-    bio: profile.bio || "",
+// ---- About tab API helpers (educations & experiences) ----
+async function createEducationApi(payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/educations/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify({
+      school: payload.school,
+      degree: payload.degree,
+      field_of_study: payload.field,
+      start_date: payload.start || null,
+      end_date: payload.end || null,
+      grade: payload.grade || "",
+    }),
   });
-  React.useEffect(() => {
-    setForm({
-      first_name: profile.first_name || "",
-      last_name: profile.last_name || "",
-      job_title: profile.job_title || "",
-      bio: profile.bio || "",
-    });
-  }, [profile]);
-  const handleSave = async () => {
-  try {
-    const payload = {
-      first_name: form.first_name.trim(),
-      last_name: form.last_name.trim(),
-      // keep email unchanged from view-only page; omit if unknown here
-      profile: {
-        full_name: `${form.first_name} ${form.last_name}`.trim(),
-        timezone: "",
-        bio: form.bio.trim(),
-        headline: "",
-        job_title: form.job_title.trim(),
-        company: "",
-        location: "",
-        skills: profile.skills || [],
-        links: profile.links || {},
-      },
-    };
-    await saveProfileToMe(payload);  // ← PUT /users/me/
-    onUpdate?.({ ...profile, ...payload, ...payload.profile }); // reflect locally
-    setEditOpen(false);
-  } catch (e) {
-    alert(e.message || "Save failed");
-  }
-};
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.detail || "Failed to add education");
+  return j;
+}
+
+async function updateEducationApi(id, payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/educations/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify({
+      school: payload.school,
+      degree: payload.degree,
+      field_of_study: payload.field,
+      start_date: payload.start || null,
+      end_date: payload.end || null,
+      grade: payload.grade || "",
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.detail || "Failed to update education");
+  return j;
+}
+
+async function deleteEducationApi(id) {
+  const r = await fetch(`${API_ROOT}/auth/me/educations/${id}/`, {
+    method: "DELETE",
+    headers: { ...authHeader() },
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete education");
+}
+
+async function createExperienceApi(payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/experiences/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify({
+      community_name: payload.org,
+      position: payload.position,
+      start_date: payload.start || null,
+      end_date: payload.current ? null : (payload.end || null),
+      currently_work_here: !!payload.current,
+      description: payload.description || "",
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.detail || "Failed to add experience");
+  return j;
+}
+
+async function updateExperienceApi(id, payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/experiences/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify({
+      community_name: payload.org,
+      position: payload.position,
+      start_date: payload.start || null,
+      end_date: payload.current ? null : (payload.end || null),
+      currently_work_here: !!payload.current,
+      description: payload.description || "",
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.detail || "Failed to update experience");
+  return j;
+}
 
 
+async function deleteExperienceApi(id) {
+  const r = await fetch(`${API_ROOT}/auth/me/experiences/${id}/`, {
+    method: "DELETE",
+    headers: { ...authHeader() },
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete experience");
+}
+
+
+function AboutTab({ profile, groups, onUpdate }) {
+  // ----- dialogs & forms -----
   const [aboutOpen, setAboutOpen] = React.useState(false);
   const [aboutForm, setAboutForm] = React.useState({
     bio: profile.bio || "",
@@ -1020,229 +1075,292 @@ function AboutTab({ profile, groups, onUpdate }) {
 
   const [expOpen, setExpOpen] = React.useState(false);
   const [editExpId, setEditExpId] = React.useState(null);
+  // NOTE: no "location" here anymore
   const [expForm, setExpForm] = React.useState({
-    org: "", position: "", start: "", end: "", current: false, location: "",
+    org: "", position: "", start: "", end: "", current: false,
   });
+
+  // NEW: Edit Contact dialog (first, last, email, location, linkedin, job title)
+  const [contactOpen, setContactOpen] = React.useState(false);
+  const [contactForm, setContactForm] = React.useState({
+    first_name: profile.first_name || "",
+    last_name:  profile.last_name  || "",
+    email:      profile.email      || "",
+    location:   profile.location   || "",
+    linkedin:   profile.links?.linkedin || "",
+    job_title:  profile.job_title  || "",
+  });
+
+  React.useEffect(() => {
+    setAboutForm({
+      bio: profile.bio || "",
+      skillsText: (profile.skills || []).join(", "),
+    });
+    setContactForm({
+      first_name: profile.first_name || "",
+      last_name:  profile.last_name  || "",
+      email:      profile.email      || "",
+      location:   profile.location   || "",
+      linkedin:   profile.links?.linkedin || "",
+      job_title:  profile.job_title  || "",
+    });
+  }, [profile]);
 
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
 
-  const openEditAbout = () => {
-    setAboutForm({ bio: profile.bio || "", skillsText: (profile.skills || []).join(", ") });
-    setAboutOpen(true);
+  const reloadExtras = React.useCallback(async () => {
+    const extra = await fetchProfileExtras();
+    onUpdate?.({ ...profile, experience: extra.experiences, education: extra.educations });
+  }, [onUpdate, profile]);
+
+  // ----- About (summary + skills) -----
+  const openEditAbout = () => setAboutOpen(true);
+  const saveAbout = async () => {
+    try {
+      const payload = {
+        first_name: profile.first_name || "",
+        last_name:  profile.last_name  || "",
+        email:      profile.email      || "",
+        profile: {
+          full_name: fullName,
+          timezone: "",
+          bio: (aboutForm.bio || "").trim(),
+          headline: "",
+          job_title: profile.job_title || "",
+          company: "",
+          location: profile.location || "",
+          skills: parseSkills(aboutForm.skillsText),
+          links: profile.links || {},
+        },
+      };
+      await saveProfileToMe(payload);
+      onUpdate?.({ ...profile, bio: payload.profile.bio, skills: payload.profile.skills });
+      setAboutOpen(false);
+    } catch (e) { alert(e.message || "Save failed"); }
   };
+
+  // ----- Education -----
   const openAddEducation = () => { setEditEduId(null); setEduForm({ school: "", degree: "", field: "", start: "", end: "", grade: "" }); setEduOpen(true); };
   const openEditEducation = (id) => {
-    const edu = profile.education?.find((e) => e.id === id);
-    if (edu) {
-      setEditEduId(id);
-      setEduForm({ school: edu.school || "", degree: edu.degree || "", field: edu.field || "", start: edu.start || "", end: edu.end || "", grade: edu.grade || "" });
-      setEduOpen(true);
-    }
-  };
-  const openAddExperience = () => { setEditExpId(null); setExpForm({ org: "", position: "", start: "", end: "", current: false, location: "" }); setExpOpen(true); };
-  const openEditExperience = (id) => {
-    const exp = profile.experience?.find((e) => e.id === id);
-    if (exp) {
-      setEditExpId(id);
-      setExpForm({ org: exp.org || "", position: exp.position || "", start: exp.start || "", end: exp.end || "", current: !!exp.current, location: exp.location || "" });
-      setExpOpen(true);
-    }
-  };
-
-  const saveAbout = async () => {
-  try {
-    const payload = {
-      first_name: profile.first_name || "",
-      last_name: profile.last_name || "",
-      profile: {
-        full_name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim(),
-        timezone: "",
-        bio: (aboutForm.bio || "").trim(),
-        headline: "",
-        job_title: profile.job_title || "",
-        company: "",
-        location: "",
-        skills: parseSkills(aboutForm.skillsText),
-        links: profile.links || {},
-      },
-    };
-    await saveProfileToMe(payload);      // ← PUT /users/me/
-    onUpdate?.({
-      ...profile,
-      bio: payload.profile.bio,
-      skills: payload.profile.skills,
+    const e = (profile.education || []).find((x) => x.id === id);
+    if (!e) return;
+    setEditEduId(id);
+    setEduForm({
+      school: e.school || "",
+      degree: e.degree || "",
+      field: e.field || e.field_of_study || "",
+      start: e.start || e.start_date || "",
+      end:   e.end   || e.end_date   || "",
+      grade: e.grade || "",
     });
-    setAboutOpen(false);
-  } catch (e) {
-    alert(e.message || "Save failed");
-  }
-};
-
-  const saveEducation = () => {
-    const eduEntry = { school: eduForm.school.trim(), degree: eduForm.degree.trim(), field: eduForm.field.trim(), start: eduForm.start, end: eduForm.end, grade: eduForm.grade.trim() };
-    let newEducation = Array.isArray(profile.education) ? [...profile.education] : [];
-    if (editEduId) {
-      const idx = newEducation.findIndex((e) => e.id === editEduId);
-      if (idx >= 0) newEducation[idx] = { ...newEducation[idx], ...eduEntry };
-    } else newEducation.push({ id: Date.now(), ...eduEntry });
-    onUpdate?.({ ...profile, education: newEducation });
-    setEduOpen(false); setEditEduId(null);
+    setEduOpen(true);
   };
-  const saveExperience = () => {
-    const expEntry = { org: expForm.org.trim(), position: expForm.position.trim(), start: expForm.start, end: expForm.end, current: !!expForm.current, location: expForm.location.trim() };
-    let newExperience = Array.isArray(profile.experience) ? [...profile.experience] : [];
-    if (editExpId) {
-      const idx = newExperience.findIndex((e) => e.id === editExpId);
-      if (idx >= 0) newExperience[idx] = { ...newExperience[idx], ...expEntry };
-    } else newExperience.push({ id: Date.now(), ...expEntry });
-    onUpdate?.({ ...profile, experience: newExperience });
-    setExpOpen(false); setEditExpId(null);
+  const saveEducation = async () => {
+    try {
+      if (editEduId) await updateEducationApi(editEduId, eduForm);
+      else           await createEducationApi(eduForm);
+      setEduOpen(false); setEditEduId(null);
+      await reloadExtras();
+    } catch (e) { alert(e.message || "Save failed"); }
   };
-  const deleteEducation = (id) => {
+  const deleteEducation = async (id) => {
     if (!window.confirm("Delete this education?")) return;
-    const newEducation = (profile.education || []).filter((e) => e.id !== id);
-    onUpdate?.({ ...profile, education: newEducation });
-    setEduOpen(false); setEditEduId(null);
+    try { await deleteEducationApi(id); setEduOpen(false); setEditEduId(null); await reloadExtras(); }
+    catch (e) { alert(e.message || "Delete failed"); }
   };
-  const deleteExperience = (id) => {
+
+  // ----- Experience (NO location field) -----
+  const openAddExperience = () => { setEditExpId(null); setExpForm({ org: "", position: "", start: "", end: "", current: false }); setExpOpen(true); };
+  const openEditExperience = (id) => {
+    const x = (profile.experience || []).find((e) => e.id === id);
+    if (!x) return;
+    setEditExpId(id);
+    setExpForm({
+      org: x.org || x.community_name || "",
+      position: x.position || "",
+      start: x.start || x.start_date || "",
+      end:   x.end   || x.end_date   || "",
+      current: !!(x.current || x.currently_work_here),
+    });
+    setExpOpen(true);
+  };
+  const saveExperience = async () => {
+    try {
+      if (editExpId) await updateExperienceApi(editExpId, expForm);
+      else           await createExperienceApi(expForm);
+      setExpOpen(false); setEditExpId(null);
+      await reloadExtras();
+    } catch (e) { alert(e.message || "Save failed"); }
+  };
+  const deleteExperience = async (id) => {
     if (!window.confirm("Delete this experience?")) return;
-    const newExperience = (profile.experience || []).filter((e) => e.id !== id);
-    onUpdate?.({ ...profile, experience: newExperience });
-    setExpOpen(false); setEditExpId(null);
+    try { await deleteExperienceApi(id); setExpOpen(false); setEditExpId(null); await reloadExtras(); }
+    catch (e) { alert(e.message || "Delete failed"); }
+  };
+
+  // ----- Contact (edit dialog) -----
+  const saveContact = async () => {
+    try {
+      const links = { ...(profile.links || {}), linkedin: (contactForm.linkedin || "").trim() };
+      const payload = {
+        first_name: (contactForm.first_name || "").trim(),
+        last_name:  (contactForm.last_name  || "").trim(),
+        email:      (contactForm.email      || "").trim() || undefined,
+        profile: {
+          full_name: `${(contactForm.first_name || "").trim()} ${(contactForm.last_name || "").trim()}`.trim(),
+          timezone: "",
+          bio: profile.bio || "",
+          headline: "",
+          job_title: (contactForm.job_title || "").trim(),
+          company: "",
+          location: (contactForm.location || "").trim(),
+          skills: profile.skills || [],
+          links,
+        },
+      };
+      await saveProfileToMe(payload);
+      onUpdate?.({
+        ...profile,
+        first_name: payload.first_name,
+        last_name:  payload.last_name,
+        email:      payload.email || "",
+        job_title:  payload.profile.job_title,
+        location:   payload.profile.location,
+        links:      payload.profile.links,
+      });
+      setContactOpen(false);
+    } catch (e) { alert(e.message || "Save failed"); }
   };
 
   return (
-    <Box>
-      <Grid container spacing={{ xs: 2, md: 2.5 }}>
-        <Grid item xs={12} md={6}>
-          <SectionCard
-            title="About"
-            action={<Tooltip title="Edit about"><IconButton size="small" onClick={openEditAbout}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}
-          >
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Summary:</Typography>
-            {profile.bio ? <Typography variant="body2">{profile.bio}</Typography> : <Typography variant="body2" color="text.secondary">—</Typography>}
-            {profile.skills && profile.skills.length > 0 && (
-              <>
-                <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Skills:</Typography>
-                <SkillsChips skills={profile.skills} />
-              </>
-            )}
-          </SectionCard>
+  <Box>
+    <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
+      {/* LEFT column: About → Experience → Education */}
+      <Grid item xs={12} md={6} sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
+        <SectionCard
+          title="About"
+          action={<Tooltip title="Edit about"><IconButton size="small" onClick={openEditAbout}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
+        >
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Summary:</Typography>
+          {profile.bio ? <Typography variant="body2">{profile.bio}</Typography>
+                       : <Typography variant="body2" color="text.secondary">—</Typography>}
 
-          <SectionCard sx={{ mt: 2 }} title="About your work" action={<Tooltip title="Edit profile"><IconButton size="small" onClick={() => setEditOpen(true)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
-              <Typography variant="subtitle2" sx={{ width: 120, minWidth: 120, color: "text.secondary" }}>Job Title:</Typography>
-              <Typography variant="body2" sx={{ flex: 1 }}>{profile.job_title || "—"}</Typography>
-            </Box>
-            <Divider sx={{ my: 0.5 }} />
-            <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
-              <Typography variant="subtitle2" sx={{ width: 120, minWidth: 120, color: "text.secondary" }}>Company:</Typography>
-              <Typography variant="body2" sx={{ flex: 1 }}>KrishvaTech</Typography>
-            </Box>
-            <Divider sx={{ my: 0.5 }} />
-            <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
-              <Typography variant="subtitle2" sx={{ width: 120, minWidth: 120, color: "text.secondary" }}>Location:</Typography>
-              <Typography variant="body2" sx={{ flex: 1 }}>Ahmedabad</Typography>
-            </Box>
-          </SectionCard>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Skills:</Typography>
+          {profile.skills && profile.skills.length
+            ? <SkillsChips skills={profile.skills} />
+            : <Typography variant="body2" color="text.secondary">—</Typography>}
+        </SectionCard>
 
-          <SectionCard sx={{ mt: 2 }} title="Experience" action={<Tooltip title="Add experience"><IconButton size="small" onClick={() => setExpOpen(true)}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            {profile.experience && profile.experience.length > 0 ? (
-              <List dense disablePadding>
-                {profile.experience.map((exp) => (
-                  <ListItem key={exp.id} disableGutters sx={{ py: 0.75 }} secondaryAction={
-                    <Tooltip title="Edit"><IconButton size="small" onClick={() => openEditExperience(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>
-                  }>
-                    <ListItemText
-                      primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{exp.position} — {exp.org}</Typography>}
-                      secondary={<Typography variant="caption" color="text.secondary">{dateRange(exp.start, exp.end, exp.current)}{exp.location ? ` · ${exp.location}` : ""}</Typography>}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <Typography variant="body2" color="text.secondary">No experience yet</Typography>
-            )}
-          </SectionCard>
-
-          <SectionCard sx={{ mt: 2 }} title="Education" action={<Tooltip title="Add education"><IconButton size="small" onClick={() => setEduOpen(true)}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            {profile.education && profile.education.length > 0 ? (
-              <List dense disablePadding>
-                {profile.education.map((edu) => (
-                  <ListItem key={edu.id} disableGutters sx={{ py: 0.75 }} secondaryAction={
-                    <Tooltip title="Edit"><IconButton size="small" onClick={() => openEditEducation(edu.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>
-                  }>
-                    <ListItemText
-                      primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{edu.degree} — {edu.school}</Typography>}
-                      secondary={<Typography variant="caption" color="text.secondary">{dateRange(edu.start, edu.end, false)}{edu.field ? ` · ${edu.field}` : ""}{edu.grade ? ` · ${edu.grade}` : ""}</Typography>}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <Typography variant="body2" color="text.secondary">No education yet</Typography>
-            )}
-          </SectionCard>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <SectionCard title="Contact">
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>LinkedIn</Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <LinkedInIcon fontSize="small" />
-              <Typography variant="body2" sx={{ wordBreak: "break-word" }}>{profile.links?.linkedin || "—"}</Typography>
-            </Box>
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Email</Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <EmailIcon fontSize="small" />
-              <Typography variant="body2">{(profile.first_name || "user").toLowerCase()}@example.com</Typography>
-            </Box>
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Location</Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <PlaceIcon fontSize="small" />
-              <Typography variant="body2">Ahmedabad</Typography>
-            </Box>
-          </SectionCard>
-
-          <SectionCard sx={{ mt: 2 }} title="Groups">
+        <SectionCard
+          title="Experience"
+          action={<Tooltip title="Add experience"><IconButton size="small" onClick={() => openAddExperience()}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
+        >
+          {profile.experience && profile.experience.length ? (
             <List dense disablePadding>
-              {(groups || []).slice(0, 2).map((g) => (
-                <ListItem key={g.id} disableGutters sx={{ py: 0.75 }}>
-                  <ListItemAvatar><Avatar>{(g.name || "").slice(0, 1)}</Avatar></ListItemAvatar>
+              {profile.experience.map((exp) => (
+                <ListItem key={exp.id} disableGutters sx={{ py: 0.75 }}
+                  secondaryAction={<Tooltip title="Edit"><IconButton size="small" onClick={() => openEditExperience(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
                   <ListItemText
-                    primary={<Typography variant="body2">{g.name}</Typography>}
-                    secondary={<Typography variant="caption" color="text.secondary">{(g.member_count ?? 0)} members</Typography>}
+                    primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{exp.position} — {exp.org}</Typography>}
+                    secondary={<Typography variant="caption" color="text.secondary">{dateRange(exp.start, exp.end, exp.current)}</Typography>}
                   />
                 </ListItem>
               ))}
             </List>
-          </SectionCard>
-        </Grid>
+          ) : <Typography variant="body2" color="text.secondary">No experience yet</Typography>}
+        </SectionCard>
+
+        <SectionCard
+          title="Education"
+          action={<Tooltip title="Add education"><IconButton size="small" onClick={() => openAddEducation()}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
+        >
+          {profile.education && profile.education.length ? (
+            <List dense disablePadding>
+              {profile.education.map((edu) => (
+                <ListItem key={edu.id} disableGutters sx={{ py: 0.75 }}
+                  secondaryAction={<Tooltip title="Edit"><IconButton size="small" onClick={() => openEditEducation(edu.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                  <ListItemText
+                    primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{edu.degree} — {edu.school}</Typography>}
+                    secondary={<Typography variant="caption" color="text.secondary">{dateRange(edu.start, edu.end, false)}{edu.field ? ` · ${edu.field}` : ""}{edu.grade ? ` · ${edu.grade}` : ""}</Typography>}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : <Typography variant="body2" color="text.secondary">No education yet</Typography>}
+        </SectionCard>
       </Grid>
 
-      {/* Profile dialogs (same structure as before) */}
-      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Profile</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="First name" fullWidth value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
-            <TextField label="Last name" fullWidth value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-            <TextField label="Job title" fullWidth value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} />
-            <TextField label="Bio" fullWidth multiline minRows={3} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave}>Save</Button>
-        </DialogActions>
-      </Dialog>
+      {/* RIGHT column: Contact → About your work */}
+      <Grid item xs={12} md={6} sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
+        <SectionCard
+          title="Contact"
+          action={<Tooltip title="Edit contact"><IconButton size="small" onClick={() => setContactOpen(true)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
+        >
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>LinkedIn</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+            <LinkedInIcon fontSize="small" />
+            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>{profile.links?.linkedin || "—"}</Typography>
+          </Box>
 
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Email</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+            <EmailIcon fontSize="small" />
+            <Typography variant="body2">{profile.email || "—"}</Typography>
+          </Box>
+
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Location</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <PlaceIcon fontSize="small" />
+            <Typography variant="body2">{profile.location || "—"}</Typography>
+          </Box>
+        </SectionCard>
+
+        {/* About your work */}
+        <SectionCard 
+          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }} 
+          title="About your work"
+        >
+          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Job Title:</Typography>
+            <Typography variant="body2" sx={{ flex: 1 }}>{profile.job_title || "—"}</Typography>
+          </Box>
+          <Divider sx={{ my: 0.5 }} />
+          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Community:</Typography>
+            <Typography variant="body2" sx={{ flex: 1 }}>{profile.company || "—"}</Typography>
+          </Box>
+          <Divider sx={{ my: 0.5 }} />
+          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Sector:</Typography>
+            <Typography variant="body2" sx={{ flex: 1 }}>—</Typography>
+          </Box>
+          <Divider sx={{ my: 0.5 }} />
+          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Industry:</Typography>
+            <Typography variant="body2" sx={{ flex: 1 }}>—</Typography>
+          </Box>
+          <Divider sx={{ my: 0.5 }} />
+          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Number of Employees:</Typography>
+            <Typography variant="body2" sx={{ flex: 1 }}>—</Typography>
+          </Box>
+        </SectionCard>
+      </Grid>
+    </Grid>
+
+      {/* --- Dialogs --- */}
+
+      {/* Edit About */}
       <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Edit About</DialogTitle>
         <DialogContent>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>Update your summary and skills</Typography>
-          <TextField label="Summary" value={aboutForm.bio} onChange={(e) => setAboutForm((f) => ({ ...f, bio: e.target.value }))} fullWidth multiline minRows={4} sx={{ mb: 2 }} placeholder="Tell people a little about yourself…" />
-          <TextField label="Skills (CSV or JSON array)" value={aboutForm.skillsText} onChange={(e) => setAboutForm((f) => ({ ...f, skillsText: e.target.value }))} fullWidth helperText="Saved as a list of strings" placeholder='e.g., M&A, Strategy  OR  ["M&A","Strategy"]' />
+          <TextField label="Summary" value={aboutForm.bio} onChange={(e) => setAboutForm((f) => ({ ...f, bio: e.target.value }))} fullWidth multiline minRows={4} sx={{ mb: 2 }} />
+          <TextField label="Skills (CSV or JSON array)" value={aboutForm.skillsText} onChange={(e) => setAboutForm((f) => ({ ...f, skillsText: e.target.value }))} fullWidth helperText="Saved as a list of strings" />
           <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
             {parseSkills(aboutForm.skillsText).length ? parseSkills(aboutForm.skillsText).map((s, i) => <Chip key={i} label={s} size="small" />) : <Typography variant="caption" color="text.secondary">No skills parsed yet</Typography>}
           </Box>
@@ -1253,6 +1371,7 @@ function AboutTab({ profile, groups, onUpdate }) {
         </DialogActions>
       </Dialog>
 
+      {/* Add/Edit Education */}
       <Dialog open={eduOpen} onClose={() => { setEduOpen(false); setEditEduId(null); }} fullWidth maxWidth="sm">
         <DialogTitle>{editEduId ? "Edit education" : "Add education"}</DialogTitle>
         <DialogContent>
@@ -1261,12 +1380,8 @@ function AboutTab({ profile, groups, onUpdate }) {
           <TextField label="Degree *" value={eduForm.degree} onChange={(e) => setEduForm((f) => ({ ...f, degree: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <TextField label="Field of Study *" value={eduForm.field} onChange={(e) => setEduForm((f) => ({ ...f, field: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Start Date" type="date" value={eduForm.start} onChange={(e) => setEduForm((f) => ({ ...f, start: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} InputProps={{ endAdornment: (<InputAdornment position="end"><CalendarTodayIcon fontSize="small" /></InputAdornment>) }} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="End Date" type="date" value={eduForm.end} onChange={(e) => setEduForm((f) => ({ ...f, end: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} InputProps={{ endAdornment: (<InputAdornment position="end"><CalendarTodayIcon fontSize="small" /></InputAdornment>) }} />
-            </Grid>
+            <Grid item xs={12} sm={6}><TextField label="Start Date" type="date" value={eduForm.start} onChange={(e) => setEduForm((f) => ({ ...f, start: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
+            <Grid item xs={12} sm={6}><TextField label="End Date"   type="date" value={eduForm.end}   onChange={(e) => setEduForm((f) => ({ ...f, end: e.target.value }))}   fullWidth InputLabelProps={{ shrink: true }} /></Grid>
           </Grid>
           <TextField label="Grade *" value={eduForm.grade} onChange={(e) => setEduForm((f) => ({ ...f, grade: e.target.value }))} fullWidth />
         </DialogContent>
@@ -1277,22 +1392,18 @@ function AboutTab({ profile, groups, onUpdate }) {
         </DialogActions>
       </Dialog>
 
+      {/* Add/Edit Experience (NO Location field) */}
       <Dialog open={expOpen} onClose={() => { setExpOpen(false); setEditExpId(null); }} fullWidth maxWidth="sm">
         <DialogTitle>{editExpId ? "Edit experience" : "Add experience"}</DialogTitle>
         <DialogContent>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>*Required fields are marked with an asterisk</Typography>
-          <TextField label="Organisation *" value={expForm.org} onChange={(e) => setExpForm((f) => ({ ...f, org: e.target.value }))} fullWidth sx={{ mb: 2 }} />
+          <TextField label="Community name *" value={expForm.org} onChange={(e) => setExpForm((f) => ({ ...f, org: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <TextField label="Position *" value={expForm.position} onChange={(e) => setExpForm((f) => ({ ...f, position: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <Grid container spacing={2} sx={{ mb: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Start Date" type="date" value={expForm.start} onChange={(e) => setExpForm((f) => ({ ...f, start: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} InputProps={{ endAdornment: (<InputAdornment position="end"><CalendarTodayIcon fontSize="small" /></InputAdornment>) }} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="End Date" type="date" value={expForm.end} onChange={(e) => setExpForm((f) => ({ ...f, end: e.target.value }))} fullWidth disabled={expForm.current} InputLabelProps={{ shrink: true }} InputProps={{ endAdornment: (<InputAdornment position="end"><CalendarTodayIcon fontSize="small" /></InputAdornment>) }} />
-            </Grid>
+            <Grid item xs={12} sm={6}><TextField label="Start Date" type="date" value={expForm.start} onChange={(e) => setExpForm((f) => ({ ...f, start: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
+            <Grid item xs={12} sm={6}><TextField label="End Date"   type="date" value={expForm.end}   onChange={(e) => setExpForm((f) => ({ ...f, end: e.target.value }))}   fullWidth disabled={expForm.current} InputLabelProps={{ shrink: true }} /></Grid>
           </Grid>
           <FormControlLabel control={<Checkbox checked={expForm.current} onChange={(e) => setExpForm((f) => ({ ...f, current: e.target.checked, end: e.target.checked ? "" : f.end }))} />} label="I currently work here" />
-          <TextField label="Location" value={expForm.location} onChange={(e) => setExpForm((f) => ({ ...f, location: e.target.value }))} fullWidth sx={{ mt: 2 }} />
         </DialogContent>
         <DialogActions>
           {editExpId && (<Button color="error" onClick={() => deleteExperience(editExpId)}>Delete</Button>)}
@@ -1300,6 +1411,28 @@ function AboutTab({ profile, groups, onUpdate }) {
           <Button variant="contained" onClick={saveExperience}>{editExpId ? "Save changes" : "Save"}</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Edit Contact */}
+      <Dialog open={contactOpen} onClose={() => setContactOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit Contact</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}><TextField label="First name" value={contactForm.first_name} onChange={(e) => setContactForm({ ...contactForm, first_name: e.target.value })} fullWidth /></Grid>
+              <Grid item xs={12} sm={6}><TextField label="Last name" value={contactForm.last_name}  onChange={(e) => setContactForm({ ...contactForm, last_name:  e.target.value })} fullWidth /></Grid>
+            </Grid>
+            <TextField label="Job title" value={contactForm.job_title} onChange={(e) => setContactForm({ ...contactForm, job_title: e.target.value })} fullWidth />
+            <TextField label="Email" value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} fullWidth />
+            <TextField label="Location" value={contactForm.location} onChange={(e) => setContactForm({ ...contactForm, location: e.target.value })} fullWidth />
+            <TextField label="LinkedIn URL" value={contactForm.linkedin} onChange={(e) => setContactForm({ ...contactForm, linkedin: e.target.value })} fullWidth />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setContactOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveContact}>Save</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
+
