@@ -168,31 +168,18 @@ function parseSkills(value) {
   return v.split(/,|\n|;/).map((s) => s.trim()).filter(Boolean);
 }
 
-// -----------------------------------------------------------------------------
-// Mock fallbacks (kept for profile/groups skeleton till real data wired there)
-// -----------------------------------------------------------------------------
-const MOCK_USER = {
+const EMPTY_PROFILE = {
+  first_name: "",
+  last_name: "",
+  email: "",
+  job_title: "",
+  bio: "",
+  location: "",
   avatar: "",
-  first_name: "Aarav",
-  last_name: "Shah",
-  job_title: "Frontend Developer",
-  bio: "Building Event & Community Platform. Coffee + React.",
-  friends_count: 50,
-};
-const MOCK_GROUPS = [];
-const MOCK_PROFILE = {
-  first_name: "Aarav",
-  last_name: "Shah",
-  job_title: "Frontend Developer",
-  bio: "Building Event & Community Platform. Coffee + React.",
-  skills: ["React", "Django", "PostgreSQL", "MUI", "WebSockets", "AWS"],
-  links: { linkedin: "https://www.linkedin.com/in/aarav-shah" },
-  experience: [
-    { id: 101, org: "KrishvaTech", position: "Frontend Developer", start: "2024-01", end: null, current: true, location: "Ahmedabad" },
-  ],
-  education: [
-    { id: 201, school: "Nirma University", degree: "B.Tech", field: "CSE", start: "2020-08", end: "2024-05", grade: "8.6 CGPA" },
-  ],
+  skills: [],
+  links: {},
+  experience: [],
+  education: [],
 };
 
 // -----------------------------------------------------------------------------
@@ -666,8 +653,8 @@ export default function HomePage() {
   const PAGE_MAX_W = 1120;
   const [myCommunityId, setMyCommunityId] = React.useState(null);
   const [posts, setPosts] = React.useState([]);           // ← now real data
-  const [profile, setProfile] = React.useState(MOCK_PROFILE);
-  const [groups, setGroups] = React.useState(MOCK_GROUPS);
+  const [profile, setProfile] = React.useState(EMPTY_PROFILE);
+const [groups, setGroups] = React.useState([]);
   const [communities, setCommunities] = React.useState([]); // for composer picklist
   const [tabIndex, setTabIndex] = React.useState(0);
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -734,7 +721,7 @@ export default function HomePage() {
       const list = await res.json();
       const rows = Array.isArray(list) ? list : (list?.results || []);
       setCommunities(rows);
-      setGroups(rows);
+      // setGroups(rows);
       setMyCommunityId(rows?.[0]?.id ?? null); // ← derive community_id from membership
     } catch (e) {
       console.error("Failed to load communities:", e);
