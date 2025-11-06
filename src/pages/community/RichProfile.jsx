@@ -138,7 +138,7 @@ function RichPostCard({ post, fullName, mutualCount, friendStatus, friendSubmitt
         {post.content && (
           <Typography sx={{ whiteSpace: "pre-wrap" }}>{post.content}</Typography>
         )}
-        {post.type === "link" && post.link && (
+        {post.link && (
           <Button
             size="small"
             href={post.link}
@@ -149,7 +149,7 @@ function RichPostCard({ post, fullName, mutualCount, friendStatus, friendSubmitt
             {post.link}
           </Button>
         )}
-        {post.type === "image" && Array.isArray(post.images) && post.images.length > 0 && (
+        {Array.isArray(post.images) && post.images.length > 0 && (
           <Stack spacing={1} direction="row" sx={{ mt: 1 }} flexWrap="wrap">
             {post.images.map((src, idx) => (
               <Box key={idx} sx={{ width: "100%", maxWidth: 200, borderRadius: 1, overflow: "hidden" }}>
@@ -298,7 +298,144 @@ export default function RichProfile() {
   // locally. When integrating with a backend, replace MOCK_POSTS with
   // fetched posts for this user. The tab state controls which tab is active.
   const [tab, setTab] = useState(0);
-  const [posts, setPosts] = useState(MOCK_POSTS);
+  const [posts, setPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+
+  function normalizePost(row = {}) {
+   // unwrap + metadata (your API enriches feed rows here)
+   const src =
+     row.post || row.object || row.activity?.object || row.data?.post || row;
+   const m = row.metadata || row.meta || {};
+
+   const created =
+     row.created_at || src?.created_at || src?.created || row.timestamp || null;
+   const id = row.id || src?.id || row.pk;
+
+   const pick = (...xs) =>
+     xs.find((v) => typeof v === "string" && v.trim().length) || "";
+
+   const text = pick(
+     // metadata first
+     m.text, m.body, m.content, m.caption, m.description, m.title,
+     // fallbacks from object
+     src?.text, src?.content, src?.body, src?.message, src?.caption
+   );
+
+   const link = pick(
+     m.link_url, m.url,
+     src?.link_url, src?.link, src?.url, src?.external_url
+   );
+
+   const singleImages = [
+    m.image_url, m.image, m.photo_url, m.picture,
+    src?.image_url, src?.image, src?.photo_url, src?.picture,
+  ].filter((v) => typeof v === "string" && v.trim().length);
+
+  const images = []
+    .concat(
+      singleImages,
+      Array.isArray(m.images) ? m.images : [],
+      Array.isArray(src?.images) ? src.images : [],
+      Array.isArray(src?.media) ? src.media : [],
+      Array.isArray(src?.attachments) ? src.attachments : [],
+      Array.isArray(m.files) ? m.files : [] // just in case attachments come under metadata.files
+    )
+    .map((a) => (typeof a === "string" ? a : a?.url || a?.file || a?.path))
+    .filter(Boolean);
+
+   const pollOptions = m.poll?.options || src?.poll?.options || m.options || m.choices || [];
+
+   let type =
+     (m.type || src?.type || (images.length ? "image" : pollOptions.length ? "poll" : link ? "link" : "text"))
+       ?.toLowerCase();
+
+   return { id, type, content: text, link, images, options: pollOptions, created_at: created };
+ }
+
+  async function fetchFeedItemById(feedId, headers) {
+    if (!feedId) return null;
+    const candidates = [
+      `${API_BASE}/activity/feed/${feedId}/?scope=home`,
+      `${API_BASE}/activity/feed/${feedId}/?scope=community`,
+      `${API_BASE}/activity/feed/${feedId}/`,
+    ];
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url, { headers, credentials: "include" });
+        if (!r.ok) continue;
+        return await r.json().catch(() => null);
+      } catch {}
+    }
+    return null;
+  }
+
+  async function fetchUserPostsById(targetUserId, isMe) {
+    const headers = { ...tokenHeader(), Accept: "application/json" };
+    const urls = [
+      // common patterns (one of these should exist in your backend)
+      `${API_BASE}/activity/feed/posts/${targetUserId}/`,
+    ];
+    if (isMe) urls.unshift(`${API_BASE}/activity/feed/posts/me/`);
+
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, { headers, credentials: "include" });
+        if (!r.ok) continue;
+        const j = await r.json().catch(() => null);
+        const arr = Array.isArray(j) ? j : j?.results || j?.posts || (j && j.id ? [j] : []);
+        if (!Array.isArray(arr)) continue;
+
+        let list = arr.map(normalizePost).filter((p) => p.id);
+
+        // If a card has no body (no content/link/images), fetch detail and merge.
+        const hydrated = await Promise.all(
+          list.map(async (p, idx) => {
+            const row = arr[idx] || {};
+            const hasBody =
+              (p.content && p.content.trim()) || p.link || (p.images || []).length;
+            if (hasBody) return p;
+            const feedId = row.id || p.id;
+            const full = await fetchFeedItemById(feedId, headers); // may 404 for some ids/scope
+            if (!full) return p;
+            const np = normalizePost(full);
+            return { ...p, ...np, id: p.id || np.id, created_at: p.created_at || np.created_at };
+          })
+        );
+        list = hydrated;
+        // newest first
+        list.sort(
+          (a, b) =>
+            new Date(b.created_at || 0).getTime() -
+            new Date(a.created_at || 0).getTime()
+        );
+        return list;
+      } catch {
+        // try next url
+      }
+    }
+    return [];
+  }
+
+  // Load when userId changes
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      // 🚧 Private: if not me and not friends, don’t fetch any posts
+    if (!isMe && (friendStatus || "").toLowerCase() !== "friends") {
+      setPosts([]);
+      setPostsLoading(false);
+      return;
+    }
+    setPostsLoading(true);
+    const list = await fetchUserPostsById(userId, isMe);
+      if (!alive) return;
+      setPosts(list);
+      setPostsLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId, isMe,friendStatus]);
 
   // Preload mutual connections count for displaying on posts. This effect
   // fetches the mutual friends list once when the component mounts (or when
@@ -341,7 +478,8 @@ export default function RichProfile() {
          incoming_pending: "pending_incoming",
          outgoing_pending: "pending_outgoing",
        };
-       setFriendStatus(map[d?.status] || d?.status || "none");
+       const s = (map[d?.status] || d?.status || "none");
+       setFriendStatus(String(s).toLowerCase());
       } catch {
         if (!alive) return;
         setFriendStatus("none");
@@ -442,7 +580,7 @@ export default function RichProfile() {
       setLoadingExtras(false);
     })();
     return () => { alive = false; };
-  }, [userId, isMe]);
+  }, [userId, isMe,friendStatus]);
 
   const fullName = useMemo(() => {
     const u = userItem || {};
@@ -587,7 +725,23 @@ const filteredMutual = useMemo(
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6">
           <aside>
             {/* Community sidebar */}
-            <CommunitySidebar stickyTop={96} />
+            <CommunitySidebar
+              stickyTop={96}
+              onChangeView={(view) => {
+                // adjust these routes to match your app
+                const map = {
+                  home: "/community",
+                  "live-feed": "/community/live-feed",
+                  notifications: "/community/notifications",
+                  messages: "/account/messages",
+                  groups: "/community/groups",
+                  members: "/community/members",
+                };
+                const to = map[view] || "/community";
+                // you already have useNavigate imported
+                navigate(to);
+              }}
+            />
           </aside>
 
           <main>
@@ -699,19 +853,43 @@ const filteredMutual = useMemo(
                   <Divider />
                   {tab === 0 && (
                     <CardContent>
-                      <Stack spacing={2}>
-                        {posts.map((post) => (
-                          <RichPostCard
-                            key={post.id}
-                            post={post}
-                            fullName={fullName}
-                            mutualCount={mutualCount}
-                            friendStatus={friendStatus}
-                            friendSubmitting={friendSubmitting}
-                            handleAddFriend={sendFriendRequest}
-                          />
-                        ))}
-                      </Stack>
+                      {(!isMe && (friendStatus || "").toLowerCase() !== "friends") ? (
+                        <Box sx={{ textAlign: "center", py: 6 }}>
+                          <Typography variant="h6" sx={{ mb: 0.5 }}>This account is private</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Add this member as a friend to see their posts.
+                          </Typography>
+                          {(friendStatus || "").toLowerCase() === "none" && (
+                            <Button
+                              variant="contained"
+                              size="small"
+                              onClick={sendFriendRequest}
+                              disabled={friendSubmitting}
+                              sx={{ mt: 2, textTransform: "none", borderRadius: 2 }}
+                            >
+                              {friendSubmitting ? "Sending…" : "Add Friend"}
+                            </Button>
+                          )}
+                        </Box>
+                      ) : postsLoading ? (
+                        <LinearProgress />
+                      ) : posts.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">No posts yet.</Typography>
+                      ) : (
+                        <Stack spacing={2}>
+                          {posts.map((post) => (
+                            <RichPostCard
+                              key={post.id}
+                              post={post}
+                              fullName={fullName}
+                              mutualCount={mutualCount}
+                              friendStatus={friendStatus}
+                              friendSubmitting={friendSubmitting}
+                              handleAddFriend={sendFriendRequest}
+                            />
+                          ))}
+                        </Stack>
+                      )}
                     </CardContent>
                   )}
                   {tab === 1 && (
