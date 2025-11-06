@@ -25,9 +25,6 @@ import SearchIcon from "@mui/icons-material/Search";
 import MailOutlineOutlinedIcon from "@mui/icons-material/MailOutlineOutlined";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
-import ZoomInIcon from "@mui/icons-material/ZoomIn";
-import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import { geoNaturalEarth1 } from "d3-geo";
 
 // Colorful world map + markers with pan/zoom
@@ -65,6 +62,10 @@ const norm = (s) =>
     .replace(/[\u2019'".,]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+
+const MIN_ZOOM = 1;      // keep world fitting the box; below this panning feels "stuck"
+const MAX_ZOOM = 8;
+const ZOOM_STEP = 1.35;  // how fast +/- changes
 
 /* ------------ Static country mapping + centroids + flag emoji ------------ */
 const COUNTRY_NAME_TO_ISO2 = {
@@ -150,85 +151,6 @@ const countryColor = (name) => {
   for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return PALETTE[h % PALETTE.length];
 };
-
-/* ------------------------ mock members (fallback) ------------------------ */
-const MOCK_MEMBERS = [
-  { id: 101, first_name: "Shehar", last_name: "Yar", email: "shehar@example.com",
-    company_from_experience: "Freelance", position_from_experience: "Frontend Engineer",
-    profile: { full_name: "Shehar Yar", job_title: "Active today", country: "Pakistan" } },
-  { id: 102, first_name: "Stewart", last_name: "Farquhar", email: "stewart@example.com",
-    company_from_experience: "Glasgow Uni", position_from_experience: "Researcher",
-    profile: { full_name: "Stewart Farquhar", job_title: "Active today", country: "United Kingdom" } },
-  { id: 103, first_name: "Christopher", last_name: "Kummer", email: "ckummer@example.com",
-    company_from_experience: "Kummer AG", position_from_experience: "CTO",
-    profile: { full_name: "Christopher Kummer", job_title: "Active today", country: "Switzerland" } },
-  { id: 104, first_name: "Eden", last_name: "Roberts", email: "edenr@example.com",
-    company_from_experience: "UWS", position_from_experience: "AI Student",
-    profile: { full_name: "Eden Roberts", job_title: "Active today", country: "United Kingdom" } },
-  { id: 105, first_name: "Jamie", last_name: "Hamilton", email: "jamieh@example.com",
-    company_from_experience: "UWS", position_from_experience: "MS AI",
-    profile: { full_name: "Jamie Hamilton", job_title: "Active today", country: "United Kingdom" } },
-  { id: 106, first_name: "Aarav", last_name: "Patel", email: "aarav@example.com",
-    company_from_experience: "TCS", position_from_experience: "SWE",
-    profile: { full_name: "Aarav Patel", job_title: "Active today", country: "India" } },
-  { id: 107, first_name: "Neha", last_name: "Shah", email: "neha@example.com",
-    company_from_experience: "Zomato", position_from_experience: "PM",
-    profile: { full_name: "Neha Shah", job_title: "Active today", country: "India" } },
-  { id: 108, first_name: "Ravi", last_name: "Kumar", email: "ravi@example.com",
-    company_from_experience: "Flipkart", position_from_experience: "Data Eng",
-    profile: { full_name: "Ravi Kumar", job_title: "Active today", country: "India" } },
-  { id: 109, first_name: "Olivia", last_name: "Smith", email: "olivia@example.com",
-    company_from_experience: "Meta", position_from_experience: "Designer",
-    profile: { full_name: "Olivia Smith", job_title: "Active today", country: "United States" } },
-  { id: 110, first_name: "Liam", last_name: "Johnson", email: "liam@example.com",
-    company_from_experience: "Stripe", position_from_experience: "SRE",
-    profile: { full_name: "Liam Johnson", job_title: "Active today", country: "United States" } },
-  { id: 111, first_name: "Aisha", last_name: "Khan", email: "aisha@example.com",
-    company_from_experience: "Noon", position_from_experience: "Ops",
-    profile: { full_name: "Aisha Khan", job_title: "Active today", country: "United Arab Emirates" } },
-  { id: 112, first_name: "Ethan", last_name: "Brown", email: "ethan@example.com",
-    company_from_experience: "Shopify", position_from_experience: "Backend",
-    profile: { full_name: "Ethan Brown", job_title: "Active today", country: "Canada" } },
-  { id: 113, first_name: "Sophie", last_name: "Martin", email: "sophie@example.com",
-    company_from_experience: "Atlassian", position_from_experience: "QE",
-    profile: { full_name: "Sophie Martin", job_title: "Active today", country: "Australia" } },
-  { id: 114, first_name: "Marco", last_name: "Rossi", email: "marco@example.com",
-    company_from_experience: "Uni Milano", position_from_experience: "PhD",
-    profile: { full_name: "Marco Rossi", job_title: "Active today", country: "Italy" } },
-  { id: 115, first_name: "Kenji", last_name: "Sato", email: "kenji@example.com",
-    company_from_experience: "Rakuten", position_from_experience: "ML Eng",
-    profile: { full_name: "Kenji Sato", job_title: "Active today", country: "Japan" } },
-  { id: 116, first_name: "Julia", last_name: "Müller", email: "julia@example.com",
-    company_from_experience: "ETH Zürich", position_from_experience: "Research",
-    profile: { full_name: "Julia Müller", job_title: "Active today", country: "Switzerland" } },
-];
-
-/* ----------------------------- preview markers ---------------------------- */
-const PREVIEW_LIST = [
-  { code: "in", members: 6, friends: 2 },
-  { code: "gb", members: 4, friends: 2 },
-  { code: "ch", members: 2, friends: 1 },
-  { code: "us", members: 3, friends: 1 },
-  { code: "pk", members: 1, friends: 0 },
-  { code: "ae", members: 1, friends: 0 },
-  { code: "ca", members: 1, friends: 0 },
-  { code: "au", members: 1, friends: 0 },
-  { code: "it", members: 1, friends: 0 },
-  { code: "jp", members: 1, friends: 0 },
-];
-function expandPreviewMarkers() {
-  const out = [];
-  for (const row of PREVIEW_LIST) {
-    const center = COUNTRY_CENTROIDS[row.code];
-    if (!center) continue;
-    const total = row.members;
-    const gf = Math.min(row.friends, row.members);
-    for (let i = 0; i < total; i++) {
-      out.push({ code: row.code, center, isFriend: i < gf });
-    }
-  }
-  return out;
-}
 
 /* -------------------------- Member card (left) -------------------------- */
 function MemberCard({ u, unread, friendStatus, onOpenProfile, onMessage, onAddFriend }) {
@@ -355,7 +277,6 @@ export default function MembersPage() {
 
   // map controls
   const [showMap, setShowMap] = useState(true);
-  const [usePreview, setUsePreview] = useState(false);
   const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 }); // pan/zoom state
 
   // Tooltip state
@@ -472,8 +393,7 @@ export default function MembersPage() {
         }
 
         if (!alive) return;
-        const finalList = list && list.length ? list : MOCK_MEMBERS;
-        setUsers(finalList.filter((u) => u.id !== me?.id));
+        setUsers((list || []).filter((u) => u.id !== me?.id));
       } catch (e) {
         if (isAbort(e)) return;
         console.error(e);
@@ -613,6 +533,8 @@ export default function MembersPage() {
   return Object.values(map).map((e) => ({ ...e, total: e.users.length }));
 }, [filtered, friendStatusByUser]);
 
+// Use preview when switch is ON, otherwise live markers;
+// if live is empty, auto-fallback to preview so the map isn’t blank.
   const markers = liveMarkers;
 
   // pagination
@@ -665,10 +587,10 @@ export default function MembersPage() {
 
   // map controls
   const zoomIn = () =>
-    setMapPos((p) => ({ ...p, zoom: Math.min(p.zoom * 1.5, 8) }));
+    setMapPos((p) => ({ ...p, zoom: Math.min(MAX_ZOOM, +(p.zoom * ZOOM_STEP).toFixed(3)) }));
   const zoomOut = () =>
-    setMapPos((p) => ({ ...p, zoom: Math.max(p.zoom / 1.5, 0.8) }));
-  const resetView = () => setMapPos({ coordinates: [0, 0], zoom: 1 });
+    setMapPos((p) => ({ ...p, zoom: Math.max(MIN_ZOOM, +(p.zoom / ZOOM_STEP).toFixed(3)) }));
+  const resetView = () => setMapPos({ coordinates: [0, 0], zoom: MIN_ZOOM });
 
   /* -------------------------------- UI -------------------------------- */
   return (
@@ -762,7 +684,6 @@ export default function MembersPage() {
             </Typography>
             <Stack direction="row" alignItems="center" spacing={2}>
               <FormControlLabel control={<Switch checked={showMap} onChange={(_, v) => setShowMap(v)} size="small" />} label="Show map" />
-              <FormControlLabel control={<Switch checked={usePreview} onChange={(_, v) => setUsePreview(v)} size="small" />} label="Preview" />
             </Stack>
           </Stack>
 
@@ -778,15 +699,19 @@ export default function MembersPage() {
                 <Typography variant="caption">Friends</Typography>
               </Stack>
             </Stack>
-
-            <Stack direction="row" spacing={1}>
-              <IconButton size="small" onClick={zoomOut}><ZoomOutIcon fontSize="small" /></IconButton>
-              <IconButton size="small" onClick={zoomIn}><ZoomInIcon fontSize="small" /></IconButton>
-              <IconButton size="small" onClick={resetView}><RestartAltIcon fontSize="small" /></IconButton>
-            </Stack>
           </Stack>
 
-          <Box ref={mapBoxRef} sx={{ position: "relative", flex: 1, minHeight: 360, "& svg": { display: "block" } }}>
+          <Box
+              ref={mapBoxRef}
+              sx={{
+                position: "relative",
+                flex: 1,
+                minHeight: 360,
+                userSelect: "none",
+                "& svg": { display: "block" },
+                "& *:focus, & *:focus-visible": { outline: "none !important" }, // remove focus rectangle
+              }}
+            >
             {showMap ? (
               <ComposableMap
                   projection={geoNaturalEarth1()}
@@ -797,9 +722,11 @@ export default function MembersPage() {
                 <ZoomableGroup
                   center={mapPos.coordinates}
                   zoom={mapPos.zoom}
-                  minZoom={0.8}
-                  maxZoom={8}
-                  onMoveEnd={(pos) => setMapPos(pos)} // drag to pan, wheel to zoom
+                  minZoom={MIN_ZOOM}
+                  maxZoom={MAX_ZOOM}
+                  onMoveStart={() => hideTip()}       // hide tooltip when you start dragging
+                  onMove={(pos) => setMapPos(pos)}    // update as you drag
+                  onMoveEnd={(pos) => setMapPos(pos)} // and when drag ends
                 >
                   <Geographies geography={geoUrl}>
                     {({ geographies }) =>
@@ -865,28 +792,30 @@ export default function MembersPage() {
                 <Typography>Map hidden.</Typography>
               </Stack>
             )}
-            {tip && (
-  <Box
-    sx={{
-      position: "absolute",
-      left: tip.x,
-      top: tip.y,
-      pointerEvents: "none",
-      bgcolor: "rgba(0,0,0,0.92)",
-      color: "#fff",
-      px: 1.25,
-      py: 0.75,
-      borderRadius: 1,
-      fontSize: 12,
-      lineHeight: 1.35,
-      boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
-      maxWidth: 280,
-      zIndex: 10,
-    }}
-  >
-    {tip.node}
-  </Box>
-)}
+            {tip?.node && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: tip.x,
+                  top: tip.y,
+                  pointerEvents: "none",
+                  backgroundColor: "rgba(0,0,0,0.92)",
+                  color: "#fff",
+                  px: 1.25,
+                  py: 0.75,
+                  borderRadius: 1,
+                  fontSize: 12,
+                  lineHeight: 1.35,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                  maxWidth: 280,
+                  zIndex: 10,
+                  border: "none",
+                  outline: "none",
+                }}
+              >
+                {tip.node}
+              </Box>
+            )}
           </Box>
         </Paper>
       </Grid>
