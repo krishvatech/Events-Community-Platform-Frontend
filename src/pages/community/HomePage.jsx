@@ -65,6 +65,74 @@ function authHeader() {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+// ---------------- Profile wiring (read) ----------------
+function mapExperience(item) {
+  return {
+    id: item.id,
+    org: item.community_name || item.org || item.company || "",
+    position: item.position || "",
+    start: item.start_date || "",
+    end: item.end_date || "",
+    current: !!item.currently_work_here,
+    location: item.location || "",
+  };
+}
+function mapEducation(item) {
+  return {
+    id: item.id,
+    school: item.school || "",
+    degree: item.degree || "",
+    field: item.field_of_study || "",
+    start: item.start_date || "",
+    end: item.end_date || "",
+    grade: item.grade || "",
+  };
+}
+
+async function fetchProfileCore() {
+  const r = await fetch(`${API_ROOT}/users/me/`, {
+    headers: { ...authHeader(), accept: "application/json" },
+  });
+  if (!r.ok) throw new Error("Failed to load /users/me/");
+  const data = await r.json();
+  const prof = data.profile || {};
+  return {
+    first_name: data.first_name || "",
+    last_name: data.last_name || "",
+    job_title: prof.job_title || "",
+    bio: prof.bio || "",
+    avatar: prof.avatar || data.avatar || "",
+    // skills may be array or CSV; your parseSkills() already exists in this file:
+    skills: Array.isArray(prof.skills) ? prof.skills : parseSkills(prof.skills || ""),
+    links: (prof.links && typeof prof.links === "object") ? prof.links : {},
+    experience: [],
+    education: [],
+  };
+}
+
+async function fetchProfileExtras() {
+  // try combined
+  try {
+    const r = await fetch(`${API_ROOT}/auth/me/profile/`, { headers: { ...authHeader(), accept: "application/json" } });
+    if (r.ok) {
+      const d = await r.json();
+      return {
+        experiences: Array.isArray(d.experiences) ? d.experiences.map(mapExperience) : [],
+        educations: Array.isArray(d.educations) ? d.educations.map(mapEducation) : [],
+      };
+    }
+  } catch {}
+  // fallback to two calls
+  const [e1, e2] = await Promise.all([
+    fetch(`${API_ROOT}/auth/me/educations/`, { headers: { ...authHeader(), accept: "application/json" } }).catch(() => null),
+    fetch(`${API_ROOT}/auth/me/experiences/`, { headers: { ...authHeader(), accept: "application/json" } }).catch(() => null),
+  ]);
+  const educations = e1?.ok ? (await e1.json()).map(mapEducation) : [];
+  const experiences = e2?.ok ? (await e2.json()).map(mapExperience) : [];
+  return { experiences, educations };
+}
+
+
 // -----------------------------------------------------------------------------
 // Small utilities
 // -----------------------------------------------------------------------------
@@ -596,8 +664,8 @@ export default function HomePage() {
   const PAGE_MAX_W = 1120;
   const [myCommunityId, setMyCommunityId] = React.useState(null);
   const [posts, setPosts] = React.useState([]);           // ← now real data
-  const [groups, setGroups] = React.useState(MOCK_GROUPS);
   const [profile, setProfile] = React.useState(MOCK_PROFILE);
+  const [groups, setGroups] = React.useState(MOCK_GROUPS);
   const [communities, setCommunities] = React.useState([]); // for composer picklist
   const [tabIndex, setTabIndex] = React.useState(0);
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -617,6 +685,20 @@ export default function HomePage() {
       setPosts([]); // keep empty
     }
   }, []);
+
+  const fetchMyProfileFromMe = React.useCallback(async () => {
+  try {
+    const core = await fetchProfileCore();
+    const extra = await fetchProfileExtras();
+    setProfile({
+      ...core,
+      experience: extra.experiences,
+      education: extra.educations,
+    });
+  } catch (e) {
+    console.error("Failed to load profile:", e);
+  }
+}, []);
 
   const fetchMyFriends = React.useCallback(async () => {
     const candidates = [
@@ -674,18 +756,13 @@ export default function HomePage() {
   }, []);
 
   React.useEffect(() => {
-    fetchMyPosts();
-    fetchMyCommunities();
-    fetchMyJoinedGroups();
-    fetchMyFriends();            // ← NEW
-  }, [fetchMyPosts, fetchMyCommunities, fetchMyJoinedGroups, fetchMyFriends]);
+  fetchMyPosts();
+  fetchMyCommunities();
+  fetchMyJoinedGroups();
+  fetchMyFriends();
+  fetchMyProfileFromMe();   // ← add this line
+}, [fetchMyPosts, fetchMyCommunities, fetchMyJoinedGroups, fetchMyFriends, fetchMyProfileFromMe]);
 
-
-  React.useEffect(() => {
-    fetchMyPosts();          // already there
-    fetchMyCommunities();    // already there (for myCommunityId)
-    fetchMyJoinedGroups();   // ← NEW
-  }, [fetchMyPosts, fetchMyCommunities, fetchMyJoinedGroups]);
 
   // ---- Create post (always visibility=friends) ----
   async function createCommunityPost(draft) {
@@ -751,24 +828,40 @@ export default function HomePage() {
       <Box sx={{ width: "100%", maxWidth: PAGE_MAX_W, mx: "auto" }}>
         {/* Header */}
         <Card variant="outlined" sx={{ borderRadius: 3, p: 2, mb: 2 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }}>
-            <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72, mr: { sm: 2 } }}>
-              {(fullName[0] || "").toUpperCase()}
-            </Avatar>
-            <Box flex={1} sx={{ alignSelf: { xs: "flex-start", sm: "center" } }}>
+  <Stack
+    direction={{ xs: "column", sm: "row" }}
+    spacing={2}
+    alignItems={{ xs: "flex-start", sm: "center" }}
+  >
+    <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72, mr: { sm: 2 } }}>
+      {(fullName[0] || "").toUpperCase()}
+    </Avatar>
+           <Box
+      sx={{
+        flex: "0 0 auto",
+        width: { xs: "100%", sm: 700, md: 780 },   // adjust numbers if you want
+        alignSelf: { xs: "flex-start", sm: "center" },
+      }}
+    >
               <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
-              <Typography variant="body2" color="text.secondary">{profile.job_title}</Typography>
-              {profile.bio && <Typography variant="body2" sx={{ mt: 1 }}>{profile.bio}</Typography>}
-            </Box>
-            <Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" }, mx: 2 }} />
-            <Box textAlign={{ xs: "left", sm: "center" }}>
-              <Typography variant="subtitle2">
-                <Box component="span" sx={{ fontWeight: 600 }}>{posts.length}</Box> Posts&nbsp;|&nbsp;
-                <Box component="span" sx={{ fontWeight: 600 }}>{friendCount || friends.length}</Box> Friends
-              </Typography>
-            </Box>
-          </Stack>
-        </Card>
+      <Typography variant="body2" color="text.secondary">{profile.job_title}</Typography>
+      {profile.bio && <Typography variant="body2" sx={{ mt: 1 }}>{profile.bio}</Typography>}
+    </Box>
+
+             <Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" }, mx: 2 }} />
+             <Box
+      sx={{
+        minWidth: { sm: 160 },
+        textAlign: { xs: "left", sm: "center" },
+      }}
+    >
+      <Typography variant="subtitle2">
+        <Box component="span" sx={{ fontWeight: 600 }}>{posts.length}</Box> Posts&nbsp;|&nbsp;
+        <Box component="span" sx={{ fontWeight: 600 }}>{friendCount || friends.length}</Box> Friends
+      </Typography>
+    </Box>
+  </Stack>
+</Card>
 
         {/* Tabs */}
         <Card variant="outlined" sx={{ borderRadius: 3, width: "100%" }}>
@@ -833,6 +926,40 @@ function SectionCard({ title, action, children, sx }) {
     </Card>
   );
 }
+// ---------------- Profile wiring (write) ----------------
+async function saveProfileToMe(payload) {
+  const clean = {
+    first_name: payload.first_name || "",
+    last_name: payload.last_name || "",
+    email: payload.email || undefined, // optional
+    profile: {
+      full_name: payload.profile?.full_name || "",
+      timezone: payload.profile?.timezone || "Asia/Kolkata",
+      bio: payload.profile?.bio || "",
+      headline: payload.profile?.headline || "",
+      job_title: payload.profile?.job_title || "",
+      company: payload.profile?.company || "",
+      location: payload.profile?.location || "",
+      skills: Array.isArray(payload.profile?.skills) ? payload.profile.skills : [],
+      links: typeof payload.profile?.links === "object" ? payload.profile.links : {},
+    },
+  };
+
+  const r = await fetch(`${API_ROOT}/users/me/`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(clean),
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = json?.detail ||
+      Object.entries(json).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ") ||
+      "Save failed";
+    throw new Error(msg);
+  }
+  return json;
+}
+
 function AboutTab({ profile, groups, onUpdate }) {
   // ... (same as before – retained from your file)
   // For brevity here, keep your existing AboutTab implementation
@@ -852,16 +979,32 @@ function AboutTab({ profile, groups, onUpdate }) {
       bio: profile.bio || "",
     });
   }, [profile]);
-  const handleSave = () => {
-    onUpdate?.({
-      ...profile,
+  const handleSave = async () => {
+  try {
+    const payload = {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
-      job_title: form.job_title.trim(),
-      bio: form.bio.trim(),
-    });
+      // keep email unchanged from view-only page; omit if unknown here
+      profile: {
+        full_name: `${form.first_name} ${form.last_name}`.trim(),
+        timezone: "",
+        bio: form.bio.trim(),
+        headline: "",
+        job_title: form.job_title.trim(),
+        company: "",
+        location: "",
+        skills: profile.skills || [],
+        links: profile.links || {},
+      },
+    };
+    await saveProfileToMe(payload);  // ← PUT /users/me/
+    onUpdate?.({ ...profile, ...payload, ...payload.profile }); // reflect locally
     setEditOpen(false);
-  };
+  } catch (e) {
+    alert(e.message || "Save failed");
+  }
+};
+
 
   const [aboutOpen, setAboutOpen] = React.useState(false);
   const [aboutForm, setAboutForm] = React.useState({
@@ -906,11 +1049,35 @@ function AboutTab({ profile, groups, onUpdate }) {
     }
   };
 
-  const saveAbout = () => {
-    const updated = { ...profile, bio: (aboutForm.bio || "").trim(), skills: parseSkills(aboutForm.skillsText) };
-    onUpdate?.(updated);
+  const saveAbout = async () => {
+  try {
+    const payload = {
+      first_name: profile.first_name || "",
+      last_name: profile.last_name || "",
+      profile: {
+        full_name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim(),
+        timezone: "",
+        bio: (aboutForm.bio || "").trim(),
+        headline: "",
+        job_title: profile.job_title || "",
+        company: "",
+        location: "",
+        skills: parseSkills(aboutForm.skillsText),
+        links: profile.links || {},
+      },
+    };
+    await saveProfileToMe(payload);      // ← PUT /users/me/
+    onUpdate?.({
+      ...profile,
+      bio: payload.profile.bio,
+      skills: payload.profile.skills,
+    });
     setAboutOpen(false);
-  };
+  } catch (e) {
+    alert(e.message || "Save failed");
+  }
+};
+
   const saveEducation = () => {
     const eduEntry = { school: eduForm.school.trim(), degree: eduForm.degree.trim(), field: eduForm.field.trim(), start: eduForm.start, end: eduForm.end, grade: eduForm.grade.trim() };
     let newEducation = Array.isArray(profile.education) ? [...profile.education] : [];
