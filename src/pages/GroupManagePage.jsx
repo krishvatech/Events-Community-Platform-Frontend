@@ -610,6 +610,61 @@ export default function GroupManagePage() {
     const [notifyEnabled, setNotifyEnabled] = React.useState(true);
     const [notifyRecipients, setNotifyRecipients] = React.useState("owners_admins");
 
+    // --- Chat toggle state (Settings tab) ---
+    const [chatOn, setChatOn] = React.useState(true);
+    const [chatSaving, setChatSaving] = React.useState(false);
+
+    // keep the confirm text for delete group
+    const [deleteGroupOpen, setDeleteGroupOpen] = React.useState(false);
+    const [deletingGroup, setDeletingGroup] = React.useState(false);
+    const [confirmName, setConfirmName] = React.useState("");
+    React.useEffect(() => { if (!deleteGroupOpen) setConfirmName(""); }, [deleteGroupOpen]);
+
+    // When group loads/changes, infer initial chat state from backend shape
+    React.useEffect(() => {
+        if (!group) return;
+        // supports either boolean chat_enabled OR message_mode = 'all'|'admins_only'
+        const initial =
+            typeof group.chat_enabled === "boolean"
+                ? group.chat_enabled
+                : (group.message_mode ? group.message_mode !== "admins_only" : true);
+        setChatOn(initial);
+    }, [group]);
+
+    const saveChatToggle = async (next) => {
+        if (!group) return;
+        setChatSaving(true);
+        try {
+            const payload =
+                typeof group.chat_enabled === "boolean"
+                    ? { chat_enabled: next }
+                    : { message_mode: next ? "all" : "admins_only" };
+
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+                const j = await res.json().catch(() => ({}));
+                throw new Error(j?.detail || `HTTP ${res.status}`);
+            }
+            const updated = await res.json();
+            setGroup(updated);
+            setChatOn(
+                typeof updated.chat_enabled === "boolean"
+                    ? updated.chat_enabled
+                    : (updated.message_mode ? updated.message_mode !== "admins_only" : next)
+            );
+        } catch (e) {
+            alert(`Could not update chat setting: ${e?.message || e}`);
+            setChatOn((prev) => !prev); // revert UI
+        } finally {
+            setChatSaving(false);
+        }
+    };
+
+
     // Load saved prefs per group from localStorage
     React.useEffect(() => {
         if (!group?.id) return;
@@ -1419,6 +1474,31 @@ export default function GroupManagePage() {
                                         <Typography className="text-slate-500 mb-3">
                                             Update visibility, manage tags/subgroups, or delete the group (wire endpoints as needed).
                                         </Typography>
+                                        {/* Chat toggle */}
+                                        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                            <div>
+                                                <Typography variant="subtitle1" className="font-semibold">Group Chat</Typography>
+                                                <Typography variant="body2" className="text-slate-600">
+                                                    {chatOn ? "Members can chat in this group." : "Chat is disabled — only owners/admins can post updates."}
+                                                </Typography>
+                                            </div>
+                                            <FormControlLabel
+                                                control={
+                                                    <Switch
+                                                        checked={!!chatOn}
+                                                        onChange={(e) => {
+                                                            const next = e.target.checked;
+                                                            setChatOn(next);        // optimistic
+                                                            saveChatToggle(next);   // persist
+                                                        }}
+                                                        disabled={chatSaving}
+                                                    />
+                                                }
+                                                label={chatOn ? "On" : "Off"}
+                                            />
+                                        </Stack>
+                                        <Divider className="my-3" />
+
                                         <Stack direction="row" spacing={1}>
                                             <Button
                                                 variant="contained"
@@ -1428,8 +1508,14 @@ export default function GroupManagePage() {
                                             >
                                                 Edit Details
                                             </Button>
-                                            <Button variant="outlined" className="rounded-xl" sx={{ textTransform: "none" }} disabled>
-                                                Delete Group (wire)
+                                            <Button
+                                                variant="outlined"
+                                                color="error"
+                                                className="rounded-xl"
+                                                sx={{ textTransform: "none" }}
+                                                onClick={() => setDeleteGroupOpen(true)}
+                                            >
+                                                Delete Group
                                             </Button>
                                         </Stack>
                                     </Paper>
@@ -1796,6 +1882,66 @@ export default function GroupManagePage() {
                                 </Button>
                             </DialogActions>
                         </Dialog>
+
+                        {/* Delete Group — confirmation */}
+                        <Dialog
+                            open={deleteGroupOpen}
+                            onClose={() => (deletingGroup ? null : setDeleteGroupOpen(false))}
+                            fullWidth
+                            maxWidth="xs"
+                            PaperProps={{ sx: { borderRadius: 3 } }}
+                        >
+                            <DialogTitle sx={{ fontWeight: 800 }}>Delete this group?</DialogTitle>
+                            <DialogContent>
+                                <Alert severity="warning" sx={{ mb: 2 }}>
+                                    This action cannot be undone. All group posts, polls and memberships will be removed.
+                                </Alert>
+                                <Typography sx={{ mb: 1 }}>
+                                    Type the group name to confirm:
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    autoFocus
+                                    value={confirmName}
+                                    onChange={(e) => setConfirmName(e.target.value)}
+                                    placeholder={group?.name || "Group name"}
+                                />
+                            </DialogContent>
+                            <DialogActions>
+                                <Button onClick={() => setDeleteGroupOpen(false)} disabled={deletingGroup} sx={{ textTransform: "none" }}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    color="error"
+                                    variant="contained"
+                                    disabled={deletingGroup || (confirmName || "").trim() !== (group?.name || "").trim()}
+                                    sx={{ textTransform: "none" }}
+                                    onClick={async () => {
+                                        if (!group) return;
+                                        setDeletingGroup(true);
+                                        try {
+                                            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
+                                                method: "DELETE",
+                                                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                            });
+                                            if (!res.ok && res.status !== 204) {
+                                                const j = await res.json().catch(() => ({}));
+                                                throw new Error(j?.detail || `HTTP ${res.status}`);
+                                            }
+                                            setDeletingGroup(false);
+                                            setDeleteGroupOpen(false);
+                                            navigate("/groups"); // adjust route if your list lives elsewhere
+                                        } catch (e) {
+                                            setDeletingGroup(false);
+                                            alert(`Failed to delete group: ${e?.message || e}`);
+                                        }
+                                    }}
+                                >
+                                    {deletingGroup ? "Deleting…" : "Delete"}
+                                </Button>
+                            </DialogActions>
+                        </Dialog>
+
                         {/* Remove member — confirmation */}
                         <Dialog
                             open={removeMemberOpen}
