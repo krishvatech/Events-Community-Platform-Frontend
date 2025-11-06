@@ -435,7 +435,8 @@ function MyFriends({ friends }) {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const startIdx = (page - 1) * perPage;
-  const pageItems = filtered.slice(startIdx, startIdx + perPage);
+  const endIdx = Math.min(startIdx + perPage, filtered.length);
+  const pageItems = filtered.slice(startIdx, endIdx);
 
   React.useEffect(() => { setPage(1); }, [query, friends.length]);
 
@@ -451,34 +452,51 @@ function MyFriends({ friends }) {
           InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }}
           sx={{ mb: 2 }}
         />
+
         {pageItems.length === 0 ? (
           <Typography color="text.secondary">No friends found.</Typography>
         ) : (
-          <Grid container spacing={2}>
-            {pageItems.map((f) => (
-              <Grid key={f.id} item xs={12} sm={6} md={4} lg={3}>
-                <Card variant="outlined" sx={{ borderRadius: 2, height: "100%" }}>
-                  <CardHeader
-                    avatar={<Avatar src={f.avatar}>{(f.name[0] || "").toUpperCase()}</Avatar>}
-                    title={<Typography fontWeight={600} variant="body1">{f.name}</Typography>}
-                    subheader={<Typography variant="caption" color="text.secondary">{f.headline || "—"}</Typography>}
-                    sx={{ pb: 0.5 }}
+          <List disablePadding>
+            {pageItems.map((f, idx) => (
+              <React.Fragment key={f.id}>
+                <ListItem
+                  alignItems="flex-start"
+                  secondaryAction={
+                    f.mutual_count ? <Chip size="small" label={`${f.mutual_count} mutual`} /> : null
+                  }
+                  sx={{
+                    px: 1,
+                    py: 1,
+                    "& .MuiListItemSecondaryAction-root": { right: { xs: 8, sm: 12 } },
+                  }}
+                >
+                  <ListItemAvatar>
+                    <Avatar src={f.avatar}>{(f.name[0] || "").toUpperCase()}</Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={<Typography fontWeight={600}>{f.name}</Typography>}
+                    secondary={
+                      <Typography variant="body2" color="text.secondary">
+                        {f.headline || "—"}
+                      </Typography>
+                    }
                   />
-                  <CardContent sx={{ pt: 0.5 }}>
-                    {!!f.mutual_count && (
-                      <Chip size="small" label={`${f.mutual_count} mutual`} />
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
+                </ListItem>
+                {idx < pageItems.length - 1 && <Divider component="li" />}
+              </React.Fragment>
             ))}
-          </Grid>
+          </List>
         )}
       </CardContent>
 
-      <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between" sx={{ p: 2, pt: 0 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ p: 2, pt: 0 }}
+      >
         <Typography variant="body2" color="text.secondary">
-          Showing {filtered.length === 0 ? 0 : startIdx + 1}–{Math.min(startIdx + perPage, filtered.length)} of {filtered.length}
+          Showing {filtered.length === 0 ? 0 : startIdx + 1}–{endIdx} of {filtered.length}
         </Typography>
         <Pagination
           count={totalPages}
@@ -493,6 +511,7 @@ function MyFriends({ friends }) {
     </Card>
   );
 }
+
 
 
 // -----------------------------------------------------------------------------
@@ -573,6 +592,7 @@ export default function HomePage() {
   const [tabIndex, setTabIndex] = React.useState(0);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [friends, setFriends] = React.useState([]);
+  const [friendCount, setFriendCount] = React.useState(0); // ← ADD THIS
 
   // ---- Fetch my posts (paginated) ----
   const fetchMyPosts = React.useCallback(async () => {
@@ -588,25 +608,27 @@ export default function HomePage() {
   }, []);
 
   const fetchMyFriends = React.useCallback(async () => {
-    // Tries a few common endpoints; keeps your code unblocked regardless of backend shape
-    const candidates = [
-      `${API_ROOT}/relationships/friends/`,
-      `${API_ROOT}/friends/`,
-      `${API_ROOT}/users/friends/`,
-      `${API_ROOT}/accounts/friends/`,
-    ];
-    for (const url of candidates) {
-      try {
-        const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
-        if (!res.ok) continue;
-        const data = await res.json();
-        const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-        setFriends(rows.map(normalizeFriend).filter(Boolean));
-        return;
-      } catch { }
-    }
-    setFriends([]);
-  }, []);
+  const candidates = [
+    `${API_ROOT}/relationships/friends/`,
+    `${API_ROOT}/friends/`,
+    `${API_ROOT}/users/friends/`,
+    `${API_ROOT}/accounts/friends/`,
+  ];
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      const total = Number(data?.count ?? rows.length) || 0;
+      setFriends(rows.map(normalizeFriend).filter(Boolean));
+      setFriendCount(total);
+      return;
+    } catch { /* try next */ }
+  }
+  setFriends([]);
+  setFriendCount(0);
+}, []);
 
 
 
@@ -731,7 +753,7 @@ export default function HomePage() {
             <Box textAlign={{ xs: "left", sm: "center" }}>
               <Typography variant="subtitle2">
                 <Box component="span" sx={{ fontWeight: 600 }}>{posts.length}</Box> Posts&nbsp;|&nbsp;
-                <Box component="span" sx={{ fontWeight: 600 }}>{MOCK_USER.friends_count}</Box> Friends
+                <Box component="span" sx={{ fontWeight: 600 }}>{friendCount || friends.length}</Box> Friends
               </Typography>
             </Box>
           </Stack>
