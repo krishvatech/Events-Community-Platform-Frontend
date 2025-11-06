@@ -78,7 +78,7 @@ function timeAgo(date) {
 function toMonthYear(d) {
   if (!d) return "";
   const [y, m] = String(d).split("-");
-  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const mi = m ? Math.max(1, Math.min(12, parseInt(m, 10))) - 1 : null;
   return mi != null && y ? `${monthNames[mi]} ${y}` : String(d);
 }
@@ -93,7 +93,7 @@ function parseSkills(value) {
   try {
     const j = JSON.parse(v);
     if (Array.isArray(j)) return j.map((s) => String(s).trim()).filter(Boolean);
-  } catch {}
+  } catch { }
   return v.split(/,|\n|;/).map((s) => s.trim()).filter(Boolean);
 }
 
@@ -250,6 +250,38 @@ function PostComposer({ communityId, onCreate }) {
 }
 
 
+// Limit the visible height to ~3 post cards and enable vertical scroll
+function ScrollThreeVisible({ children }) {
+  const ref = React.useRef(null);
+  const [maxH, setMaxH] = React.useState(null);
+
+  const measure = React.useCallback(() => {
+    const root = ref.current;
+    if (!root) return;
+    const cards = root.querySelectorAll(".MuiCard-root");
+    if (!cards.length) { setMaxH(null); return; }
+
+    const take = Math.min(3, cards.length);
+    let sum = 0;
+    for (let i = 0; i < take; i++) sum += cards[i].getBoundingClientRect().height;
+    const spacingPx = 16 * (take - 1); // Stack spacing={2}
+    setMaxH(Math.ceil(sum + spacingPx + 2));
+  }, []);
+
+  React.useLayoutEffect(() => {
+    measure();
+    const id = setTimeout(measure, 350); // re-measure after images load
+    return () => clearTimeout(id);
+  }, [children, measure]);
+
+  return (
+    <Box ref={ref} sx={{ maxHeight: maxH ?? "none", overflowY: maxH ? "auto" : "visible", pr: 1 }}>
+      {children}
+    </Box>
+  );
+}
+
+
 // -----------------------------------------------------------------------------
 // Post card + lists
 // -----------------------------------------------------------------------------
@@ -371,6 +403,99 @@ function MyGroups({ groups }) {
 }
 
 // -----------------------------------------------------------------------------
+// Friends list (new)
+// -----------------------------------------------------------------------------
+function normalizeFriend(row) {
+  // Supports multiple payload styles
+  const u = row?.friend || row?.user || row || {};
+  const id = u.id ?? row.id;
+  const first = u.first_name || u.firstName || "";
+  const last = u.last_name || u.lastName || "";
+  return {
+    id,
+    name: `${first} ${last}`.trim() || u.username || "Friend",
+    avatar: u.avatar || u.profile_image || "",
+    headline: u.job_title || u.title || u.bio || "",
+    mutual_count: row?.mutual_count ?? row?.mutuals ?? 0,
+  };
+}
+
+function MyFriends({ friends }) {
+  const [query, setQuery] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const perPage = 8;
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return friends;
+    return friends.filter((f) =>
+      f.name.toLowerCase().includes(q) || (f.headline || "").toLowerCase().includes(q)
+    );
+  }, [friends, query]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const startIdx = (page - 1) * perPage;
+  const pageItems = filtered.slice(startIdx, startIdx + perPage);
+
+  React.useEffect(() => { setPage(1); }, [query, friends.length]);
+
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+      <CardHeader title="My Friends" sx={{ pb: 0 }} />
+      <CardContent sx={{ pt: 1 }}>
+        <TextField
+          fullWidth
+          placeholder="Search friends"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }}
+          sx={{ mb: 2 }}
+        />
+        {pageItems.length === 0 ? (
+          <Typography color="text.secondary">No friends found.</Typography>
+        ) : (
+          <Grid container spacing={2}>
+            {pageItems.map((f) => (
+              <Grid key={f.id} item xs={12} sm={6} md={4} lg={3}>
+                <Card variant="outlined" sx={{ borderRadius: 2, height: "100%" }}>
+                  <CardHeader
+                    avatar={<Avatar src={f.avatar}>{(f.name[0] || "").toUpperCase()}</Avatar>}
+                    title={<Typography fontWeight={600} variant="body1">{f.name}</Typography>}
+                    subheader={<Typography variant="caption" color="text.secondary">{f.headline || "—"}</Typography>}
+                    sx={{ pb: 0.5 }}
+                  />
+                  <CardContent sx={{ pt: 0.5 }}>
+                    {!!f.mutual_count && (
+                      <Chip size="small" label={`${f.mutual_count} mutual`} />
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </CardContent>
+
+      <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between" sx={{ p: 2, pt: 0 }}>
+        <Typography variant="body2" color="text.secondary">
+          Showing {filtered.length === 0 ? 0 : startIdx + 1}–{Math.min(startIdx + perPage, filtered.length)} of {filtered.length}
+        </Typography>
+        <Pagination
+          count={totalPages}
+          page={page}
+          onChange={(_, p) => setPage(p)}
+          color="primary"
+          size="medium"
+          siblingCount={0}
+          boundaryCount={1}
+        />
+      </Stack>
+    </Card>
+  );
+}
+
+
+// -----------------------------------------------------------------------------
 // API mappers
 // -----------------------------------------------------------------------------
 function mapFeedItemRowToUiPost(row) {
@@ -447,6 +572,7 @@ export default function HomePage() {
   const [communities, setCommunities] = React.useState([]); // for composer picklist
   const [tabIndex, setTabIndex] = React.useState(0);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [friends, setFriends] = React.useState([]);
 
   // ---- Fetch my posts (paginated) ----
   const fetchMyPosts = React.useCallback(async () => {
@@ -461,49 +587,79 @@ export default function HomePage() {
     }
   }, []);
 
-  
+  const fetchMyFriends = React.useCallback(async () => {
+    // Tries a few common endpoints; keeps your code unblocked regardless of backend shape
+    const candidates = [
+      `${API_ROOT}/relationships/friends/`,
+      `${API_ROOT}/friends/`,
+      `${API_ROOT}/users/friends/`,
+      `${API_ROOT}/accounts/friends/`,
+    ];
+    for (const url of candidates) {
+      try {
+        const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+        setFriends(rows.map(normalizeFriend).filter(Boolean));
+        return;
+      } catch { }
+    }
+    setFriends([]);
+  }, []);
+
+
+
   // ---- Fetch my communities (owner or member) ----
   const fetchMyCommunities = React.useCallback(async () => {
-  try {
-    const res = await fetch(`${API_ROOT}/communities/`, { headers: { ...authHeader(), accept: "application/json" } });
-    const list = await res.json();
-    const rows = Array.isArray(list) ? list : (list?.results || []);
-    setCommunities(rows);
-    setGroups(rows);
-    setMyCommunityId(rows?.[0]?.id ?? null); // ← derive community_id from membership
-  } catch (e) {
-    console.error("Failed to load communities:", e);
-    setCommunities([]);
-    setMyCommunityId(null);
-  }
-}, []);
+    try {
+      const res = await fetch(`${API_ROOT}/communities/`, { headers: { ...authHeader(), accept: "application/json" } });
+      const list = await res.json();
+      const rows = Array.isArray(list) ? list : (list?.results || []);
+      setCommunities(rows);
+      setGroups(rows);
+      setMyCommunityId(rows?.[0]?.id ?? null); // ← derive community_id from membership
+    } catch (e) {
+      console.error("Failed to load communities:", e);
+      setCommunities([]);
+      setMyCommunityId(null);
+    }
+  }, []);
   const fetchMyJoinedGroups = React.useCallback(async () => {
-  try {
-    const res = await fetch(`${API_ROOT}/groups/joined-groups/`, {
-      headers: { ...authHeader(), accept: "application/json" },
-    });
-    const data = await res.json();
-    const rows = Array.isArray(data) ? data : (data?.results || []);
-    const normalized = rows.map(normalizeJoinedGroup).filter(Boolean);
-    setGroups(normalized);
-  } catch (e) {
-    console.error("Failed to load joined groups:", e);
-    setGroups([]);
-  }
-}, []);
+    try {
+      const res = await fetch(`${API_ROOT}/groups/joined-groups/`, {
+        headers: { ...authHeader(), accept: "application/json" },
+      });
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : (data?.results || []);
+      const normalized = rows.map(normalizeJoinedGroup).filter(Boolean);
+      setGroups(normalized);
+    } catch (e) {
+      console.error("Failed to load joined groups:", e);
+      setGroups([]);
+    }
+  }, []);
 
   React.useEffect(() => {
-  fetchMyPosts();          // already there
-  fetchMyCommunities();    // already there (for myCommunityId)
-  fetchMyJoinedGroups();   // ← NEW
-}, [fetchMyPosts, fetchMyCommunities, fetchMyJoinedGroups]);
+    fetchMyPosts();
+    fetchMyCommunities();
+    fetchMyJoinedGroups();
+    fetchMyFriends();            // ← NEW
+  }, [fetchMyPosts, fetchMyCommunities, fetchMyJoinedGroups, fetchMyFriends]);
+
+
+  React.useEffect(() => {
+    fetchMyPosts();          // already there
+    fetchMyCommunities();    // already there (for myCommunityId)
+    fetchMyJoinedGroups();   // ← NEW
+  }, [fetchMyPosts, fetchMyCommunities, fetchMyJoinedGroups]);
 
   // ---- Create post (always visibility=friends) ----
   async function createCommunityPost(draft) {
-  const communityId = myCommunityId;           // ← always post to your single community
-  if (!communityId) { alert("Community not loaded yet."); return; }
-  const fd = new FormData();
-  fd.append("visibility", "friends");
+    const communityId = myCommunityId;           // ← always post to your single community
+    if (!communityId) { alert("Community not loaded yet."); return; }
+    const fd = new FormData();
+    fd.append("visibility", "friends");
 
     if (draft.type === "text") {
       fd.append("type", "text");
@@ -586,6 +742,7 @@ export default function HomePage() {
           <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} variant="scrollable" allowScrollButtonsMobile>
             <Tab label="My Posts" />
             <Tab label="My Groups" />
+            <Tab label="My Friends" />
             <Tab label="About" />
           </Tabs>
           <Divider />
@@ -598,11 +755,14 @@ export default function HomePage() {
                     Create Post
                   </Button>
                 </Stack>
-                <MyPostsList posts={posts} />
+                <ScrollThreeVisible>
+                  <MyPostsList posts={posts} />
+                </ScrollThreeVisible>
               </Stack>
             )}
             {tabIndex === 1 && <MyGroups groups={groups} />}
-            {tabIndex === 2 && <AboutTab profile={profile} groups={groups} onUpdate={handleUpdateProfile} />}
+            {tabIndex === 2 && <MyFriends friends={friends} />}     {/* ← NEW */}
+            {tabIndex === 3 && <AboutTab profile={profile} groups={groups} onUpdate={handleUpdateProfile} />}
           </CardContent>
         </Card>
       </Box>
@@ -620,6 +780,8 @@ export default function HomePage() {
     </Box>
   );
 }
+
+
 
 // ---------------- About tab (unchanged core logic) ----------------
 function SkillsChips({ skills }) {
