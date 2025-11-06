@@ -245,6 +245,37 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
     return true;
   };
 
+  function normalizeServerPost(resp, prevItem, fallbackKind) {
+    if (!resp) return prevItem;
+
+    const meta = resp.metadata || {};
+    const t = (resp.type || meta.type || prevItem.type || fallbackKind || "text").toLowerCase();
+
+    // start from previous values so we don't lose things like created_at
+    const out = { ...prevItem, ...resp };
+    delete out.metadata; // we'll flatten below
+
+    out.type = t;
+    out.tags = Array.isArray(resp.tags) ? resp.tags : (meta.tags || prevItem.tags || []);
+    out.visibility = resp.visibility || meta.visibility || prevItem.visibility;
+
+    if (t === "text") {
+      out.text = resp.text ?? meta.text ?? prevItem.text ?? "";
+    } else if (t === "image") {
+      out.image_url = resp.image_url ?? meta.image_url ?? prevItem.image_url;
+      out.caption   = resp.caption   ?? meta.caption   ?? prevItem.caption   ?? "";
+    } else if (t === "link") {
+      out.url         = resp.url         ?? meta.url         ?? prevItem.url;
+      out.title       = resp.title       ?? meta.title       ?? prevItem.title;
+      out.description = resp.description ?? meta.description ?? prevItem.description;
+    } else if (t === "poll") {
+      out.question = resp.question ?? meta.question ?? prevItem.question ?? "";
+      out.options  = resp.options  ?? meta.options  ?? prevItem.options  ?? [];
+    }
+
+    return out;
+  }
+
   const handleSave = async () => {
     if (!communityId || !item?.id) {
       setToast({ open: true, type: "error", msg: "Missing community or post id." });
@@ -263,7 +294,7 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
 
     setSaving(true);
     const tokenHeaders = authHeader();
-    const POST_DETAIL_URL = `${API_ROOT}/communities/${communityId}/posts/${item.id}/`;
+    const POST_DETAIL_URL = `${API_ROOT}/communities/${communityId}/posts/${item.id}/edit/`;
 
     try {
       let res;
@@ -292,8 +323,24 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
         });
       }
 
-      const updated = res?.ok ? await res.json()
-        : { ...item, text, caption, url: linkUrl, title: linkTitle, description: linkDesc, question, options: pollOptions };
+      let updated;
+      if (res?.ok) {
+        const json = await res.json();
+        updated = normalizeServerPost(json, item, kind);
+      } else {
+        // fallback: local shape (already what PostCard expects)
+        updated = {
+          ...item,
+          type: kind,
+          text,
+          caption,
+          url: linkUrl,
+          title: linkTitle,
+          description: linkDesc,
+          question,
+          options: pollOptions,
+        };
+      }
       onSaved?.(updated);
       onClose?.();
     } catch {
@@ -390,7 +437,7 @@ function DeleteConfirmDialog({ open, onClose, communityId, item, onDeleted }) {
 
     setBusy(true);
     const tokenHeaders = authHeader();
-    const POST_DETAIL_URL = `${API_ROOT}/communities/${communityId}/posts/${item.id}/`;
+    const POST_DETAIL_URL = `${API_ROOT}/communities/${communityId}/posts/${item.id}/delete/`;
     try {
       await fetch(POST_DETAIL_URL, { method: "DELETE", headers: { ...tokenHeaders } });
     } catch { }
@@ -913,7 +960,7 @@ export default function AdminPostsPage() {
                   item={it}
                   communityId={activeCommunityId}
                   onUpdated={(updated) =>
-                    setItems((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+                    setItems((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)))
                   }
                   onDeleted={(id) =>
                     setItems((prev) => prev.filter((p) => p.id !== id))
