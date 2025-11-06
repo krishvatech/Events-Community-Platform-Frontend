@@ -43,6 +43,7 @@ import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import { IconButton, InputAdornment } from "@mui/material";
 import AdminPostsPage from "./AdminPostsPage.jsx";
+import AdminNotificationsPage from "./AdminNotificationsPage.jsx";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -238,7 +239,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "16" }) {
       if (publishISO) fd.append("resource_publish_at", publishISO);
     }
 
-   
+
     if (resourceType === "file") {
       resFiles.forEach((f) => fd.append("resource_files", f, f.name));
     } else if (resourceType === "link") {
@@ -247,7 +248,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "16" }) {
       resVideos.map((s) => String(s || "").trim()).filter(Boolean).forEach((u) => fd.append("resource_videos", u));
     }
 
-    
+
     if (resTitle.trim()) fd.append("resource_title", resTitle.trim());
     if (resDesc.trim()) fd.append("resource_description", resDesc.trim());
     resTags.filter(Boolean).forEach((t) => fd.append("resource_tags", t));
@@ -424,31 +425,31 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "16" }) {
           <Grid container spacing={2}>
             <Grid item xs={12} md={3}>
               <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} fullWidth
-                         InputLabelProps={{ shrink: true }}
-                         InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }} />
+                InputLabelProps={{ shrink: true }}
+                InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }} />
             </Grid>
             <Grid item xs={12} md={3}>
               <TextField label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth
-                         InputLabelProps={{ shrink: true }}
-                         InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }} />
+                InputLabelProps={{ shrink: true }}
+                InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }} />
             </Grid>
             <Grid item xs={12} md={3}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <TimePicker label="Start time *" ampm minutesStep={30} value={dayjs(`1970-01-01T${startTime}`)}
-                            onChange={(v) => setStartTime(v ? dayjs(v).format("HH:mm") : startTime)}
-                            slotProps={{ textField: { fullWidth: true } }} />
+                  onChange={(v) => setStartTime(v ? dayjs(v).format("HH:mm") : startTime)}
+                  slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
             </Grid>
             <Grid item xs={12} md={3}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <TimePicker label="End time *" ampm minutesStep={30} value={dayjs(`1970-01-01T${endTime}`)}
-                            onChange={(v) => setEndTime(v ? dayjs(v).format("HH:mm") : endTime)}
-                            slotProps={{ textField: { fullWidth: true } }} />
+                  onChange={(v) => setEndTime(v ? dayjs(v).format("HH:mm") : endTime)}
+                  slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
             </Grid>
             <Grid item xs={12} md={4}>
               <TextField label="Timezone *" select value={timezone} onChange={(e) => setTimezone(e.target.value)} fullWidth
-                         SelectProps={{ IconComponent: ExpandMoreRoundedIcon }}>
+                SelectProps={{ IconComponent: ExpandMoreRoundedIcon }}>
                 {["Asia/Kolkata", "UTC", "Europe/London", "America/New_York", "America/Los_Angeles"].map((tz) => (
                   <MenuItem key={tz} value={tz}>{tz.replace("/", " - ")}</MenuItem>
                 ))}
@@ -581,7 +582,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "16" }) {
                 {resLinks.map((val, idx) => (
                   <Stack key={`link-${idx}`} direction="row" spacing={1} sx={{ width: "100%" }}>
                     <TextField fullWidth placeholder="https://example.com/resource" value={val}
-                               onChange={(e) => setResLinks((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
+                      onChange={(e) => setResLinks((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
                     <Button variant="outlined" color="error" onClick={() => setResLinks((p) => p.filter((_, i) => i !== idx))}>
                       Remove
                     </Button>
@@ -601,7 +602,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "16" }) {
                 {resVideos.map((val, idx) => (
                   <Stack key={`video-${idx}`} direction="row" spacing={1} sx={{ width: "100%" }}>
                     <TextField fullWidth placeholder="https://youtu.be/abcd…" value={val}
-                               onChange={(e) => setResVideos((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
+                      onChange={(e) => setResVideos((p) => p.map((x, i) => (i === idx ? e.target.value : x)))} size="small" />
                     <Button variant="outlined" color="error" onClick={() => setResVideos((p) => p.filter((_, i) => i !== idx))}>
                       Remove
                     </Button>
@@ -1353,6 +1354,8 @@ export default function Dashboard() {
               <MyResourcesAdmin />
             ) : active === "groups" ? (
               <GroupsAdmin />
+            ) : active === "notifications" ? (
+              <AdminNotificationsPage />
             ) : (
               <MyResourcesAdmin />   // fallback unchanged
             )}
