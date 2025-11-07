@@ -383,6 +383,7 @@ function PostCard({ post, avatarUrl, actorName }) {
   const name = (post.actor_name || actorName || "You");
   const initial = (name?.[0] || "U").toUpperCase();
   const photo = post.actor_avatar || avatarUrl || "";
+  const commentInputRef = React.useRef(null);
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardHeader
@@ -465,12 +466,24 @@ function PostCard({ post, avatarUrl, actorName }) {
         <Tooltip title="Comments">
           <IconButton
             size="medium"
-            onClick={() => (window.__openComments?.(post.id))?.()}
+            onClick={() => {
+              if (commentInputRef?.current) commentInputRef.current.focus();
+            }}
           >
             <ChatBubbleOutlineRoundedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </CardActions>
+      {/* Inline comments, always visible */}
+      <Box sx={{ px: 2, pb: 2, width: "100%" }}>
+        <CommentsDialog
+          inline
+          initialCount={3}            // show a few first, then “Load more”
+          postId={post.id}
+          onClose={() => { }}          // no-op (modal path unused here)
+          inputRef={commentInputRef}  // for focusing when icon clicked
+        />
+      </Box>
     </Card>
   );
 }
@@ -484,11 +497,11 @@ function MyPostsList({ posts, avatarUrl, actorName }) {
     );
   }
   return (
-   <Stack spacing={2}>
-     {posts.map((p) => (
-       <PostCard key={p.id} post={p} avatarUrl={avatarUrl} actorName={actorName} />
-     ))}
-   </Stack>
+    <Stack spacing={2}>
+      {posts.map((p) => (
+        <PostCard key={p.id} post={p} avatarUrl={avatarUrl} actorName={actorName} />
+      ))}
+    </Stack>
   );
 }
 
@@ -961,9 +974,9 @@ export default function HomePage() {
                 <IconButton
                   size="small"
                   onClick={() => {
-                      setAvatarPreview(profile.avatar || "");
-                      setAvatarDialogOpen(true);
-                    }}
+                    setAvatarPreview(profile.avatar || "");
+                    setAvatarDialogOpen(true);
+                  }}
                   sx={{
                     position: "absolute",
                     right: -6,
@@ -1452,11 +1465,11 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
         let j = {};
         try { j = await r.json(); } catch { /* 204 or empty body */ }
         const newUrl =
-              j?.avatar ||
-              j?.profile?.avatar ||
-              j?.data?.avatar ||
-              j?.user_image_url ||         // ← add this
-              null;
+          j?.avatar ||
+          j?.profile?.avatar ||
+          j?.data?.avatar ||
+          j?.user_image_url ||         // ← add this
+          null;
 
         // If server returned 204/no body, do a quick re-fetch of /users/me/
         if (!newUrl) {
@@ -1522,8 +1535,15 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
 }
 
 
-// Function For Comments Dialog
-function CommentsDialog({ open, postId, onClose }) {
+function CommentsDialog({
+  open,
+  postId,
+  onClose,
+  // NEW: inline mode props
+  inline = false,
+  initialCount = 3,
+  inputRef = null,
+}) {
   const [loading, setLoading] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [comments, setComments] = React.useState([]);
@@ -1531,8 +1551,8 @@ function CommentsDialog({ open, postId, onClose }) {
   const [meId, setMeId] = React.useState(null);
   const [replyingTo, setReplyingTo] = React.useState(null);
   const [replyText, setReplyText] = React.useState("");
+  const [visibleCount, setVisibleCount] = React.useState(initialCount);
 
-  // --- helpers that reuse API_ROOT/authHeader from the file ---
   async function getMeId() {
     try {
       const r = await fetch(`${API_ROOT}/users/me/`, { headers: { ...authHeader(), accept: "application/json" } });
@@ -1582,10 +1602,12 @@ function CommentsDialog({ open, postId, onClose }) {
   }
 
   async function createComment(postId, body, parentId = null) {
-    // Try post-scoped first, then global /comments/
+    if (!body.trim()) return null;
     const payload = parentId ? { text: body, parent: parentId } : { text: body };
+
     const scoped = [
       { url: `${API_ROOT}/posts/${postId}/comments/`, body: payload },
+      { url: `${API_ROOT}/communities/${postId}/comments/`, body: payload }, // in case of alt route
       { url: `${API_ROOT}/communities/posts/${postId}/comments/`, body: payload },
     ];
     for (const { url, body: b } of scoped) {
@@ -1638,20 +1660,24 @@ function CommentsDialog({ open, postId, onClose }) {
     return false;
   }
 
-  // load on open
+  // Load on mount / when switching between posts
   React.useEffect(() => {
     let mounted = true;
     (async () => {
-      if (!open || !postId) return;
+      if ((!inline && !open) || !postId) return;
       setLoading(true);
       const uid = await getMeId();
       if (mounted) setMeId(uid);
       const list = await fetchComments(postId);
-      if (mounted) setComments(list);
+      if (mounted) {
+        // newest first at root
+        setComments(list.sort((a, b) => (new Date(b.created || 0)) - (new Date(a.created || 0))));
+        setVisibleCount(initialCount);
+      }
       setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [open, postId]);
+  }, [open, inline, postId, initialCount]);
 
   const onSubmitNew = async () => {
     if (!text.trim()) return;
@@ -1692,7 +1718,7 @@ function CommentsDialog({ open, postId, onClose }) {
     );
     const ok = await toggleLike(id);
     if (!ok) {
-      // revert if server failed
+      // revert
       setComments((prev) =>
         prev.map((c) =>
           c.id === id ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1 } : c
@@ -1766,6 +1792,57 @@ function CommentsDialog({ open, postId, onClose }) {
     </Box>
   );
 
+  // -------- Inline mode (LinkedIn/Instagram style) --------
+  if (inline) {
+    const roots = comments; // normalized as root-level with nested replies
+    const visibleRoots = roots.slice(0, visibleCount);
+    const hasMore = roots.length > visibleRoots.length;
+
+    return (
+      <Box>
+        {/* Always-show input */}
+        <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Write a comment…"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            inputRef={inputRef || undefined}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onSubmitNew();
+              }
+            }}
+          />
+          <Button variant="contained" onClick={onSubmitNew} disabled={submitting || !text.trim()}>
+            Post
+          </Button>
+        </Stack>
+
+        {loading ? (
+          <Typography variant="body2" color="text.secondary">Loading comments…</Typography>
+        ) : visibleRoots.length === 0 ? (
+          <Typography variant="caption" color="text.secondary">Be the first to comment.</Typography>
+        ) : (
+          <Box>
+            {visibleRoots.map((c) => <Item key={c.id} c={c} />)}
+          </Box>
+        )}
+
+        {hasMore && (
+          <Box sx={{ mt: 1 }}>
+            <Button size="small" onClick={() => setVisibleCount((v) => v + initialCount)}>
+              Load more comments
+            </Button>
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  // -------- Original modal path kept for compatibility --------
   return (
     <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Comments</DialogTitle>

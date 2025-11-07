@@ -69,6 +69,7 @@ const avatarOf = (u = {}) =>
 // Minimal PostCard (local) so we don't touch your existing files
 // -----------------------------------------------------------------------------
 function PostCard({ post }) {
+  const commentInputRef = React.useRef(null);
   return (
     <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
       <CardHeader
@@ -130,10 +131,24 @@ function PostCard({ post }) {
           <Typography variant="caption">{post.like_count || 0}</Typography>
         </Box>
         <Tooltip title="Comments">
-          <IconButton size="small" onClick={() => window.__openGroupComments?.(post.id)}>
+          <IconButton
+            size="small"
+            onClick={() => {
+              if (commentInputRef?.current) commentInputRef.current.focus();
+            }}
+          >
             <ChatBubbleOutlineRoundedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
+      </Box>
+      <Box sx={{ px: 1.5, pb: 1.5 }}>
+        <CommentsDialog
+          inline
+          initialCount={3}
+          postId={post.id}
+          // groupId is optional; we omit it so it gracefully falls back to /posts/:id/comments
+          inputRef={commentInputRef}
+        />
       </Box>
     </Card>
   );
@@ -575,19 +590,28 @@ function OverviewTab({ group }) {
   );
 }
 
-function CommentsDialog({ open, postId, groupId, onClose }) {
+function CommentsDialog({
+  open,
+  postId,
+  groupId,
+  onClose,
+  // NEW inline mode (for per-post rendering)
+  inline = false,
+  initialCount = 3,
+  inputRef = null,
+}) {
   const [loading, setLoading] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [comments, setComments] = React.useState([]);
   const [text, setText] = React.useState("");
   const [replyingTo, setReplyingTo] = React.useState(null);
   const [replyText, setReplyText] = React.useState("");
+  const [visibleCount, setVisibleCount] = React.useState(initialCount);
 
   function normalizeUser(u) {
     if (!u) return { id: null, name: "User", avatar: "" };
     const id = u.id ?? u.user_id ?? null;
-    const name =
-      u.name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username || "User";
+    const name = u.name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username || "User";
     const avatar = u.avatar || u.profile_image || u.photo || "";
     return { id, name, avatar };
   }
@@ -605,7 +629,7 @@ function CommentsDialog({ open, postId, groupId, onClose }) {
 
   async function fetchComments(postId) {
     const candidates = [
-      `${API_ROOT}/groups/${groupId}/posts/${postId}/comments/`,
+      ...(groupId ? [`${API_ROOT}/groups/${groupId}/posts/${postId}/comments/`] : []),
       `${API_ROOT}/posts/${postId}/comments/`,
       `${API_ROOT}/comments/?post=${postId}`,
     ];
@@ -622,9 +646,10 @@ function CommentsDialog({ open, postId, groupId, onClose }) {
   }
 
   async function createComment(postId, body, parentId = null) {
+    if (!body.trim()) return null;
     const payload = parentId ? { text: body, parent: parentId } : { text: body };
     const scoped = [
-      { url: `${API_ROOT}/groups/${groupId}/posts/${postId}/comments/`, body: payload },
+      ...(groupId ? [{ url: `${API_ROOT}/groups/${groupId}/posts/${postId}/comments/`, body: payload }] : []),
       { url: `${API_ROOT}/posts/${postId}/comments/`, body: payload },
     ];
     for (const { url, body: b } of scoped) {
@@ -637,7 +662,6 @@ function CommentsDialog({ open, postId, groupId, onClose }) {
         if (r.ok) return normalizeComment(await r.json());
       } catch { }
     }
-    // Fallback
     try {
       const r = await fetch(`${API_ROOT}/comments/`, {
         method: "POST",
@@ -683,14 +707,18 @@ function CommentsDialog({ open, postId, groupId, onClose }) {
   React.useEffect(() => {
     let mounted = true;
     (async () => {
-      if (!open || !postId) return;
+      if ((!inline && !open) || !postId) return;
       setLoading(true);
       const list = await fetchComments(postId);
-      if (mounted) setComments(list);
+      if (mounted) {
+        // newest first at root
+        setComments(list.sort((a, b) => (new Date(b.created || 0)) - (new Date(a.created || 0))));
+        setVisibleCount(initialCount);
+      }
       setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [open, postId, groupId]);
+  }, [open, inline, postId, groupId, initialCount]);
 
   const onSubmitNew = async () => {
     if (!text.trim()) return;
@@ -754,11 +782,7 @@ function CommentsDialog({ open, postId, groupId, onClose }) {
         <Box sx={{ flex: 1 }}>
           <Stack direction="row" alignItems="baseline" spacing={1}>
             <Typography variant="subtitle2">{c.author.name}</Typography>
-            {c.created && (
-              <Typography variant="caption" color="text.secondary">
-                {timeAgo(c.created)}
-              </Typography>
-            )}
+            {c.created && <Typography variant="caption" color="text.secondary">{timeAgo(c.created)}</Typography>}
           </Stack>
           <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mt: 0.25 }}>{c.body}</Typography>
 
@@ -773,12 +797,7 @@ function CommentsDialog({ open, postId, groupId, onClose }) {
             </Button>
 
             {c.canDelete && (
-              <Button
-                size="small"
-                color="error"
-                startIcon={<DeleteOutlineRoundedIcon />}
-                onClick={() => onDelete(c.id, !!parentId, parentId)}
-              >
+              <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onDelete(c.id, !!parentId, parentId)}>
                 Delete
               </Button>
             )}
@@ -810,6 +829,56 @@ function CommentsDialog({ open, postId, groupId, onClose }) {
     </Box>
   );
 
+  // ---------- INLINE (Instagram/LinkedIn style) ----------
+  if (inline) {
+    const roots = comments; // already normalized with nested replies (if your API returns flat, you can extend)
+    const visibleRoots = roots.slice(0, visibleCount);
+    const hasMore = roots.length > visibleRoots.length;
+
+    return (
+      <Box sx={{ mt: 1 }}>
+        <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Write a comment…"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            inputRef={inputRef || undefined}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onSubmitNew();
+              }
+            }}
+          />
+          <Button variant="contained" onClick={onSubmitNew} disabled={submitting || !text.trim()}>
+            Post
+          </Button>
+        </Stack>
+
+        {loading ? (
+          <Stack alignItems="center" py={1.5}><CircularProgress size={18} /></Stack>
+        ) : visibleRoots.length === 0 ? (
+          <Typography variant="caption" color="text.secondary">Be the first to comment.</Typography>
+        ) : (
+          <Box>
+            {visibleRoots.map((c) => <Item key={c.id} c={c} />)}
+          </Box>
+        )}
+
+        {hasMore && (
+          <Box sx={{ mt: 1 }}>
+            <Button size="small" onClick={() => setVisibleCount((v) => v + initialCount)}>
+              Load more comments
+            </Button>
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  // ---------- ORIGINAL MODAL (kept for compatibility) ----------
   return (
     <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Comments</DialogTitle>
@@ -819,9 +888,7 @@ function CommentsDialog({ open, postId, groupId, onClose }) {
         ) : comments.length === 0 ? (
           <Typography variant="body2" color="text.secondary">No comments yet. Be the first to comment!</Typography>
         ) : (
-          <Box>
-            {comments.map((c) => <Item key={c.id} c={c} />)}
-          </Box>
+          <Box>{comments.map((c) => <Item key={c.id} c={c} />)}</Box>
         )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -840,8 +907,6 @@ function CommentsDialog({ open, postId, groupId, onClose }) {
     </Dialog>
   );
 }
-
-
 
 // -----------------------------------------------------------------------------
 // Page
