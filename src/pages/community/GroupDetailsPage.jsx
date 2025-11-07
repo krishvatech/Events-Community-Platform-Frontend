@@ -4,8 +4,13 @@ import { useParams, Link as RouterLink } from "react-router-dom";
 import {
   Avatar, Box, Button, Card, CardContent, CardHeader, Chip, Divider, Grid,
   IconButton, List, ListItem, ListItemAvatar, ListItemText, Stack, Tab, Tabs,
-  TextField, Typography, InputAdornment, Pagination, Tooltip, CircularProgress
+  TextField, Typography, InputAdornment, Pagination, Tooltip, CircularProgress,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
+import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import SearchIcon from "@mui/icons-material/Search";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
@@ -115,6 +120,21 @@ function PostCard({ post }) {
           </List>
         )}
       </CardContent>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 1.5, pb: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          <Tooltip title={post.liked_by_me ? "Unlike" : "Like"}>
+            <IconButton size="small" onClick={() => window.__toggleGroupPostLike?.(post.id)}>
+              {post.liked_by_me ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+          <Typography variant="caption">{post.like_count || 0}</Typography>
+        </Box>
+        <Tooltip title="Comments">
+          <IconButton size="small" onClick={() => window.__openGroupComments?.(post.id)}>
+            <ChatBubbleOutlineRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
     </Card>
   );
 }
@@ -131,6 +151,8 @@ function shapePost(row) {
     type,
     actor_name: nameOf(actor),
     actor_avatar: avatarOf(actor),
+    liked_by_me: !!(row.liked_by_me ?? row.liked ?? row.is_liked ?? row.me_liked),
+    like_count: Number(row.like_count ?? row.likes_count ?? row.likes ?? 0) || 0,
   };
   // common text post fields from DRF-style payloads
   const text =
@@ -301,6 +323,46 @@ function PostsTab({ groupId }) {
   }, [groupId]);
 
   React.useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  // Global toggler to avoid changing PostCard props
+  React.useEffect(() => {
+    window.__toggleGroupPostLike = async (postId) => {
+      // optimistic flip
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, liked_by_me: !p.liked_by_me, like_count: (p.liked_by_me ? Math.max(0, (p.like_count || 0) - 1) : (p.like_count || 0) + 1) }
+            : p
+        )
+      );
+
+      // try common endpoints
+      const endpoints = [
+        `${API_ROOT}/posts/${postId}/like/`,
+        `${API_ROOT}/posts/${postId}/toggle-like/`,
+        `${API_ROOT}/groups/${groupId}/posts/${postId}/like/`,
+      ];
+      let ok = false;
+      for (const url of endpoints) {
+        try {
+          const r = await fetch(url, { method: "POST", headers: { ...authHeader(), accept: "application/json" } });
+          if (r.ok) { ok = true; break; }
+        } catch { }
+      }
+      if (!ok) {
+        // revert if server failed
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === postId
+              ? { ...p, liked_by_me: !p.liked_by_me, like_count: (p.liked_by_me ? Math.max(0, (p.like_count || 0) - 1) : (p.like_count || 0) + 1) }
+              : p
+          )
+        );
+      }
+    };
+    return () => { try { delete window.__toggleGroupPostLike; } catch { } };
+  }, [groupId]);
+
 
   if (loading) {
     return (
@@ -513,6 +575,273 @@ function OverviewTab({ group }) {
   );
 }
 
+function CommentsDialog({ open, postId, groupId, onClose }) {
+  const [loading, setLoading] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [comments, setComments] = React.useState([]);
+  const [text, setText] = React.useState("");
+  const [replyingTo, setReplyingTo] = React.useState(null);
+  const [replyText, setReplyText] = React.useState("");
+
+  function normalizeUser(u) {
+    if (!u) return { id: null, name: "User", avatar: "" };
+    const id = u.id ?? u.user_id ?? null;
+    const name =
+      u.name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username || "User";
+    const avatar = u.avatar || u.profile_image || u.photo || "";
+    return { id, name, avatar };
+  }
+  function normalizeComment(c) {
+    const author = normalizeUser(c.author || c.user || c.created_by || c.owner);
+    const id = c.id;
+    const created = c.created_at || c.created || c.timestamp || null;
+    const body = c.text || c.body || c.content || "";
+    const likedByMe = !!(c.liked || c.liked_by_me);
+    const likeCount = Number(c.like_count ?? c.likes ?? 0) || 0;
+    const canDelete = !!(c.can_delete || c.is_owner);
+    const replies = Array.isArray(c.replies) ? c.replies.map(normalizeComment) : [];
+    return { id, created, body, author, likedByMe, likeCount, canDelete, replies };
+  }
+
+  async function fetchComments(postId) {
+    const candidates = [
+      `${API_ROOT}/groups/${groupId}/posts/${postId}/comments/`,
+      `${API_ROOT}/posts/${postId}/comments/`,
+      `${API_ROOT}/comments/?post=${postId}`,
+    ];
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
+        if (!r.ok) continue;
+        const data = await r.json();
+        const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : (data?.comments || []));
+        return rows.map(normalizeComment);
+      } catch { }
+    }
+    return [];
+  }
+
+  async function createComment(postId, body, parentId = null) {
+    const payload = parentId ? { text: body, parent: parentId } : { text: body };
+    const scoped = [
+      { url: `${API_ROOT}/groups/${groupId}/posts/${postId}/comments/`, body: payload },
+      { url: `${API_ROOT}/posts/${postId}/comments/`, body: payload },
+    ];
+    for (const { url, body: b } of scoped) {
+      try {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify(b),
+        });
+        if (r.ok) return normalizeComment(await r.json());
+      } catch { }
+    }
+    // Fallback
+    try {
+      const r = await fetch(`${API_ROOT}/comments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ post: postId, text: body, parent: parentId || undefined }),
+      });
+      if (r.ok) return normalizeComment(await r.json());
+    } catch { }
+    throw new Error("Could not create comment");
+  }
+
+  async function toggleLikeComment(commentId) {
+    const candidates = [
+      `${API_ROOT}/comments/${commentId}/like/`,
+      `${API_ROOT}/comments/${commentId}/toggle-like/`,
+    ];
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url, { method: "POST", headers: { ...authHeader(), accept: "application/json" } });
+        if (r.ok) return true;
+      } catch { }
+    }
+    return false;
+  }
+
+  async function deleteComment(commentId) {
+    const candidates = [
+      `${API_ROOT}/comments/${commentId}/`,
+      `${API_ROOT}/comments/${commentId}/delete/`,
+    ];
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url, {
+          method: url.endsWith("/delete/") ? "POST" : "DELETE",
+          headers: { ...authHeader(), accept: "application/json" },
+        });
+        if (r.ok || r.status === 204) return true;
+      } catch { }
+    }
+    return false;
+  }
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!open || !postId) return;
+      setLoading(true);
+      const list = await fetchComments(postId);
+      if (mounted) setComments(list);
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, [open, postId, groupId]);
+
+  const onSubmitNew = async () => {
+    if (!text.trim()) return;
+    setSubmitting(true);
+    try {
+      const c = await createComment(postId, text.trim(), null);
+      setComments((prev) => [c, ...prev]);
+      setText("");
+    } catch (e) { alert(e.message || "Failed to add comment"); }
+    setSubmitting(false);
+  };
+
+  const onSubmitReply = async () => {
+    if (!replyingTo || !replyText.trim()) return;
+    setSubmitting(true);
+    try {
+      const c = await createComment(postId, replyText.trim(), replyingTo);
+      setComments((prev) =>
+        prev.map((p) => (p.id === replyingTo ? { ...p, replies: [...(p.replies || []), c] } : p))
+      );
+      setReplyingTo(null);
+      setReplyText("");
+    } catch (e) { alert(e.message || "Failed to reply"); }
+    setSubmitting(false);
+  };
+
+  const onLike = async (id) => {
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1 }
+          : c
+      )
+    );
+    const ok = await toggleLikeComment(id);
+    if (!ok) {
+      // revert
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1 }
+            : c
+        )
+      );
+    }
+  };
+
+  const onDelete = async (id, isReply = false, parentId = null) => {
+    const ok = await deleteComment(id);
+    if (!ok) return alert("Delete failed");
+    setComments((prev) => {
+      if (!isReply) return prev.filter((c) => c.id !== id);
+      return prev.map((p) => (p.id === parentId ? { ...p, replies: (p.replies || []).filter((r) => r.id !== id) } : p));
+    });
+  };
+
+  const Item = ({ c, depth = 0, parentId = null }) => (
+    <Box sx={{ pl: depth ? 5 : 0, py: 1 }}>
+      <Stack direction="row" spacing={1}>
+        <Avatar src={c.author.avatar}>{(c.author.name[0] || "").toUpperCase()}</Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Stack direction="row" alignItems="baseline" spacing={1}>
+            <Typography variant="subtitle2">{c.author.name}</Typography>
+            {c.created && (
+              <Typography variant="caption" color="text.secondary">
+                {timeAgo(c.created)}
+              </Typography>
+            )}
+          </Stack>
+          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mt: 0.25 }}>{c.body}</Typography>
+
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+            <IconButton size="small" onClick={() => onLike(c.id)}>
+              {c.likedByMe ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
+            </IconButton>
+            <Typography variant="caption">{c.likeCount || 0}</Typography>
+
+            <Button size="small" startIcon={<ReplyRoundedIcon />} onClick={() => { setReplyingTo(c.id); setReplyText(""); }}>
+              Reply
+            </Button>
+
+            {c.canDelete && (
+              <Button
+                size="small"
+                color="error"
+                startIcon={<DeleteOutlineRoundedIcon />}
+                onClick={() => onDelete(c.id, !!parentId, parentId)}
+              >
+                Delete
+              </Button>
+            )}
+          </Stack>
+
+          {c.replies && c.replies.length > 0 && (
+            <Box sx={{ mt: 1 }}>
+              {c.replies.map((r) => <Item key={r.id} c={r} depth={1} parentId={c.id} />)}
+            </Box>
+          )}
+
+          {replyingTo === c.id && (
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              <TextField
+                size="small"
+                fullWidth
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Write a reply…"
+              />
+              <Button variant="contained" onClick={onSubmitReply} disabled={submitting || !replyText.trim()}>
+                Send
+              </Button>
+              <Button onClick={() => { setReplyingTo(null); setReplyText(""); }}>Cancel</Button>
+            </Stack>
+          )}
+        </Box>
+      </Stack>
+    </Box>
+  );
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Comments</DialogTitle>
+      <DialogContent dividers sx={{ pt: 1 }}>
+        {loading ? (
+          <Typography variant="body2" color="text.secondary">Loading comments…</Typography>
+        ) : comments.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No comments yet. Be the first to comment!</Typography>
+        ) : (
+          <Box>
+            {comments.map((c) => <Item key={c.id} c={c} />)}
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Write a comment…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <Button variant="contained" onClick={onSubmitNew} disabled={submitting || !text.trim()}>
+          Post
+        </Button>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
 
 // -----------------------------------------------------------------------------
 // Page
@@ -523,6 +852,8 @@ export default function GroupDetailsPage() {
   const [group, setGroup] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [me, setMe] = React.useState(null);
+  const [commentOpen, setCommentOpen] = React.useState(false);
+  const [commentPostId, setCommentPostId] = React.useState(null);
   React.useEffect(() => {
     (async () => {
       try {
@@ -532,6 +863,11 @@ export default function GroupDetailsPage() {
         if (res.ok) setMe(await res.json());
       } catch { }
     })();
+  }, []);
+
+  React.useEffect(() => {
+    window.__openGroupComments = (postId) => { setCommentPostId(postId); setCommentOpen(true); };
+    return () => { try { delete window.__openGroupComments; } catch { } };
   }, []);
 
   const fetchGroup = React.useCallback(async () => {
@@ -706,6 +1042,12 @@ export default function GroupDetailsPage() {
           </Card>
         </CommunityRightRailLayout>
       </Box>
+      <CommentsDialog
+        open={commentOpen}
+        postId={commentPostId}
+        groupId={groupId}
+        onClose={() => setCommentOpen(false)}
+      />
     </Box>
   );
 }

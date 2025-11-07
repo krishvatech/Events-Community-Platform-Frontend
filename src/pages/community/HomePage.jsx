@@ -53,6 +53,7 @@ import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 
 
 // -----------------------------------------------------------------------------
@@ -431,9 +432,35 @@ function PostCard({ post }) {
           </List>
         )}
       </CardContent>
-      <CardActions sx={{ pt: 0 }}>
-        <Button size="small" onClick={() => (window.__openLikes?.(post.id))?.()}>Like</Button>
-        <Button size="small" onClick={() => (window.__openComments?.(post.id))?.()}>Comment</Button>
+      <CardActions sx={{ pt: 0, gap: 0.5 }}>
+        {/* Like icon — choose ONE of the onClick behaviors below */}
+        <Tooltip title="Like">
+          <IconButton
+            size="medium"
+            onClick={() => {
+              // OPTION A: just toggle like
+              //handleLike?.(post);
+              // OPTION B: toggle like AND open the likers list (uncomment next line if you want both)
+              (window.__openLikes?.(post.id))?.();
+            }}
+          >
+            {post?.liked_by_me ? (
+              <FavoriteRoundedIcon fontSize="small" />
+            ) : (
+              <FavoriteBorderRoundedIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Tooltip>
+
+        {/* Comment icon — opens the comments popup */}
+        <Tooltip title="Comments">
+          <IconButton
+            size="medium"
+            onClick={() => (window.__openComments?.(post.id))?.()}
+          >
+            <ChatBubbleOutlineRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </CardActions>
     </Card>
   );
