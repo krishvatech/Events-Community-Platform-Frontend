@@ -1169,59 +1169,84 @@ function PostEditDialog({ open, post, communityId, onClose, onSaved }) {
 
   // Build both JSON and FormData shapes; try multiple endpoints until one works
   async function updatePostApi() {
-    const jsonPayload = (() => {
-      if (type === "text") return { type: "text", content };
-      if (type === "link") return { type: "link", url: link, description: content };
-      if (type === "image") return { type: "image", caption: content };
-      if (type === "poll") {
-        const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
-        return { type: "poll", question: content, options: opts.length ? opts : undefined };
-      }
-      return { type: "text", content };
-    })();
-
-    const formPayload = (() => {
-      const fd = new FormData();
-      fd.append("type", type);
-      if (type === "text") fd.append("content", content || "");
-      if (type === "link") { fd.append("url", link || ""); if (content) fd.append("description", content); }
-      if (type === "image") { if (content) fd.append("caption", content); }
-      if (type === "poll") {
-        fd.append("question", content || "");
-        optionsText.split("\n").map(s => s.trim()).filter(Boolean).forEach((o) => fd.append("options", o));
-      }
-      return fd;
-    })();
-
-    const cId = communityId;
-    const id = post.id;
-
-    const candidates = [
-      // Common working patterns seen in your logs
-      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PATCH", body: jsonPayload, json: true },
-      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PUT", body: jsonPayload, json: true },
-      { url: `${API_ROOT}/posts/${id}/`, method: "PATCH", body: jsonPayload, json: true },
-      { url: `${API_ROOT}/posts/${id}/edit/`, method: "POST", body: jsonPayload, json: true },
-      // FormData fallbacks
-      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "POST", body: formPayload, json: false },
-    ];
-
-    for (const c of candidates) {
-      try {
-        const r = await fetch(c.url, {
-          method: c.method,
-          headers: c.json ? { "Content-Type": "application/json", ...authHeader() } : { ...authHeader() },
-          body: c.json ? JSON.stringify(c.body) : c.body,
-        });
-        if (!r.ok) continue;
-        const resp = await r.json().catch(() => ({}));
-        // Reuse your existing mapper
-        const ui = mapCreateResponseToUiPost(resp);
-        return { ...post, ...ui, id: post.id };
-      } catch { /* try next */ }
+  // Build the values we KNOW (from the dialog)
+  const localUi = (() => {
+    if (type === "text") return { type: "text", content };
+    if (type === "link") return { type: "link", content, link };
+    if (type === "image") return { type: "image", content };
+    if (type === "poll") {
+      const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
+      return { type: "poll", content, options: opts };
     }
-    throw new Error("Update failed");
+    return { type: "text", content };
+  })();
+
+  // JSON + FormData variants (same as before)
+  const jsonPayload = (() => {
+    if (type === "text") return { type: "text", content };
+    if (type === "link") return { type: "link", url: link, description: content };
+    if (type === "image") return { type: "image", caption: content };
+    if (type === "poll") {
+      const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
+      return { type: "poll", question: content, options: opts.length ? opts : undefined };
+    }
+    return { type: "text", content };
+  })();
+
+  const formPayload = (() => {
+    const fd = new FormData();
+    fd.append("type", type);
+    if (type === "text") fd.append("content", content || "");
+    if (type === "link") { fd.append("url", link || ""); if (content) fd.append("description", content); }
+    if (type === "image") { if (content) fd.append("caption", content); }
+    if (type === "poll") {
+      fd.append("question", content || "");
+      optionsText.split("\n").map(s => s.trim()).filter(Boolean).forEach((o) => fd.append("options", o));
+    }
+    return fd;
+  })();
+
+  const cId = communityId;
+  const id = post.id;
+
+  const candidates = [
+    { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PATCH", body: jsonPayload, json: true },
+    { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PUT",   body: jsonPayload, json: true },
+    { url: `${API_ROOT}/posts/${id}/`,                         method: "PATCH", body: jsonPayload, json: true },
+    { url: `${API_ROOT}/posts/${id}/edit/`,                    method: "POST",  body: jsonPayload, json: true },
+    { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "POST",  body: formPayload, json: false },
+  ];
+
+  let serverUi = {};
+  for (const c of candidates) {
+    try {
+      const r = await fetch(c.url, {
+        method: c.method,
+        headers: c.json ? { "Content-Type": "application/json", ...authHeader() } : { ...authHeader() },
+        body: c.json ? JSON.stringify(c.body) : c.body,
+      });
+      if (!r.ok) continue;
+      // Many of your endpoints return either empty JSON or a minimal shape.
+      const resp = await r.json().catch(() => ({}));
+      serverUi = mapCreateResponseToUiPost(resp) || {};
+      break;
+    } catch { /* try next */ }
   }
+
+  // Merge priority: existing post → server response → local dialog values
+  // (Local values win if server is empty/minimal)
+  const merged = {
+    ...post,
+    ...serverUi,
+    ...localUi,
+    id: post.id, // keep same id
+  };
+  // Ensure we don't lose arrays/fields when server returns nothing:
+  if (merged.type === "poll" && !Array.isArray(merged.options)) merged.options = localUi.options || post.options || [];
+  if (merged.type === "image" && !merged.images) merged.images = post.images || [];
+
+  return merged;
+}
 
   const onSave = async () => {
     setSaving(true);
