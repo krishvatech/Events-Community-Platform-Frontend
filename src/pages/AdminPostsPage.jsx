@@ -23,6 +23,12 @@ import {
   Snackbar,
   Alert,
 } from "@mui/material";
+import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+import {
+  Divider, List, ListItem, ListItemAvatar, ListItemText, AvatarGroup, Badge
+} from "@mui/material";
 import { IconButton, Tooltip, CircularProgress, DialogContentText } from "@mui/material";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -263,14 +269,14 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
       out.text = resp.text ?? meta.text ?? prevItem.text ?? "";
     } else if (t === "image") {
       out.image_url = resp.image_url ?? meta.image_url ?? prevItem.image_url;
-      out.caption   = resp.caption   ?? meta.caption   ?? prevItem.caption   ?? "";
+      out.caption = resp.caption ?? meta.caption ?? prevItem.caption ?? "";
     } else if (t === "link") {
-      out.url         = resp.url         ?? meta.url         ?? prevItem.url;
-      out.title       = resp.title       ?? meta.title       ?? prevItem.title;
+      out.url = resp.url ?? meta.url ?? prevItem.url;
+      out.title = resp.title ?? meta.title ?? prevItem.title;
       out.description = resp.description ?? meta.description ?? prevItem.description;
     } else if (t === "poll") {
       out.question = resp.question ?? meta.question ?? prevItem.question ?? "";
-      out.options  = resp.options  ?? meta.options  ?? prevItem.options  ?? [];
+      out.options = resp.options ?? meta.options ?? prevItem.options ?? [];
     }
 
     return out;
@@ -462,6 +468,284 @@ function DeleteConfirmDialog({ open, onClose, communityId, item, onDeleted }) {
   );
 }
 
+// Like Dialog
+// ---------- Likes dialog ----------
+function LikesDialog({ open, onClose, communityId, postId }) {
+  const [loading, setLoading] = React.useState(true);
+  const [rows, setRows] = React.useState([]);
+
+  const load = React.useCallback(async () => {
+    if (!open || !communityId || !postId) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${API_ROOT}/communities/${communityId}/posts/${postId}/likes/`,
+        { headers: { Accept: "application/json", ...authHeader() } }
+      );
+      const json = res.ok ? await res.json() : [];
+      const list = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
+      setRows(list);
+    } catch { setRows([]); }
+    setLoading(false);
+  }, [open, communityId, postId]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Liked by</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+        ) : rows.length === 0 ? (
+          <Typography color="text.secondary">No likes yet.</Typography>
+        ) : (
+          <List>
+            {rows.map((u) => (
+              <ListItem key={u.id || u.user_id}>
+                <ListItemAvatar><Avatar src={u.avatar} alt={u.name || u.username} /></ListItemAvatar>
+                <ListItemText
+                  primary={u.name || u.username || `User #${u.id || u.user_id}`}
+                  secondary={u.handle ? `@${u.handle}` : undefined}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+// ---------- Comments dialog (threaded, like, reply, admin delete) ----------
+function CommentsDialog({ open, onClose, communityId, postId }) {
+  const [loading, setLoading] = React.useState(true);
+  const [comments, setComments] = React.useState([]);
+  const [me, setMe] = React.useState(null);
+  const [input, setInput] = React.useState("");
+  const [replyTo, setReplyTo] = React.useState(null);
+
+  const isAdmin = !!(me?.is_admin || me?.is_staff || me?.is_moderator);
+
+  const fetchMe = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${API_ROOT}/users/me/`, { headers: { ...authHeader() } });
+      const j = r.ok ? await r.json() : null;
+      setMe(j || {});
+    } catch { setMe({}); }
+  }, []);
+
+  const load = React.useCallback(async () => {
+    if (!open || !communityId || !postId) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/?page_size=200`,
+        { headers: { Accept: "application/json", ...authHeader() } }
+      );
+      const json = res.ok ? await res.json() : [];
+      const flat = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
+      setComments(flat);
+    } catch { setComments([]); }
+    setLoading(false);
+  }, [open, communityId, postId]);
+
+  React.useEffect(() => { if (open) { fetchMe(); load(); } }, [open, fetchMe, load]);
+
+  // helpers
+  const buildTree = React.useMemo(() => {
+    const byId = new Map(); const roots = [];
+    comments.forEach(c => byId.set(c.id, { ...c, children: [] }));
+    byId.forEach(c => {
+      if (c.parent_id && byId.get(c.parent_id)) byId.get(c.parent_id).children.push(c);
+      else roots.push(c);
+    });
+    return roots;
+  }, [comments]);
+
+  async function createComment(text, parentId = null) {
+    if (!text.trim()) return;
+    try {
+      const res = await fetch(
+        `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify(parentId ? { text, parent_id: parentId } : { text }),
+        }
+      );
+      if (res.ok) { await load(); setInput(""); setReplyTo(null); }
+    } catch {}
+  }
+
+  async function toggleCommentLike(c) {
+    const url = `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/${c.id}/like/`;
+    const liked = !!c.user_has_liked;
+    try {
+      const res = await fetch(url, { method: liked ? "DELETE" : "POST", headers: { ...authHeader() } });
+      if (res.ok) await load();
+    } catch {}
+  }
+
+  async function deleteComment(c) {
+    // Prefer DELETE to detail; gracefully fall back to /delete/
+    const tryUrls = [
+      `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/${c.id}/`,
+      `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/${c.id}/delete/`
+    ];
+    for (const u of tryUrls) {
+      try {
+        const res = await fetch(u, { method: "DELETE", headers: { ...authHeader() } });
+        if (res.ok) { await load(); return; }
+      } catch {}
+    }
+  }
+
+  const CommentItem = ({ c, depth = 0 }) => (
+    <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? `2px solid ${BORDER}` : "none", ml: depth ? 1.5 : 0, mt: depth ? 1 : 0 }}>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
+        <Typography variant="subtitle2">{c.author?.name || c.author?.username || `User #${c.author_id}`}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {new Date(c.created_at || Date.now()).toLocaleString()}
+        </Typography>
+      </Stack>
+      <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+        <Button
+          size="small"
+          startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
+          onClick={() => toggleCommentLike(c)}
+        >
+          {c.like_count ?? 0}
+        </Button>
+        <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
+          Reply
+        </Button>
+        {(isAdmin || (me?.id && c.author_id === me.id)) && (
+          <Button size="small" color="error" onClick={() => deleteComment(c)}>
+            Delete
+          </Button>
+        )}
+      </Stack>
+      {!!c.children?.length && (
+        <Stack spacing={1} sx={{ mt: 1 }}>
+          {c.children.map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+        </Stack>
+      )}
+    </Box>
+  );
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Comments</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+        ) : buildTree.length === 0 ? (
+          <Typography color="text.secondary">No comments yet.</Typography>
+        ) : (
+          <Stack spacing={2}>
+            {buildTree.map((c) => <CommentItem key={c.id} c={c} />)}
+          </Stack>
+        )}
+      </DialogContent>
+      <Divider />
+      <Box sx={{ px: 2, py: 1.5 }}>
+        {replyTo && (
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
+            <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+          </Stack>
+        )}
+        <Stack direction="row" spacing={1}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+          />
+          <Button variant="contained" onClick={() => createComment(input, replyTo?.id || null)}>Post</Button>
+        </Stack>
+      </Box>
+    </Dialog>
+  );
+}
+
+// ---------- Social bar (below each card) ----------
+function PostSocialBar({ communityId, post, onCounts }) {
+  const [likeCount, setLikeCount] = React.useState(post.like_count ?? 0);
+  const [commentCount, setCommentCount] = React.useState(post.comment_count ?? 0);
+  const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
+  const [likesOpen, setLikesOpen] = React.useState(false);
+  const [commentsOpen, setCommentsOpen] = React.useState(false);
+
+  async function togglePostLike() {
+    const url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/like/`;
+    const willUnlike = userHasLiked;
+    try {
+      const res = await fetch(url, { method: willUnlike ? "DELETE" : "POST", headers: { ...authHeader() } });
+      if (res.ok) {
+        setUserHasLiked(!willUnlike);
+        setLikeCount((n) => (willUnlike ? Math.max(0, n - 1) : n + 1));
+        onCounts?.({ likeCount: willUnlike ? Math.max(0, likeCount - 1) : likeCount + 1, commentCount });
+      }
+    } catch {}
+  }
+
+  return (
+    <>
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ px: 1, pb: 1 }}>
+        <Button
+          size="small"
+          startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
+          onClick={togglePostLike}
+        >
+          {likeCount}
+        </Button>
+        <Button
+          size="small"
+          startIcon={<ChatBubbleOutlineRoundedIcon />}
+          onClick={() => setCommentsOpen(true)}
+        >
+          {commentCount}
+        </Button>
+        <Button size="small" onClick={() => setLikesOpen(true)}>View likes</Button>
+      </Stack>
+
+      <LikesDialog open={likesOpen} onClose={() => setLikesOpen(false)} communityId={communityId} postId={post.id} />
+      <CommentsDialog
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        communityId={communityId}
+        postId={post.id}
+      />
+    </>
+  );
+}
+
+// ---------- Wrapper that composes your existing PostWithActions + Social ----------
+function PostShell({ item, communityId, onUpdated, onDeleted }) {
+  return (
+    <Box>
+      {/* your original overlay card with Edit/Delete – untouched */}
+      <PostWithActions
+        item={item}
+        communityId={communityId}
+        onUpdated={onUpdated}
+        onDeleted={onDeleted}
+      />
+      {/* new social row below the card */}
+      {!String(item.id).startsWith("local-") && (
+        <PostSocialBar communityId={communityId} post={item} />
+      )}
+    </Box>
+  );
+}
+
+
 // ------- overlay wrapper (no changes to your PostCard) -------
 function PostWithActions({ item, communityId, onUpdated, onDeleted }) {
   const [editOpen, setEditOpen] = React.useState(false);
@@ -627,31 +911,31 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
         const created =
           json?.poll
             ? {
-                id: json.feed_item_id || `local-${Date.now()}`, // FEED ITEM id (used for voting)
-                created_at: new Date().toISOString(),
-                type: "poll",
-                question: json.poll.question,
-                is_closed: !!json.poll.is_closed,
-                options: (json.poll.options || []).map(o => ({
-                  id: o.id,
-                  label: o.text,
-                  votes: o.vote_count ?? 0,
-                })),
-                user_votes: json.poll.user_votes || [],
-                community_id: pollPayload.community_id,
-              }
+              id: json.feed_item_id || `local-${Date.now()}`, // FEED ITEM id (used for voting)
+              created_at: new Date().toISOString(),
+              type: "poll",
+              question: json.poll.question,
+              is_closed: !!json.poll.is_closed,
+              options: (json.poll.options || []).map(o => ({
+                id: o.id,
+                label: o.text,
+                votes: o.vote_count ?? 0,
+              })),
+              user_votes: json.poll.user_votes || [],
+              community_id: pollPayload.community_id,
+            }
             : {
-                id: `local-${Date.now()}`,
-                created_at: new Date().toISOString(),
-                type: "poll",
-                question,
-                options: pollOptions
-                  .map(t => t.trim())
-                  .filter(Boolean)
-                  .map((t, i) => ({ id: i + 1, label: t, votes: 0 })),
-                user_votes: [],
-                community_id: pollPayload.community_id,
-              };
+              id: `local-${Date.now()}`,
+              created_at: new Date().toISOString(),
+              type: "poll",
+              question,
+              options: pollOptions
+                .map(t => t.trim())
+                .filter(Boolean)
+                .map((t, i) => ({ id: i + 1, label: t, votes: 0 })),
+              user_votes: [],
+              community_id: pollPayload.community_id,
+            };
 
         onCreated?.(created);   // list will show instantly
         onClose?.();
@@ -910,75 +1194,75 @@ export default function AdminPostsPage() {
   }, [routeCommunityId]);
 
   function mapFeedPollToAdminItem(row) {
-  const m = row?.metadata || {};
-  if ((m.type || row.type) !== "poll") return null;
+    const m = row?.metadata || {};
+    if ((m.type || row.type) !== "poll") return null;
 
-  const options = (m.options || []).map(o => ({
-    id: o.id ?? o.option_id ?? null,
-    text: o.text ?? o.label ?? "",
-    vote_count: o.vote_count ?? o.votes ?? 0,
-  }));
+    const options = (m.options || []).map(o => ({
+      id: o.id ?? o.option_id ?? null,
+      text: o.text ?? o.label ?? "",
+      vote_count: o.vote_count ?? o.votes ?? 0,
+    }));
 
-  return {
-    // Note: this is the FEED ITEM id (not a community post id)
-    id: row.id,
-    type: "poll",
-    created_at: row.created_at || new Date().toISOString(),
-    community: { id: row.community_id, name: row.community_name || `Community #${row.community_id}` },
-    question: m.question || "",
-    options,
-    tags: m.tags || [],
-    __source: "feed",            // marker (optional)
-    __feed_item_id: row.id,      // marker (optional)
-  };
-}
+    return {
+      // Note: this is the FEED ITEM id (not a community post id)
+      id: row.id,
+      type: "poll",
+      created_at: row.created_at || new Date().toISOString(),
+      community: { id: row.community_id, name: row.community_name || `Community #${row.community_id}` },
+      question: m.question || "",
+      options,
+      tags: m.tags || [],
+      __source: "feed",            // marker (optional)
+      __feed_item_id: row.id,      // marker (optional)
+    };
+  }
 
 
   const load = React.useCallback(async () => {
-  setLoadingErr("");
-  try {
-    if (!activeCommunityId) return;
+    setLoadingErr("");
+    try {
+      if (!activeCommunityId) return;
 
-    // ---- existing posts API (text/image/link) ----
-    const postsUrl = new URL(`${API_ROOT}/communities/${activeCommunityId}/posts/`, API_ROOT);
-    if (search.trim()) postsUrl.searchParams.set("search", search.trim());
+      // ---- existing posts API (text/image/link) ----
+      const postsUrl = new URL(`${API_ROOT}/communities/${activeCommunityId}/posts/`, API_ROOT);
+      if (search.trim()) postsUrl.searchParams.set("search", search.trim());
 
-    // ---- feed API for polls ----
-    const feedUrl = new URL(`${API_ROOT}/activity/feed/`, API_ROOT);
-    feedUrl.searchParams.set("scope", "community");
-    feedUrl.searchParams.set("community_id", String(activeCommunityId));
-    if (search.trim()) {
-      feedUrl.searchParams.set("q", search.trim());
-      feedUrl.searchParams.set("search", search.trim());
+      // ---- feed API for polls ----
+      const feedUrl = new URL(`${API_ROOT}/activity/feed/`, API_ROOT);
+      feedUrl.searchParams.set("scope", "community");
+      feedUrl.searchParams.set("community_id", String(activeCommunityId));
+      if (search.trim()) {
+        feedUrl.searchParams.set("q", search.trim());
+        feedUrl.searchParams.set("search", search.trim());
+      }
+
+      const [resPosts, resFeed] = await Promise.all([
+        fetch(postsUrl.toString(), { headers: { Accept: "application/json", ...authHeader() } }),
+        fetch(feedUrl.toString(), { headers: { Accept: "application/json", ...authHeader() } }),
+      ]);
+
+      const postsJson = resPosts.ok ? await resPosts.json() : [];
+      const posts = Array.isArray(postsJson?.results) ? postsJson.results
+        : Array.isArray(postsJson) ? postsJson : [];
+
+      const feedJson = resFeed.ok ? await resFeed.json() : [];
+      const feedRows = Array.isArray(feedJson?.results) ? feedJson.results
+        : Array.isArray(feedJson) ? feedJson : [];
+      const polls = feedRows.map(mapFeedPollToAdminItem).filter(Boolean);
+
+      // merge + sort (newest first)
+      const merged = [...posts, ...polls].sort((a, b) => {
+        const ta = new Date(a.created_at || 0).getTime();
+        const tb = new Date(b.created_at || 0).getTime();
+        return tb - ta;
+      });
+
+      setItems(merged);
+    } catch {
+      setItems([]);
+      setLoadingErr("Network error");
     }
-
-    const [resPosts, resFeed] = await Promise.all([
-      fetch(postsUrl.toString(), { headers: { Accept: "application/json", ...authHeader() } }),
-      fetch(feedUrl.toString(),  { headers: { Accept: "application/json", ...authHeader() } }),
-    ]);
-
-    const postsJson = resPosts.ok ? await resPosts.json() : [];
-    const posts = Array.isArray(postsJson?.results) ? postsJson.results
-                 : Array.isArray(postsJson) ? postsJson : [];
-
-    const feedJson = resFeed.ok ? await resFeed.json() : [];
-    const feedRows = Array.isArray(feedJson?.results) ? feedJson.results
-                    : Array.isArray(feedJson) ? feedJson : [];
-    const polls = feedRows.map(mapFeedPollToAdminItem).filter(Boolean);
-
-    // merge + sort (newest first)
-    const merged = [...posts, ...polls].sort((a, b) => {
-      const ta = new Date(a.created_at || 0).getTime();
-      const tb = new Date(b.created_at || 0).getTime();
-      return tb - ta;
-    });
-
-    setItems(merged);
-  } catch {
-    setItems([]);
-    setLoadingErr("Network error");
-  }
-}, [search, activeCommunityId]);
+  }, [search, activeCommunityId]);
 
   React.useEffect(() => {
     if (activeCommunityId) load();
@@ -1043,7 +1327,7 @@ export default function AdminPostsPage() {
           ) : (
             <Stack spacing={2}>
               {items.map((it) => (
-                <PostWithActions
+                <PostShell
                   key={it.id || it.created_at}
                   item={it}
                   communityId={activeCommunityId}

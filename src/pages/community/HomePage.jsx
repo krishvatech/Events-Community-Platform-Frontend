@@ -54,6 +54,9 @@ import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
+import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
+
 
 
 // -----------------------------------------------------------------------------
@@ -742,6 +745,10 @@ export default function HomePage() {
   const [editPostId, setEditPostId] = React.useState(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deletePostId, setDeletePostId] = React.useState(null);
+  const [avatarDialogOpen, setAvatarDialogOpen] = React.useState(false);
+  const [avatarFile, setAvatarFile] = React.useState(null);
+  const [avatarPreview, setAvatarPreview] = React.useState("");
+  const [avatarSaving, setAvatarSaving] = React.useState(false);
 
 
   // ---- Expose global functions to open comments/likes dialogs ----
@@ -934,9 +941,28 @@ export default function HomePage() {
             alignItems={{ xs: "flex-start", sm: "center" }}
             sx={{ width: "100%", flexWrap: { xs: "wrap", sm: "nowrap" } }}   // ← make inner layout span 100%
           >
-            <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72, mr: { sm: 2 } }}>
-              {(fullName[0] || "").toUpperCase()}
-            </Avatar>
+            <Box sx={{ position: "relative", mr: { sm: 2 }, width: 72, height: 72 }}>
+              <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72 }}>
+                {(fullName[0] || "").toUpperCase()}
+              </Avatar>
+              <Tooltip title="Change photo">
+                <IconButton
+                  size="small"
+                  onClick={() => setAvatarDialogOpen(true)}
+                  sx={{
+                    position: "absolute",
+                    right: -6,
+                    bottom: -6,
+                    bgcolor: "background.paper",
+                    border: "1px solid",
+                    borderColor: "divider",
+                    boxShadow: 1,
+                  }}
+                >
+                  <PhotoCameraRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
             <Box
               sx={{
                 flex: "0 0 auto",
@@ -1014,6 +1040,24 @@ export default function HomePage() {
         open={likesOpen}
         postId={likesPostId}
         onClose={() => setLikesOpen(false)}
+      />
+      <AvatarUploadDialog
+        open={avatarDialogOpen}
+        file={avatarFile}
+        preview={avatarPreview}
+        saving={avatarSaving}
+        onPick={(f, url) => { setAvatarFile(f); setAvatarPreview(url); }}
+        onClose={() => { setAvatarDialogOpen(false); setAvatarFile(null); setAvatarPreview(""); }}
+        onSaved={(newUrl) => {
+          if (newUrl) {
+            // update only the avatar field; keep the rest of profile intact
+            setProfile((p) => ({ ...p, avatar: newUrl }));
+          }
+          setAvatarDialogOpen(false);
+          setAvatarFile(null);
+          setAvatarPreview("");
+        }}
+        setSaving={setAvatarSaving}
       />
       <PostEditDialog
         open={editOpen}
@@ -1169,84 +1213,84 @@ function PostEditDialog({ open, post, communityId, onClose, onSaved }) {
 
   // Build both JSON and FormData shapes; try multiple endpoints until one works
   async function updatePostApi() {
-  // Build the values we KNOW (from the dialog)
-  const localUi = (() => {
-    if (type === "text") return { type: "text", content };
-    if (type === "link") return { type: "link", content, link };
-    if (type === "image") return { type: "image", content };
-    if (type === "poll") {
-      const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
-      return { type: "poll", content, options: opts };
+    // Build the values we KNOW (from the dialog)
+    const localUi = (() => {
+      if (type === "text") return { type: "text", content };
+      if (type === "link") return { type: "link", content, link };
+      if (type === "image") return { type: "image", content };
+      if (type === "poll") {
+        const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
+        return { type: "poll", content, options: opts };
+      }
+      return { type: "text", content };
+    })();
+
+    // JSON + FormData variants (same as before)
+    const jsonPayload = (() => {
+      if (type === "text") return { type: "text", content };
+      if (type === "link") return { type: "link", url: link, description: content };
+      if (type === "image") return { type: "image", caption: content };
+      if (type === "poll") {
+        const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
+        return { type: "poll", question: content, options: opts.length ? opts : undefined };
+      }
+      return { type: "text", content };
+    })();
+
+    const formPayload = (() => {
+      const fd = new FormData();
+      fd.append("type", type);
+      if (type === "text") fd.append("content", content || "");
+      if (type === "link") { fd.append("url", link || ""); if (content) fd.append("description", content); }
+      if (type === "image") { if (content) fd.append("caption", content); }
+      if (type === "poll") {
+        fd.append("question", content || "");
+        optionsText.split("\n").map(s => s.trim()).filter(Boolean).forEach((o) => fd.append("options", o));
+      }
+      return fd;
+    })();
+
+    const cId = communityId;
+    const id = post.id;
+
+    const candidates = [
+      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PATCH", body: jsonPayload, json: true },
+      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PUT", body: jsonPayload, json: true },
+      { url: `${API_ROOT}/posts/${id}/`, method: "PATCH", body: jsonPayload, json: true },
+      { url: `${API_ROOT}/posts/${id}/edit/`, method: "POST", body: jsonPayload, json: true },
+      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "POST", body: formPayload, json: false },
+    ];
+
+    let serverUi = {};
+    for (const c of candidates) {
+      try {
+        const r = await fetch(c.url, {
+          method: c.method,
+          headers: c.json ? { "Content-Type": "application/json", ...authHeader() } : { ...authHeader() },
+          body: c.json ? JSON.stringify(c.body) : c.body,
+        });
+        if (!r.ok) continue;
+        // Many of your endpoints return either empty JSON or a minimal shape.
+        const resp = await r.json().catch(() => ({}));
+        serverUi = mapCreateResponseToUiPost(resp) || {};
+        break;
+      } catch { /* try next */ }
     }
-    return { type: "text", content };
-  })();
 
-  // JSON + FormData variants (same as before)
-  const jsonPayload = (() => {
-    if (type === "text") return { type: "text", content };
-    if (type === "link") return { type: "link", url: link, description: content };
-    if (type === "image") return { type: "image", caption: content };
-    if (type === "poll") {
-      const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
-      return { type: "poll", question: content, options: opts.length ? opts : undefined };
-    }
-    return { type: "text", content };
-  })();
+    // Merge priority: existing post → server response → local dialog values
+    // (Local values win if server is empty/minimal)
+    const merged = {
+      ...post,
+      ...serverUi,
+      ...localUi,
+      id: post.id, // keep same id
+    };
+    // Ensure we don't lose arrays/fields when server returns nothing:
+    if (merged.type === "poll" && !Array.isArray(merged.options)) merged.options = localUi.options || post.options || [];
+    if (merged.type === "image" && !merged.images) merged.images = post.images || [];
 
-  const formPayload = (() => {
-    const fd = new FormData();
-    fd.append("type", type);
-    if (type === "text") fd.append("content", content || "");
-    if (type === "link") { fd.append("url", link || ""); if (content) fd.append("description", content); }
-    if (type === "image") { if (content) fd.append("caption", content); }
-    if (type === "poll") {
-      fd.append("question", content || "");
-      optionsText.split("\n").map(s => s.trim()).filter(Boolean).forEach((o) => fd.append("options", o));
-    }
-    return fd;
-  })();
-
-  const cId = communityId;
-  const id = post.id;
-
-  const candidates = [
-    { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PATCH", body: jsonPayload, json: true },
-    { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PUT",   body: jsonPayload, json: true },
-    { url: `${API_ROOT}/posts/${id}/`,                         method: "PATCH", body: jsonPayload, json: true },
-    { url: `${API_ROOT}/posts/${id}/edit/`,                    method: "POST",  body: jsonPayload, json: true },
-    { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "POST",  body: formPayload, json: false },
-  ];
-
-  let serverUi = {};
-  for (const c of candidates) {
-    try {
-      const r = await fetch(c.url, {
-        method: c.method,
-        headers: c.json ? { "Content-Type": "application/json", ...authHeader() } : { ...authHeader() },
-        body: c.json ? JSON.stringify(c.body) : c.body,
-      });
-      if (!r.ok) continue;
-      // Many of your endpoints return either empty JSON or a minimal shape.
-      const resp = await r.json().catch(() => ({}));
-      serverUi = mapCreateResponseToUiPost(resp) || {};
-      break;
-    } catch { /* try next */ }
+    return merged;
   }
-
-  // Merge priority: existing post → server response → local dialog values
-  // (Local values win if server is empty/minimal)
-  const merged = {
-    ...post,
-    ...serverUi,
-    ...localUi,
-    id: post.id, // keep same id
-  };
-  // Ensure we don't lose arrays/fields when server returns nothing:
-  if (merged.type === "poll" && !Array.isArray(merged.options)) merged.options = localUi.options || post.options || [];
-  if (merged.type === "image" && !merged.images) merged.images = post.images || [];
-
-  return merged;
-}
 
   const onSave = async () => {
     setSaving(true);
@@ -1345,6 +1389,103 @@ function PostDeleteConfirm({ open, postId, communityId, onClose, onDeleted }) {
         <Button onClick={onClose}>Cancel</Button>
         <Button color="error" variant="contained" onClick={onConfirm} disabled={busy}>
           {busy ? "Deleting…" : "Delete"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// Edit Profile pic 
+function AvatarUploadDialog({ open, file, preview, saving, onPick, onClose, onSaved, setSaving }) {
+  const inputRef = React.useRef(null);
+
+  const handleChoose = () => inputRef.current?.click();
+
+  const handleFileChange = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => onPick(f, ev.target.result);
+    reader.readAsDataURL(f);
+  };
+
+  async function uploadAvatarApi(theFile) {
+    // Try a few likely endpoints; stop on the first success.
+    // All are multipart with field "avatar".
+    const candidates = [
+      { url: `${API_ROOT}/users/me/avatar/`, method: "POST", field: "avatar" },
+      { url: `${API_ROOT}/auth/me/avatar/`, method: "POST", field: "avatar" },
+      { url: `${API_ROOT}/profile/avatar/`, method: "POST", field: "avatar" },
+      { url: `${API_ROOT}/users/me/`, method: "PATCH", field: "avatar" }, // generic fallback
+    ];
+
+    for (const c of candidates) {
+      try {
+        const fd = new FormData();
+        fd.append(c.field, theFile, theFile.name);
+        const r = await fetch(c.url, { method: c.method, headers: { ...authHeader() }, body: fd });
+        if (!r.ok) continue;
+
+        // Most APIs return the fresh profile or avatar url
+        let j = {};
+        try { j = await r.json(); } catch { /* 204 or empty body */ }
+        const newUrl = j?.avatar || j?.profile?.avatar || j?.data?.avatar || null;
+
+        // If server returned 204/no body, do a quick re-fetch of /users/me/
+        if (!newUrl) {
+          try {
+            const me = await fetch(`${API_ROOT}/users/me/`, { headers: { ...authHeader(), accept: "application/json" } });
+            if (me.ok) {
+              const d = await me.json();
+              return d?.profile?.avatar || d?.avatar || null;
+            }
+          } catch { /* ignore */ }
+        }
+        return newUrl;
+      } catch {
+        /* try next */
+      }
+    }
+    return null;
+  }
+
+  const handleSave = async () => {
+    if (!file) return;
+    setSaving(true);
+    const newUrl = await uploadAvatarApi(file);
+    setSaving(false);
+    if (!newUrl) {
+      alert("Could not update photo. Please check your avatar endpoint.");
+      return;
+    }
+    // cache-bust just in case
+    const finalUrl = `${newUrl}${newUrl.includes("?") ? "&" : "?"}_=${Date.now()}`;
+    onSaved(finalUrl);
+  };
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Update profile photo</DialogTitle>
+      <DialogContent dividers>
+        <input ref={inputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
+        <Stack spacing={2} alignItems="center">
+          <Avatar src={preview || ""} sx={{ width: 120, height: 120 }}>
+            {/* fallback initial if no preview */}
+          </Avatar>
+          <Button variant="outlined" startIcon={<CloudUploadRoundedIcon />} onClick={handleChoose}>
+            Choose image
+          </Button>
+          <Typography variant="caption" color="text.secondary">
+            JPG/PNG, recommended square image
+          </Typography>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={handleSave} disabled={!file || saving}>
+          {saving ? "Saving…" : "Save"}
         </Button>
       </DialogActions>
     </Dialog>
