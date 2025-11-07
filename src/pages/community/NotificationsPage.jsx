@@ -370,7 +370,7 @@ export default function NotificationsPage({
         is_read: !!n.is_read,
         actor: {
           name: n.actor?.display_name || n.actor?.username || n.actor?.email || "User",
-          avatar: n.actor?.avatar || "",
+          avatar: n.actor?.avatar_url || "",   // ← use avatar_url now returned by API
         },
         context: {
           friend_request_id: n.data?.friend_request_id,

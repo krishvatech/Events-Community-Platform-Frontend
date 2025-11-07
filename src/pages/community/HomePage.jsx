@@ -139,7 +139,7 @@ async function fetchProfileCore() {
     job_title: prof.job_title || "",
     bio: prof.bio || "",
     location: prof.location || "",
-    avatar: prof.avatar || data.avatar || "",
+    avatar: prof.user_image_url || prof.user_image || prof.avatar || data.avatar || "",
     skills: Array.isArray(prof.skills) ? prof.skills : parseSkills(prof.skills || ""),
     links: (prof.links && typeof prof.links === "object") ? prof.links : {},
     experience: [],
@@ -379,12 +379,15 @@ function ScrollThreeVisible({ children }) {
 // -----------------------------------------------------------------------------
 // Post card + lists
 // -----------------------------------------------------------------------------
-function PostCard({ post }) {
+function PostCard({ post, avatarUrl, actorName }) {
+  const name = (post.actor_name || actorName || "You");
+  const initial = (name?.[0] || "U").toUpperCase();
+  const photo = post.actor_avatar || avatarUrl || "";
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardHeader
-        avatar={<Avatar src={""}>{("A")}</Avatar>}
-        title={<Typography fontWeight={600}>{post.actor_name || "You"}</Typography>}
+        avatar={<Avatar src={photo}>{initial}</Avatar>}
+        title={<Typography fontWeight={600}>{name}</Typography>}
         subheader={timeAgo(post.created_at)}
         action={
           <Stack direction="row" spacing={0.5}>
@@ -469,7 +472,7 @@ function PostCard({ post }) {
   );
 }
 
-function MyPostsList({ posts }) {
+function MyPostsList({ posts, avatarUrl, actorName }) {
   if (!posts || posts.length === 0) {
     return (
       <Card variant="outlined" sx={{ borderRadius: 3 }}>
@@ -477,7 +480,13 @@ function MyPostsList({ posts }) {
       </Card>
     );
   }
-  return (<Stack spacing={2}>{posts.map((p) => <PostCard key={p.id} post={p} />)}</Stack>);
+  return (
+   <Stack spacing={2}>
+     {posts.map((p) => (
+       <PostCard key={p.id} post={p} avatarUrl={avatarUrl} actorName={actorName} />
+     ))}
+   </Stack>
+  );
 }
 
 function MyGroups({ groups }) {
@@ -948,7 +957,10 @@ export default function HomePage() {
               <Tooltip title="Change photo">
                 <IconButton
                   size="small"
-                  onClick={() => setAvatarDialogOpen(true)}
+                  onClick={() => {
+                      setAvatarPreview(profile.avatar || "");
+                      setAvatarDialogOpen(true);
+                    }}
                   sx={{
                     position: "absolute",
                     right: -6,
@@ -1009,7 +1021,11 @@ export default function HomePage() {
                   </Button>
                 </Stack>
                 <ScrollThreeVisible>
-                  <MyPostsList posts={posts} />
+                  <MyPostsList
+                    posts={posts}
+                    avatarUrl={profile.avatar}
+                    actorName={fullName}
+                  />
                 </ScrollThreeVisible>
               </Stack>
             )}
@@ -1045,6 +1061,7 @@ export default function HomePage() {
         open={avatarDialogOpen}
         file={avatarFile}
         preview={avatarPreview}
+        currentUrl={profile.avatar}
         saving={avatarSaving}
         onPick={(f, url) => { setAvatarFile(f); setAvatarPreview(url); }}
         onClose={() => { setAvatarDialogOpen(false); setAvatarFile(null); setAvatarPreview(""); }}
@@ -1398,7 +1415,7 @@ function PostDeleteConfirm({ open, postId, communityId, onClose, onDeleted }) {
 
 
 // Edit Profile pic 
-function AvatarUploadDialog({ open, file, preview, saving, onPick, onClose, onSaved, setSaving }) {
+function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, onClose, onSaved, setSaving }) {
   const inputRef = React.useRef(null);
 
   const handleChoose = () => inputRef.current?.click();
@@ -1431,7 +1448,12 @@ function AvatarUploadDialog({ open, file, preview, saving, onPick, onClose, onSa
         // Most APIs return the fresh profile or avatar url
         let j = {};
         try { j = await r.json(); } catch { /* 204 or empty body */ }
-        const newUrl = j?.avatar || j?.profile?.avatar || j?.data?.avatar || null;
+        const newUrl =
+              j?.avatar ||
+              j?.profile?.avatar ||
+              j?.data?.avatar ||
+              j?.user_image_url ||         // ← add this
+              null;
 
         // If server returned 204/no body, do a quick re-fetch of /users/me/
         if (!newUrl) {
@@ -1439,7 +1461,13 @@ function AvatarUploadDialog({ open, file, preview, saving, onPick, onClose, onSa
             const me = await fetch(`${API_ROOT}/users/me/`, { headers: { ...authHeader(), accept: "application/json" } });
             if (me.ok) {
               const d = await me.json();
-              return d?.profile?.avatar || d?.avatar || null;
+              return (
+                d?.profile?.avatar ||
+                d?.avatar ||
+                d?.profile?.user_image_url ||   // ← add
+                d?.profile?.user_image ||       // ← add (in case it’s a relative path)
+                null
+              );
             }
           } catch { /* ignore */ }
         }
@@ -1471,9 +1499,7 @@ function AvatarUploadDialog({ open, file, preview, saving, onPick, onClose, onSa
       <DialogContent dividers>
         <input ref={inputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
         <Stack spacing={2} alignItems="center">
-          <Avatar src={preview || ""} sx={{ width: 120, height: 120 }}>
-            {/* fallback initial if no preview */}
-          </Avatar>
+          <Avatar src={preview || currentUrl || ""} sx={{ width: 120, height: 120 }} />
           <Button variant="outlined" startIcon={<CloudUploadRoundedIcon />} onClick={handleChoose}>
             Choose image
           </Button>

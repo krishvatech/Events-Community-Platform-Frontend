@@ -54,6 +54,19 @@ const tokenHeader = () => {
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
+const getAvatarUrl = (u) => {
+  const p = u?.profile || {};
+  return (
+    u?.avatar_url ||      // from /users/roster/ (server serializer)
+    u?.avatar ||          // alternative
+    p.user_image ||       // your DB field on profile if present
+    p.image_url ||
+    p.photo ||
+    p.avatar ||
+    ""
+  );
+};
+
 const normalizeFriendStatus = (s) => {
   const v = (s || "").toLowerCase();
   if (["friends", "friend", "accepted", "approve", "approved"].includes(v)) return "friends";
@@ -210,10 +223,13 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
     >
       <Stack direction="row" spacing={1.5} alignItems="center">
         <Avatar
+          src={u?.avatar_url || ""}
+          alt={name}
           sx={{ width: 44, height: 44, cursor: "pointer", bgcolor: "#e2e8f0", color: "#334155", fontWeight: 700 }}
           onClick={() => onOpenProfile?.(u)}
         >
-          {(name || "?").slice(0, 1).toUpperCase()}
+          {/* fallback initial only when no image */}
+          {!(u?.avatar_url) ? (name || "?").slice(0, 1).toUpperCase() : null}
         </Avatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>

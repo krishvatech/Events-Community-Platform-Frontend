@@ -46,6 +46,19 @@ const tokenHeader = () => {
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
+const pickAvatarUrl = (u) => {
+  if (!u) return "";
+  const cands = [
+    u.avatar_url,                       // from /users/roster/
+    u.profile?.user_image,              // your DB column
+    u.profile?.avatar,
+    u.profile?.photo,
+    u.profile?.image_url,
+    u.profile?.image,
+  ];
+  return cands.find((x) => typeof x === "string" && x.trim()) || "";
+};
+
 // UI helpers
 const Section = ({ title, children, action }) => (
   <Card variant="outlined" sx={{ borderRadius: 2 }}>
@@ -122,12 +135,12 @@ function timeAgo(date) {
 
 // Post card component used in the Posts tab. Shows the post content and a
 // bottom row with mutual connections and a friend button (if not friends).
-function RichPostCard({ post, fullName, mutualCount, friendStatus, friendSubmitting, handleAddFriend }) {
+function RichPostCard({ post, fullName, avatarUrl, mutualCount, friendStatus, friendSubmitting, handleAddFriend }) {
   return (
     <Card variant="outlined" sx={{ borderRadius: 2 }}>
       <CardHeader
         avatar={
-          <Avatar sx={{ width: 40, height: 40 }}>
+          <Avatar sx={{ width: 40, height: 40 }} src={avatarUrl}>
             {(fullName || "?").slice(0, 1).toUpperCase()}
           </Avatar>
         }
@@ -752,7 +765,7 @@ const filteredMutual = useMemo(
                 {/* Header Card */}
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                   <Box className="flex items-center gap-3">
-                    <Avatar sx={{ width: 56, height: 56 }}>
+                    <Avatar sx={{ width: 56, height: 56 }} src={pickAvatarUrl(userItem)}>
                       {(fullName || "?").slice(0, 1).toUpperCase()}
                     </Avatar>
                     <Box sx={{ minWidth: 0 }}>
@@ -882,6 +895,7 @@ const filteredMutual = useMemo(
                               key={post.id}
                               post={post}
                               fullName={fullName}
+                              avatarUrl={pickAvatarUrl(userItem)}
                               mutualCount={mutualCount}
                               friendStatus={friendStatus}
                               friendSubmitting={friendSubmitting}
@@ -1134,7 +1148,7 @@ const filteredMutual = useMemo(
                           }
                         >
                           <ListItemAvatar>
-                            <Avatar sx={{ width: 36, height: 36 }}>
+                            <Avatar sx={{ width: 36, height: 36 }} src={pickAvatarUrl(f)}>
                               {(name || "?").slice(0, 1).toUpperCase()}
                             </Avatar>
                           </ListItemAvatar>

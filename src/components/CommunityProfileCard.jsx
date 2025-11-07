@@ -43,6 +43,14 @@ const RAW_BASE = (
   "http://127.0.0.1:8000/api"   // <-- safe local fallback
 ).trim();
 
+function resolveMediaUrl(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  // strip trailing "/api" if present so we get the origin
+  const origin = RAW_BASE.replace(/\/api\/?$/i, "").replace(/\/$/, "");
+  return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 // Build Group Detail route (pick the one that matches your app)
 const buildGroupDetailUrl = (g) => {
   const id = g?.id || g?.pk;
@@ -109,16 +117,17 @@ function buildName(u = {}) {
 }
 
 function pickAvatar(u) {
-  // Defensive: if the object is falsy, return empty string
   if (!u || typeof u !== "object") return "";
-  return (
-    u.avatar ||
-    u.avatar_url ||
-    u.profile?.avatar ||
-    u.profile?.image_url ||
-    u.profile?.photo ||
-    ""
-  );
+  // Check the common fields across your APIs
+  const raw =
+    // flat fields
+    u.user_image_url || u.user_image || u.photo_url ||
+    u.avatar || u.avatar_url ||
+    // nested profile fields
+    u.profile?.user_image_url || u.profile?.user_image ||
+    u.profile?.avatar || u.profile?.image_url || u.profile?.photo ||
+    "";
+  return resolveMediaUrl(raw);
 }
 
 // ------------------------------------------------
