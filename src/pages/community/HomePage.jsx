@@ -418,7 +418,7 @@ function PostCard({ post }) {
         )}
       </CardContent>
       <CardActions sx={{ pt: 0 }}>
-        <Button size="small">Like</Button>
+        <Button size="small" onClick={() => (window.__openLikes?.(post.id))?.()}>Like</Button>
         <Button size="small" onClick={() => (window.__openComments?.(post.id))?.()}>Comment</Button>
       </CardActions>
     </Card>
@@ -695,6 +695,9 @@ export default function HomePage() {
   const [commentOpen, setCommentOpen] = React.useState(false);
   const [commentPostId, setCommentPostId] = React.useState(null);
   const openCommentsFor = (postId) => { setCommentPostId(postId); setCommentOpen(true); };
+  const [likesOpen, setLikesOpen] = React.useState(false);
+  const [likesPostId, setLikesPostId] = React.useState(null);
+
 
   // expose a safe opener so PostCard can trigger without prop changes
   React.useEffect(() => {
@@ -702,6 +705,12 @@ export default function HomePage() {
     return () => { try { delete window.__openComments; } catch { } };
   }, []);
 
+  React.useEffect(() => {
+    window.__openLikes = (postId) => () => { setLikesPostId(postId); setLikesOpen(true); };
+    return () => {
+      try { delete window.__openLikes; } catch { }
+    };
+  }, []);
 
 
   // ---- Fetch my posts (paginated) ----
@@ -946,11 +955,126 @@ export default function HomePage() {
         postId={commentPostId}
         onClose={() => setCommentOpen(false)}
       />
+      <LikesDialog
+        open={likesOpen}
+        postId={likesPostId}
+        onClose={() => setLikesOpen(false)}
+      />
     </Box>
   );
 }
 
+// Function For Likes Dialog
+function LikesDialog({ open, postId, onClose }) {
+  const [loading, setLoading] = React.useState(false);
+  const [likers, setLikers] = React.useState([]);
 
+  function normalizeUser(u) {
+    if (!u) return { id: null, name: "User", avatar: "" };
+    const id = u.id ?? u.user_id ?? null;
+    const name =
+      u.name ||
+      `${u.first_name || ""} ${u.last_name || ""}`.trim() ||
+      u.username ||
+      "User";
+    const avatar = u.avatar || u.profile_image || u.photo || "";
+    const headline =
+      u.headline || u.job_title || u.title || u.bio || u.about || "";
+    return { id, name, avatar, headline };
+  }
+
+  // Handle different API shapes: some endpoints return {results:[{user:{...}}]}, others return raw users
+  function normalizeLikerRow(row) {
+    const user = row?.user || row?.owner || row?.liked_by || row;
+    return normalizeUser(user);
+  }
+
+  async function fetchLikers(postId) {
+    // Try common DRF patterns you’re likely already using
+    const candidates = [
+      `${API_ROOT}/posts/${postId}/likes/`,
+      `${API_ROOT}/communities/posts/${postId}/likes/`,
+      `${API_ROOT}/activity/posts/${postId}/likes/`,
+      `${API_ROOT}/reactions/?post=${postId}&type=like`,
+      `${API_ROOT}/likes/?post=${postId}`,
+    ];
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url, {
+          headers: { ...authHeader(), accept: "application/json" },
+        });
+        if (!r.ok) continue;
+        const data = await r.json();
+        const rows = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+          ? data
+          : data?.items || data?.likers || [];
+        return rows.map(normalizeLikerRow);
+      } catch {
+        /* try next */
+      }
+    }
+    return [];
+  }
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!open || !postId) return;
+      setLoading(true);
+      const list = await fetchLikers(postId);
+      if (mounted) setLikers(list);
+      setLoading(false);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [open, postId]);
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>
+        {`Liked by${likers.length ? ` (${likers.length})` : ""}`}
+      </DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Typography variant="body2" color="text.secondary">
+            Loading…
+          </Typography>
+        ) : likers.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No likes yet.
+          </Typography>
+        ) : (
+          <List dense>
+            {likers.map((u) => (
+              <ListItem key={u.id || u.name} disableGutters>
+                <ListItemAvatar>
+                  <Avatar src={u.avatar}>
+                    {(u.name || "U").slice(0, 1).toUpperCase()}
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={u.name}
+                  secondary={u.headline || null}
+                  primaryTypographyProps={{ variant: "body2", fontWeight: 600 }}
+                  secondaryTypographyProps={{ variant: "caption" }}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+// Function For Comments Dialog
 function CommentsDialog({ open, postId, onClose }) {
   const [loading, setLoading] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
