@@ -432,7 +432,10 @@ function PostCard({ post, avatarUrl, actorName }) {
             {post.options.map((opt, idx) => (
               <ListItem key={idx} disableGutters sx={{ px: 1 }}>
                 <ListItemAvatar><Avatar sx={{ width: 28, height: 28 }}>{idx + 1}</Avatar></ListItemAvatar>
-                <ListItemText primary={opt} />
+                <ListItemText
+                  primary={typeof opt === "string" ? opt : (opt?.text ?? opt?.label ?? `Option ${idx + 1}`)}
+                  secondary={typeof opt === "object" && typeof opt?.vote_count === "number" ? `${opt.vote_count} votes` : null}
+                />
               </ListItem>
             ))}
           </List>
