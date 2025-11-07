@@ -424,26 +424,41 @@ function ResourceBlock({ post, onOpenEvent }) {
   );
 }
 
-function CommentsDialog({ open, onClose, postId, onBumpCount }) {
+function CommentsDialog({
+  open,
+  onClose,
+  postId,
+  onBumpCount,
+  // NEW: inline mode props (default off, so old modal behavior still works)
+  inline = false,
+  initialCount = 3,
+  inputRef = null,
+}) {
   const [loading, setLoading] = React.useState(false);
   const [me, setMe] = React.useState(null);
   const [items, setItems] = React.useState([]);
   const [text, setText] = React.useState("");
   const [replyTo, setReplyTo] = React.useState(null);
 
+  // NEW: how many root comments to show inline
+  const [visibleCount, setVisibleCount] = React.useState(initialCount);
+
   // who am I (for delete-own)
   React.useEffect(() => {
-    if (!open) return;
+    if (!inline && !open) return;
     (async () => {
       try {
         const r = await fetch(toApiUrl("users/me/"), { headers: { ...authHeaders() } });
         setMe(r.ok ? await r.json() : {});
-      } catch { setMe({}); }
+      } catch {
+        setMe({});
+      }
     })();
-  }, [open]);
+  }, [open, inline]);
 
   const load = React.useCallback(async () => {
-    if (!open || !postId) return;
+    if (!postId) return;
+    if (!inline && !open) return;
     setLoading(true);
     try {
       const r = await fetch(toApiUrl(`activity/feed/${postId}/comments/?page_size=200`), {
@@ -452,20 +467,27 @@ function CommentsDialog({ open, onClose, postId, onBumpCount }) {
       const j = r.ok ? await r.json() : [];
       const flat = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
       setItems(flat);
-    } catch { setItems([]); }
+      // reset visible window each fetch
+      setVisibleCount(initialCount);
+    } catch {
+      setItems([]);
+    }
     setLoading(false);
-  }, [open, postId]);
+  }, [postId, open, inline, initialCount]);
 
   React.useEffect(() => { load(); }, [load]);
 
-  // build simple tree
+  // build simple tree (roots + children)
   const roots = React.useMemo(() => {
     const map = new Map();
     (items || []).forEach(c => map.set(c.id, { ...c, children: [] }));
     map.forEach(c => {
       if (c.parent_id && map.get(c.parent_id)) map.get(c.parent_id).children.push(c);
     });
-    return [...map.values()].filter(c => !c.parent_id);
+    // sort newest first at root level (common social behavior)
+    return [...map.values()]
+      .filter(c => !c.parent_id)
+      .sort((a, b) => (new Date(b.created_at || 0)) - (new Date(a.created_at || 0)));
   }, [items]);
 
   async function createComment(body, parentId = null) {
@@ -480,7 +502,7 @@ function CommentsDialog({ open, onClose, postId, onBumpCount }) {
         setText("");
         setReplyTo(null);
         await load();
-        onBumpCount?.(); // let parent increment the visible count
+        onBumpCount?.(); // bump count in the post card
       }
     } catch { }
   }
@@ -497,7 +519,6 @@ function CommentsDialog({ open, onClose, postId, onBumpCount }) {
   }
 
   async function deleteOwn(c) {
-    // Only allow if comment author == me
     const myId = me?.id || me?.user?.id;
     if (!myId || (c.author_id !== myId)) return;
     try {
@@ -510,14 +531,24 @@ function CommentsDialog({ open, onClose, postId, onBumpCount }) {
   }
 
   const CommentItem = ({ c, depth = 0 }) => (
-    <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #e2e8f0" : "none", ml: depth ? 1.5 : 0, mt: depth ? 1 : 0 }}>
+    <Box
+      sx={{
+        pl: depth ? 2 : 0,
+        borderLeft: depth ? "2px solid #e2e8f0" : "none",
+        ml: depth ? 1.5 : 0,
+        mt: depth ? 1 : 0
+      }}
+    >
       <Stack direction="row" spacing={1} alignItems="center">
         <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
-        <Typography variant="subtitle2">{c.author?.name || c.author?.username || `User #${c.author_id}`}</Typography>
+        <Typography variant="subtitle2">
+          {c.author?.name || c.author?.username || `User #${c.author_id}`}
+        </Typography>
         <Typography variant="caption" color="text.secondary">
           {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
         </Typography>
       </Stack>
+
       <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
 
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
@@ -538,12 +569,84 @@ function CommentsDialog({ open, onClose, postId, onBumpCount }) {
 
       {!!c.children?.length && (
         <Stack spacing={1} sx={{ mt: 1 }}>
-          {c.children.map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+          {c.children
+            .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0))) // replies older->newer
+            .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
         </Stack>
       )}
     </Box>
   );
 
+  // --------- INLINE RENDER (Instagram/LinkedIn style) ----------
+  if (inline) {
+    const visibleRoots = roots.slice(0, visibleCount);
+    const hasMore = roots.length > visibleRoots.length;
+
+    return (
+      <Box sx={{ mt: 1.25 }}>
+        {replyTo && (
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Replying to {replyTo.author?.name || `#${replyTo.author_id}`}
+            </Typography>
+            <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+          </Stack>
+        )}
+
+        {/* Always show comment input */}
+        <Stack direction="row" spacing={1}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            inputRef={inputRef || undefined}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                createComment(text, replyTo?.id || null);
+              }
+            }}
+          />
+          <Button
+            variant="contained"
+            onClick={() => createComment(text, replyTo?.id || null)}
+            disabled={loading || !text.trim()}
+          >
+            Post
+          </Button>
+        </Stack>
+
+        {/* Comments list */}
+        <Box sx={{ mt: 1.25 }}>
+          {loading ? (
+            <Stack alignItems="center" py={2}><CircularProgress size={20} /></Stack>
+          ) : visibleRoots.length === 0 ? (
+            <Typography variant="caption" color="text.secondary">Be the first to comment.</Typography>
+          ) : (
+            <Stack spacing={1.25}>
+              {visibleRoots.map(c => <CommentItem key={c.id} c={c} />)}
+            </Stack>
+          )}
+
+          {hasMore && (
+            <Stack alignItems="flex-start" sx={{ mt: 1 }}>
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => setVisibleCount(v => v + initialCount)}
+              >
+                Load more comments
+              </Button>
+            </Stack>
+          )}
+        </Box>
+      </Box>
+    );
+  }
+
+  // --------- ORIGINAL MODAL (left intact for compatibility) ----------
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Comments</DialogTitle>
@@ -580,6 +683,7 @@ function CommentsDialog({ open, onClose, postId, onBumpCount }) {
     </Dialog>
   );
 }
+
 
 function ShareDialog({ open, onClose, postId, onShared }) {
   const [loading, setLoading] = React.useState(false);
@@ -738,6 +842,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
   React.useEffect(() => { setLocal(post); }, [post]);
+  const commentInputRef = React.useRef(null);
   const bumpShareCount = () => {
     setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, shares: (curr.metrics?.shares ?? 0) + 1 } }));
   };
@@ -851,7 +956,15 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         </IconButton>
         <Typography variant="caption">{local.metrics?.likes ?? 0}</Typography>
 
-        <IconButton size="small" onClick={() => setCommentsOpen(true)}>
+        <IconButton
+          size="small"
+          onClick={() => {
+            // focus the always-visible inline input
+            if (commentInputRef?.current) {
+              commentInputRef.current.focus();
+            }
+          }}
+        >
           <ChatBubbleOutlineIcon fontSize="small" />
         </IconButton>
         <Typography variant="caption">{local.metrics?.comments ?? 0}</Typography>
@@ -860,12 +973,15 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         <Typography variant="caption">{local.metrics?.shares ?? 0}</Typography>
       </Stack>
 
+      {/* Inline comments, always visible like LinkedIn/Instagram */}
       <CommentsDialog
-        open={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
+        inline
+        initialCount={3}         // show a few, then "Load more" reveals more
         postId={post.id}
         onBumpCount={bumpCommentCount}
+        inputRef={commentInputRef}
       />
+
       <ShareDialog
         open={shareOpen}
         onClose={() => setShareOpen(false)}
