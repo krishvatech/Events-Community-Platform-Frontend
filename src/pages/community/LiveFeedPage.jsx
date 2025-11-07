@@ -17,6 +17,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, List, ListItem, ListItemAvatar, ListItemText, Divider
 } from "@mui/material";
+import { Checkbox, ListItemButton } from "@mui/material";
 
 
 const BORDER = "#e2e8f0";
@@ -580,13 +581,167 @@ function CommentsDialog({ open, onClose, postId, onBumpCount }) {
   );
 }
 
+function ShareDialog({ open, onClose, postId, onShared }) {
+  const [loading, setLoading] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [friends, setFriends] = React.useState([]);
+  const [query, setQuery] = React.useState("");
+  const [selected, setSelected] = React.useState(new Set());
+
+  // Normalize any friends API shape -> { id, name, avatar }
+  function normalizeFriends(list) {
+    return (list || []).map((f) => {
+      const u = f.user || f.friend || f.to_user || f.peer || f.profile || f;
+      const id = u?.id ?? f.user_id ?? f.friend_id ?? f.peer_id ?? f.id;
+      const name =
+        u?.name ||
+        u?.full_name ||
+        (u?.first_name || u?.last_name ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : null) ||
+        u?.username ||
+        `User #${id}`;
+      const avatar = u?.avatar || u?.profile?.avatar || f?.avatar || "";
+      return { id, name, avatar };
+    }).filter(x => x.id);
+  }
+
+  // Try common endpoints until one works
+  const fetchFriends = React.useCallback(async () => {
+    if (!open) return;
+    setLoading(true);
+    const candidates = [
+      "friends?status=accepted",
+      "friends/accepted",
+      "friends/list",
+      "friendships?status=accepted",
+      "users/me/friends",
+    ];
+    for (const path of candidates) {
+      try {
+        const r = await fetch(toApiUrl(path), { headers: { Accept: "application/json", ...authHeaders() } });
+        if (!r.ok) continue;
+        const j = await r.json();
+        const arr = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : j?.data || []);
+        const norm = normalizeFriends(arr);
+        setFriends(norm);
+        setLoading(false);
+        return;
+      } catch { /* try next */ }
+    }
+    setFriends([]);
+    setLoading(false);
+  }, [open]);
+
+  React.useEffect(() => { fetchFriends(); }, [fetchFriends]);
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return friends;
+    return friends.filter(f => (f.name || "").toLowerCase().includes(q));
+  }, [friends, query]);
+
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function shareNow() {
+    if (!selected.size || !postId) return;
+    setSending(true);
+
+    const payloads = [
+      { url: `activity/feed/${postId}/share/`, body: { recipients: [...selected] } },
+      { url: `posts/${postId}/share/`, body: { recipients: [...selected] } },
+      { url: `share/`, body: { post_id: postId, recipients: [...selected] } },
+    ];
+
+    for (const p of payloads) {
+      try {
+        const r = await fetch(toApiUrl(p.url), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(p.body),
+        });
+        if (r.ok) {
+          setSending(false);
+          onShared?.();      // bump the counter in the card
+          onClose?.();       // close dialog
+          setSelected(new Set());
+          setQuery("");
+          return;
+        }
+      } catch { /* try next */ }
+    }
+    setSending(false);
+    alert("Could not share this post. Please check your share endpoint.");
+  }
+
+  return (
+    <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Share post</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+        ) : friends.length === 0 ? (
+          <Typography color="text.secondary">No friends found.</Typography>
+        ) : (
+          <>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Search friends…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 1.5 }}
+            />
+            <Divider sx={{ mb: 1 }} />
+            <List dense disablePadding>
+              {filtered.map((f) => (
+                <ListItem key={f.id} disablePadding secondaryAction={
+                  <Checkbox edge="end" onChange={() => toggle(f.id)} checked={selected.has(f.id)} />
+                }>
+                  <ListItemButton onClick={() => toggle(f.id)}>
+                    <ListItemAvatar><Avatar src={f.avatar} /></ListItemAvatar>
+                    <ListItemText primary={f.name} />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={sending}>Cancel</Button>
+        <Button variant="contained" onClick={shareNow} disabled={!selected.size || sending}>
+          {sending ? "Sharing…" : "Share"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
 
 // ---- POST CARD ----
 function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const [local, setLocal] = React.useState(post);
   const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
+  const [shareOpen, setShareOpen] = React.useState(false);
   React.useEffect(() => { setLocal(post); }, [post]);
+  const bumpShareCount = () => {
+    setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, shares: (curr.metrics?.shares ?? 0) + 1 } }));
+  };
+
   const inc = (k) => {
     const next = { ...local, metrics: { ...local.metrics, [k]: (local.metrics?.[k] ?? 0) + 1 } };
     setLocal(next);
@@ -701,7 +856,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         </IconButton>
         <Typography variant="caption">{local.metrics?.comments ?? 0}</Typography>
 
-        <IconButton size="small" onClick={() => inc("shares")}><IosShareIcon fontSize="small" /></IconButton>
+        <IconButton size="small" onClick={() => setShareOpen(true)}><IosShareIcon fontSize="small" /></IconButton>
         <Typography variant="caption">{local.metrics?.shares ?? 0}</Typography>
       </Stack>
 
@@ -710,6 +865,12 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         onClose={() => setCommentsOpen(false)}
         postId={post.id}
         onBumpCount={bumpCommentCount}
+      />
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        postId={post.id}
+        onShared={bumpShareCount}
       />
     </Paper>
   );
