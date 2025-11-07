@@ -49,6 +49,11 @@ import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
+import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+
 
 // -----------------------------------------------------------------------------
 // API helpers
@@ -150,7 +155,7 @@ async function fetchProfileExtras() {
         educations: Array.isArray(d.educations) ? d.educations.map(mapEducation) : [],
       };
     }
-  } catch {}
+  } catch { }
   // fallback to two calls
   const [e1, e2] = await Promise.all([
     fetch(`${API_ROOT}/auth/me/educations/`, { headers: { ...authHeader(), accept: "application/json" } }).catch(() => null),
@@ -414,7 +419,7 @@ function PostCard({ post }) {
       </CardContent>
       <CardActions sx={{ pt: 0 }}>
         <Button size="small">Like</Button>
-        <Button size="small">Comment</Button>
+        <Button size="small" onClick={() => (window.__openComments?.(post.id))?.()}>Comment</Button>
       </CardActions>
     </Card>
   );
@@ -681,12 +686,22 @@ export default function HomePage() {
   const [myCommunityId, setMyCommunityId] = React.useState(null);
   const [posts, setPosts] = React.useState([]);           // ← now real data
   const [profile, setProfile] = React.useState(EMPTY_PROFILE);
-const [groups, setGroups] = React.useState([]);
+  const [groups, setGroups] = React.useState([]);
   const [communities, setCommunities] = React.useState([]); // for composer picklist
   const [tabIndex, setTabIndex] = React.useState(0);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [friends, setFriends] = React.useState([]);
   const [friendCount, setFriendCount] = React.useState(0); // ← ADD THIS
+  const [commentOpen, setCommentOpen] = React.useState(false);
+  const [commentPostId, setCommentPostId] = React.useState(null);
+  const openCommentsFor = (postId) => { setCommentPostId(postId); setCommentOpen(true); };
+
+  // expose a safe opener so PostCard can trigger without prop changes
+  React.useEffect(() => {
+    window.__openComments = (postId) => () => openCommentsFor(postId);
+    return () => { try { delete window.__openComments; } catch { } };
+  }, []);
+
 
 
   // ---- Fetch my posts (paginated) ----
@@ -703,18 +718,18 @@ const [groups, setGroups] = React.useState([]);
   }, []);
 
   const fetchMyProfileFromMe = React.useCallback(async () => {
-  try {
-    const core = await fetchProfileCore();
-    const extra = await fetchProfileExtras();
-    setProfile({
-      ...core,
-      experience: extra.experiences,
-      education: extra.educations,
-    });
-  } catch (e) {
-    console.error("Failed to load profile:", e);
-  }
-}, []);
+    try {
+      const core = await fetchProfileCore();
+      const extra = await fetchProfileExtras();
+      setProfile({
+        ...core,
+        experience: extra.experiences,
+        education: extra.educations,
+      });
+    } catch (e) {
+      console.error("Failed to load profile:", e);
+    }
+  }, []);
 
   const fetchMyFriends = React.useCallback(async () => {
     const candidates = [
@@ -772,12 +787,12 @@ const [groups, setGroups] = React.useState([]);
   }, []);
 
   React.useEffect(() => {
-  fetchMyPosts();
-  fetchMyCommunities();
-  fetchMyJoinedGroups();
-  fetchMyFriends();
-  fetchMyProfileFromMe();   // ← add this line
-}, [fetchMyPosts, fetchMyCommunities, fetchMyJoinedGroups, fetchMyFriends, fetchMyProfileFromMe]);
+    fetchMyPosts();
+    fetchMyCommunities();
+    fetchMyJoinedGroups();
+    fetchMyFriends();
+    fetchMyProfileFromMe();   // ← add this line
+  }, [fetchMyPosts, fetchMyCommunities, fetchMyJoinedGroups, fetchMyFriends, fetchMyProfileFromMe]);
 
 
   // ---- Create post (always visibility=friends) ----
@@ -845,45 +860,45 @@ const [groups, setGroups] = React.useState([]);
 
         {/* Header */}
         <Card
-  variant="outlined"
-  className="profileHeaderCard"
-  sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}   // ← forces full width of its container
->
-  <Stack
-    direction={{ xs: "column", sm: "row" }}
-    spacing={2}
-    alignItems={{ xs: "flex-start", sm: "center" }}
-    sx={{ width: "100%", flexWrap: { xs: "wrap", sm: "nowrap" } }}   // ← make inner layout span 100%
-  >
-    <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72, mr: { sm: 2 } }}>
-      {(fullName[0] || "").toUpperCase()}
-    </Avatar>
-           <Box
-      sx={{
-        flex: "0 0 auto",
-        width: { xs: "100%", sm: 700, md: 780 },   // adjust numbers if you want
-        alignSelf: { xs: "flex-start", sm: "center" },
-      }}
-    >
+          variant="outlined"
+          className="profileHeaderCard"
+          sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}   // ← forces full width of its container
+        >
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            sx={{ width: "100%", flexWrap: { xs: "wrap", sm: "nowrap" } }}   // ← make inner layout span 100%
+          >
+            <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72, mr: { sm: 2 } }}>
+              {(fullName[0] || "").toUpperCase()}
+            </Avatar>
+            <Box
+              sx={{
+                flex: "0 0 auto",
+                width: { xs: "100%", sm: 700, md: 780 },   // adjust numbers if you want
+                alignSelf: { xs: "flex-start", sm: "center" },
+              }}
+            >
               <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
-      <Typography variant="body2" color="text.secondary">{profile.job_title}</Typography>
-      {profile.bio && <Typography variant="body2" sx={{ mt: 1 }}>{profile.bio}</Typography>}
-    </Box>
+              <Typography variant="body2" color="text.secondary">{profile.job_title}</Typography>
+              {profile.bio && <Typography variant="body2" sx={{ mt: 1 }}>{profile.bio}</Typography>}
+            </Box>
 
-             <Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" }, mx: 2 }} />
-             <Box
-      sx={{
-        minWidth: { sm: 160 },
-        textAlign: { xs: "left", sm: "center" },
-      }}
-    >
-      <Typography variant="subtitle2">
-        <Box component="span" sx={{ fontWeight: 600 }}>{posts.length}</Box> Posts&nbsp;|&nbsp;
-        <Box component="span" sx={{ fontWeight: 600 }}>{friendCount || friends.length}</Box> Friends
-      </Typography>
-    </Box>
-  </Stack>
-</Card>
+            <Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" }, mx: 2 }} />
+            <Box
+              sx={{
+                minWidth: { sm: 160 },
+                textAlign: { xs: "left", sm: "center" },
+              }}
+            >
+              <Typography variant="subtitle2">
+                <Box component="span" sx={{ fontWeight: 600 }}>{posts.length}</Box> Posts&nbsp;|&nbsp;
+                <Box component="span" sx={{ fontWeight: 600 }}>{friendCount || friends.length}</Box> Friends
+              </Typography>
+            </Box>
+          </Stack>
+        </Card>
 
         {/* Tabs */}
         <Card variant="outlined" sx={{ borderRadius: 3, width: "100%" }}>
@@ -925,10 +940,290 @@ const [groups, setGroups] = React.useState([]);
           <Button onClick={() => setDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+      {/* Comments dialog (view, like, reply, delete) */}
+      <CommentsDialog
+        open={commentOpen}
+        postId={commentPostId}
+        onClose={() => setCommentOpen(false)}
+      />
     </Box>
   );
 }
 
+
+function CommentsDialog({ open, postId, onClose }) {
+  const [loading, setLoading] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [comments, setComments] = React.useState([]);
+  const [text, setText] = React.useState("");
+  const [meId, setMeId] = React.useState(null);
+  const [replyingTo, setReplyingTo] = React.useState(null);
+  const [replyText, setReplyText] = React.useState("");
+
+  // --- helpers that reuse API_ROOT/authHeader from the file ---
+  async function getMeId() {
+    try {
+      const r = await fetch(`${API_ROOT}/users/me/`, { headers: { ...authHeader(), accept: "application/json" } });
+      if (!r.ok) return null;
+      const d = await r.json();
+      return d?.id ?? d?.user?.id ?? null;
+    } catch { return null; }
+  }
+
+  function normalizeUser(u) {
+    if (!u) return { id: null, name: "User", avatar: "" };
+    const id = u.id ?? u.user_id ?? null;
+    const name = (u.name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username || "User");
+    const avatar = u.avatar || u.profile_image || "";
+    return { id, name, avatar };
+  }
+
+  function normalizeComment(c) {
+    const author = normalizeUser(c.author || c.user || c.created_by);
+    const id = c.id;
+    const created = c.created_at || c.created || c.timestamp || null;
+    const body = c.text || c.body || c.content || "";
+    const likedByMe = !!(c.liked || c.liked_by_me);
+    const likeCount = Number(c.like_count ?? c.likes ?? 0) || 0;
+    const canDelete = !!(c.can_delete || c.is_owner || (author.id && meId && author.id === meId));
+    const replies = Array.isArray(c.replies) ? c.replies.map(normalizeComment) : [];
+    return { id, created, body, author, likedByMe, likeCount, canDelete, replies };
+  }
+
+  async function fetchComments(postId) {
+    const candidates = [
+      `${API_ROOT}/posts/${postId}/comments/`,
+      `${API_ROOT}/communities/posts/${postId}/comments/`,
+      `${API_ROOT}/activity/posts/${postId}/comments/`,
+      `${API_ROOT}/comments/?post=${postId}`,
+    ];
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
+        if (!r.ok) continue;
+        const data = await r.json();
+        const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : (data?.comments || []));
+        return rows.map(normalizeComment);
+      } catch { /* try next */ }
+    }
+    return [];
+  }
+
+  async function createComment(postId, body, parentId = null) {
+    // Try post-scoped first, then global /comments/
+    const payload = parentId ? { text: body, parent: parentId } : { text: body };
+    const scoped = [
+      { url: `${API_ROOT}/posts/${postId}/comments/`, body: payload },
+      { url: `${API_ROOT}/communities/posts/${postId}/comments/`, body: payload },
+    ];
+    for (const { url, body: b } of scoped) {
+      try {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify(b),
+        });
+        if (r.ok) return normalizeComment(await r.json());
+      } catch { }
+    }
+    // Global fallback
+    try {
+      const r = await fetch(`${API_ROOT}/comments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ post: postId, text: body, parent: parentId || undefined }),
+      });
+      if (r.ok) return normalizeComment(await r.json());
+    } catch { }
+    throw new Error("Could not create comment");
+  }
+
+  async function toggleLike(commentId) {
+    const candidates = [
+      { url: `${API_ROOT}/comments/${commentId}/like/`, method: "POST" },
+      { url: `${API_ROOT}/comments/${commentId}/toggle-like/`, method: "POST" },
+    ];
+    for (const c of candidates) {
+      try {
+        const r = await fetch(c.url, { method: c.method, headers: { ...authHeader(), accept: "application/json" } });
+        if (r.ok) return true;
+      } catch { }
+    }
+    return false;
+  }
+
+  async function deleteComment(commentId) {
+    const candidates = [
+      { url: `${API_ROOT}/comments/${commentId}/`, method: "DELETE" },
+      { url: `${API_ROOT}/comments/${commentId}/delete/`, method: "POST" },
+    ];
+    for (const c of candidates) {
+      try {
+        const r = await fetch(c.url, { method: c.method, headers: { ...authHeader(), accept: "application/json" } });
+        if (r.ok || r.status === 204) return true;
+      } catch { }
+    }
+    return false;
+  }
+
+  // load on open
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!open || !postId) return;
+      setLoading(true);
+      const uid = await getMeId();
+      if (mounted) setMeId(uid);
+      const list = await fetchComments(postId);
+      if (mounted) setComments(list);
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, [open, postId]);
+
+  const onSubmitNew = async () => {
+    if (!text.trim()) return;
+    setSubmitting(true);
+    try {
+      const c = await createComment(postId, text.trim(), null);
+      setComments((prev) => [c, ...prev]);
+      setText("");
+    } catch (e) {
+      alert(e.message || "Failed to add comment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const onSubmitReply = async () => {
+    if (!replyingTo || !replyText.trim()) return;
+    setSubmitting(true);
+    try {
+      const c = await createComment(postId, replyText.trim(), replyingTo);
+      setComments((prev) =>
+        prev.map((p) => (p.id === replyingTo ? { ...p, replies: [...(p.replies || []), c] } : p))
+      );
+      setReplyingTo(null);
+      setReplyText("");
+    } catch (e) {
+      alert(e.message || "Failed to reply");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const onLike = async (id) => {
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1 } : c
+      )
+    );
+    const ok = await toggleLike(id);
+    if (!ok) {
+      // revert if server failed
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === id ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1 } : c
+        )
+      );
+    }
+  };
+
+  const onDelete = async (id, isReply = false, parentId = null) => {
+    if (!window.confirm("Delete this comment?")) return;
+    const ok = await deleteComment(id);
+    if (!ok) return alert("Delete failed");
+    setComments((prev) => {
+      if (!isReply) return prev.filter((c) => c.id !== id);
+      return prev.map((p) => (p.id === parentId ? { ...p, replies: (p.replies || []).filter((r) => r.id !== id) } : p));
+    });
+  };
+
+  const Item = ({ c, depth = 0, parentId = null }) => (
+    <Box sx={{ pl: depth ? 5 : 0, py: 1 }}>
+      <Stack direction="row" spacing={1}>
+        <Avatar src={c.author.avatar}>{(c.author.name[0] || "").toUpperCase()}</Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Stack direction="row" alignItems="baseline" spacing={1}>
+            <Typography variant="subtitle2">{c.author.name}</Typography>
+            {c.created && <Typography variant="caption" color="text.secondary">{timeAgo(c.created)}</Typography>}
+          </Stack>
+          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mt: 0.25 }}>{c.body}</Typography>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+            <IconButton size="small" onClick={() => onLike(c.id)}>
+              {c.likedByMe ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
+            </IconButton>
+            <Typography variant="caption">{c.likeCount || 0}</Typography>
+
+            <Button size="small" startIcon={<ReplyRoundedIcon />} onClick={() => { setReplyingTo(c.id); setReplyText(""); }}>
+              Reply
+            </Button>
+
+            {c.canDelete && (
+              <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onDelete(c.id, !!parentId, parentId)}>
+                Delete
+              </Button>
+            )}
+          </Stack>
+
+          {/* Replies */}
+          {c.replies && c.replies.length > 0 && (
+            <Box sx={{ mt: 1 }}>
+              {c.replies.map((r) => <Item key={r.id} c={r} depth={1} parentId={c.id} />)}
+            </Box>
+          )}
+
+          {/* Inline reply box */}
+          {replyingTo === c.id && (
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              <TextField
+                size="small"
+                fullWidth
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Write a reply…"
+              />
+              <Button variant="contained" onClick={onSubmitReply} disabled={submitting || !replyText.trim()}>
+                Send
+              </Button>
+              <Button onClick={() => { setReplyingTo(null); setReplyText(""); }}>Cancel</Button>
+            </Stack>
+          )}
+        </Box>
+      </Stack>
+    </Box>
+  );
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Comments</DialogTitle>
+      <DialogContent dividers sx={{ pt: 1 }}>
+        {loading ? (
+          <Typography variant="body2" color="text.secondary">Loading comments…</Typography>
+        ) : comments.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No comments yet. Be the first to comment!</Typography>
+        ) : (
+          <Box>
+            {comments.map((c) => <Item key={c.id} c={c} />)}
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Write a comment…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <Button variant="contained" onClick={onSubmitNew} disabled={submitting || !text.trim()}>
+          Post
+        </Button>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
 
 
 // ---------------- About tab (unchanged core logic) ----------------
@@ -1098,11 +1393,11 @@ function AboutTab({ profile, groups, onUpdate }) {
   const [contactOpen, setContactOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState({
     first_name: profile.first_name || "",
-    last_name:  profile.last_name  || "",
-    email:      profile.email      || "",
-    location:   profile.location   || "",
-    linkedin:   profile.links?.linkedin || "",
-    job_title:  profile.job_title  || "",
+    last_name: profile.last_name || "",
+    email: profile.email || "",
+    location: profile.location || "",
+    linkedin: profile.links?.linkedin || "",
+    job_title: profile.job_title || "",
   });
 
   React.useEffect(() => {
@@ -1112,11 +1407,11 @@ function AboutTab({ profile, groups, onUpdate }) {
     });
     setContactForm({
       first_name: profile.first_name || "",
-      last_name:  profile.last_name  || "",
-      email:      profile.email      || "",
-      location:   profile.location   || "",
-      linkedin:   profile.links?.linkedin || "",
-      job_title:  profile.job_title  || "",
+      last_name: profile.last_name || "",
+      email: profile.email || "",
+      location: profile.location || "",
+      linkedin: profile.links?.linkedin || "",
+      job_title: profile.job_title || "",
     });
   }, [profile]);
 
@@ -1133,8 +1428,8 @@ function AboutTab({ profile, groups, onUpdate }) {
     try {
       const payload = {
         first_name: profile.first_name || "",
-        last_name:  profile.last_name  || "",
-        email:      profile.email      || "",
+        last_name: profile.last_name || "",
+        email: profile.email || "",
         profile: {
           full_name: fullName,
           timezone: "",
@@ -1164,7 +1459,7 @@ function AboutTab({ profile, groups, onUpdate }) {
       degree: e.degree || "",
       field: e.field || e.field_of_study || "",
       start: e.start || e.start_date || "",
-      end:   e.end   || e.end_date   || "",
+      end: e.end || e.end_date || "",
       grade: e.grade || "",
     });
     setEduOpen(true);
@@ -1172,7 +1467,7 @@ function AboutTab({ profile, groups, onUpdate }) {
   const saveEducation = async () => {
     try {
       if (editEduId) await updateEducationApi(editEduId, eduForm);
-      else           await createEducationApi(eduForm);
+      else await createEducationApi(eduForm);
       setEduOpen(false); setEditEduId(null);
       await reloadExtras();
     } catch (e) { alert(e.message || "Save failed"); }
@@ -1193,7 +1488,7 @@ function AboutTab({ profile, groups, onUpdate }) {
       org: x.org || x.community_name || "",
       position: x.position || "",
       start: x.start || x.start_date || "",
-      end:   x.end   || x.end_date   || "",
+      end: x.end || x.end_date || "",
       current: !!(x.current || x.currently_work_here),
     });
     setExpOpen(true);
@@ -1201,7 +1496,7 @@ function AboutTab({ profile, groups, onUpdate }) {
   const saveExperience = async () => {
     try {
       if (editExpId) await updateExperienceApi(editExpId, expForm);
-      else           await createExperienceApi(expForm);
+      else await createExperienceApi(expForm);
       setExpOpen(false); setEditExpId(null);
       await reloadExtras();
     } catch (e) { alert(e.message || "Save failed"); }
@@ -1218,8 +1513,8 @@ function AboutTab({ profile, groups, onUpdate }) {
       const links = { ...(profile.links || {}), linkedin: (contactForm.linkedin || "").trim() };
       const payload = {
         first_name: (contactForm.first_name || "").trim(),
-        last_name:  (contactForm.last_name  || "").trim(),
-        email:      (contactForm.email      || "").trim() || undefined,
+        last_name: (contactForm.last_name || "").trim(),
+        email: (contactForm.email || "").trim() || undefined,
         profile: {
           full_name: `${(contactForm.first_name || "").trim()} ${(contactForm.last_name || "").trim()}`.trim(),
           timezone: "",
@@ -1236,135 +1531,135 @@ function AboutTab({ profile, groups, onUpdate }) {
       onUpdate?.({
         ...profile,
         first_name: payload.first_name,
-        last_name:  payload.last_name,
-        email:      payload.email || "",
-        job_title:  payload.profile.job_title,
-        location:   payload.profile.location,
-        links:      payload.profile.links,
+        last_name: payload.last_name,
+        email: payload.email || "",
+        job_title: payload.profile.job_title,
+        location: payload.profile.location,
+        links: payload.profile.links,
       });
       setContactOpen(false);
     } catch (e) { alert(e.message || "Save failed"); }
   };
 
   return (
-  <Box>
-    <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
-      {/* LEFT column: About → Experience → Education */}
-      <Grid item xs={12} md={6} sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
-        <SectionCard
-          title="About"
-          action={<Tooltip title="Edit about"><IconButton size="small" onClick={openEditAbout}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}
-          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
-        >
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Summary:</Typography>
-          {profile.bio ? <Typography variant="body2">{profile.bio}</Typography>
-                       : <Typography variant="body2" color="text.secondary">—</Typography>}
+    <Box>
+      <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
+        {/* LEFT column: About → Experience → Education */}
+        <Grid item xs={12} md={6} sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
+          <SectionCard
+            title="About"
+            action={<Tooltip title="Edit about"><IconButton size="small" onClick={openEditAbout}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+            sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
+          >
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Summary:</Typography>
+            {profile.bio ? <Typography variant="body2">{profile.bio}</Typography>
+              : <Typography variant="body2" color="text.secondary">—</Typography>}
 
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Skills:</Typography>
-          {profile.skills && profile.skills.length
-            ? <SkillsChips skills={profile.skills} />
-            : <Typography variant="body2" color="text.secondary">—</Typography>}
-        </SectionCard>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Skills:</Typography>
+            {profile.skills && profile.skills.length
+              ? <SkillsChips skills={profile.skills} />
+              : <Typography variant="body2" color="text.secondary">—</Typography>}
+          </SectionCard>
 
-        <SectionCard
-          title="Experience"
-          action={<Tooltip title="Add experience"><IconButton size="small" onClick={() => openAddExperience()}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}
-          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
-        >
-          {profile.experience && profile.experience.length ? (
-            <List dense disablePadding>
-              {profile.experience.map((exp) => (
-                <ListItem key={exp.id} disableGutters sx={{ py: 0.75 }}
-                  secondaryAction={<Tooltip title="Edit"><IconButton size="small" onClick={() => openEditExperience(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-                  <ListItemText
-                    primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{exp.position} — {exp.org}</Typography>}
-                    secondary={<Typography variant="caption" color="text.secondary">{dateRange(exp.start, exp.end, exp.current)}</Typography>}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          ) : <Typography variant="body2" color="text.secondary">No experience yet</Typography>}
-        </SectionCard>
+          <SectionCard
+            title="Experience"
+            action={<Tooltip title="Add experience"><IconButton size="small" onClick={() => openAddExperience()}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+            sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
+          >
+            {profile.experience && profile.experience.length ? (
+              <List dense disablePadding>
+                {profile.experience.map((exp) => (
+                  <ListItem key={exp.id} disableGutters sx={{ py: 0.75 }}
+                    secondaryAction={<Tooltip title="Edit"><IconButton size="small" onClick={() => openEditExperience(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                    <ListItemText
+                      primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{exp.position} — {exp.org}</Typography>}
+                      secondary={<Typography variant="caption" color="text.secondary">{dateRange(exp.start, exp.end, exp.current)}</Typography>}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : <Typography variant="body2" color="text.secondary">No experience yet</Typography>}
+          </SectionCard>
 
-        <SectionCard
-          title="Education"
-          action={<Tooltip title="Add education"><IconButton size="small" onClick={() => openAddEducation()}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}
-          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
-        >
-          {profile.education && profile.education.length ? (
-            <List dense disablePadding>
-              {profile.education.map((edu) => (
-                <ListItem key={edu.id} disableGutters sx={{ py: 0.75 }}
-                  secondaryAction={<Tooltip title="Edit"><IconButton size="small" onClick={() => openEditEducation(edu.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-                  <ListItemText
-                    primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{edu.degree} — {edu.school}</Typography>}
-                    secondary={<Typography variant="caption" color="text.secondary">{dateRange(edu.start, edu.end, false)}{edu.field ? ` · ${edu.field}` : ""}{edu.grade ? ` · ${edu.grade}` : ""}</Typography>}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          ) : <Typography variant="body2" color="text.secondary">No education yet</Typography>}
-        </SectionCard>
+          <SectionCard
+            title="Education"
+            action={<Tooltip title="Add education"><IconButton size="small" onClick={() => openAddEducation()}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+            sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
+          >
+            {profile.education && profile.education.length ? (
+              <List dense disablePadding>
+                {profile.education.map((edu) => (
+                  <ListItem key={edu.id} disableGutters sx={{ py: 0.75 }}
+                    secondaryAction={<Tooltip title="Edit"><IconButton size="small" onClick={() => openEditEducation(edu.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                    <ListItemText
+                      primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{edu.degree} — {edu.school}</Typography>}
+                      secondary={<Typography variant="caption" color="text.secondary">{dateRange(edu.start, edu.end, false)}{edu.field ? ` · ${edu.field}` : ""}{edu.grade ? ` · ${edu.grade}` : ""}</Typography>}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : <Typography variant="body2" color="text.secondary">No education yet</Typography>}
+          </SectionCard>
+        </Grid>
+
+        {/* RIGHT column: Contact → About your work */}
+        <Grid item xs={12} md={6} sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
+          <SectionCard
+            title="Contact"
+            action={<Tooltip title="Edit contact"><IconButton size="small" onClick={() => setContactOpen(true)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+            sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
+          >
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>LinkedIn</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+              <LinkedInIcon fontSize="small" />
+              <Typography variant="body2" sx={{ wordBreak: "break-word" }}>{profile.links?.linkedin || "—"}</Typography>
+            </Box>
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Email</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+              <EmailIcon fontSize="small" />
+              <Typography variant="body2">{profile.email || "—"}</Typography>
+            </Box>
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Location</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <PlaceIcon fontSize="small" />
+              <Typography variant="body2">{profile.location || "—"}</Typography>
+            </Box>
+          </SectionCard>
+
+          {/* About your work */}
+          <SectionCard
+            sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
+            title="About your work"
+          >
+            <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+              <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Job Title:</Typography>
+              <Typography variant="body2" sx={{ flex: 1 }}>{profile.job_title || "—"}</Typography>
+            </Box>
+            <Divider sx={{ my: 0.5 }} />
+            <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+              <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Community:</Typography>
+              <Typography variant="body2" sx={{ flex: 1 }}>{profile.company || "—"}</Typography>
+            </Box>
+            <Divider sx={{ my: 0.5 }} />
+            <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+              <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Sector:</Typography>
+              <Typography variant="body2" sx={{ flex: 1 }}>—</Typography>
+            </Box>
+            <Divider sx={{ my: 0.5 }} />
+            <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+              <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Industry:</Typography>
+              <Typography variant="body2" sx={{ flex: 1 }}>—</Typography>
+            </Box>
+            <Divider sx={{ my: 0.5 }} />
+            <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
+              <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Number of Employees:</Typography>
+              <Typography variant="body2" sx={{ flex: 1 }}>—</Typography>
+            </Box>
+          </SectionCard>
+        </Grid>
       </Grid>
-
-      {/* RIGHT column: Contact → About your work */}
-      <Grid item xs={12} md={6} sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
-        <SectionCard
-          title="Contact"
-          action={<Tooltip title="Edit contact"><IconButton size="small" onClick={() => setContactOpen(true)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}
-          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
-        >
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>LinkedIn</Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-            <LinkedInIcon fontSize="small" />
-            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>{profile.links?.linkedin || "—"}</Typography>
-          </Box>
-
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Email</Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-            <EmailIcon fontSize="small" />
-            <Typography variant="body2">{profile.email || "—"}</Typography>
-          </Box>
-
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Location</Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <PlaceIcon fontSize="small" />
-            <Typography variant="body2">{profile.location || "—"}</Typography>
-          </Box>
-        </SectionCard>
-
-        {/* About your work */}
-        <SectionCard 
-          sx={{ minHeight: 200, display: "flex", flexDirection: "column" }} 
-          title="About your work"
-        >
-          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
-            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Job Title:</Typography>
-            <Typography variant="body2" sx={{ flex: 1 }}>{profile.job_title || "—"}</Typography>
-          </Box>
-          <Divider sx={{ my: 0.5 }} />
-          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
-            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Community:</Typography>
-            <Typography variant="body2" sx={{ flex: 1 }}>{profile.company || "—"}</Typography>
-          </Box>
-          <Divider sx={{ my: 0.5 }} />
-          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
-            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Sector:</Typography>
-            <Typography variant="body2" sx={{ flex: 1 }}>—</Typography>
-          </Box>
-          <Divider sx={{ my: 0.5 }} />
-          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
-            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Industry:</Typography>
-            <Typography variant="body2" sx={{ flex: 1 }}>—</Typography>
-          </Box>
-          <Divider sx={{ my: 0.5 }} />
-          <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
-            <Typography variant="subtitle2" sx={{ width: 150, minWidth: 150, color: "text.secondary" }}>Number of Employees:</Typography>
-            <Typography variant="body2" sx={{ flex: 1 }}>—</Typography>
-          </Box>
-        </SectionCard>
-      </Grid>
-    </Grid>
 
       {/* --- Dialogs --- */}
 
@@ -1395,7 +1690,7 @@ function AboutTab({ profile, groups, onUpdate }) {
           <TextField label="Field of Study *" value={eduForm.field} onChange={(e) => setEduForm((f) => ({ ...f, field: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <Grid container spacing={2} sx={{ mb: 2 }}>
             <Grid item xs={12} sm={6}><TextField label="Start Date" type="date" value={eduForm.start} onChange={(e) => setEduForm((f) => ({ ...f, start: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
-            <Grid item xs={12} sm={6}><TextField label="End Date"   type="date" value={eduForm.end}   onChange={(e) => setEduForm((f) => ({ ...f, end: e.target.value }))}   fullWidth InputLabelProps={{ shrink: true }} /></Grid>
+            <Grid item xs={12} sm={6}><TextField label="End Date" type="date" value={eduForm.end} onChange={(e) => setEduForm((f) => ({ ...f, end: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
           </Grid>
           <TextField label="Grade *" value={eduForm.grade} onChange={(e) => setEduForm((f) => ({ ...f, grade: e.target.value }))} fullWidth />
         </DialogContent>
@@ -1415,7 +1710,7 @@ function AboutTab({ profile, groups, onUpdate }) {
           <TextField label="Position *" value={expForm.position} onChange={(e) => setExpForm((f) => ({ ...f, position: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <Grid container spacing={2} sx={{ mb: 1 }}>
             <Grid item xs={12} sm={6}><TextField label="Start Date" type="date" value={expForm.start} onChange={(e) => setExpForm((f) => ({ ...f, start: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
-            <Grid item xs={12} sm={6}><TextField label="End Date"   type="date" value={expForm.end}   onChange={(e) => setExpForm((f) => ({ ...f, end: e.target.value }))}   fullWidth disabled={expForm.current} InputLabelProps={{ shrink: true }} /></Grid>
+            <Grid item xs={12} sm={6}><TextField label="End Date" type="date" value={expForm.end} onChange={(e) => setExpForm((f) => ({ ...f, end: e.target.value }))} fullWidth disabled={expForm.current} InputLabelProps={{ shrink: true }} /></Grid>
           </Grid>
           <FormControlLabel control={<Checkbox checked={expForm.current} onChange={(e) => setExpForm((f) => ({ ...f, current: e.target.checked, end: e.target.checked ? "" : f.end }))} />} label="I currently work here" />
         </DialogContent>
@@ -1433,48 +1728,48 @@ function AboutTab({ profile, groups, onUpdate }) {
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}><TextField label="First name" value={contactForm.first_name} onChange={(e) => setContactForm({ ...contactForm, first_name: e.target.value })} fullWidth /></Grid>
-              <Grid item xs={12} sm={6}><TextField label="Last name" value={contactForm.last_name}  onChange={(e) => setContactForm({ ...contactForm, last_name:  e.target.value })} fullWidth /></Grid>
+              <Grid item xs={12} sm={6}><TextField label="Last name" value={contactForm.last_name} onChange={(e) => setContactForm({ ...contactForm, last_name: e.target.value })} fullWidth /></Grid>
             </Grid>
             <TextField label="Job title" value={contactForm.job_title} onChange={(e) => setContactForm({ ...contactForm, job_title: e.target.value })} fullWidth />
             <TextField label="Email" value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} fullWidth />
             <Autocomplete
-                size="small"
-                fullWidth
-                options={COUNTRY_OPTIONS}
-                autoHighlight
-                value={getSelectedCountry({ location: contactForm.location })}
-                getOptionLabel={(opt) => opt?.label ?? ""}
-                isOptionEqualToValue={(o, v) => o.code === v.code}
-                onChange={(_, newVal) =>
-                  setContactForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))
-                }
+              size="small"
+              fullWidth
+              options={COUNTRY_OPTIONS}
+              autoHighlight
+              value={getSelectedCountry({ location: contactForm.location })}
+              getOptionLabel={(opt) => opt?.label ?? ""}
+              isOptionEqualToValue={(o, v) => o.code === v.code}
+              onChange={(_, newVal) =>
+                setContactForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))
+              }
 
-                // ⬇️ show 7 items, then scroll
-                ListboxProps={{
-                  style: {
-                    maxHeight: 36 * 7,   // 36px per option for size="small"; use 48 * 7 for "medium"
-                    overflowY: "auto",
-                    paddingTop: 0,
-                    paddingBottom: 0,
-                  },
-                }}
+              // ⬇️ show 7 items, then scroll
+              ListboxProps={{
+                style: {
+                  maxHeight: 36 * 7,   // 36px per option for size="small"; use 48 * 7 for "medium"
+                  overflowY: "auto",
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                },
+              }}
 
-                renderOption={(props, option) => (
-                  <li {...props} key={option.code}>
-                    <span style={{ marginRight: 8 }}>{option.emoji}</span>
-                    {option.label}
-                  </li>
-                )}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Location"
-                    placeholder="Select country"
-                    fullWidth
-                    inputProps={{ ...params.inputProps, autoComplete: "new-password" }}
-                  />
-                )}
-              />
+              renderOption={(props, option) => (
+                <li {...props} key={option.code}>
+                  <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                  {option.label}
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Location"
+                  placeholder="Select country"
+                  fullWidth
+                  inputProps={{ ...params.inputProps, autoComplete: "new-password" }}
+                />
+              )}
+            />
             <TextField label="LinkedIn URL" value={contactForm.linkedin} onChange={(e) => setContactForm({ ...contactForm, linkedin: e.target.value })} fullWidth />
           </Stack>
         </DialogContent>
