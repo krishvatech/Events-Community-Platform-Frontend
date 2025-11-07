@@ -20,6 +20,10 @@ import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import AdminSidebar from "../components/AdminSidebar";
+import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+
 
 
 // ---- API helpers (reuse same pattern as GroupsAdmin.jsx) ----
@@ -60,39 +64,39 @@ const RoleBadge = ({ role }) => {
 
 // Keep labels safe for Chips / text
 const toStr = (v) => {
-  if (v == null) return "";
-  if (typeof v === "object") return String(v?.text ?? v?.label ?? JSON.stringify(v));
-  return String(v);
+    if (v == null) return "";
+    if (typeof v === "object") return String(v?.text ?? v?.label ?? JSON.stringify(v));
+    return String(v);
 };
 
 // Always-unique key for posts (avoids poll/post ID clashes)
 const postKey = (p) => `${p?.type || "post"}:${p?.feed_item_id ?? p?.id ?? Math.random()}`;
 
 function mapFeedPollToPost(row) {
-  const m = row?.metadata || {};
-  const t = (m.type || row.type || "").toLowerCase();
-  if (t !== "poll") return null;
+    const m = row?.metadata || {};
+    const t = (m.type || row.type || "").toLowerCase();
+    if (t !== "poll") return null;
 
-  // make every option a plain string (prevents Chip label errors)
-  const opts = Array.isArray(m.options)
-    ? m.options.map(o => String(o?.text ?? o?.label ?? o))
-    : [];
+    // make every option a plain string (prevents Chip label errors)
+    const opts = Array.isArray(m.options)
+        ? m.options.map(o => String(o?.text ?? o?.label ?? o))
+        : [];
 
-  return {
-    id: Number(row.id),
-    feed_item_id: Number(row.id),
-    type: "poll",
+    return {
+        id: Number(row.id),
+        feed_item_id: Number(row.id),
+        type: "poll",
 
-    // ✅ the missing piece
-    question: m.question ?? m.title ?? row.title ?? row.text ?? "",
+        // ✅ the missing piece
+        question: m.question ?? m.title ?? row.title ?? row.text ?? "",
 
-    options: opts,
+        options: opts,
 
-    created_at: row.created_at || m.created_at || row.createdAt || new Date().toISOString(),
-    created_by: row.created_by || row.user || row.actor || null,
-    hidden: !!(row.is_hidden ?? m.is_hidden),
-    is_hidden: !!(row.is_hidden ?? m.is_hidden),
-  };
+        created_at: row.created_at || m.created_at || row.createdAt || new Date().toISOString(),
+        created_by: row.created_by || row.user || row.actor || null,
+        hidden: !!(row.is_hidden ?? m.is_hidden),
+        is_hidden: !!(row.is_hidden ?? m.is_hidden),
+    };
 }
 
 // ---- Edit Dialog (inline, smaller version) ----
@@ -602,6 +606,267 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
 }
 
 
+// ---------- Likes Popup ----------
+function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
+    const [loading, setLoading] = React.useState(false);
+    const [rows, setRows] = React.useState([]);
+
+    const load = React.useCallback(async () => {
+        if (!open || !groupIdOrSlug || !postId) return;
+        setLoading(true);
+        const token = getToken();
+        const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+
+        // Try a few common patterns; first success wins
+        const candidates = [
+            `${API_ROOT}/groups/${groupIdOrSlug}/posts/${postId}/likes/`,
+            `${API_ROOT}/activity/feed/${postId}/likes/`,
+        ];
+        for (const url of candidates) {
+            try {
+                const r = await fetch(url, { headers });
+                if (!r.ok) continue;
+                const j = await r.json().catch(() => []);
+                const arr = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : j?.data || []);
+                setRows(arr || []);
+                setLoading(false);
+                return;
+            } catch { }
+        }
+        setRows([]);
+        setLoading(false);
+    }, [open, groupIdOrSlug, postId]);
+
+    React.useEffect(() => { load(); }, [load]);
+
+    return (
+        <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
+            <DialogTitle>Liked by</DialogTitle>
+            <DialogContent dividers>
+                {loading ? (
+                    <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+                ) : rows.length === 0 ? (
+                    <Typography color="text.secondary">No likes yet.</Typography>
+                ) : (
+                    <List>
+                        {rows.map((u, i) => {
+                            const user = u.user || u; // tolerate shapes
+                            return (
+                                <ListItem key={user.id ?? i}>
+                                    <ListItemAvatar><Avatar src={user.avatar} /></ListItemAvatar>
+                                    <ListItemText primary={user.name || user.username || `User #${user.id}`} />
+                                </ListItem>
+                            );
+                        })}
+                    </List>
+                )}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Close</Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
+// ---------- Comments Popup (threaded, like, reply, delete by author or group owner) ----------
+function GroupCommentsDialog({ open, onClose, groupIdOrSlug, postId, groupOwnerId, onBumpCount }) {
+    const [loading, setLoading] = React.useState(false);
+    const [me, setMe] = React.useState(null);
+    const [items, setItems] = React.useState([]);
+    const [text, setText] = React.useState("");
+    const [replyTo, setReplyTo] = React.useState(null);
+
+    React.useEffect(() => {
+        if (!open) return;
+        (async () => {
+            try {
+                const r = await fetch(`${API_ROOT}/users/me/`, { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) } });
+                setMe(r.ok ? await r.json() : {});
+            } catch { setMe({}); }
+        })();
+    }, [open]);
+
+    const load = React.useCallback(async () => {
+        if (!open || !groupIdOrSlug || !postId) return;
+        setLoading(true);
+        const token = getToken();
+        const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+
+        const url = `${API_ROOT}/groups/${groupIdOrSlug}/posts/${postId}/comments/?page_size=200`;
+        try {
+            const r = await fetch(url, { headers });
+            const j = r.ok ? await r.json() : [];
+            const flat = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+            setItems(flat || []);
+        } catch { setItems([]); }
+        setLoading(false);
+    }, [open, groupIdOrSlug, postId]);
+
+    React.useEffect(() => { load(); }, [load]);
+
+    const roots = React.useMemo(() => {
+        const map = new Map();
+        (items || []).forEach(c => map.set(c.id, { ...c, children: [] }));
+        map.forEach(c => { if (c.parent_id && map.get(c.parent_id)) map.get(c.parent_id).children.push(c); });
+        return [...map.values()].filter(c => !c.parent_id);
+    }, [items]);
+
+    async function createComment(body, parentId = null) {
+        if (!body.trim()) return;
+        const token = getToken();
+        try {
+            const r = await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/posts/${postId}/comments/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify(parentId ? { text: body, parent_id: parentId } : { text: body }),
+            });
+            if (r.ok) { setText(""); setReplyTo(null); await load(); onBumpCount?.(); }
+        } catch { }
+    }
+
+    async function toggleCommentLike(c) {
+        const token = getToken();
+        const liked = !!c.user_has_liked;
+        try {
+            const r = await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/posts/${postId}/comments/${c.id}/like/`, {
+                method: liked ? "DELETE" : "POST",
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+            if (r.ok) load();
+        } catch { }
+    }
+
+    async function deleteComment(c) {
+        // Only author OR group owner
+        const myId = me?.id || me?.user?.id;
+        if (!(myId && (myId === c.author_id || myId === groupOwnerId || groupOwnerId === c.author_id))) return;
+        const token = getToken();
+        try {
+            const r = await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/posts/${postId}/comments/${c.id}/`, {
+                method: "DELETE",
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+            if (r.ok) load();
+        } catch { }
+    }
+
+    const CommentItem = ({ c, depth = 0 }) => (
+        <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #e2e8f0" : "none", ml: depth ? 1.5 : 0, mt: depth ? 1 : 0 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+                <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
+                <Typography variant="subtitle2">{c.author?.name || c.author?.username || `User #${c.author_id}`}</Typography>
+                <Typography variant="caption" color="text.secondary">{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
+            </Stack>
+            <Typography sx={{ mt: .5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: .5 }}>
+                <Button size="small"
+                    startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
+                    onClick={() => toggleCommentLike(c)}
+                >
+                    {c.like_count ?? 0}
+                </Button>
+                <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
+                    Reply
+                </Button>
+                {((me?.id || me?.user?.id) === c.author_id || (me?.id || me?.user?.id) === groupOwnerId) && (
+                    <Button size="small" color="error" onClick={() => deleteComment(c)}>Delete</Button>
+                )}
+            </Stack>
+            {!!c.children?.length && (
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                    {c.children.map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+                </Stack>
+            )}
+        </Box>
+    );
+
+    return (
+        <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="md">
+            <DialogTitle>Comments</DialogTitle>
+            <DialogContent dividers>
+                {loading ? (
+                    <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+                ) : roots.length === 0 ? (
+                    <Typography color="text.secondary">No comments yet.</Typography>
+                ) : (
+                    <Stack spacing={2}>{roots.map((c) => <CommentItem key={c.id} c={c} />)}</Stack>
+                )}
+            </DialogContent>
+            <Divider />
+            <Box sx={{ px: 2, py: 1.5 }}>
+                {replyTo && (
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                        <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
+                        <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+                    </Stack>
+                )}
+                <Stack direction="row" spacing={1}>
+                    <TextField size="small" fullWidth placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+                        value={text} onChange={(e) => setText(e.target.value)} />
+                    <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
+                </Stack>
+            </Box>
+        </Dialog>
+    );
+}
+
+// ---------- Social row under each post ----------
+function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
+    const [likesOpen, setLikesOpen] = React.useState(false);
+    const [commentsOpen, setCommentsOpen] = React.useState(false);
+    const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
+    const [counts, setCounts] = React.useState({
+        likes: post.like_count ?? post.metrics?.likes ?? 0,
+        comments: post.comment_count ?? post.metrics?.comments ?? 0,
+    });
+
+    async function toggleLike() {
+        // Optional: toggle your like (also opens popup per your ask)
+        try {
+            const r = await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/posts/${post.id}/like/`, {
+                method: userHasLiked ? "DELETE" : "POST",
+                headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+            });
+            if (r.ok) {
+                setUserHasLiked(!userHasLiked);
+                setCounts((c) => ({ ...c, likes: Math.max(0, c.likes + (userHasLiked ? -1 : 1)) }));
+            }
+        } catch { }
+        setLikesOpen(true); // open popup as requested “on like → show liked users”
+    }
+
+    const bumpCommentCount = () => setCounts((c) => ({ ...c, comments: c.comments + 1 }));
+
+    return (
+        <>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1 }}>
+                <Button size="small" startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />} onClick={toggleLike}>
+                    {counts.likes}
+                </Button>
+                <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon />} onClick={() => setCommentsOpen(true)}>
+                    {counts.comments}
+                </Button>
+            </Stack>
+
+            <GroupLikesDialog
+                open={likesOpen}
+                onClose={() => setLikesOpen(false)}
+                groupIdOrSlug={groupIdOrSlug}
+                postId={post.id}
+            />
+            <GroupCommentsDialog
+                open={commentsOpen}
+                onClose={() => setCommentsOpen(false)}
+                groupIdOrSlug={groupIdOrSlug}
+                postId={post.id}
+                groupOwnerId={groupOwnerId}
+                onBumpCount={bumpCommentCount}
+            />
+        </>
+    );
+}
+
+
 
 // ---- Main page ----
 export default function GroupManagePage() {
@@ -945,8 +1210,8 @@ export default function GroupManagePage() {
         setPostsLoading(true); setPostsError("");
         try {
             const headers = {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
             };
 
             // (A) normal group posts (text/image/link/event)
@@ -965,7 +1230,7 @@ export default function GroupManagePage() {
             const resFeed = await fetch(feedUrl.toString(), { headers });
             const feedJson = await resFeed.json().catch(() => ([]));
             const feedRows = Array.isArray(feedJson?.results) ? feedJson.results
-                            : (Array.isArray(feedJson) ? feedJson : []);
+                : (Array.isArray(feedJson) ? feedJson : []);
             const polls = feedRows.map(mapFeedPollToPost).filter(Boolean);
 
             // merge + newest first
@@ -973,11 +1238,11 @@ export default function GroupManagePage() {
             const seen = new Set();
             const uniq = [];
             for (const p of merged) {
-            const id = Number(p?.feed_item_id ?? p?.id);
-            const key = `${(p?.type || "post").toLowerCase()}:${isNaN(id) ? "na" : id}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            uniq.push(p);
+                const id = Number(p?.feed_item_id ?? p?.id);
+                const key = `${(p?.type || "post").toLowerCase()}:${isNaN(id) ? "na" : id}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                uniq.push(p);
             }
 
             // newest first
@@ -989,7 +1254,7 @@ export default function GroupManagePage() {
         } finally {
             setPostsLoading(false);
         }
-        }, [idOrSlug, token, group?.id]);
+    }, [idOrSlug, token, group?.id]);
 
     // Load posts only when Posts tab is active (saves calls)
     React.useEffect(() => {
@@ -1791,8 +2056,12 @@ export default function GroupManagePage() {
                                                             ) : (
                                                                 <Typography>{p.text}</Typography>
                                                             )}
+                                                            <GroupPostSocialBar
+                                                                groupIdOrSlug={idOrSlug}
+                                                                groupOwnerId={group?.created_by?.id}
+                                                                post={p}
+                                                            />
                                                         </Paper>
-
                                                     ))}
                                                 </Stack>
                                             )}

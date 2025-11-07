@@ -37,6 +37,8 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import LinkIcon from "@mui/icons-material/Link";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
+import Pagination from "@mui/material/Pagination";
+
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 function getToken() {
@@ -576,7 +578,7 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
         }
       );
       if (res.ok) { await load(); setInput(""); setReplyTo(null); }
-    } catch {}
+    } catch { }
   }
 
   async function toggleCommentLike(c) {
@@ -585,7 +587,7 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
     try {
       const res = await fetch(url, { method: liked ? "DELETE" : "POST", headers: { ...authHeader() } });
       if (res.ok) await load();
-    } catch {}
+    } catch { }
   }
 
   async function deleteComment(c) {
@@ -598,7 +600,7 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
       try {
         const res = await fetch(u, { method: "DELETE", headers: { ...authHeader() } });
         if (res.ok) { await load(); return; }
-      } catch {}
+      } catch { }
     }
   }
 
@@ -692,7 +694,7 @@ function PostSocialBar({ communityId, post, onCounts }) {
         setLikeCount((n) => (willUnlike ? Math.max(0, n - 1) : n + 1));
         onCounts?.({ likeCount: willUnlike ? Math.max(0, likeCount - 1) : likeCount + 1, commentCount });
       }
-    } catch {}
+    } catch { }
   }
 
   return (
@@ -1171,6 +1173,21 @@ export default function AdminPostsPage() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [loadingErr, setLoadingErr] = React.useState("");
 
+  const PER_PAGE = 5;
+  const [page, setPage] = React.useState(1);
+  const totalPages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+  const pageItems = React.useMemo(() => {
+    const start = (page - 1) * PER_PAGE;
+    return items.slice(start, start + PER_PAGE);
+  }, [items, page]);
+
+  // keep page in range when items change (e.g., after search/delete)
+  React.useEffect(() => {
+    const pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+    if (page > pages) setPage(pages);
+  }, [items]);
+
+
   React.useEffect(() => {
     if (routeCommunityId) {
       setActiveCommunityId(routeCommunityId);
@@ -1325,22 +1342,32 @@ export default function AdminPostsPage() {
               {loadingErr ? loadingErr : "No posts yet."}
             </Paper>
           ) : (
-            <Stack spacing={2}>
-              {items.map((it) => (
-                <PostShell
-                  key={it.id || it.created_at}
-                  item={it}
-                  communityId={activeCommunityId}
-                  onUpdated={(updated) =>
-                    setItems((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)))
-                  }
-                  onDeleted={(id) =>
-                    setItems((prev) => prev.filter((p) => p.id !== id))
-                  }
-                />
-              ))}
+            <>
+              <Stack spacing={2}>
+                {pageItems.map((it) => (
+                  <PostShell
+                    key={it.id || it.created_at}
+                    item={it}
+                    communityId={activeCommunityId}
+                    onUpdated={(updated) =>
+                      setItems((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)))
+                    }
+                    onDeleted={(id) => setItems((prev) => prev.filter((p) => p.id !== id))}
+                  />
+                ))}
+              </Stack>
 
-            </Stack>
+              <Stack direction="row" justifyContent="center" sx={{ mt: 1 }}>
+                <Pagination
+                  count={totalPages}
+                  page={page}
+                  onChange={(_, v) => setPage(v)}
+                  shape="rounded"
+                  size="small"
+                  siblingCount={0}
+                />
+              </Stack>
+            </>
           )}
         </Box>
       </Container>
