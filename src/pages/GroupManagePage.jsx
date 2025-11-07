@@ -58,6 +58,42 @@ const RoleBadge = ({ role }) => {
     return <Chip size="small" label={cfg.label} className={cfg.className} />;
 };
 
+// Keep labels safe for Chips / text
+const toStr = (v) => {
+  if (v == null) return "";
+  if (typeof v === "object") return String(v?.text ?? v?.label ?? JSON.stringify(v));
+  return String(v);
+};
+
+// Always-unique key for posts (avoids poll/post ID clashes)
+const postKey = (p) => `${p?.type || "post"}:${p?.feed_item_id ?? p?.id ?? Math.random()}`;
+
+function mapFeedPollToPost(row) {
+  const m = row?.metadata || {};
+  const t = (m.type || row.type || "").toLowerCase();
+  if (t !== "poll") return null;
+
+  // make every option a plain string (prevents Chip label errors)
+  const opts = Array.isArray(m.options)
+    ? m.options.map(o => String(o?.text ?? o?.label ?? o))
+    : [];
+
+  return {
+    id: Number(row.id),
+    feed_item_id: Number(row.id),
+    type: "poll",
+
+    // ✅ the missing piece
+    question: m.question ?? m.title ?? row.title ?? row.text ?? "",
+
+    options: opts,
+
+    created_at: row.created_at || m.created_at || row.createdAt || new Date().toISOString(),
+    created_by: row.created_by || row.user || row.actor || null,
+    hidden: !!(row.is_hidden ?? m.is_hidden),
+    is_hidden: !!(row.is_hidden ?? m.is_hidden),
+  };
+}
 
 // ---- Edit Dialog (inline, smaller version) ----
 function EditGroupDialog({ open, group, onClose, onUpdated }) {
@@ -908,51 +944,52 @@ export default function GroupManagePage() {
         if (!idOrSlug) return;
         setPostsLoading(true); setPostsError("");
         try {
-            const [resPosts, resPolls] = await Promise.all([
-                fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
-                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                }),
-                fetch(`${API_ROOT}/groups/${idOrSlug}/polls/`, {
-                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                }),
-            ]);
+            const headers = {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            };
+
+            // (A) normal group posts (text/image/link/event)
+            const resPosts = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, { headers });
             const postsJson = await resPosts.json().catch(() => ([]));
-            const pollsJson = await resPolls.json().catch(() => ([]));
-            const byFeedItemId = new Map(
-                (Array.isArray(postsJson) ? postsJson : []).map(it => [Number(it.id), it])
-            );
             if (!resPosts.ok) throw new Error(postsJson?.detail || `HTTP ${resPosts.status}`);
-            if (!resPolls.ok) throw new Error(pollsJson?.detail || `HTTP ${resPolls.status}`);
+            let postsArr = Array.isArray(postsJson) ? postsJson : [];
+            // If backend returns polls here, drop them — we load polls from Activity Feed.
+            postsArr = postsArr.filter(p => (p?.type || "").toLowerCase() !== "poll");
+            // (B) polls now come from Activity Feed (scope=group)
+            const gid = group?.id || idOrSlug; // prefer numeric id when present
+            const feedUrl = new URL(`${API_ROOT}/activity/feed/`, API_ROOT);
+            feedUrl.searchParams.set("scope", "group");
+            feedUrl.searchParams.set("group_id", String(gid));
 
-            // Map polls to the same shape your UI expects for display
-            const pollsAsPosts = (Array.isArray(pollsJson) ? pollsJson : []).map(p => {
-                const fid = Number(p.feed_item_id ?? p.id);
-                const match = byFeedItemId.get(fid);
-                const isHidden = Boolean(match?.hidden ?? match?.is_hidden);
-                return {
-                    id: fid,
-                    feed_item_id: p.feed_item_id ?? null,
-                    type: "poll",
-                    created_at: p.created_at,
-                    created_by: p.created_by,             // if your serializer returns this
-                    question: p.question,
-                    options: (p.options || []).map(o => o.text),
-                    // carry hidden flags so the menu shows "Unhide"
-                    hidden: isHidden,
-                    is_hidden: isHidden,
-                };
-            });
+            const resFeed = await fetch(feedUrl.toString(), { headers });
+            const feedJson = await resFeed.json().catch(() => ([]));
+            const feedRows = Array.isArray(feedJson?.results) ? feedJson.results
+                            : (Array.isArray(feedJson) ? feedJson : []);
+            const polls = feedRows.map(mapFeedPollToPost).filter(Boolean);
 
-            const merged = [...(Array.isArray(postsJson) ? postsJson : []), ...pollsAsPosts]
-                .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-            setPosts(merged);
+            // merge + newest first
+            const merged = [...postsArr, ...polls]
+            const seen = new Set();
+            const uniq = [];
+            for (const p of merged) {
+            const id = Number(p?.feed_item_id ?? p?.id);
+            const key = `${(p?.type || "post").toLowerCase()}:${isNaN(id) ? "na" : id}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            uniq.push(p);
+            }
+
+            // newest first
+            uniq.sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0));
+            setPosts(uniq);
         } catch (e) {
             setPostsError(String(e?.message || e));
             setPosts([]);
         } finally {
             setPostsLoading(false);
         }
-    }, [idOrSlug, token]);
+        }, [idOrSlug, token, group?.id]);
 
     // Load posts only when Posts tab is active (saves calls)
     React.useEffect(() => {
@@ -1010,12 +1047,10 @@ export default function GroupManagePage() {
                 const payload = {
                     question: pollQuestion.trim(),
                     options: pollOptions.map(o => o.trim()).filter(Boolean),
-                    // Optional extras if/when you add UI controls:
-                    // allows_multiple: true/false,
-                    // is_anonymous: true/false,
-                    // ends_at: new Date(...).toISOString(),
+                    group_id: Number(group?.id || idOrSlug), // feed needs the owning group
                 };
-                const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/polls/`, {
+
+                const res = await fetch(`${API_ROOT}/activity/feed/polls/create/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                     body: JSON.stringify(payload),
@@ -1695,7 +1730,7 @@ export default function GroupManagePage() {
                                             ) : (
                                                 <Stack spacing={2}>
                                                     {posts.map((p) => (
-                                                        <Paper key={p.id} elevation={0} className="rounded-xl border border-slate-200 p-3">
+                                                        <Paper key={postKey(p)} elevation={0} className="rounded-xl border border-slate-200 p-3">
                                                             <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
                                                                 <Chip size="small" label={String(p.type || "text").toUpperCase()} />
                                                                 <Typography variant="caption" className="text-slate-500">
@@ -1738,7 +1773,7 @@ export default function GroupManagePage() {
                                                                     <Typography className="mb-1 font-medium">{p.question}</Typography>
                                                                     <Stack spacing={0.5}>
                                                                         {(p.options || []).map((o, i) => (
-                                                                            <Chip key={i} size="small" label={o} className="bg-slate-100 text-slate-700 w-fit" />
+                                                                            <Chip key={i} size="small" label={toStr(o)} className="bg-slate-100 text-slate-700 w-fit" />
                                                                         ))}
                                                                     </Stack>
                                                                 </>

@@ -67,11 +67,27 @@ function useDebounced(value, delay = 400) {
   }, [value, delay]);
   return v;
 }
+function pickId(...cands) {
+  for (const v of cands) {
+    if (v === 0 || v === "0") return 0;
+    if (v !== null && v !== undefined && v !== "" && v !== "null") {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : v; // keep numeric if possible
+    }
+  }
+  return null;
+}
 
 // ---- FEED MAPPER (adds group_id globally) ----
 function mapFeedItem(item) {
   // --- Robust metadata parsing (handles string or object) ---
-  const rawMeta = item?.metadata;
+  const rawMeta =
+    item?.metadata ??
+    item?.meta ??
+    item?.data ??
+    item?.payload ??
+    null;
+
   let m = {};
   if (rawMeta) {
     if (typeof rawMeta === "string") {
@@ -88,11 +104,19 @@ function mapFeedItem(item) {
   const displayName =
     item.actor_name || item.actor_username || `User #${item.actor_id}`;
 
-  const base = {
+  const community_id =
+    item?.community_id ??
+    m?.community_id ??
+    m?.communityId ??
+    (typeof m?.community === "object" ? m.community?.id : m?.community) ??
+    (typeof item?.community === "object" ? item.community?.id : item?.community) ??
+    null;
+
+    const base = {
     id: item.id,
     created_at: item.created_at,
     author: { name: displayName, avatar: item.actor_avatar || "" },
-    community_id: item.community_id ?? m.community_id ?? null,
+    community_id: community_id ? Number(community_id) : null,
     community_avatar: m.community_cover_url || "",
     community:
       m.community_name ||
@@ -125,22 +149,41 @@ function mapFeedItem(item) {
   }
 
   // ---- Poll post ----
-  if (t === "poll" || Array.isArray(m.options)) {
-    return {
-      ...base,
-      type: "poll",
-      group_id: base.group_id,
-      poll_id: m.poll_id ?? m.id ?? null,
-      text: m.question || "",
-      options: (m.options || []).map((o) => ({
-        id: o.id ?? o.option_id ?? null,
-        label: o.text ?? o.label ?? String(o),
-        votes: o.vote_count ?? o.votes ?? 0,
-      })),
-      user_votes: m.user_votes || [],
-      is_closed: Boolean(m.is_closed),
-    };
-  }
+  if (t === "poll" || Array.isArray(m.options) || m.poll_id || m.question) {
+  const question =
+    m.question ??
+    item.question ??
+    item.title ??
+    ""; // ensure something is renderable
+
+  const options = (m.options || []).map((o, i) => ({
+    id: o.id ?? o.option_id ?? i + 1,
+    label: o.text ?? o.label ?? String(o),
+    votes: o.vote_count ?? o.votes ?? 0,
+  }));
+
+  return {
+    ...base,
+    type: "poll",
+
+    // 🔑 expose question under every common key
+    text: question,
+    title: question,
+    question: question,
+    content: question,
+
+    poll_id: pickId(
+      m.poll_id, m.pollId, m.poll?.id,
+      item.poll_id, item.target_object_id, item.object_id, item.target_id,
+      item.targetId, item.objectId,
+      (t === "poll" ? m.id : null)
+    ),
+    options,
+    user_votes: m.user_votes || [],
+    is_closed: Boolean(m.is_closed),
+    group_id: base.group_id,
+  };
+}
 
   // ---- Link post ----
   if (t === "link" || m.url) {
@@ -214,6 +257,7 @@ function PollBlock({ post, onVote }) {
     0
   );
   const canVote = !post.is_closed;
+  const hasOptions = (post.options || []).length > 0;
 
   return (
     <Box>
@@ -222,9 +266,13 @@ function PollBlock({ post, onVote }) {
           {post.text}
         </Typography>
       )}
-
+      {!hasOptions && (
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+          No options added yet.
+        </Typography>
+      )}
       <Stack spacing={1}>
-        {(post.options || []).map((opt) => {
+        {(post.options || []).map((opt, idx) => {
           const optionId = opt.id ?? opt.option_id ?? null;
           const label = opt.label ?? opt.text ?? String(opt);
           const votes = typeof opt.votes === "number" ? opt.votes : (opt.vote_count ?? 0);
@@ -232,7 +280,8 @@ function PollBlock({ post, onVote }) {
           const chosen = optionId && userVotes.includes(optionId);
 
           const tryVote = () => {
-            if (canVote && optionId && !chosen) onVote?.(optionId);
+            if (!canVote || chosen) return;
+            onVote?.(optionId, { label, idx });
           };
 
           return (
@@ -449,7 +498,7 @@ const headingTitle = post.group_id
         )}
 
         {post.type === "poll" && (
-          <PollBlock post={local} onVote={(optionId) => onPollVote?.(post, optionId)} />
+          <PollBlock post={local} onVote={(optionId, meta) => onPollVote?.(post, optionId, meta)} />
         )}
 
         {post.type === "event" && (
@@ -586,36 +635,44 @@ export default function LiveFeedPage({
     return () => ws.close();
   }, [websocketUrl, scope]);
 
-  async function voteOnPoll(post, optionId) {
-    if (!post.group_id || !post.poll_id) {
-      alert("Missing poll identifiers");
-      return;
-    }
-    try {
-      const res = await fetch(
-        toApiUrl(`groups/${post.group_id}/polls/${post.poll_id}/vote/`),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({ option_ids: [optionId] }),
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const payload = await res.json();
-      const updated = {
-        ...post,
-        is_closed: payload.is_closed,
-        user_votes: payload.user_votes || [],
-        options: (payload.options || []).map(o => ({
-          id: o.id, label: o.text, votes: o.vote_count || 0,
-        })),
-      };
-      setPosts(curr => curr.map(p => (p.id === post.id ? updated : p)));
-    } catch (err) {
-      console.error(err);
-      alert("Failed to vote: " + err.message);
-    }
+  async function voteOnPoll(post, optionId, meta) {
+  // Resolve optionId if missing (by label/index from the UI)
+  if (!optionId) {
+    const byIdx = (meta && Number.isInteger(meta.idx)) ? post.options?.[meta.idx] : null;
+    const byLabel = (post.options || []).find(o => (o.label || o.text) === meta?.label);
+    const picked = byIdx || byLabel || null;
+    optionId = picked?.id || picked?.option_id || null;
+    if (!optionId) { alert("Could not resolve option id"); return; }
   }
+
+  const url = toApiUrl(`activity/feed/${post.id}/poll/vote/`); // 👈 use FEED ITEM id
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ option_ids: [optionId] }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+
+    // Backend may return { ok, poll: {...} } or a flat poll-like object
+    const p = payload.poll || payload;
+    const updated = {
+      ...post,
+      is_closed: Boolean(p.is_closed),
+      user_votes: Array.isArray(p.user_votes) ? p.user_votes : post.user_votes || [],
+      options: (p.options || []).map(o => ({
+        id: o.id || o.option_id,
+        label: o.text || o.label,
+        votes: o.vote_count ?? o.votes ?? 0,
+      })),
+    };
+    setPosts(curr => curr.map(x => (x.id === post.id ? updated : x)));
+  } catch (err) {
+    console.error(err);
+    alert("Failed to vote: " + err.message);
+  }
+}
 
   const handleLoadMore = async () => {
     if (!nextUrl) { setHasMore(false); return; }
@@ -693,7 +750,7 @@ export default function LiveFeedPage({
                 post={p}
                 onReact={onReact}
                 onOpenEvent={onOpenEvent}
-                onPollVote={(post, optionId) => voteOnPoll(post, optionId)}
+                onPollVote={(post, optionId,meta) => voteOnPoll(post, optionId,meta)}
               />
             ))
           )}

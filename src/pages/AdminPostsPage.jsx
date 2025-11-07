@@ -157,7 +157,7 @@ function PostCard({ item }) {
                   variant="outlined"
                   sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}
                 >
-                  {typeof opt === "string" ? opt : opt?.text}
+                  {typeof opt === "string" ? opt : (opt?.text ?? opt?.label ?? "")}
                 </Paper>
               ))}
             </Stack>
@@ -578,26 +578,12 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
     try {
       let res, payload;
 
-      if (type === "image") {
-        // multipart for S3 upload
-        const fd = new FormData();
-        fd.append("type", "image");
-        fd.append("image", imageFile);                // ← file
-        fd.append("visibility", "community");
-        if (caption) fd.append("caption", caption);
-        const tagList = tags.split(",").map(s => s.trim()).filter(Boolean);
-        tagList.forEach(t => fd.append("tags", t));
-        res = await fetch(COMMUNITY_CREATE_URL, {
-          method: "POST",
-          headers: { ...tokenHeaders },               // DO NOT set Content-Type manually
-          body: fd,
-        });
-      } else if (type === "link") {
+      if (type === "link") {
         payload = {
           type: "link",
-          url: linkUrl.trim(),
-          title: linkTitle.trim() || undefined,
-          description: linkDesc.trim() || undefined,
+          url: linkUrl,
+          title: linkTitle,
+          description: linkDesc,
           tags: tags.split(",").map(s => s.trim()).filter(Boolean),
           visibility: "community",
         };
@@ -606,19 +592,71 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
           headers: { "Content-Type": "application/json", ...tokenHeaders },
           body: JSON.stringify(payload),
         });
+
+      } else if (type === "image") {
+        const fd = new FormData();
+        fd.append("type", "image");
+        fd.append("caption", caption || "");
+        fd.append("visibility", "community");
+        tags.split(",").map(s => s.trim()).filter(Boolean).forEach(t => fd.append("tags", t));
+        if (imageFile) fd.append("image", imageFile);
+
+        res = await fetch(COMMUNITY_CREATE_URL, {
+          method: "POST",
+          headers: { ...tokenHeaders }, // let browser set multipart boundary
+          body: fd,
+        });
+
       } else if (type === "poll") {
-        payload = {
-          type: "poll",
+        // Create poll via Activity Feed, scoped to the community
+        const pollPayload = {
           question,
           options: pollOptions.map(o => o.trim()).filter(Boolean),
-          tags: tags.split(",").map(s => s.trim()).filter(Boolean),
-          visibility: "community",
+          community_id: Number(communityId),
+          // allows_multiple, is_anonymous, closes_at can be added later
         };
-        res = await fetch(COMMUNITY_CREATE_URL, {
+
+        res = await fetch(`${API_ROOT}/activity/feed/polls/create/`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...tokenHeaders },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(pollPayload),
         });
+
+        const json = res.ok ? await res.json() : null;
+
+        const created =
+          json?.poll
+            ? {
+                id: json.feed_item_id || `local-${Date.now()}`, // FEED ITEM id (used for voting)
+                created_at: new Date().toISOString(),
+                type: "poll",
+                question: json.poll.question,
+                is_closed: !!json.poll.is_closed,
+                options: (json.poll.options || []).map(o => ({
+                  id: o.id,
+                  label: o.text,
+                  votes: o.vote_count ?? 0,
+                })),
+                user_votes: json.poll.user_votes || [],
+                community_id: pollPayload.community_id,
+              }
+            : {
+                id: `local-${Date.now()}`,
+                created_at: new Date().toISOString(),
+                type: "poll",
+                question,
+                options: pollOptions
+                  .map(t => t.trim())
+                  .filter(Boolean)
+                  .map((t, i) => ({ id: i + 1, label: t, votes: 0 })),
+                user_votes: [],
+                community_id: pollPayload.community_id,
+              };
+
+        onCreated?.(created);   // list will show instantly
+        onClose?.();
+        return;
+
       } else {
         // text
         payload = {
@@ -640,6 +678,7 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
 
       onCreated?.(created);   // list will show instantly
       onClose?.();
+
     } catch (e) {
       onCreated?.({
         id: `local-${Date.now()}`,
@@ -870,27 +909,76 @@ export default function AdminPostsPage() {
     })();
   }, [routeCommunityId]);
 
+  function mapFeedPollToAdminItem(row) {
+  const m = row?.metadata || {};
+  if ((m.type || row.type) !== "poll") return null;
+
+  const options = (m.options || []).map(o => ({
+    id: o.id ?? o.option_id ?? null,
+    text: o.text ?? o.label ?? "",
+    vote_count: o.vote_count ?? o.votes ?? 0,
+  }));
+
+  return {
+    // Note: this is the FEED ITEM id (not a community post id)
+    id: row.id,
+    type: "poll",
+    created_at: row.created_at || new Date().toISOString(),
+    community: { id: row.community_id, name: row.community_name || `Community #${row.community_id}` },
+    question: m.question || "",
+    options,
+    tags: m.tags || [],
+    __source: "feed",            // marker (optional)
+    __feed_item_id: row.id,      // marker (optional)
+  };
+}
+
+
   const load = React.useCallback(async () => {
-    setLoadingErr("");
-    try {
-      if (!activeCommunityId) return; // don’t call until we know the community
-      const url = new URL(`${API_ROOT}/communities/${activeCommunityId}/posts/`, API_ROOT);
-      if (search.trim()) url.searchParams.set("search", search.trim());
-      const res = await fetch(url.toString(), {
-        headers: { Accept: "application/json", ...authHeader() },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setItems(Array.isArray(json?.results) ? json.results : json || []);
-      } else {
-        setItems([]);
-        setLoadingErr(`HTTP ${res.status}`);
-      }
-    } catch {
-      setItems([]);
-      setLoadingErr("Network error");
+  setLoadingErr("");
+  try {
+    if (!activeCommunityId) return;
+
+    // ---- existing posts API (text/image/link) ----
+    const postsUrl = new URL(`${API_ROOT}/communities/${activeCommunityId}/posts/`, API_ROOT);
+    if (search.trim()) postsUrl.searchParams.set("search", search.trim());
+
+    // ---- feed API for polls ----
+    const feedUrl = new URL(`${API_ROOT}/activity/feed/`, API_ROOT);
+    feedUrl.searchParams.set("scope", "community");
+    feedUrl.searchParams.set("community_id", String(activeCommunityId));
+    if (search.trim()) {
+      feedUrl.searchParams.set("q", search.trim());
+      feedUrl.searchParams.set("search", search.trim());
     }
-  }, [search, activeCommunityId]);
+
+    const [resPosts, resFeed] = await Promise.all([
+      fetch(postsUrl.toString(), { headers: { Accept: "application/json", ...authHeader() } }),
+      fetch(feedUrl.toString(),  { headers: { Accept: "application/json", ...authHeader() } }),
+    ]);
+
+    const postsJson = resPosts.ok ? await resPosts.json() : [];
+    const posts = Array.isArray(postsJson?.results) ? postsJson.results
+                 : Array.isArray(postsJson) ? postsJson : [];
+
+    const feedJson = resFeed.ok ? await resFeed.json() : [];
+    const feedRows = Array.isArray(feedJson?.results) ? feedJson.results
+                    : Array.isArray(feedJson) ? feedJson : [];
+    const polls = feedRows.map(mapFeedPollToAdminItem).filter(Boolean);
+
+    // merge + sort (newest first)
+    const merged = [...posts, ...polls].sort((a, b) => {
+      const ta = new Date(a.created_at || 0).getTime();
+      const tb = new Date(b.created_at || 0).getTime();
+      return tb - ta;
+    });
+
+    setItems(merged);
+  } catch {
+    setItems([]);
+    setLoadingErr("Network error");
+  }
+}, [search, activeCommunityId]);
 
   React.useEffect(() => {
     if (activeCommunityId) load();
