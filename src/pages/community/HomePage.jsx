@@ -382,6 +382,20 @@ function PostCard({ post }) {
         avatar={<Avatar src={""}>{("A")}</Avatar>}
         title={<Typography fontWeight={600}>{post.actor_name || "You"}</Typography>}
         subheader={timeAgo(post.created_at)}
+        action={
+          <Stack direction="row" spacing={0.5}>
+            <Tooltip title="Edit">
+              <IconButton size="small" onClick={() => (window.__openPostEdit?.(post.id))?.()}>
+                <EditRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton size="small" color="error" onClick={() => (window.__confirmDeletePost?.(post.id))?.()}>
+                <DeleteOutlineRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        }
       />
       <CardContent sx={{ pt: 0 }}>
         {post.content && <Typography sx={{ whiteSpace: "pre-wrap" }}>{post.content}</Typography>}
@@ -697,9 +711,13 @@ export default function HomePage() {
   const openCommentsFor = (postId) => { setCommentPostId(postId); setCommentOpen(true); };
   const [likesOpen, setLikesOpen] = React.useState(false);
   const [likesPostId, setLikesPostId] = React.useState(null);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editPostId, setEditPostId] = React.useState(null);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deletePostId, setDeletePostId] = React.useState(null);
 
 
-  // expose a safe opener so PostCard can trigger without prop changes
+  // ---- Expose global functions to open comments/likes dialogs ----
   React.useEffect(() => {
     window.__openComments = (postId) => () => openCommentsFor(postId);
     return () => { try { delete window.__openComments; } catch { } };
@@ -711,6 +729,16 @@ export default function HomePage() {
       try { delete window.__openLikes; } catch { }
     };
   }, []);
+
+  // --- Expose global functions to open edit/delete dialogs ----
+  React.useEffect(() => {
+    window.__openPostEdit = (postId) => () => { setEditPostId(postId); setEditOpen(true); };
+    window.__confirmDeletePost = (postId) => () => { setDeletePostId(postId); setDeleteOpen(true); };
+    return () => {
+      try { delete window.__openPostEdit; delete window.__confirmDeletePost; } catch { }
+    };
+  }, []);
+
 
 
   // ---- Fetch my posts (paginated) ----
@@ -960,6 +988,28 @@ export default function HomePage() {
         postId={likesPostId}
         onClose={() => setLikesOpen(false)}
       />
+      <PostEditDialog
+        open={editOpen}
+        post={posts.find((p) => p.id === editPostId)}
+        communityId={myCommunityId}
+        onClose={() => setEditOpen(false)}
+        onSaved={(updated) => {
+          if (!updated) { setEditOpen(false); return; }
+          setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          setEditOpen(false);
+        }}
+      />
+      <PostDeleteConfirm
+        open={deleteOpen}
+        postId={deletePostId}
+        communityId={myCommunityId}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={(id) => {
+          if (!id) { setDeleteOpen(false); return; }
+          setPosts((prev) => prev.filter((p) => p.id !== id));
+          setDeleteOpen(false);
+        }}
+      />
     </Box>
   );
 }
@@ -1008,8 +1058,8 @@ function LikesDialog({ open, postId, onClose }) {
         const rows = Array.isArray(data?.results)
           ? data.results
           : Array.isArray(data)
-          ? data
-          : data?.items || data?.likers || [];
+            ? data
+            : data?.items || data?.likers || [];
         return rows.map(normalizeLikerRow);
       } catch {
         /* try next */
@@ -1068,6 +1118,182 @@ function LikesDialog({ open, postId, onClose }) {
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// Function For Edit Post Dialog & Delete Confirm Dialog
+function PostEditDialog({ open, post, communityId, onClose, onSaved }) {
+  const [saving, setSaving] = React.useState(false);
+  const [type, setType] = React.useState(post?.type || "text");
+  const [content, setContent] = React.useState(post?.content || "");
+  const [link, setLink] = React.useState(post?.link || "");
+  const [optionsText, setOptionsText] = React.useState(Array.isArray(post?.options) ? post.options.join("\n") : "");
+
+  React.useEffect(() => {
+    setType(post?.type || "text");
+    setContent(post?.content || "");
+    setLink(post?.link || "");
+    setOptionsText(Array.isArray(post?.options) ? post.options.join("\n") : "");
+  }, [post]);
+
+  if (!post) return null;
+
+  // Build both JSON and FormData shapes; try multiple endpoints until one works
+  async function updatePostApi() {
+    const jsonPayload = (() => {
+      if (type === "text") return { type: "text", content };
+      if (type === "link") return { type: "link", url: link, description: content };
+      if (type === "image") return { type: "image", caption: content };
+      if (type === "poll") {
+        const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
+        return { type: "poll", question: content, options: opts.length ? opts : undefined };
+      }
+      return { type: "text", content };
+    })();
+
+    const formPayload = (() => {
+      const fd = new FormData();
+      fd.append("type", type);
+      if (type === "text") fd.append("content", content || "");
+      if (type === "link") { fd.append("url", link || ""); if (content) fd.append("description", content); }
+      if (type === "image") { if (content) fd.append("caption", content); }
+      if (type === "poll") {
+        fd.append("question", content || "");
+        optionsText.split("\n").map(s => s.trim()).filter(Boolean).forEach((o) => fd.append("options", o));
+      }
+      return fd;
+    })();
+
+    const cId = communityId;
+    const id = post.id;
+
+    const candidates = [
+      // Common working patterns seen in your logs
+      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PATCH", body: jsonPayload, json: true },
+      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PUT", body: jsonPayload, json: true },
+      { url: `${API_ROOT}/posts/${id}/`, method: "PATCH", body: jsonPayload, json: true },
+      { url: `${API_ROOT}/posts/${id}/edit/`, method: "POST", body: jsonPayload, json: true },
+      // FormData fallbacks
+      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "POST", body: formPayload, json: false },
+    ];
+
+    for (const c of candidates) {
+      try {
+        const r = await fetch(c.url, {
+          method: c.method,
+          headers: c.json ? { "Content-Type": "application/json", ...authHeader() } : { ...authHeader() },
+          body: c.json ? JSON.stringify(c.body) : c.body,
+        });
+        if (!r.ok) continue;
+        const resp = await r.json().catch(() => ({}));
+        // Reuse your existing mapper
+        const ui = mapCreateResponseToUiPost(resp);
+        return { ...post, ...ui, id: post.id };
+      } catch { /* try next */ }
+    }
+    throw new Error("Update failed");
+  }
+
+  const onSave = async () => {
+    setSaving(true);
+    try {
+      const updated = await updatePostApi();
+      onSaved?.(updated);
+    } catch (e) {
+      alert(e.message || "Could not update post");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Edit post</DialogTitle>
+      <DialogContent sx={{ pt: 2 }}>
+        {/* Type is shown read-only to keep the UI minimal */}
+        <Typography variant="caption" color="text.secondary">Type: {type}</Typography>
+        {type === "text" && (
+          <TextField fullWidth multiline minRows={4} sx={{ mt: 1 }}
+            value={content} onChange={(e) => setContent(e.target.value)} placeholder="Say something…" />
+        )}
+        {type === "link" && (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField fullWidth value={link} onChange={(e) => setLink(e.target.value)} label="Link URL" />
+            <TextField fullWidth multiline minRows={3} value={content} onChange={(e) => setContent(e.target.value)} label="Description" />
+          </Stack>
+        )}
+        {type === "image" && (
+          <TextField fullWidth multiline minRows={3} sx={{ mt: 1 }}
+            value={content} onChange={(e) => setContent(e.target.value)} label="Caption" />
+        )}
+        {type === "poll" && (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} label="Question" />
+            <TextField fullWidth multiline minRows={3} value={optionsText} onChange={(e) => setOptionsText(e.target.value)} label="Options (one per line)" />
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function PostDeleteConfirm({ open, postId, communityId, onClose, onDeleted }) {
+  const [busy, setBusy] = React.useState(false);
+  if (!postId) return null;
+
+  async function deletePostApi() {
+    const cId = communityId;
+    const id = postId;
+
+    const candidates = [
+      // Try the /delete/ suffix first (matches your earlier working patterns)
+      { url: `${API_ROOT}/communities/${cId}/posts/${id}/delete/`, method: "DELETE" },
+      { url: `${API_ROOT}/communities/${cId}/posts/${id}/delete/`, method: "POST" },
+      // Plain resource delete
+      { url: `${API_ROOT}/communities/${cId}/posts/${id}/`, method: "DELETE" },
+      { url: `${API_ROOT}/posts/${id}/delete/`, method: "POST" },
+      { url: `${API_ROOT}/posts/${id}/`, method: "DELETE" },
+    ];
+
+    for (const c of candidates) {
+      try {
+        const r = await fetch(c.url, { method: c.method, headers: { ...authHeader(), accept: "application/json" } });
+        if (r.ok || r.status === 204) return true;
+      } catch { /* try next */ }
+    }
+    return false;
+  }
+
+  const onConfirm = async () => {
+    setBusy(true);
+    const ok = await deletePostApi();
+    setBusy(false);
+    if (!ok) {
+      alert("Delete failed");          // keep or replace with your snackbar later
+      return;
+    }
+    onDeleted?.(postId);               // parent already closes the dialog & updates list
+  };
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Delete post</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary">
+          This action can’t be undone.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button color="error" variant="contained" onClick={onConfirm} disabled={busy}>
+          {busy ? "Deleting…" : "Delete"}
+        </Button>
       </DialogActions>
     </Dialog>
   );
