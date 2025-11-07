@@ -12,6 +12,12 @@ import HowToVoteOutlinedIcon from "@mui/icons-material/HowToVoteOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import SearchIcon from "@mui/icons-material/Search";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  CircularProgress, List, ListItem, ListItemAvatar, ListItemText, Divider
+} from "@mui/material";
+
 
 const BORDER = "#e2e8f0";
 
@@ -28,7 +34,7 @@ const API_ORIGIN = API_BASE.replace(/\/api(\/|$)/i, "");
 
 function toMediaUrl(p) {
   if (!p) return "";
-  try { return new URL(p).toString(); } catch {}
+  try { return new URL(p).toString(); } catch { }
   const rel = String(p).replace(/^\/+/, "");
   // if backend already serves under /media/, keep it; else prefix /media/
   return `${API_ORIGIN}/${rel.startsWith("media/") ? rel : `media/${rel}`}`;
@@ -112,7 +118,7 @@ function mapFeedItem(item) {
     (typeof item?.community === "object" ? item.community?.id : item?.community) ??
     null;
 
-    const base = {
+  const base = {
     id: item.id,
     created_at: item.created_at,
     author: { name: displayName, avatar: item.actor_avatar || "" },
@@ -150,40 +156,40 @@ function mapFeedItem(item) {
 
   // ---- Poll post ----
   if (t === "poll" || Array.isArray(m.options) || m.poll_id || m.question) {
-  const question =
-    m.question ??
-    item.question ??
-    item.title ??
-    ""; // ensure something is renderable
+    const question =
+      m.question ??
+      item.question ??
+      item.title ??
+      ""; // ensure something is renderable
 
-  const options = (m.options || []).map((o, i) => ({
-    id: o.id ?? o.option_id ?? i + 1,
-    label: o.text ?? o.label ?? String(o),
-    votes: o.vote_count ?? o.votes ?? 0,
-  }));
+    const options = (m.options || []).map((o, i) => ({
+      id: o.id ?? o.option_id ?? i + 1,
+      label: o.text ?? o.label ?? String(o),
+      votes: o.vote_count ?? o.votes ?? 0,
+    }));
 
-  return {
-    ...base,
-    type: "poll",
+    return {
+      ...base,
+      type: "poll",
 
-    // 🔑 expose question under every common key
-    text: question,
-    title: question,
-    question: question,
-    content: question,
+      // 🔑 expose question under every common key
+      text: question,
+      title: question,
+      question: question,
+      content: question,
 
-    poll_id: pickId(
-      m.poll_id, m.pollId, m.poll?.id,
-      item.poll_id, item.target_object_id, item.object_id, item.target_id,
-      item.targetId, item.objectId,
-      (t === "poll" ? m.id : null)
-    ),
-    options,
-    user_votes: m.user_votes || [],
-    is_closed: Boolean(m.is_closed),
-    group_id: base.group_id,
-  };
-}
+      poll_id: pickId(
+        m.poll_id, m.pollId, m.poll?.id,
+        item.poll_id, item.target_object_id, item.object_id, item.target_id,
+        item.targetId, item.objectId,
+        (t === "poll" ? m.id : null)
+      ),
+      options,
+      user_votes: m.user_votes || [],
+      is_closed: Boolean(m.is_closed),
+      group_id: base.group_id,
+    };
+  }
 
   // ---- Link post ----
   if (t === "link" || m.url) {
@@ -417,21 +423,198 @@ function ResourceBlock({ post, onOpenEvent }) {
   );
 }
 
+function CommentsDialog({ open, onClose, postId, onBumpCount }) {
+  const [loading, setLoading] = React.useState(false);
+  const [me, setMe] = React.useState(null);
+  const [items, setItems] = React.useState([]);
+  const [text, setText] = React.useState("");
+  const [replyTo, setReplyTo] = React.useState(null);
+
+  // who am I (for delete-own)
+  React.useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const r = await fetch(toApiUrl("users/me/"), { headers: { ...authHeaders() } });
+        setMe(r.ok ? await r.json() : {});
+      } catch { setMe({}); }
+    })();
+  }, [open]);
+
+  const load = React.useCallback(async () => {
+    if (!open || !postId) return;
+    setLoading(true);
+    try {
+      const r = await fetch(toApiUrl(`activity/feed/${postId}/comments/?page_size=200`), {
+        headers: { Accept: "application/json", ...authHeaders() },
+      });
+      const j = r.ok ? await r.json() : [];
+      const flat = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+      setItems(flat);
+    } catch { setItems([]); }
+    setLoading(false);
+  }, [open, postId]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  // build simple tree
+  const roots = React.useMemo(() => {
+    const map = new Map();
+    (items || []).forEach(c => map.set(c.id, { ...c, children: [] }));
+    map.forEach(c => {
+      if (c.parent_id && map.get(c.parent_id)) map.get(c.parent_id).children.push(c);
+    });
+    return [...map.values()].filter(c => !c.parent_id);
+  }, [items]);
+
+  async function createComment(body, parentId = null) {
+    if (!body.trim()) return;
+    try {
+      const r = await fetch(toApiUrl(`activity/feed/${postId}/comments/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(parentId ? { text: body, parent_id: parentId } : { text: body }),
+      });
+      if (r.ok) {
+        setText("");
+        setReplyTo(null);
+        await load();
+        onBumpCount?.(); // let parent increment the visible count
+      }
+    } catch { }
+  }
+
+  async function toggleCommentLike(c) {
+    const liked = !!c.user_has_liked;
+    try {
+      const r = await fetch(toApiUrl(`activity/feed/${postId}/comments/${c.id}/like/`), {
+        method: liked ? "DELETE" : "POST",
+        headers: { ...authHeaders() },
+      });
+      if (r.ok) load();
+    } catch { }
+  }
+
+  async function deleteOwn(c) {
+    // Only allow if comment author == me
+    const myId = me?.id || me?.user?.id;
+    if (!myId || (c.author_id !== myId)) return;
+    try {
+      const r = await fetch(toApiUrl(`activity/feed/${postId}/comments/${c.id}/`), {
+        method: "DELETE",
+        headers: { ...authHeaders() },
+      });
+      if (r.ok) load();
+    } catch { }
+  }
+
+  const CommentItem = ({ c, depth = 0 }) => (
+    <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #e2e8f0" : "none", ml: depth ? 1.5 : 0, mt: depth ? 1 : 0 }}>
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
+        <Typography variant="subtitle2">{c.author?.name || c.author?.username || `User #${c.author_id}`}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+        </Typography>
+      </Stack>
+      <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
+
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+        <Button
+          size="small"
+          startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+          onClick={() => toggleCommentLike(c)}
+        >
+          {c.like_count ?? 0}
+        </Button>
+        <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
+          Reply
+        </Button>
+        {(me?.id || me?.user?.id) === c.author_id && (
+          <Button size="small" color="error" onClick={() => deleteOwn(c)}>Delete</Button>
+        )}
+      </Stack>
+
+      {!!c.children?.length && (
+        <Stack spacing={1} sx={{ mt: 1 }}>
+          {c.children.map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+        </Stack>
+      )}
+    </Box>
+  );
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Comments</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+        ) : roots.length === 0 ? (
+          <Typography color="text.secondary">No comments yet.</Typography>
+        ) : (
+          <Stack spacing={2}>
+            {roots.map(c => <CommentItem key={c.id} c={c} />)}
+          </Stack>
+        )}
+      </DialogContent>
+      <Divider />
+      <Box sx={{ px: 2, py: 1.5 }}>
+        {replyTo && (
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
+            <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+          </Stack>
+        )}
+        <Stack direction="row" spacing={1}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
+        </Stack>
+      </Box>
+    </Dialog>
+  );
+}
+
+
 // ---- POST CARD ----
 function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const [local, setLocal] = React.useState(post);
+  const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
+  const [commentsOpen, setCommentsOpen] = React.useState(false);
   React.useEffect(() => { setLocal(post); }, [post]);
   const inc = (k) => {
     const next = { ...local, metrics: { ...local.metrics, [k]: (local.metrics?.[k] ?? 0) + 1 } };
     setLocal(next);
     onReact?.(post.id, k, next.metrics[k]);
   };
+  async function likeOnce() {
+    if (userHasLiked) return; // like only once
+    try {
+      const r = await fetch(toApiUrl(`activity/feed/${post.id}/like/`), {
+        method: "POST",
+        headers: { ...authHeaders() },
+      });
+      if (r.ok) {
+        setUserHasLiked(true);
+        setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, likes: (curr.metrics?.likes ?? 0) + 1 } }));
+      }
+    } catch { }
+  }
 
-const headingTitle = post.group_id
+  const bumpCommentCount = () => {
+    setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, comments: (curr.metrics?.comments ?? 0) + 1 } }));
+  };
+
+  const headingTitle = post.group_id
     ? (post.group || (post.group_id ? `Group #${post.group_id}` : "—"))
     : (post.visibility === "community"
-        ? (post.community || (post.community_id ? `Community #${post.community_id}` : "—"))
-        : (post.author?.name || "—"));
+      ? (post.community || (post.community_id ? `Community #${post.community_id}` : "—"))
+      : (post.author?.name || "—"));
   return (
     <Paper key={post.id} elevation={0} sx={{ p: 2, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
       {/* Header */}
@@ -439,13 +622,13 @@ const headingTitle = post.group_id
         <Avatar src={post.group_avatar || post.author?.avatar} alt={headingTitle} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
 
-        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-          {headingTitle}
-        </Typography>
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {headingTitle}
+          </Typography>
 
-        <Typography variant="caption" color="text.secondary" noWrap>
-          {post.author?.name} · {formatWhen(post.created_at)}
-        </Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {post.author?.name} · {formatWhen(post.created_at)}
+          </Typography>
         </Box>
         {post.type === "event" && <Chip size="small" color="primary" label="Event" variant="outlined" />}
         {post.type === "poll" && <Chip size="small" label="Poll" variant="outlined" />}
@@ -507,20 +690,27 @@ const headingTitle = post.group_id
       </Box>
 
       {/* Actions */}
-      <Stack direction="row" spacing={1} sx={{ mt: 1.25 }} alignItems="center" justifyContent="space-between">
-        <Stack direction="row" spacing={1} alignItems="center">
-          <IconButton size="small" onClick={() => inc("likes")}><FavoriteBorderIcon fontSize="small" /></IconButton>
-          <Typography variant="caption">{local.metrics?.likes ?? 0}</Typography>
+      <Stack direction="row" spacing={1} sx={{ mt: 1.25 }} alignItems="center">
+        <IconButton size="small" onClick={likeOnce}>
+          {userHasLiked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+        </IconButton>
+        <Typography variant="caption">{local.metrics?.likes ?? 0}</Typography>
 
-          <IconButton size="small" onClick={() => inc("comments")}><ChatBubbleOutlineIcon fontSize="small" /></IconButton>
-          <Typography variant="caption">{local.metrics?.comments ?? 0}</Typography>
+        <IconButton size="small" onClick={() => setCommentsOpen(true)}>
+          <ChatBubbleOutlineIcon fontSize="small" />
+        </IconButton>
+        <Typography variant="caption">{local.metrics?.comments ?? 0}</Typography>
 
-          <IconButton size="small" onClick={() => inc("shares")}><IosShareIcon fontSize="small" /></IconButton>
-          <Typography variant="caption">{local.metrics?.shares ?? 0}</Typography>
-        </Stack>
-
-        <Button size="small" variant="text" onClick={() => onOpenPost?.(post.id)}>Open</Button>
+        <IconButton size="small" onClick={() => inc("shares")}><IosShareIcon fontSize="small" /></IconButton>
+        <Typography variant="caption">{local.metrics?.shares ?? 0}</Typography>
       </Stack>
+
+      <CommentsDialog
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        postId={post.id}
+        onBumpCount={bumpCommentCount}
+      />
     </Paper>
   );
 }
@@ -533,7 +723,7 @@ export default function LiveFeedPage({
   onCreatePost = () => { },
   onReact = () => { },
   websocketUrl,
-  communityId,       
+  communityId,
   user,
   stats,
   tags = [],
@@ -559,25 +749,25 @@ export default function LiveFeedPage({
 
   // Build initial URL based on scope + search
   const buildFeedPath = React.useCallback((sc, q) => {
-  const params = new URLSearchParams();
+    const params = new URLSearchParams();
 
-  if (sc === "mine") {
-    params.set("mine", "true");
-    params.set("scope", "member_groups");
-  } else {
-    params.set("scope", "home"); // server does union: feed + events
-  }
+    if (sc === "mine") {
+      params.set("mine", "true");
+      params.set("scope", "member_groups");
+    } else {
+      params.set("scope", "home"); // server does union: feed + events
+    }
 
-  if (communityId) params.set("community_id", String(communityId)); // 👈 add this
+    if (communityId) params.set("community_id", String(communityId)); // 👈 add this
 
-  const qTrim = (q || "").trim();
-  if (qTrim) {
-    params.set("q", qTrim);
-    params.set("search", qTrim);
-  }
-  const qs = params.toString();
-  return `activity/feed/${qs ? `?${qs}` : ""}`;
-}, [communityId]);
+    const qTrim = (q || "").trim();
+    if (qTrim) {
+      params.set("q", qTrim);
+      params.set("search", qTrim);
+    }
+    const qs = params.toString();
+    return `activity/feed/${qs ? `?${qs}` : ""}`;
+  }, [communityId]);
 
   // Load a page (absolute or relative DRF next)
   async function loadFeed(url, append = false) {
@@ -630,49 +820,49 @@ export default function LiveFeedPage({
           // De-dup if the same id is already present (e.g., appears later via HTTP page load)
           setPosts((curr) => [incoming, ...curr.filter((p) => p.id !== incoming.id)]);
         }
-      } catch {}
+      } catch { }
     };
     return () => ws.close();
   }, [websocketUrl, scope]);
 
   async function voteOnPoll(post, optionId, meta) {
-  // Resolve optionId if missing (by label/index from the UI)
-  if (!optionId) {
-    const byIdx = (meta && Number.isInteger(meta.idx)) ? post.options?.[meta.idx] : null;
-    const byLabel = (post.options || []).find(o => (o.label || o.text) === meta?.label);
-    const picked = byIdx || byLabel || null;
-    optionId = picked?.id || picked?.option_id || null;
-    if (!optionId) { alert("Could not resolve option id"); return; }
-  }
+    // Resolve optionId if missing (by label/index from the UI)
+    if (!optionId) {
+      const byIdx = (meta && Number.isInteger(meta.idx)) ? post.options?.[meta.idx] : null;
+      const byLabel = (post.options || []).find(o => (o.label || o.text) === meta?.label);
+      const picked = byIdx || byLabel || null;
+      optionId = picked?.id || picked?.option_id || null;
+      if (!optionId) { alert("Could not resolve option id"); return; }
+    }
 
-  const url = toApiUrl(`activity/feed/${post.id}/poll/vote/`); // 👈 use FEED ITEM id
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ option_ids: [optionId] }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json();
+    const url = toApiUrl(`activity/feed/${post.id}/poll/vote/`); // 👈 use FEED ITEM id
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ option_ids: [optionId] }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json();
 
-    // Backend may return { ok, poll: {...} } or a flat poll-like object
-    const p = payload.poll || payload;
-    const updated = {
-      ...post,
-      is_closed: Boolean(p.is_closed),
-      user_votes: Array.isArray(p.user_votes) ? p.user_votes : post.user_votes || [],
-      options: (p.options || []).map(o => ({
-        id: o.id || o.option_id,
-        label: o.text || o.label,
-        votes: o.vote_count ?? o.votes ?? 0,
-      })),
-    };
-    setPosts(curr => curr.map(x => (x.id === post.id ? updated : x)));
-  } catch (err) {
-    console.error(err);
-    alert("Failed to vote: " + err.message);
+      // Backend may return { ok, poll: {...} } or a flat poll-like object
+      const p = payload.poll || payload;
+      const updated = {
+        ...post,
+        is_closed: Boolean(p.is_closed),
+        user_votes: Array.isArray(p.user_votes) ? p.user_votes : post.user_votes || [],
+        options: (p.options || []).map(o => ({
+          id: o.id || o.option_id,
+          label: o.text || o.label,
+          votes: o.vote_count ?? o.votes ?? 0,
+        })),
+      };
+      setPosts(curr => curr.map(x => (x.id === post.id ? updated : x)));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to vote: " + err.message);
+    }
   }
-}
 
   const handleLoadMore = async () => {
     if (!nextUrl) { setHasMore(false); return; }
@@ -750,7 +940,7 @@ export default function LiveFeedPage({
                 post={p}
                 onReact={onReact}
                 onOpenEvent={onOpenEvent}
-                onPollVote={(post, optionId,meta) => voteOnPoll(post, optionId,meta)}
+                onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
               />
             ))
           )}
