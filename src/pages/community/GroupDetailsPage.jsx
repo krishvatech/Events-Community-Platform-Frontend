@@ -1,6 +1,6 @@
 // src/pages/community/GroupDetailsPage.jsx
 import * as React from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link as RouterLink } from "react-router-dom";
 import {
   Avatar, Box, Button, Card, CardContent, CardHeader, Chip, Divider, Grid,
   IconButton, List, ListItem, ListItemAvatar, ListItemText, Stack, Tab, Tabs,
@@ -21,11 +21,14 @@ const BORDER = "#e2e8f0";
 // Keep helpers local (mirrors your HomePage style). No imports from your code.
 // -----------------------------------------------------------------------------
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
-const getToken = () =>
-  localStorage.getItem("token") ||
-  localStorage.getItem("access") ||
-  localStorage.getItem("access_token") ||
-  "";
+const getToken = () => {
+  const keys = ["token", "access", "access_token", "accessToken", "jwt", "JWT"];
+  for (const k of keys) {
+    const v = localStorage.getItem(k);
+    if (v) return v;
+  }
+  return "";
+};
 const authHeader = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
@@ -38,7 +41,25 @@ const timeAgo = (date) => {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 };
+const nameOf = (u = {}) =>
+  u.profile?.full_name ||
+  u.full_name ||
+  u.user_full_name ||
+  u.name ||
+  [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+  u.display_name ||
+  u.username ||
+  u.email ||
+  "Member";
 
+const avatarOf = (u = {}) =>
+  u.avatar ||
+  u.avatar_url ||
+  u.photo ||
+  u.profile?.avatar ||
+  u.profile?.image_url ||
+  u.profile?.photo ||
+  "";
 // -----------------------------------------------------------------------------
 // Minimal PostCard (local) so we don't touch your existing files
 // -----------------------------------------------------------------------------
@@ -101,19 +122,38 @@ function PostCard({ post }) {
 // Shape feed rows into UI posts (works with a few backend styles)
 function shapePost(row) {
   const m = row?.metadata || {};
+  const actor =
+    row.actor || row.user || row.author || row.created_by || row.owner || {};
   const type = (row?.type || m.type || "text").toLowerCase();
   const base = {
     id: row.id,
-    created_at: row.created_at || row.timestamp || Date.now(),
+    created_at: row.created_at || row.created || row.timestamp || Date.now(),
     type,
-    actor_name: row.actor_name || row.actor?.name || row.user?.name || "",
-    actor_avatar: row.actor?.avatar || row.user?.avatar || "",
+    actor_name: nameOf(actor),
+    actor_avatar: avatarOf(actor),
   };
-  if (type === "text") return { ...base, content: row.content || m.text || "" };
-  if (type === "link") return { ...base, content: row.description || m.description || "", link: row.url || m.url || "" };
-  if (type === "image") return { ...base, content: row.caption || m.caption || "", images: row.images || (m.image_url ? [m.image_url] : []) };
-  if (type === "poll") return { ...base, content: row.question || m.question || "", options: Array.isArray(row.options || m.options) ? (row.options || m.options) : [] };
-  return { ...base, content: row.content || m.text || "" };
+  // common text post fields from DRF-style payloads
+  const text =
+    row.content || row.text || row.body || row.message || m.text || "";
+  if (type === "link") {
+    return {
+      ...base,
+      content: row.description || m.description || text,
+      link: row.url || m.url || row.link || "",
+    };
+  }
+  if (type === "image") {
+    return {
+      ...base,
+      content: row.caption || m.caption || text,
+      images: row.images || (m.image_url ? [m.image_url] : []),
+    };
+  }
+  if (type === "poll") {
+    const opts = row.options || m.options;
+    return { ...base, content: row.question || m.question || text, options: Array.isArray(opts) ? opts : [] };
+  }
+  return { ...base, content: text };
 }
 
 // -----------------------------------------------------------------------------
@@ -244,8 +284,6 @@ function PostsTab({ groupId }) {
     setLoading(true);
     const candidates = [
       `${API_ROOT}/groups/${groupId}/posts/`,
-      `${API_ROOT}/groups/${groupId}/feed/`,
-      `${API_ROOT}/activity/feed/?scope=group&group_id=${groupId}`,
     ];
     for (const url of candidates) {
       try {
@@ -290,29 +328,55 @@ function MembersTab({ groupId }) {
   const perPage = 12;
 
   const fetchMembers = React.useCallback(async () => {
+    // Try your preferred endpoint first, then common variants
     const candidates = [
-      `${API_ROOT}/groups/${groupId}/members/`,
-      `${API_ROOT}/groups/${groupId}/memberships/`,
-      `${API_ROOT}/memberships/?group=${groupId}`,
+      `${API_ROOT}/groups/${groupId}/member/?page_size=100`,
+      `${API_ROOT}/groups/${groupId}/members/?page_size=100`,
+      `${API_ROOT}/groups/${groupId}/memberships/?page_size=100`,
+      `${API_ROOT}/memberships/?group=${groupId}&page_size=100`,
+      // no-trailing-slash fallbacks
+      `${API_ROOT}/groups/${groupId}/member`,
+      `${API_ROOT}/groups/${groupId}/members`,
     ];
     for (const url of candidates) {
       try {
-        const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
+        const res = await fetch(url, {
+          headers: { ...authHeader(), accept: "application/json" },
+        });
         if (!res.ok) continue;
         const data = await res.json();
-        const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+        const rows =
+          Array.isArray(data?.results) ? data.results :
+            Array.isArray(data?.members) ? data.members :
+              Array.isArray(data?.items) ? data.items :
+                (Array.isArray(data) ? data : []);
+        if (!rows) continue;
         const normalized = rows.map((r) => {
-          const u = r.user || r.member || r;
+          // Common shapes your API might return
+          const u = r.user || r.member || r.participant || r.account || r.profile || r;
+          const displayName =
+            r.user_full_name || r.member_name || r.display_name || null;
+          const role =
+            r.role ||
+            r.role_display ||
+            r.membership_role ||
+            r.role_name ||
+            r.user_role ||
+            r.membership?.role ||
+            (r.is_owner ? "owner" : r.is_admin ? "admin" : r.is_moderator ? "moderator" : "member");
           return {
-            id: u.id || r.id,
-            name: `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username || "Member",
-            avatar: u.avatar || u.profile_image || "",
-            role: r.role || "member",
+            id: u?.id || r.id,
+            name: displayName || nameOf(u) || nameOf(r),
+            avatar: avatarOf(u) || avatarOf(r),
+            role: (role || "member").toString().toLowerCase(),
+            email: u?.email || r?.email || null,
           };
         });
         setMembers(normalized);
         return;
-      } catch { }
+      } catch (e) {
+        // ignore and try next
+      }
     }
     setMembers([]);
   }, [groupId]);
@@ -340,20 +404,38 @@ function MembersTab({ groupId }) {
         onChange={(e) => setQuery(e.target.value)}
         InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }}
       />
-      <Grid container spacing={2}>
+      <Stack spacing={1.25}>
         {pageItems.map((m) => (
-          <Grid key={m.id} item xs={12} sm={6} md={4} lg={3}>
-            <Card variant="outlined" sx={{ borderRadius: 2, borderColor: BORDER }}>
-              <CardHeader
-                avatar={<Avatar src={m.avatar}>{(m.name || "M").slice(0, 1)}</Avatar>}
-                title={<Typography fontWeight={600} variant="body1">{m.name}</Typography>}
-                subheader={<Chip label={m.role} size="small" />}
-                sx={{ pb: 0.5 }}
-              />
-            </Card>
-          </Grid>
+          <Box
+            key={m.id}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              border: "1px solid",
+              borderColor: BORDER,
+              borderRadius: 2,
+              p: 1.25,
+              width: "100%",
+            }}
+          >
+            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+              <Avatar src={m.avatar}>{(m.name || "M").slice(0, 1)}</Avatar>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body1" fontWeight={600} noWrap title={m.name}>
+                  {m.name}
+                </Typography>
+                {!!m.email && (
+                  <Typography variant="caption" color="text.secondary" noWrap title={m.email}>
+                    {m.email}
+                  </Typography>
+                )}
+              </Box>
+            </Stack>
+            <Chip label={m.role} size="small" />
+          </Box>
         ))}
-      </Grid>
+      </Stack>
       <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between">
         <Typography variant="body2" color="text.secondary">
           Showing {filtered.length === 0 ? 0 : startIdx + 1}–{Math.min(startIdx + perPage, filtered.length)} of {filtered.length}
@@ -375,61 +457,62 @@ function MembersTab({ groupId }) {
 function OverviewTab({ group }) {
   if (!group) return null;
   return (
-    <Grid container spacing={3}>
-      <Grid item xs={12} md={7}>
-        <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
-          <CardHeader
-            title={
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                About this group
-              </Typography>
-            }
-          />
-          <CardContent sx={{ pt: 0 }}>
-            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-              {group.description || group.about || "No description yet."}
-            </Typography>
-          </CardContent>
-        </Card>
-      </Grid>
-      <Grid item xs={12} md={5}>
-        <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
-          <CardHeader
-            title={
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Group info
-              </Typography>
-            }
-          />
-          <CardContent sx={{ pt: 0 }}>
-            <Stack spacing={1} divider={<Divider />}>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-                <Typography variant="body2" color="text.secondary">Members</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {group.member_count ?? group.members_count ?? "—"}
-                </Typography>
-              </Box>
+    <Stack spacing={3}>
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
+        <CardHeader title={<Typography variant="h6" sx={{ fontWeight: 600 }}>About this group</Typography>} />
+        <CardContent sx={{ pt: 0 }}>
+          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+            {group.description || group.about || "No description yet."}
+          </Typography>
+        </CardContent>
+      </Card>
 
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
+        <CardHeader title={<Typography variant="h6" sx={{ fontWeight: 600 }}>Group info</Typography>} />
+        <CardContent sx={{ pt: 0 }}>
+          {/* your info rows */}
+          <Stack spacing={1} divider={<Divider />}>
+            {group.parent_id && group.parent_id !== group.id && (
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-                <Typography variant="body2" color="text.secondary">Visibility</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500, textTransform: "capitalize" }}>
-                  {(group.visibility || "private").toString()}
-                </Typography>
-              </Box>
-
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-                <Typography variant="body2" color="text.secondary">Created</Typography>
+                <Typography variant="body2" color="text.secondary">Parent group</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {(group.created_at && new Date(group.created_at).toLocaleDateString()) || "—"}
+                  <Button
+                    component={RouterLink}
+                    to={`/community/groups/${group.parent_id}`}
+                    variant="text"
+                    size="small"
+                    sx={{ textTransform: "none", p: 0, minWidth: 0 }}
+                  >
+                    {group.parent_name || `#${group.parent_id}`}
+                  </Button>
                 </Typography>
               </Box>
-            </Stack>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
+            )}
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
+              <Typography variant="body2" color="text.secondary">Members</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {group.member_count ?? group.members_count ?? "—"}
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
+              <Typography variant="body2" color="text.secondary">Visibility</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 500, textTransform: "capitalize" }}>
+                {(group.visibility || "private").toString()}
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
+              <Typography variant="body2" color="text.secondary">Created</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                {(group.created_at && new Date(group.created_at).toLocaleDateString()) || "—"}
+              </Typography>
+            </Box>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Stack>
   );
 }
+
 
 // -----------------------------------------------------------------------------
 // Page
@@ -462,6 +545,36 @@ export default function GroupDetailsPage() {
         const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
         if (!res.ok) continue;
         const data = await res.json();
+
+        // Detect parent info (various backend shapes)
+        const parentId =
+          data.parent_id ??
+          data.parent?.id ??
+          data.parent_group_id ??
+          data.parent_group?.id ??
+          data.parentGroupId ??
+          data.parentGroup?.id ??
+          null;
+        let parentName =
+          data.parent?.name ??
+          data.parent_name ??
+          data.parent_group?.name ??
+          data.parentGroup?.name ??
+          null;
+
+        // If we have an id but no name, fetch the parent detail once for display
+        if (parentId && !parentName) {
+          try {
+            const pres = await fetch(`${API_ROOT}/groups/${parentId}/`, {
+              headers: { ...authHeader(), accept: "application/json" },
+            });
+            if (pres.ok) {
+              const pdata = await pres.json();
+              parentName = pdata.name || pdata.title || pdata.display_name || parentName;
+            }
+          } catch { }
+        }
+
         setGroup({
           id: data.id,
           name: data.name,
@@ -470,6 +583,8 @@ export default function GroupDetailsPage() {
           avatar: data.avatar || "",
           created_at: data.created_at,
           visibility: data.visibility || "private",
+          parent_id: parentId || null,
+          parent_name: parentName || null,
         });
         setLoading(false);
         return;

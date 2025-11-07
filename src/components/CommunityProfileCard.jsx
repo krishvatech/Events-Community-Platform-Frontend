@@ -22,6 +22,7 @@ import {
 } from "@mui/material";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import { Link as RouterLink } from "react-router-dom";
 
 const BORDER = "#e2e8f0";
 const SLATE_700 = "#334155";
@@ -41,6 +42,19 @@ const RAW_BASE = (
   window.API_BASE_URL ??
   "http://127.0.0.1:8000/api"   // <-- safe local fallback
 ).trim();
+
+// Build Group Detail route (pick the one that matches your app)
+const buildGroupDetailUrl = (g) => {
+  const id = g?.id || g?.pk;
+  // If your route is /community/groups/:id (common since your page is in pages/community):
+  return `/community/groups/${id}`;
+  // If your route is /groups/:id, use this instead:
+  // return `/groups/${id}`;
+  // If you use slugs:
+  // const slug = g?.slug || g?.code;
+  // return `/community/groups/${slug || id}`;
+};
+
 
 function joinApi(url) {
   if (/^https?:\/\//i.test(url)) return url; // already absolute
@@ -396,7 +410,15 @@ export default function CommunityProfileCard({
 
           <Stack spacing={1.25} mt={1}>
             {(groupsPreview || []).map((c) => (
-              <Stack key={c.id} direction="row" spacing={1.25} alignItems="center">
+              <Stack
+                key={c.id}
+                direction="row"
+                spacing={1.25}
+                alignItems="center"
+                component={RouterLink}
+                to={buildGroupDetailUrl(c)}
+                sx={{ textDecoration: "none", cursor: "pointer" }}
+              >
                 <Avatar
                   variant="rounded"
                   sx={{
@@ -425,7 +447,7 @@ export default function CommunityProfileCard({
                     <Button
                       size="small"
                       variant="text"
-                      onClick={() => onCommunityUnsubscribe(c)}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCommunityUnsubscribe(c); }}
                       sx={{
                         p: 0,
                         minWidth: 0,
@@ -483,7 +505,12 @@ export default function CommunityProfileCard({
           <List disablePadding>
             {(groups || []).map((c, idx) => (
               <React.Fragment key={c.id || idx}>
-                <ListItemButton disableRipple>
+                <ListItemButton
+                  disableRipple
+                  component={RouterLink}
+                  to={buildGroupDetailUrl(c)}
+                  onClick={() => setOpenGroups(false)}
+                >
                   <ListItemAvatar>
                     <Avatar
                       variant="rounded"
@@ -508,7 +535,7 @@ export default function CommunityProfileCard({
                     <Button
                       size="small"
                       variant="outlined"
-                      onClick={() => onCommunityUnsubscribe(c)}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCommunityUnsubscribe(c); }}
                       sx={{ textTransform: "none" }}
                     >
                       Unsubscribe
