@@ -87,6 +87,23 @@ async function apiFetch(url, { method = "GET", headers = {}, body } = {}) {
 }
 
 // ---------- UI SUB-COMPONENTS ----------
+// ---- image helpers for popup avatars ----
+const absUrl = (u) => {
+  if (!u) return "";
+  if (/^(https?:|data:)/i.test(u)) return u;
+  try { return new URL(u, API_ROOT).href; } catch { return u; }
+};
+const urlish = (v) => (typeof v === "string" ? v : (v && typeof v === "object" && v.url) ? v.url : "");
+const pickImg = (obj, keys) => {
+  for (const path of keys) {
+    const parts = path.split(".");
+    let cur = obj;
+    for (const p of parts) cur = cur?.[p];
+    const u = absUrl(urlish(cur));
+    if (u) return u;
+  }
+  return "";
+};
 
 // Left list row (conversation item)
 function ConversationRow({ thread, active, onClick }) {
@@ -113,7 +130,17 @@ function ConversationRow({ thread, active, onClick }) {
     >
       <ListItemAvatar sx={{ minWidth: 48 }}>
         <Badge variant={unread > 0 ? "dot" : "standard"} color="primary" overlap="circular">
-          <Avatar src={thread.context_logo}>{(title || "C").slice(0, 1)}</Avatar>
+          <Avatar
+            src={
+              thread?.context_logo
+              || thread?.context_cover
+              || thread?.group_cover
+              || thread?.event_cover
+              || ""
+            }
+          >
+            {(title || "C").slice(0, 1)}
+          </Avatar>
         </Badge>
       </ListItemAvatar>
 
@@ -190,7 +217,60 @@ function Bubble({ m, showSender, myAvatar }) {
     </Stack>
   );
 }
+async function hydrateMissingAvatars(items, type) {
+  const out = [...items];
+  const pickFromUser = (j) =>
+    pickImg(j, [
+      "profile.user_image", "profile.user_image.url",
+      "profile.avatar", "profile.avatar.url",
+      "profile.picture", "profile.photo", "profile_pic",
+      "avatar", "image",
+      "linkedin.picture_url",
+    ]);
 
+  const pickFromGroup = (j) =>
+    pickImg(j, [
+      "logo_url", "logo.url", "logo", "avatar", "image",
+      "cover_image.url", "cover_image", "banner_url", "banner", "cover",
+      "header_image", "hero_image",
+    ]);
+
+  const pickFromEvent = (j) =>
+    pickImg(j, [
+      "thumbnail", "thumbnail.url", "poster", "poster.url", "logo_url",
+      "cover_image.url", "cover_image", "banner_url", "banner", "cover",
+      "header_image", "hero_image", "preview_image",
+    ]);
+
+  const endpoint = (t, id) => {
+    if (t === "friend") return `${API_ROOT}/users/${id}/`;
+    if (t === "group") return `${API_ROOT}/groups/${id}/`;
+    if (t === "event") return `${API_ROOT}/events/${id}/`;
+    return null;
+  };
+
+  const mapper = (t, json) =>
+    t === "friend" ? pickFromUser(json) :
+      t === "group" ? pickFromGroup(json) :
+        t === "event" ? pickFromEvent(json) : "";
+
+  const jobs = out.map(async (item) => {
+    if (item.avatar) return item; // already good
+    const url = endpoint(type, item.id);
+    if (!url) return item;
+    try {
+      const res = await apiFetch(url);
+      if (!res.ok) return item;
+      const j = await res.json();
+      const av = mapper(type, j);
+      return av ? { ...item, avatar: av } : item;
+    } catch {
+      return item;
+    }
+  });
+
+  return Promise.all(jobs);
+}
 // ---------- New Chat Dialog (Friends | Groups | Events) ----------
 function NewChatDialog({ open, onClose, onOpened }) {
   const [tab, setTab] = React.useState(0); // 0: Friends, 1: Groups, 2: Events
@@ -211,7 +291,12 @@ function NewChatDialog({ open, onClose, onOpened }) {
         out.push({
           id: x.id,
           name: x.title || x.name || `Event #${x.id}`,
-          avatar: x.banner_url || x.cover_image || x.poster || x.thumbnail || "",
+          avatar:
+            pickImg(x, [
+              "thumbnail", "poster", "logo_url",
+              "cover_image", "banner_url", "banner", "cover", "header_image", "hero_image",
+              "preview_image",      // your model field
+            ]) || "",
         });
         continue;
       }
@@ -222,7 +307,12 @@ function NewChatDialog({ open, onClose, onOpened }) {
         out.push({
           id,
           name: ev.title || ev.name || x.event_title || `Event #${id}`,
-          avatar: ev.banner_url || ev.cover_image || ev.poster || ev.thumbnail || "",
+          avatar:
+            pickImg(ev, [
+              "thumbnail", "poster", "logo_url",
+              "cover_image", "banner_url", "banner", "cover", "header_image", "hero_image",
+              "preview_image",
+            ]) || "",
         });
         continue;
       }
@@ -253,13 +343,37 @@ function NewChatDialog({ open, onClose, onOpened }) {
         const fr = await apiFetch(`${API_ROOT}/friends/?page_size=100`);
         const frJson = await fr.json();
         const ff = (Array.isArray(frJson?.results) ? frJson.results : Array.isArray(frJson) ? frJson : [])
-          .map((x) => ({
-            id: x?.friend?.id ?? x?.id ?? x?.user_id ?? x?.user?.id,
-            name: x?.friend?.full_name || x?.friend?.username || x?.friend_name || x?.name || x?.user?.username || "Friend",
-            avatar: x?.friend?.avatar || x?.avatar || "",
-          }))
+          .map((x) => {
+            const id =
+              x?.friend?.id ?? x?.id ?? x?.user_id ?? x?.user?.id;
+            const name =
+              x?.friend?.full_name ||
+              x?.friend?.username ||
+              x?.friend_name ||
+              x?.name ||
+              x?.user?.username ||
+              "Friend";
+            const avatar =
+              pickImg(x, [
+                // preferred: profile images
+                "friend.profile.user_image",
+                "friend.profile.avatar",
+                "profile.user_image",
+                "profile.avatar",
+                // direct fields / fallbacks
+                "friend.avatar",
+                "friend.image",
+                "friend.photo",
+                "avatar",
+                "image",
+                // linkedin (if present)
+                "friend.linkedin.picture_url",
+              ]) || "";
+            return { id, name, avatar };
+          })
           .filter((x) => x.id);
         setFriends(ff);
+        try { setFriends(await hydrateMissingAvatars(ff, "friend")); } catch { }
 
         // ---- GROUPS ----
         let gRes = await apiFetch(`${MESSAGING}/conversations/chat-groups/`);
@@ -273,13 +387,21 @@ function NewChatDialog({ open, onClose, onOpened }) {
           }
         }
         const gg = (Array.isArray(gJson?.results) ? gJson.results : Array.isArray(gJson) ? gJson : [])
-          .map((g) => ({
-            id: g.id,
-            name: g.name || g.title || "Group",
-            avatar: g.logo_url || g.cover_image || "",
-          }))
+          .map((g) => {
+            const id = g.id;
+            const name = g.name || g.title || "Group";
+            const avatar =
+              pickImg(g, [
+                // logos first
+                "logo_url", "logo", "avatar", "image",
+                // covers/banners (supports .url objects)
+                "cover_image", "banner", "banner_url", "cover", "header_image", "hero_image",
+              ]) || "";
+            return { id, name, avatar };
+          })
           .filter((g) => g.id);
         setGroups(gg);
+        try { setGroups(await hydrateMissingAvatars(gg, "group")); } catch { }
 
         // ---- EVENTS (your candidates) ----
         // optionally get me.id for the last candidate
@@ -323,6 +445,7 @@ function NewChatDialog({ open, onClose, onOpened }) {
         }
 
         setEvents(evOut);
+        try { setEvents(await hydrateMissingAvatars(evOut, "event")); } catch { }
       } catch (e) {
         console.error("Load lists failed", e);
       } finally {
@@ -415,7 +538,7 @@ function NewChatDialog({ open, onClose, onOpened }) {
                 }}
               >
                 <ListItemAvatar sx={{ minWidth: 44 }}>
-                  <Avatar src={x.avatar}>{(x.name || "X").slice(0, 1)}</Avatar>
+                  <Avatar src={absUrl(x.avatar)}>{(x.name || "X").slice(0, 1)}</Avatar>
                 </ListItemAvatar>
                 <ListItemText
                   primary={<Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>{x.name}</Typography>}
@@ -692,7 +815,12 @@ export default function MessagesPage() {
     || (active?.chat_type === "dm" ? "Direct Message" : "Conversation");
 
   const topCover = active?.context_cover || "";
-  const topLogo = active?.context_logo || "";
+  const topLogo =
+    active?.context_logo
+    || active?.context_cover
+    || active?.group_cover
+    || active?.event_cover
+    || "";
   // const topMembers = [];  // (optional) hydrate from your own members API
 
   return (
@@ -776,16 +904,6 @@ export default function MessagesPage() {
                   <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
                     {topTitle}
                   </Typography>
-
-                  {topCover && (
-                    <Box sx={{ mt: 1, borderRadius: 2, overflow: "hidden", border: `1px solid ${BORDER}` }}>
-                      <img
-                        src={topCover}
-                        alt="cover"
-                        style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }}
-                      />
-                    </Box>
-                  )}
                 </Stack>
 
                 <Stack direction="row" alignItems="center" spacing={1.25}>
