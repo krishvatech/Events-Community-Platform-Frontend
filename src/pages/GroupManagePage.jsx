@@ -669,58 +669,91 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
 }
 
 // ---------- Comments Popup (threaded, like, reply, delete by author or group owner) ----------
-function GroupCommentsDialog({ open, onClose, groupIdOrSlug, postId, groupOwnerId, onBumpCount }) {
+function GroupCommentsDialog({
+    open,
+    onClose,
+    groupIdOrSlug,
+    postId,
+    groupOwnerId,
+    onBumpCount,
+    // NEW props for Instagram/LinkedIn style
+    inline = false,
+    initialCount = 3,
+    inputRef = null,
+}) {
     const [loading, setLoading] = React.useState(false);
     const [me, setMe] = React.useState(null);
     const [items, setItems] = React.useState([]);
     const [text, setText] = React.useState("");
     const [replyTo, setReplyTo] = React.useState(null);
+    const [visibleCount, setVisibleCount] = React.useState(initialCount);
 
-    React.useEffect(() => {
-        if (!open) return;
-        (async () => {
-            try {
-                const r = await fetch(`${API_ROOT}/users/me/`, { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) } });
-                setMe(r.ok ? await r.json() : {});
-            } catch { setMe({}); }
-        })();
-    }, [open]);
+    // fetch current user (for delete permission)
+    const fetchMe = React.useCallback(async () => {
+        try {
+            const r = await fetch(`${API_ROOT}/users/me/`, {
+                headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
+            });
+            setMe(r.ok ? await r.json() : {});
+        } catch {
+            setMe({});
+        }
+    }, []);
 
     const load = React.useCallback(async () => {
-        if (!open || !groupIdOrSlug || !postId) return;
+        if (!(groupIdOrSlug && postId)) return;
+        if (!inline && !open) return;
         setLoading(true);
         const token = getToken();
         const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-
-        const url = `${API_ROOT}/groups/${groupIdOrSlug}/posts/${postId}/comments/?page_size=200`;
         try {
-            const r = await fetch(url, { headers });
+            const r = await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/posts/${postId}/comments/?page_size=200`, { headers });
             const j = r.ok ? await r.json() : [];
             const flat = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
             setItems(flat || []);
-        } catch { setItems([]); }
+            setVisibleCount(initialCount);
+        } catch {
+            setItems([]);
+        }
         setLoading(false);
-    }, [open, groupIdOrSlug, postId]);
+    }, [groupIdOrSlug, postId, open, inline, initialCount]);
 
-    React.useEffect(() => { load(); }, [load]);
+    // load when opened (modal) or mounted (inline)
+    React.useEffect(() => {
+        if (inline || open) {
+            fetchMe();
+            load();
+        }
+    }, [inline, open, fetchMe, load]);
 
+    // build threaded tree
     const roots = React.useMemo(() => {
         const map = new Map();
         (items || []).forEach(c => map.set(c.id, { ...c, children: [] }));
-        map.forEach(c => { if (c.parent_id && map.get(c.parent_id)) map.get(c.parent_id).children.push(c); });
-        return [...map.values()].filter(c => !c.parent_id);
+        map.forEach(c => {
+            if (c.parent_id && map.get(c.parent_id)) map.get(c.parent_id).children.push(c);
+        });
+        // newest roots first
+        return [...map.values()]
+            .filter(c => !c.parent_id)
+            .sort((a, b) => (new Date(b.created_at || 0)) - (new Date(a.created_at || 0)));
     }, [items]);
 
     async function createComment(body, parentId = null) {
-        if (!body.trim()) return;
+        if (!body?.trim()) return;
         const token = getToken();
         try {
             const r = await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/posts/${postId}/comments/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify(parentId ? { text: body, parent_id: parentId } : { text: body }),
+                body: JSON.stringify(parentId ? { text: body.trim(), parent_id: parentId } : { text: body.trim() }),
             });
-            if (r.ok) { setText(""); setReplyTo(null); await load(); onBumpCount?.(); }
+            if (r.ok) {
+                setText("");
+                setReplyTo(null);
+                onBumpCount?.();
+                await load();
+            }
         } catch { }
     }
 
@@ -732,7 +765,7 @@ function GroupCommentsDialog({ open, onClose, groupIdOrSlug, postId, groupOwnerI
                 method: liked ? "DELETE" : "POST",
                 headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             });
-            if (r.ok) load();
+            if (r.ok) await load();
         } catch { }
     }
 
@@ -746,20 +779,32 @@ function GroupCommentsDialog({ open, onClose, groupIdOrSlug, postId, groupOwnerI
                 method: "DELETE",
                 headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             });
-            if (r.ok) load();
+            if (r.ok) await load();
         } catch { }
     }
 
     const CommentItem = ({ c, depth = 0 }) => (
-        <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #e2e8f0" : "none", ml: depth ? 1.5 : 0, mt: depth ? 1 : 0 }}>
+        <Box sx={{
+            pl: depth ? 2 : 0,
+            borderLeft: depth ? "2px solid #e2e8f0" : "none",
+            ml: depth ? 1.5 : 0,
+            mt: depth ? 1 : 0
+        }}>
             <Stack direction="row" spacing={1} alignItems="center">
                 <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
-                <Typography variant="subtitle2">{c.author?.name || c.author?.username || `User #${c.author_id}`}</Typography>
-                <Typography variant="caption" color="text.secondary">{c.created_at ? new Date(c.created_at).toLocaleString() : ""}</Typography>
+                <Typography variant="subtitle2">
+                    {c.author?.name || c.author?.username || `User #${c.author_id}`}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                    {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+                </Typography>
             </Stack>
+
             <Typography sx={{ mt: .5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
+
             <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: .5 }}>
-                <Button size="small"
+                <Button
+                    size="small"
                     startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
                     onClick={() => toggleCommentLike(c)}
                 >
@@ -772,14 +817,81 @@ function GroupCommentsDialog({ open, onClose, groupIdOrSlug, postId, groupOwnerI
                     <Button size="small" color="error" onClick={() => deleteComment(c)}>Delete</Button>
                 )}
             </Stack>
+
             {!!c.children?.length && (
                 <Stack spacing={1} sx={{ mt: 1 }}>
-                    {c.children.map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+                    {c.children
+                        .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0)))  // replies oldest→newest
+                        .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
                 </Stack>
             )}
         </Box>
     );
 
+    // -------- INLINE: LinkedIn/Instagram style (always visible box) --------
+    if (inline) {
+        const visibleRoots = roots.slice(0, visibleCount);
+        const hasMore = roots.length > visibleRoots.length;
+
+        return (
+            <Box sx={{ mt: 1 }}>
+                {replyTo && (
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                            Replying to {replyTo.author?.name || `#${replyTo.author_id}`}
+                        </Typography>
+                        <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+                    </Stack>
+                )}
+
+                <Stack direction="row" spacing={1}>
+                    <TextField
+                        size="small"
+                        fullWidth
+                        placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        inputRef={inputRef || undefined}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                createComment(text, replyTo?.id || null);
+                            }
+                        }}
+                    />
+                    <Button
+                        variant="contained"
+                        onClick={() => createComment(text, replyTo?.id || null)}
+                        disabled={!text.trim()}
+                    >
+                        Post
+                    </Button>
+                </Stack>
+
+                <Box sx={{ mt: 1.25 }}>
+                    {loading ? (
+                        <Stack alignItems="center" py={1.5}><CircularProgress size={18} /></Stack>
+                    ) : visibleRoots.length === 0 ? (
+                        <Typography variant="caption" color="text.secondary">Be the first to comment.</Typography>
+                    ) : (
+                        <Stack spacing={1.25}>
+                            {visibleRoots.map((c) => <CommentItem key={c.id} c={c} />)}
+                        </Stack>
+                    )}
+
+                    {hasMore && (
+                        <Stack alignItems="flex-start" sx={{ mt: 1 }}>
+                            <Button size="small" variant="text" onClick={() => setVisibleCount(v => v + initialCount)}>
+                                Load more comments
+                            </Button>
+                        </Stack>
+                    )}
+                </Box>
+            </Box>
+        );
+    }
+
+    // -------- ORIGINAL MODAL (kept intact) --------
     return (
         <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="md">
             <DialogTitle>Comments</DialogTitle>
@@ -801,14 +913,22 @@ function GroupCommentsDialog({ open, onClose, groupIdOrSlug, postId, groupOwnerI
                     </Stack>
                 )}
                 <Stack direction="row" spacing={1}>
-                    <TextField size="small" fullWidth placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
-                        value={text} onChange={(e) => setText(e.target.value)} />
-                    <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
+                    <TextField
+                        size="small"
+                        fullWidth
+                        placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                    />
+                    <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>
+                        Post
+                    </Button>
                 </Stack>
             </Box>
         </Dialog>
     );
 }
+
 
 // ---------- Social row under each post ----------
 function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
@@ -819,6 +939,8 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
         likes: post.like_count ?? post.metrics?.likes ?? 0,
         comments: post.comment_count ?? post.metrics?.comments ?? 0,
     });
+
+    const commentInputRef = React.useRef(null);
 
     async function toggleLike() {
         // Optional: toggle your like (also opens popup per your ask)
@@ -847,20 +969,22 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                     {counts.comments}
                 </Button>
             </Stack>
-
+            <Box sx={{ px: 1, pb: 1 }}>
+                <GroupCommentsDialog
+                    inline
+                    initialCount={3}
+                    groupIdOrSlug={groupIdOrSlug}
+                    postId={post.id}
+                    groupOwnerId={groupOwnerId}
+                    onBumpCount={bumpCommentCount}
+                    inputRef={commentInputRef}
+                />
+            </Box>
             <GroupLikesDialog
                 open={likesOpen}
                 onClose={() => setLikesOpen(false)}
                 groupIdOrSlug={groupIdOrSlug}
                 postId={post.id}
-            />
-            <GroupCommentsDialog
-                open={commentsOpen}
-                onClose={() => setCommentsOpen(false)}
-                groupIdOrSlug={groupIdOrSlug}
-                postId={post.id}
-                groupOwnerId={groupOwnerId}
-                onBumpCount={bumpCommentCount}
             />
         </>
     );

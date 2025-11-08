@@ -521,12 +521,22 @@ function LikesDialog({ open, onClose, communityId, postId }) {
 }
 
 // ---------- Comments dialog (threaded, like, reply, admin delete) ----------
-function CommentsDialog({ open, onClose, communityId, postId }) {
+function CommentsDialog({
+  open,
+  onClose,
+  communityId,
+  postId,
+  // NEW: inline rendering like LinkedIn/Instagram
+  inline = false,
+  initialCount = 3,
+  inputRef = null,
+}) {
   const [loading, setLoading] = React.useState(true);
   const [comments, setComments] = React.useState([]);
   const [me, setMe] = React.useState(null);
   const [input, setInput] = React.useState("");
   const [replyTo, setReplyTo] = React.useState(null);
+  const [visibleCount, setVisibleCount] = React.useState(initialCount);
 
   const isAdmin = !!(me?.is_admin || me?.is_staff || me?.is_moderator);
 
@@ -535,11 +545,13 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
       const r = await fetch(`${API_ROOT}/users/me/`, { headers: { ...authHeader() } });
       const j = r.ok ? await r.json() : null;
       setMe(j || {});
-    } catch { setMe({}); }
+    } catch {
+      setMe({});
+    }
   }, []);
 
   const load = React.useCallback(async () => {
-    if (!open || !communityId || !postId) return;
+    if ((!inline && !open) || !communityId || !postId) return;
     setLoading(true);
     try {
       const res = await fetch(
@@ -549,21 +561,32 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
       const json = res.ok ? await res.json() : [];
       const flat = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
       setComments(flat);
-    } catch { setComments([]); }
+      setVisibleCount(initialCount);
+    } catch {
+      setComments([]);
+    }
     setLoading(false);
-  }, [open, communityId, postId]);
+  }, [open, inline, communityId, postId, initialCount]);
 
-  React.useEffect(() => { if (open) { fetchMe(); load(); } }, [open, fetchMe, load]);
+  // Load on open (modal) or mount (inline)
+  React.useEffect(() => {
+    if (inline || open) {
+      fetchMe();
+      load();
+    }
+  }, [inline, open, fetchMe, load]);
 
-  // helpers
-  const buildTree = React.useMemo(() => {
-    const byId = new Map(); const roots = [];
-    comments.forEach(c => byId.set(c.id, { ...c, children: [] }));
+  // Build threaded tree
+  const roots = React.useMemo(() => {
+    const byId = new Map();
+    (comments || []).forEach(c => byId.set(c.id, { ...c, children: [] }));
     byId.forEach(c => {
       if (c.parent_id && byId.get(c.parent_id)) byId.get(c.parent_id).children.push(c);
-      else roots.push(c);
     });
-    return roots;
+    // newest roots first
+    return [...byId.values()]
+      .filter(c => !c.parent_id)
+      .sort((a, b) => (new Date(b.created_at || 0)) - (new Date(a.created_at || 0)));
   }, [comments]);
 
   async function createComment(text, parentId = null) {
@@ -577,7 +600,11 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
           body: JSON.stringify(parentId ? { text, parent_id: parentId } : { text }),
         }
       );
-      if (res.ok) { await load(); setInput(""); setReplyTo(null); }
+      if (res.ok) {
+        setInput("");
+        setReplyTo(null);
+        await load();
+      }
     } catch { }
   }
 
@@ -591,10 +618,9 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
   }
 
   async function deleteComment(c) {
-    // Prefer DELETE to detail; gracefully fall back to /delete/
     const tryUrls = [
       `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/${c.id}/`,
-      `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/${c.id}/delete/`
+      `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/${c.id}/delete/`,
     ];
     for (const u of tryUrls) {
       try {
@@ -605,15 +631,26 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
   }
 
   const CommentItem = ({ c, depth = 0 }) => (
-    <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? `2px solid ${BORDER}` : "none", ml: depth ? 1.5 : 0, mt: depth ? 1 : 0 }}>
+    <Box
+      sx={{
+        pl: depth ? 2 : 0,
+        borderLeft: depth ? `2px solid ${BORDER}` : "none",
+        ml: depth ? 1.5 : 0,
+        mt: depth ? 1 : 0
+      }}
+    >
       <Stack direction="row" alignItems="center" spacing={1}>
         <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
-        <Typography variant="subtitle2">{c.author?.name || c.author?.username || `User #${c.author_id}`}</Typography>
+        <Typography variant="subtitle2">
+          {c.author?.name || c.author?.username || `User #${c.author_id}`}
+        </Typography>
         <Typography variant="caption" color="text.secondary">
           {new Date(c.created_at || Date.now()).toLocaleString()}
         </Typography>
       </Stack>
+
       <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
+
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
         <Button
           size="small"
@@ -631,25 +668,98 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
           </Button>
         )}
       </Stack>
+
       {!!c.children?.length && (
         <Stack spacing={1} sx={{ mt: 1 }}>
-          {c.children.map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+          {c.children
+            .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0))) // replies oldest→newest
+            .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
         </Stack>
       )}
     </Box>
   );
 
+  // ---------- INLINE view (LinkedIn/Instagram style) ----------
+  if (inline) {
+    const visibleRoots = roots.slice(0, visibleCount);
+    const hasMore = roots.length > visibleRoots.length;
+
+    return (
+      <Box sx={{ mt: 1 }}>
+        {replyTo && (
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Replying to {replyTo.author?.name || `#${replyTo.author_id}`}
+            </Typography>
+            <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+          </Stack>
+        )}
+
+        {/* Always-visible input */}
+        <Stack direction="row" spacing={1}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            inputRef={inputRef || undefined}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                createComment(input, replyTo?.id || null);
+              }
+            }}
+          />
+          <Button
+            variant="contained"
+            onClick={() => createComment(input, replyTo?.id || null)}
+            disabled={!input.trim()}
+          >
+            Post
+          </Button>
+        </Stack>
+
+        {/* Comments */}
+        <Box sx={{ mt: 1.25 }}>
+          {loading ? (
+            <Stack alignItems="center" py={1.5}><CircularProgress size={18} /></Stack>
+          ) : visibleRoots.length === 0 ? (
+            <Typography variant="caption" color="text.secondary">Be the first to comment.</Typography>
+          ) : (
+            <Stack spacing={1.25}>
+              {visibleRoots.map((c) => <CommentItem key={c.id} c={c} />)}
+            </Stack>
+          )}
+
+          {hasMore && (
+            <Stack alignItems="flex-start" sx={{ mt: 1 }}>
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => setVisibleCount(v => v + initialCount)}
+              >
+                Load more comments
+              </Button>
+            </Stack>
+          )}
+        </Box>
+      </Box>
+    );
+  }
+
+  // ---------- ORIGINAL MODAL (kept for compatibility) ----------
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Comments</DialogTitle>
       <DialogContent dividers>
         {loading ? (
           <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
-        ) : buildTree.length === 0 ? (
+        ) : roots.length === 0 ? (
           <Typography color="text.secondary">No comments yet.</Typography>
         ) : (
           <Stack spacing={2}>
-            {buildTree.map((c) => <CommentItem key={c.id} c={c} />)}
+            {roots.map((c) => <CommentItem key={c.id} c={c} />)}
           </Stack>
         )}
       </DialogContent>
@@ -657,7 +767,9 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
       <Box sx={{ px: 2, py: 1.5 }}>
         {replyTo && (
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-            <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Replying to {replyTo.author?.name || `#${replyTo.author_id}`}
+            </Typography>
             <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
           </Stack>
         )}
@@ -669,12 +781,15 @@ function CommentsDialog({ open, onClose, communityId, postId }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
-          <Button variant="contained" onClick={() => createComment(input, replyTo?.id || null)}>Post</Button>
+          <Button variant="contained" onClick={() => createComment(input, replyTo?.id || null)}>
+            Post
+          </Button>
         </Stack>
       </Box>
     </Dialog>
   );
 }
+
 
 // ---------- Social bar (below each card) ----------
 function PostSocialBar({ communityId, post, onCounts }) {
@@ -683,6 +798,7 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
   const [likesOpen, setLikesOpen] = React.useState(false);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
+  const commentInputRef = React.useRef(null);
 
   async function togglePostLike() {
     const url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/like/`;
@@ -710,13 +826,25 @@ function PostSocialBar({ communityId, post, onCounts }) {
         <Button
           size="small"
           startIcon={<ChatBubbleOutlineRoundedIcon />}
-          onClick={() => setCommentsOpen(true)}
+          onClick={() => {
+            if (commentInputRef?.current) commentInputRef.current.focus();
+          }}
         >
           {commentCount}
         </Button>
         <Button size="small" onClick={() => setLikesOpen(true)}>View likes</Button>
       </Stack>
-
+      {/* Inline comments (always visible, like LinkedIn/Instagram) */}
+      <Box sx={{ px: 1, pb: 1 }}>
+        <CommentsDialog
+          inline
+          initialCount={3}
+          communityId={communityId}
+          postId={post.id}
+          onClose={() => { }}
+          inputRef={commentInputRef}
+        />
+      </Box>
       <LikesDialog open={likesOpen} onClose={() => setLikesOpen(false)} communityId={communityId} postId={post.id} />
       <CommentsDialog
         open={commentsOpen}
