@@ -113,7 +113,7 @@ function ConversationRow({ thread, active, onClick }) {
     >
       <ListItemAvatar sx={{ minWidth: 48 }}>
         <Badge variant={unread > 0 ? "dot" : "standard"} color="primary" overlap="circular">
-          <Avatar>{(title || "C").slice(0, 1)}</Avatar>
+          <Avatar src={thread.context_logo}>{(title || "C").slice(0, 1)}</Avatar>
         </Badge>
       </ListItemAvatar>
 
@@ -153,7 +153,11 @@ function Bubble({ m, showSender }) {
       alignItems="flex-end"
       sx={{ my: 1 }}
     >
-      {!mine && <Avatar sx={{ width: 32, height: 32, mr: 1 }}>{(m.sender_display || m.sender_name || "U").slice(0, 1)}</Avatar>}
+      {!mine && (
+        <Avatar src={m.sender_avatar} sx={{ width: 32, height: 32, mr: 1 }}>
+          {(m.sender_display || m.sender_name || "U").slice(0, 1)}
+        </Avatar>
+      )}
       <Box
         sx={{
           maxWidth: "78%",
@@ -187,24 +191,67 @@ function Bubble({ m, showSender }) {
   );
 }
 
-// ---------- New Chat Dialog ----------
+// ---------- New Chat Dialog (Friends | Groups | Events) ----------
 function NewChatDialog({ open, onClose, onOpened }) {
-  const [tab, setTab] = React.useState(0); // 0: Friends, 1: Groups
+  const [tab, setTab] = React.useState(0); // 0: Friends, 1: Groups, 2: Events
   const [q, setQ] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [friends, setFriends] = React.useState([]);
   const [groups, setGroups] = React.useState([]);
+  const [events, setEvents] = React.useState([]);
+
+  // small helper: normalize any response into [{id, name, avatar}]
+  const normalizeEvents = React.useCallback((json) => {
+    const inArr = Array.isArray(json?.results) ? json.results : Array.isArray(json) ? json : [];
+    const out = [];
+
+    for (const x of inArr) {
+      // Case A: it's already an event object
+      if (x?.id && (x?.title || x?.name)) {
+        out.push({
+          id: x.id,
+          name: x.title || x.name || `Event #${x.id}`,
+          avatar: x.banner_url || x.cover_image || x.poster || x.thumbnail || "",
+        });
+        continue;
+      }
+      // Case B: it's a registration object; event nested
+      const ev = x?.event || x?.event_obj || null;
+      if (ev && (ev.id || x.event_id)) {
+        const id = ev.id || x.event_id;
+        out.push({
+          id,
+          name: ev.title || ev.name || x.event_title || `Event #${id}`,
+          avatar: ev.banner_url || ev.cover_image || ev.poster || ev.thumbnail || "",
+        });
+        continue;
+      }
+      // Case C: registration with ids/titles split
+      if (x?.event_id) {
+        const id = x.event_id;
+        out.push({
+          id,
+          name: x.event_title || `Event #${id}`,
+          avatar: "",
+        });
+      }
+    }
+
+    // dedupe by id
+    const seen = new Set();
+    return out.filter((e) => (e.id && !seen.has(e.id) && seen.add(e.id)));
+  }, []);
 
   React.useEffect(() => {
     if (!open) return;
-    onOpened?.(); // parent can refetch conversations after creation
+    onOpened?.();
+
     (async () => {
       setLoading(true);
       try {
-        // friends
+        // ---- FRIENDS ----
         const fr = await apiFetch(`${API_ROOT}/friends/?page_size=100`);
         const frJson = await fr.json();
-        // shape to {id, name, avatar}
         const ff = (Array.isArray(frJson?.results) ? frJson.results : Array.isArray(frJson) ? frJson : [])
           .map((x) => ({
             id: x?.friend?.id ?? x?.id ?? x?.user_id ?? x?.user?.id,
@@ -214,11 +261,9 @@ function NewChatDialog({ open, onClose, onOpened }) {
           .filter((x) => x.id);
         setFriends(ff);
 
-        // groups (use joined groups primarily; fallback explore)
-        // chat-eligible groups (includes private groups you’re a member of)
+        // ---- GROUPS ----
         let gRes = await apiFetch(`${MESSAGING}/conversations/chat-groups/`);
         let gJson = await gRes.json();
-        // defensive fallback to your older endpoints if needed:
         if (!Array.isArray(gJson) || gJson.length === 0) {
           const jg = await apiFetch(`${API_ROOT}/groups/joined-groups/`);
           gJson = await jg.json();
@@ -235,20 +280,66 @@ function NewChatDialog({ open, onClose, onOpened }) {
           }))
           .filter((g) => g.id);
         setGroups(gg);
+
+        // ---- EVENTS (your candidates) ----
+        // optionally get me.id for the last candidate
+        let meId = null;
+        try {
+          const meRes = await apiFetch(`${API_ROOT}/users/me/`);
+          if (meRes.ok) {
+            const meJson = await meRes.json();
+            meId = meJson?.id || null;
+          }
+        } catch { }
+
+        const candidates = [
+          `${API_ROOT}/events/mine/`,
+          `${API_ROOT}/event-registrations/mine/`,
+          `${API_ROOT}/registrations/mine/`,
+          `${API_ROOT}/event-registrations/?user=me`,
+          meId ? `${API_ROOT}/event-registrations/?user=${meId}` : null,
+        ].filter(Boolean);
+
+        let evOut = [];
+        // prefer a precise helper if you add one later
+        try {
+          const er = await apiFetch(`${MESSAGING}/conversations/chat-events/`);
+          if (er.ok) {
+            const ej = await er.json();
+            evOut = normalizeEvents(ej);
+          }
+        } catch { }
+
+        if (evOut.length === 0) {
+          for (const url of candidates) {
+            try {
+              const r = await apiFetch(url);
+              if (!r.ok) continue;
+              const j = await r.json();
+              const picked = normalizeEvents(j);
+              if (picked.length) { evOut = picked; break; }
+            } catch { }
+          }
+        }
+
+        setEvents(evOut);
       } catch (e) {
         console.error("Load lists failed", e);
       } finally {
         setLoading(false);
       }
     })();
-  }, [open]);
+  }, [open, normalizeEvents]);
 
-  const list = tab === 0 ? friends : groups;
+  const list = React.useMemo(() => (tab === 0 ? friends : tab === 1 ? groups : events), [tab, friends, groups, events]);
   const filtered = React.useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return list;
     return list.filter((x) => (x.name || "").toLowerCase().includes(t));
   }, [q, list]);
+
+  const placeholder = tab === 0 ? "Search friends…" : tab === 1 ? "Search groups…" : "Search events…";
+  const secondary = tab === 0 ? "Direct message" : tab === 1 ? "Group chat" : "Event chat";
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -257,12 +348,13 @@ function NewChatDialog({ open, onClose, onOpened }) {
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
           <Tab label="Friends" />
           <Tab label="Groups" />
+          <Tab label="Events" />
         </Tabs>
 
         <TextField
           fullWidth
           size="small"
-          placeholder={`Search ${tab === 0 ? "friends" : "groups"}…`}
+          placeholder={placeholder}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           InputProps={{
@@ -283,19 +375,12 @@ function NewChatDialog({ open, onClose, onOpened }) {
           <List dense>
             {filtered.map((x) => (
               <ListItem
-                key={`${tab}-${x.id}`}
+                key={`tab${tab}-${x.id}`}
                 disableGutters
-                sx={{
-                  px: 1,
-                  py: 1,
-                  borderRadius: 2,
-                  cursor: "pointer",
-                  "&:hover": { bgcolor: "#fafafa" },
-                }}
+                sx={{ px: 1, py: 1, borderRadius: 2, cursor: "pointer", "&:hover": { bgcolor: "#fafafa" } }}
                 onClick={async () => {
                   try {
                     if (tab === 0) {
-                      // Friend: ensure/get DM
                       const res = await apiFetch(`${MESSAGING}/conversations/`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -304,8 +389,7 @@ function NewChatDialog({ open, onClose, onOpened }) {
                       const convo = await res.json();
                       if (!res.ok) throw new Error(convo?.detail || "Unable to create DM");
                       onClose({ type: "dm", conversation: convo });
-                    } else {
-                      /// Group: ensure/get real group room (sets conversation.group_id)
+                    } else if (tab === 1) {
                       const res = await apiFetch(`${MESSAGING}/conversations/ensure-group/`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -314,10 +398,19 @@ function NewChatDialog({ open, onClose, onOpened }) {
                       const convo = await res.json();
                       if (!res.ok) throw new Error(convo?.detail || "Unable to create group chat");
                       onClose({ type: "group", conversation: convo });
+                    } else {
+                      const res = await apiFetch(`${MESSAGING}/conversations/ensure-event/`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ event: x.id, title: x.name }),
+                      });
+                      const convo = await res.json();
+                      if (!res.ok) throw new Error(convo?.detail || "Unable to create event chat");
+                      onClose({ type: "event", conversation: convo });
                     }
                   } catch (e) {
                     console.error(e);
-                    onClose(); // close anyway; you can surface a toast if you have one
+                    onClose();
                   }
                 }}
               >
@@ -325,12 +418,8 @@ function NewChatDialog({ open, onClose, onOpened }) {
                   <Avatar src={x.avatar}>{(x.name || "X").slice(0, 1)}</Avatar>
                 </ListItemAvatar>
                 <ListItemText
-                  primary={
-                    <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
-                      {x.name}
-                    </Typography>
-                  }
-                  secondary={tab === 0 ? "Direct message" : "Group chat"}
+                  primary={<Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>{x.name}</Typography>}
+                  secondary={secondary}
                 />
               </ListItem>
             ))}
@@ -601,6 +690,9 @@ export default function MessagesPage() {
   const topTitle = (active?.group?.name)
     || active?.display_title
     || (active?.chat_type === "dm" ? "Direct Message" : "Conversation");
+
+  const topCover = active?.context_cover || "";
+  const topLogo = active?.context_logo || "";
   // const topMembers = [];  // (optional) hydrate from your own members API
 
   return (
@@ -678,10 +770,22 @@ export default function MessagesPage() {
             <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 1 }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                 <Stack direction="row" alignItems="center" spacing={1.5}>
-                  <Avatar sx={{ width: 40, height: 40 }}>{(topTitle || "C").slice(0, 1)}</Avatar>
+                  <Avatar src={topLogo} sx={{ width: 40, height: 40 }}>
+                    {(topTitle || "C").slice(0, 1)}
+                  </Avatar>
                   <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
                     {topTitle}
                   </Typography>
+
+                  {topCover && (
+                    <Box sx={{ mt: 1, borderRadius: 2, overflow: "hidden", border: `1px solid ${BORDER}` }}>
+                      <img
+                        src={topCover}
+                        alt="cover"
+                        style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }}
+                      />
+                    </Box>
+                  )}
                 </Stack>
 
                 <Stack direction="row" alignItems="center" spacing={1.25}>
