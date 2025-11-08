@@ -10,13 +10,8 @@ import {
   Stack,
   TextField,
   Typography,
-  Card,
-  CardContent,
-  CardActions,
-  LinearProgress,
-  Alert,
-  Avatar,
-  Pagination,
+  Card, CardContent, CardActions, LinearProgress, Alert, Avatar, Pagination,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
@@ -44,7 +39,7 @@ function authHeader() {
 }
 
 /* ---------- Single group card ---------- */
-function GroupGridCard({ g, onJoin }) {
+function GroupGridCard({ g, onJoin, onOpen }) {
   const isPrivate = (g.visibility || "").toLowerCase() === "private";
   const groupPath = `/community/group/${g.slug || g.id}`;
   const members = g.member_count ?? g.members_count ?? g.members?.length ?? 0;
@@ -74,18 +69,11 @@ function GroupGridCard({ g, onJoin }) {
     >
 
       <Box
-        sx={{
-          width: "100%",
-          height: 130,
-          bgcolor: "#f8fafc",
-          borderBottom: `1px solid ${BORDER}`,
-          backgroundImage: g.cover ? `url(${g.cover})` : "none",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
+        onClick={() => onOpen?.(g)}
+        sx={{ ...{ width: "100%", height: 130, bgcolor: "#f8fafc", borderBottom: `1px solid ${BORDER}`, backgroundImage: g.cover ? `url(${g.cover})` : "none", backgroundSize: "cover", backgroundPosition: "center" }, cursor: "pointer" }}
       />
 
-      <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+      <CardContent sx={{ flexGrow: 1, pb: 1, cursor: "pointer" }} onClick={() => onOpen?.(g)}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
           <Typography variant="caption" color="text.secondary">
             {isPrivate ? "Private" : "Public"}
@@ -118,9 +106,11 @@ function GroupGridCard({ g, onJoin }) {
         <Button
           size="small"
           variant="outlined"
-          component={RouterLink}
-          to={groupPath}
-          sx={{ textTransform: "none", ml: 1 }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpen?.(g);
+          }}
         >
           Details
         </Button>
@@ -184,6 +174,57 @@ function TopicHeader({ title, previews = [], extraCount = 0 }) {
   );
 }
 
+function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
+  if (!group) return null;
+
+  const members = group.member_count ?? group.members_count ?? group.members?.length ?? 0;
+  const isPrivate = (group.visibility || "").toLowerCase() === "private";
+  const visibility = (group.visibility || "").toLowerCase();
+  const jp = (group.join_policy || "").toLowerCase();
+  const pending = (group.membership_status || "").toLowerCase() === "pending";
+  const joined = (group.membership_status || "").toLowerCase() === "joined" || !!group.is_member;
+  const isApproval = visibility === "public" && (jp === "public_approval" || jp === "approval");
+  const ctaText = joined ? "Joined" : pending ? "Request pending" : (isApproval ? "Request to join" : "Join");
+
+  return (
+    <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{group.name}</DialogTitle>
+      <DialogContent dividers>
+        <Box
+          sx={{
+            width: "100%", height: 180, mb: 2, borderRadius: 2, overflow: "hidden",
+            bgcolor: "#f8fafc", border: `1px solid ${BORDER}`,
+            backgroundImage: group.cover ? `url(${group.cover})` : "none",
+            backgroundSize: "cover", backgroundPosition: "center",
+          }}
+        />
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="caption" color="text.secondary">
+            {isPrivate ? "Private" : "Public"}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">•</Typography>
+          <Typography variant="caption" color="text.secondary">{members} members</Typography>
+        </Stack>
+        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+          {group.description || "No description provided."}
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        <Button
+          variant="contained"
+          onClick={() => onJoin?.(group)}
+          disabled={pending || joined}
+          sx={{ textTransform: "none", fontWeight: 700 }}
+        >
+          {ctaText}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
 export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
@@ -197,6 +238,10 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
   const [groups, setGroups] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+
+  const [quickOpen, setQuickOpen] = React.useState(false);
+  const [selected, setSelected] = React.useState(null);
+  const openQuick = (g) => { setSelected(g); setQuickOpen(true); };
 
   const [previews, setPreviews] = React.useState([
     {
@@ -399,7 +444,7 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
           <Grid container spacing={2}>
             {paginatedGroups.map((g) => (
               <Grid key={g.id} item xs={12} sm={6} md={4}>
-                <GroupGridCard g={g} onJoin={handleJoin} />
+                <GroupGridCard g={g} onJoin={handleJoin} onOpen={openQuick} />
               </Grid>
             ))}
 
@@ -428,6 +473,12 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
               />
             </Box>
           )}
+          <GroupQuickViewDialog
+            open={quickOpen}
+            group={selected}
+            onClose={() => setQuickOpen(false)}
+            onJoin={handleJoin}
+          />
         </Box>
 
         {/* RIGHT: Sidebar - sticky */}
