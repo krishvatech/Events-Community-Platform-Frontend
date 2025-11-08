@@ -2,7 +2,6 @@
 import * as React from "react";
 import {
   Avatar,
-  AvatarGroup,
   Badge,
   Box,
   Button,
@@ -43,6 +42,8 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import VideoFileOutlinedIcon from "@mui/icons-material/VideoFileOutlined";
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
+import { useNavigate } from "react-router-dom";
+
 
 const BORDER = "#e2e8f0";
 const PANEL_H = "calc(100vh - 130px)";
@@ -51,16 +52,10 @@ const TIME_H = 16;   // px reserved at the bottom for time
 
 const bubbleSx = (mine) => (theme) => ({
   position: "relative",
-  // leave room for tail so no horizontal scroll
   maxWidth: "calc(78% - 8px)",
-
-  // base padding
   padding: theme.spacing(0.75, 1.25),
-
-  // reserve space for the time (right + bottom)
   paddingRight: `calc(${theme.spacing(1.25)} + ${TIME_W}px)`,
   paddingBottom: `calc(${theme.spacing(0.75)} + ${TIME_H}px)`,
-
   borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
   bgcolor: mine ? "rgb(189, 189, 189, 0.25)" : theme.palette.background.paper,
   color: mine ? theme.palette.common.black : "inherit",
@@ -68,8 +63,6 @@ const bubbleSx = (mine) => (theme) => ({
   boxShadow: mine ? "0 2px 6px rgba(114, 113, 113, 0.15)" : "none",
   overflowWrap: "anywhere",
   wordBreak: "break-word",
-
-  // WhatsApp-like tail
   "&:after": {
     content: '""',
     position: "absolute",
@@ -84,19 +77,40 @@ const bubbleSx = (mine) => (theme) => ({
   },
 });
 
-
-
 // ---------- API helpers ----------
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 const MESSAGING = `${API_ROOT}/messaging`;
 
-const CAPTION_SX = { fontSize: 11, lineHeight: 1.2 };             // general tiny text
+// Centralized endpoints (keeps paths consistent with DRF trailing slashes)
+const ENDPOINTS = {
+  // Conversations
+  conversations: () => `${MESSAGING}/conversations/`,
+  conversationMessages: (cid) => `${MESSAGING}/conversations/${cid}/messages/`,
+  conversationMembers: (cid) => `${MESSAGING}/conversations/${cid}/members/`,
+  convMarkAllRead: (cid) => `${MESSAGING}/conversations/${cid}/mark-all-read/`,
+  chatGroups: () => `${MESSAGING}/conversations/chat-groups/`,
+  chatEvents: () => `${MESSAGING}/conversations/chat-events/`,
+  ensureGroup: () => `${MESSAGING}/conversations/ensure-group/`,
+  ensureEvent: () => `${MESSAGING}/conversations/ensure-event/`,
+
+  // Messages
+  messageRead: (mid) => `${MESSAGING}/messages/${mid}/read/`,
+};
+// ---------- SPA routes (taken from GroupsPage & MembersPage) ----------
+const groupPath = (objOrId) => {
+  const o = typeof objOrId === "object" ? objOrId : { id: objOrId };
+  return `/community/group/${o?.slug || o?.id}`;
+};
+const userProfilePath = (id) => `/community/rich-profile/${id}`;
+
+
+
+const CAPTION_SX = { fontSize: 11, lineHeight: 1.2 };
 const TINY_TIME_SX = { fontSize: 11, lineHeight: 1.2, opacity: .7 };
 const CHIP_TINY_SX = {
   height: 18,
   '& .MuiChip-label': { px: 0.75, fontSize: 11, fontWeight: 400, lineHeight: '14px' }
 };
-
 
 function getCookie(name) {
   if (typeof document === "undefined") return null;
@@ -133,8 +147,39 @@ async function apiFetch(url, { method = "GET", headers = {}, body } = {}) {
   return res;
 }
 
+// small JSON helper
+async function postJSON(url, data) {
+  const res = await apiFetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: data ? JSON.stringify(data) : undefined,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.detail || `POST ${url} failed`);
+  return json;
+}
+
+// -------- read receipts helpers ----------
+async function markMessageRead(messageId) {
+  try {
+    const res = await apiFetch(ENDPOINTS.messageRead(messageId), { method: "POST" });
+    if (!res.ok) throw new Error("mark read failed");
+  } catch (e) {
+    console.warn("markMessageRead:", e?.message || e);
+  }
+}
+
+async function markConversationAllRead(conversationId) {
+  try {
+    const res = await apiFetch(ENDPOINTS.convMarkAllRead(conversationId), { method: "POST" });
+    if (!res.ok) throw new Error("mark all read failed");
+  } catch (e) {
+    console.warn("markConversationAllRead:", e?.message || e);
+  }
+}
+
+
 // ---------- UI SUB-COMPONENTS ----------
-// ---- image helpers for popup avatars ----
 const absUrl = (u) => {
   if (!u) return "";
   if (/^(https?:|data:)/i.test(u)) return u;
@@ -152,15 +197,51 @@ const pickImg = (obj, keys) => {
   return "";
 };
 
-// Left list row (conversation item)
+// ---- last-message helpers ----
+const getLastMessageObj = (t) => {
+  const lm = t?.last_message ?? t?.latest_message ?? t?.last ?? null;
+  if (!lm) return null;
+  return typeof lm === "string" ? { body: lm } : lm;
+};
+
+const getLastTimeISO = (t) => {
+  const lm = getLastMessageObj(t);
+  return (
+    // ✅ prefer sticky client-side values when present
+    t?._last_ts || t?.local_last_ts ||
+    // server-provided possibilities
+    t?.last_message_created_at ||
+    t?.last_message_at ||
+    t?.last_message_time ||
+    t?.last_message_timestamp ||
+    lm?.created_at || lm?.timestamp || lm?.sent_at ||
+    // fallbacks
+    t?.updated_at || t?.created_at || null
+  );
+};
+
+const formatHHMM = (iso) =>
+  iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+
+const getLastPreviewText = (t) => {
+  const lm = getLastMessageObj(t);
+  return (
+    t?.last_message_text ||
+    t?.last_text ||
+    (lm?.body || lm?.text || lm?.message || "") ||
+    ""
+  );
+};
+
+
 function ConversationRow({ thread, active, onClick }) {
   const unread = thread.unread_count || 0;
+  const timeISO = thread._last_ts || getLastTimeISO(thread);
+  const time = formatHHMM(timeISO);
+  const last = getLastPreviewText(thread);
   const title = (thread?.group?.name)
     || thread.display_title
     || (thread.chat_type === "dm" ? "Direct Message" : "Conversation");
-  const time = thread.updated_at ? new Date(thread.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-  const last = thread.last_message || "";
-
   return (
     <ListItem
       disableGutters
@@ -217,8 +298,6 @@ function ConversationRow({ thread, active, onClick }) {
   );
 }
 
-// Single message bubble (center)
-
 function Bubble({ m, showSender }) {
   const mine = Boolean(m.mine);
 
@@ -227,7 +306,10 @@ function Bubble({ m, showSender }) {
       direction="row"
       justifyContent={mine ? "flex-end" : "flex-start"}
       alignItems="flex-end"
-      sx={{ my: 0.75 }}
+      sx={{ my: 0.75, width: "100%" }}   // <-- ensure the row spans full width
+      data-mid={m.id}
+      data-mine={mine ? "1" : "0"}
+      data-readbyme={m.read_by_me ? "1" : "0"}
     >
       {!mine && (
         <Avatar src={m.sender_avatar} sx={{ width: 30, height: 30, mr: 1 }}>
@@ -245,7 +327,7 @@ function Bubble({ m, showSender }) {
               fontWeight: 700,
               display: "block",
               mb: 0.25,
-              opacity: 0.9,  
+              opacity: 0.9,
             }}
           >
             {mine ? "You" : (m.sender_display || m.sender_name)}
@@ -253,15 +335,11 @@ function Bubble({ m, showSender }) {
         )}
 
         {m.body && (
-        <Typography
-          variant="body2"
-          sx={{ whiteSpace: "pre-wrap" }}  // darker text in green bubble
-        >
-          {m.body}
-        </Typography>
+          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+            {m.body}
+          </Typography>
         )}
 
-        {/* time inside bubble, bottom-right */}
         <Typography
           className="bubble-time"
           variant="caption"
@@ -313,7 +391,7 @@ async function hydrateMissingAvatars(items, type) {
         t === "event" ? pickFromEvent(json) : "";
 
   const jobs = out.map(async (item) => {
-    if (item.avatar) return item; // already good
+    if (item.avatar) return item;
     const url = endpoint(type, item.id);
     if (!url) return item;
     try {
@@ -329,22 +407,20 @@ async function hydrateMissingAvatars(items, type) {
 
   return Promise.all(jobs);
 }
-// ---------- New Chat Dialog (Friends | Groups | Events) ----------
+
+// ---------- New Chat Dialog ----------
 function NewChatDialog({ open, onClose, onOpened }) {
-  const [tab, setTab] = React.useState(0); // 0: Friends, 1: Groups, 2: Events
+  const [tab, setTab] = React.useState(0);
   const [q, setQ] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [friends, setFriends] = React.useState([]);
   const [groups, setGroups] = React.useState([]);
   const [events, setEvents] = React.useState([]);
 
-  // small helper: normalize any response into [{id, name, avatar}]
   const normalizeEvents = React.useCallback((json) => {
     const inArr = Array.isArray(json?.results) ? json.results : Array.isArray(json) ? json : [];
     const out = [];
-
     for (const x of inArr) {
-      // Case A: it's already an event object
       if (x?.id && (x?.title || x?.name)) {
         out.push({
           id: x.id,
@@ -353,12 +429,11 @@ function NewChatDialog({ open, onClose, onOpened }) {
             pickImg(x, [
               "thumbnail", "poster", "logo_url",
               "cover_image", "banner_url", "banner", "cover", "header_image", "hero_image",
-              "preview_image",      // your model field
+              "preview_image",
             ]) || "",
         });
         continue;
       }
-      // Case B: it's a registration object; event nested
       const ev = x?.event || x?.event_obj || null;
       if (ev && (ev.id || x.event_id)) {
         const id = ev.id || x.event_id;
@@ -374,18 +449,11 @@ function NewChatDialog({ open, onClose, onOpened }) {
         });
         continue;
       }
-      // Case C: registration with ids/titles split
       if (x?.event_id) {
         const id = x.event_id;
-        out.push({
-          id,
-          name: x.event_title || `Event #${id}`,
-          avatar: "",
-        });
+        out.push({ id, name: x.event_title || `Event #${id}`, avatar: "" });
       }
     }
-
-    // dedupe by id
     const seen = new Set();
     return out.filter((e) => (e.id && !seen.has(e.id) && seen.add(e.id)));
   }, []);
@@ -397,7 +465,6 @@ function NewChatDialog({ open, onClose, onOpened }) {
     (async () => {
       setLoading(true);
       try {
-        // ---- FRIENDS ----
         const fr = await apiFetch(`${API_ROOT}/friends/?page_size=100`);
         const frJson = await fr.json();
         const ff = (Array.isArray(frJson?.results) ? frJson.results : Array.isArray(frJson) ? frJson : [])
@@ -413,18 +480,15 @@ function NewChatDialog({ open, onClose, onOpened }) {
               "Friend";
             const avatar =
               pickImg(x, [
-                // preferred: profile images
                 "friend.profile.user_image",
                 "friend.profile.avatar",
                 "profile.user_image",
                 "profile.avatar",
-                // direct fields / fallbacks
                 "friend.avatar",
                 "friend.image",
                 "friend.photo",
                 "avatar",
                 "image",
-                // linkedin (if present)
                 "friend.linkedin.picture_url",
               ]) || "";
             return { id, name, avatar };
@@ -433,8 +497,7 @@ function NewChatDialog({ open, onClose, onOpened }) {
         setFriends(ff);
         try { setFriends(await hydrateMissingAvatars(ff, "friend")); } catch { }
 
-        // ---- GROUPS ----
-        let gRes = await apiFetch(`${MESSAGING}/conversations/chat-groups/`);
+        let gRes = await apiFetch(ENDPOINTS.chatGroups());
         let gJson = await gRes.json();
         if (!Array.isArray(gJson) || gJson.length === 0) {
           const jg = await apiFetch(`${API_ROOT}/groups/joined-groups/`);
@@ -450,9 +513,7 @@ function NewChatDialog({ open, onClose, onOpened }) {
             const name = g.name || g.title || "Group";
             const avatar =
               pickImg(g, [
-                // logos first
                 "logo_url", "logo", "avatar", "image",
-                // covers/banners (supports .url objects)
                 "cover_image", "banner", "banner_url", "cover", "header_image", "hero_image",
               ]) || "";
             return { id, name, avatar };
@@ -461,8 +522,6 @@ function NewChatDialog({ open, onClose, onOpened }) {
         setGroups(gg);
         try { setGroups(await hydrateMissingAvatars(gg, "group")); } catch { }
 
-        // ---- EVENTS (your candidates) ----
-        // optionally get me.id for the last candidate
         let meId = null;
         try {
           const meRes = await apiFetch(`${API_ROOT}/users/me/`);
@@ -481,9 +540,8 @@ function NewChatDialog({ open, onClose, onOpened }) {
         ].filter(Boolean);
 
         let evOut = [];
-        // prefer a precise helper if you add one later
         try {
-          const er = await apiFetch(`${MESSAGING}/conversations/chat-events/`);
+          const er = await apiFetch(ENDPOINTS.chatEvents());
           if (er.ok) {
             const ej = await er.json();
             evOut = normalizeEvents(ej);
@@ -523,7 +581,7 @@ function NewChatDialog({ open, onClose, onOpened }) {
   const secondary = tab === 0 ? "Direct message" : tab === 1 ? "Group chat" : "Event chat";
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={() => onClose?.()} fullWidth maxWidth="sm">
       <DialogTitle>Start a new chat</DialogTitle>
       <DialogContent dividers>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
@@ -569,16 +627,16 @@ function NewChatDialog({ open, onClose, onOpened }) {
                       });
                       const convo = await res.json();
                       if (!res.ok) throw new Error(convo?.detail || "Unable to create DM");
-                      onClose({ type: "dm", conversation: convo });
+                      onClose?.({ type: "dm", conversation: convo });
                     } else if (tab === 1) {
-                      const res = await apiFetch(`${MESSAGING}/conversations/ensure-group/`, {
+                      const res = await apiFetch(ENDPOINTS.ensureGroup(), {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ group: x.id, title: x.name }),
                       });
                       const convo = await res.json();
                       if (!res.ok) throw new Error(convo?.detail || "Unable to create group chat");
-                      onClose({ type: "group", conversation: convo });
+                      onClose?.({ type: "group", conversation: convo });
                     } else {
                       const res = await apiFetch(`${MESSAGING}/conversations/ensure-event/`, {
                         method: "POST",
@@ -587,11 +645,11 @@ function NewChatDialog({ open, onClose, onOpened }) {
                       });
                       const convo = await res.json();
                       if (!res.ok) throw new Error(convo?.detail || "Unable to create event chat");
-                      onClose({ type: "event", conversation: convo });
+                      onClose?.({ type: "event", conversation: convo });
                     }
                   } catch (e) {
                     console.error(e);
-                    onClose();
+                    onClose?.();
                   }
                 }}
               >
@@ -618,6 +676,8 @@ function NewChatDialog({ open, onClose, onOpened }) {
 
 /** ---------- PAGE ---------- */
 export default function MessagesPage() {
+  const navigate = useNavigate();
+
   // LEFT: conversations list
   const [q, setQ] = React.useState("");
   const [threads, setThreads] = React.useState([]); // API: /conversations/
@@ -656,15 +716,13 @@ export default function MessagesPage() {
       out.push({ label, items: arr });
     }
 
-    // keep chronological order of sections according to first item's time
     out.sort((a, b) => new Date(a.items[0].created_at) - new Date(b.items[0].created_at));
     return out;
   }, [messages]);
 
   const [draft, setDraft] = React.useState("");
 
-  // Right-rail: attachments summary derived from messages
-  // put near other hooks
+  // attachments summary
   const attachmentSummary = React.useMemo(() => {
     const out = {
       document: { key: 'document', icon: <DescriptionOutlinedIcon fontSize="small" />, label: 'Documents', count: 0 },
@@ -690,31 +748,115 @@ export default function MessagesPage() {
     return Object.values(out);
   }, [messages]);
 
-
-  // ME + right-rail members
   const [me, setMe] = React.useState(null);
   const [topMembers, setTopMembers] = React.useState([]);
-
   const active = React.useMemo(() => threads.find((t) => t.id === activeId) || null, [threads, activeId]);
+
+  // --- READ RECEIPT: throttle controls ---
+  const markCooldown = React.useRef(false);
+  const markAllReadInFlight = React.useRef(false);
+
+  // mark all read call (idempotent)
+  const markAllReadNow = React.useCallback(async () => {
+    if (!activeId) return;
+    if (markAllReadInFlight.current) return;
+    markAllReadInFlight.current = true;
+    try {
+      const r = await postJSON(ENDPOINTS.convMarkAllRead(activeId));
+      // Drop unread badge for this conversation immediately
+      setThreads((cur) => cur.map((t) => (t.id === activeId ? { ...t, unread_count: 0 } : t)));
+      // Flip local messages' read_by_me (for UI)
+      setMessages((cur) => cur.map((m) => (m.mine ? m : { ...m, read_by_me: true })));
+    } catch (e) {
+      // ignore errors silently; it's idempotent anyway
+    } finally {
+      markAllReadInFlight.current = false;
+    }
+  }, [activeId]);
+
+  // debounced helper: avoid hammering endpoint while scrolling/polling
+  const markAllReadDebounced = React.useCallback(() => {
+    if (markCooldown.current) return;
+    markCooldown.current = true;
+    markAllReadNow();
+    setTimeout(() => { markCooldown.current = false; }, 800);
+  }, [markAllReadNow]);
 
   // fetch conversations
   const loadConversations = React.useCallback(async () => {
     try {
-      const res = await apiFetch(`${MESSAGING}/conversations/`);
+      const res = await apiFetch(ENDPOINTS.conversations());
       if (res.status === 401) { console.warn("Not authenticated for conversations"); return; }
       const data = await res.json();
       if (Array.isArray(data)) {
-        setThreads(data);
-        if (!activeId && data.length) setActiveId(data[0].id);
+        setThreads((prev) => {
+          // 🔧 key by String(id) so "1" and 1 are the same
+          const byId = new Map(prev.map((p) => [String(p.id), p]));
+
+          const normalized = data
+            .map((t) => {
+              const serverTs = getLastTimeISO(t);
+              const prevTs = byId.get(String(t.id))?._last_ts;
+              // 🔧 never roll back to an older time
+              const best =
+                new Date(serverTs || 0).getTime() >= new Date(prevTs || 0).getTime()
+                  ? serverTs
+                  : prevTs;
+              return {
+                ...t,
+                _last_ts: best || serverTs || t.updated_at || t.created_at,
+              };
+            })
+            .sort(
+              (a, b) =>
+                new Date(b._last_ts || 0).getTime() - new Date(a._last_ts || 0).getTime()
+            );
+
+          if (!activeId && normalized.length) setActiveId(normalized[0].id);
+          return normalized;
+        });
       }
+
     } catch (e) {
       console.error("Failed to load conversations", e);
     }
   }, [activeId]);
+  // Resolve group key from many possible shapes, then navigate
+  const resolveActiveGroup = React.useCallback(() => {
+    const g = active?.group || active?.context_group || null;
+    return {
+      id:
+        active?.group_id ??
+        g?.id ??
+        active?.context_group_id ??
+        active?.context_id ??
+        null,
+      slug:
+        active?.group_slug ??
+        g?.slug ??
+        active?.context_slug ??
+        null,
+    };
+  }, [active]);
 
-  React.useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+  const hasActiveGroup = React.useMemo(() => {
+    const { id, slug } = resolveActiveGroup();
+    return Boolean(id || slug);
+  }, [resolveActiveGroup]);
+
+  const openActiveGroup = React.useCallback(() => {
+    const { id, slug } = resolveActiveGroup();
+    if (!id && !slug) return;
+    navigate(groupPath({ id, slug }));
+  }, [navigate, resolveActiveGroup]);
+
+  // Go to a member's profile page
+  const openUserProfile = React.useCallback((uid) => {
+    if (!uid) return;
+    navigate(userProfilePath(uid));
+  }, [navigate]);
+
+  React.useEffect(() => { loadConversations(); }, [loadConversations]);
 
   // load me
   React.useEffect(() => {
@@ -732,39 +874,145 @@ export default function MessagesPage() {
   }, []);
 
   // fetch messages for active thread
+
+  // fetch messages for active thread
   const loadMessages = React.useCallback(async () => {
     if (!activeId) return;
     try {
-      const res = await apiFetch(`${MESSAGING}/conversations/${activeId}/messages/`);
+      const res = await apiFetch(ENDPOINTS.conversationMessages(activeId));
       if (!res.ok) { console.error("Messages load failed", res.status); return; }
       const payload = await res.json();
-      const rows = Array.isArray(payload?.results) ? payload.results
-        : Array.isArray(payload) ? payload : [];
-      const mapped = rows.map((m) => {
-        const senderId = m.sender_id ?? m.sender ?? m.user_id ?? m.user;
-        const mine = me ? String(senderId) === String(me.id) : Boolean(m.mine);
+
+      // Accept many possible server shapes:
+      // - DRF pagination:   { results: [...] }
+      // - Our custom:       { items: [...] } or { messages: [...] } or { data: [...] }
+      // - Bare array:       [ ... ]
+      const rowsRaw =
+        (Array.isArray(payload?.results) && payload.results) ||
+        (Array.isArray(payload?.items) && payload.items) ||
+        (Array.isArray(payload?.messages) && payload.messages) ||
+        (Array.isArray(payload?.data) && payload.data) ||
+        (Array.isArray(payload) && payload) ||
+        [];
+
+      // Normalize fields used by the UI  ✅ sets "mine"
+      const mapped = rowsRaw.map((m) => {
+        const senderId =
+          m.sender_id ??
+          m.user_id ??
+          (typeof m.sender === "object" ? m.sender?.id : m.sender) ??
+          (typeof m.user === "object" ? m.user?.id : m.user);
+
+        const createdIso =
+          m.created_at ?? m.created ?? m.timestamp ?? m.sent_at ?? m.createdOn;
+
+        // >>> THE IMPORTANT BIT: decide if this message is mine (logged-in user)
+        const isMine = me
+          ? String(senderId) === String(me.id)
+          : Boolean(m.mine);
+
         return {
-          ...m,
-          mine,
-          _time: m.created_at
-            ? new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          id: m.id ?? m.pk ?? m.uuid ?? String(Math.random()),
+          body: m.body ?? m.text ?? m.message ?? "",
+          sender_id: senderId,
+          sender_name: m.sender_name ?? m.sender_display ?? m.senderUsername ?? "",
+          sender_display: isMine
+            ? "You"
+            : (m.sender_display ?? m.sender_name ?? m.senderUsername ?? ""),
+          sender_avatar:
+            m.sender_avatar ??
+            (typeof m.sender === "object" ? m.sender?.avatar : undefined) ??
+            "",
+
+          attachments: Array.isArray(m.attachments) ? m.attachments : [],
+          read_by_me: Boolean(m.read_by_me ?? m.seen ?? m.is_read),
+
+          // ✅ include mine flag so Bubble can right-align like WhatsApp
+          mine: isMine,
+
+          created_at: createdIso,
+          _time: createdIso
+            ? new Date(createdIso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
             : "",
         };
       });
+
       setMessages(mapped);
+      // 🔧 Update the active conversation row's last-time from the newest message
+      const last = mapped[mapped.length - 1];
+      const lastIso = last?.created_at || null;
+
+      if (lastIso) {
+        setThreads((cur) =>
+          cur
+            .map((t) => {
+              if (t.id !== activeId) return t;
+              const prevTs = t._last_ts;
+              const better =
+                new Date(lastIso || 0).getTime() >= new Date(prevTs || 0).getTime()
+                  ? lastIso
+                  : prevTs;
+              return {
+                ...t,
+                _last_ts: better,
+                last_message: last?.body ?? t.last_message,
+                last_message_created_at: better || t.last_message_created_at,
+              };
+            })
+            .sort(
+              (a, b) =>
+                new Date(b._last_ts || 0).getTime() - new Date(a._last_ts || 0).getTime()
+            )
+        );
+      }
+
+
+      // scroll to bottom (keep your code)
       requestAnimationFrame(() => {
         const el = document.getElementById("chat-scroll");
         if (el) el.scrollTop = el.scrollHeight;
       });
+
+      // mark inbound bubbles as read once ~60% visible
+      requestAnimationFrame(() => {
+        const container = document.getElementById("chat-scroll");
+        if (!container) return;
+
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            const el = entry.target;
+            const mid = el.getAttribute("data-mid");
+            const mine = el.getAttribute("data-mine") === "1";
+            const byme = el.getAttribute("data-readbyme") === "1";
+            if (!mid || mine || byme) return;
+            markMessageRead(mid);               // fire-and-forget
+            el.setAttribute("data-readbyme", "1");
+            io.unobserve(el);
+          });
+        }, { root: container, threshold: 0.6 });
+
+        container.querySelectorAll("[data-mid]").forEach((n) => io.observe(n));
+      });
+
+      // scroll to bottom
+      requestAnimationFrame(() => {
+        const el = document.getElementById("chat-scroll");
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+
+      // Important: immediately mark-all-read for visible conversation
+      markAllReadDebounced();
     } catch (e) {
       console.error("Failed to load messages", e);
     }
-  }, [activeId]);
+  }, [activeId, me, markAllReadDebounced]);
+
 
   // initial + polling
   React.useEffect(() => {
     if (!activeId) return;
-    loadMessages();                           // load now
+    loadMessages();                          // load now
     const iv = setInterval(loadMessages, 4000); // then poll
     return () => clearInterval(iv);
   }, [activeId, loadMessages]);
@@ -775,27 +1023,62 @@ export default function MessagesPage() {
     return () => clearInterval(iv);
   }, [loadConversations]);
 
+  const normalizeMember = (p) => ({
+    id:
+      p.id ?? p.user_id ?? p.user?.id ?? p.pk ?? null,
+    name:
+      p.name ?? p.display_name ?? p.username ??
+      p.user?.full_name ?? p.user?.username ?? "Member",
+    avatar:
+      p.avatar ?? p.user?.avatar ?? p.profile?.user_image ?? "",
+    role:
+      p.role ?? p.membership_role ?? (p.is_host ? "Host" : undefined),
+    is_you: Boolean(p.is_you || p.is_me || p.me || p.user?.is_me),
+  });
+
+  const dedupeMembers = (arr) => {
+    const byId = new Map();
+    const rank = { Host: 4, Owner: 4, Admin: 3, Moderator: 2, Member: 1, undefined: 0, null: 0 };
+
+    for (const raw of arr) {
+      const m = normalizeMember(raw);
+      const key = m.id || `${m.name}|${m.avatar}`; // fallback key if id missing
+      const prev = byId.get(key);
+      if (!prev) {
+        byId.set(key, m);
+      } else {
+        // merge duplicates: keep best role, keep avatar if missing, keep "You" if any copy has it
+        const merged = { ...prev };
+        if (m.is_you) merged.is_you = true;
+        if ((rank[m.role] || 0) > (rank[merged.role] || 0)) merged.role = m.role;
+        if (!merged.avatar && m.avatar) merged.avatar = m.avatar;
+        byId.set(key, merged);
+      }
+    }
+    return [...byId.values()];
+  };
+
+
   const loadMembers = React.useCallback(async (cid) => {
     if (!cid) return;
     try {
-      const res = await apiFetch(`${MESSAGING}/conversations/${cid}/members/`);
+      const res = await apiFetch(ENDPOINTS.conversationMembers(cid));
       if (!res.ok) { setTopMembers([]); return; }
-      const arr = await res.json();
-      // Normalize: [{id, name, avatar, role, is_you}]
-      setTopMembers(Array.isArray(arr) ? arr : []);
+      const raw = await res.json();
+      const list = Array.isArray(raw) ? raw :
+        (Array.isArray(raw?.results) ? raw.results : []);
+      setTopMembers(dedupeMembers(list));
     } catch (e) {
       console.error("members load failed", e);
       setTopMembers([]);
     }
   }, []);
 
-  // whenever active conversation changes, load members
   React.useEffect(() => {
     if (!activeId) { setTopMembers([]); return; }
     loadMembers(activeId);
   }, [activeId, loadMembers]);
 
-  // search filter
   const filtered = React.useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return threads;
@@ -808,12 +1091,17 @@ export default function MessagesPage() {
     const text = draft.trim();
     if (!text || !activeId) return;
 
-    const nowStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const now = new Date();
+    const nowStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
     const localMsg = {
       id: "local-" + Date.now(),
       body: text,
       mine: true,
+      sender_id: me?.id,
+      sender_avatar: me?.profile?.user_image || me?.avatar || "",
       sender_display: "You",
+      created_at: now.toISOString(),
       _time: nowStr,
     };
     setMessages((cur) => [...cur, localMsg]);
@@ -824,7 +1112,7 @@ export default function MessagesPage() {
     });
 
     try {
-      const res = await apiFetch(`${MESSAGING}/conversations/${activeId}/messages/`, {
+      const res = await apiFetch(ENDPOINTS.conversationMessages(activeId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: text, attachments: [] }),
@@ -837,6 +1125,7 @@ export default function MessagesPage() {
           m.id === localMsg.id
             ? {
               ...saved,
+              mine: true,
               _time: saved.created_at
                 ? new Date(saved.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                 : nowStr,
@@ -849,11 +1138,18 @@ export default function MessagesPage() {
         cur
           .map((t) =>
             t.id === activeId
-              ? { ...t, last_message: saved.body, updated_at: saved.created_at || new Date().toISOString(), unread_count: 0 }
+              ? {
+                ...t,
+                last_message: saved.body,
+                last_message_created_at: saved.created_at || new Date().toISOString(),
+                _last_ts: saved.created_at || new Date().toISOString(),   // ✅ drive UI time
+                unread_count: 0,
+              }
               : t
           )
-          .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+          .sort((a, b) => new Date(b._last_ts || 0) - new Date(a._last_ts || 0))
       );
+
     } catch (e) {
       console.error(e);
     }
@@ -875,29 +1171,37 @@ export default function MessagesPage() {
     };
   }, []);
 
+  // scroll listener: if near bottom, mark-all-read (new inbound messages)
+  React.useEffect(() => {
+    const el = document.getElementById("chat-scroll");
+    if (!el) return;
+    const onScroll = () => {
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+      if (nearBottom) markAllReadDebounced();
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [activeId, markAllReadDebounced]);
+
   const topTitle = (active?.group?.name)
     || active?.display_title
     || (active?.chat_type === "dm" ? "Direct Message" : "Conversation");
 
-  const topCover = active?.context_cover || "";
   const topLogo =
     active?.context_logo
     || active?.context_cover
     || active?.group_cover
     || active?.event_cover
     || "";
-  // const topMembers = [];  // (optional) hydrate from your own members API
 
   return (
     <>
-      {/* New Chat Dialog */}
       <NewChatDialog
         open={newOpen}
         onOpened={() => { }}
         onClose={async (result) => {
           setNewOpen(false);
           if (!result?.conversation) return;
-          // make sure the new/ensured conversation appears in the list and gets activated
           await loadConversations();
           const newId = result.conversation?.id;
           if (newId) setActiveId(newId);
@@ -907,7 +1211,7 @@ export default function MessagesPage() {
       <Grid container spacing={2}>
         {/* LEFT: Conversation list */}
         <Grid item xs={12} md={3}>
-          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, display: "flex", maxWidth: 350, flexDirection: "column" }}>
+          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, display: "flex", Width: 350, flexDirection: "column" }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>Messages</Typography>
               <IconButton size="small"><AttachFileOutlinedIcon fontSize="small" /></IconButton>
@@ -928,24 +1232,11 @@ export default function MessagesPage() {
               }}
             />
 
-            {!!pinned.length && (
-              <>
-                <Typography variant="caption" sx={{ mt: 1.5, mb: 0.5, display: "block", color: "text.secondary" }}>
-                  Pinned Message
-                </Typography>
-                <List dense>
-                  {pinned.map((t) => (
-                    <ConversationRow key={t.id} thread={t} active={t.id === activeId} onClick={() => setActiveId(t.id)} />
-                  ))}
-                </List>
-              </>
-            )}
-
             <Typography variant="caption" sx={{ mt: 1, mb: 0.5, display: "block", color: "text.secondary" }}>
               All Message
             </Typography>
             <List dense sx={{ flex: 1, overflowY: "auto" }}>
-              {rest.map((t) => (
+              {filtered.map((t) => (
                 <ConversationRow key={t.id} thread={t} active={t.id === activeId} onClick={() => setActiveId(t.id)} />
               ))}
             </List>
@@ -958,27 +1249,44 @@ export default function MessagesPage() {
 
         {/* CENTER: Chat */}
         <Grid item xs={12} md={6}>
-          <Box sx={{ height: PANEL_H, display: "flex", flexDirection: "column", minHeight: 0, maxWidth: 520 }}>
+          <Box sx={{ height: PANEL_H, display: "flex", flexDirection: "column", minHeight: 0, Width: 520 }}>
             {/* Top bar */}
             <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 1 }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-                <Stack direction="row" alignItems="center" spacing={1.5}>
-                  <Avatar src={topLogo} sx={{ width: 40, height: 40 }}>
+                {/* CLICKABLE: group avatar + name */}
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1.5}
+                  role={hasActiveGroup ? "button" : undefined}
+                  tabIndex={hasActiveGroup ? 0 : -1}
+                  sx={{ cursor: hasActiveGroup ? "pointer" : "default", outline: "none" }}
+                  onClick={hasActiveGroup ? openActiveGroup : undefined}
+                  onKeyDown={(e) => { if (e.key === "Enter" && hasActiveGroup) openActiveGroup(); }}
+                  title={hasActiveGroup ? "Open group details" : undefined}
+                >
+                  <Avatar
+                    src={topLogo}
+                    sx={{ width: 40, height: 40, cursor: hasActiveGroup ? "pointer" : "default" }}
+                    onClick={hasActiveGroup ? openActiveGroup : undefined}
+                  >
                     {(topTitle || "C").slice(0, 1)}
                   </Avatar>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      fontWeight: 800,
+                      cursor: hasActiveGroup ? "pointer" : "default",
+                      "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
+                    }}
+                    onClick={hasActiveGroup ? openActiveGroup : undefined}
+                  >
                     {topTitle}
                   </Typography>
                 </Stack>
 
+                {/* Right actions */}
                 <Stack direction="row" alignItems="center" spacing={1.25}>
-                  <AvatarGroup max={4} sx={{ "& .MuiAvatar-root": { width: 28, height: 28, fontSize: 12 } }}>
-                    {topMembers.map((m, i) => (
-                      <Avatar key={m.id || i} src={m.avatar}>
-                        {(m.name || "U").slice(0, 1)}
-                      </Avatar>
-                    ))}
-                  </AvatarGroup>
                   <IconButton size="small"><PhoneOutlinedIcon fontSize="small" /></IconButton>
                   <IconButton size="small"><VideocamOutlinedIcon fontSize="small" /></IconButton>
                   <IconButton size="small"><MoreVertOutlinedIcon fontSize="small" /></IconButton>
@@ -1004,9 +1312,9 @@ export default function MessagesPage() {
                   flex: 1,
                   overflowY: "auto",
                   overflowX: "hidden",
-                  scrollbarWidth: "none",        // Firefox
-                  msOverflowStyle: "none",       // IE/Edge (legacy)
-                  "&::-webkit-scrollbar": { display: "none" }, // Chrome/Safari
+                  scrollbarWidth: "none",
+                  msOverflowStyle: "none",
+                  "&::-webkit-scrollbar": { display: "none" },
                 }}
               >
                 {sections.map((sec) => (
@@ -1060,9 +1368,17 @@ export default function MessagesPage() {
 
         {/* RIGHT: Members + Attachments */}
         <Grid item xs={12} md={3}>
-          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, maxWidth: 260, display: "flex", flexDirection: "column" }}>
+          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, Width: 260, display: "flex", flexDirection: "column" }}>
             <Stack spacing={1.25}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 800,
+                  cursor: hasActiveGroup ? "pointer" : "default",
+                  "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
+                }}
+                onClick={hasActiveGroup ? openActiveGroup : undefined}
+              >
                 {topTitle}
               </Typography>
 
@@ -1078,9 +1394,30 @@ export default function MessagesPage() {
                   </Button>
                   <Stack spacing={1}>
                     {topMembers.map((p) => (
-                      <Stack key={p.id} direction="row" spacing={1} alignItems="center">
-                        <Avatar src={p.avatar} sx={{ width: 28, height: 28 }} />
-                        <Typography variant="body2">{p.name}</Typography>
+                      <Stack
+                        key={p.id}
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        role="button"
+                        tabIndex={0}
+                        sx={{ cursor: "pointer" }}
+                        onClick={() => { if (p.id) openUserProfile(p.id); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" && p.id) openUserProfile(p.id); }}
+                        title="Open user profile"
+                      >
+                        <Avatar
+                          src={p.avatar}
+                          sx={{ width: 28, height: 28, cursor: "pointer" }}
+                          onClick={() => openUserProfile(p.id)}
+                        />
+                        <Typography
+                          variant="body2"
+                          sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                          onClick={() => openUserProfile(p.id)}
+                        >
+                          {p.name}
+                        </Typography>
                         <Box sx={{ ml: "auto" }}>
                           {p.is_you ? (
                             <Chip size="small" color="primary" label="You" sx={CHIP_TINY_SX} />
