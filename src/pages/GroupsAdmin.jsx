@@ -3,7 +3,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
-  MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Dialog,
+  MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Pagination, Dialog,
   DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -343,7 +343,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           });
           if (fresh.ok) updated = await fresh.json();
-        } catch {}
+        } catch { }
       }
 
       const merged = {
@@ -562,12 +562,16 @@ export default function GroupsAdmin() {
 
   const [editOpen, setEditOpen] = React.useState(false);
   const [editing, setEditing] = React.useState(null);
+  // --- pagination (6 per page) ---
+  const PAGE_SIZE = 6;
+  const [page, setPage] = React.useState(1);
+
 
   const onUpdated = (updated) => {
     setGroups((prev) =>
       prev.map((x) =>
         ((x.id && updated.id && x.id === updated.id) ||
-         (x.slug && updated.slug && x.slug === updated.slug))
+          (x.slug && updated.slug && x.slug === updated.slug))
           ? updated
           : x
       )
@@ -618,6 +622,18 @@ export default function GroupsAdmin() {
       `${g.name || ""} ${g.description || ""}`.toLowerCase().includes(term)
     );
   }, [groups, q]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageItems = React.useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  );
+
+  // reset/clamp page when filters change
+  React.useEffect(() => { setPage(1); }, [q]);
+  React.useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages, page]);
+
 
   const onCreated = (g) => setGroups((prev) => [g, ...prev]);
 
@@ -697,7 +713,7 @@ export default function GroupsAdmin() {
       ) : (
         <Box sx={{ flexGrow: 1 }}>
           <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-2 md:gap-3">
-            {filtered.map((g) => (
+            {pageItems.map((g) => (
               <div key={g.id || g.slug} className="col-span-4">
                 <GroupCard
                   g={g}
@@ -707,6 +723,15 @@ export default function GroupsAdmin() {
               </div>
             ))}
           </div>
+          <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_, v) => setPage(v)}
+              shape="rounded"
+              size="medium"
+            />
+          </Stack>
         </Box>
       )}
 

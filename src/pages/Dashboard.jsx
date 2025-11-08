@@ -44,6 +44,7 @@ import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import { IconButton, InputAdornment } from "@mui/material";
 import AdminPostsPage from "./AdminPostsPage.jsx";
 import AdminNotificationsPage from "./AdminNotificationsPage.jsx";
+import AdminSettings from "./AdminSettings.jsx"
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -1356,6 +1357,8 @@ export default function Dashboard() {
               <GroupsAdmin />
             ) : active === "notifications" ? (
               <AdminNotificationsPage />
+            ) : active === "settings" ? (
+              <AdminSettings/>
             ) : (
               <MyResourcesAdmin />   // fallback unchanged
             )}

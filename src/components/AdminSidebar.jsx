@@ -75,7 +75,6 @@ export default function AdminSidebar({
 
   // Default admin tabs based on your system
   const defaultItems = [
-    { key: "dashboard",    label: "Activity",       Icon: DashboardIcon },
     { key: "events",       label: "My Events",      Icon: EventIcon },
     { key: "posts",     label: "Posts",       Icon: PostsIcon },
     { key: "resources",    label: "My Resources",   Icon: ResourceIcon },
