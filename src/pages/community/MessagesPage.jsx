@@ -144,7 +144,7 @@ function ConversationRow({ thread, active, onClick }) {
 }
 
 // Single message bubble (center)
-function Bubble({ m, showSender }) {
+function Bubble({ m, showSender, myAvatar }) {
   const mine = Boolean(m.mine);
   return (
     <Stack
