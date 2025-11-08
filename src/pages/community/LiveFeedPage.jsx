@@ -638,6 +638,59 @@ function CommentsDialog({
     setLoading(false);
   }, [postId, open, inline, initialCount, target?.id, target?.type]);
 
+
+  // --- delete helpers ---
+  const myId = me?.id || me?.user?.id;
+  const isAdmin =
+    !!(me?.is_staff || me?.is_superuser || me?.isAdmin || me?.role === "admin" ||
+      (Array.isArray(me?.roles) && me.roles.includes("admin")));
+
+  function canDelete(c) {
+    return c?.author_id === myId || isAdmin;
+  }
+
+  // collect the comment id + all nested reply ids for optimistic removal
+  function collectDescendants(list, rootId) {
+    const toRemove = new Set([rootId]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const row of list) {
+        if (row.parent_id && toRemove.has(row.parent_id) && !toRemove.has(row.id)) {
+          toRemove.add(row.id);
+          changed = true;
+        }
+      }
+    }
+    return toRemove;
+  }
+
+  async function deleteComment(c) {
+    if (!canDelete(c)) return;
+
+    const ok = window.confirm("Delete this comment?");
+    if (!ok) return;
+
+    // optimistic UI: drop this comment and all its replies
+    setItems(prev => {
+      const ids = collectDescendants(prev, c.id);
+      return prev.filter(row => !ids.has(row.id));
+    });
+
+    try {
+      const r = await fetch(toApiUrl(`engagements/comments/${c.id}/`), {
+        method: "DELETE",
+        headers: { ...authHeaders() },
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      // success: nothing else to do
+    } catch (e) {
+      // fallback: reload if server refused
+      await load();
+      alert("Could not delete comment. Please try again.");
+    }
+  }
+
   React.useEffect(() => { load(); }, [load]);
 
   // build simple tree (roots + children)
@@ -753,18 +806,6 @@ function bumpCommentLikeLocal(targetId, liked) {
   }
 }
 
-  async function deleteOwn(c) {
-    const myId = me?.id || me?.user?.id;
-    if (!myId || (c.author_id !== myId)) return;
-    try {
-      const r = await fetch(toApiUrl(`engagements/comments/${c.id}/`), {
-        method: "DELETE",
-        headers: { ...authHeaders() },
-      });
-      if (r.ok) load();
-    } catch { }
-  }
-
   function updateCommentInTree(list, targetId, updater) {
     return (list || []).map(n => {
       if (n.id === targetId) return updater(n);
@@ -812,8 +853,10 @@ function bumpCommentLikeLocal(targetId, liked) {
         <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
           Reply
         </Button>
-        {(me?.id || me?.user?.id) === c.author_id && (
-          <Button size="small" color="error" onClick={() => deleteOwn(c)}>Delete</Button>
+        {canDelete(c) && (
+          <Button size="small" color="error" onClick={() => deleteComment(c)}>
+            Delete
+          </Button>
         )}
       </Stack>
 
