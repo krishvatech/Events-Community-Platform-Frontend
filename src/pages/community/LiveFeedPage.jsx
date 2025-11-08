@@ -21,6 +21,101 @@ import { Checkbox, ListItemButton } from "@mui/material";
 
 
 const BORDER = "#e2e8f0";
+// ===== Suggested Connections (mock) =====
+const MOCK_SUGGESTED = [
+  { id: 101, name: "Aarav Shah", mutuals: 8, avatar: "" },
+  { id: 102, name: "Pooja Patel", mutuals: 12, avatar: "" },
+  { id: 103, name: "Rohan Mehta", mutuals: 5, avatar: "" },
+  { id: 104, name: "Nisha Desai", mutuals: 3, avatar: "" },
+  { id: 105, name: "Vikram S.", mutuals: 9, avatar: "" },
+  { id: 106, name: "Ishita K.", mutuals: 6, avatar: "" },
+  { id: 107, name: "Rahul Verma", mutuals: 2, avatar: "" },
+  { id: 108, name: "Sneha G.", mutuals: 7, avatar: "" },
+  { id: 109, name: "Devansh R.", mutuals: 11, avatar: "" },
+  { id: 110, name: "Kritika M.", mutuals: 4, avatar: "" },
+];
+
+function SuggestedConnections({ list = MOCK_SUGGESTED }) {
+  const [connected, setConnected] = React.useState(() => new Set());
+  function toggle(id) {
+    setConnected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 1.5,
+        mb: 2,
+        borderColor: BORDER,
+        borderRadius: 3,
+        bgcolor: "background.paper",
+      }}
+    >
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+          Suggested connections
+        </Typography>
+        <Button size="small" variant="text">See all</Button>
+      </Stack>
+
+      {/* Horizontal slider */}
+      <Box
+        sx={{
+          overflowX: "auto",
+          px: 0.5,
+          pb: 0.5,
+          scrollSnapType: "x mandatory",
+          "&::-webkit-scrollbar": { height: 6 },
+          "&::-webkit-scrollbar-thumb": { bgcolor: "divider", borderRadius: 999 },
+        }}
+      >
+        <Stack direction="row" spacing={1.25}>
+          {list.map((u) => {
+            const isConnected = connected.has(u.id);
+            return (
+              <Box key={u.id} sx={{ minWidth: 140, scrollSnapAlign: "start" }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1,
+                    borderRadius: 2,
+                    textAlign: "center",
+                    borderColor: BORDER,
+                  }}
+                >
+                  <Avatar src={u.avatar} sx={{ width: 56, height: 56, mx: "auto", mb: 0.75 }}>
+                    {(u.name || "U").slice(0, 1)}
+                  </Avatar>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+                    {u.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {u.mutuals} mutual
+                    {u.mutuals === 1 ? "" : "s"}
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant={isConnected ? "outlined" : "contained"}
+                    sx={{ mt: 1 }}
+                    onClick={() => toggle(u.id)}
+                  >
+                    {isConnected ? "Connected" : "Connect"}
+                  </Button>
+                </Paper>
+              </Box>
+            );
+          })}
+        </Stack>
+      </Box>
+    </Paper>
+  );
+}
+
 
 // ---- API helpers (kept from your file) ----
 const RAW_BASE =
@@ -262,7 +357,7 @@ function mapFeedItem(item) {
 
   // ---- Link post ----
   if ((t === "link" || m.url) &&
-     !m.resource_id && !m.file && !m.file_url && !m.link_url && !m.video_url) {
+    !m.resource_id && !m.file && !m.file_url && !m.link_url && !m.video_url) {
     return {
       ...base,
       type: "link",
@@ -288,39 +383,39 @@ function mapFeedItem(item) {
 
   // ---- Resource (file/link) post ----
   if (
-  t === "resource" || t === "file" || t === "link" || t === "video" ||
-  m.resource_id || m.file || m.file_url || m.link_url || m.video_url
-) {
-  // derive the numeric resource id from whatever the backend sent
-  const rid =
-    m.resource_id ??
-    (typeof m.id === "number" ? m.id : undefined) ??
-    (typeof m.object_id === "number" ? m.object_id : undefined) ??
-    (typeof item.object_id === "number" ? item.object_id : undefined) ??
-    (typeof item.id === "string" && item.id.startsWith("resource-")
-      ? parseInt(item.id.split("-")[1], 10)
-      : null);
+    t === "resource" || t === "file" || t === "link" || t === "video" ||
+    m.resource_id || m.file || m.file_url || m.link_url || m.video_url
+  ) {
+    // derive the numeric resource id from whatever the backend sent
+    const rid =
+      m.resource_id ??
+      (typeof m.id === "number" ? m.id : undefined) ??
+      (typeof m.object_id === "number" ? m.object_id : undefined) ??
+      (typeof item.object_id === "number" ? item.object_id : undefined) ??
+      (typeof item.id === "string" && item.id.startsWith("resource-")
+        ? parseInt(item.id.split("-")[1], 10)
+        : null);
 
-  // your engagements API accepts CT id OR "app_label.ModelName"; use the readable form
-  const resourceCT = m.resource_ct || "content.resource";
+    // your engagements API accepts CT id OR "app_label.ModelName"; use the readable form
+    const resourceCT = m.resource_ct || "content.resource";
 
-  return {
-    ...base,
-    type: "resource",
-    text: m.description || m.text || "",
-    resource: {
-      id: rid, // keep the real resource id on the card
-      title: m.title || "Resource",
-      file_url: toMediaUrl(m.file_url || m.file || ""),
-      link_url: m.link_url || null,
-      video_url: toMediaUrl(m.video_url || ""),
-      event_id: m.event_id ?? item.target_object_id ?? null,
-      event_title: m.event_title || m.title || null,
-    },
-    // single source of truth for engagements (likes/comments/shares/metrics)
-    engage: rid ? { type: resourceCT, id: Number(rid) } : undefined,
-  };
-}
+    return {
+      ...base,
+      type: "resource",
+      text: m.description || m.text || "",
+      resource: {
+        id: rid, // keep the real resource id on the card
+        title: m.title || "Resource",
+        file_url: toMediaUrl(m.file_url || m.file || ""),
+        link_url: m.link_url || null,
+        video_url: toMediaUrl(m.video_url || ""),
+        event_id: m.event_id ?? item.target_object_id ?? null,
+        event_title: m.event_title || m.title || null,
+      },
+      // single source of truth for engagements (likes/comments/shares/metrics)
+      engage: rid ? { type: resourceCT, id: Number(rid) } : undefined,
+    };
+  }
 
   if (t === "event" || t === "event_update" || isEventVerb || hasEventFields) {
     const eventId = m.event_id ?? item.target_object_id ?? item.id ?? null;
@@ -563,12 +658,12 @@ function CommentsDialog({
 
   // who am I (for delete-own)
   React.useEffect(() => {
-  if (!inline && !open) return;
-  (async () => {
-    const meJson = await getMeCached(); // getMeCached already returns JSON
-    setMe(meJson || {});
-  })();
-}, [open, inline]);
+    if (!inline && !open) return;
+    (async () => {
+      const meJson = await getMeCached(); // getMeCached already returns JSON
+      setMe(meJson || {});
+    })();
+  }, [open, inline]);
 
   const load = React.useCallback(async () => {
     if (!postId) return;
@@ -712,8 +807,8 @@ function CommentsDialog({
       // build the correct payload (FeedItem fallback, or content.Resource if present)
       const topLevelPayload = target?.id
         ? (target?.type
-            ? { text: body, target_type: target.type, target_id: target.id }
-            : { text: body, target_id: target.id })
+          ? { text: body, target_type: target.type, target_id: target.id }
+          : { text: body, target_id: target.id })
         : { text: body, target_id: postId };
 
       const payload = parentId
@@ -731,80 +826,81 @@ function CommentsDialog({
         await load();
         onBumpCount?.();
       }
-    } catch {}
+    } catch { }
   }
 
 
-function bumpCommentLikeLocal(targetId, liked) {
-  setItems(prev => prev.map(x => x.id === targetId
-    ? { ...x,
+  function bumpCommentLikeLocal(targetId, liked) {
+    setItems(prev => prev.map(x => x.id === targetId
+      ? {
+        ...x,
         user_has_liked: liked,
         like_count: Math.max(0, (x.like_count ?? 0) + (liked ? 1 : -1))
       }
-    : x
-  ));
-}
+      : x
+    ));
+  }
 
   async function toggleCommentLike(commentId) {
-  // 1) optimistic update
-  setItems((curr) => {
-    const i = curr.findIndex((c) => c.id === commentId);
-    if (i === -1) return curr;
-    const wasLiked = !!curr[i].user_has_liked;
-    const next = [...curr];
-    next[i] = {
-      ...curr[i],
-      user_has_liked: !wasLiked,
-      like_count: Math.max(0, (curr[i].like_count || 0) + (wasLiked ? -1 : +1)),
-    };
-    return next;
-  });
-
-  // 2) hit the toggle endpoint
-  try {
-    const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      // ✅ correct field name
-      body: JSON.stringify({ target_type: "comment", target_id: commentId, reaction: "like" }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    // 3) re-sync the single comment count (cheap)
-    const res2 = await fetch(
-      toApiUrl(`engagements/reactions/counts/?target_type=comment&ids=${commentId}`),
-      { headers: { Accept: "application/json", ...authHeaders() } }
-    );
-    if (res2.ok) {
-      const payload = await res2.json();
-      const m = payload?.results?.[String(commentId)];
-      if (m) {
-        setItems((curr) =>
-          curr.map((c) =>
-            c.id === commentId ? { ...c, like_count: m.like_count, user_has_liked: !!m.user_has_liked } : c
-          )
-        );
-      }
-    }
-  } catch (e) {
-    console.error("toggleCommentLike failed:", e);
-    // rollback optimistic change on error
+    // 1) optimistic update
     setItems((curr) => {
       const i = curr.findIndex((c) => c.id === commentId);
       if (i === -1) return curr;
-      const didLike = !!curr[i].user_has_liked;
+      const wasLiked = !!curr[i].user_has_liked;
       const next = [...curr];
-      // reverse what we did above
       next[i] = {
         ...curr[i],
-        user_has_liked: !didLike,
-        like_count: Math.max(0, (curr[i].like_count || 0) + (didLike ? -1 : +1)),
+        user_has_liked: !wasLiked,
+        like_count: Math.max(0, (curr[i].like_count || 0) + (wasLiked ? -1 : +1)),
       };
       return next;
     });
-    alert("Failed to like/unlike. Please try again.");
+
+    // 2) hit the toggle endpoint
+    try {
+      const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        // ✅ correct field name
+        body: JSON.stringify({ target_type: "comment", target_id: commentId, reaction: "like" }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      // 3) re-sync the single comment count (cheap)
+      const res2 = await fetch(
+        toApiUrl(`engagements/reactions/counts/?target_type=comment&ids=${commentId}`),
+        { headers: { Accept: "application/json", ...authHeaders() } }
+      );
+      if (res2.ok) {
+        const payload = await res2.json();
+        const m = payload?.results?.[String(commentId)];
+        if (m) {
+          setItems((curr) =>
+            curr.map((c) =>
+              c.id === commentId ? { ...c, like_count: m.like_count, user_has_liked: !!m.user_has_liked } : c
+            )
+          );
+        }
+      }
+    } catch (e) {
+      console.error("toggleCommentLike failed:", e);
+      // rollback optimistic change on error
+      setItems((curr) => {
+        const i = curr.findIndex((c) => c.id === commentId);
+        if (i === -1) return curr;
+        const didLike = !!curr[i].user_has_liked;
+        const next = [...curr];
+        // reverse what we did above
+        next[i] = {
+          ...curr[i],
+          user_has_liked: !didLike,
+          like_count: Math.max(0, (curr[i].like_count || 0) + (didLike ? -1 : +1)),
+        };
+        return next;
+      });
+      alert("Failed to like/unlike. Please try again.");
+    }
   }
-}
 
   function updateCommentInTree(list, targetId, updater) {
     return (list || []).map(n => {
@@ -817,66 +913,66 @@ function bumpCommentLikeLocal(targetId, liked) {
   }
 
   const CommentItem = ({ c, depth = 0 }) => {
-  // fetch the like count for this comment once when it renders
+    // fetch the like count for this comment once when it renders
 
-  return (
-    <Box
-      sx={{
-        pl: depth ? 2 : 0,
-        borderLeft: depth ? "2px solid #e2e8f0" : "none",
-        ml: depth ? 1.5 : 0,
-        mt: depth ? 1 : 0
-      }}
-    >
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }}>
-          {(c.author?.name || "U").slice(0, 1)}
-        </Avatar>
-        <Typography variant="subtitle2">
-          {c.author?.name || c.author?.username || "User"}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
-        </Typography>
-      </Stack>
-
-      <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
-
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
-        <Button
-          size="small"
-          startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
-          onClick={() => toggleCommentLike(c.id)}
-        >
-          {c.like_count ?? 0}
-        </Button>
-        <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
-          Reply
-        </Button>
-        {canDelete(c) && (
-          <Button size="small" color="error" onClick={() => deleteComment(c)}>
-            Delete
-          </Button>
-        )}
-      </Stack>
-
-      {!!c.children?.length && (
-        <Stack spacing={1} sx={{ mt: 1 }}>
-          {c.children
-            .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0)))
-            .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+    return (
+      <Box
+        sx={{
+          pl: depth ? 2 : 0,
+          borderLeft: depth ? "2px solid #e2e8f0" : "none",
+          ml: depth ? 1.5 : 0,
+          mt: depth ? 1 : 0
+        }}
+      >
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }}>
+            {(c.author?.name || "U").slice(0, 1)}
+          </Avatar>
+          <Typography variant="subtitle2">
+            {c.author?.name || c.author?.username || "User"}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+          </Typography>
         </Stack>
-      )}
-    </Box>
-  );
-};
+
+        <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
+
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+          <Button
+            size="small"
+            startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+            onClick={() => toggleCommentLike(c.id)}
+          >
+            {c.like_count ?? 0}
+          </Button>
+          <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
+            Reply
+          </Button>
+          {canDelete(c) && (
+            <Button size="small" color="error" onClick={() => deleteComment(c)}>
+              Delete
+            </Button>
+          )}
+        </Stack>
+
+        {!!c.children?.length && (
+          <Stack spacing={1} sx={{ mt: 1 }}>
+            {c.children
+              .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0)))
+              .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+          </Stack>
+        )}
+      </Box>
+    );
+  };
 
   // --------- INLINE RENDER (Instagram/LinkedIn style) ----------
   if (inline) {
     const visibleRoots = roots.slice(0, visibleCount);
     const hasMore = roots.length > visibleRoots.length;
-    
-    
+
+
 
     return (
       <Box sx={{ mt: 1.25 }}>
@@ -942,7 +1038,7 @@ function bumpCommentLikeLocal(targetId, liked) {
     );
   }
 
-  
+
   // --------- ORIGINAL MODAL (left intact for compatibility) ----------
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -1049,32 +1145,32 @@ function ShareDialog({ open, onClose, postId, onShared, target }) {
   }
 
   async function shareNow() {
-  if (!selected.size || !postId) return;
-  setSending(true);
-  try {
-    const base = target?.id
-      ? (target?.type
+    if (!selected.size || !postId) return;
+    setSending(true);
+    try {
+      const base = target?.id
+        ? (target?.type
           ? { target_type: target.type, target_id: target.id }
           : { target_id: target.id })
-      : { target_id: postId };
+        : { target_id: postId };
 
-    const r = await fetch(toApiUrl(`engagements/shares/`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ ...base, to_users: [...selected] }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const r = await fetch(toApiUrl(`engagements/shares/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ ...base, to_users: [...selected] }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
 
-    setSending(false);
-    onShared?.();
-    onClose?.();
-    setSelected(new Set());
-    setQuery("");
-  } catch (e) {
-    setSending(false);
-    alert("Could not share this post. Please check your share endpoint.");
+      setSending(false);
+      onShared?.();
+      onClose?.();
+      setSelected(new Set());
+      setQuery("");
+    } catch (e) {
+      setSending(false);
+      alert("Could not share this post. Please check your share endpoint.");
+    }
   }
-}
   return (
     <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Share post</DialogTitle>
@@ -1150,44 +1246,44 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const refreshBusy = React.useRef(false);
 
   async function refreshCounts() {
-  if (refreshBusy.current) return;
-  refreshBusy.current = true;
-  try {
-    const target = engageTargetOf(post);
-    const c = await fetchEngagementCountsForTarget(target);
-    setLocal((curr) => ({ ...curr, user_has_liked: !!c.user_has_liked, metrics: { ...curr.metrics, ...c } }));
-  } finally {
-    refreshBusy.current = false;
+    if (refreshBusy.current) return;
+    refreshBusy.current = true;
+    try {
+      const target = engageTargetOf(post);
+      const c = await fetchEngagementCountsForTarget(target);
+      setLocal((curr) => ({ ...curr, user_has_liked: !!c.user_has_liked, metrics: { ...curr.metrics, ...c } }));
+    } finally {
+      refreshBusy.current = false;
+    }
   }
-}
   React.useEffect(() => { setLocal(post); refreshCounts(); }, [post]);
   async function toggleLike() {
-  try {
-    const target = engageTargetOf(post);
-    const payload = { target_id: target.id, reaction: "like" }; // field name is 'reaction', not 'kind'
-    if (target.type) payload.target_type = target.type;
+    try {
+      const target = engageTargetOf(post);
+      const payload = { target_id: target.id, reaction: "like" }; // field name is 'reaction', not 'kind'
+      if (target.type) payload.target_type = target.type;
 
-    // optimistic UI
-    setUserHasLiked((prev) => !prev);
-    setLocal((curr) => ({
-      ...curr,
-      metrics: { ...curr.metrics, likes: Math.max(0, (curr.metrics?.likes ?? 0) + (userHasLiked ? -1 : +1)) },
-    }));
+      // optimistic UI
+      setUserHasLiked((prev) => !prev);
+      setLocal((curr) => ({
+        ...curr,
+        metrics: { ...curr.metrics, likes: Math.max(0, (curr.metrics?.likes ?? 0) + (userHasLiked ? -1 : +1)) },
+      }));
 
-    const r = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    // re-sync exact counts
-    await refreshCounts();
-  } catch (e) {
-    console.error("toggleLike failed:", e);
-    // simple rollback by forcing a refresh
-    await refreshCounts();
+      const r = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      // re-sync exact counts
+      await refreshCounts();
+    } catch (e) {
+      console.error("toggleLike failed:", e);
+      // simple rollback by forcing a refresh
+      await refreshCounts();
+    }
   }
-}
 
   const bumpCommentCount = () => {
     setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, comments: (curr.metrics?.comments ?? 0) + 1 } }));
@@ -1373,41 +1469,41 @@ export default function LiveFeedPage({
   }, [communityId]);
 
   async function fetchBatchMetrics(ids) {
-  if (!ids?.length) return {};
-  const url = toApiUrl(`engagements/metrics/?ids=${ids.join(",")}`);
-  try {
-    const res = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
-    if (!res.ok) return {};
-    return await res.json(); // { [id]: {likes, comments, shares, user_has_liked ...} }
-  } catch {
-    return {};
+    if (!ids?.length) return {};
+    const url = toApiUrl(`engagements/metrics/?ids=${ids.join(",")}`);
+    try {
+      const res = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+      if (!res.ok) return {};
+      return await res.json(); // { [id]: {likes, comments, shares, user_has_liked ...} }
+    } catch {
+      return {};
+    }
   }
-}
 
   async function hydrateMetrics(feedItems) {
-  if (!feedItems?.length) return feedItems;
+    if (!feedItems?.length) return feedItems;
 
-  // only numeric ids are engageable by the current endpoints
-  const numericIds = feedItems.map(p => p.id).filter((id) => Number.isInteger(id));
-  const map = await fetchBatchMetrics(numericIds);
+    // only numeric ids are engageable by the current endpoints
+    const numericIds = feedItems.map(p => p.id).filter((id) => Number.isInteger(id));
+    const map = await fetchBatchMetrics(numericIds);
 
-  return feedItems.map(p => {
-    const m = map[p.id] || {};
-    return {
-      ...p,
-      like_count:    m.like_count    ?? m.likes    ?? p.like_count    ?? 0,
-      comment_count: m.comment_count ?? m.comments ?? p.comment_count ?? 0,
-      share_count:   m.share_count   ?? m.shares   ?? p.share_count   ?? 0,
-      user_has_liked: (m.user_has_liked ?? m.me_liked ?? p.user_has_liked ?? false),
-      metrics: {
-        ...(p.metrics || {}),
-        likes:    m.likes    ?? m.like_count    ?? p.metrics?.likes    ?? 0,
-        comments: m.comments ?? m.comment_count ?? p.metrics?.comments ?? 0,
-        shares:   m.shares   ?? m.share_count   ?? p.metrics?.shares   ?? 0,
-      },
-    };
-  });
-}
+    return feedItems.map(p => {
+      const m = map[p.id] || {};
+      return {
+        ...p,
+        like_count: m.like_count ?? m.likes ?? p.like_count ?? 0,
+        comment_count: m.comment_count ?? m.comments ?? p.comment_count ?? 0,
+        share_count: m.share_count ?? m.shares ?? p.share_count ?? 0,
+        user_has_liked: (m.user_has_liked ?? m.me_liked ?? p.user_has_liked ?? false),
+        metrics: {
+          ...(p.metrics || {}),
+          likes: m.likes ?? m.like_count ?? p.metrics?.likes ?? 0,
+          comments: m.comments ?? m.comment_count ?? p.metrics?.comments ?? 0,
+          shares: m.shares ?? m.share_count ?? p.metrics?.shares ?? 0,
+        },
+      };
+    });
+  }
 
 
   // Load a page (absolute or relative DRF next)
@@ -1421,11 +1517,11 @@ export default function LiveFeedPage({
       if (res.status === 401) throw new Error("Unauthorized (401): missing/expired token");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-       const page = await res.json();
-       const rawItems = (page.results || page).map(mapFeedItem).filter(Boolean);
-       const items = await hydrateMetrics(rawItems); // ⬅️ enrich with like/comment/share + me_liked
- 
-       setPosts((curr) => (append ? [...curr, ...items] : items));
+      const page = await res.json();
+      const rawItems = (page.results || page).map(mapFeedItem).filter(Boolean);
+      const items = await hydrateMetrics(rawItems); // ⬅️ enrich with like/comment/share + me_liked
+
+      setPosts((curr) => (append ? [...curr, ...items] : items));
       const next = page?.next ? page.next : null;
       setHasMore(Boolean(next));
       setNextUrl(next);
@@ -1537,29 +1633,29 @@ export default function LiveFeedPage({
   }, [posts, scope, dq]);
 
   React.useEffect(() => {
-  if (!displayPosts.length) return;
-  const ids = displayPosts.map(p => p.id);
-  let stop = false;
+    if (!displayPosts.length) return;
+    const ids = displayPosts.map(p => p.id);
+    let stop = false;
 
-  async function tick() {
-    try {
-      const map = await fetchBatchMetrics(ids);
-      if (stop) return;
-      setPosts(curr =>
-        curr.map(p => {
-          const m = map[p.id];
-          return m ? { ...p, user_has_liked: !!m.user_has_liked, metrics: { ...p.metrics, ...m } } : p;
-        })
-      );
-    } catch {}
-  }
+    async function tick() {
+      try {
+        const map = await fetchBatchMetrics(ids);
+        if (stop) return;
+        setPosts(curr =>
+          curr.map(p => {
+            const m = map[p.id];
+            return m ? { ...p, user_has_liked: !!m.user_has_liked, metrics: { ...p.metrics, ...m } } : p;
+          })
+        );
+      } catch { }
+    }
 
-  const t = setInterval(() => {
-   if (document.visibilityState === "visible") tick();
- }, 30000); // every 30s
-  tick(); // also once immediately
-  return () => { stop = true; clearInterval(t); };
-}, [displayPosts]);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") tick();
+    }, 30000); // every 30s
+    tick(); // also once immediately
+    return () => { stop = true; clearInterval(t); };
+  }, [displayPosts]);
 
 
   return (
@@ -1602,16 +1698,21 @@ export default function LiveFeedPage({
               <Typography variant="body2" color="text.secondary">No posts match your filters.</Typography>
             </Paper>
           ) : (
-            displayPosts.map((p) => (
-              <PostCard
-                key={p.id}
-                post={p}
-                onReact={onReact}
-                onOpenEvent={onOpenEvent}
-                onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
-              />
+            displayPosts.map((p, idx) => (
+              <React.Fragment key={p.id}>
+                <PostCard
+                  post={p}
+                  onReact={onReact}
+                  onOpenEvent={onOpenEvent}
+                  onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
+                />
+                {((idx + 1) % 4 === 0) && (
+                  <SuggestedConnections />
+                )}
+              </React.Fragment>
             ))
           )}
+
 
           {/* Pagination / Load more */}
           {hasMore && (
