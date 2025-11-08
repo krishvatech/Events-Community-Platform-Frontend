@@ -654,7 +654,8 @@ function bumpCommentLikeLocal(targetId, liked) {
     const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ target_type: "comment", target_id: commentId, kind: "like" }),
+      // ✅ correct field name
+      body: JSON.stringify({ target_type: "comment", target_id: commentId, reaction: "like" }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -1058,23 +1059,40 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   }
   React.useEffect(() => { setLocal(post); refreshCounts(); }, [post]);
   async function toggleLike() {
-    try {
-      const r = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ target_type: "comment", target_id: commentId, kind: "like" })
-      });
-      if (!r.ok) return;
-      const j = await r.json().catch(() => ({}));
-      const liked = j.status === "liked" || (!userHasLiked && r.status === 201);
-      setUserHasLiked(liked);
-      setLocal(curr => ({
-        ...curr,
-        metrics: { ...curr.metrics, likes: Math.max(0, (curr.metrics?.likes ?? 0) + (liked ? 1 : -1)) }
-      }));
-      await refreshCounts();
-    } catch {}
+  // optimistic flip
+  setUserHasLiked((prev) => !prev);
+  setLocal((curr) => ({
+    ...curr,
+    metrics: {
+      ...curr.metrics,
+      likes: Math.max(0, (curr.metrics?.likes ?? 0) + (userHasLiked ? -1 : +1)),
+    },
+  }));
+
+  try {
+    // ✅ use feed_item alias and the correct field 'reaction'
+    const r = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ feed_item: post.id, reaction: "like" }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+    // re-sync from server so all users see the same count
+    await refreshCounts();
+  } catch (e) {
+    // rollback if it failed
+    setUserHasLiked((prev) => !prev);
+    setLocal((curr) => ({
+      ...curr,
+      metrics: {
+        ...curr.metrics,
+        likes: Math.max(0, (curr.metrics?.likes ?? 0) + (userHasLiked ? +1 : -1)),
+      },
+    }));
+    console.error("post like failed:", e);
   }
+}
 
   const bumpCommentCount = () => {
     setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, comments: (curr.metrics?.comments ?? 0) + 1 } }));
@@ -1270,27 +1288,29 @@ export default function LiveFeedPage({
 }
 
   async function hydrateMetrics(feedItems) {
-    if (!feedItems?.length) return feedItems;
-    const map = await fetchBatchMetrics(feedItems.map(p => p.id));
-    return feedItems.map(p => {
-      const m = map[p.id] || {};
-      return {
-        ...p,
-        // immediate totals on the card
-        like_count: m.like_count ?? m.likes ?? p.like_count ?? 0,
-        comment_count: m.comment_count ?? m.comments ?? p.comment_count ?? 0,
-        share_count: m.share_count ?? m.shares ?? p.share_count ?? 0,
-        user_has_liked: (m.user_has_liked ?? m.me_liked ?? p.user_has_liked ?? false),
-        // optional nested metrics obj you already merge into UI
-        metrics: {
-          ...(p.metrics || {}),
-          likes: m.likes ?? m.like_count ?? p.metrics?.likes ?? 0,
-          comments: m.comments ?? m.comment_count ?? p.metrics?.comments ?? 0,
-          shares: m.shares ?? m.share_count ?? p.metrics?.shares ?? 0,
-        },
-      };
-    });
-  }
+  if (!feedItems?.length) return feedItems;
+
+  // only numeric ids are engageable by the current endpoints
+  const numericIds = feedItems.map(p => p.id).filter((id) => Number.isInteger(id));
+  const map = await fetchBatchMetrics(numericIds);
+
+  return feedItems.map(p => {
+    const m = map[p.id] || {};
+    return {
+      ...p,
+      like_count:    m.like_count    ?? m.likes    ?? p.like_count    ?? 0,
+      comment_count: m.comment_count ?? m.comments ?? p.comment_count ?? 0,
+      share_count:   m.share_count   ?? m.shares   ?? p.share_count   ?? 0,
+      user_has_liked: (m.user_has_liked ?? m.me_liked ?? p.user_has_liked ?? false),
+      metrics: {
+        ...(p.metrics || {}),
+        likes:    m.likes    ?? m.like_count    ?? p.metrics?.likes    ?? 0,
+        comments: m.comments ?? m.comment_count ?? p.metrics?.comments ?? 0,
+        shares:   m.shares   ?? m.share_count   ?? p.metrics?.shares   ?? 0,
+      },
+    };
+  });
+}
 
 
   // Load a page (absolute or relative DRF next)
