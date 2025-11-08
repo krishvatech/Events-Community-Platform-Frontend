@@ -83,6 +83,23 @@ async function runLimited(items, limit, worker) {
   return ret;
 }
 
+function engageTargetOf(post) {
+  if (post?.engage?.id) return post.engage; // already set by mapper
+
+  // resources engage on content.Resource
+  if (post?.type === "resource" && post?.resource?.id) {
+    return { type: "content.resource", id: Number(post.resource.id) };
+  }
+
+  // events engage on events.Event (so likes/comments live on the Event row)
+  if (post?.type === "event" && (post?.event?.id || post?.id)) {
+    return { type: "events.event", id: Number(post.event?.id || post.id) };
+  }
+
+  // default → FeedItem
+  return { type: null, id: Number(post.id) };
+}
+
 function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
 }
@@ -101,9 +118,16 @@ async function fetchBatchMetrics(ids) {
   });
   return r.ok ? r.json() : {};
 }
-async function fetchEngagementCounts(postId) {
-  const map = await fetchBatchMetrics([postId]);
-  return map[postId] || { likes: 0, comments: 0, shares: 0 };
+async function fetchEngagementCountsForTarget(target) {
+  if (!target?.id) return { likes: 0, comments: 0, shares: 0, user_has_liked: false };
+  const tt = target.type ? `&target_type=${encodeURIComponent(target.type)}` : "";
+  const r = await fetch(toApiUrl(`engagements/metrics/?ids=${target.id}${tt}`), {
+    headers: { Accept: "application/json", ...authHeaders() },
+  });
+  if (!r.ok) return { likes: 0, comments: 0, shares: 0, user_has_liked: false };
+  const j = await r.json();
+  const key = String(target.id);
+  return j[key] || j[target.id] || { likes: 0, comments: 0, shares: 0, user_has_liked: false };
 }
 
 // small debounce hook for search
@@ -237,7 +261,8 @@ function mapFeedItem(item) {
   }
 
   // ---- Link post ----
-  if (t === "link" || m.url) {
+  if ((t === "link" || m.url) &&
+     !m.resource_id && !m.file && !m.file_url && !m.link_url && !m.video_url) {
     return {
       ...base,
       type: "link",
@@ -263,35 +288,54 @@ function mapFeedItem(item) {
 
   // ---- Resource (file/link) post ----
   if (
-    t === "resource" || t === "file" || t === "link" || t === "video" ||
-    m.file || m.file_url || m.link_url || m.video_url
-  ) {
-    return {
-      ...base,
-      type: "resource",
-      text: m.description || m.text || "",
-      resource: {
-        title: m.title || "Resource",
-        file_url: toMediaUrl(m.file_url || m.file || ""),
-        link_url: m.link_url || null,
-        video_url: toMediaUrl(m.video_url || ""),
-        event_id: m.event_id ?? item.target_object_id ?? null,
-        event_title: m.event_title || m.title || null,
-      },
-    };
-  }
+  t === "resource" || t === "file" || t === "link" || t === "video" ||
+  m.resource_id || m.file || m.file_url || m.link_url || m.video_url
+) {
+  // derive the numeric resource id from whatever the backend sent
+  const rid =
+    m.resource_id ??
+    (typeof m.id === "number" ? m.id : undefined) ??
+    (typeof m.object_id === "number" ? m.object_id : undefined) ??
+    (typeof item.object_id === "number" ? item.object_id : undefined) ??
+    (typeof item.id === "string" && item.id.startsWith("resource-")
+      ? parseInt(item.id.split("-")[1], 10)
+      : null);
+
+  // your engagements API accepts CT id OR "app_label.ModelName"; use the readable form
+  const resourceCT = m.resource_ct || "content.resource";
+
+  return {
+    ...base,
+    type: "resource",
+    text: m.description || m.text || "",
+    resource: {
+      id: rid, // keep the real resource id on the card
+      title: m.title || "Resource",
+      file_url: toMediaUrl(m.file_url || m.file || ""),
+      link_url: m.link_url || null,
+      video_url: toMediaUrl(m.video_url || ""),
+      event_id: m.event_id ?? item.target_object_id ?? null,
+      event_title: m.event_title || m.title || null,
+    },
+    // single source of truth for engagements (likes/comments/shares/metrics)
+    engage: rid ? { type: resourceCT, id: Number(rid) } : undefined,
+  };
+}
 
   if (t === "event" || t === "event_update" || isEventVerb || hasEventFields) {
+    const eventId = m.event_id ?? item.target_object_id ?? item.id ?? null;
     return {
       ...base,
       type: "event",
       text: m.description || m.summary || m.text || "",
       event: {
-        id: m.event_id ?? item.target_object_id ?? null,
+        id: eventId,
         title: m.event_title || m.title || "Event",
         when: m.start_time || m.new_time || m.time || "",
         where: m.venue || m.location || "",
       },
+      // 👇 key line: store where reactions/comments should go
+      engage: eventId ? { type: "events.event", id: Number(eventId) } : undefined,
     };
   }
 
@@ -506,6 +550,7 @@ function CommentsDialog({
   inline = false,
   initialCount = 3,
   inputRef = null,
+  target
 }) {
   const [loading, setLoading] = React.useState(false);
   const [me, setMe] = React.useState(null);
@@ -530,7 +575,15 @@ function CommentsDialog({
     if (!inline && !open) return;
     setLoading(true);
     try {
-      const r = await fetch(toApiUrl(`engagements/comments/?target_id=${postId}&page_size=200`), {
+      const params = new URLSearchParams();
+      if (target?.id) {
+        if (target?.type) params.set("target_type", target.type);
+        params.set("target_id", String(target.id));
+      } else {
+        params.set("target_id", String(postId));
+      }
+      params.set("page_size", "200");
+      const r = await fetch(toApiUrl(`engagements/comments/?${params.toString()}`), {
         headers: { Accept: "application/json", ...authHeaders() },
       });
       const j = r.ok ? await r.json() : [];
@@ -583,7 +636,7 @@ function CommentsDialog({
       setItems([]);
     }
     setLoading(false);
-  }, [postId, open, inline, initialCount]);
+  }, [postId, open, inline, initialCount, target?.id, target?.type]);
 
   React.useEffect(() => { load(); }, [load]);
 
@@ -603,25 +656,30 @@ function CommentsDialog({
   async function createComment(body, parentId = null) {
     if (!body.trim()) return;
     try {
+      // build the correct payload (FeedItem fallback, or content.Resource if present)
+      const topLevelPayload = target?.id
+        ? (target?.type
+            ? { text: body, target_type: target.type, target_id: target.id }
+            : { text: body, target_id: target.id })
+        : { text: body, target_id: postId };
+
+      const payload = parentId
+        ? { text: body, parent: parentId }  // replies inherit target from parent on backend
+        : topLevelPayload;
+
       const r = await fetch(toApiUrl(`engagements/comments/`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(
-          parentId
-            ? { text: body, parent: parentId }             // reply
-            : { text: body, target_id: postId }            // top-level on FeedItem
-        ),
+        body: JSON.stringify(payload),
       });
       if (r.ok) {
         setText("");
         setReplyTo(null);
         await load();
-        onBumpCount?.(); // bump count in the post card
+        onBumpCount?.();
       }
-    } catch { }
+    } catch {}
   }
-  
-
 
 
 function bumpCommentLikeLocal(targetId, liked) {
@@ -881,7 +939,7 @@ function bumpCommentLikeLocal(targetId, liked) {
 }
 
 
-function ShareDialog({ open, onClose, postId, onShared }) {
+function ShareDialog({ open, onClose, postId, onShared, target }) {
   const [loading, setLoading] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [friends, setFriends] = React.useState([]);
@@ -948,31 +1006,32 @@ function ShareDialog({ open, onClose, postId, onShared }) {
   }
 
   async function shareNow() {
-    if (!selected.size || !postId) return;
-    setSending(true);
-    try {
-      const r = await fetch(toApiUrl(`engagements/shares/`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({
-          target_id: postId,
-          to_users: [...selected],     // friends you picked
-          // to_groups: [...selectedGroups], // (add later if you add group picker UI)
-          // note: "optional note text"
-        }),
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      setSending(false);
-      onShared?.();   // bump counter
-      onClose?.();    // close dialog
-      setSelected(new Set());
-      setQuery("");
-    } catch (e) {
-      setSending(false);
-      alert("Could not share this post. Please check your share endpoint.");
-    }
-  }
+  if (!selected.size || !postId) return;
+  setSending(true);
+  try {
+    const base = target?.id
+      ? (target?.type
+          ? { target_type: target.type, target_id: target.id }
+          : { target_id: target.id })
+      : { target_id: postId };
 
+    const r = await fetch(toApiUrl(`engagements/shares/`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ ...base, to_users: [...selected] }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+    setSending(false);
+    onShared?.();
+    onClose?.();
+    setSelected(new Set());
+    setQuery("");
+  } catch (e) {
+    setSending(false);
+    alert("Could not share this post. Please check your share endpoint.");
+  }
+}
   return (
     <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Share post</DialogTitle>
@@ -1048,49 +1107,42 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const refreshBusy = React.useRef(false);
 
   async function refreshCounts() {
-    if (refreshBusy.current) return;        // <-- prevent concurrent refreshes
-    refreshBusy.current = true;
-    try {
-      const c = await fetchEngagementCounts(post.id);
-      setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, ...c } }));
-    } finally {
-      refreshBusy.current = false;
-    }
+  if (refreshBusy.current) return;
+  refreshBusy.current = true;
+  try {
+    const target = engageTargetOf(post);
+    const c = await fetchEngagementCountsForTarget(target);
+    setLocal((curr) => ({ ...curr, user_has_liked: !!c.user_has_liked, metrics: { ...curr.metrics, ...c } }));
+  } finally {
+    refreshBusy.current = false;
   }
+}
   React.useEffect(() => { setLocal(post); refreshCounts(); }, [post]);
   async function toggleLike() {
-  // optimistic flip
-  setUserHasLiked((prev) => !prev);
-  setLocal((curr) => ({
-    ...curr,
-    metrics: {
-      ...curr.metrics,
-      likes: Math.max(0, (curr.metrics?.likes ?? 0) + (userHasLiked ? -1 : +1)),
-    },
-  }));
-
   try {
-    // ✅ use feed_item alias and the correct field 'reaction'
-    const r = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ feed_item: post.id, reaction: "like" }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const target = engageTargetOf(post);
+    const payload = { target_id: target.id, reaction: "like" }; // field name is 'reaction', not 'kind'
+    if (target.type) payload.target_type = target.type;
 
-    // re-sync from server so all users see the same count
-    await refreshCounts();
-  } catch (e) {
-    // rollback if it failed
+    // optimistic UI
     setUserHasLiked((prev) => !prev);
     setLocal((curr) => ({
       ...curr,
-      metrics: {
-        ...curr.metrics,
-        likes: Math.max(0, (curr.metrics?.likes ?? 0) + (userHasLiked ? +1 : -1)),
-      },
+      metrics: { ...curr.metrics, likes: Math.max(0, (curr.metrics?.likes ?? 0) + (userHasLiked ? -1 : +1)) },
     }));
-    console.error("post like failed:", e);
+
+    const r = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    // re-sync exact counts
+    await refreshCounts();
+  } catch (e) {
+    console.error("toggleLike failed:", e);
+    // simple rollback by forcing a refresh
+    await refreshCounts();
   }
 }
 
@@ -1207,6 +1259,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         inline
         initialCount={3}         // show a few, then "Load more" reveals more
         postId={post.id}
+        target={engageTargetOf(post)}
         onBumpCount={bumpCommentCount}
         inputRef={commentInputRef}
       />
@@ -1215,6 +1268,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         postId={post.id}
+        target={engageTargetOf(post)}
         onShared={bumpShareCount}
       />
     </Paper>
