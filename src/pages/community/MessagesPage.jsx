@@ -45,11 +45,58 @@ import VideoFileOutlinedIcon from "@mui/icons-material/VideoFileOutlined";
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
 
 const BORDER = "#e2e8f0";
-const PANEL_H = "calc(100vh - 180px)";
+const PANEL_H = "calc(100vh - 130px)";
+const TIME_W = 56;   // px reserved on the right for time
+const TIME_H = 16;   // px reserved at the bottom for time
+
+const bubbleSx = (mine) => (theme) => ({
+  position: "relative",
+  // leave room for tail so no horizontal scroll
+  maxWidth: "calc(78% - 8px)",
+
+  // base padding
+  padding: theme.spacing(0.75, 1.25),
+
+  // reserve space for the time (right + bottom)
+  paddingRight: `calc(${theme.spacing(1.25)} + ${TIME_W}px)`,
+  paddingBottom: `calc(${theme.spacing(0.75)} + ${TIME_H}px)`,
+
+  borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+  bgcolor: mine ? "rgb(189, 189, 189, 0.25)" : theme.palette.background.paper,
+  color: mine ? theme.palette.common.black : "inherit",
+  border: `1px solid ${mine ? "rgba(87, 87, 87, 0.15)" : BORDER}`,
+  boxShadow: mine ? "0 2px 6px rgba(114, 113, 113, 0.15)" : "none",
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
+
+  // WhatsApp-like tail
+  "&:after": {
+    content: '""',
+    position: "absolute",
+    bottom: 0,
+    width: 0,
+    height: 0,
+    borderTop: "8px solid transparent",
+    borderBottom: "8px solid transparent",
+    ...(mine
+      ? { right: -8, borderLeft: "8px solid rgba(87, 87, 87, 0.15)" }
+      : { left: -8, borderRight: `8px solid ${theme.palette.background.paper}` }),
+  },
+});
+
+
 
 // ---------- API helpers ----------
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 const MESSAGING = `${API_ROOT}/messaging`;
+
+const CAPTION_SX = { fontSize: 11, lineHeight: 1.2 };             // general tiny text
+const TINY_TIME_SX = { fontSize: 11, lineHeight: 1.2, opacity: .7 };
+const CHIP_TINY_SX = {
+  height: 18,
+  '& .MuiChip-label': { px: 0.75, fontSize: 11, fontWeight: 400, lineHeight: '14px' }
+};
+
 
 function getCookie(name) {
   if (typeof document === "undefined") return null;
@@ -150,7 +197,7 @@ function ConversationRow({ thread, active, onClick }) {
             <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
               {title}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={CAPTION_SX}>
               {time}
             </Typography>
           </Stack>
@@ -171,52 +218,63 @@ function ConversationRow({ thread, active, onClick }) {
 }
 
 // Single message bubble (center)
-function Bubble({ m, showSender, myAvatar }) {
+
+function Bubble({ m, showSender }) {
   const mine = Boolean(m.mine);
+
   return (
     <Stack
       direction="row"
       justifyContent={mine ? "flex-end" : "flex-start"}
       alignItems="flex-end"
-      sx={{ my: 1 }}
+      sx={{ my: 0.75 }}
     >
       {!mine && (
-        <Avatar src={m.sender_avatar} sx={{ width: 32, height: 32, mr: 1 }}>
+        <Avatar src={m.sender_avatar} sx={{ width: 30, height: 30, mr: 1 }}>
           {(m.sender_display || m.sender_name || "U").slice(0, 1)}
         </Avatar>
       )}
-      <Box
-        sx={{
-          maxWidth: "78%",
-          bgcolor: mine ? "#2dd4bf" : "background.paper",
-          color: mine ? "white" : "inherit",
-          px: 1.5,
-          py: 1,
-          borderRadius: 2,
-          border: `1px solid ${mine ? "#14b8a6" : BORDER}`,
-          boxShadow: mine ? "0 2px 6px rgba(20,184,166,0.25)" : "none",
-        }}
-      >
-        {!mine && showSender && (
-          <Typography variant="caption" sx={{ fontWeight: 700 }}>
-            {m.sender_display || m.sender_name}
+
+      <Box sx={bubbleSx(mine)}>
+        {showSender && (
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: 11,
+              lineHeight: 1.2,
+              fontWeight: 700,
+              display: "block",
+              mb: 0.25,
+              opacity: 0.9,  
+            }}
+          >
+            {mine ? "You" : (m.sender_display || m.sender_name)}
           </Typography>
         )}
+
         {m.body && (
-          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-            {m.body}
-          </Typography>
+        <Typography
+          variant="body2"
+          sx={{ whiteSpace: "pre-wrap" }}  // darker text in green bubble
+        >
+          {m.body}
+        </Typography>
         )}
-        <Stack direction="row" justifyContent="flex-end">
-          <Typography variant="caption" sx={{ opacity: 0.7 }}>
-            {m._time}
-          </Typography>
-        </Stack>
+
+        {/* time inside bubble, bottom-right */}
+        <Typography
+          className="bubble-time"
+          variant="caption"
+          sx={{ position: "absolute", right: 8, bottom: 4, fontSize: 11, lineHeight: 1, opacity: 0.75 }}
+        >
+          {m._time}
+        </Typography>
       </Box>
-      {mine && <Avatar sx={{ width: 32, height: 32, ml: 1 }}>Y</Avatar>}
     </Stack>
   );
 }
+
+
 async function hydrateMissingAvatars(items, type) {
   const out = [...items];
   const pickFromUser = (j) =>
@@ -682,10 +740,17 @@ export default function MessagesPage() {
       const payload = await res.json();
       const rows = Array.isArray(payload?.results) ? payload.results
         : Array.isArray(payload) ? payload : [];
-      const mapped = rows.map((m) => ({
-        ...m,
-        _time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-      }));
+      const mapped = rows.map((m) => {
+        const senderId = m.sender_id ?? m.sender ?? m.user_id ?? m.user;
+        const mine = me ? String(senderId) === String(me.id) : Boolean(m.mine);
+        return {
+          ...m,
+          mine,
+          _time: m.created_at
+            ? new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "",
+        };
+      });
       setMessages(mapped);
       requestAnimationFrame(() => {
         const el = document.getElementById("chat-scroll");
@@ -842,7 +907,7 @@ export default function MessagesPage() {
       <Grid container spacing={2}>
         {/* LEFT: Conversation list */}
         <Grid item xs={12} md={3}>
-          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, display: "flex", flexDirection: "column" }}>
+          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, display: "flex", maxWidth: 350, flexDirection: "column" }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>Messages</Typography>
               <IconButton size="small"><AttachFileOutlinedIcon fontSize="small" /></IconButton>
@@ -893,7 +958,7 @@ export default function MessagesPage() {
 
         {/* CENTER: Chat */}
         <Grid item xs={12} md={6}>
-          <Box sx={{ height: PANEL_H, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <Box sx={{ height: PANEL_H, display: "flex", flexDirection: "column", minHeight: 0, maxWidth: 520 }}>
             {/* Top bar */}
             <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 1 }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
@@ -933,15 +998,33 @@ export default function MessagesPage() {
                 flexDirection: "column",
               }}
             >
-              <Box id="chat-scroll" sx={{ flex: 1, overflowY: "auto" }}>
+              <Box
+                id="chat-scroll"
+                sx={{
+                  flex: 1,
+                  overflowY: "auto",
+                  overflowX: "hidden",
+                  scrollbarWidth: "none",        // Firefox
+                  msOverflowStyle: "none",       // IE/Edge (legacy)
+                  "&::-webkit-scrollbar": { display: "none" }, // Chrome/Safari
+                }}
+              >
                 {sections.map((sec) => (
                   <React.Fragment key={sec.label}>
                     <Stack alignItems="center" sx={{ my: 0.8 }}>
                       <Chip size="small" variant="outlined" label={sec.label} />
                     </Stack>
-                    {sec.items.map((m) => (
-                      <Bubble key={m.id} m={m} showSender={active?.chat_type !== "dm"} />
-                    ))}
+                    {sec.items.map((m, i) => {
+                      const prev = sec.items[i - 1];
+                      const firstOfBlock = !prev || prev.sender_id !== m.sender_id;
+                      return (
+                        <Bubble
+                          key={m.id}
+                          m={m}
+                          showSender={active?.chat_type !== "dm" && firstOfBlock}
+                        />
+                      );
+                    })}
                   </React.Fragment>
                 ))}
               </Box>
@@ -977,7 +1060,7 @@ export default function MessagesPage() {
 
         {/* RIGHT: Members + Attachments */}
         <Grid item xs={12} md={3}>
-          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, display: "flex", flexDirection: "column" }}>
+          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, maxWidth: 260, display: "flex", flexDirection: "column" }}>
             <Stack spacing={1.25}>
               <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
                 {topTitle}
@@ -1000,9 +1083,9 @@ export default function MessagesPage() {
                         <Typography variant="body2">{p.name}</Typography>
                         <Box sx={{ ml: "auto" }}>
                           {p.is_you ? (
-                            <Chip size="small" color="primary" label="You" />
+                            <Chip size="small" color="primary" label="You" sx={CHIP_TINY_SX} />
                           ) : p.role ? (
-                            <Chip size="small" variant="outlined" label={p.role} />
+                            <Chip size="small" variant="outlined" label={p.role} sx={CHIP_TINY_SX} />
                           ) : null}
                         </Box>
                       </Stack>
