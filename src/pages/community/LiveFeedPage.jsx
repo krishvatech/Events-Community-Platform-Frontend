@@ -61,8 +61,49 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+let _meCache = null;
+async function getMeCached() {
+  if (_meCache) return _meCache;
+  const r = await fetch(toApiUrl("users/me/"), { headers: { ...authHeaders(), Accept: "application/json" } });
+  _meCache = r.ok ? await r.json() : null;
+  return _meCache;
+}
+
+async function runLimited(items, limit, worker) {
+  const ret = new Array(items.length);
+  let i = 0;
+  const pool = new Set();
+  async function runOne(idx) {
+    const p = worker(items[idx]).then((res) => { ret[idx] = res; }).finally(() => pool.delete(p));
+    pool.add(p);
+    if (pool.size >= limit) await Promise.race(pool);
+  }
+  while (i < items.length) await runOne(i++);
+  await Promise.all(pool);
+  return ret;
+}
+
 function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
+}
+
+function getCountFromPage(j) {
+  if (j && typeof j.count === "number") return j.count;
+  if (Array.isArray(j?.results)) return j.results.length;
+  if (Array.isArray(j)) return j.length;
+  return 0;
+}
+
+async function fetchBatchMetrics(ids) {
+  if (!ids?.length) return {};
+  const r = await fetch(toApiUrl(`engagements/metrics/?ids=${ids.join(",")}`), {
+    headers: { Accept: "application/json", ...authHeaders() },
+  });
+  return r.ok ? r.json() : {};
+}
+async function fetchEngagementCounts(postId) {
+  const map = await fetchBatchMetrics([postId]);
+  return map[postId] || { likes: 0, comments: 0, shares: 0 };
 }
 
 // small debounce hook for search
@@ -122,7 +163,10 @@ function mapFeedItem(item) {
   const base = {
     id: item.id,
     created_at: item.created_at,
-    author: { name: displayName, avatar: item.actor_avatar || "" },
+    author: {
+      name: displayName,
+      avatar: toMediaUrl(item.actor_avatar || m.author_avatar || ""),
+    },
     community_id: community_id ? Number(community_id) : null,
     community_avatar: m.community_cover_url || "",
     community:
@@ -424,6 +468,35 @@ function ResourceBlock({ post, onOpenEvent }) {
   );
 }
 
+function normalizeCommentRow(c) {
+  // parent id normalization
+  const parent_id =
+    c.parent_id ??
+    (typeof c.parent === "number" ? c.parent : (typeof c.parent === "object" ? c.parent?.id : null)) ??
+    c.parentId ?? null;
+
+  // author normalization
+  const rawAuthor = c.author || c.user || c.created_by || c.owner || {};
+  const author_id = rawAuthor.id ?? c.author_id ?? c.user_id ?? c.created_by_id ?? null;
+  const name =
+    rawAuthor.name ||
+    rawAuthor.full_name ||
+    (rawAuthor.first_name || rawAuthor.last_name
+      ? `${rawAuthor.first_name || ""} ${rawAuthor.last_name || ""}`.trim()
+      : rawAuthor.username) ||
+    (author_id ? `User #${author_id}` : "User");
+  const avatar = toMediaUrl(
+    rawAuthor.avatar || rawAuthor.profile?.avatar || c.author_avatar || ""
+  );
+
+  return {
+    ...c,
+    parent_id,
+    author_id,
+    author: { id: author_id, name, avatar },
+  };
+}
+
 function CommentsDialog({
   open,
   onClose,
@@ -445,30 +518,67 @@ function CommentsDialog({
 
   // who am I (for delete-own)
   React.useEffect(() => {
-    if (!inline && !open) return;
-    (async () => {
-      try {
-        const r = await fetch(toApiUrl("users/me/"), { headers: { ...authHeaders() } });
-        setMe(r.ok ? await r.json() : {});
-      } catch {
-        setMe({});
-      }
-    })();
-  }, [open, inline]);
+  if (!inline && !open) return;
+  (async () => {
+    const meJson = await getMeCached(); // getMeCached already returns JSON
+    setMe(meJson || {});
+  })();
+}, [open, inline]);
 
   const load = React.useCallback(async () => {
     if (!postId) return;
     if (!inline && !open) return;
     setLoading(true);
     try {
-      const r = await fetch(toApiUrl(`activity/feed/${postId}/comments/?page_size=200`), {
+      const r = await fetch(toApiUrl(`engagements/comments/?target_id=${postId}&page_size=200`), {
         headers: { Accept: "application/json", ...authHeaders() },
       });
       const j = r.ok ? await r.json() : [];
-      const flat = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+      const flatRaw = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+      const rootsOnly = flatRaw.map(normalizeCommentRow);
+
+      // fetch replies for each root (1 extra request per root)
+      const replyUrls = rootsOnly.map((root) =>
+        toApiUrl(`engagements/comments/?parent=${root.id}&page_size=200`)
+      );
+
+      const replyPages = await runLimited(replyUrls, 3, async (url) => {
+        try {
+          const rr = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+          return rr.ok ? await rr.json() : [];
+        } catch { return []; }
+      });
+
+      const replies = replyPages.flatMap((jr) => {
+        const arr = Array.isArray(jr?.results) ? jr.results : (Array.isArray(jr) ? jr : []);
+        return arr.map(normalizeCommentRow);
+      });
+      // combine roots + replies and let the tree builder attach children
+      const flat = [...rootsOnly, ...replies];
       setItems(flat);
       // reset visible window each fetch
       setVisibleCount(initialCount);
+      try {
+        const ids = flat.map(c => c.id);
+        if (ids.length) {
+          const resCounts = await fetch(
+            toApiUrl(`engagements/reactions/counts/?target_type=comment&ids=${ids.join(",")}`),
+            { headers: { Accept: "application/json", ...authHeaders() } }
+          );
+          if (resCounts.ok) {
+            const payload = await resCounts.json();
+            const map = payload?.results || {};
+            setItems(curr =>
+              curr.map(c => {
+                const m = map[String(c.id)];
+                return m ? { ...c, like_count: m.like_count ?? c.like_count, user_has_liked: !!m.user_has_liked } : c;
+              })
+            );
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to hydrate comment counts:", e);
+      }
     } catch {
       setItems([]);
     }
@@ -493,10 +603,14 @@ function CommentsDialog({
   async function createComment(body, parentId = null) {
     if (!body.trim()) return;
     try {
-      const r = await fetch(toApiUrl(`activity/feed/${postId}/comments/`), {
+      const r = await fetch(toApiUrl(`engagements/comments/`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(parentId ? { text: body, parent_id: parentId } : { text: body }),
+        body: JSON.stringify(
+          parentId
+            ? { text: body, parent: parentId }             // reply
+            : { text: body, target_id: postId }            // top-level on FeedItem
+        ),
       });
       if (r.ok) {
         setText("");
@@ -506,23 +620,85 @@ function CommentsDialog({
       }
     } catch { }
   }
+  
 
-  async function toggleCommentLike(c) {
-    const liked = !!c.user_has_liked;
-    try {
-      const r = await fetch(toApiUrl(`activity/feed/${postId}/comments/${c.id}/like/`), {
-        method: liked ? "DELETE" : "POST",
-        headers: { ...authHeaders() },
-      });
-      if (r.ok) load();
-    } catch { }
+
+
+function bumpCommentLikeLocal(targetId, liked) {
+  setItems(prev => prev.map(x => x.id === targetId
+    ? { ...x,
+        user_has_liked: liked,
+        like_count: Math.max(0, (x.like_count ?? 0) + (liked ? 1 : -1))
+      }
+    : x
+  ));
+}
+
+  async function toggleCommentLike(commentId) {
+  // 1) optimistic update
+  setItems((curr) => {
+    const i = curr.findIndex((c) => c.id === commentId);
+    if (i === -1) return curr;
+    const wasLiked = !!curr[i].user_has_liked;
+    const next = [...curr];
+    next[i] = {
+      ...curr[i],
+      user_has_liked: !wasLiked,
+      like_count: Math.max(0, (curr[i].like_count || 0) + (wasLiked ? -1 : +1)),
+    };
+    return next;
+  });
+
+  // 2) hit the toggle endpoint
+  try {
+    const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ target_type: "comment", target_id: commentId, kind: "like" }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    // 3) re-sync the single comment count (cheap)
+    const res2 = await fetch(
+      toApiUrl(`engagements/reactions/counts/?target_type=comment&ids=${commentId}`),
+      { headers: { Accept: "application/json", ...authHeaders() } }
+    );
+    if (res2.ok) {
+      const payload = await res2.json();
+      const m = payload?.results?.[String(commentId)];
+      if (m) {
+        setItems((curr) =>
+          curr.map((c) =>
+            c.id === commentId ? { ...c, like_count: m.like_count, user_has_liked: !!m.user_has_liked } : c
+          )
+        );
+      }
+    }
+  } catch (e) {
+    console.error("toggleCommentLike failed:", e);
+    // rollback optimistic change on error
+    setItems((curr) => {
+      const i = curr.findIndex((c) => c.id === commentId);
+      if (i === -1) return curr;
+      const didLike = !!curr[i].user_has_liked;
+      const next = [...curr];
+      // reverse what we did above
+      next[i] = {
+        ...curr[i],
+        user_has_liked: !didLike,
+        like_count: Math.max(0, (curr[i].like_count || 0) + (didLike ? -1 : +1)),
+      };
+      return next;
+    });
+    alert("Failed to like/unlike. Please try again.");
   }
+}
 
   async function deleteOwn(c) {
     const myId = me?.id || me?.user?.id;
     if (!myId || (c.author_id !== myId)) return;
     try {
-      const r = await fetch(toApiUrl(`activity/feed/${postId}/comments/${c.id}/`), {
+      const r = await fetch(toApiUrl(`engagements/comments/${c.id}/`), {
         method: "DELETE",
         headers: { ...authHeaders() },
       });
@@ -530,7 +706,20 @@ function CommentsDialog({
     } catch { }
   }
 
-  const CommentItem = ({ c, depth = 0 }) => (
+  function updateCommentInTree(list, targetId, updater) {
+    return (list || []).map(n => {
+      if (n.id === targetId) return updater(n);
+      if (n.children?.length) {
+        return { ...n, children: updateCommentInTree(n.children, targetId, updater) };
+      }
+      return n;
+    });
+  }
+
+  const CommentItem = ({ c, depth = 0 }) => {
+  // fetch the like count for this comment once when it renders
+
+  return (
     <Box
       sx={{
         pl: depth ? 2 : 0,
@@ -540,9 +729,11 @@ function CommentsDialog({
       }}
     >
       <Stack direction="row" spacing={1} alignItems="center">
-        <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
+        <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }}>
+          {(c.author?.name || "U").slice(0, 1)}
+        </Avatar>
         <Typography variant="subtitle2">
-          {c.author?.name || c.author?.username || `User #${c.author_id}`}
+          {c.author?.name || c.author?.username || "User"}
         </Typography>
         <Typography variant="caption" color="text.secondary">
           {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
@@ -555,7 +746,7 @@ function CommentsDialog({
         <Button
           size="small"
           startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
-          onClick={() => toggleCommentLike(c)}
+          onClick={() => toggleCommentLike(c.id)}
         >
           {c.like_count ?? 0}
         </Button>
@@ -570,17 +761,20 @@ function CommentsDialog({
       {!!c.children?.length && (
         <Stack spacing={1} sx={{ mt: 1 }}>
           {c.children
-            .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0))) // replies older->newer
+            .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0)))
             .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
         </Stack>
       )}
     </Box>
   );
+};
 
   // --------- INLINE RENDER (Instagram/LinkedIn style) ----------
   if (inline) {
     const visibleRoots = roots.slice(0, visibleCount);
     const hasMore = roots.length > visibleRoots.length;
+    
+    
 
     return (
       <Box sx={{ mt: 1.25 }}>
@@ -646,6 +840,7 @@ function CommentsDialog({
     );
   }
 
+  
   // --------- ORIGINAL MODAL (left intact for compatibility) ----------
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -754,32 +949,27 @@ function ShareDialog({ open, onClose, postId, onShared }) {
   async function shareNow() {
     if (!selected.size || !postId) return;
     setSending(true);
-
-    const payloads = [
-      { url: `activity/feed/${postId}/share/`, body: { recipients: [...selected] } },
-      { url: `posts/${postId}/share/`, body: { recipients: [...selected] } },
-      { url: `share/`, body: { post_id: postId, recipients: [...selected] } },
-    ];
-
-    for (const p of payloads) {
-      try {
-        const r = await fetch(toApiUrl(p.url), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify(p.body),
-        });
-        if (r.ok) {
-          setSending(false);
-          onShared?.();      // bump the counter in the card
-          onClose?.();       // close dialog
-          setSelected(new Set());
-          setQuery("");
-          return;
-        }
-      } catch { /* try next */ }
+    try {
+      const r = await fetch(toApiUrl(`engagements/shares/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          target_id: postId,
+          to_users: [...selected],     // friends you picked
+          // to_groups: [...selectedGroups], // (add later if you add group picker UI)
+          // note: "optional note text"
+        }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setSending(false);
+      onShared?.();   // bump counter
+      onClose?.();    // close dialog
+      setSelected(new Set());
+      setQuery("");
+    } catch (e) {
+      setSending(false);
+      alert("Could not share this post. Please check your share endpoint.");
     }
-    setSending(false);
-    alert("Could not share this post. Please check your share endpoint.");
   }
 
   return (
@@ -845,6 +1035,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const commentInputRef = React.useRef(null);
   const bumpShareCount = () => {
     setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, shares: (curr.metrics?.shares ?? 0) + 1 } }));
+    refreshCounts();
   };
 
   const inc = (k) => {
@@ -852,22 +1043,42 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
     setLocal(next);
     onReact?.(post.id, k, next.metrics[k]);
   };
-  async function likeOnce() {
-    if (userHasLiked) return; // like only once
+
+  const refreshBusy = React.useRef(false);
+
+  async function refreshCounts() {
+    if (refreshBusy.current) return;        // <-- prevent concurrent refreshes
+    refreshBusy.current = true;
     try {
-      const r = await fetch(toApiUrl(`activity/feed/${post.id}/like/`), {
+      const c = await fetchEngagementCounts(post.id);
+      setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, ...c } }));
+    } finally {
+      refreshBusy.current = false;
+    }
+  }
+  React.useEffect(() => { setLocal(post); refreshCounts(); }, [post]);
+  async function toggleLike() {
+    try {
+      const r = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
         method: "POST",
-        headers: { ...authHeaders() },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ target_type: "comment", target_id: commentId, kind: "like" })
       });
-      if (r.ok) {
-        setUserHasLiked(true);
-        setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, likes: (curr.metrics?.likes ?? 0) + 1 } }));
-      }
-    } catch { }
+      if (!r.ok) return;
+      const j = await r.json().catch(() => ({}));
+      const liked = j.status === "liked" || (!userHasLiked && r.status === 201);
+      setUserHasLiked(liked);
+      setLocal(curr => ({
+        ...curr,
+        metrics: { ...curr.metrics, likes: Math.max(0, (curr.metrics?.likes ?? 0) + (liked ? 1 : -1)) }
+      }));
+      await refreshCounts();
+    } catch {}
   }
 
   const bumpCommentCount = () => {
     setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, comments: (curr.metrics?.comments ?? 0) + 1 } }));
+    refreshCounts();
   };
 
   const headingTitle = post.group_id
@@ -951,7 +1162,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
 
       {/* Actions */}
       <Stack direction="row" spacing={1} sx={{ mt: 1.25 }} alignItems="center">
-        <IconButton size="small" onClick={likeOnce}>
+        <IconButton size="small" onClick={toggleLike}>
           {userHasLiked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
         </IconButton>
         <Typography variant="caption">{local.metrics?.likes ?? 0}</Typography>
@@ -1046,6 +1257,42 @@ export default function LiveFeedPage({
     return `activity/feed/${qs ? `?${qs}` : ""}`;
   }, [communityId]);
 
+  async function fetchBatchMetrics(ids) {
+  if (!ids?.length) return {};
+  const url = toApiUrl(`engagements/metrics/?ids=${ids.join(",")}`);
+  try {
+    const res = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+    if (!res.ok) return {};
+    return await res.json(); // { [id]: {likes, comments, shares, user_has_liked ...} }
+  } catch {
+    return {};
+  }
+}
+
+  async function hydrateMetrics(feedItems) {
+    if (!feedItems?.length) return feedItems;
+    const map = await fetchBatchMetrics(feedItems.map(p => p.id));
+    return feedItems.map(p => {
+      const m = map[p.id] || {};
+      return {
+        ...p,
+        // immediate totals on the card
+        like_count: m.like_count ?? m.likes ?? p.like_count ?? 0,
+        comment_count: m.comment_count ?? m.comments ?? p.comment_count ?? 0,
+        share_count: m.share_count ?? m.shares ?? p.share_count ?? 0,
+        user_has_liked: (m.user_has_liked ?? m.me_liked ?? p.user_has_liked ?? false),
+        // optional nested metrics obj you already merge into UI
+        metrics: {
+          ...(p.metrics || {}),
+          likes: m.likes ?? m.like_count ?? p.metrics?.likes ?? 0,
+          comments: m.comments ?? m.comment_count ?? p.metrics?.comments ?? 0,
+          shares: m.shares ?? m.share_count ?? p.metrics?.shares ?? 0,
+        },
+      };
+    });
+  }
+
+
   // Load a page (absolute or relative DRF next)
   async function loadFeed(url, append = false) {
     setLoading(true);
@@ -1057,10 +1304,11 @@ export default function LiveFeedPage({
       if (res.status === 401) throw new Error("Unauthorized (401): missing/expired token");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const page = await res.json();
-      const items = (page.results || page).map(mapFeedItem).filter(Boolean);
-
-      setPosts((curr) => (append ? [...curr, ...items] : items));
+       const page = await res.json();
+       const rawItems = (page.results || page).map(mapFeedItem).filter(Boolean);
+       const items = await hydrateMetrics(rawItems); // ⬅️ enrich with like/comment/share + me_liked
+ 
+       setPosts((curr) => (append ? [...curr, ...items] : items));
       const next = page?.next ? page.next : null;
       setHasMore(Boolean(next));
       setNextUrl(next);
@@ -1170,6 +1418,32 @@ export default function LiveFeedPage({
     }
     return arr;
   }, [posts, scope, dq]);
+
+  React.useEffect(() => {
+  if (!displayPosts.length) return;
+  const ids = displayPosts.map(p => p.id);
+  let stop = false;
+
+  async function tick() {
+    try {
+      const map = await fetchBatchMetrics(ids);
+      if (stop) return;
+      setPosts(curr =>
+        curr.map(p => {
+          const m = map[p.id];
+          return m ? { ...p, user_has_liked: !!m.user_has_liked, metrics: { ...p.metrics, ...m } } : p;
+        })
+      );
+    } catch {}
+  }
+
+  const t = setInterval(() => {
+   if (document.visibilityState === "visible") tick();
+ }, 30000); // every 30s
+  tick(); // also once immediately
+  return () => { stop = true; clearInterval(t); };
+}, [displayPosts]);
+
 
   return (
     <Grid container spacing={2}>
