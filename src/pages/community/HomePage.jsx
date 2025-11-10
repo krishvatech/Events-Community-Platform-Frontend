@@ -1051,8 +1051,17 @@ export default function HomePage() {
               }}
             >
               <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
-              <Typography variant="body2" color="text.secondary">{profile.job_title}</Typography>
-              {profile.bio && <Typography variant="body2" sx={{ mt: 1 }}>{profile.bio}</Typography>}
+
+              {/* Show latest experience under name */}
+              {profile.experience && profile.experience.length > 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  {profile.experience[0].position} – {profile.experience[0].org}
+                </Typography>
+              ) : (
+                profile.job_title && (
+                  <Typography variant="body2" color="text.secondary">{profile.job_title}</Typography>
+                )
+              )}
             </Box>
 
             <Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" }, mx: 2 }} />
