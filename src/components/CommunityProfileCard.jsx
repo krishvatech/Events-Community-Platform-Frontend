@@ -63,6 +63,7 @@ const buildGroupDetailUrl = (g) => {
   // return `/community/groups/${slug || id}`;
 };
 
+const buildRichProfileUrl = (u) => `/community/rich-profile/${u?.id ?? u}`;
 
 function joinApi(url) {
   if (/^https?:\/\//i.test(url)) return url; // already absolute
@@ -170,6 +171,7 @@ export default function CommunityProfileCard({
         code: (g.slug && g.slug.slice(0, 2).toUpperCase()) || initials(name),
         color: g.color || "#F1F5F9",
         subscribed: !!(g.subscribed || g.is_member || g.member_status === "active"),
+        cover_image: resolveMediaUrl(g.cover_image || g.coverImage || g.icon || g.image || ""),
       };
     });
   }
@@ -430,17 +432,19 @@ export default function CommunityProfileCard({
               >
                 <Avatar
                   variant="rounded"
+                  src={c.cover_image || undefined}
+                  imgProps={{ referrerPolicy: "no-referrer" }}
                   sx={{
                     width: 28,
                     height: 28,
                     borderRadius: 1.5,
-                    bgcolor: c.color || "#F1F5F9",
+                    bgcolor: c.cover_image ? undefined : (c.color || "#F1F5F9"),
                     color: "#111827",
                     fontSize: 12,
                     fontWeight: 700,
                   }}
                 >
-                  {c.code || initials(c.name)}
+                  {!c.cover_image ? (c.code || initials(c.name)) : null}
                 </Avatar>
 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -486,8 +490,18 @@ export default function CommunityProfileCard({
 
           <Stack spacing={1.25} mt={1}>
             {(friendsPreview || []).map((f) => (
-              <Stack key={f.id} direction="row" spacing={1.25} alignItems="center">
-                <Avatar src={f.avatarUrl} alt={f.name} sx={{ width: 28, height: 28 }} />
+              <Stack
+                key={f.id}
+                direction="row"
+                spacing={1.25}
+                alignItems="center"
+                component={RouterLink}
+                to={buildRichProfileUrl(f)}
+                sx={{ textDecoration: "none", cursor: "pointer" }}
+              >
+                <Avatar src={f.avatarUrl} alt={f.name} sx={{ width: 28, height: 28 }}>
+                  {f.avatarUrl ? null : (f.name?.[0] || "").toUpperCase()}
+                </Avatar>
                 <Typography
                   variant="body2"
                   sx={{ fontWeight: 600, color: SLATE_700 }}
@@ -573,18 +587,25 @@ export default function CommunityProfileCard({
           <List disablePadding>
             {(friends || []).map((f, idx) => (
               <React.Fragment key={f.id || idx}>
-                <ListItemButton disableRipple>
+                <ListItemButton
+                  disableRipple
+                  component={RouterLink}
+                  to={buildRichProfileUrl(f)}
+                  onClick={() => setOpenFriends(false)}
+                >
                   <ListItemAvatar>
-                    <Avatar src={f.avatarUrl} alt={f.name} />
+                    <Avatar src={f.avatarUrl} alt={f.name}>
+                      {f.avatarUrl ? null : (f.name?.[0] || "").toUpperCase()}
+                    </Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={<Typography sx={{ fontWeight: 700 }}>{f.name}</Typography>}
-                    secondary=""
+                    secondary={f.job_title || f.headline || ""}
                   />
                   <Button
                     size="small"
                     variant="outlined"
-                    onClick={() => onMessage(f)}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMessage(f); }}
                     sx={{ textTransform: "none" }}
                   >
                     Message
