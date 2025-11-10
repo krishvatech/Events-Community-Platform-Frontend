@@ -239,14 +239,18 @@ export default function MyRecordingsPage() {
                     return;
                   }
                   // Send to the admin dashboard with a tab hint
-                  if (key === "events") navigate("/dashboard");
-                  else if (key === "resources") navigate("/dashboard");
-                  else navigate("/account");
+                  if (key === "events") navigate("/admin/events");
+                  else if (key === "posts") navigate("/admin/posts");
+                  else if (key === "resources") navigate("/admin/resources");
+                  else if (key === "groups") navigate("/admin/groups");
+                  else if (key === "notifications") navigate("/admin/notifications");
+                  else if (key === "settings") navigate("/admin/settings");
+                  else navigate("/admin/events");
                 }}
                 title="Admin"
               />
             ) : (
-              <AccountSidebar stickyTop={96} />
+              <AdminSidebar stickyTop={96} />
             )}
           </aside>
 
