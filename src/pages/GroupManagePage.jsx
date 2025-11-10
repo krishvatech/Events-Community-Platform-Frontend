@@ -72,23 +72,40 @@ const toStr = (v) => {
 // Always-unique key for posts (avoids poll/post ID clashes)
 const postKey = (p) => `${p?.type || "post"}:${p?.feed_item_id ?? p?.id ?? Math.random()}`;
 
+const cleanPollOptions = (arr) => {
+    const seen = new Set();
+    const out = [];
+    for (const raw of (arr || [])) {
+        const s = String(raw ?? "").trim();
+        if (!s) continue;
+        const key = s.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(s);
+        if (out.length >= 10) break; // hard cap at 10 options
+    }
+    return out;
+};
+
 function mapFeedPollToPost(row) {
     const m = row?.metadata || {};
     const t = (m.type || row.type || "").toLowerCase();
     if (t !== "poll") return null;
 
-    // normalize options → strings
     const opts = Array.isArray(m.options)
         ? m.options.map(o => String(o?.text ?? o?.label ?? o))
         : [];
 
-    // capture group id from either the row or metadata
     const gidRaw = row?.group_id ?? m.group_id ?? m.groupId ?? m.group?.id;
     const gid = Number(gidRaw) || null;
 
+    // 👇 real poll id coming from metadata
+    const pollId = Number(m.poll_id ?? row.poll_id ?? null) || null;
+
     return {
-        id: Number(row.id),
-        feed_item_id: Number(row.id),
+        id: Number(row.id),              // feed item id (keep for UI keys)
+        feed_item_id: Number(row.id),    // feed item id
+        poll_id: pollId,                 // 👈 add this
         type: "poll",
         question: m.question ?? m.title ?? row.title ?? row.text ?? "",
         options: opts,
@@ -96,11 +113,10 @@ function mapFeedPollToPost(row) {
         created_by: row.created_by || row.user || row.actor || null,
         hidden: !!(row.is_hidden ?? m.is_hidden),
         is_hidden: !!(row.is_hidden ?? m.is_hidden),
-
-        // ✅ important: keep the owning group
         group_id: gid,
     };
 }
+
 
 
 // ---- Edit Dialog (inline, smaller version) ----
@@ -1261,6 +1277,7 @@ export default function GroupManagePage() {
     const [postMenuAnchor, setPostMenuAnchor] = React.useState(null);
     const [activePost, setActivePost] = React.useState(null);
     const [editPostOpen, setEditPostOpen] = React.useState(false);
+    const [editImageFile, setEditImageFile] = React.useState(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
     // Member removal confirm (new)
     const [removeMemberOpen, setRemoveMemberOpen] = React.useState(false);
@@ -1310,19 +1327,47 @@ export default function GroupManagePage() {
     // Delete
     const deletePost = async () => {
         if (!activePost) return;
-        const postId = Number(activePost._feed_item_id ?? activePost.feed_item_id ?? activePost.id);
-        if (!Number.isInteger(postId)) { alert("Invalid item id"); return; }
 
-        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/delete-post/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: JSON.stringify({ id: postId })
-        });
-        if (!res.ok) {
-            const j = await res.json().catch(() => ({}));
-            alert(j?.detail || `HTTP ${res.status}`);
+        const itemId = Number(activePost._feed_item_id ?? activePost.feed_item_id ?? activePost.id);
+        if (!Number.isInteger(itemId)) { alert("Invalid item id"); return; }
+
+        const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+        let ok = false, lastErr = "";
+
+        try {
+            if (String(activePost.type).toLowerCase() === "poll") {
+                const pollId = Number(activePost.poll_id);
+                if (!Number.isInteger(pollId)) {
+                    alert("Cannot delete: missing poll_id in this item.");
+                    return;
+                }
+                // Use only the dedicated /delete/ endpoints (works with POST or DELETE)
+                for (const { url, method, body } of [
+                    { url: `${API_ROOT}/activity/feed/polls/${pollId}/delete/`, method: "DELETE" }
+                ]) {
+                    const r = await fetch(url, { method, headers, ...(body ? { body } : {}) });
+                    if (r.ok || r.status === 204) { ok = true; break; }
+                    lastErr = `HTTP ${r.status}`;
+                }
+            } else {
+                // NEW group post delete endpoints
+                for (const { url, method, body } of [
+                    { url: `${API_ROOT}/groups/${idOrSlug}/posts/${itemId}/delete/`, method: "DELETE" }
+                ]) {
+                    const r = await fetch(url, { method, headers, ...(body ? { body } : {}) });
+                    if (r.ok || r.status === 204) { ok = true; break; }
+                    lastErr = `HTTP ${r.status}`;
+                }
+            }
+        } catch (e) {
+            lastErr = e?.message || String(e);
+        }
+
+        if (!ok) {
+            alert(`Failed to delete: ${lastErr || "Unknown error"}`);
             return;
         }
+
         setDeleteConfirmOpen(false);
         await fetchPosts();
         setPostMenuAnchor(null);
@@ -1460,7 +1505,7 @@ export default function GroupManagePage() {
             } else if (postType === "poll") {
                 const payload = {
                     question: pollQuestion.trim(),
-                    options: pollOptions.map(o => o.trim()).filter(Boolean),
+                    options: cleanPollOptions(pollOptions),
                     group_id: Number(group?.id || idOrSlug), // feed needs the owning group
                 };
 
@@ -2153,8 +2198,8 @@ export default function GroupManagePage() {
                                                             </Stack>
 
                                                             {/* Render by type */}
-                                                            {/* footer actions at end of post (not for polls) */}
-                                                            {canModerate && ["text", "poll"].includes(p.type) && (
+                                                            {/* footer actions at end of post — show for ALL types if we can moderate and item has an id */}
+                                                            {canModerate && Number.isInteger(Number(p.feed_item_id ?? p.id)) && (
                                                                 <Stack direction="row" justifyContent="flex-end" className="mt-2">
                                                                     <IconButton size="small" onClick={(e) => openPostMenu(e, p)} title="More">
                                                                         <MoreVertRoundedIcon fontSize="small" />
@@ -2444,7 +2489,7 @@ export default function GroupManagePage() {
                                 </ListItemText>
                             </MenuItem>
 
-                            <MenuItem onClick={() => { setEditPostOpen(true); closePostMenu(); }} disabled={!activePost}>
+                            <MenuItem onClick={() => { setEditImageFile(null); setEditPostOpen(true); closePostMenu(); }} disabled={!activePost}>
                                 <ListItemIcon>✏️</ListItemIcon>
                                 <ListItemText>Edit</ListItemText>
                             </MenuItem>
@@ -2469,7 +2514,12 @@ export default function GroupManagePage() {
                             </DialogActions>
                         </Dialog>
                         {/* Edit Post dialog */}
-                        <Dialog open={editPostOpen} onClose={() => setEditPostOpen(false)} fullWidth maxWidth="sm">
+                        <Dialog
+                            open={editPostOpen}
+                            onClose={() => { setEditPostOpen(false); setEditImageFile(null); }}
+                            fullWidth
+                            maxWidth="sm"
+                        >
                             <DialogTitle>Edit Post</DialogTitle>
                             <DialogContent>
                                 {activePost?.type === "text" && (
@@ -2542,20 +2592,86 @@ export default function GroupManagePage() {
                                 )}
 
                                 {activePost?.type === "image" && (
-                                    <TextField
-                                        label="Caption"
-                                        fullWidth
-                                        multiline minRows={2}
-                                        value={activePost?.text || ""}
-                                        onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
-                                        className="mt-2"
-                                    />
+                                    <>
+                                        <TextField
+                                            label="Caption"
+                                            fullWidth
+                                            multiline minRows={2}
+                                            value={activePost?.text || ""}
+                                            onChange={(e) => setActivePost({ ...activePost, text: e.target.value })}
+                                            className="mt-2"
+                                        />
+                                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                                            <label htmlFor="edit-image-file">
+                                                <Button component="span" size="small" variant="outlined" startIcon={<AttachFileRoundedIcon />}>
+                                                    Replace image
+                                                </Button>
+                                            </label>
+                                            <input
+                                                id="edit-image-file"
+                                                type="file"
+                                                accept="image/*"
+                                                style={{ display: "none" }}
+                                                onChange={(e) => setEditImageFile(e.target.files?.[0] || null)}
+                                            />
+                                            <Typography variant="body2" className="text-slate-600">
+                                                {editImageFile ? editImageFile.name : "Keeping current image"}
+                                            </Typography>
+                                        </Stack>
+                                    </>
                                 )}
 
+
                                 {activePost?.type === "poll" && (
-                                    <Alert severity="info" className="mt-2">
-                                        Editing polls is not enabled here. You can still Hide/Unhide or Delete.
-                                    </Alert>
+                                    <>
+                                        <TextField
+                                            label="Question"
+                                            fullWidth
+                                            value={activePost?.question || ""}
+                                            onChange={(e) => setActivePost({ ...activePost, question: e.target.value })}
+                                            className="mt-2"
+                                        />
+
+                                        <Stack spacing={1} className="mt-2">
+                                            {(activePost?.options || []).map((opt, idx) => (
+                                                <Stack key={idx} direction="row" spacing={1} alignItems="center">
+                                                    <TextField
+                                                        label={`Option ${idx + 1}`}
+                                                        fullWidth
+                                                        value={String(opt ?? "")}
+                                                        onChange={(e) => {
+                                                            const next = [...(activePost?.options || [])];
+                                                            next[idx] = e.target.value;
+                                                            setActivePost({ ...activePost, options: next });
+                                                        }}
+                                                    />
+                                                    <Button
+                                                        size="small"
+                                                        onClick={() => {
+                                                            const next = [...(activePost?.options || [])];
+                                                            next.splice(idx, 1);
+                                                            setActivePost({ ...activePost, options: next });
+                                                        }}
+                                                        disabled={(activePost?.options?.length || 0) <= 2}  // ✅ keep at least 2
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                </Stack>
+                                            ))}
+
+                                            <Button
+                                                size="small"
+                                                startIcon={<AddRoundedIcon />}
+                                                onClick={() => {
+                                                    const cur = activePost?.options || [];
+                                                    if (cur.length >= 10) return;             // ✅ cap at 10
+                                                    setActivePost({ ...activePost, options: [...cur, ""] });
+                                                }}
+                                            >
+                                                Add option
+                                            </Button>
+                                        </Stack>
+                                    </>
                                 )}
                             </DialogContent>
                             <DialogActions>
@@ -2563,31 +2679,113 @@ export default function GroupManagePage() {
                                 <Button
                                     onClick={async () => {
                                         if (!activePost) return;
-                                        // Adjust endpoint if your backend differs
-                                        const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/${activePost.id}/`, {
-                                            method: "PATCH",
-                                            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                                            body: JSON.stringify(
-                                                activePost.type === "text" ? { text: activePost.text } :
-                                                    activePost.type === "link" ? { text: activePost.text, url: activePost.url } :
-                                                        activePost.type === "event" ? { title: activePost.title, text: activePost.text, starts_at: activePost.starts_at, ends_at: activePost.ends_at } :
-                                                            activePost.type === "image" ? { text: activePost.text } :
-                                                                {}
-                                            )
-                                        });
-                                        if (!res.ok) {
-                                            const j = await res.json().catch(() => ({}));
-                                            alert(j?.detail || `HTTP ${res.status}`);
-                                            return;
+                                        const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+
+                                        try {
+                                            const itemId = Number(activePost._feed_item_id ?? activePost.id);
+                                            if (!Number.isInteger(itemId)) { alert("Invalid item id"); return; }
+
+                                            if (activePost.type === "poll") {
+                                                // REPLACE the payload build with this:
+                                                const patchPayload = {
+                                                    question: (activePost.question || "").trim(),
+                                                    options: cleanPollOptions(activePost.options || []),   // ✅ use helper
+                                                };
+                                                if (patchPayload.options.length < 2) {
+                                                    alert("Poll must have at least 2 options.");
+                                                    return;
+                                                }
+
+                                                const pollId = Number(activePost.poll_id);
+                                                let ok = false, lastErr = "";
+
+                                                if (Number.isInteger(pollId)) {
+                                                    try {
+                                                        const r = await fetch(`${API_ROOT}/activity/feed/polls/${pollId}/`, {
+                                                            method: "PATCH",
+                                                            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                                            body: JSON.stringify(patchPayload),
+                                                        });
+                                                        ok = r.ok;
+                                                        if (!ok) lastErr = `HTTP ${r.status}`;
+                                                    } catch (e) { lastErr = e?.message || String(e); }
+                                                }
+
+                                                if (!ok) {
+                                                    const itemId = Number(activePost._feed_item_id ?? activePost.id);
+                                                    try {
+                                                        const r2 = await fetch(`${API_ROOT}/activity/feed/${itemId}/poll/`, {
+                                                            method: "PATCH",
+                                                            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                                            body: JSON.stringify(patchPayload),
+                                                        });
+                                                        ok = r2.ok;
+                                                        if (!ok) lastErr = `HTTP ${r2.status}`;
+                                                    } catch (e) { lastErr = e?.message || String(e); }
+                                                }
+
+                                                if (!ok) { alert(`Failed to update poll: ${lastErr}`); return; }
+                                            }
+                                            else {
+                                                // Non-poll posts → use NEW /edit endpoint
+                                                let ok = false, lastErr = "";
+
+                                                if (activePost.type === "image" && editImageFile) {
+                                                    const fd = new FormData();
+                                                    fd.append("text", activePost.text || "");
+                                                    fd.append("image", editImageFile, editImageFile.name);
+
+                                                    for (const url of [
+                                                        `${API_ROOT}/groups/${idOrSlug}/posts/${itemId}/edit`,
+                                                        `${API_ROOT}/groups/${idOrSlug}/posts/${itemId}/edit/`,
+                                                    ]) {
+                                                        try {
+                                                            const r = await fetch(url, { method: "PATCH", headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: fd });
+                                                            if (r.ok) { ok = true; break; }
+                                                            lastErr = `HTTP ${r.status}`;
+                                                        } catch (e) { lastErr = e?.message || String(e); }
+                                                    }
+                                                } else {
+                                                    const body =
+                                                        activePost.type === "text"
+                                                            ? { text: activePost.text }
+                                                            : activePost.type === "link"
+                                                                ? { text: activePost.text, url: activePost.url }
+                                                                : activePost.type === "event"
+                                                                    ? { title: activePost.title, text: activePost.text, starts_at: activePost.starts_at, ends_at: activePost.ends_at }
+                                                                    : { text: activePost.text };
+
+                                                    for (const { url, method, hdrs, payload } of [
+                                                        // Prefer NEW /edit (JSON)
+                                                        { url: `${API_ROOT}/groups/${idOrSlug}/posts/${itemId}/edit`, method: "PATCH", hdrs: { "Content-Type": "application/json" }, payload: JSON.stringify(body) },
+                                                        { url: `${API_ROOT}/groups/${idOrSlug}/posts/${itemId}/edit/`, method: "PATCH", hdrs: { "Content-Type": "application/json" }, payload: JSON.stringify(body) },
+                                                        // Fallback to legacy PATCH /posts/:id/
+                                                        { url: `${API_ROOT}/groups/${idOrSlug}/posts/${itemId}/`, method: "PATCH", hdrs: { "Content-Type": "application/json" }, payload: JSON.stringify(body) },
+                                                    ]) {
+                                                        try {
+                                                            const r = await fetch(url, { method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(hdrs || {}) }, body: payload });
+                                                            if (r.ok) { ok = true; break; }
+                                                            lastErr = `HTTP ${r.status}`;
+                                                        } catch (e) { lastErr = e?.message || String(e); }
+                                                    }
+                                                }
+
+                                                if (!ok) { alert(`Failed to update post: ${lastErr}`); return; }
+                                                setEditImageFile(null);
+                                            }
+
+                                            setEditPostOpen(false);
+                                            await fetchPosts();
+                                        } catch (e) {
+                                            alert(String(e?.message || e));
                                         }
-                                        setEditPostOpen(false);
-                                        await fetchPosts();
                                     }}
                                     variant="contained"
                                     sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                 >
                                     Save
                                 </Button>
+
                             </DialogActions>
                         </Dialog>
                     </Container>
