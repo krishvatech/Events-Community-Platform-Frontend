@@ -29,6 +29,17 @@ const JOIN_BTN_SX = {
 const ITEMS_PER_PAGE = 6;
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+// derive the backend origin (e.g. http://127.0.0.1:8000) from API_ROOT
+const API_ORIGIN = (() => {
+  try { const u = new URL(API_ROOT); return `${u.protocol}//${u.host}`; } catch { return ""; }
+})();
+
+// turn relative "/media/..." into absolute "http://host/media/..."
+const toAbsolute = (u) =>
+  !u ? "" : /^https?:\/\//i.test(u)
+    ? u
+    : `${(import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN)}${u.startsWith("/") ? "" : "/"}${u}`;
+
 
 function authHeader() {
   const token =
@@ -70,7 +81,19 @@ function GroupGridCard({ g, onJoin, onOpen }) {
 
       <Box
         onClick={() => onOpen?.(g)}
-        sx={{ ...{ width: "100%", height: 130, bgcolor: "#f8fafc", borderBottom: `1px solid ${BORDER}`, backgroundImage: g.cover ? `url(${g.cover})` : "none", backgroundSize: "cover", backgroundPosition: "center" }, cursor: "pointer" }}
+        sx={{
+          width: "100%",
+          height: 130,
+          bgcolor: "#f8fafc",
+          borderBottom: `1px solid ${BORDER}`,
+          backgroundImage:
+            (g.cover_image || g.cover)
+              ? `url(${toAbsolute(g.cover_image || g.cover)})`
+              : "none",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          cursor: "pointer"
+        }}
       />
 
       <CardContent sx={{ flexGrow: 1, pb: 1, cursor: "pointer" }} onClick={() => onOpen?.(g)}>
@@ -194,7 +217,10 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
           sx={{
             width: "100%", height: 180, mb: 2, borderRadius: 2, overflow: "hidden",
             bgcolor: "#f8fafc", border: `1px solid ${BORDER}`,
-            backgroundImage: group.cover ? `url(${group.cover})` : "none",
+            backgroundImage:
+              (group.cover_image || group.cover)
+                ? `url(${toAbsolute(group.cover_image || group.cover)})`
+                : "none",
             backgroundSize: "cover", backgroundPosition: "center",
           }}
         />
