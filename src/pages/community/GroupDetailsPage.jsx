@@ -1,6 +1,6 @@
 // src/pages/community/GroupDetailsPage.jsx
 import * as React from "react";
-import { useParams, Link as RouterLink } from "react-router-dom";
+import { useParams, Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Avatar, Box, Button, Card, CardContent, CardHeader, Chip, Divider, Grid,
   IconButton, List, ListItem, ListItemAvatar, ListItemText, Stack, Tab, Tabs,
@@ -912,6 +912,7 @@ function CommentsDialog({
 // Page
 // -----------------------------------------------------------------------------
 export default function GroupDetailsPage() {
+  const navigate = useNavigate();
   const { groupId } = useParams();
   const [tab, setTab] = React.useState(3); // Default to Overview tab
   const [group, setGroup] = React.useState(null);
@@ -1011,7 +1012,12 @@ export default function GroupDetailsPage() {
             flexShrink: 0,
           }}
         >
-          <CommunitySidebar active="groups" />
+          <CommunitySidebar
+            view="feed"  // highlight “Groups”
+            onChangeView={(key) =>
+              navigate(key === "home" ? "/community" : `/community?view=${key}`)
+            }
+          />
         </Box>
 
         {/* RIGHT: Group content */}

@@ -72,8 +72,8 @@ const Section = ({ title, children, action }) => (
 );
 
 const MONTHS = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 const toMonthYear = (d) => {
   if (!d) return "";
@@ -315,55 +315,55 @@ export default function RichProfile() {
   const [postsLoading, setPostsLoading] = useState(true);
 
   function normalizePost(row = {}) {
-   // unwrap + metadata (your API enriches feed rows here)
-   const src =
-     row.post || row.object || row.activity?.object || row.data?.post || row;
-   const m = row.metadata || row.meta || {};
+    // unwrap + metadata (your API enriches feed rows here)
+    const src =
+      row.post || row.object || row.activity?.object || row.data?.post || row;
+    const m = row.metadata || row.meta || {};
 
-   const created =
-     row.created_at || src?.created_at || src?.created || row.timestamp || null;
-   const id = row.id || src?.id || row.pk;
+    const created =
+      row.created_at || src?.created_at || src?.created || row.timestamp || null;
+    const id = row.id || src?.id || row.pk;
 
-   const pick = (...xs) =>
-     xs.find((v) => typeof v === "string" && v.trim().length) || "";
+    const pick = (...xs) =>
+      xs.find((v) => typeof v === "string" && v.trim().length) || "";
 
-   const text = pick(
-     // metadata first
-     m.text, m.body, m.content, m.caption, m.description, m.title,
-     // fallbacks from object
-     src?.text, src?.content, src?.body, src?.message, src?.caption
-   );
+    const text = pick(
+      // metadata first
+      m.text, m.body, m.content, m.caption, m.description, m.title,
+      // fallbacks from object
+      src?.text, src?.content, src?.body, src?.message, src?.caption
+    );
 
-   const link = pick(
-     m.link_url, m.url,
-     src?.link_url, src?.link, src?.url, src?.external_url
-   );
+    const link = pick(
+      m.link_url, m.url,
+      src?.link_url, src?.link, src?.url, src?.external_url
+    );
 
-   const singleImages = [
-    m.image_url, m.image, m.photo_url, m.picture,
-    src?.image_url, src?.image, src?.photo_url, src?.picture,
-  ].filter((v) => typeof v === "string" && v.trim().length);
+    const singleImages = [
+      m.image_url, m.image, m.photo_url, m.picture,
+      src?.image_url, src?.image, src?.photo_url, src?.picture,
+    ].filter((v) => typeof v === "string" && v.trim().length);
 
-  const images = []
-    .concat(
-      singleImages,
-      Array.isArray(m.images) ? m.images : [],
-      Array.isArray(src?.images) ? src.images : [],
-      Array.isArray(src?.media) ? src.media : [],
-      Array.isArray(src?.attachments) ? src.attachments : [],
-      Array.isArray(m.files) ? m.files : [] // just in case attachments come under metadata.files
-    )
-    .map((a) => (typeof a === "string" ? a : a?.url || a?.file || a?.path))
-    .filter(Boolean);
+    const images = []
+      .concat(
+        singleImages,
+        Array.isArray(m.images) ? m.images : [],
+        Array.isArray(src?.images) ? src.images : [],
+        Array.isArray(src?.media) ? src.media : [],
+        Array.isArray(src?.attachments) ? src.attachments : [],
+        Array.isArray(m.files) ? m.files : [] // just in case attachments come under metadata.files
+      )
+      .map((a) => (typeof a === "string" ? a : a?.url || a?.file || a?.path))
+      .filter(Boolean);
 
-   const pollOptions = m.poll?.options || src?.poll?.options || m.options || m.choices || [];
+    const pollOptions = m.poll?.options || src?.poll?.options || m.options || m.choices || [];
 
-   let type =
-     (m.type || src?.type || (images.length ? "image" : pollOptions.length ? "poll" : link ? "link" : "text"))
-       ?.toLowerCase();
+    let type =
+      (m.type || src?.type || (images.length ? "image" : pollOptions.length ? "poll" : link ? "link" : "text"))
+        ?.toLowerCase();
 
-   return { id, type, content: text, link, images, options: pollOptions, created_at: created };
- }
+    return { id, type, content: text, link, images, options: pollOptions, created_at: created };
+  }
 
   async function fetchFeedItemById(feedId, headers) {
     if (!feedId) return null;
@@ -377,7 +377,7 @@ export default function RichProfile() {
         const r = await fetch(url, { headers, credentials: "include" });
         if (!r.ok) continue;
         return await r.json().catch(() => null);
-      } catch {}
+      } catch { }
     }
     return null;
   }
@@ -434,13 +434,13 @@ export default function RichProfile() {
     let alive = true;
     (async () => {
       // 🚧 Private: if not me and not friends, don’t fetch any posts
-    if (!isMe && (friendStatus || "").toLowerCase() !== "friends") {
-      setPosts([]);
-      setPostsLoading(false);
-      return;
-    }
-    setPostsLoading(true);
-    const list = await fetchUserPostsById(userId, isMe);
+      if (!isMe && (friendStatus || "").toLowerCase() !== "friends") {
+        setPosts([]);
+        setPostsLoading(false);
+        return;
+      }
+      setPostsLoading(true);
+      const list = await fetchUserPostsById(userId, isMe);
       if (!alive) return;
       setPosts(list);
       setPostsLoading(false);
@@ -448,7 +448,7 @@ export default function RichProfile() {
     return () => {
       alive = false;
     };
-  }, [userId, isMe,friendStatus]);
+  }, [userId, isMe, friendStatus]);
 
   // Preload mutual connections count for displaying on posts. This effect
   // fetches the mutual friends list once when the component mounts (or when
@@ -488,11 +488,11 @@ export default function RichProfile() {
         const d = await r.json().catch(() => ({}));
         if (!alive) return;
         const map = {
-         incoming_pending: "pending_incoming",
-         outgoing_pending: "pending_outgoing",
-       };
-       const s = (map[d?.status] || d?.status || "none");
-       setFriendStatus(String(s).toLowerCase());
+          incoming_pending: "pending_incoming",
+          outgoing_pending: "pending_outgoing",
+        };
+        const s = (map[d?.status] || d?.status || "none");
+        setFriendStatus(String(s).toLowerCase());
       } catch {
         if (!alive) return;
         setFriendStatus("none");
@@ -544,7 +544,7 @@ export default function RichProfile() {
         const list = Array.isArray(data) ? data : data?.results || [];
         const found = list.find((x) => String(x.id) === String(userId));
         if (alive) setUserItem(found || null);
-      } catch {}
+      } catch { }
       finally {
         if (alive) setLoadingBase(false);
       }
@@ -593,7 +593,7 @@ export default function RichProfile() {
       setLoadingExtras(false);
     })();
     return () => { alive = false; };
-  }, [userId, isMe,friendStatus]);
+  }, [userId, isMe, friendStatus]);
 
   const fullName = useMemo(() => {
     const u = userItem || {};
@@ -624,11 +624,11 @@ export default function RichProfile() {
   const [connQ, setConnQ] = useState("");
 
   const displayName = (u) =>
-   u?.username ||
-   u?.profile?.full_name ||
-   `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
-   u?.email ||
-   `User ${u?.id || ""}`.trim();
+    u?.username ||
+    u?.profile?.full_name ||
+    `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
+    u?.email ||
+    `User ${u?.id || ""}`.trim();
 
   async function startChat(recipientId) {
     try {
@@ -649,86 +649,86 @@ export default function RichProfile() {
   }
 
   function normalizeFriendShape(x) {
-  const u = x?.user || x?.friend || x?.friend_user || x?.other_user || x?.target || x;
-  return {
-    id: u?.id ?? x?.id,
-    username: u?.username ?? x?.username ?? "",
-    email: u?.email ?? x?.email ?? "",
-    first_name: u?.first_name ?? x?.first_name ?? "",
-    last_name: u?.last_name ?? x?.last_name ?? "",
-    profile: u?.profile ?? x?.profile ?? null,
-  };
-}
+    const u = x?.user || x?.friend || x?.friend_user || x?.other_user || x?.target || x;
+    return {
+      id: u?.id ?? x?.id,
+      username: u?.username ?? x?.username ?? "",
+      email: u?.email ?? x?.email ?? "",
+      first_name: u?.first_name ?? x?.first_name ?? "",
+      last_name: u?.last_name ?? x?.last_name ?? "",
+      profile: u?.profile ?? x?.profile ?? null,
+    };
+  }
 
   // Try a few likely endpoints; adjust to your backend path if needed.
   async function fetchFriendList(targetUserId) {
     const url = `${API_BASE}/friends/of/?user_id=${targetUserId}`;
     try {
-        const r = await fetch(url, { headers: tokenHeader(), credentials: "include" });
-        const j = await r.json().catch(() => null);
-        if (!r.ok || !j) return [];
-        const arr = Array.isArray(j) ? j : j.results || j.friends || [];
-        return Array.isArray(arr) ? arr.map(normalizeFriendShape) : [];
+      const r = await fetch(url, { headers: tokenHeader(), credentials: "include" });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j) return [];
+      const arr = Array.isArray(j) ? j : j.results || j.friends || [];
+      return Array.isArray(arr) ? arr.map(normalizeFriendShape) : [];
     } catch {
-        return [];
+      return [];
     }
-    }
-
-    async function fetchMutualList(targetUserId) {
-        if (!targetUserId || String(targetUserId) === String(me?.id || "")) return [];
-        try {
-            const r = await fetch(`${API_BASE}/friends/mutual/?user_id=${targetUserId}`, {
-            headers: tokenHeader(),
-            credentials: "include",
-            });
-            const j = await r.json().catch(() => []);
-            const arr = Array.isArray(j) ? j : j.results || j.friends || [];
-            return Array.isArray(arr) ? arr.map(normalizeFriendShape) : [];
-        } catch {
-            return [];
-        }
-        }
-  const openConnections = async () => {
-  setConnOpen(true);
-  setConnLoading(true);
-  const [list, mutualList] = await Promise.all([
-    fetchFriendList(userId),
-    fetchMutualList(userId),
-  ]);
-  setConnections(list);
-  setMutual(mutualList);
-  setMutualCount(mutualList.length);
-
-  // Preload friendship status for everyone we might show
-  const ids = Array.from(new Set([...list, ...mutualList].map((x) => String(x?.id)).filter(Boolean)));
-  const missing = ids.filter((id) => connFriendStatus[id] === undefined && String(id) !== String(me?.id || ""));
-  if (missing.length) {
-    const entries = await Promise.all(
-      missing.map(async (id) => [id, await fetchFriendStatus(id)])
-    );
-    setConnFriendStatus((m) => ({ ...m, ...Object.fromEntries(entries) }));
   }
-  setConnLoading(false);
-};
+
+  async function fetchMutualList(targetUserId) {
+    if (!targetUserId || String(targetUserId) === String(me?.id || "")) return [];
+    try {
+      const r = await fetch(`${API_BASE}/friends/mutual/?user_id=${targetUserId}`, {
+        headers: tokenHeader(),
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => []);
+      const arr = Array.isArray(j) ? j : j.results || j.friends || [];
+      return Array.isArray(arr) ? arr.map(normalizeFriendShape) : [];
+    } catch {
+      return [];
+    }
+  }
+  const openConnections = async () => {
+    setConnOpen(true);
+    setConnLoading(true);
+    const [list, mutualList] = await Promise.all([
+      fetchFriendList(userId),
+      fetchMutualList(userId),
+    ]);
+    setConnections(list);
+    setMutual(mutualList);
+    setMutualCount(mutualList.length);
+
+    // Preload friendship status for everyone we might show
+    const ids = Array.from(new Set([...list, ...mutualList].map((x) => String(x?.id)).filter(Boolean)));
+    const missing = ids.filter((id) => connFriendStatus[id] === undefined && String(id) !== String(me?.id || ""));
+    if (missing.length) {
+      const entries = await Promise.all(
+        missing.map(async (id) => [id, await fetchFriendStatus(id)])
+      );
+      setConnFriendStatus((m) => ({ ...m, ...Object.fromEntries(entries) }));
+    }
+    setConnLoading(false);
+  };
 
   const filterList = (arr) => {
-  const s = (connQ || "").toLowerCase().trim();
-  if (!s) return arr;
-  return arr.filter((u) => {
-    const name = (displayName(u) || "").toLowerCase();
-    const email = (u?.email || "").toLowerCase();
-    return name.includes(s) || email.includes(s);
-  });
-};
+    const s = (connQ || "").toLowerCase().trim();
+    if (!s) return arr;
+    return arr.filter((u) => {
+      const name = (displayName(u) || "").toLowerCase();
+      const email = (u?.email || "").toLowerCase();
+      return name.includes(s) || email.includes(s);
+    });
+  };
 
-const filteredConnections = useMemo(
-  () => filterList(connections),
-  [connections, connQ]
-);
-const filteredMutual = useMemo(
-  () => filterList(mutual),
-  [mutual, connQ]
-);
+  const filteredConnections = useMemo(
+    () => filterList(connections),
+    [connections, connQ]
+  );
+  const filteredMutual = useMemo(
+    () => filterList(mutual),
+    [mutual, connQ]
+  );
 
   /* ========================= */
 
@@ -740,18 +740,15 @@ const filteredMutual = useMemo(
             {/* Community sidebar */}
             <CommunitySidebar
               stickyTop={96}
-              onChangeView={(view) => {
-                // adjust these routes to match your app
-                const map = {
-                  home: "/community",
-                  "live-feed": "/community/live-feed",
-                  notifications: "/community/notifications",
-                  messages: "/account/messages",
-                  groups: "/community/groups",
-                  members: "/community/members",
-                };
-                const to = map[view] || "/community";
-                // you already have useNavigate imported
+              view="members"
+              onChangeView={(key) => {
+                // keys emitted by CommunitySideBar: 'home' | 'live' | 'notify' | 'messages' | 'feed' | 'members'
+                const to =
+                  key === "home"
+                    ? "/community"
+                    : key === "messages"
+                      ? "/account/messages"
+                      : `/community?view=${key}`;
                 navigate(to);
               }}
             />
@@ -790,56 +787,56 @@ const filteredMutual = useMemo(
                     {!isMe && (
                       <Box sx={{ mt: 1.5, display: "flex", justifyContent: "flex-end", ml: "auto", gap: 1 }}>
                         {friendLoading && (
-                         <Button variant="outlined" size="small" disabled>Loading…</Button>
-                       )}
-                       {!friendLoading && friendStatus === "friends" && (
-                        <>
+                          <Button variant="outlined" size="small" disabled>Loading…</Button>
+                        )}
+                        {!friendLoading && friendStatus === "friends" && (
+                          <>
                             <Button
-                            variant="outlined"
-                            size="small"
-                            disabled
-                            sx={{ textTransform: "none", borderRadius: 2 }}
+                              variant="outlined"
+                              size="small"
+                              disabled
+                              sx={{ textTransform: "none", borderRadius: 2 }}
                             >
-                            Your Friend
+                              Your Friend
                             </Button>
                             {!!mutualCount && (
-                                <Chip
+                              <Chip
                                 label={`${mutualCount} mutual`}
                                 size="small"
                                 sx={{ alignSelf: "center" }}
-                                />
+                              />
                             )}
                             <Button
+                              variant="contained"
+                              size="small"
+                              onClick={openConnections}
+                              sx={{ textTransform: "none", borderRadius: 2 }}
+                            >
+                              Connections
+                            </Button>
+                          </>
+                        )}
+                        {!friendLoading && friendStatus === "pending_outgoing" && (
+                          <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+                            Request sent
+                          </Button>
+                        )}
+                        {!friendLoading && friendStatus === "pending_incoming" && (
+                          <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+                            Pending your approval
+                          </Button>
+                        )}
+                        {!friendLoading && friendStatus === "none" && (
+                          <Button
                             variant="contained"
                             size="small"
-                            onClick={openConnections}
+                            onClick={sendFriendRequest}
+                            disabled={friendSubmitting}
                             sx={{ textTransform: "none", borderRadius: 2 }}
-                            >
-                            Connections
-                            </Button>
-                        </>
+                          >
+                            {friendSubmitting ? "Sending…" : "Add Friend"}
+                          </Button>
                         )}
-                       {!friendLoading && friendStatus === "pending_outgoing" && (
-                         <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-                           Request sent
-                         </Button>
-                       )}
-                       {!friendLoading && friendStatus === "pending_incoming" && (
-                         <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-                           Pending your approval
-                         </Button>
-                       )}
-                       {!friendLoading && friendStatus === "none" && (
-                         <Button
-                           variant="contained"
-                           size="small"
-                           onClick={sendFriendRequest}
-                           disabled={friendSubmitting}
-                           sx={{ textTransform: "none", borderRadius: 2 }}
-                         >
-                           {friendSubmitting ? "Sending…" : "Add Friend"}
-                         </Button>
-                       )}
                       </Box>
                     )}
                   </Box>
@@ -954,14 +951,14 @@ const filteredMutual = useMemo(
                           {(currentExp?.start_date ||
                             currentExp?.end_date ||
                             currentExp?.currently_work_here) && (
-                            <Typography variant="caption" color="text.secondary">
-                              {rangeText(
-                                currentExp?.start_date,
-                                currentExp?.end_date,
-                                currentExp?.currently_work_here
-                              )}
-                            </Typography>
-                          )}
+                              <Typography variant="caption" color="text.secondary">
+                                {rangeText(
+                                  currentExp?.start_date,
+                                  currentExp?.end_date,
+                                  currentExp?.currently_work_here
+                                )}
+                              </Typography>
+                            )}
                         </Section>
 
                         {/* Experience section */}
@@ -1053,10 +1050,10 @@ const filteredMutual = useMemo(
             value={connTab}
             onChange={(e, v) => setConnTab(v)}
             sx={{ mb: 1 }}
-            >
+          >
             <Tab value="all" label={`All (${connections.length})`} />
             <Tab value="mutual" label={`Mutual (${mutual.length})`} />
-            </Tabs>
+          </Tabs>
           <TextField
             fullWidth
             size="small"
@@ -1076,7 +1073,7 @@ const filteredMutual = useMemo(
             <LinearProgress />
           ) : (
             <>
-              { (connTab === "mutual" ? filteredMutual : filteredConnections).length === 0 ? (
+              {(connTab === "mutual" ? filteredMutual : filteredConnections).length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   No connections found.
                 </Typography>

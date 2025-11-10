@@ -1,5 +1,6 @@
 // src/pages/CommunityHubPage.jsx
 import * as React from "react";
+import { useSearchParams } from "react-router-dom";
 import { Box, Grid, IconButton, Paper, Typography, Drawer } from "@mui/material";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 
@@ -20,7 +21,9 @@ const TOPICS = [
 ];
 
 export default function CommunityHubPage() {
-  const [view, setView] = React.useState("feed"); // "home" | "live" | "notify" | "messages" | "members" | "feed"
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialView = (searchParams.get("view") || "home").toLowerCase();
+  const [view, setView] = React.useState(initialView); // "home" | "live" | "notify" | "messages" | "members" | "feed"
   const [navOpen, setNavOpen] = React.useState(false);
 
   const titleMap = {
@@ -48,6 +51,8 @@ export default function CommunityHubPage() {
             topics={TOPICS}
             onChangeView={(key) => {
               setView(key);
+              // keep URL in sync; empty query for Home
+              setSearchParams(key === "home" ? {} : { view: key }, { replace: true });
               setNavOpen(false);
             }}
           />
@@ -66,7 +71,10 @@ export default function CommunityHubPage() {
           <CommunitySideBar
             view={view}
             topics={TOPICS}
-            onChangeView={(key) => setView(key)}
+            onChangeView={(key) => {
+              setView(key);
+              setSearchParams(key === "home" ? {} : { view: key }, { replace: true });
+            }}
           />
         </Grid>
 
