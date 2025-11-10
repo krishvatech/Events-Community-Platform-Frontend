@@ -120,27 +120,41 @@ function mapFeedPollToPost(row) {
 
 
 // ---- Edit Dialog (inline, smaller version) ----
+// ---- Edit Dialog (match screenshot fields) ----
 function EditGroupDialog({ open, group, onClose, onUpdated }) {
     const token = getToken();
+
+    // form state
     const [name, setName] = React.useState("");
     const [description, setDescription] = React.useState("");
-    const [visibility, setVisibility] = React.useState("public");
+    const [visibility, setVisibility] = React.useState("public");        // public | private
+    const [joinPolicy, setJoinPolicy] = React.useState("open");          // open | approval | invite
     const [imageFile, setImageFile] = React.useState(null);
     const [localPreview, setLocalPreview] = React.useState("");
     const [removeImage, setRemoveImage] = React.useState(false);
     const [submitting, setSubmitting] = React.useState(false);
     const [errors, setErrors] = React.useState({});
+    const isSubgroup = !!(group?.parent_id || group?.parent?.id || group?.parent);
 
+    // hydrate from loaded group
     React.useEffect(() => {
         if (!group) return;
         setName(group.name || "");
         setDescription(group.description || "");
         setVisibility(group.visibility || "public");
+        setJoinPolicy(group.join_policy === "open" ? "open" : "approval");
         setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
         setImageFile(null);
         setRemoveImage(false);
         setErrors({});
     }, [group]);
+
+    // if Private → force Invite-only (optional safety)
+    React.useEffect(() => {
+        if (visibility === "private" && joinPolicy !== "invite") {
+            setJoinPolicy("invite");
+        }
+    }, [visibility]); // eslint-disable-line
 
     const onPickFile = (file) => {
         if (!file) return;
@@ -166,9 +180,15 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
             const fd = new FormData();
             fd.append("name", name.trim());
             fd.append("description", description.trim());
-            fd.append("visibility", visibility);
+
+            // 👇 only for main groups; sub-groups inherit from parent
+            if (!isSubgroup) {
+                fd.append("visibility", visibility);
+                fd.append("join_policy", joinPolicy);
+            }
+
             if (imageFile) fd.append("cover_image", imageFile, imageFile.name);
-            if (removeImage) fd.append("remove_cover_image", "1"); // backend clears it
+            if (removeImage) fd.append("remove_cover_image", "1");
 
             const idOrSlug = group.slug || group.id;
             const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
@@ -186,7 +206,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     `HTTP ${res.status}`;
                 throw new Error(msg);
             }
-            onUpdated?.({ ...json, _cache: Date.now() }); // cache-bust for images
+            onUpdated?.({ ...json, _cache: Date.now() }); // bust image cache
             onClose?.();
         } catch (e) {
             setErrors((prev) => ({ ...prev, __all__: String(e?.message || e) }));
@@ -198,11 +218,23 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     if (!group) return null;
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            fullWidth
+            maxWidth="md"
+            PaperProps={{ className: "rounded-2xl" }}
+        >
             <DialogTitle className="font-extrabold">Edit Group</DialogTitle>
-            <DialogContent dividers>
-                {errors.__all__ && <Alert severity="error" className="mb-3">{errors.__all__}</Alert>}
 
+            <DialogContent dividers>
+                {errors.__all__ && (
+                    <Alert severity="error" className="mb-3">
+                        {errors.__all__}
+                    </Alert>
+                )}
+
+                {/* Group name row (avatar + input) */}
                 <Box className="flex items-start gap-3 mb-4">
                     <Avatar sx={{ bgcolor: "#10b8a6", width: 40, height: 40 }} />
                     <TextField
@@ -217,28 +249,58 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                 </Box>
 
                 <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
+                    {/* left: text fields */}
                     <Grid xs={12} md={7}>
                         <TextField
                             label="Description *"
-                            multiline minRows={3}
+                            multiline
+                            minRows={3}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            fullWidth className="mb-3"
-                            error={!!errors.description} helperText={errors.description}
+                            fullWidth
+                            className="mb-3"
+                            error={!!errors.description}
+                            helperText={errors.description}
                         />
-                        <TextField
-                            label="Visibility"
-                            select fullWidth className="mb-3"
-                            value={visibility}
-                            onChange={(e) => setVisibility(e.target.value)}
-                        >
-                            <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-                            <MenuItem value="private">Private (invite-only)</MenuItem>
-                        </TextField>
+
+                        {/* Visibility (only for top-level groups) */}
+                        {!isSubgroup && (
+                            <TextField
+                                label="Visibility"
+                                select
+                                fullWidth
+                                className="mb-3"
+                                value={visibility}
+                                onChange={(e) => setVisibility(e.target.value)}
+                            >
+                                <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
+                                <MenuItem value="private">Private (invite-only)</MenuItem>
+                            </TextField>
+                        )}
+
+                        {/* Join Policy (only for top-level groups) */}
+                        {!isSubgroup && (
+                            <TextField
+                                label="Join Policy"
+                                select
+                                fullWidth
+                                className="mb-3"
+                                value={joinPolicy}
+                                onChange={(e) => setJoinPolicy(e.target.value)}
+                                disabled={visibility === "private"}
+                                helperText={visibility === "private" ? "Private groups require approval." : undefined}
+                            >
+                                <MenuItem value="open">Open (join instantly)</MenuItem>
+                                <MenuItem value="approval">Approval required</MenuItem>
+                            </TextField>
+                        )}
                     </Grid>
 
+                    {/* right: cover image */}
                     <Grid xs={12} md={5}>
-                        <Typography variant="subtitle1" className="font-semibold">Group Photo</Typography>
+                        <Typography variant="subtitle1" className="font-semibold">
+                            Cover Image
+                        </Typography>
                         <Typography variant="caption" className="text-slate-500 block mb-2">
                             Recommended 650×365px • Max 50 MB
                         </Typography>
@@ -251,12 +313,20 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                                 <img
                                     src={localPreview}
                                     alt="cover"
-                                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                                    style={{
+                                        position: "absolute",
+                                        inset: 0,
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                    }}
                                 />
                             ) : (
                                 <Stack alignItems="center" spacing={1}>
                                     <ImageRoundedIcon />
-                                    <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
+                                    <Typography variant="body2" className="text-slate-600">
+                                        Image Preview
+                                    </Typography>
                                 </Stack>
                             )}
                             <input
@@ -270,14 +340,23 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
                         <Stack direction="row" spacing={1} className="mt-2">
                             <label htmlFor="group-edit-image-file">
-                                <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                                <Button
+                                    component="span"
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<InsertPhotoRoundedIcon />}
+                                >
                                     Upload
                                 </Button>
                             </label>
                             <Button
                                 size="small"
                                 variant="text"
-                                onClick={() => { setRemoveImage(true); setImageFile(null); setLocalPreview(""); }}
+                                onClick={() => {
+                                    setRemoveImage(true);
+                                    setImageFile(null);
+                                    setLocalPreview("");
+                                }}
                             >
                                 Remove
                             </Button>
@@ -285,14 +364,21 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     </Grid>
                 </Grid>
             </DialogContent>
+
             <DialogActions className="px-6 py-4">
-                <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>Cancel</Button>
+                <Button onClick={onClose} className="rounded-xl" sx={{ textTransform: "none" }}>
+                    Cancel
+                </Button>
                 <Button
                     onClick={submit}
                     disabled={submitting}
                     variant="contained"
                     className="rounded-xl"
-                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                    sx={{
+                        textTransform: "none",
+                        backgroundColor: "#10b8a6",
+                        "&:hover": { backgroundColor: "#0ea5a4" },
+                    }}
                 >
                     Save
                 </Button>
@@ -300,6 +386,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         </Dialog>
     );
 }
+
 
 
 function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }) {
@@ -429,7 +516,7 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
     const [slug, setSlug] = React.useState("");
     const [description, setDescription] = React.useState("");
     const [visibility, setVisibility] = React.useState("public");  // public | private
-    const [joinPolicy, setJoinPolicy] = React.useState("open");    // open | approval | invite
+    const [joinPolicy, setJoinPolicy] = React.useState("open");
     const [imageFile, setImageFile] = React.useState(null);
     const [localPreview, setLocalPreview] = React.useState("");
     const [submitting, setSubmitting] = React.useState(false);
@@ -469,10 +556,14 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
             fd.append("name", name.trim());
             fd.append("slug", slug.trim());
             fd.append("description", description.trim());
-            fd.append("visibility", visibility);
-            fd.append("join_policy", joinPolicy);
+
+            // 👇 inherit from parent, do NOT expose in UI
+            const parentVis = parentGroup?.visibility || "public";
+            const parentJoin = parentGroup?.join_policy || (parentVis === "private" ? "approval" : "open");
+            fd.append("visibility", parentVis);
+            fd.append("join_policy", parentJoin);
+
             fd.append("parent_id", String(parentGroup.id));
-            // send community_id if you have it (works with your backend shape)
             if (parentGroup?.community?.id) fd.append("community_id", String(parentGroup.community.id));
             if (parentGroup?.community_id) fd.append("community_id", String(parentGroup.community_id));
             if (imageFile) fd.append("cover_image", imageFile, imageFile.name);
@@ -538,27 +629,36 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
                             error={!!errors.description} helperText={errors.description}
                         />
 
-                        <TextField
-                            label="Visibility"
-                            select fullWidth className="mb-3"
-                            value={visibility}
-                            onChange={(e) => setVisibility(e.target.value)}
-                        >
-                            <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-                            <MenuItem value="private">Private (invite-only)</MenuItem>
-                        </TextField>
+                        {/* HIDDEN: sub-groups inherit from parent */}
+                        {false && (
+                            <TextField
+                                label="Visibility"
+                                select
+                                fullWidth
+                                className="mb-3"
+                                value={visibility}
+                                onChange={(e) => setVisibility(e.target.value)}
+                            >
+                                <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
+                                <MenuItem value="private">Private (invite-only)</MenuItem>
+                            </TextField>
+                        )}
 
-                        <TextField
-                            label="Join Policy"
-                            select fullWidth className="mb-3"
-                            value={joinPolicy}
-                            onChange={(e) => setJoinPolicy(e.target.value)}
-                        >
-                            <MenuItem value="open">Open (join instantly)</MenuItem>
-                            <MenuItem value="approval">Approval required</MenuItem>
-                            <MenuItem value="invite">Invite-only</MenuItem>
-                        </TextField>
-
+                        {false && (
+                            <TextField
+                                label="Join Policy"
+                                select
+                                fullWidth
+                                className="mb-3"
+                                value={joinPolicy}
+                                onChange={(e) => setJoinPolicy(e.target.value)}
+                                disabled={visibility === "private"}
+                                helperText={visibility === "private" ? "Private groups require approval." : undefined}
+                            >
+                                <MenuItem value="open">Open (join instantly)</MenuItem>
+                                <MenuItem value="approval">Approval required</MenuItem>
+                            </TextField>
+                        )}
                         {/* hidden slug like Create Group */}
                         <Box sx={{ display: "none" }}>
                             <TextField

@@ -48,8 +48,7 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "");
 
 // Pretty label for the chip
-const labelJoinPolicy = (v) =>
-  v === "approval" ? "Approval" : v === "invite" ? "Invite" : "Open";
+const labelJoinPolicy = (v) => (v === "approval" ? "Approval" : "Open");
 
 // ---- Create Group Dialog ----
 function CreateGroupDialog({ open, onClose, onCreated }) {
@@ -65,6 +64,10 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
   const [submitting, setSubmitting] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
   const [errors, setErrors] = React.useState({});
+  // If the group is private, lock join policy to "approval"
+  React.useEffect(() => {
+    if (visibility === "private") setJoinPolicy("approval");
+  }, [visibility]);
 
   const onNameChange = (v) => {
     setName(v);
@@ -167,18 +170,22 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
                 value={visibility} onChange={(e) => setVisibility(e.target.value)}
               >
                 <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-                <MenuItem value="private">Private (invite-only)</MenuItem>
+                <MenuItem value="private">Private (approval only)</MenuItem>
               </TextField>
 
               {/* NEW: Join Policy */}
               <TextField
                 label="Join Policy"
-                select fullWidth className="mb-3"
-                value={joinPolicy} onChange={(e) => setJoinPolicy(e.target.value)}
+                select
+                fullWidth
+                className="mb-3"
+                value={joinPolicy}
+                onChange={(e) => setJoinPolicy(e.target.value)}
+                disabled={visibility === "private"}
+                helperText={visibility === "private" ? "Private groups require approval." : undefined}
               >
                 <MenuItem value="open">Open (join instantly)</MenuItem>
                 <MenuItem value="approval">Approval required</MenuItem>
-                <MenuItem value="invite">Invite-only</MenuItem>
               </TextField>
 
               {/* hidden slug field */}
@@ -261,7 +268,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [visibility, setVisibility] = React.useState("public");
-  const [joinPolicy, setJoinPolicy] = React.useState("open"); // <-- NEW
+  const [joinPolicy, setJoinPolicy] = React.useState("open");
   const [imageFile, setImageFile] = React.useState(null);
   const [localPreview, setLocalPreview] = React.useState("");
   const [removeImage, setRemoveImage] = React.useState(false);
@@ -273,12 +280,16 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     setName(group.name || "");
     setDescription(group.description || "");
     setVisibility(group.visibility || "public");
-    setJoinPolicy(group.join_policy || "open"); // <-- NEW
+    setJoinPolicy(group.join_policy === "open" ? "open" : "approval");
     setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
     setImageFile(null);
     setRemoveImage(false);
     setErrors({});
   }, [group]);
+
+  React.useEffect(() => {
+    if (visibility === "private") setJoinPolicy("approval");
+  }, [visibility]);
 
   const onPickFile = (file) => {
     if (!file) return;
@@ -406,18 +417,22 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
               value={visibility} onChange={(e) => setVisibility(e.target.value)}
             >
               <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-              <MenuItem value="private">Private (invite-only)</MenuItem>
+              <MenuItem value="private">Private (approval only)</MenuItem>
             </TextField>
 
             {/* NEW: Join Policy */}
             <TextField
               label="Join Policy"
-              select fullWidth className="mb-3"
-              value={joinPolicy} onChange={(e) => setJoinPolicy(e.target.value)}
+              select
+              fullWidth
+              className="mb-3"
+              value={joinPolicy}
+              onChange={(e) => setJoinPolicy(e.target.value)}
+              disabled={visibility === "private"}
+              helperText={visibility === "private" ? "Private groups require approval." : undefined}
             >
               <MenuItem value="open">Open (join instantly)</MenuItem>
               <MenuItem value="approval">Approval required</MenuItem>
-              <MenuItem value="invite">Invite-only</MenuItem>
             </TextField>
           </div>
 

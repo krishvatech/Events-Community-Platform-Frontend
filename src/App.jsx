@@ -88,8 +88,8 @@ const AppShell = () => {
 
           {/* aliases so the sidebar appears on group manage/details too */}
           <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
-          <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
         </Route>
+         <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:id" element={<EventDetailsPage />} />
         <Route path="/cart" element={<CartPage />} />
