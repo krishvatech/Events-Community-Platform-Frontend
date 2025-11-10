@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
   MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Pagination, Dialog,
-  DialogTitle, DialogContent, DialogActions
+  DialogTitle, DialogContent, DialogActions, Popper  // <-- ADD THIS
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
@@ -48,7 +48,79 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "");
 
 // Pretty label for the chip
-const labelJoinPolicy = (v) => (v === "approval" ? "Approval" : "Open");
+const labelJoinPolicy = (v) =>
+  v === "approval" ? "Approval" : v === "invite" ? "Invite" : "Open";
+
+// ---- Create Group Dialog ----
+// Replace the entire CreateGroupDialog and EditGroupDialog with this:
+function CustomSelect({ label, value, onChange, options, disabled, helperText }) {
+  const [open, setOpen] = React.useState(false);
+  const anchorRef = React.useRef(null);
+
+  return (
+    <Box className="mb-3">
+      <Box
+        ref={anchorRef}
+        onClick={() => !disabled && setOpen(!open)}
+        className="border border-slate-300 rounded-md p-3 bg-white cursor-pointer hover:bg-slate-50 transition"
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          minHeight: 56,
+          '&:hover': { borderColor: "#10b8a6" }
+        }}
+      >
+        <Box>
+          <Typography variant="caption" className="text-slate-500">{label}</Typography>
+          <Typography variant="body2" className="font-medium">
+            {options.find(opt => opt.value === value)?.label || "Select..."}
+          </Typography>
+        </Box>
+        <Box className="text-slate-400">▼</Box>
+      </Box>
+
+      <Popper
+        open={open}
+        anchorEl={anchorRef.current}
+        placement="bottom-start"
+        style={{ zIndex: 10000 }}
+      >
+        <Paper
+          elevation={3}
+          className="rounded-md border border-slate-200 overflow-hidden"
+          style={{ width: anchorRef.current?.offsetWidth || 300 }}
+        >
+          <Box className="max-h-60 overflow-y-auto">
+            {options.map((opt) => (
+              <Box
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className="px-4 py-2.5 hover:bg-slate-100 cursor-pointer transition border-b border-slate-100 last:border-b-0"
+                sx={{
+                  backgroundColor: value === opt.value ? "#e0f2f1" : "transparent",
+                  fontWeight: value === opt.value ? 600 : 400,
+                  color: value === opt.value ? "#10b8a6" : "inherit"
+                }}
+              >
+                {opt.label}
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      </Popper>
+
+      {helperText && (
+        <Typography variant="caption" className="text-slate-500 block mt-1">
+          {helperText}
+        </Typography>
+      )}
+    </Box>
+  );
+}
 
 // ---- Create Group Dialog ----
 function CreateGroupDialog({ open, onClose, onCreated }) {
@@ -57,16 +129,22 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [visibility, setVisibility] = React.useState("public"); // public | private
-  const [joinPolicy, setJoinPolicy] = React.useState("open");    // open | invite | approval   <-- NEW
+  const [visibility, setVisibility] = React.useState("public");
+  const [joinPolicy, setJoinPolicy] = React.useState("open");
   const [imageFile, setImageFile] = React.useState(null);
   const [localPreview, setLocalPreview] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
   const [errors, setErrors] = React.useState({});
-  // If the group is private, lock join policy to "approval"
+
   React.useEffect(() => {
-    if (visibility === "private") setJoinPolicy("approval");
+    if (visibility === "private") {
+      setJoinPolicy("invite");
+    } else {
+      if (!joinPolicy || joinPolicy === "invite") {
+        setJoinPolicy("open");
+      }
+    }
   }, [visibility]);
 
   const onNameChange = (v) => {
@@ -100,7 +178,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
       fd.append("slug", slug.trim());
       fd.append("description", description.trim());
       fd.append("visibility", visibility);
-      fd.append("join_policy", joinPolicy); // <-- NEW
+      fd.append("join_policy", visibility === "private" ? "invite" : joinPolicy);
       if (imageFile) fd.append("cover_image", imageFile, imageFile.name);
 
       const res = await fetch(`${API_ROOT}/groups/`, {
@@ -122,7 +200,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
       setToast({ open: true, type: "success", msg: "Group created" });
       onClose?.();
       setName(""); setSlug(""); setDescription(""); setVisibility("public");
-      setJoinPolicy("open"); // reset  <-- NEW
+      setJoinPolicy("open");
       setImageFile(null); setLocalPreview("");
     } catch (e) {
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
@@ -166,29 +244,40 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
 
               <TextField
                 label="Visibility"
-                select fullWidth className="mb-3"
-                value={visibility} onChange={(e) => setVisibility(e.target.value)}
-              >
-                <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-                <MenuItem value="private">Private (approval only)</MenuItem>
-              </TextField>
-
-              {/* NEW: Join Policy */}
-              <TextField
-                label="Join Policy"
                 select
                 fullWidth
                 className="mb-3"
-                value={joinPolicy}
-                onChange={(e) => setJoinPolicy(e.target.value)}
-                disabled={visibility === "private"}
-                helperText={visibility === "private" ? "Private groups require approval." : undefined}
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value)}
+                SelectProps={{
+                  MenuProps: {
+                    disablePortal: true,
+                    PaperProps: { sx: { zIndex: 1300 } }
+                  },
+                }}
               >
-                <MenuItem value="open">Open (join instantly)</MenuItem>
-                <MenuItem value="approval">Approval required</MenuItem>
+                <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
+                <MenuItem value="private">Private (invite-only)</MenuItem>
               </TextField>
 
-              {/* hidden slug field */}
+              <CustomSelect
+                label="Join Policy"
+                value={joinPolicy}
+                onChange={(val) => setJoinPolicy(val)}
+                disabled={visibility === "private"}
+                helperText={visibility === "private" ? "Private groups are invite-only." : ""}
+                options={
+                  visibility === "public"
+                    ? [
+                      { label: "Open (join instantly)", value: "open" },
+                      { label: "Approval required", value: "approval" }
+                    ]
+                    : [
+                      { label: "Invite only", value: "invite" }
+                    ]
+                }
+              />
+
               <Box sx={{ display: "none" }}>
                 <TextField label="Slug *" value={slug} onChange={(e) => setSlug(slugify(e.target.value))} />
               </Box>
@@ -280,7 +369,14 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     setName(group.name || "");
     setDescription(group.description || "");
     setVisibility(group.visibility || "public");
-    setJoinPolicy(group.join_policy === "open" ? "open" : "approval");
+    setJoinPolicy(
+      group.join_policy === "open"
+        ? "open"
+        : group.join_policy === "invite"
+          ? "invite"
+          : "approval"
+    );
+
     setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
     setImageFile(null);
     setRemoveImage(false);
@@ -288,7 +384,13 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
   }, [group]);
 
   React.useEffect(() => {
-    if (visibility === "private") setJoinPolicy("approval");
+    if (visibility === "private") {
+      setJoinPolicy("invite");
+    } else {
+      if (!joinPolicy || joinPolicy === "invite") {
+        setJoinPolicy("open");
+      }
+    }
   }, [visibility]);
 
   const onPickFile = (file) => {
@@ -316,7 +418,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
       fd.append("name", name.trim());
       fd.append("description", description.trim());
       fd.append("visibility", visibility);
-      fd.append("join_policy", joinPolicy); // <-- NEW
+      fd.append("join_policy", visibility === "private" ? "invite" : joinPolicy);
 
       if (imageFile && !removeImage) fd.append("cover_image", imageFile, imageFile.name);
       if (removeImage) fd.append("remove_cover_image", "1");
@@ -413,26 +515,49 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
             <TextField
               label="Visibility"
-              select fullWidth className="mb-3"
-              value={visibility} onChange={(e) => setVisibility(e.target.value)}
+              select
+              fullWidth
+              className="mb-3"
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value)}
+              SelectProps={{
+                MenuProps: {
+                  disablePortal: true,
+                  PaperProps: { sx: { zIndex: 1300 } }
+                },
+              }}
             >
               <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-              <MenuItem value="private">Private (approval only)</MenuItem>
+              <MenuItem value="private">Private (invite-only)</MenuItem>
             </TextField>
 
-            {/* NEW: Join Policy */}
             <TextField
               label="Join Policy"
               select
               fullWidth
               className="mb-3"
               value={joinPolicy}
-              onChange={(e) => setJoinPolicy(e.target.value)}
+              onChange={(e) => {
+                const newVal = e.target.value;
+                setJoinPolicy(newVal);
+              }}
               disabled={visibility === "private"}
-              helperText={visibility === "private" ? "Private groups require approval." : undefined}
+              helperText={visibility === "private" ? "Private groups are invite-only." : ""}
+              SelectProps={{
+                menuProps: {
+                  disablePortal: true,
+                  PaperProps: { sx: { zIndex: 1300 } }
+                },
+              }}
             >
-              <MenuItem value="open">Open (join instantly)</MenuItem>
-              <MenuItem value="approval">Approval required</MenuItem>
+              {visibility === "public" ? (
+                <>
+                  <MenuItem value="open">Open (join instantly)</MenuItem>
+                  <MenuItem value="approval">Approval required</MenuItem>
+                </>
+              ) : (
+                <MenuItem value="invite">Invite only</MenuItem>
+              )}
             </TextField>
           </div>
 

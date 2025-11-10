@@ -5,7 +5,7 @@ import {
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
     TextField, Typography, Switch, FormControlLabel, CircularProgress,
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup,
-    IconButton, Menu, ListItemIcon
+    IconButton, Menu, ListItemIcon, Popper
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
@@ -118,8 +118,77 @@ function mapFeedPollToPost(row) {
 }
 
 
+function CustomSelect({ label, value, onChange, options, disabled, helperText }) {
+    const [open, setOpen] = React.useState(false);
+    const anchorRef = React.useRef(null);
 
-// ---- Edit Dialog (inline, smaller version) ----
+    return (
+        <Box className="mb-3">
+            <Box
+                ref={anchorRef}
+                onClick={() => !disabled && setOpen(!open)}
+                className="border border-slate-300 rounded-md p-3 bg-white cursor-pointer hover:bg-slate-50 transition"
+                sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    minHeight: 56,
+                    opacity: disabled ? 0.6 : 1,
+                    pointerEvents: disabled ? "none" : "auto",
+                    '&:hover': { borderColor: disabled ? "inherit" : "#10b8a6" }
+                }}
+            >
+                <Box>
+                    <Typography variant="caption" className="text-slate-500">{label}</Typography>
+                    <Typography variant="body2" className="font-medium">
+                        {options.find(opt => opt.value === value)?.label || "Select..."}
+                    </Typography>
+                </Box>
+                <Box className="text-slate-400">▼</Box>
+            </Box>
+
+            <Popper
+                open={open}
+                anchorEl={anchorRef.current}
+                placement="bottom-start"
+                style={{ zIndex: 10000 }}
+            >
+                <Paper
+                    elevation={3}
+                    className="rounded-md border border-slate-200 overflow-hidden"
+                    style={{ width: anchorRef.current?.offsetWidth || 300 }}
+                >
+                    <Box className="max-h-60 overflow-y-auto">
+                        {options.map((opt) => (
+                            <Box
+                                key={opt.value}
+                                onClick={() => {
+                                    onChange(opt.value);
+                                    setOpen(false);
+                                }}
+                                className="px-4 py-2.5 hover:bg-slate-100 cursor-pointer transition border-b border-slate-100 last:border-b-0"
+                                sx={{
+                                    backgroundColor: value === opt.value ? "#e0f2f1" : "transparent",
+                                    fontWeight: value === opt.value ? 600 : 400,
+                                    color: value === opt.value ? "#10b8a6" : "inherit"
+                                }}
+                            >
+                                {opt.label}
+                            </Box>
+                        ))}
+                    </Box>
+                </Paper>
+            </Popper>
+
+            {helperText && (
+                <Typography variant="caption" className="text-slate-500 block mt-1">
+                    {helperText}
+                </Typography>
+            )}
+        </Box>
+    );
+}
+
 // ---- Edit Dialog (match screenshot fields) ----
 function EditGroupDialog({ open, group, onClose, onUpdated }) {
     const token = getToken();
@@ -127,8 +196,8 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     // form state
     const [name, setName] = React.useState("");
     const [description, setDescription] = React.useState("");
-    const [visibility, setVisibility] = React.useState("public");        // public | private
-    const [joinPolicy, setJoinPolicy] = React.useState("open");          // open | approval | invite
+    const [visibility, setVisibility] = React.useState("public");
+    const [joinPolicy, setJoinPolicy] = React.useState("open");
     const [imageFile, setImageFile] = React.useState(null);
     const [localPreview, setLocalPreview] = React.useState("");
     const [removeImage, setRemoveImage] = React.useState(false);
@@ -154,7 +223,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         if (visibility === "private" && joinPolicy !== "invite") {
             setJoinPolicy("invite");
         }
-    }, [visibility]); // eslint-disable-line
+    }, [visibility]);
 
     const onPickFile = (file) => {
         if (!file) return;
@@ -181,7 +250,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
             fd.append("name", name.trim());
             fd.append("description", description.trim());
 
-            // 👇 only for main groups; sub-groups inherit from parent
+            // only for main groups; sub-groups inherit from parent
             if (!isSubgroup) {
                 fd.append("visibility", visibility);
                 fd.append("join_policy", joinPolicy);
@@ -206,7 +275,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     `HTTP ${res.status}`;
                 throw new Error(msg);
             }
-            onUpdated?.({ ...json, _cache: Date.now() }); // bust image cache
+            onUpdated?.({ ...json, _cache: Date.now() });
             onClose?.();
         } catch (e) {
             setErrors((prev) => ({ ...prev, __all__: String(e?.message || e) }));
@@ -234,7 +303,6 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     </Alert>
                 )}
 
-                {/* Group name row (avatar + input) */}
                 <Box className="flex items-start gap-3 mb-4">
                     <Avatar sx={{ bgcolor: "#10b8a6", width: 40, height: 40 }} />
                     <TextField
@@ -249,7 +317,6 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                 </Box>
 
                 <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
-                    {/* left: text fields */}
                     <Grid xs={12} md={7}>
                         <TextField
                             label="Description *"
@@ -265,38 +332,39 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
                         {/* Visibility (only for top-level groups) */}
                         {!isSubgroup && (
-                            <TextField
+                            <CustomSelect
                                 label="Visibility"
-                                select
-                                fullWidth
-                                className="mb-3"
                                 value={visibility}
-                                onChange={(e) => setVisibility(e.target.value)}
-                            >
-                                <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-                                <MenuItem value="private">Private (invite-only)</MenuItem>
-                            </TextField>
+                                onChange={(val) => setVisibility(val)}
+                                options={[
+                                    { label: "Public (anyone can find & request to join)", value: "public" },
+                                    { label: "Private (invite-only)", value: "private" }
+                                ]}
+                            />
                         )}
 
                         {/* Join Policy (only for top-level groups) */}
                         {!isSubgroup && (
-                            <TextField
+                            <CustomSelect
                                 label="Join Policy"
-                                select
-                                fullWidth
-                                className="mb-3"
                                 value={joinPolicy}
-                                onChange={(e) => setJoinPolicy(e.target.value)}
+                                onChange={(val) => setJoinPolicy(val)}
                                 disabled={visibility === "private"}
-                                helperText={visibility === "private" ? "Private groups require approval." : undefined}
-                            >
-                                <MenuItem value="open">Open (join instantly)</MenuItem>
-                                <MenuItem value="approval">Approval required</MenuItem>
-                            </TextField>
+                                helperText={visibility === "private" ? "Private groups are invite-only." : ""}
+                                options={
+                                    visibility === "public"
+                                        ? [
+                                            { label: "Open (join instantly)", value: "open" },
+                                            { label: "Approval required", value: "approval" }
+                                        ]
+                                        : [
+                                            { label: "Invite only", value: "invite" }
+                                        ]
+                                }
+                            />
                         )}
                     </Grid>
 
-                    {/* right: cover image */}
                     <Grid xs={12} md={5}>
                         <Typography variant="subtitle1" className="font-semibold">
                             Cover Image
@@ -386,7 +454,6 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         </Dialog>
     );
 }
-
 
 
 function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }) {
