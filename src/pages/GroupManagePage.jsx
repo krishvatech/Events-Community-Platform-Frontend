@@ -77,27 +77,31 @@ function mapFeedPollToPost(row) {
     const t = (m.type || row.type || "").toLowerCase();
     if (t !== "poll") return null;
 
-    // make every option a plain string (prevents Chip label errors)
+    // normalize options → strings
     const opts = Array.isArray(m.options)
         ? m.options.map(o => String(o?.text ?? o?.label ?? o))
         : [];
+
+    // capture group id from either the row or metadata
+    const gidRaw = row?.group_id ?? m.group_id ?? m.groupId ?? m.group?.id;
+    const gid = Number(gidRaw) || null;
 
     return {
         id: Number(row.id),
         feed_item_id: Number(row.id),
         type: "poll",
-
-        // ✅ the missing piece
         question: m.question ?? m.title ?? row.title ?? row.text ?? "",
-
         options: opts,
-
         created_at: row.created_at || m.created_at || row.createdAt || new Date().toISOString(),
         created_by: row.created_by || row.user || row.actor || null,
         hidden: !!(row.is_hidden ?? m.is_hidden),
         is_hidden: !!(row.is_hidden ?? m.is_hidden),
+
+        // ✅ important: keep the owning group
+        group_id: gid,
     };
 }
+
 
 // ---- Edit Dialog (inline, smaller version) ----
 function EditGroupDialog({ open, group, onClose, onUpdated }) {
@@ -1332,33 +1336,54 @@ export default function GroupManagePage() {
     const fetchPosts = React.useCallback(async () => {
         if (!idOrSlug) return;
         setPostsLoading(true); setPostsError("");
+
         try {
             const headers = {
                 "Content-Type": "application/json",
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
             };
 
-            // (A) normal group posts (text/image/link/event)
+            // (A) group posts (text/image/link/event) from /groups/:idOrSlug/posts/
             const resPosts = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, { headers });
             const postsJson = await resPosts.json().catch(() => ([]));
             if (!resPosts.ok) throw new Error(postsJson?.detail || `HTTP ${resPosts.status}`);
+
             let postsArr = Array.isArray(postsJson) ? postsJson : [];
-            // If backend returns polls here, drop them — we load polls from Activity Feed.
+            // drop polls if backend mixes them here; we'll pull them from Activity Feed
             postsArr = postsArr.filter(p => (p?.type || "").toLowerCase() !== "poll");
-            // (B) polls now come from Activity Feed (scope=group)
-            const gid = group?.id || idOrSlug; // prefer numeric id when present
-            const feedUrl = new URL(`${API_ROOT}/activity/feed/`, API_ROOT);
-            feedUrl.searchParams.set("scope", "group");
-            feedUrl.searchParams.set("group_id", String(gid));
 
-            const resFeed = await fetch(feedUrl.toString(), { headers });
-            const feedJson = await resFeed.json().catch(() => ([]));
-            const feedRows = Array.isArray(feedJson?.results) ? feedJson.results
-                : (Array.isArray(feedJson) ? feedJson : []);
-            const polls = feedRows.map(mapFeedPollToPost).filter(Boolean);
+            // (B) polls come from Activity Feed (scope=group)
+            const currentGid = Number(group?.id) || null;
+            const currentSlug = group?.slug || String(idOrSlug);
 
-            // merge + newest first
-            const merged = [...postsArr, ...polls]
+            // try multiple URL shapes; take first successful one
+            const feedCandidates = [
+                `${API_ROOT}/activity/feed/?scope=group&group_id=${encodeURIComponent(currentGid || "")}`,
+                `${API_ROOT}/activity/feed/?scope=group&group_slug=${encodeURIComponent(currentSlug)}`,
+                `${API_ROOT}/activity/feed/?scope=group&group=${encodeURIComponent(currentGid || "")}`,
+            ];
+
+            let feedRows = null;
+            for (const url of feedCandidates) {
+                try {
+                    const r = await fetch(url, { headers });
+                    if (!r.ok) continue;
+                    const j = await r.json().catch(() => ([]));
+                    feedRows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+                    if (Array.isArray(feedRows)) break;
+                } catch { /* try next */ }
+            }
+            if (!Array.isArray(feedRows)) feedRows = [];
+
+            // map → polls and STRICTLY keep only polls of THIS group
+            const pollsAll = feedRows.map(mapFeedPollToPost).filter(Boolean);
+            const polls = pollsAll.filter(p => {
+                // prefer numeric id comparison; as a fallback, keep all if we don't know currentGid
+                return currentGid ? Number(p.group_id) === currentGid : true;
+            });
+
+            // merge + de-dup + newest first
+            const merged = [...postsArr, ...polls];
             const seen = new Set();
             const uniq = [];
             for (const p of merged) {
@@ -1368,9 +1393,8 @@ export default function GroupManagePage() {
                 seen.add(key);
                 uniq.push(p);
             }
-
-            // newest first
             uniq.sort((a, b) => new Date(b?.created_at || 0) - new Date(a?.created_at || 0));
+
             setPosts(uniq);
         } catch (e) {
             setPostsError(String(e?.message || e));
@@ -1378,7 +1402,8 @@ export default function GroupManagePage() {
         } finally {
             setPostsLoading(false);
         }
-    }, [idOrSlug, token, group?.id]);
+    }, [idOrSlug, token, group?.id, group?.slug]);
+
 
     // Load posts only when Posts tab is active (saves calls)
     React.useEffect(() => {
