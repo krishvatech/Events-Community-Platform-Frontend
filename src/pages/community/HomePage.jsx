@@ -457,12 +457,7 @@ function PostCard({ post, avatarUrl, actorName }) {
         <Tooltip title="Like">
           <IconButton
             size="medium"
-            onClick={() => {
-              // OPTION A: just toggle like
-              //handleLike?.(post);
-              // OPTION B: toggle like AND open the likers list (uncomment next line if you want both)
-              (window.__openLikes?.(post.id))?.();
-            }}
+            onClick={() => window.__toggleLike?.(post.id, true)}
           >
             {post?.liked_by_me ? (
               <FavoriteRoundedIcon fontSize="small" />
@@ -471,6 +466,7 @@ function PostCard({ post, avatarUrl, actorName }) {
             )}
           </IconButton>
         </Tooltip>
+        <Typography variant="caption">{post?.metrics?.likes ?? 0}</Typography>
 
         {/* Comment icon — opens the comments popup */}
         <Tooltip title="Comments">
@@ -483,6 +479,7 @@ function PostCard({ post, avatarUrl, actorName }) {
             <ChatBubbleOutlineRoundedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
+        <Typography variant="caption">{post?.metrics?.comments ?? 0}</Typography>
       </CardActions>
       {/* Inline comments, always visible */}
       <Box sx={{ px: 2, pb: 2, width: "100%" }}>
@@ -851,6 +848,61 @@ export default function HomePage() {
   }, []);
 
 
+  // Toggle like for a FeedItem, then optionally open the likers popup
+  React.useEffect(() => {
+    window.__toggleLike = async (postId, openAfter = false) => {
+      try {
+        // optimistic UI
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === postId
+              ? {
+                ...p,
+                liked_by_me: !p.liked_by_me,
+                metrics: {
+                  ...(p.metrics || {}),
+                  likes: (p.metrics?.likes ?? 0) + (p.liked_by_me ? -1 : 1),
+                },
+              }
+              : p
+          )
+        );
+        // backend toggle
+        const r = await fetch(`${API_ROOT}/engagements/reactions/toggle/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({
+            target_type: "activity_feed.feeditem",
+            target_id: postId,
+            reaction: "like",
+          }),
+        });
+        if (!r.ok) throw new Error("toggle failed");
+        if (openAfter) {
+          setLikesPostId(postId);
+          setLikesOpen(true);
+        }
+      } catch {
+        // revert on error
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === postId
+              ? {
+                ...p,
+                liked_by_me: !p.liked_by_me,
+                metrics: {
+                  ...(p.metrics || {}),
+                  likes: (p.metrics?.likes ?? 0) + (p.liked_by_me ? -1 : 1),
+                },
+              }
+              : p
+          )
+        );
+      }
+    };
+    return () => { try { delete window.__toggleLike; } catch { } };
+  }, []);
+
 
   // ---- Fetch my posts (paginated) ----
   const fetchMyPosts = React.useCallback(async () => {
@@ -858,7 +910,23 @@ export default function HomePage() {
       const res = await fetch(`${API_ROOT}/activity/feed/posts/me/`, { headers: { ...authHeader(), accept: "application/json" } });
       const data = await res.json();
       const rows = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      setPosts(rows.map(mapFeedItemRowToUiPost));
+      const ui = rows.map(mapFeedItemRowToUiPost);
+      setPosts(ui);
+      // hydrate metrics (likes, comments, liked_by_me) from engagements
+      const ids = ui.map(p => p.id).join(",");
+      if (ids) {
+        const m = await fetch(`${API_ROOT}/engagements/metrics/?target_type=activity_feed.feeditem&ids=${ids}`, {
+          headers: { ...authHeader(), accept: "application/json" },
+        }).then(r => r.ok ? r.json() : {});
+        setPosts(prev => prev.map(p => ({
+          ...p,
+          liked_by_me: (m?.[p.id]?.user_has_liked ?? p.liked_by_me) || false,
+          metrics: {
+            likes: m?.[p.id]?.likes ?? 0,
+            comments: m?.[p.id]?.comments ?? 0,
+          },
+        })));
+      }
     } catch (e) {
       console.error("Failed to load my posts:", e);
       setPosts([]); // keep empty
@@ -1207,11 +1275,8 @@ function LikesDialog({ open, postId, onClose }) {
   async function fetchLikers(postId) {
     // Try common DRF patterns you’re likely already using
     const candidates = [
-      `${API_ROOT}/posts/${postId}/likes/`,
-      `${API_ROOT}/communities/posts/${postId}/likes/`,
-      `${API_ROOT}/activity/posts/${postId}/likes/`,
-      `${API_ROOT}/reactions/?post=${postId}&type=like`,
-      `${API_ROOT}/likes/?post=${postId}`,
+      // engagements: return likers of a FeedItem (post)
+      `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${postId}&reaction=like`,
     ];
     for (const url of candidates) {
       try {
@@ -1220,11 +1285,13 @@ function LikesDialog({ open, postId, onClose }) {
         });
         if (!r.ok) continue;
         const data = await r.json();
-        const rows = Array.isArray(data?.results)
-          ? data.results
-          : Array.isArray(data)
-            ? data
-            : data?.items || data?.likers || [];
+        const rows =
+          Array.isArray(data?.results) ? data.results :
+            Array.isArray(data) ? data :
+              Array.isArray(data?.items) ? data.items :
+                Array.isArray(data?.likers) ? data.likers :
+                  Array.isArray(data?.data) ? data.data :
+                    [];
         return rows.map(normalizeLikerRow);
       } catch {
         /* try next */
@@ -1645,10 +1712,8 @@ function CommentsDialog({
 
   async function fetchComments(postId) {
     const candidates = [
-      `${API_ROOT}/posts/${postId}/comments/`,
-      `${API_ROOT}/communities/posts/${postId}/comments/`,
-      `${API_ROOT}/activity/posts/${postId}/comments/`,
-      `${API_ROOT}/comments/?post=${postId}`,
+      // engagements: list comments for this post (FeedItem)
+      `${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${postId}&page_size=200`,
     ];
     for (const url of candidates) {
       try {
@@ -1666,21 +1731,19 @@ function CommentsDialog({
     if (!body.trim()) return null;
     const payload = parentId ? { text: body, parent: parentId } : { text: body };
 
-    const scoped = [
-      { url: `${API_ROOT}/posts/${postId}/comments/`, body: payload },
-      { url: `${API_ROOT}/communities/${postId}/comments/`, body: payload }, // in case of alt route
-      { url: `${API_ROOT}/communities/posts/${postId}/comments/`, body: payload },
-    ];
-    for (const { url, body: b } of scoped) {
-      try {
-        const r = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify(b),
-        });
-        if (r.ok) return normalizeComment(await r.json());
-      } catch { }
-    }
+    // engagements: create root comment or reply
+    try {
+      const r = await fetch(`${API_ROOT}/engagements/comments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(
+          parentId
+            ? { text: body, parent: parentId } // reply: backend inherits target from parent
+            : { text: body, target_type: "activity_feed.feeditem", target_id: postId } // root comment
+        ),
+      });
+      if (r.ok) return normalizeComment(await r.json());
+    } catch { /* handled below */ }
     // Global fallback
     try {
       const r = await fetch(`${API_ROOT}/comments/`, {
@@ -1695,8 +1758,8 @@ function CommentsDialog({
 
   async function toggleLike(commentId) {
     const candidates = [
-      { url: `${API_ROOT}/comments/${commentId}/like/`, method: "POST" },
-      { url: `${API_ROOT}/comments/${commentId}/toggle-like/`, method: "POST" },
+      // engagements: toggle like on a comment
+      { url: `${API_ROOT}/engagements/comments/${commentId}/toggle-like/`, method: "POST" },
     ];
     for (const c of candidates) {
       try {
@@ -1709,8 +1772,8 @@ function CommentsDialog({
 
   async function deleteComment(commentId) {
     const candidates = [
-      { url: `${API_ROOT}/comments/${commentId}/`, method: "DELETE" },
-      { url: `${API_ROOT}/comments/${commentId}/delete/`, method: "POST" },
+      // engagements: delete comment
+      { url: `${API_ROOT}/engagements/comments/${commentId}/`, method: "DELETE" },
     ];
     for (const c of candidates) {
       try {
