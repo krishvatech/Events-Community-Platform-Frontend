@@ -1666,14 +1666,6 @@ export default function GroupManagePage() {
     return (
         <div className="max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0">
             <div className="grid grid-cols-12 gap-4">
-                {/* LEFT: Admin sidebar (hidden on small screens, sticky on desktop) */}
-                <aside className="hidden lg:block col-span-3">
-                    <Box sx={{ position: "sticky", top: 88 /* match Dashboard.jsx header offset */ }}>
-                        {/* If your Dashboard passes a prop, reuse it (e.g., active="groups") */}
-                        <AdminSidebar active="groups" />
-                        {/* OR whatever prop name/value your Dashboard uses */}
-                    </Box>
-                </aside>
 
                 {/* RIGHT: your original page content unchanged */}
                 <main className="col-span-12 lg:col-span-9">

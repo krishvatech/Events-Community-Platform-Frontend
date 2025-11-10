@@ -33,10 +33,10 @@ const DashboardIcon   = CI?.CustomDashboardIcon   ?? DashboardRoundedIcon;
 const EventIcon       = CI?.CustomEventIcon       ?? EventNoteRoundedIcon;
 const ResourceIcon    = CI?.CustomResourcesIcon   ?? LibraryBooksRoundedIcon;
 const RecordingsIcon  = CI?.CustomRecordingsIcon  ?? OndemandVideoRoundedIcon;
-const MessagesIcon    = CI?.CustomMessagesIcon    ?? ChatBubbleOutlineRoundedIcon;
-const OrdersIcon      = CI?.CustomOrdersIcon      ?? ReceiptLongRoundedIcon;
+// const MessagesIcon    = CI?.CustomMessagesIcon    ?? ChatBubbleOutlineRoundedIcon;
+// const OrdersIcon      = CI?.CustomOrdersIcon      ?? ReceiptLongRoundedIcon;
 const MembersIcon     = CI?.CustomCommunityIcon   ?? PeopleAltRoundedIcon;
-const SubsIcon        = CI?.CustomSubscriptionsIcon ?? AutorenewRoundedIcon;
+// const SubsIcon        = CI?.CustomSubscriptionsIcon ?? AutorenewRoundedIcon;
 const NotifsIcon      = CI?.CustomNotificationsIcon ?? NotificationsNoneRoundedIcon;
 const SettingsIcon    = CI?.CustomSettingsIcon    ?? SettingsRoundedIcon;
 const PostsIcon = CI?.CustomPostsIcon ?? ArticleOutlinedIcon;
@@ -79,10 +79,10 @@ export default function AdminSidebar({
     { key: "posts",     label: "Posts",       Icon: PostsIcon },
     { key: "resources",    label: "My Resources",   Icon: ResourceIcon },
     { key: "recordings",   label: "My Recordings",  Icon: RecordingsIcon },
-    { key: "messages",     label: "Messages",       Icon: MessagesIcon },
-    { key: "orders",       label: "Orders",         Icon: OrdersIcon },
+    // { key: "messages",     label: "Messages",       Icon: MessagesIcon },
+    // { key: "orders",       label: "Orders",         Icon: OrdersIcon },
     { key: "groups",       label: "Groups",         Icon: GroupsRoundedIcon },
-    { key: "subscriptions",label: "Subscriptions",  Icon: SubsIcon },
+    // { key: "subscriptions",label: "Subscriptions",  Icon: SubsIcon },
     { key: "notifications",label: "Notifications",  Icon: NotifsIcon },
     { key: "settings",     label: "Settings",       Icon: SettingsIcon },
   ];

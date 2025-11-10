@@ -234,7 +234,7 @@ const SignInPage = () => {
 
       // Staff → dashboard (hard redirect so nothing else can override it)
       if (isStaffUser(userObj)) {
-        window.location.replace("/dashboard");
+        window.location.replace("/admin/events");
         return;
       }
 

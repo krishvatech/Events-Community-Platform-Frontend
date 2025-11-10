@@ -1329,21 +1329,6 @@ export default function Dashboard() {
           rowSpacing={{ xs: 2, md: 2 }}
           columns={{ xs: 12, md: 12 }}
         >
-          {/* Left: Admin sidebar */}
-          <Grid size={{ xs: 12, md: 3 }}>
-            <AdminSidebar
-              active={active}
-              onSelect={(key) => {
-                if (key === "recordings") {
-                  // Open the SAME page but in host mode
-                  navigate("/account/recordings?scope=host");
-                } else {
-                  setActive(key);
-                }
-              }}
-              title="Admin"
-            />
-          </Grid>
 
           {/* Right: Content */}
           <Grid size={{ xs: 12, md: 9 }}>
