@@ -63,6 +63,16 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 // API helpers
 // -----------------------------------------------------------------------------
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+// Derive the backend origin from API_ROOT (http://127.0.0.1:8000 if your API is there)
+const API_ORIGIN = (() => {
+  try {
+    const u = new URL(API_ROOT);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return "";
+  }
+})();
+
 
 function getToken() {
   return (
@@ -539,7 +549,15 @@ function MyGroups({ groups }) {
         {pageItems.map((g, idx) => (
           <React.Fragment key={g.id}>
             <ListItem alignItems="flex-start" secondaryAction={<Chip label={`${g.member_count ?? 0} members`} size="small" />}>
-              <ListItemAvatar><Avatar>{(g.name || "").slice(0, 1)}</Avatar></ListItemAvatar>
+              <ListItemAvatar>
+                <Avatar
+                  src={g.cover_image || undefined}
+                  alt={g.name || "Group"}
+                  imgProps={{ referrerPolicy: "no-referrer" }}
+                >
+                  {(g.name || "").slice(0, 1).toUpperCase()}
+                </Avatar>
+              </ListItemAvatar>
               <ListItemText
                 primary={
                   <Typography
@@ -573,20 +591,47 @@ function MyGroups({ groups }) {
 // -----------------------------------------------------------------------------
 // Friends list (new)
 // -----------------------------------------------------------------------------
+// Put this small helper once (top of file or near other utils)
+const toAbsolute = (u) =>
+  !u
+    ? ""
+    : /^https?:\/\//i.test(u)
+      ? u
+      : `${(import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN)}${u.startsWith("/") ? "" : "/"}${u}`;
+
+
 function normalizeFriend(row) {
-  // Supports multiple payload styles
+  // accept common payload shapes
   const u = row?.friend || row?.user || row || {};
+  const profile = u.profile || u.userprofile || u.user_profile || row?.profile || {};
+
   const id = u.id ?? row.id;
   const first = u.first_name || u.firstName || "";
   const last = u.last_name || u.lastName || "";
+
+  // Match the same priority you already use elsewhere (profile → flat → legacy)
+  const avatarRaw =
+    profile.user_image_url ||
+    profile.user_image ||
+    u.user_image_url ||
+    u.user_image ||
+    row.user_image ||                 // sometimes it lives on the row itself
+    u.image_url ||
+    u.photo_url ||
+    u.avatar_url ||
+    u.profile_image ||
+    u.avatar ||
+    "";
+
   return {
     id,
     name: `${first} ${last}`.trim() || u.username || "Friend",
-    avatar: u.avatar || u.profile_image || "",
+    avatar: toAbsolute(avatarRaw),
     headline: u.job_title || u.title || u.bio || "",
     mutual_count: row?.mutual_count ?? row?.mutuals ?? 0,
   };
 }
+
 
 function MyFriends({ friends }) {
   const [query, setQuery] = React.useState("");
@@ -639,7 +684,12 @@ function MyFriends({ friends }) {
                   }}
                 >
                   <ListItemAvatar>
-                    <Avatar src={f.avatar}>{(f.name[0] || "").toUpperCase()}</Avatar>
+                    <Avatar
+                      src={f.avatar}
+                      imgProps={{ referrerPolicy: "no-referrer" }}
+                    >
+                      {(f.name?.[0] || "").toUpperCase()}
+                    </Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={<Typography fontWeight={600}>{f.name}</Typography>}
@@ -720,6 +770,7 @@ function normalizeJoinedGroup(row) {
       name: row.name,
       description: row.description || row.about || "",
       member_count: row.member_count ?? row.members_count ?? row.members ?? 0,
+      cover_image: row.cover_image || row.coverImage || null,
     };
   }
   // If it returns memberships with a nested `group`
@@ -730,6 +781,7 @@ function normalizeJoinedGroup(row) {
       name: g.name,
       description: g.description || g.about || "",
       member_count: g.member_count ?? g.members_count ?? 0,
+      cover_image: g.cover_image || g.coverImage || null,
     };
   }
   return null;
