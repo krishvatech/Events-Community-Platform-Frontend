@@ -847,6 +847,15 @@ export default function HomePage() {
     };
   }, []);
 
+  React.useEffect(() => {
+    window.__setPostMetrics = (postId, patch) => {
+      setPosts(prev => prev.map(p =>
+        p.id === postId ? { ...p, metrics: { ...(p.metrics || {}), ...patch } } : p
+      ));
+    };
+    return () => { try { delete window.__setPostMetrics; } catch { } };
+  }, []);
+
 
   // Toggle like for a FeedItem, then optionally open the likers popup
   React.useEffect(() => {
@@ -915,17 +924,27 @@ export default function HomePage() {
       // hydrate metrics (likes, comments, liked_by_me) from engagements
       const ids = ui.map(p => p.id).join(",");
       if (ids) {
-        const m = await fetch(`${API_ROOT}/engagements/metrics/?target_type=activity_feed.feeditem&ids=${ids}`, {
-          headers: { ...authHeader(), accept: "application/json" },
-        }).then(r => r.ok ? r.json() : {});
-        setPosts(prev => prev.map(p => ({
-          ...p,
-          liked_by_me: (m?.[p.id]?.user_has_liked ?? p.liked_by_me) || false,
-          metrics: {
-            likes: m?.[p.id]?.likes ?? 0,
-            comments: m?.[p.id]?.comments ?? 0,
-          },
-        })));
+        const raw = await fetch(
+          `${API_ROOT}/engagements/metrics/?target_type=activity_feed.feeditem&ids=${ids}`,
+          { headers: { ...authHeader(), accept: "application/json" } }
+        ).then(r => (r.ok ? r.json() : {}));
+        const bag = raw?.results || raw?.data || raw?.metrics || raw || {};
+        setPosts(prev =>
+          prev.map(p => {
+            const key = String(p.id);
+            const row = bag[key] ||
+              (Array.isArray(bag) ? bag.find(x => String(x.id) === key) : null) ||
+              {};
+            return {
+              ...p,
+              liked_by_me: Boolean(row.user_has_liked ?? p.liked_by_me),
+              metrics: {
+                likes: Number(row.likes ?? 0),
+                comments: Number(row.comments ?? 0),
+              },
+            };
+          })
+        );
       }
     } catch (e) {
       console.error("Failed to load my posts:", e);
@@ -1254,13 +1273,30 @@ function LikesDialog({ open, postId, onClose }) {
 
   function normalizeUser(u) {
     if (!u) return { id: null, name: "User", avatar: "" };
-    const id = u.id ?? u.user_id ?? null;
+    const id =
+      u.id ??
+      u.user_id ??
+      u.owner_id ??
+      null;
+    const first =
+      u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
+    const last =
+      u.last_name ?? u.lastName ?? u.user_last_name ?? u.user__last_name ?? "";
     const name =
       u.name ||
-      `${u.first_name || ""} ${u.last_name || ""}`.trim() ||
+      `${first} ${last}`.trim() ||
       u.username ||
-      "User";
-    const avatar = u.avatar || u.profile_image || u.photo || "";
+      (id ? `User #${id}` : "User");
+    const avatarRaw =
+      u.avatar ||
+      u.profile_image ||
+      u.photo ||
+      u.image_url ||
+      u.user_image_url ||
+      u.user_image ||
+      u.avatar_url ||
+      "";
+    const avatar = toAbsolute(avatarRaw);
     const headline =
       u.headline || u.job_title || u.title || u.bio || u.about || "";
     return { id, name, avatar, headline };
@@ -1268,16 +1304,36 @@ function LikesDialog({ open, postId, onClose }) {
 
   // Handle different API shapes: some endpoints return {results:[{user:{...}}]}, others return raw users
   function normalizeLikerRow(row) {
-    const user = row?.user || row?.owner || row?.liked_by || row;
-    return normalizeUser(user);
+    // Prefer nested user object if present
+    const nested =
+      row?.user ||
+      row?.owner ||
+      row?.liked_by ||
+      row?.actor ||
+      null;
+    if (nested && typeof nested === "object") return normalizeUser(nested);
+    // Fallback: reaction rows with flattened user fields / IDs
+    const u = {
+      id: row?.user_id ?? row?.owner_id ?? row?.liked_by_id ?? null,
+      first_name: row?.user_first_name ?? row?.user__first_name,
+      last_name: row?.user_last_name ?? row?.user__last_name,
+      username: row?.user_username ?? row?.user__username,
+      avatar: row?.user_avatar ?? row?.user_image_url ?? row?.user__avatar,
+      headline: row?.user_headline,
+    };
+    return normalizeUser(u);
   }
 
   async function fetchLikers(postId) {
     // Try common DRF patterns you’re likely already using
     const candidates = [
-      // engagements: return likers of a FeedItem (post)
-      `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${postId}&reaction=like`,
+      // Primary: reactions list filtered to "like" for a FeedItem
+      `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${postId}&reaction=like&page_size=200`,
+
+      // Optional fallback (if you also exposed a helper)
+      `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${postId}`,
     ];
+
     for (const url of candidates) {
       try {
         const r = await fetch(url, {
@@ -1706,15 +1762,35 @@ function CommentsDialog({
     const likedByMe = !!(c.liked || c.liked_by_me);
     const likeCount = Number(c.like_count ?? c.likes ?? 0) || 0;
     const canDelete = !!(c.can_delete || c.is_owner || (author.id && meId && author.id === meId));
-    const replies = Array.isArray(c.replies) ? c.replies.map(normalizeComment) : [];
+    const replies = Array.isArray(c.replies)
+      ? c.replies.map((r) => {
+        // If the server already returns the same shape, recurse
+        if (r.body || r.text || r.content || r.author || r.user) {
+          return normalizeComment(r);
+        }
+        // Guard for alternate shapes
+        return {
+          id: r.id,
+          created: r.created_at || r.timestamp || r.created || null,
+          body: r.content || r.text || "",
+          author: normalizeUser(r.user || r.author),
+          likedByMe: !!(r.liked || r.liked_by_me),
+          likeCount: Number(r.like_count ?? r.likes ?? 0) || 0,
+          canDelete: false,
+          replies: [],
+        };
+      })
+      : [];
     return { id, created, body, author, likedByMe, likeCount, canDelete, replies };
   }
 
   async function fetchComments(postId) {
     const candidates = [
-      // engagements: list comments for this post (FeedItem)
-      `${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${postId}&page_size=200`,
+      // engagements: list comments for this FeedItem (with nested replies)
+      `${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${postId}&include_replies=1&page_size=200`,
     ];
+
+
     for (const url of candidates) {
       try {
         const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
@@ -1794,9 +1870,11 @@ function CommentsDialog({
       if (mounted) setMeId(uid);
       const list = await fetchComments(postId);
       if (mounted) {
-        // newest first at root
-        setComments(list.sort((a, b) => (new Date(b.created || 0)) - (new Date(a.created || 0))));
+        const sorted = list.sort((a, b) => (new Date(b.created || 0)) - (new Date(a.created || 0)));
+        setComments(sorted);
         setVisibleCount(initialCount);
+        // tell parent to refresh the visible count badge
+        window.__setPostMetrics?.(postId, { comments: sorted.length });
       }
       setLoading(false);
     })();
