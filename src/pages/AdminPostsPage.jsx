@@ -37,7 +37,9 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import LinkIcon from "@mui/icons-material/Link";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
+import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import Pagination from "@mui/material/Pagination";
+
 
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
@@ -64,6 +66,7 @@ function toApiUrl(pathOrUrl) {
   }
 }
 function authHeaders() { return { ...authHeader() }; }
+
 
 // Map a post to the correct engagement target (feed item | event | resource)
 function engageTargetOf(post) {
@@ -528,18 +531,25 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
       : Array.isArray(payload?.results) ? payload.results
         : Array.isArray(payload?.data) ? payload.data
           : Array.isArray(payload?.items) ? payload.items
+            : Array.isArray(payload?.likers) ? payload.likers
             : Array.isArray(payload?.likes) ? payload.likes
               : [];
+
     return arr.map((r) => {
       const u = r.user || r.actor || r.owner || r.created_by || r.author || r.profile || r;
       const id = u?.id ?? u?.user_id ?? r.user_id ?? r.id;
       const name = u?.name || u?.full_name || u?.username ||
         [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
         (id ? `User #${id}` : "User");
-      const avatar = u?.avatar || u?.photo || u?.image || u?.profile?.avatar || r.avatar || "";
+      const avatar =
+        u?.user_image || u?.user_image_url ||
+        u?.avatar || u?.photo || u?.image || u?.profile?.avatar ||
+        r.user_image || r.user_image_url || r.avatar || "";
+
       return id ? { id, name, avatar } : null;
     }).filter(Boolean);
   };
+
 
   const load = React.useCallback(async () => {
     if (!open) return;
@@ -548,17 +558,25 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
     const tgt = propTarget?.id ? propTarget : { id: postId, type: null };
 
     // Try the new engagements APIs first, then legacy fallbacks.
-    const urls = [
-      tgt.type
-        ? `${API_ROOT}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
-        : `${API_ROOT}/engagements/reactions/?reaction=like&target_id=${tgt.id}&page_size=200`,
-      tgt.type
-        ? `${API_ROOT}/engagements/reactions/liked-by/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
-        : `${API_ROOT}/engagements/reactions/liked-by/?target_id=${tgt.id}&page_size=200`,
-      // legacy community/feed fallbacks (if your backend still exposes them)
-      communityId ? `${API_ROOT}/communities/${communityId}/posts/${postId}/likes/` : null,
-      `${API_ROOT}/activity/feed/${postId}/likes/`,
-    ].filter(Boolean);
+      const urls = [
+        // primary: reactions filtered to like
+        (tgt.type
+          ? `${API_ROOT}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
+          : `${API_ROOT}/engagements/reactions/?reaction=like&target_id=${tgt.id}&page_size=200`),
+
+        // helper: who-liked (feed_item form)
+        `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${tgt.id}`,
+
+        // helper: who-liked (target_type/target_id form, if supported)
+        (tgt.type
+          ? `${API_ROOT}/engagements/reactions/who-liked/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}`
+          : null),
+
+        // legacy community/feed fallbacks
+        (communityId ? `${API_ROOT}/communities/${communityId}/posts/${postId}/likes/` : null),
+        `${API_ROOT}/activity/feed/${postId}/likes/`,
+      ].filter(Boolean);
+
 
     const collected = [];
     for (const url of urls) {
@@ -579,9 +597,12 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
     // de-dupe
     const seen = new Set();
     const dedup = [];
-    for (const u of collected) { if (!seen.has(u.id)) { seen.add(u.id); dedup.push(u); } }
-
+    for (const u of collected) {
+      const k = (u.id != null) ? `id:${u.id}` : `name:${(u.name||"").toLowerCase()}`;
+      if (!seen.has(k)) { seen.add(k); dedup.push(u); }
+    }
     setRows(dedup);
+
     setLoading(false);
   }, [open, communityId, postId, propTarget?.id, propTarget?.type]);
 
@@ -589,7 +610,7 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Liked by</DialogTitle>
+      <DialogTitle>{`Liked by${rows.length ? ` (${rows.length})` : ""}`}</DialogTitle>
       <DialogContent dividers>
         {loading ? (
           <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
@@ -611,7 +632,100 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
   );
 }
 
+function SharesDialog({ open, onClose, communityId, postId, target: propTarget }) {
+  const [loading, setLoading] = React.useState(true);
+  const [rows, setRows] = React.useState([]);
 
+  // normalize many possible payload shapes -> [{id,name,avatar}]
+  const normalizeUsers = (payload) => {
+    const arr = Array.isArray(payload) ? payload
+      : Array.isArray(payload?.results) ? payload.results
+      : Array.isArray(payload?.data) ? payload.data
+      : Array.isArray(payload?.items) ? payload.items
+      : Array.isArray(payload?.shares) ? payload.shares
+      : [];
+    return arr.map((r) => {
+      const u = r.user || r.actor || r.owner || r.shared_by || r.created_by || r.author || r.profile || r;
+      const id = u?.id ?? u?.user_id ?? r.user_id ?? r.actor_id ?? r.owner_id ?? r.id;
+      const name =
+        u?.name || u?.full_name || u?.username ||
+        [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
+        (id ? `User #${id}` : "User");
+      const avatar =
+        u?.user_image || u?.user_image_url ||
+        u?.avatar || u?.photo || u?.image || u?.profile?.avatar ||
+        r.user_image || r.user_image_url || r.avatar || "";
+      return id ? { id, name, avatar } : null;
+    }).filter(Boolean);
+  };
+
+  const load = React.useCallback(async () => {
+    if (!open) return;
+    setLoading(true);
+
+    const tgt = propTarget?.id ? propTarget : { id: postId, type: null };
+
+    // Preferred → fallbacks. Both return the same user rows shape after normalization.
+    const urls = [
+      // preferred: engagements/shares with target_type
+      tgt.type
+        ? `${API_ROOT}/engagements/shares/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
+        : `${API_ROOT}/engagements/shares/?target_id=${tgt.id}&page_size=200`,
+      // alternate param occasionally present in your backend
+      `${API_ROOT}/engagements/shares/?feed_item=${tgt.id}&page_size=200`,
+    ];
+
+    const collected = [];
+    for (const url of urls) {
+      try {
+        let next = url;
+        while (next) {
+          const res = await fetch(next, { headers: { Accept: "application/json", ...authHeader() } });
+          if (!res.ok) break;
+          const json = await res.json();
+          collected.push(...normalizeUsers(json));
+          next = json?.next ? (/^https?:/i.test(json.next) ? json.next : `${API_ROOT}${json.next.startsWith("/") ? "" : "/"}${json.next}`) : null;
+        }
+        if (collected.length) break; // stop once one worked
+      } catch {}
+    }
+
+    // de-dupe by id (or name if id missing)
+    const seen = new Set(); const unique = [];
+    for (const u of collected) {
+      const k = (u.id != null) ? `id:${u.id}` : `name:${(u.name||"").toLowerCase()}`;
+      if (!seen.has(k)) { seen.add(k); unique.push(u); }
+    }
+
+    setRows(unique);
+    setLoading(false);
+  }, [open, postId, propTarget?.id, propTarget?.type]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>{`Shared by${rows.length ? ` (${rows.length})` : ""}`}</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+        ) : rows.length === 0 ? (
+          <Typography color="text.secondary">No shares yet.</Typography>
+        ) : (
+          <List>
+            {rows.map((u) => (
+              <ListItem key={u.id || u.name}>
+                <ListItemAvatar><Avatar src={u.avatar} alt={u.name} /></ListItemAvatar>
+                <ListItemText primary={u.name} />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+    </Dialog>
+  );
+}
 
 // ---------- Comments dialog (engagements/comments + replies + comment-like) ----------
 function CommentsDialog({
@@ -920,13 +1034,17 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
   const [likesOpen, setLikesOpen] = React.useState(false);
   const commentInputRef = React.useRef(null);
+  const [shareCount, setShareCount] = React.useState(post.share_count ?? post.metrics?.shares ?? 0);
+  const [sharesOpen, setSharesOpen] = React.useState(false);  
 
   async function refreshCounts() {
     const c = await fetchEngagementCountsForTarget(target);
-    setLikeCount(c.likes ?? 0);
-    setCommentCount(c.comments ?? 0);
-    setUserHasLiked(!!c.user_has_liked);
-    onCounts?.({ likeCount: c.likes ?? 0, commentCount: c.comments ?? 0 });
+      setLikeCount(c.likes ?? 0);
+      setCommentCount(c.comments ?? 0);
+      setShareCount(c.shares ?? 0);
+      setUserHasLiked(!!c.user_has_liked);
+      onCounts?.({ likeCount: c.likes ?? 0, commentCount: c.comments ?? 0, shareCount: c.shares ?? 0 });
+
   }
   React.useEffect(() => { refreshCounts(); /* on mount */ }, [post.id]);
 
@@ -960,10 +1078,11 @@ function PostSocialBar({ communityId, post, onCounts }) {
         <Button
           size="small"
           startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
-          onClick={togglePostLike}
+          onClick={() => setLikesOpen(true)}
         >
           {likeCount}
         </Button>
+
         <Button
           size="small"
           startIcon={<ChatBubbleOutlineRoundedIcon />}
@@ -971,8 +1090,19 @@ function PostSocialBar({ communityId, post, onCounts }) {
         >
           {commentCount}
         </Button>
-        <Button size="small" onClick={() => setLikesOpen(true)}>View likes</Button>
+
+        {/* share count + popup trigger */}
+        <Button
+          size="small"
+          startIcon={<IosShareRoundedIcon />}
+          onClick={() => setSharesOpen(true)}
+        >
+          {shareCount}
+        </Button>
+
+
       </Stack>
+
 
       {/* Inline comments (threaded; same as LiveFeed) */}
       <Box sx={{ px: 1, pb: 1 }}>
@@ -993,6 +1123,14 @@ function PostSocialBar({ communityId, post, onCounts }) {
         postId={post.id}
         target={engageTargetOf(post)}
       />
+      <SharesDialog
+        open={sharesOpen}
+        onClose={() => setSharesOpen(false)}
+        communityId={communityId}
+        postId={post.id}
+        target={engageTargetOf(post)}
+      />
+
     </>
   );
 }
