@@ -631,17 +631,7 @@ export default function ProfilePage() {
                       )}
                     </SectionCard>
 
-                    <SectionCard sx={{ mt: 2 }} title="About your work" action={<Button size="small">Edit</Button>}>
-                      <KV label="Job Title" value={form.job_title} />
-                      <Divider sx={{ my: 0.5 }} />
-                      <KV label="Community" value={form.company} />
-                      <Divider sx={{ my: 0.5 }} />
-                      <KV label="Sector" value={''} />
-                      <Divider sx={{ my: 0.5 }} />
-                      <KV label="Industry" value={''} />
-                      <Divider sx={{ my: 0.5 }} />
-                      <KV label="Number of Employees" value={''} />
-                    </SectionCard>
+
 
                     <SectionCard
                       sx={{ mt: 2 }}
@@ -808,14 +798,18 @@ export default function ProfilePage() {
                         }} />
                       )}
                     </SectionCard>
-
-                    <SectionCard sx={{ mt: 2 }} title="Groups">
-                      <List dense disablePadding>
-                        <GroupItem name="Academic Sector" members="1328 members" />
-                        <Divider component="li" sx={{ my: 1 }} />
-                        <GroupItem name="Data/ AI Leaders" members="1328 members" />
-                      </List>
+                    <SectionCard sx={{ mt: 2 }} title="About your work" action={<Button size="small">Edit</Button>}>
+                      <KV label="Job Title" value={form.job_title} />
+                      <Divider sx={{ my: 0.5 }} />
+                      <KV label="Community" value={form.company} />
+                      <Divider sx={{ my: 0.5 }} />
+                      <KV label="Sector" value={''} />
+                      <Divider sx={{ my: 0.5 }} />
+                      <KV label="Industry" value={''} />
+                      <Divider sx={{ my: 0.5 }} />
+                      <KV label="Number of Employees" value={''} />
                     </SectionCard>
+
                   </Grid>
                 </Grid>
               </Box>

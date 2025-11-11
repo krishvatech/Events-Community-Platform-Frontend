@@ -21,21 +21,9 @@ import { Checkbox, ListItemButton } from "@mui/material";
 
 
 const BORDER = "#e2e8f0";
-// ===== Suggested Connections (mock) =====
-const MOCK_SUGGESTED = [
-  { id: 101, name: "Aarav Shah", mutuals: 8, avatar: "" },
-  { id: 102, name: "Pooja Patel", mutuals: 12, avatar: "" },
-  { id: 103, name: "Rohan Mehta", mutuals: 5, avatar: "" },
-  { id: 104, name: "Nisha Desai", mutuals: 3, avatar: "" },
-  { id: 105, name: "Vikram S.", mutuals: 9, avatar: "" },
-  { id: 106, name: "Ishita K.", mutuals: 6, avatar: "" },
-  { id: 107, name: "Rahul Verma", mutuals: 2, avatar: "" },
-  { id: 108, name: "Sneha G.", mutuals: 7, avatar: "" },
-  { id: 109, name: "Devansh R.", mutuals: 11, avatar: "" },
-  { id: 110, name: "Kritika M.", mutuals: 4, avatar: "" },
-];
 
-function SuggestedConnections({ list = MOCK_SUGGESTED }) {
+
+function SuggestedConnections({ list = [] }) {
   const [connected, setConnected] = React.useState(() => new Set());
   function toggle(id) {
     setConnected(prev => {
@@ -1434,6 +1422,23 @@ export default function LiveFeedPage({
   const [query, setQuery] = React.useState("");
   const dq = useDebounced(query, 400);
 
+  // Suggested connections (fetched once)
+  const [suggested, setSuggested] = React.useState([]);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(toApiUrl("friends/suggested/?limit=12"), {
+          headers: { Accept: "application/json", ...authHeaders() },
+        });
+        const j = r.ok ? await r.json() : [];
+        setSuggested(Array.isArray(j) ? j : (j.results || []));
+      } catch {
+        setSuggested([]);
+      }
+    })();
+  }, []);
+
+
   // Feed data
   const [posts, setPosts] = React.useState(initialPosts ?? []);
   const [nextUrl, setNextUrl] = React.useState(null);
@@ -1707,7 +1712,7 @@ export default function LiveFeedPage({
                   onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
                 />
                 {((idx + 1) % 4 === 0) && (
-                  <SuggestedConnections />
+                  <SuggestedConnections list={suggested} />
                 )}
               </React.Fragment>
             ))

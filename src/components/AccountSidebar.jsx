@@ -14,12 +14,9 @@ import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import MailOutlineOutlinedIcon from "@mui/icons-material/MailOutlineOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
 import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
-import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 
@@ -29,12 +26,9 @@ const NAV_ITEMS = [
   { key: "profile",       label: "Profile",       icon: <PersonOutlineOutlinedIcon />, to: "/account/profile" },
   { key: "elibrary",      label: "My Recordings", icon: <MenuBookOutlinedIcon />, to: "/account/recordings" },
   { key: "forums",        label: "Forums",        icon: <ForumOutlinedIcon /> },
-  { key: "groups",        label: "Groups",        icon: <GroupsOutlinedIcon /> },
-  { key: "messages", label: "Messages", icon: <MailOutlineOutlinedIcon />, to: "/account/messages" },
   { key: "orders",        label: "Orders",        icon: <ReceiptLongOutlinedIcon />, to: "/cart" },
   { key: "memberships",   label: "Memberships",   icon: <WorkspacePremiumOutlinedIcon /> },
   { key: "subscriptions", label: "Subscriptions", icon: <AutorenewOutlinedIcon /> },
-  { key: "notifications", label: "Notifications", icon: <NotificationsNoneOutlinedIcon /> },
   { key: "friends",       label: "Friends",       icon: <PeopleAltOutlinedIcon /> },
   { key: "settings",      label: "Settings",      icon: <SettingsOutlinedIcon /> },
 ];
@@ -47,7 +41,6 @@ export default function AccountSidebar({ stickyTop = 96 }) {
     if (pathname.startsWith("/cart")) return "orders";
     if (pathname.startsWith("/myevents")) return "courses";
     if (pathname.startsWith("/events/")) return "courses"; // event details keeps highlight
-    if (pathname.startsWith("/account/messages")) return "messages";
     if (pathname.startsWith("/account/recordings")) return "elibrary";
     if (pathname.startsWith("/account/profile")) return "profile";
     return "activity";
