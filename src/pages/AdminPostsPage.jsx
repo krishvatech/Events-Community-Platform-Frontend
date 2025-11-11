@@ -1035,7 +1035,9 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const [likesOpen, setLikesOpen] = React.useState(false);
   const commentInputRef = React.useRef(null);
   const [shareCount, setShareCount] = React.useState(post.share_count ?? post.metrics?.shares ?? 0);
-  const [sharesOpen, setSharesOpen] = React.useState(false);  
+  const [sharesOpen, setSharesOpen] = React.useState(false);
+  const [commentsOpen, setCommentsOpen] = React.useState(false);
+
 
   async function refreshCounts() {
     const c = await fetchEngagementCountsForTarget(target);
@@ -1073,48 +1075,35 @@ function PostSocialBar({ communityId, post, onCounts }) {
   }
 
   return (
-    <>
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ px: 1, pb: 1 }}>
-        <Button
-          size="small"
-          startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
-          onClick={() => setLikesOpen(true)}
-        >
-          {likeCount}
-        </Button>
+      <>
+        {/* NEW: popup-trigger row (Likes / Comments / Shares) */}
+        <Stack direction="row" spacing={1.25} alignItems="center" sx={{ px: 1, pt: 0.5, pb: 0.5 }}>
+          <Button size="small" startIcon={<FavoriteBorderRoundedIcon />} onClick={() => setLikesOpen(true)}>
+            {likeCount}
+          </Button>
+          <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon />} onClick={() => setCommentsOpen(true)}>
+            {commentCount}
+          </Button>
+          <Button size="small" startIcon={<IosShareRoundedIcon />} onClick={() => setSharesOpen(true)}>
+            {shareCount}
+          </Button>
+        </Stack>
 
-        <Button
-          size="small"
-          startIcon={<ChatBubbleOutlineRoundedIcon />}
-          onClick={() => commentInputRef.current?.focus()}
-        >
-          {commentCount}
-        </Button>
-
-        {/* share count + popup trigger */}
-        <Button
-          size="small"
-          startIcon={<IosShareRoundedIcon />}
-          onClick={() => setSharesOpen(true)}
-        >
-          {shareCount}
-        </Button>
-
-
-      </Stack>
+        {/* Main action row (Like toggles; counts remain visible) */}
+        {/* Main action row (ONLY Like button) */}
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ px: 1, pb: 1 }}>
+          <Button
+            size="small"
+            startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
+            onClick={togglePostLike}
+          >
+            Like
+          </Button>
+        </Stack>
 
 
       {/* Inline comments (threaded; same as LiveFeed) */}
-      <Box sx={{ px: 1, pb: 1 }}>
-        <CommentsDialog
-          inline
-          initialCount={3}
-          communityId={communityId}
-          postId={post.id}
-          target={target}
-          inputRef={commentInputRef}
-        />
-      </Box>
+
 
       <LikesDialog
         open={likesOpen}
@@ -1129,6 +1118,13 @@ function PostSocialBar({ communityId, post, onCounts }) {
         communityId={communityId}
         postId={post.id}
         target={engageTargetOf(post)}
+      />
+      <CommentsDialog
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        communityId={communityId}
+        postId={post.id}
+        target={target}
       />
 
     </>
