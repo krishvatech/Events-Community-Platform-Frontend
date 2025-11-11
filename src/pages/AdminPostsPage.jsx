@@ -56,6 +56,50 @@ function authHeader() {
 
 const BORDER = "#e5e7eb";
 
+// --- BEGIN: engagements helpers (ported from LiveFeed) ---
+function toApiUrl(pathOrUrl) {
+  try { return new URL(pathOrUrl).toString(); } catch {
+    const rel = String(pathOrUrl).replace(/^\/+/, "");
+    return `${API_ROOT}/${rel.replace(/^api\/+/, "")}`;
+  }
+}
+function authHeaders() { return { ...authHeader() }; }
+
+// Map a post to the correct engagement target (feed item | event | resource)
+function engageTargetOf(post) {
+  if (post?.type === "resource" && post?.resource?.id) {
+    return { type: "content.resource", id: Number(post.resource.id) };
+  }
+  if (post?.type === "event" && (post?.event?.id || post?.id)) {
+    return { type: "events.event", id: Number(post.event?.id || post.id) };
+  }
+  return { type: null, id: Number(post.id) }; // default: feed item
+}
+
+// Fetch like/comment/share counts (and me-liked) for a single target
+async function fetchEngagementCountsForTarget(target) {
+  if (!target?.id) return { likes: 0, comments: 0, shares: 0, user_has_liked: false };
+  const tt = target.type ? `&target_type=${encodeURIComponent(target.type)}` : "";
+  const r = await fetch(
+    toApiUrl(`engagements/metrics/?ids=${target.id}${tt}`),
+    { headers: { Accept: "application/json", ...authHeaders() } }
+  );
+  if (!r.ok) return { likes: 0, comments: 0, shares: 0, user_has_liked: false };
+  const j = await r.json();
+  return j[String(target.id)] || { likes: 0, comments: 0, shares: 0, user_has_liked: false };
+}
+
+// small concurrency helper (for fetching replies)
+async function runLimited(items, limit, worker) {
+  const out = new Array(items.length); let i = 0; const pool = new Set();
+  async function one(idx) { const p = worker(items[idx]).then(res => out[idx] = res).finally(() => pool.delete(p)); pool.add(p); if (pool.size >= limit) await Promise.race(pool); }
+  while (i < items.length) await one(i++);
+  await Promise.all(pool);
+  return out;
+}
+// --- END: engagements helpers ---
+
+
 // Stable Row wrapper (top-level, memoized)
 const Row = React.memo(function Row({ children }) {
   return (
@@ -472,24 +516,74 @@ function DeleteConfirmDialog({ open, onClose, communityId, item, onDeleted }) {
 
 // Like Dialog
 // ---------- Likes dialog ----------
-function LikesDialog({ open, onClose, communityId, postId }) {
+// ---------- Likes dialog (uses engagements/*, with fallbacks) ----------
+// ---------- Likes dialog (engagements-first with robust fallbacks) ----------
+function LikesDialog({ open, onClose, communityId, postId, target: propTarget }) {
   const [loading, setLoading] = React.useState(true);
   const [rows, setRows] = React.useState([]);
 
+  // normalize many possible payload shapes -> [{id,name,avatar}]
+  const normalizeUsers = (payload) => {
+    const arr = Array.isArray(payload) ? payload
+      : Array.isArray(payload?.results) ? payload.results
+        : Array.isArray(payload?.data) ? payload.data
+          : Array.isArray(payload?.items) ? payload.items
+            : Array.isArray(payload?.likes) ? payload.likes
+              : [];
+    return arr.map((r) => {
+      const u = r.user || r.actor || r.owner || r.created_by || r.author || r.profile || r;
+      const id = u?.id ?? u?.user_id ?? r.user_id ?? r.id;
+      const name = u?.name || u?.full_name || u?.username ||
+        [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
+        (id ? `User #${id}` : "User");
+      const avatar = u?.avatar || u?.photo || u?.image || u?.profile?.avatar || r.avatar || "";
+      return id ? { id, name, avatar } : null;
+    }).filter(Boolean);
+  };
+
   const load = React.useCallback(async () => {
-    if (!open || !communityId || !postId) return;
+    if (!open) return;
     setLoading(true);
-    try {
-      const res = await fetch(
-        `${API_ROOT}/communities/${communityId}/posts/${postId}/likes/`,
-        { headers: { Accept: "application/json", ...authHeader() } }
-      );
-      const json = res.ok ? await res.json() : [];
-      const list = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
-      setRows(list);
-    } catch { setRows([]); }
+
+    const tgt = propTarget?.id ? propTarget : { id: postId, type: null };
+
+    // Try the new engagements APIs first, then legacy fallbacks.
+    const urls = [
+      tgt.type
+        ? `${API_ROOT}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
+        : `${API_ROOT}/engagements/reactions/?reaction=like&target_id=${tgt.id}&page_size=200`,
+      tgt.type
+        ? `${API_ROOT}/engagements/reactions/liked-by/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
+        : `${API_ROOT}/engagements/reactions/liked-by/?target_id=${tgt.id}&page_size=200`,
+      // legacy community/feed fallbacks (if your backend still exposes them)
+      communityId ? `${API_ROOT}/communities/${communityId}/posts/${postId}/likes/` : null,
+      `${API_ROOT}/activity/feed/${postId}/likes/`,
+    ].filter(Boolean);
+
+    const collected = [];
+    for (const url of urls) {
+      try {
+        let next = url;
+        while (next) {
+          const res = await fetch(next, { headers: { Accept: "application/json", ...authHeader() } });
+          if (!res.ok) break;
+          const json = await res.json();
+          collected.push(...normalizeUsers(json));
+          const n = json?.next;
+          next = n ? (/^https?:/i.test(n) ? n : `${API_ROOT}${n.startsWith("/") ? "" : "/"}${n}`) : null;
+        }
+        if (collected.length) break; // stop once one endpoint works
+      } catch { }
+    }
+
+    // de-dupe
+    const seen = new Set();
+    const dedup = [];
+    for (const u of collected) { if (!seen.has(u.id)) { seen.add(u.id); dedup.push(u); } }
+
+    setRows(dedup);
     setLoading(false);
-  }, [open, communityId, postId]);
+  }, [open, communityId, postId, propTarget?.id, propTarget?.type]);
 
   React.useEffect(() => { load(); }, [load]);
 
@@ -504,12 +598,9 @@ function LikesDialog({ open, onClose, communityId, postId }) {
         ) : (
           <List>
             {rows.map((u) => (
-              <ListItem key={u.id || u.user_id}>
-                <ListItemAvatar><Avatar src={u.avatar} alt={u.name || u.username} /></ListItemAvatar>
-                <ListItemText
-                  primary={u.name || u.username || `User #${u.id || u.user_id}`}
-                  secondary={u.handle ? `@${u.handle}` : undefined}
-                />
+              <ListItem key={u.id}>
+                <ListItemAvatar><Avatar src={u.avatar} alt={u.name} /></ListItemAvatar>
+                <ListItemText primary={u.name} />
               </ListItem>
             ))}
           </List>
@@ -520,170 +611,224 @@ function LikesDialog({ open, onClose, communityId, postId }) {
   );
 }
 
-// ---------- Comments dialog (threaded, like, reply, admin delete) ----------
+
+
+// ---------- Comments dialog (engagements/comments + replies + comment-like) ----------
 function CommentsDialog({
   open,
   onClose,
   communityId,
   postId,
-  // NEW: inline rendering like LinkedIn/Instagram
   inline = false,
   initialCount = 3,
   inputRef = null,
+  target
 }) {
-  const [loading, setLoading] = React.useState(true);
-  const [comments, setComments] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
   const [me, setMe] = React.useState(null);
-  const [input, setInput] = React.useState("");
+  const [items, setItems] = React.useState([]);
+  const [text, setText] = React.useState("");
   const [replyTo, setReplyTo] = React.useState(null);
   const [visibleCount, setVisibleCount] = React.useState(initialCount);
 
-  const isAdmin = !!(me?.is_admin || me?.is_staff || me?.is_moderator);
+  React.useEffect(() => {
+    if (!inline && !open) return;
+    (async () => {
+      try {
+        const r = await fetch(toApiUrl(`users/me/`), { headers: { ...authHeaders() } });
+        setMe(r.ok ? await r.json() : {});
+      } catch { setMe({}); }
+    })();
+  }, [open, inline]);
 
-  const fetchMe = React.useCallback(async () => {
-    try {
-      const r = await fetch(`${API_ROOT}/users/me/`, { headers: { ...authHeader() } });
-      const j = r.ok ? await r.json() : null;
-      setMe(j || {});
-    } catch {
-      setMe({});
-    }
-  }, []);
+  const normalizeCommentRow = (c) => {
+    const parent_id =
+      c.parent_id ??
+      (typeof c.parent === "number" ? c.parent : (typeof c.parent === "object" ? c.parent?.id : null)) ??
+      c.parentId ?? null;
+
+    const rawAuthor = c.author || c.user || c.created_by || c.owner || {};
+    const author_id = rawAuthor.id ?? c.author_id ?? c.user_id ?? c.created_by_id ?? null;
+    const name =
+      rawAuthor.name || rawAuthor.full_name ||
+      (rawAuthor.first_name || rawAuthor.last_name
+        ? `${rawAuthor.first_name || ""} ${rawAuthor.last_name || ""}`.trim()
+        : rawAuthor.username) ||
+      (author_id ? `User #${author_id}` : "User");
+    const avatar = rawAuthor.avatar || rawAuthor.profile?.avatar || c.author_avatar || "";
+    return { ...c, parent_id, author_id, author: { id: author_id, name, avatar } };
+  };
 
   const load = React.useCallback(async () => {
-    if ((!inline && !open) || !communityId || !postId) return;
+    if ((!inline && !open)) return;
+    const tgt = target?.id ? target : { id: postId, type: null };
     setLoading(true);
     try {
-      const res = await fetch(
-        `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/?page_size=200`,
-        { headers: { Accept: "application/json", ...authHeader() } }
-      );
-      const json = res.ok ? await res.json() : [];
-      const flat = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
-      setComments(flat);
+      // 1) fetch roots
+      const params = new URLSearchParams();
+      if (tgt.type) params.set("target_type", tgt.type);
+      params.set("target_id", String(tgt.id));
+      params.set("page_size", "200");
+
+      const r = await fetch(toApiUrl(`engagements/comments/?${params.toString()}`), {
+        headers: { Accept: "application/json", ...authHeaders() },
+      });
+      const j = r.ok ? await r.json() : [];
+      const roots = (Array.isArray(j?.results) ? j.results : Array.isArray(j) ? j : []).map(normalizeCommentRow);
+
+      // 2) fetch replies for each root (parallel)
+      const replyUrls = roots.map(root => toApiUrl(`engagements/comments/?parent=${root.id}&page_size=200`));
+      const replyPages = await runLimited(replyUrls, 3, async (url) => {
+        try {
+          const rr = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+          return rr.ok ? await rr.json() : [];
+        } catch { return []; }
+      });
+      const replies = replyPages.flatMap(pg => {
+        const arr = Array.isArray(pg?.results) ? pg.results : (Array.isArray(pg) ? pg : []);
+        return arr.map(normalizeCommentRow);
+      });
+
+      setItems([...roots, ...replies]);
       setVisibleCount(initialCount);
-    } catch {
-      setComments([]);
-    }
-    setLoading(false);
-  }, [open, inline, communityId, postId, initialCount]);
 
-  // Load on open (modal) or mount (inline)
-  React.useEffect(() => {
-    if (inline || open) {
-      fetchMe();
-      load();
-    }
-  }, [inline, open, fetchMe, load]);
-
-  // Build threaded tree
-  const roots = React.useMemo(() => {
-    const byId = new Map();
-    (comments || []).forEach(c => byId.set(c.id, { ...c, children: [] }));
-    byId.forEach(c => {
-      if (c.parent_id && byId.get(c.parent_id)) byId.get(c.parent_id).children.push(c);
-    });
-    // newest roots first
-    return [...byId.values()]
-      .filter(c => !c.parent_id)
-      .sort((a, b) => (new Date(b.created_at || 0)) - (new Date(a.created_at || 0)));
-  }, [comments]);
-
-  async function createComment(text, parentId = null) {
-    if (!text.trim()) return;
-    try {
-      const res = await fetch(
-        `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify(parentId ? { text, parent_id: parentId } : { text }),
+      // hydrate comment like counts
+      try {
+        const ids = [...roots, ...replies].map(c => c.id);
+        if (ids.length) {
+          const rc = await fetch(
+            toApiUrl(`engagements/reactions/counts/?target_type=comment&ids=${ids.join(",")}`),
+            { headers: { Accept: "application/json", ...authHeaders() } }
+          );
+          if (rc.ok) {
+            const payload = await rc.json();
+            const map = payload?.results || {};
+            setItems(curr =>
+              curr.map(c => {
+                const m = map[String(c.id)];
+                return m ? { ...c, like_count: m.like_count ?? c.like_count, user_has_liked: !!m.user_has_liked } : c;
+              })
+            );
+          }
         }
-      );
-      if (res.ok) {
-        setInput("");
-        setReplyTo(null);
-        await load();
-      }
-    } catch { }
-  }
+      } catch { }
+    } catch { setItems([]); }
+    setLoading(false);
+  }, [open, inline, initialCount, postId, target?.id, target?.type]);
 
-  async function toggleCommentLike(c) {
-    const url = `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/${c.id}/like/`;
-    const liked = !!c.user_has_liked;
+  React.useEffect(() => { load(); }, [load]);
+
+  const myId = me?.id || me?.user?.id;
+  const isAdmin = !!(me?.is_staff || me?.is_superuser || me?.is_moderator || me?.isAdmin);
+
+  function canDelete(c) { return c?.author_id === myId || isAdmin; }
+
+  async function createComment(body, parentId = null) {
+    if (!body.trim()) return;
+    const tgt = target?.id ? target : { id: postId, type: null };
+    const rootPayload = tgt.type
+      ? { text: body, target_type: tgt.type, target_id: tgt.id }
+      : { text: body, target_id: tgt.id };
+    const payload = parentId ? { text: body, parent: parentId } : rootPayload;
+
     try {
-      const res = await fetch(url, { method: liked ? "DELETE" : "POST", headers: { ...authHeader() } });
-      if (res.ok) await load();
+      const r = await fetch(toApiUrl(`engagements/comments/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+      });
+      if (r.ok) { setText(""); setReplyTo(null); await load(); }
     } catch { }
   }
 
   async function deleteComment(c) {
-    const tryUrls = [
-      `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/${c.id}/`,
-      `${API_ROOT}/communities/${communityId}/posts/${postId}/comments/${c.id}/delete/`,
-    ];
-    for (const u of tryUrls) {
-      try {
-        const res = await fetch(u, { method: "DELETE", headers: { ...authHeader() } });
-        if (res.ok) { await load(); return; }
-      } catch { }
+    if (!canDelete(c)) return;
+    const ok = window.confirm("Delete this comment?");
+    if (!ok) return;
+    try {
+      const r = await fetch(toApiUrl(`engagements/comments/${c.id}/`), { method: "DELETE", headers: { ...authHeaders() } });
+      if (!r.ok) throw new Error();
+      await load();
+    } catch { alert("Could not delete comment."); }
+  }
+
+  async function toggleCommentLike(commentId) {
+    // optimistic
+    setItems(curr => curr.map(c => c.id === commentId
+      ? { ...c, user_has_liked: !c.user_has_liked, like_count: Math.max(0, (c.like_count || 0) + (c.user_has_liked ? -1 : +1)) }
+      : c
+    ));
+    try {
+      const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ target_type: "comment", target_id: commentId, reaction: "like" }),
+      });
+      if (!res.ok) throw new Error();
+      const rc = await fetch(
+        toApiUrl(`engagements/reactions/counts/?target_type=comment&ids=${commentId}`),
+        { headers: { Accept: "application/json", ...authHeaders() } }
+      );
+      if (rc.ok) {
+        const payload = await rc.json();
+        const m = payload?.results?.[String(commentId)];
+        if (m) {
+          setItems(curr => curr.map(c => c.id === commentId ? { ...c, like_count: m.like_count, user_has_liked: !!m.user_has_liked } : c));
+        }
+      }
+    } catch {
+      // rollback by reloading the single thread
+      await load();
     }
   }
 
+  // build tree
+  const roots = React.useMemo(() => {
+    const map = new Map();
+    items.forEach(c => map.set(c.id, { ...c, children: [] }));
+    map.forEach(c => { if (c.parent_id && map.get(c.parent_id)) map.get(c.parent_id).children.push(c); });
+    return [...map.values()].filter(c => !c.parent_id)
+      .sort((a, b) => (new Date(b.created_at || 0)) - (new Date(a.created_at || 0)));
+  }, [items]);
+
   const CommentItem = ({ c, depth = 0 }) => (
-    <Box
-      sx={{
-        pl: depth ? 2 : 0,
-        borderLeft: depth ? `2px solid ${BORDER}` : "none",
-        ml: depth ? 1.5 : 0,
-        mt: depth ? 1 : 0
-      }}
-    >
+    <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? `2px solid ${BORDER}` : "none", ml: depth ? 1.5 : 0, mt: depth ? 1 : 0 }}>
       <Stack direction="row" alignItems="center" spacing={1}>
         <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
-        <Typography variant="subtitle2">
-          {c.author?.name || c.author?.username || `User #${c.author_id}`}
-        </Typography>
+        <Typography variant="subtitle2">{c.author?.name || "User"}</Typography>
         <Typography variant="caption" color="text.secondary">
-          {new Date(c.created_at || Date.now()).toLocaleString()}
+          {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
         </Typography>
       </Stack>
 
-      <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
+      <Typography sx={{ mt: .5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
 
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
-        <Button
-          size="small"
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: .5 }}>
+        <Button size="small"
           startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
-          onClick={() => toggleCommentLike(c)}
+          onClick={() => toggleCommentLike(c.id)}
         >
           {c.like_count ?? 0}
         </Button>
         <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
           Reply
         </Button>
-        {(isAdmin || (me?.id && c.author_id === me.id)) && (
-          <Button size="small" color="error" onClick={() => deleteComment(c)}>
-            Delete
-          </Button>
-        )}
+        {canDelete(c) && <Button size="small" color="error" onClick={() => deleteComment(c)}>Delete</Button>}
       </Stack>
 
       {!!c.children?.length && (
         <Stack spacing={1} sx={{ mt: 1 }}>
-          {c.children
-            .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0))) // replies oldest→newest
+          {c.children.sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0)))
             .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
         </Stack>
       )}
     </Box>
   );
 
-  // ---------- INLINE view (LinkedIn/Instagram style) ----------
+  // INLINE (like LiveFeed)
   if (inline) {
     const visibleRoots = roots.slice(0, visibleCount);
     const hasMore = roots.length > visibleRoots.length;
-
     return (
       <Box sx={{ mt: 1 }}>
         {replyTo && (
@@ -694,33 +839,22 @@ function CommentsDialog({
             <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
           </Stack>
         )}
-
-        {/* Always-visible input */}
         <Stack direction="row" spacing={1}>
           <TextField
-            size="small"
-            fullWidth
+            size="small" fullWidth
             placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            value={text}
+            onChange={e => setText(e.target.value)}
             inputRef={inputRef || undefined}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                createComment(input, replyTo?.id || null);
-              }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); createComment(text, replyTo?.id || null); }
             }}
           />
-          <Button
-            variant="contained"
-            onClick={() => createComment(input, replyTo?.id || null)}
-            disabled={!input.trim()}
-          >
+          <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)} disabled={loading || !text.trim()}>
             Post
           </Button>
         </Stack>
 
-        {/* Comments */}
         <Box sx={{ mt: 1.25 }}>
           {loading ? (
             <Stack alignItems="center" py={1.5}><CircularProgress size={18} /></Stack>
@@ -728,17 +862,12 @@ function CommentsDialog({
             <Typography variant="caption" color="text.secondary">Be the first to comment.</Typography>
           ) : (
             <Stack spacing={1.25}>
-              {visibleRoots.map((c) => <CommentItem key={c.id} c={c} />)}
+              {visibleRoots.map(c => <CommentItem key={c.id} c={c} />)}
             </Stack>
           )}
-
           {hasMore && (
             <Stack alignItems="flex-start" sx={{ mt: 1 }}>
-              <Button
-                size="small"
-                variant="text"
-                onClick={() => setVisibleCount(v => v + initialCount)}
-              >
+              <Button size="small" variant="text" onClick={() => setVisibleCount(v => v + initialCount)}>
                 Load more comments
               </Button>
             </Stack>
@@ -748,7 +877,7 @@ function CommentsDialog({
     );
   }
 
-  // ---------- ORIGINAL MODAL (kept for compatibility) ----------
+  // MODAL
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Comments</DialogTitle>
@@ -758,9 +887,7 @@ function CommentsDialog({
         ) : roots.length === 0 ? (
           <Typography color="text.secondary">No comments yet.</Typography>
         ) : (
-          <Stack spacing={2}>
-            {roots.map((c) => <CommentItem key={c.id} c={c} />)}
-          </Stack>
+          <Stack spacing={2}>{roots.map(c => <CommentItem key={c.id} c={c} />)}</Stack>
         )}
       </DialogContent>
       <Divider />
@@ -774,16 +901,9 @@ function CommentsDialog({
           </Stack>
         )}
         <Stack direction="row" spacing={1}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-          />
-          <Button variant="contained" onClick={() => createComment(input, replyTo?.id || null)}>
-            Post
-          </Button>
+          <TextField size="small" fullWidth placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+            value={text} onChange={e => setText(e.target.value)} />
+          <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
         </Stack>
       </Box>
     </Dialog>
@@ -791,26 +911,47 @@ function CommentsDialog({
 }
 
 
-// ---------- Social bar (below each card) ----------
+
+// ---------- Social bar (uses engagements/*) ----------
 function PostSocialBar({ communityId, post, onCounts }) {
-  const [likeCount, setLikeCount] = React.useState(post.like_count ?? 0);
-  const [commentCount, setCommentCount] = React.useState(post.comment_count ?? 0);
+  const target = React.useMemo(() => engageTargetOf(post), [post]);
+  const [likeCount, setLikeCount] = React.useState(post.like_count ?? post.metrics?.likes ?? 0);
+  const [commentCount, setCommentCount] = React.useState(post.comment_count ?? post.metrics?.comments ?? 0);
   const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
   const [likesOpen, setLikesOpen] = React.useState(false);
-  const [commentsOpen, setCommentsOpen] = React.useState(false);
   const commentInputRef = React.useRef(null);
 
+  async function refreshCounts() {
+    const c = await fetchEngagementCountsForTarget(target);
+    setLikeCount(c.likes ?? 0);
+    setCommentCount(c.comments ?? 0);
+    setUserHasLiked(!!c.user_has_liked);
+    onCounts?.({ likeCount: c.likes ?? 0, commentCount: c.comments ?? 0 });
+  }
+  React.useEffect(() => { refreshCounts(); /* on mount */ }, [post.id]);
+
   async function togglePostLike() {
-    const url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/like/`;
+    // optimistic
     const willUnlike = userHasLiked;
+    setUserHasLiked(!willUnlike);
+    setLikeCount(n => Math.max(0, n + (willUnlike ? -1 : +1)));
+
     try {
-      const res = await fetch(url, { method: willUnlike ? "DELETE" : "POST", headers: { ...authHeader() } });
-      if (res.ok) {
-        setUserHasLiked(!willUnlike);
-        setLikeCount((n) => (willUnlike ? Math.max(0, n - 1) : n + 1));
-        onCounts?.({ likeCount: willUnlike ? Math.max(0, likeCount - 1) : likeCount + 1, commentCount });
-      }
-    } catch { }
+      const body = target.type
+        ? { target_type: target.type, target_id: target.id, reaction: "like" }
+        : { target_id: target.id, reaction: "like" };
+
+      const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      await refreshCounts();
+    } catch {
+      // rollback by resync
+      await refreshCounts();
+    }
   }
 
   return (
@@ -826,35 +967,36 @@ function PostSocialBar({ communityId, post, onCounts }) {
         <Button
           size="small"
           startIcon={<ChatBubbleOutlineRoundedIcon />}
-          onClick={() => {
-            if (commentInputRef?.current) commentInputRef.current.focus();
-          }}
+          onClick={() => commentInputRef.current?.focus()}
         >
           {commentCount}
         </Button>
         <Button size="small" onClick={() => setLikesOpen(true)}>View likes</Button>
       </Stack>
-      {/* Inline comments (always visible, like LinkedIn/Instagram) */}
+
+      {/* Inline comments (threaded; same as LiveFeed) */}
       <Box sx={{ px: 1, pb: 1 }}>
         <CommentsDialog
           inline
           initialCount={3}
           communityId={communityId}
           postId={post.id}
-          onClose={() => { }}
+          target={target}
           inputRef={commentInputRef}
         />
       </Box>
-      <LikesDialog open={likesOpen} onClose={() => setLikesOpen(false)} communityId={communityId} postId={post.id} />
-      <CommentsDialog
-        open={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
+
+      <LikesDialog
+        open={likesOpen}
+        onClose={() => setLikesOpen(false)}
         communityId={communityId}
         postId={post.id}
+        target={engageTargetOf(post)}
       />
     </>
   );
 }
+
 
 // ---------- Wrapper that composes your existing PostWithActions + Social ----------
 function PostShell({ item, communityId, onUpdated, onDeleted }) {
