@@ -56,7 +56,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
-
+import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 
 
 // -----------------------------------------------------------------------------
@@ -480,6 +480,17 @@ function PostCard({ post, avatarUrl, actorName }) {
           </IconButton>
         </Tooltip>
         <Typography variant="caption">{post?.metrics?.comments ?? 0}</Typography>
+        {/* Share icon — opens "Shared by" popup */}
+        <Tooltip title="Shares">
+          <IconButton
+            size="medium"
+            onClick={window.__openShares?.(post.id)}
+          >
+            <IosShareRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Typography variant="caption">{post?.metrics?.shares ?? 0}</Typography>
+
       </CardActions>
       {/* Inline comments, always visible */}
       <Box sx={{ px: 2, pb: 2, width: "100%" }}>
@@ -823,6 +834,8 @@ export default function HomePage() {
   const [avatarFile, setAvatarFile] = React.useState(null);
   const [avatarPreview, setAvatarPreview] = React.useState("");
   const [avatarSaving, setAvatarSaving] = React.useState(false);
+  const [sharesOpen, setSharesOpen] = React.useState(false);
+  const [sharesPostId, setSharesPostId] = React.useState(null);
 
 
   // ---- Expose global functions to open comments/likes dialogs ----
@@ -837,6 +850,12 @@ export default function HomePage() {
       try { delete window.__openLikes; } catch { }
     };
   }, []);
+
+  React.useEffect(() => {
+    window.__openShares = (postId) => () => { setSharesPostId(postId); setSharesOpen(true); };
+    return () => { try { delete window.__openShares; } catch { } };
+  }, []);
+
 
   // --- Expose global functions to open edit/delete dialogs ----
   React.useEffect(() => {
@@ -951,6 +970,38 @@ export default function HomePage() {
       setPosts([]); // keep empty
     }
   }, []);
+
+  React.useEffect(() => {
+    if (Array.isArray(posts) && posts.length) {
+      hydrateShareCounts(posts);
+    }
+  }, [posts]);
+
+
+  async function hydrateShareCounts(items) {
+    const ids = (items || []).map(p => p?.id).filter(Boolean);
+    if (!ids.length) return;
+    try {
+      const res = await fetch(
+        `${API_ROOT}/engagements/metrics/?target_type=activity_feed.feeditem&ids=${ids.join(",")}`,
+        { headers: { ...authHeader(), accept: "application/json" } }
+      );
+      if (!res.ok) return;
+      const raw = await res.json();
+      const bag = raw?.results || raw?.data || raw?.metrics || raw || {};
+      // Update each post’s share count without touching your existing like/comment logic
+      for (const id of ids) {
+        const key = String(id);
+        const row = bag[key] ||
+          (Array.isArray(bag) ? bag.find(x => String(x.id) === key) : null) || {};
+        const shares = Number(
+          row.shares ?? row.share_count ?? row.shares_count ?? 0
+        ) || 0;
+        window.__setPostMetrics?.(id, { shares });
+      }
+    } catch { }
+  }
+
 
   const fetchMyProfileFromMe = React.useCallback(async () => {
     try {
@@ -1221,6 +1272,12 @@ export default function HomePage() {
         postId={likesPostId}
         onClose={() => setLikesOpen(false)}
       />
+      <SharesDialog
+        open={sharesOpen}
+        postId={sharesPostId}
+        onClose={() => setSharesOpen(false)}
+      />
+
       <AvatarUploadDialog
         open={avatarDialogOpen}
         file={avatarFile}
@@ -1278,29 +1335,34 @@ function LikesDialog({ open, postId, onClose }) {
       u.user_id ??
       u.owner_id ??
       null;
+
     const first =
       u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
     const last =
       u.last_name ?? u.lastName ?? u.user_last_name ?? u.user__last_name ?? "";
+
     const name =
       u.name ||
       `${first} ${last}`.trim() ||
       u.username ||
       (id ? `User #${id}` : "User");
+
+    // ⬇️ Prefer user_image first, then fallbacks
     const avatarRaw =
+      u.user_image ||
+      u.user_image_url ||
       u.avatar ||
       u.profile_image ||
       u.photo ||
       u.image_url ||
-      u.user_image_url ||
-      u.user_image ||
       u.avatar_url ||
       "";
+
     const avatar = toAbsolute(avatarRaw);
-    const headline =
-      u.headline || u.job_title || u.title || u.bio || u.about || "";
+    const headline = u.headline || u.job_title || u.title || u.bio || u.about || "";
     return { id, name, avatar, headline };
   }
+
 
   // Handle different API shapes: some endpoints return {results:[{user:{...}}]}, others return raw users
   function normalizeLikerRow(row) {
@@ -1318,7 +1380,8 @@ function LikesDialog({ open, postId, onClose }) {
       first_name: row?.user_first_name ?? row?.user__first_name,
       last_name: row?.user_last_name ?? row?.user__last_name,
       username: row?.user_username ?? row?.user__username,
-      avatar: row?.user_avatar ?? row?.user_image_url ?? row?.user__avatar,
+      // ⬇️ Prefer user_image first
+      avatar: row?.user_image ?? row?.user_image_url ?? row?.user_avatar ?? row?.user__avatar,
       headline: row?.user_headline,
     };
     return normalizeUser(u);
@@ -1410,6 +1473,139 @@ function LikesDialog({ open, postId, onClose }) {
     </Dialog>
   );
 }
+
+function SharesDialog({ open, postId, onClose }) {
+  const [loading, setLoading] = React.useState(false);
+  const [sharers, setSharers] = React.useState([]);
+
+  function normalizeUser(u) {
+    if (!u) return { id: null, name: "User", avatar: "" };
+    const id = u.id ?? u.user_id ?? u.owner_id ?? null;
+
+    const first = u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
+    const last = u.last_name ?? u.lastName ?? u.user_last_name ?? u.user__last_name ?? "";
+
+    const name =
+      u.name ||
+      `${first} ${last}`.trim() ||
+      u.username ||
+      (id ? `User #${id}` : "User");
+
+    // ⬇️ Prefer user_image first, then fallbacks
+    const avatarRaw =
+      u.user_image ||
+      u.user_image_url ||
+      u.avatar ||
+      u.profile_image ||
+      u.photo ||
+      u.image_url ||
+      u.avatar_url ||
+      "";
+
+    const avatar = toAbsolute(avatarRaw);
+    const headline = u.headline || u.job_title || u.title || u.bio || u.about || "";
+    return { id, name, avatar, headline };
+  }
+
+
+  function normalizeShareRow(row) {
+    // Prefer nested user when available
+    const nested = row?.user || row?.owner || row?.actor || row?.shared_by || null;
+    if (nested && typeof nested === "object") return normalizeUser(nested);
+    // Fallback flattened forms
+    const u = {
+      id: row?.user_id ?? row?.owner_id ?? row?.actor_id ?? null,
+      first_name: row?.user_first_name ?? row?.user__first_name,
+      last_name: row?.user_last_name ?? row?.user__last_name,
+      username: row?.user_username ?? row?.user__username,
+      // ⬇️ Prefer user_image first
+      avatar: row?.user_image ?? row?.user_image_url ?? row?.user_avatar ?? row?.user__avatar,
+      headline: row?.user_headline,
+    };
+    return normalizeUser(u);
+  }
+
+  async function fetchSharers(feedId) {
+    const urls = [
+      // Generic shares listing filtered to this FeedItem
+      `${API_ROOT}/engagements/shares/?target_type=activity_feed.feeditem&target_id=${feedId}&page_size=200`,
+      // Optional alternate param some APIs expose
+      `${API_ROOT}/engagements/shares/?feed_item=${feedId}&page_size=200`,
+    ];
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
+        if (!r.ok) continue;
+        const data = await r.json();
+        const rows =
+          Array.isArray(data?.results) ? data.results :
+            Array.isArray(data) ? data :
+              Array.isArray(data?.items) ? data.items :
+                Array.isArray(data?.shares) ? data.shares :
+                  Array.isArray(data?.data) ? data.data : [];
+        return rows.map(normalizeShareRow);
+      } catch { }
+    }
+    return [];
+  }
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!open || !postId) return;
+      setLoading(true);
+      const list = await fetchSharers(postId);
+
+      // ⬇️ De-dupe by stable key: id if present, else name
+      const seen = new Set();
+      const unique = [];
+      for (const u of list) {
+        const key = (u.id != null) ? `id:${u.id}` : `name:${(u.name || "").toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(u);
+      }
+
+      if (mounted) setSharers(unique);
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, [open, postId]);
+
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{`Shared by${sharers.length ? ` (${sharers.length})` : ""}`}</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Typography variant="body2" color="text.secondary">Loading…</Typography>
+        ) : sharers.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No shares yet.</Typography>
+        ) : (
+          <List dense>
+            {sharers.map((u) => (
+              <ListItem key={`${u.id || u.name}-share`} disableGutters>
+                <ListItemAvatar>
+                  <Avatar src={u.avatar}>{(u.name || "U").slice(0, 1).toUpperCase()}</Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={u.name}
+                  secondary={u.headline || null}
+                  primaryTypographyProps={{ variant: "body2", fontWeight: 600 }}
+                  secondaryTypographyProps={{ variant: "caption" }}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 
 // Function For Edit Post Dialog & Delete Confirm Dialog
 function PostEditDialog({ open, post, communityId, onClose, onSaved }) {
