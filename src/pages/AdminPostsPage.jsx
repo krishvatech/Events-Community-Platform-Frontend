@@ -39,6 +39,9 @@ import LinkIcon from "@mui/icons-material/Link";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import Pagination from "@mui/material/Pagination";
+import RepeatRoundedIcon from "@mui/icons-material/RepeatRounded";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+
 
 
 
@@ -532,8 +535,8 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
         : Array.isArray(payload?.data) ? payload.data
           : Array.isArray(payload?.items) ? payload.items
             : Array.isArray(payload?.likers) ? payload.likers
-            : Array.isArray(payload?.likes) ? payload.likes
-              : [];
+              : Array.isArray(payload?.likes) ? payload.likes
+                : [];
 
     return arr.map((r) => {
       const u = r.user || r.actor || r.owner || r.created_by || r.author || r.profile || r;
@@ -558,24 +561,24 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
     const tgt = propTarget?.id ? propTarget : { id: postId, type: null };
 
     // Try the new engagements APIs first, then legacy fallbacks.
-      const urls = [
-        // primary: reactions filtered to like
-        (tgt.type
-          ? `${API_ROOT}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
-          : `${API_ROOT}/engagements/reactions/?reaction=like&target_id=${tgt.id}&page_size=200`),
+    const urls = [
+      // primary: reactions filtered to like
+      (tgt.type
+        ? `${API_ROOT}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
+        : `${API_ROOT}/engagements/reactions/?reaction=like&target_id=${tgt.id}&page_size=200`),
 
-        // helper: who-liked (feed_item form)
-        `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${tgt.id}`,
+      // helper: who-liked (feed_item form)
+      `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${tgt.id}`,
 
-        // helper: who-liked (target_type/target_id form, if supported)
-        (tgt.type
-          ? `${API_ROOT}/engagements/reactions/who-liked/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}`
-          : null),
+      // helper: who-liked (target_type/target_id form, if supported)
+      (tgt.type
+        ? `${API_ROOT}/engagements/reactions/who-liked/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}`
+        : null),
 
-        // legacy community/feed fallbacks
-        (communityId ? `${API_ROOT}/communities/${communityId}/posts/${postId}/likes/` : null),
-        `${API_ROOT}/activity/feed/${postId}/likes/`,
-      ].filter(Boolean);
+      // legacy community/feed fallbacks
+      (communityId ? `${API_ROOT}/communities/${communityId}/posts/${postId}/likes/` : null),
+      `${API_ROOT}/activity/feed/${postId}/likes/`,
+    ].filter(Boolean);
 
 
     const collected = [];
@@ -598,7 +601,7 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
     const seen = new Set();
     const dedup = [];
     for (const u of collected) {
-      const k = (u.id != null) ? `id:${u.id}` : `name:${(u.name||"").toLowerCase()}`;
+      const k = (u.id != null) ? `id:${u.id}` : `name:${(u.name || "").toLowerCase()}`;
       if (!seen.has(k)) { seen.add(k); dedup.push(u); }
     }
     setRows(dedup);
@@ -640,10 +643,10 @@ function SharesDialog({ open, onClose, communityId, postId, target: propTarget }
   const normalizeUsers = (payload) => {
     const arr = Array.isArray(payload) ? payload
       : Array.isArray(payload?.results) ? payload.results
-      : Array.isArray(payload?.data) ? payload.data
-      : Array.isArray(payload?.items) ? payload.items
-      : Array.isArray(payload?.shares) ? payload.shares
-      : [];
+        : Array.isArray(payload?.data) ? payload.data
+          : Array.isArray(payload?.items) ? payload.items
+            : Array.isArray(payload?.shares) ? payload.shares
+              : [];
     return arr.map((r) => {
       const u = r.user || r.actor || r.owner || r.shared_by || r.created_by || r.author || r.profile || r;
       const id = u?.id ?? u?.user_id ?? r.user_id ?? r.actor_id ?? r.owner_id ?? r.id;
@@ -687,13 +690,13 @@ function SharesDialog({ open, onClose, communityId, postId, target: propTarget }
           next = json?.next ? (/^https?:/i.test(json.next) ? json.next : `${API_ROOT}${json.next.startsWith("/") ? "" : "/"}${json.next}`) : null;
         }
         if (collected.length) break; // stop once one worked
-      } catch {}
+      } catch { }
     }
 
     // de-dupe by id (or name if id missing)
     const seen = new Set(); const unique = [];
     for (const u of collected) {
-      const k = (u.id != null) ? `id:${u.id}` : `name:${(u.name||"").toLowerCase()}`;
+      const k = (u.id != null) ? `id:${u.id}` : `name:${(u.name || "").toLowerCase()}`;
       if (!seen.has(k)) { seen.add(k); unique.push(u); }
     }
 
@@ -1024,7 +1027,131 @@ function CommentsDialog({
   );
 }
 
+function SharePickerDialog({ open, onClose, target, onShared }) {
+  const [loading, setLoading] = React.useState(true);
+  const [users, setUsers] = React.useState([]);
+  const [groups, setGroups] = React.useState([]);
+  const [selectedUsers, setSelectedUsers] = React.useState(new Set());
+  const [selectedGroups, setSelectedGroups] = React.useState(new Set());
+  const [sending, setSending] = React.useState(false);
+  const [q, setQ] = React.useState("");
 
+  const load = React.useCallback(async () => {
+    if (!open) return;
+    setLoading(true);
+    try {
+      // preferred helper (single round-trip)
+      const r = await fetch(`${API_ROOT}/engagements/share-targets/`, { headers: { Accept: "application/json", ...authHeader() }});
+      if (r.ok) {
+        const j = await r.json();
+        setUsers(Array.isArray(j.users) ? j.users : []);
+        setGroups(Array.isArray(j.groups) ? j.groups : []);
+      } else {
+        setUsers([]); setGroups([]);
+      }
+    } catch {
+      setUsers([]); setGroups([]);
+    }
+    setLoading(false);
+  }, [open]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const filteredUsers = users.filter(u => !q || (u.name || "").toLowerCase().includes(q.toLowerCase()));
+  const filteredGroups = groups.filter(g => !q || (g.name || "").toLowerCase().includes(q.toLowerCase()));
+
+  const toggleSel = (bucket, setBucket, id) => {
+    setBucket(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+
+  const doShare = async () => {
+    if (!target?.id) return;
+    setSending(true);
+    try {
+      const body = {
+        // Send feed_item for posts; or use { target_type, target_id } if needed
+        feed_item: target.id,
+        to_user_ids: Array.from(selectedUsers),
+        to_group_ids: Array.from(selectedGroups),
+      };
+      const r = await fetch(`${API_ROOT}/engagements/shares/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error();
+      onShared?.();  // e.g., refreshCounts()
+      onClose?.();
+    } catch {
+      alert("Could not share. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={sending ? undefined : onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Share</DialogTitle>
+      <DialogContent dividers>
+        <TextField
+          fullWidth size="small" placeholder="Search people or groups…"
+          value={q} onChange={(e) => setQ(e.target.value)} sx={{ mb: 1.5 }}
+        />
+        {loading ? (
+          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+        ) : (
+          <Stack spacing={2}>
+            {!!filteredUsers.length && (
+              <Box>
+                <Typography variant="overline">People</Typography>
+                <List dense>
+                  {filteredUsers.map(u => (
+                    <ListItem key={`u-${u.id}`} button onClick={() => toggleSel(selectedUsers, setSelectedUsers, u.id)}>
+                      <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0,1)}</Avatar></ListItemAvatar>
+                      <ListItemText primary={u.name || `User #${u.id}`} />
+                      <Checkbox edge="end" checked={selectedUsers.has(u.id)} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
+            {!!filteredGroups.length && (
+              <Box>
+                <Typography variant="overline">Groups</Typography>
+                <List dense>
+                  {filteredGroups.map(g => (
+                    <ListItem key={`g-${g.id}`} button onClick={() => toggleSel(selectedGroups, setSelectedGroups, g.id)}>
+                      <ListItemAvatar><Avatar src={g.avatar}>{(g.name || "G").slice(0,1)}</Avatar></ListItemAvatar>
+                      <ListItemText primary={g.name || `Group #${g.id}`} />
+                      <Checkbox edge="end" checked={selectedGroups.has(g.id)} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
+            {!filteredUsers.length && !filteredGroups.length && (
+              <Typography color="text.secondary">No results.</Typography>
+            )}
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={sending}>Cancel</Button>
+        <Button
+          onClick={doShare}
+          variant="contained"
+          disabled={sending || (selectedUsers.size === 0 && selectedGroups.size === 0)}
+        >
+          {sending ? <CircularProgress size={18} /> : "Share"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
 
 // ---------- Social bar (uses engagements/*) ----------
 function PostSocialBar({ communityId, post, onCounts }) {
@@ -1037,15 +1164,62 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const [shareCount, setShareCount] = React.useState(post.share_count ?? post.metrics?.shares ?? 0);
   const [sharesOpen, setSharesOpen] = React.useState(false);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
+  const [likers, setLikers] = React.useState([]);
+  // const [sharePickerOpen, setSharePickerOpen] = React.useState(false);
+
+  const normalizeUsers = (payload) => {
+    const arr = Array.isArray(payload) ? payload
+      : Array.isArray(payload?.results) ? payload.results
+        : Array.isArray(payload?.data) ? payload.data
+          : Array.isArray(payload?.items) ? payload.items
+            : Array.isArray(payload?.likers) ? payload.likers
+              : Array.isArray(payload?.likes) ? payload.likes
+                : [];
+    return arr.map((r) => {
+      const u = r.user || r.actor || r.owner || r.created_by || r.author || r.profile || r;
+      const id = u?.id ?? u?.user_id ?? r.user_id ?? r.id;
+      const name =
+        u?.name || u?.full_name || u?.username ||
+        [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
+        (id ? `User #${id}` : "User");
+      const avatar =
+        u?.user_image || u?.user_image_url ||
+        u?.avatar || u?.photo || u?.image || u?.profile?.avatar ||
+        r.user_image || r.user_image_url || r.avatar || "";
+      return { id, name, avatar };
+    }).filter(Boolean);
+  };
+
+  const loadTopLikers = React.useCallback(async () => {
+    const tgt = target?.id ? target : { id: post.id, type: null };
+    const urls = [
+      (tgt.type
+        ? `${API_ROOT}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=5`
+        : `${API_ROOT}/engagements/reactions/?reaction=like&target_id=${tgt.id}&page_size=5`),
+      `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${tgt.id}&page_size=5`,
+    ];
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, { headers: { Accept: "application/json", ...authHeader() } });
+        if (!r.ok) continue;
+        const j = await r.json();
+        const list = normalizeUsers(j);
+        if (list.length) { setLikers(list); return; }
+      } catch { }
+    }
+    setLikers([]);
+  }, [post.id, target?.id, target?.type]);
+
+  React.useEffect(() => { loadTopLikers(); }, [loadTopLikers]);
 
 
   async function refreshCounts() {
     const c = await fetchEngagementCountsForTarget(target);
-      setLikeCount(c.likes ?? 0);
-      setCommentCount(c.comments ?? 0);
-      setShareCount(c.shares ?? 0);
-      setUserHasLiked(!!c.user_has_liked);
-      onCounts?.({ likeCount: c.likes ?? 0, commentCount: c.comments ?? 0, shareCount: c.shares ?? 0 });
+    setLikeCount(c.likes ?? 0);
+    setCommentCount(c.comments ?? 0);
+    setShareCount(c.shares ?? 0);
+    setUserHasLiked(!!c.user_has_liked);
+    onCounts?.({ likeCount: c.likes ?? 0, commentCount: c.comments ?? 0, shareCount: c.shares ?? 0 });
 
   }
   React.useEffect(() => { refreshCounts(); /* on mount */ }, [post.id]);
@@ -1075,36 +1249,71 @@ function PostSocialBar({ communityId, post, onCounts }) {
   }
 
   return (
-      <>
-        {/* NEW: popup-trigger row (Likes / Comments / Shares) */}
-        <Stack direction="row" spacing={1.25} alignItems="center" sx={{ px: 1, pt: 0.5, pb: 0.5 }}>
-          <Button size="small" startIcon={<FavoriteBorderRoundedIcon />} onClick={() => setLikesOpen(true)}>
-            {likeCount}
-          </Button>
-          <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon />} onClick={() => setCommentsOpen(true)}>
-            {commentCount}
-          </Button>
-          <Button size="small" startIcon={<IosShareRoundedIcon />} onClick={() => setSharesOpen(true)}>
-            {shareCount}
-          </Button>
-        </Stack>
-
-        {/* Main action row (Like toggles; counts remain visible) */}
-        {/* Main action row (ONLY Like button) */}
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ px: 1, pb: 1 }}>
-          <Button
-            size="small"
-            startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
-            onClick={togglePostLike}
+    <>
+      {/* Meta strip: avatars + "Name and N others"  |  counts on the right */}
+      <Box sx={{ px: 1.25, pt: 0.75, pb: 0.5 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          {/* Left: liker avatars + sentence */}
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ cursor: "pointer" }}
+            onClick={() => setLikesOpen(true)}
           >
-            Like
-          </Button>
+            <AvatarGroup
+              max={3}
+              sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}
+            >
+              {(likers || []).slice(0, 3).map((u) => (
+                <Avatar key={u.id || u.name} src={u.avatar} alt={u.name}>
+                  {(u.name || "U").slice(0, 1)}
+                </Avatar>
+              ))}
+            </AvatarGroup>
+
+            <Typography variant="body2">
+              {likers?.[0]?.name
+                ? `${likers[0].name} and ${Math.max(0, (likeCount || 0) - 1).toLocaleString()} others`
+                : `${(likeCount || 0).toLocaleString()} likes`}
+            </Typography>
+          </Stack>
+
+          {/* Right: shares */}
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Button size="small" onClick={() => setSharesOpen(true)}>
+              {Number(shareCount || 0).toLocaleString()} shares
+            </Button>
+          </Stack>
+
         </Stack>
+      </Box>
 
+      {/* Action row: Like / Comment / Repost / Send */}
+      <Stack
+        direction="row"
+        justifyContent="space-around"
+        alignItems="center"
+        sx={{ borderTop: `1px solid ${BORDER}`, px: 0.5, py: 0.5 }}
+      >
+        {/* IMPORTANT: Like opens dialog (no toggle) */}
+        <Button
+          size="small"
+          startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
+          onClick={togglePostLike}
+        >
+          Like
+        </Button>
 
-      {/* Inline comments (threaded; same as LiveFeed) */}
+        <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon />} onClick={() => setCommentsOpen(true)}>
+          Comment
+        </Button>
 
+        <Button size="small" startIcon={<IosShareRoundedIcon />} onClick={() => setSharesOpen(true)}>
+          Share
+        </Button>
 
+      </Stack>
       <LikesDialog
         open={likesOpen}
         onClose={() => setLikesOpen(false)}
@@ -1126,7 +1335,6 @@ function PostSocialBar({ communityId, post, onCounts }) {
         postId={post.id}
         target={target}
       />
-
     </>
   );
 }
