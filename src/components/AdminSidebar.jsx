@@ -23,7 +23,7 @@ import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineR
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
-import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
+// import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
@@ -37,7 +37,7 @@ const RecordingsIcon  = CI?.CustomRecordingsIcon  ?? OndemandVideoRoundedIcon;
 // const OrdersIcon      = CI?.CustomOrdersIcon      ?? ReceiptLongRoundedIcon;
 const MembersIcon     = CI?.CustomCommunityIcon   ?? PeopleAltRoundedIcon;
 // const SubsIcon        = CI?.CustomSubscriptionsIcon ?? AutorenewRoundedIcon;
-const NotifsIcon      = CI?.CustomNotificationsIcon ?? NotificationsNoneRoundedIcon;
+// const NotifsIcon      = CI?.CustomNotificationsIcon ?? NotificationsNoneRoundedIcon;
 const SettingsIcon    = CI?.CustomSettingsIcon    ?? SettingsRoundedIcon;
 const PostsIcon = CI?.CustomPostsIcon ?? ArticleOutlinedIcon;
 
@@ -83,7 +83,7 @@ export default function AdminSidebar({
     // { key: "orders",       label: "Orders",         Icon: OrdersIcon },
     { key: "groups",       label: "Groups",         Icon: GroupsRoundedIcon },
     // { key: "subscriptions",label: "Subscriptions",  Icon: SubsIcon },
-    { key: "notifications",label: "Notifications",  Icon: NotifsIcon },
+    // { key: "notifications",label: "Notifications",  Icon: NotifsIcon },
     { key: "settings",     label: "Settings",       Icon: SettingsIcon },
   ];
 
