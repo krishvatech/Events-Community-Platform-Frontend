@@ -24,6 +24,7 @@ import {
   ListItemText,
   Pagination,
   Stack,
+  AvatarGroup,
   Tab,
   Tabs,
   TextField,
@@ -394,6 +395,53 @@ function PostCard({ post, avatarUrl, actorName }) {
   const initial = (name?.[0] || "U").toUpperCase();
   const photo = post.actor_avatar || avatarUrl || "";
   const commentInputRef = React.useRef(null);
+  // --- likers preview for the meta strip (same endpoints used in AdminPostsPage) ---
+  const [likers, setLikers] = React.useState([]);
+  const likeCount = Number(post?.metrics?.likes ?? 0);
+  const commentCount = Number(post?.metrics?.comments ?? 0);
+  const shareCount = Number(post?.metrics?.shares ?? 0);
+
+  const normalizeUsers = (payload) => {
+    const rows = Array.isArray(payload?.results) ? payload.results : (Array.isArray(payload) ? payload : []);
+    return rows.map((r) => {
+      const u = r.user || r.actor || r.profile || r;
+      const id =
+        u?.id ?? u?.user_id ?? r.user_id ?? r.id;
+      const name =
+        u?.name || u?.full_name || u?.username ||
+        [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
+        (id ? `User #${id}` : "User");
+      const avatar =
+        u?.user_image || u?.user_image_url ||
+        u?.avatar || u?.photo || u?.image || u?.profile?.avatar ||
+        r.user_image || r.user_image_url || r.avatar || "";
+      return { id, name, avatar };
+    }).filter(Boolean);
+  };
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const urls = [
+          // Primary: generic reactions API, filtered to likes
+          `${API_ROOT}/engagements/reactions/?reaction=like&target_type=activity_feed.feeditem&target_id=${post.id}&page_size=5`,
+          // Fallback: who-liked helper if present
+          `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${post.id}&page_size=5`,
+        ];
+        for (const url of urls) {
+          const r = await fetch(url, { headers: { Accept: "application/json", ...authHeader() } });
+          if (!r.ok) continue;
+          const j = await r.json();
+          const list = normalizeUsers(j);
+          if (!cancelled) setLikers(list);
+          if (list.length) break;
+        }
+      } catch { if (!cancelled) setLikers([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [post.id]);
+
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardHeader
@@ -452,56 +500,79 @@ function PostCard({ post, avatarUrl, actorName }) {
           </List>
         )}
       </CardContent>
-      <CardActions sx={{ pt: 0, gap: 0.5 }}>
-        {/* Like icon — choose ONE of the onClick behaviors below */}
-        <Tooltip title="Like">
-          <IconButton
-            size="medium"
-            onClick={() => window.__toggleLike?.(post.id, true)}
-          >
-            {post?.liked_by_me ? (
-              <FavoriteRoundedIcon fontSize="small" />
-            ) : (
-              <FavoriteBorderRoundedIcon fontSize="small" />
-            )}
-          </IconButton>
-        </Tooltip>
-        <Typography variant="caption">{post?.metrics?.likes ?? 0}</Typography>
+      <CardActions sx={{ px: 1, py: 0.5, display: 'block' }}>
+        {/* Meta strip: avatars + "Name and N others"  |  shares on the right */}
+        <Box sx={{ px: 1.25, pt: 0.75, pb: 0.5 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            {/* Left: liker avatars + sentence (click opens likers dialog) */}
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ cursor: "pointer" }}
+              onClick={() => window.__openLikes?.(post.id)?.()}
+            >
+              <AvatarGroup
+                max={3}
+                sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}
+              >
+                {(likers || []).slice(0, 3).map((u) => (
+                  <Avatar key={u.id || u.name} src={u.avatar} alt={u.name}>
+                    {(u.name || "U").slice(0, 1)}
+                  </Avatar>
+                ))}
+              </AvatarGroup>
 
-        {/* Comment icon — opens the comments popup */}
-        <Tooltip title="Comments">
-          <IconButton
-            size="medium"
-            onClick={() => {
-              if (commentInputRef?.current) commentInputRef.current.focus();
-            }}
+              <Typography variant="body2">
+                {likers?.[0]?.name
+                  ? `${likers[0].name} and ${Math.max(0, (likeCount || 0) - 1).toLocaleString()} others`
+                  : `${(likeCount || 0).toLocaleString()} likes`}
+              </Typography>
+            </Stack>
+
+            {/* Right: "N SHARES" (click opens share list) */}
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Button size="small" onClick={() => window.__openShares?.(post.id)?.()}>
+                {Number(shareCount || 0).toLocaleString()} SHARES
+              </Button>
+            </Stack>
+          </Stack>
+        </Box>
+
+        {/* Action row: Like / Comment / Share (same as Admin social bar) */}
+        <Stack direction="row" justifyContent="space-around" alignItems="center"
+          sx={{ mt: 0.25, pt: 0.5, borderTop: (t) => `1px solid ${t.palette.divider}`, px: 0.5, pb: 0.5 }}>
+          {/* Like — uses your existing toggle + opens likers dialog (Admin behavior) */}
+          <Button
+            size="small"
+            startIcon={post?.liked_by_me ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
+            onClick={(e) => { e.stopPropagation(); window.__toggleLike?.(post.id); }}
           >
-            <ChatBubbleOutlineRoundedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Typography variant="caption">{post?.metrics?.comments ?? 0}</Typography>
-        {/* Share icon — opens "Shared by" popup */}
-        <Tooltip title="Shares">
-          <IconButton
-            size="medium"
-            onClick={window.__openShares?.(post.id)}
+            LIKE
+          </Button>
+
+          {/* Comment — opens the comments popup (same as Admin) */}
+          <Button
+            size="small"
+            startIcon={<ChatBubbleOutlineRoundedIcon />}
+            onClick={() => window.__openComments?.(post.id)?.()}
           >
-            <IosShareRoundedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Typography variant="caption">{post?.metrics?.shares ?? 0}</Typography>
+            COMMENT
+          </Button>
+
+          {/* Share — opens the “shared by” list */}
+          <Button
+            size="small"
+            startIcon={<IosShareRoundedIcon />}
+            onClick={() => window.__openShares?.(post.id)?.()}
+          >
+            SHARE
+          </Button>
+        </Stack>
+
 
       </CardActions>
-      {/* Inline comments, always visible */}
-      <Box sx={{ px: 2, pb: 2, width: "100%" }}>
-        <CommentsDialog
-          inline
-          initialCount={3}            // show a few first, then “Load more”
-          postId={post.id}
-          onClose={() => { }}          // no-op (modal path unused here)
-          inputRef={commentInputRef}  // for focusing when icon clicked
-        />
-      </Box>
+
     </Card>
   );
 }
@@ -1930,8 +2001,22 @@ function CommentsDialog({
   const [text, setText] = React.useState("");
   const [meId, setMeId] = React.useState(null);
   const [replyingTo, setReplyingTo] = React.useState(null);
+  // Who am I replying to? (search roots + replies)
+  const replyTarget = React.useMemo(() => {
+    if (!replyingTo) return null;
+    for (const root of comments) {
+      if (root.id === replyingTo) return root;
+      const child = (root.replies || []).find((r) => r.id === replyingTo);
+      if (child) return child;
+    }
+    return null;
+  }, [replyingTo, comments]);
+
+  const replyToName = replyTarget?.author?.name || "";
+
   const [replyText, setReplyText] = React.useState("");
   const [visibleCount, setVisibleCount] = React.useState(initialCount);
+  const composerRef = React.useRef(null);
 
   async function getMeId() {
     try {
@@ -1950,21 +2035,21 @@ function CommentsDialog({
     return { id, name, avatar };
   }
 
-  function normalizeComment(c) {
+  // inside CommentsDialog
+  function normalizeComment(c, currentUserId = meId) {
     const author = normalizeUser(c.author || c.user || c.created_by);
     const id = c.id;
     const created = c.created_at || c.created || c.timestamp || null;
     const body = c.text || c.body || c.content || "";
     const likedByMe = !!(c.liked || c.liked_by_me);
     const likeCount = Number(c.like_count ?? c.likes ?? 0) || 0;
-    const canDelete = !!(c.can_delete || c.is_owner || (author.id && meId && author.id === meId));
+    const canDelete = !!(c.can_delete || c.is_owner || (author.id && currentUserId && author.id === currentUserId));
+
     const replies = Array.isArray(c.replies)
       ? c.replies.map((r) => {
-        // If the server already returns the same shape, recurse
         if (r.body || r.text || r.content || r.author || r.user) {
-          return normalizeComment(r);
+          return normalizeComment(r, currentUserId);
         }
-        // Guard for alternate shapes
         return {
           id: r.id,
           created: r.created_at || r.timestamp || r.created || null,
@@ -1972,31 +2057,68 @@ function CommentsDialog({
           author: normalizeUser(r.user || r.author),
           likedByMe: !!(r.liked || r.liked_by_me),
           likeCount: Number(r.like_count ?? r.likes ?? 0) || 0,
-          canDelete: false,
+          canDelete: !!((r.user?.id || r.author?.id) && currentUserId && (r.user?.id || r.author?.id) === currentUserId),
           replies: [],
         };
       })
       : [];
+
     return { id, created, body, author, likedByMe, likeCount, canDelete, replies };
   }
 
-  async function fetchComments(postId) {
-    const candidates = [
-      // engagements: list comments for this FeedItem (with nested replies)
-      `${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${postId}&include_replies=1&page_size=200`,
-    ];
 
+  async function fetchComments(postId, currentUserId) {
+    const rootUrl = `${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${postId}&page_size=200`;
+    try {
+      const r = await fetch(rootUrl, { headers: { ...authHeader(), accept: "application/json" } });
+      if (!r.ok) return [];
+      const j = await r.json();
+      const rootRows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : (j?.comments || []));
+      const roots = rootRows.map((c) => ({ ...normalizeComment(c, currentUserId), replies: [] }));
 
-    for (const url of candidates) {
-      try {
-        const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
-        if (!r.ok) continue;
-        const data = await r.json();
-        const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : (data?.comments || []));
-        return rows.map(normalizeComment);
-      } catch { /* try next */ }
+      await Promise.all(
+        roots.map(async (root) => {
+          try {
+            const rr = await fetch(`${API_ROOT}/engagements/comments/?parent=${root.id}&page_size=200`,
+              { headers: { ...authHeader(), accept: "application/json" } });
+            if (!rr.ok) return;
+            const jj = await rr.json();
+            const rows = Array.isArray(jj?.results) ? jj.results : (Array.isArray(jj) ? jj : []);
+            root.replies = rows.map((x) => normalizeComment(x, currentUserId));
+          } catch { }
+        })
+      );
+
+      // 3) Hydrate like counts + my-like for both roots and replies
+      const ids = [
+        ...roots.map((c) => c.id),
+        ...roots.flatMap((c) => (c.replies || []).map((r) => r.id)),
+      ];
+      if (ids.length) {
+        try {
+          const rc = await fetch(
+            `${API_ROOT}/engagements/reactions/counts/?target_type=comment&ids=${ids.join(",")}`,
+            { headers: { ...authHeader(), accept: "application/json" } }
+          );
+          if (rc.ok) {
+            const payload = await rc.json();
+            const map = payload?.results || {};
+            const apply = (obj) => {
+              const m = map[String(obj.id)];
+              if (m) {
+                obj.likeCount = Number(m.like_count || 0);
+                obj.likedByMe = !!m.user_has_liked;
+              }
+            };
+            roots.forEach((c) => { apply(c); (c.replies || []).forEach(apply); });
+          }
+        } catch { }
+      }
+
+      return roots;
+    } catch {
+      return [];
     }
-    return [];
   }
 
   async function createComment(postId, body, parentId = null) {
@@ -2029,18 +2151,18 @@ function CommentsDialog({
   }
 
   async function toggleLike(commentId) {
-    const candidates = [
-      // engagements: toggle like on a comment
-      { url: `${API_ROOT}/engagements/comments/${commentId}/toggle-like/`, method: "POST" },
-    ];
-    for (const c of candidates) {
-      try {
-        const r = await fetch(c.url, { method: c.method, headers: { ...authHeader(), accept: "application/json" } });
-        if (r.ok) return true;
-      } catch { }
+    try {
+      const res = await fetch(`${API_ROOT}/engagements/reactions/toggle/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ target_type: "comment", target_id: commentId, reaction: "like" }),
+      });
+      return res.ok;
+    } catch {
+      return false;
     }
-    return false;
   }
+
 
   async function deleteComment(commentId) {
     const candidates = [
@@ -2064,12 +2186,11 @@ function CommentsDialog({
       setLoading(true);
       const uid = await getMeId();
       if (mounted) setMeId(uid);
-      const list = await fetchComments(postId);
+      const list = await fetchComments(postId, uid);   // ← pass uid
       if (mounted) {
         const sorted = list.sort((a, b) => (new Date(b.created || 0)) - (new Date(a.created || 0)));
         setComments(sorted);
         setVisibleCount(initialCount);
-        // tell parent to refresh the visible count badge
         window.__setPostMetrics?.(postId, { comments: sorted.length });
       }
       setLoading(false);
@@ -2077,12 +2198,25 @@ function CommentsDialog({
     return () => { mounted = false; };
   }, [open, inline, postId, initialCount]);
 
+
   const onSubmitNew = async () => {
     if (!text.trim()) return;
     setSubmitting(true);
     try {
-      const c = await createComment(postId, text.trim(), null);
-      setComments((prev) => [c, ...prev]);
+      // If replyingTo is set, post as a reply; else post as a root comment
+      const parentId = replyingTo || null;
+      const c = await createComment(postId, text.trim(), parentId);
+      if (parentId) {
+        // Reload so the reply renders under its parent (same approach as Admin)
+        const list = await fetchComments(postId, meId || (await getMeId()));
+
+        const sorted = list.sort((a, b) => (new Date(b.created || 0)) - (new Date(a.created || 0)));
+        setComments(sorted);
+        setReplyingTo(null);
+        window.__setPostMetrics?.(postId, { comments: sorted.length });
+      } else {
+        setComments((prev) => [c, ...prev]);
+      }
       setText("");
     } catch (e) {
       alert(e.message || "Failed to add comment");
@@ -2095,12 +2229,17 @@ function CommentsDialog({
     if (!replyingTo || !replyText.trim()) return;
     setSubmitting(true);
     try {
-      const c = await createComment(postId, replyText.trim(), replyingTo);
-      setComments((prev) =>
-        prev.map((p) => (p.id === replyingTo ? { ...p, replies: [...(p.replies || []), c] } : p))
-      );
+      await createComment(postId, replyText.trim(), replyingTo);
       setReplyingTo(null);
       setReplyText("");
+
+      // Reload comments so replies show correctly (same as AdminPostsPage does)
+      const list = await fetchComments(postId, meId || (await getMeId()));
+
+
+      const sorted = list.sort((a, b) => (new Date(b.created || 0)) - (new Date(a.created || 0)));
+      setComments(sorted);
+      window.__setPostMetrics?.(postId, { comments: sorted.length });
     } catch (e) {
       alert(e.message || "Failed to reply");
     } finally {
@@ -2108,22 +2247,59 @@ function CommentsDialog({
     }
   };
 
+
   const onLike = async (id) => {
+    // optimistic update for root or reply
     setComments((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1 } : c
-      )
+      prev.map((c) => {
+        if (c.id === id) {
+          const liked = !c.likedByMe;
+          return { ...c, likedByMe: liked, likeCount: Math.max(0, (c.likeCount || 0) + (liked ? 1 : -1)) };
+        }
+        const replies = (c.replies || []).map((r) => {
+          if (r.id !== id) return r;
+          const liked = !r.likedByMe;
+          return { ...r, likedByMe: liked, likeCount: Math.max(0, (r.likeCount || 0) + (liked ? 1 : -1)) };
+        });
+        return { ...c, replies };
+      })
     );
+
     const ok = await toggleLike(id);
     if (!ok) {
-      // revert
-      setComments((prev) =>
-        prev.map((c) =>
-          c.id === id ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1 } : c
-        )
-      );
+      // hard resync on failure
+      const list = await fetchComments(postId, meId || (await getMeId()));
+
+      const sorted = list.sort((a, b) => (new Date(b.created || 0)) - (new Date(a.created || 0)));
+      setComments(sorted);
+    } else {
+      // precise resync of this one id from counts API
+      try {
+        const rc = await fetch(
+          `${API_ROOT}/engagements/reactions/counts/?target_type=comment&ids=${id}`,
+          { headers: { ...authHeader(), accept: "application/json" } }
+        );
+        if (rc.ok) {
+          const payload = await rc.json();
+          const m = payload?.results?.[String(id)];
+          if (m) {
+            setComments((prev) =>
+              prev.map((c) => {
+                if (c.id === id) {
+                  return { ...c, likedByMe: !!m.user_has_liked, likeCount: Number(m.like_count || 0) };
+                }
+                const replies = (c.replies || []).map((r) =>
+                  r.id === id ? { ...r, likedByMe: !!m.user_has_liked, likeCount: Number(m.like_count || 0) } : r
+                );
+                return { ...c, replies };
+              })
+            );
+          }
+        }
+      } catch { }
     }
   };
+
 
   const onDelete = async (id, isReply = false, parentId = null) => {
     if (!window.confirm("Delete this comment?")) return;
@@ -2136,9 +2312,14 @@ function CommentsDialog({
   };
 
   const Item = ({ c, depth = 0, parentId = null }) => (
-    <Box sx={{ pl: depth ? 5 : 0, py: 1 }}>
-      <Stack direction="row" spacing={1}>
-        <Avatar src={c.author.avatar}>{(c.author.name[0] || "").toUpperCase()}</Avatar>
+    <Box sx={{ pl: depth ? 4 : 0, py: 0.75 }}>
+      <Stack direction="row" spacing={0.75}>
+        <Avatar
+          src={c.author.avatar}
+          sx={{ width: depth ? 28 : 32, height: depth ? 28 : 32 }}
+        >
+          {(c.author.name[0] || "").toUpperCase()}
+        </Avatar>
         <Box sx={{ flex: 1 }}>
           <Stack direction="row" alignItems="baseline" spacing={1}>
             <Typography variant="subtitle2">{c.author.name}</Typography>
@@ -2150,10 +2331,19 @@ function CommentsDialog({
               {c.likedByMe ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
             </IconButton>
             <Typography variant="caption">{c.likeCount || 0}</Typography>
-
-            <Button size="small" startIcon={<ReplyRoundedIcon />} onClick={() => { setReplyingTo(c.id); setReplyText(""); }}>
+            <Button
+              size="small"
+              startIcon={<ReplyRoundedIcon />}
+              onClick={() => {
+                setReplyingTo(c.id);
+                setText("");
+                setTimeout(() => composerRef.current?.focus?.(), 0);
+              }}
+            >
               Reply
             </Button>
+
+
 
             {c.canDelete && (
               <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onDelete(c.id, !!parentId, parentId)}>
@@ -2170,21 +2360,7 @@ function CommentsDialog({
           )}
 
           {/* Inline reply box */}
-          {replyingTo === c.id && (
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-              <TextField
-                size="small"
-                fullWidth
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Write a reply…"
-              />
-              <Button variant="contained" onClick={onSubmitReply} disabled={submitting || !replyText.trim()}>
-                Send
-              </Button>
-              <Button onClick={() => { setReplyingTo(null); setReplyText(""); }}>Cancel</Button>
-            </Stack>
-          )}
+
         </Box>
       </Stack>
     </Box>
@@ -2206,7 +2382,8 @@ function CommentsDialog({
             placeholder="Write a comment…"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            inputRef={inputRef || undefined}
+            inputRef={inputRef || composerRef}
+
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -2214,6 +2391,7 @@ function CommentsDialog({
               }
             }}
           />
+
           <Button variant="contained" onClick={onSubmitNew} disabled={submitting || !text.trim()}>
             Post
           </Button>
@@ -2255,19 +2433,48 @@ function CommentsDialog({
           </Box>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap" }}>
+        {/* Replying banner (modal) */}
+        {replyingTo && (
+          <Box sx={{ width: "100%", mb: 1 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="caption" color="text.secondary">
+                Replying to <b>{replyToName}</b>
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => {
+                  setReplyingTo(null);
+                  setText("");
+                }}
+              >
+                CANCEL
+              </Button>
+            </Stack>
+          </Box>
+        )}
+
         <TextField
           fullWidth
           size="small"
-          placeholder="Write a comment…"
+          placeholder={replyingTo ? "Write a reply…" : "Write a comment…"}
           value={text}
           onChange={(e) => setText(e.target.value)}
+          inputRef={composerRef}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              onSubmitNew();
+            }
+          }}
         />
+
         <Button variant="contained" onClick={onSubmitNew} disabled={submitting || !text.trim()}>
           Post
         </Button>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
+
     </Dialog>
   );
 }
