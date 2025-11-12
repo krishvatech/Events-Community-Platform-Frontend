@@ -1,10 +1,9 @@
 // src/pages/community/LiveFeedPage.jsx
 import * as React from "react";
 import {
-  Avatar, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
-  Paper, Stack, TextField, Typography, InputAdornment
+  Avatar, AvatarGroup, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
+ Paper, Stack, TextField, Typography, InputAdornment
 } from "@mui/material";
-import AvatarGroup from "@mui/material/AvatarGroup";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import IosShareIcon from "@mui/icons-material/IosShare";
@@ -1467,7 +1466,9 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const [local, setLocal] = React.useState(post);
   const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
+  const [likers, setLikers] = React.useState([]);
   const [shareOpen, setShareOpen] = React.useState(false);
+
   React.useEffect(() => { setLocal(post); }, [post]);
   const commentInputRef = React.useRef(null);
   const bumpShareCount = () => {
@@ -1495,6 +1496,38 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
     }
   }
   React.useEffect(() => { setLocal(post); refreshCounts(); }, [post]);
+  React.useEffect(() => {
+  const target = engageTargetOf(post);
+  let cancelled = false;
+  (async () => {
+    try {
+      const urls = [
+        toApiUrl(`engagements/reactions/?reaction=like&target_id=${target.id}${target.type ? `&target_type=${encodeURIComponent(target.type)}` : ""}&page_size=5`),
+        toApiUrl(`engagements/reactions/who-liked/?${target.type ? `target_type=${encodeURIComponent(target.type)}&` : ""}target_id=${target.id}&page_size=5`),
+      ];
+      for (const url of urls) {
+        const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+        if (!r.ok) continue;
+        const j = await r.json();
+        const rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+        const norm = rows.map((row) => {
+          const u = row.user || row.actor || row.profile || row;
+          const name =
+            u?.name || u?.full_name ||
+            (u?.first_name || u?.last_name ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : u?.username) ||
+            "User";
+          const avatar = toMediaUrl(u?.avatar || u?.user_image || u?.photo || u?.image || "");
+          const id = u?.id || row.user_id || row.id;
+          return { id, name, avatar };
+        }).filter(Boolean);
+        if (!cancelled) setLikers(norm);
+        if (norm.length) break;
+      }
+    } catch { if (!cancelled) setLikers([]); }
+  })();
+  return () => { cancelled = true; };
+}, [post.id]);
+
   async function toggleLike() {
     try {
       const target = engageTargetOf(post);
@@ -1608,38 +1641,78 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
       </Box>
 
       {/* Actions */}
-      <Stack direction="row" spacing={1} sx={{ mt: 1.25 }} alignItems="center">
-        <IconButton size="small" onClick={toggleLike}>
-          {userHasLiked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
-        </IconButton>
-        <Typography variant="caption">{local.metrics?.likes ?? 0}</Typography>
+{/* Meta strip: likers avatars + sentence | shares on right */}
+<Box sx={{ px: 0.5, pt: 0.5 }}>
+  <Stack direction="row" alignItems="center" justifyContent="space-between">
+    <Stack direction="row" spacing={1} alignItems="center">
+      <AvatarGroup max={3} sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}>
+        {(likers || []).slice(0, 3).map((u) => (
+          <Avatar key={u.id || u.name} src={u.avatar}>
+            {(u.name || "U").slice(0, 1)}
+          </Avatar>
+        ))}
+      </AvatarGroup>
+      <Typography variant="body2">
+        {likers?.[0]?.name
+          ? `${likers[0].name} and ${Math.max(0, (local.metrics?.likes || 0) - 1).toLocaleString()} others`
+          : `${(local.metrics?.likes || 0).toLocaleString()} likes`}
+      </Typography>
+    </Stack>
 
-        <IconButton
-          size="small"
-          onClick={() => {
-            // focus the always-visible inline input
-            if (commentInputRef?.current) {
-              commentInputRef.current.focus();
-            }
-          }}
-        >
-          <ChatBubbleOutlineIcon fontSize="small" />
-        </IconButton>
-        <Typography variant="caption">{local.metrics?.comments ?? 0}</Typography>
+    <Button size="small" onClick={() => setShareOpen(true)}>
+      {(local.metrics?.shares || 0).toLocaleString()} SHARES
+    </Button>
+  </Stack>
+</Box>
 
-        <IconButton size="small" onClick={() => setShareOpen(true)}><IosShareIcon fontSize="small" /></IconButton>
-        <Typography variant="caption">{local.metrics?.shares ?? 0}</Typography>
-      </Stack>
+<Divider sx={{ my: 1 }} />
+
+    {/* Action row: Like / Comment / Share */}
+    <Stack direction="row" justifyContent="space-around" alignItems="center" sx={{ px: 0.5, pb: 0.5 }}>
+      <Button
+        size="small"
+        startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderIcon />}
+        onClick={toggleLike}
+      >
+        LIKE
+      </Button>
+
+     <Button
+  size="small"
+  startIcon={<ChatBubbleOutlineIcon />}
+  onClick={() => {
+    setCommentsOpen((v) => {
+      const next = !v;
+      if (!v) setTimeout(() => commentInputRef.current?.focus?.(), 0); // focus when opening
+      return next;
+    });
+  }}
+>
+  COMMENT
+</Button>
+
+
+      <Button
+        size="small"
+        startIcon={<IosShareIcon />}
+        onClick={() => setShareOpen(true)}
+      >
+        SHARE
+      </Button>
+    </Stack>
+
 
       {/* Inline comments, always visible like LinkedIn/Instagram */}
-      <CommentsDialog
-        inline
-        initialCount={3}         // show a few, then "Load more" reveals more
-        postId={post.id}
-        target={engageTargetOf(post)}
-        onBumpCount={bumpCommentCount}
-        inputRef={commentInputRef}
-      />
+   {commentsOpen && (
+  <CommentsDialog
+    inline
+    initialCount={3}
+    postId={post.id}
+    target={engageTargetOf(post)}
+    onBumpCount={bumpCommentCount}
+    inputRef={commentInputRef}
+  />
+)}
 
       <ShareDialog
         open={shareOpen}
