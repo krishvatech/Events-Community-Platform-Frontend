@@ -39,7 +39,7 @@ const emitUnreadCount = (count) => {
   try {
     window.dispatchEvent(new CustomEvent("notify:unread", { detail: { count } }));
     localStorage.setItem("unread_notifications", String(count));
-  } catch {}
+  } catch { }
 };
 
 /* ---------------------- helpers ---------------------- */
@@ -81,6 +81,7 @@ function NotificationRow({
   onDeclineRequest,
   onFollowBack,
 }) {
+  const navigate = useNavigate();
   const unread = !item.is_read;
 
   const ActionsByKind = () => {
@@ -155,7 +156,15 @@ function NotificationRow({
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <ListItemAvatar sx={{ minWidth: 48 }}>
-          <Avatar src={item.actor?.avatar} alt={item.actor?.name}>
+          <Avatar
+            src={item.actor?.avatar}
+            alt={item.actor?.name}
+            onClick={() => {
+              const uid = item?.context?.profile_user_id || item?.actor?.id;
+              if (uid) navigate(`/community/rich-profile/${uid}`);
+            }}
+            sx={{ cursor: (item?.context?.profile_user_id || item?.actor?.id) ? "pointer" : "default" }}
+          >
             {(item.actor?.name || "S").slice(0, 1).toUpperCase()}
           </Avatar>
         </ListItemAvatar>
@@ -350,112 +359,121 @@ export default function NotificationsPage({
   const grouped = groupByDay(filtered);
 
   React.useEffect(() => {
-  let alive = true;
-  (async () => {
-    try {
-      const r = await fetch(`${API_BASE}/notifications/`, {
-        headers: { ...tokenHeader(), Accept: "application/json" },
-        credentials: "include",
-      });
-      const j = await r.json().catch(() => []);
-      const raw = Array.isArray(j) ? j : j?.results || [];
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/notifications/`, {
+          headers: { ...tokenHeader(), Accept: "application/json" },
+          credentials: "include",
+        });
+        const j = await r.json().catch(() => []);
+        const raw = Array.isArray(j) ? j : j?.results || [];
 
-      const mapped = raw.map((n) => ({
-        id: n.id,
-        kind: n.kind,
-        state: n.state || "",
-        title: n.title || "",
-        description: n.description || "",
-        created_at: n.created_at,
-        is_read: !!n.is_read,
-        actor: {
-          name: n.actor?.display_name || n.actor?.username || n.actor?.email || "User",
-          avatar: n.actor?.avatar_url || "",   // ← use avatar_url now returned by API
-        },
-        context: {
-          friend_request_id: n.data?.friend_request_id,
-          profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
-        },
-      }));
+        const mapped = raw.map((n) => ({
+          id: n.id,
+          kind: n.kind,
+          state: n.state || "",
+          title: n.title || "",
+          description: n.description || "",
+          created_at: n.created_at,
+          is_read: !!n.is_read,
+          actor: {
+            id: n.actor?.id,
+            name: n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
+            avatar: n.actor?.avatar_url || "",   // ← use avatar_url now returned by API
+          },
+          context: {
+            friend_request_id: n.data?.friend_request_id,
+            profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
+          },
+        }));
 
-      if (!alive) return;
-      setItems(mapped);
+        if (!alive) return;
+        setItems(mapped);
 
-      // 🔔 mark-all-read-on-open (optimistic)
-      const idsToMark = mapped.filter((i) => !i.is_read).map((i) => i.id);
-      if (idsToMark.length) {
-        setItems((curr) =>
-          curr.map((i) => (idsToMark.includes(i.id) ? { ...i, is_read: true } : i))
-        );
-        try {
-          await fetch(`${API_BASE}/notifications/mark-read/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...tokenHeader(),
-              Accept: "application/json",
-            },
-            credentials: "include",
-            body: JSON.stringify({ ids: idsToMark }),
-          });
-        } catch {}
+        // 🔔 mark-all-read-on-open (optimistic)
+        const idsToMark = mapped.filter((i) => !i.is_read).map((i) => i.id);
+        if (idsToMark.length) {
+          setItems((curr) =>
+            curr.map((i) => (idsToMark.includes(i.id) ? { ...i, is_read: true } : i))
+          );
+          try {
+            await fetch(`${API_BASE}/notifications/mark-read/`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...tokenHeader(),
+                Accept: "application/json",
+              },
+              credentials: "include",
+              body: JSON.stringify({ ids: idsToMark }),
+            });
+          } catch { }
+        }
+        // sidebar bell → 0
+        emitUnreadCount(0);
+      } catch {
+        /* ignore */
       }
-      // sidebar bell → 0
-      emitUnreadCount(0);
-    } catch {
-      /* ignore */
-    }
-  })();
-  return () => {
-    alive = false;
-  };
-}, []);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const apiMarkRead = async (ids = []) => {
-  if (!ids.length) return;
-  try {
-    await fetch(`${API_BASE}/notifications/mark-read/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ ids }),
-    });
-  } catch {}
-};
+    if (!ids.length) return;
+    try {
+      await fetch(`${API_BASE}/notifications/mark-read/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ids }),
+      });
+    } catch { }
+  };
 
   /* ---------- actions: optimistic mock handlers ---------- */
   const handleToggleRead = async (id, nowRead) => {
-  setItems((curr) => {
-    const next = curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i));
-    emitUnreadCount(next.filter((x) => !x.is_read).length);
-    return next;
-  });
-  // backend only supports "mark as read"
-  if (nowRead) await apiMarkRead([id]);
-};
+    setItems((curr) => {
+      const next = curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i));
+      emitUnreadCount(next.filter((x) => !x.is_read).length);
+      return next;
+    });
+    // backend only supports "mark as read"
+    if (nowRead) await apiMarkRead([id]);
+  };
 
   const handleMarkAllRead = async () => {
-  const ids = items.filter((i) => !i.is_read).map((i) => i.id);
-  if (!ids.length) return;
-  setItems((curr) => {
-    const next = curr.map((i) => ({ ...i, is_read: true }));
-    emitUnreadCount(0);
-    return next;
-  });
-  await apiMarkRead(ids);
-};
+    const ids = items.filter((i) => !i.is_read).map((i) => i.id);
+    if (!ids.length) return;
+    setItems((curr) => {
+      const next = curr.map((i) => ({ ...i, is_read: true }));
+      emitUnreadCount(0);
+      return next;
+    });
+    await apiMarkRead(ids);
+  };
 
   const handleOpen = (n) => {
     if (onOpen) return onOpen(n);
-    // default: smart routes by context mock
     const ctx = n.context || {};
-    if (ctx.profile_user_id) return navigate(`/community/rich-profile/${ctx.profile_user_id}`);
+
+    // Friend/connection requests → Open goes to sender's profile
+    if (n.kind === "friend_request" || n.kind === "connection_request") {
+      if (ctx.profile_user_id) return navigate(`/community/rich-profile/${ctx.profile_user_id}`);
+      return;
+    }
+
+    // All other notifications: Open should go to the target only (NOT profile)
     if (ctx.eventId) return navigate(`/events/${ctx.eventId}`);
     if (ctx.postId) return navigate(`/feed/post/${ctx.postId}`);
     if (ctx.groupSlug) return navigate(`/groups/${ctx.groupSlug}`);
-    // fallback
+
+    // No profile fallback here—profile is opened ONLY via avatar click
     return;
   };
+
 
   const updateItem = (id, patch) =>
     setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...patch } : i)));

@@ -4,6 +4,7 @@ import {
   Avatar, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
   Paper, Stack, TextField, Typography, InputAdornment
 } from "@mui/material";
+import AvatarGroup from "@mui/material/AvatarGroup";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import IosShareIcon from "@mui/icons-material/IosShare";
@@ -25,6 +26,162 @@ const BORDER = "#e2e8f0";
 
 function SuggestedConnections({ list = [] }) {
   const [connected, setConnected] = React.useState(() => new Set());
+
+  // --- friend status (same idea as RichProfile) ---
+  const [friendStatusByUser, setFriendStatusByUser] = React.useState({});
+
+  // normalize backend statuses (incoming_pending/outgoing_pending → pending_incoming/pending_outgoing)
+  function normalizeFriendStatus(s) {
+    const map = { incoming_pending: "pending_incoming", outgoing_pending: "pending_outgoing" };
+    return String(map[s] || s || "none").toLowerCase();
+  }
+  // preload friend status for first few visible cards
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      const first = (list || []).slice(0, 8).map(u => u.id).filter(Boolean);
+      const need = first.filter(id => friendStatusByUser[id] === undefined);
+      if (!need.length) return;
+      const entries = await Promise.all(need.map(async (id) => [id, await fetchFriendStatus(id)]));
+      if (alive && entries.length) {
+        setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
+      }
+    })();
+    return () => { alive = false; };
+  }, [list]);
+
+
+  async function fetchFriendStatus(userId) {
+    try {
+      const r = await fetch(toApiUrl(`friends/status/?user_id=${userId}`), {
+        headers: { Accept: "application/json", ...authHeaders() },
+        credentials: "include",
+      });
+      const d = await r.json().catch(() => ({}));
+      return normalizeFriendStatus(d?.status);
+    } catch {
+      return "none";
+    }
+  }
+
+  // NEW: See-all dialog
+  const [openAll, setOpenAll] = React.useState(false);
+
+
+  // avatar + name helpers (match posts/profile fallbacks)
+  function userName(u) {
+    return (
+      u?.name ||
+      u?.display_name ||
+      `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
+      u?.username ||
+      u?.email ||
+      `User #${u?.id}`
+    );
+  }
+  function userAvatar(u) {
+    const p = u?.profile || {};
+    const candidates = [
+      u?.avatar, u?.avatar_url, u?.avatarUrl,
+      u?.user_image, p?.user_image,
+      u?.profile_image, u?.profile_picture, p?.profile_image, p?.profile_picture,
+      u?.image, u?.image_url, p?.image, p?.image_url,
+      u?.photo, u?.photo_url, p?.photo, p?.photo_url,
+      u?.picture, u?.picture_url
+    ];
+    const raw = candidates.find(Boolean) || "";
+    return toMediaUrl(raw);
+  }
+
+  // cache resolved avatar by user id
+  const [avatarByUser, setAvatarByUser] = React.useState({});
+
+  // extract avatar url from any user/profile JSON shape
+  function pickAvatarFromJson(j) {
+    const p = j?.profile || j?.data || {};
+    const cand = [
+      j?.avatar, j?.avatar_url, j?.avatarUrl,
+      j?.user_image, p?.user_image,
+      j?.profile_image, j?.profile_picture, p?.profile_image, p?.profile_picture,
+      j?.image, j?.image_url, p?.image, p?.image_url,
+      j?.photo, j?.photo_url, p?.photo, p?.photo_url,
+      j?.picture, j?.picture_url
+    ].find(Boolean) || "";
+    return toMediaUrl(cand);
+  }
+
+  // try a few likely endpoints to fetch a user profile and grab avatar
+  async function hydrateAvatar(userId) {
+    if (!userId || avatarByUser[userId]) return;
+    const endpoints = [
+      `users/${userId}/`,
+      `profiles/${userId}/`,
+      `user-profiles/${userId}/`,
+      `accounts/${userId}/`,
+    ];
+    for (const path of endpoints) {
+      try {
+        const r = await fetch(toApiUrl(path), { headers: { Accept: "application/json", ...authHeaders() } });
+        if (!r.ok) continue;
+        const j = await r.json();
+        const url = pickAvatarFromJson(j);
+        if (url) {
+          setAvatarByUser((m) => ({ ...m, [userId]: url }));
+          return;
+        }
+      } catch { /* try next */ }
+    }
+  }
+
+  // prefetch for first few visible suggestions
+  React.useEffect(() => {
+    (list || []).slice(0, 8).forEach(u => hydrateAvatar(u.id));
+  }, [list]);
+
+
+  async function sendFriendRequest(id) {
+    try {
+      const r = await fetch(toApiUrl(`friend-requests/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ to_user: Number(id) }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok && r.status !== 200 && r.status !== 201) {
+        throw new Error(d?.detail || "Failed to send request");
+      }
+      const st = normalizeFriendStatus(d?.status || "pending_outgoing");
+      setFriendStatusByUser((m) => ({ ...m, [id]: st }));
+    } catch (e) {
+      alert(e?.message || "Failed to send request");
+    }
+  }
+
+
+
+
+  // cache of mutuals: { [userId]: Array<{id,name,avatar}> }
+  const [mutualMap, setMutualMap] = React.useState({});
+
+  async function loadMutuals(userId) {
+    // don’t refetch if we already have it
+    if (mutualMap[userId] !== undefined) return;
+    try {
+      const res = await fetch(toApiUrl(`friends/mutual/?user_id=${userId}`), {
+        headers: { Accept: "application/json", ...authHeaders() },
+      });
+      const arr = res.ok ? await res.json() : [];
+      const normalized = (arr || []).map(m => ({
+        id: m.id,
+        name: m.name || m.display_name || m.username || `User #${m.id}`,
+        avatar: toMediaUrl(m.avatar || m.avatar_url || (m.profile && m.profile.avatar) || ""),
+      }));
+      setMutualMap(prev => ({ ...prev, [userId]: normalized }));
+    } catch {
+      setMutualMap(prev => ({ ...prev, [userId]: [] }));
+    }
+  }
   function toggle(id) {
     setConnected(prev => {
       const next = new Set(prev);
@@ -48,8 +205,7 @@ function SuggestedConnections({ list = [] }) {
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
           Suggested connections
         </Typography>
-        <Button size="small" variant="text">See all</Button>
-      </Stack>
+        <Button size="small" variant="text" onClick={() => setOpenAll(true)}>See all</Button>      </Stack>
 
       {/* Horizontal slider */}
       <Box
@@ -75,25 +231,119 @@ function SuggestedConnections({ list = [] }) {
                     textAlign: "center",
                     borderColor: BORDER,
                   }}
+                  onMouseEnter={() => {
+                    if (u.mutuals > 0) loadMutuals(u.id);
+                    hydrateAvatar(u.id);
+                  }}
                 >
-                  <Avatar src={u.avatar} sx={{ width: 56, height: 56, mx: "auto", mb: 0.75 }}>
-                    {(u.name || "U").slice(0, 1)}
+                  <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 56, height: 56, mx: "auto", mb: 0.75 }}>
+                    {(userName(u) || "U").slice(0, 1)}
                   </Avatar>
                   <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
-                    {u.name}
+                    {userName(u)}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {u.mutuals} mutual
-                    {u.mutuals === 1 ? "" : "s"}
-                  </Typography>
-                  <Button
-                    size="small"
-                    variant={isConnected ? "outlined" : "contained"}
-                    sx={{ mt: 1 }}
-                    onClick={() => toggle(u.id)}
-                  >
-                    {isConnected ? "Connected" : "Connect"}
-                  </Button>
+                  {/* Mutual friends avatars (only if > 0) */}
+                  {u.mutuals > 0 && (
+                    <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="center" sx={{ mt: 0.5 }}>
+                      <AvatarGroup
+                        max={3}
+                        sx={{ "& .MuiAvatar-root": { width: 18, height: 18, fontSize: 10 } }}
+                      >
+                        {(mutualMap[u.id] || []).slice(0, 3).map(m => (
+                          <Avatar key={m.id} src={userAvatar(m)}>
+                            {(m.name || "U").slice(0, 1)}
+                          </Avatar>
+                        ))}
+                      </AvatarGroup>
+                      <Typography variant="caption" color="text.secondary">
+                        {u.mutuals} mutual{u.mutuals === 1 ? "" : "s"}
+                      </Typography>
+                    </Stack>
+                  )}
+                  {(() => {
+                    const status = String(friendStatusByUser[u.id] || "").toLowerCase();
+                    if (status === "friends") {
+                      return (
+                        <Button size="small" variant="outlined" sx={{ mt: 1 }} disabled>
+                          Friends
+                        </Button>
+                      );
+                    }
+                    if (status === "pending_outgoing") {
+                      return (
+                        <Button size="small" variant="outlined" sx={{ mt: 1 }} disabled>
+                          Request sent
+                        </Button>
+                      );
+                    }
+                    if (status === "pending_incoming") {
+                      return (
+                        <Button size="small" variant="outlined" sx={{ mt: 1 }} disabled>
+                          Pending your approval
+                        </Button>
+                      );
+                    }
+                    return (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        sx={{ mt: 1 }}
+                        onClick={() => sendFriendRequest(u.id)}
+                      >
+                        Connect
+                      </Button>
+                    );
+                  })()}
+                  <Dialog open={openAll} onClose={() => setOpenAll(false)} maxWidth="sm" fullWidth>
+                    <DialogTitle>Suggested connections</DialogTitle>
+                    <DialogContent dividers>
+                      <Stack spacing={1.25}>
+                        {list.map((u) => {
+                          const status = String(friendStatusByUser[u.id] || "").toLowerCase();
+                          return (
+                            <Paper key={u.id} variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Avatar src={avatarByUser[u.id] || userAvatar(u)} sx={{ width: 36, height: 36 }}>                                  {(userName(u) || "U").slice(0, 1)}
+                                </Avatar>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+                                    {userName(u)}
+                                  </Typography>
+                                  {u.mutuals > 0 && (
+                                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.25 }}>
+                                      <AvatarGroup max={3} sx={{ "& .MuiAvatar-root": { width: 18, height: 18, fontSize: 10 } }}>
+                                        {(mutualMap[u.id] || []).slice(0, 3).map((m) => (
+                                          <Avatar key={m.id} src={userAvatar(m)}>
+                                            {(m.name || "U").slice(0, 1)}
+                                          </Avatar>
+                                        ))}
+                                      </AvatarGroup>
+                                      <Typography variant="caption" color="text.secondary">
+                                        {u.mutuals} mutual{u.mutuals === 1 ? "" : "s"}
+                                      </Typography>
+                                    </Stack>
+                                  )}
+                                </Box>
+
+                                {status === "friends" ? (
+                                  <Button size="small" variant="outlined" disabled>Friends</Button>
+                                ) : status === "pending_outgoing" ? (
+                                  <Button size="small" variant="outlined" disabled>Request pending</Button>
+                                ) : (
+                                  <Button size="small" variant="contained" onClick={() => sendFriendRequest(u.id)}>
+                                    Connect
+                                  </Button>
+                                )}
+                              </Stack>
+                            </Paper>
+                          );
+                        })}
+                        {(!list || list.length === 0) && (
+                          <Typography color="text.secondary">No suggestions right now.</Typography>
+                        )}
+                      </Stack>
+                    </DialogContent>
+                  </Dialog>
                 </Paper>
               </Box>
             );

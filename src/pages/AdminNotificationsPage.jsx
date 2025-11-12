@@ -22,6 +22,8 @@ import {
   Pagination,
 } from "@mui/material";
 
+import { Link } from "react-router-dom";
+
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 import GroupAddRoundedIcon from "@mui/icons-material/GroupAddRounded";
@@ -46,22 +48,92 @@ const qs = (obj = {}) =>
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join("&");
 
-// --- Endpoint adapter: change paths here if your backend differs ---
 const ENDPOINTS = {
-  list: (params) => `${API_ROOT}/admin/notifications/?${qs(params)}`,
-  markRead: (id) => `${API_ROOT}/admin/notifications/${id}/read/`,
-  markAllRead: () => `${API_ROOT}/admin/notifications/mark-all-read/`,
-  // Actions for join requests (tweak to match your server)
-  approveJoin: (n) =>
-    `${API_ROOT}/groups/${n?.group?.id}/join-requests/${n?.request_id}/approve/`,
-  rejectJoin: (n) =>
-    `${API_ROOT}/groups/${n?.group?.id}/join-requests/${n?.request_id}/reject/`,
+  notifList: (params) =>
+    `${API_ROOT}/notifications/?${qs({
+      kind: params?.kind,
+      unread: params?.unread ? 1 : undefined,
+      page: params?.page,
+      page_size: params?.page_size,
+    })}`,
+  notifMarkReadBulk: () => `${API_ROOT}/notifications/mark-read/`,
+
+  // groups endpoints
+  groupsPage: (page = 1) => `${API_ROOT}/groups/?${qs({ page, page_size: 200 })}`,
+  pendingForGroup: (groupId) => `${API_ROOT}/groups/${groupId}/member-requests/`,
+  approveJoin: (groupId, userId) => `${API_ROOT}/groups/${groupId}/member-requests/approve/${userId}/`,
+  rejectJoin: (groupId, userId) => `${API_ROOT}/groups/${groupId}/member-requests/reject/${userId}/`,
 };
 
-// Types we surface in UI tabs
+// ---- Data loaders ---------------------------------------------------------
+
+async function loadJoinRequests() {
+  // 1) fetch groups where current user is owner/admin/mod (via current_user_role)
+  const res = await fetch(ENDPOINTS.groupsPage(1), { headers: { Accept: "application/json", ...authHeader() } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const groups = Array.isArray(data) ? data : data?.results || [];
+
+  const manageable = groups.filter((g) => ["owner", "admin", "moderator"].includes(g?.current_user_role));
+
+  const all = [];
+  for (const g of manageable) {
+    try {
+      const r = await fetch(ENDPOINTS.pendingForGroup(g.id), { headers: { Accept: "application/json", ...authHeader() } });
+      if (!r.ok) continue;
+      const jr = await r.json();
+      const rows = (jr?.requests || []).map((req) => ({
+        id: `join-${g.id}-${req?.user?.id}`,
+        _source: "join",
+        type: "join_request",
+        status: req?.status || "pending",
+        created_at: req?.joined_at,
+        actor_name: req?.user?.name || "Someone",
+        actor_avatar: req?.user?.avatar || "",
+        user_id: req?.user?.id,
+        group: { id: g.id, name: g.name },
+        read_at: null,
+      }));
+      all.push(...rows);
+    } catch {
+      /* ignore per-group errors */
+    }
+  }
+  all.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+  return { items: all, count: all.length };
+}
+
+async function loadMemberJoined(onlyUnread = false) {
+  // read real notifications emitted by backend signals
+  const res = await fetch(
+    ENDPOINTS.notifList({ kind: "system", unread: onlyUnread ? 1 : undefined, page_size: 200 }),
+    { headers: { Accept: "application/json", ...authHeader() } }
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const j = await res.json();
+  const list = Array.isArray(j) ? j : j?.results || [];
+
+  const items = list
+    .filter((n) => n?.data?.type === "group_member_joined")
+    .map((n) => ({
+      id: n.id,                 // notification id
+      _source: "notif",        // enables Mark read
+      type: "member_joined",
+      created_at: n.created_at,
+      actor_id: n?.actor?.id,
+      actor_name: n?.actor?.display_name || n?.actor?.username || "Someone",
+      actor_avatar: n?.actor?.avatar_url || "",
+      user_id: n?.data?.user_id,
+      group: { id: n?.data?.group_id, name: n?.data?.group_name || `#${n?.data?.group_id}` },
+      read_at: n?.is_read ? n.created_at : null,
+    }));
+
+  items.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+  return { items, count: items.length };
+}
+
 const TABS = [
   { key: "all", label: "All", icon: <NotificationsRoundedIcon fontSize="small" /> },
-  { key: "group_created", label: "Group created", icon: <GroupRoundedIcon fontSize="small" /> },
   { key: "member_joined", label: "User joined", icon: <GroupAddRoundedIcon fontSize="small" /> },
   { key: "join_request", label: "Join requests", icon: <PersonAddAlt1RoundedIcon fontSize="small" /> },
 ];
@@ -74,7 +146,6 @@ function formatTime(iso) {
 
 function TypeChip({ type }) {
   const map = {
-    group_created: { color: "primary", label: "Group created" },
     member_joined: { color: "success", label: "User joined" },
     join_request: { color: "warning", label: "Join request" },
   };
@@ -86,41 +157,30 @@ function RowActions({ n, onApprove, onReject, onMarkRead, busy }) {
   if (n.type === "join_request" && n.status === "pending") {
     return (
       <Stack direction="row" spacing={1}>
-        <Button
-          size="small"
-          variant="contained"
-          startIcon={<CheckRoundedIcon />}
-          disabled={busy}
-          onClick={() => onApprove?.(n)}
-          sx={{ textTransform: "none", borderRadius: 2 }}
-        >
-          Approve
-        </Button>
-        <Button
-          size="small"
-          color="error"
-          variant="outlined"
-          startIcon={<CloseRoundedIcon />}
-          disabled={busy}
-          onClick={() => onReject?.(n)}
-          sx={{ textTransform: "none", borderRadius: 2 }}
-        >
-          Reject
-        </Button>
+        <Button size="small" variant="contained" startIcon={<CheckRoundedIcon />} disabled={busy}
+          onClick={() => onApprove?.(n)} sx={{ textTransform: "none", borderRadius: 2 }}>Approve</Button>
+        <Button size="small" variant="outlined" startIcon={<CloseRoundedIcon />} disabled={busy}
+          onClick={() => onReject?.(n)} sx={{ textTransform: "none", borderRadius: 2 }}>Reject</Button>
       </Stack>
     );
   }
-  return (
-    <Button
-      size="small"
-      variant="text"
-      onClick={() => onMarkRead?.(n)}
-      disabled={busy || !!n.read_at}
-      sx={{ textTransform: "none", borderRadius: 2 }}
-    >
-      {n.read_at ? "Read" : "Mark read"}
-    </Button>
-  );
+  if (n._source === "notif") {
+    return (
+      <Button size="small" startIcon={<DoneAllRoundedIcon />} disabled={busy || !!n.read_at}
+        onClick={() => onMarkRead?.(n)} sx={{ textTransform: "none", borderRadius: 2 }}>
+        {n.read_at ? "Read" : "Mark read"}
+      </Button>
+    );
+  }
+  return null;
+}
+
+function profileHref(n) {
+  const uid = n?.user_id || n?.actor_id;
+  return uid ? `/community/rich-profile/${uid}` : "#";
+}
+function groupHref(n) {
+  return n?.group?.id ? `/community/groups/${n.group.id}` : "#"; // route already redirects to /admin/community/groups/:id
 }
 
 export default function AdminNotificationsPage() {
@@ -131,6 +191,8 @@ export default function AdminNotificationsPage() {
   const [count, setCount] = React.useState(0);
   const [page, setPage] = React.useState(1);
   const pageSize = 10;
+  const start = (page - 1) * pageSize;
+  const pageItems = items.slice(start, start + pageSize);
 
   const [busyId, setBusyId] = React.useState(null);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
@@ -138,47 +200,50 @@ export default function AdminNotificationsPage() {
   const fetchData = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        ENDPOINTS.list({
-          type: tab === "all" ? "" : tab,
-          unread: onlyUnread ? 1 : "",
-          page,
-          page_size: pageSize,
-        }),
-        { headers: { "Accept": "application/json", ...authHeader() } }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      // Expecting { results, count } shape; fall back if array
-      const list = Array.isArray(data) ? data : (data?.results || []);
-      setItems(list);
-      setCount(Array.isArray(data) ? list.length : (data?.count ?? list.length));
+      let out = { items: [], count: 0 };
+      if (tab === "join_request") {
+        out = await loadJoinRequests();
+        if (onlyUnread) {
+          out.items = out.items.filter((x) => x.type === "join_request" && x.status === "pending");
+          out.count = out.items.length;
+        }
+      } else if (tab === "member_joined") {
+        out = await loadMemberJoined(onlyUnread);
+      } else {
+        // ALL = pending join requests + member joined (system notifications)
+        const [reqs, joined] = await Promise.all([loadJoinRequests(), loadMemberJoined(onlyUnread)]);
+        out.items = [...reqs.items, ...joined.items].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+        out.count = out.items.length;
+        if (onlyUnread) {
+          out.items = out.items.filter((x) => (x.type === "join_request" ? x.status === "pending" : !x.read_at));
+          out.count = out.items.length;
+        }
+      }
+      setItems(out.items);
+      setCount(out.count);
     } catch (e) {
-      setToast({ open: true, type: "error", msg: `Failed to load: ${e?.message || e}` });
+      setItems([]);
+      setCount(0);
     } finally {
       setLoading(false);
     }
-  }, [tab, onlyUnread, page]);
-
-  React.useEffect(() => {
-    setPage(1); // reset page when filters change
   }, [tab, onlyUnread]);
 
-  React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  React.useEffect(() => { setPage(1); }, [tab, onlyUnread]);
+  React.useEffect(() => { fetchData(); }, [fetchData]);
 
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
 
   const markRead = async (n) => {
-    if (!n?.id || n.read_at) return;
+    if (n?._source !== "notif" || !n?.id || n.read_at) return;
     setBusyId(n.id);
     try {
-      const res = await fetch(ENDPOINTS.markRead(n.id), {
+      const res = await fetch(ENDPOINTS.notifMarkReadBulk(), {
         method: "POST",
-        headers: { ...authHeader() },
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ ids: [n.id] }),
       });
-      if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)));
     } catch (e) {
       setToast({ open: true, type: "error", msg: `Could not mark read: ${e?.message || e}` });
@@ -187,27 +252,11 @@ export default function AdminNotificationsPage() {
     }
   };
 
-  const markAllRead = async () => {
-    setBusyId("all");
-    try {
-      const res = await fetch(ENDPOINTS.markAllRead(), {
-        method: "POST",
-        headers: { ...authHeader() },
-      });
-      if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
-      setItems((prev) => prev.map((x) => ({ ...x, read_at: x.read_at || new Date().toISOString() })));
-      setToast({ open: true, type: "success", msg: "All visible notifications marked read." });
-    } catch (e) {
-      setToast({ open: true, type: "error", msg: `Failed: ${e?.message || e}` });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   const approveJoin = async (n) => {
+    if (!n?.group?.id || !n?.user_id) return;
     setBusyId(n.id);
     try {
-      const res = await fetch(ENDPOINTS.approveJoin(n), {
+      const res = await fetch(ENDPOINTS.approveJoin(n.group.id, n.user_id), {
         method: "POST",
         headers: { ...authHeader() },
       });
@@ -222,9 +271,10 @@ export default function AdminNotificationsPage() {
   };
 
   const rejectJoin = async (n) => {
+    if (!n?.group?.id || !n?.user_id) return;
     setBusyId(n.id);
     try {
-      const res = await fetch(ENDPOINTS.rejectJoin(n), {
+      const res = await fetch(ENDPOINTS.rejectJoin(n.group.id, n.user_id), {
         method: "POST",
         headers: { ...authHeader() },
       });
@@ -251,61 +301,26 @@ export default function AdminNotificationsPage() {
             <RefreshRoundedIcon />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Mark all read (current list)">
-          <span>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<DoneAllRoundedIcon />}
-              disabled={busyId === "all" || loading || items.length === 0}
-              onClick={markAllRead}
-              sx={{ textTransform: "none", borderRadius: 2 }}
-            >
-              Mark all read
-            </Button>
-          </span>
-        </Tooltip>
       </Stack>
     </Stack>
   );
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 2, maxWidth: 960 }}>
       {Header}
 
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        sx={{ mb: 1, "& .MuiTab-root": { textTransform: "none" } }}
-      >
+      <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ mb: 1 }}>
         {TABS.map((t) => (
-          <Tab
-            key={t.key}
-            value={t.key}
-            icon={t.icon}
-            iconPosition="start"
-            label={t.label}
-          />
+          <Tab key={t.key} iconPosition="start" icon={t.icon} label={t.label} value={t.key} />
         ))}
       </Tabs>
 
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={onlyUnread}
-              onChange={(e) => setOnlyUnread(e.target.checked)}
-            />
-          }
-          label="Only unread"
-        />
-        <Typography variant="body2" color="text.secondary">
-          {count} total
-        </Typography>
+        <FormControlLabel control={<Checkbox checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} />} label="Only unread" />
+        <Typography variant="body2" color="text.secondary">{count} total</Typography>
       </Stack>
 
       <Divider sx={{ mb: 2 }} />
-
       {loading && <LinearProgress sx={{ mb: 2 }} />}
 
       <Stack spacing={1.5}>
@@ -313,114 +328,74 @@ export default function AdminNotificationsPage() {
           <Card variant="outlined" sx={{ borderRadius: 3 }}>
             <CardContent>
               <Typography>No notifications found.</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Try switching tabs or turning off “Only unread”.
-              </Typography>
+              <Typography variant="body2" color="text.secondary">Try switching tabs or turning off “Only unread”.</Typography>
             </CardContent>
           </Card>
         )}
 
-        {items.map((n) => (
-          <Card
-            key={n.id}
-            variant="outlined"
-            sx={{
-              borderRadius: 3,
-              opacity: n.read_at ? 0.9 : 1,
-              borderColor: n.read_at ? "divider" : "primary.light",
-            }}
-          >
+        {pageItems.map((n) => (
+          <Card key={n.id} variant="outlined" sx={{ borderRadius: 3, opacity: n.read_at ? 0.9 : 1, borderColor: n.read_at ? "divider" : "primary.light" }}>
             <CardContent sx={{ pb: 1.5 }}>
               <Stack direction="row" spacing={2} alignItems="flex-start">
                 <Avatar
-                  src={n?.user?.avatar || ""}
-                  alt={n?.user?.name || ""}
-                  sx={{ width: 42, height: 42 }}
-                >
-                  <NotificationsRoundedIcon fontSize="small" />
-                </Avatar>
+                  component={Link}
+                  to={profileHref(n)}
+                  src={n.actor_avatar || n?.user?.avatar || ""}
+                  alt={n.actor_name || n?.user?.name || ""}
+                  sx={{ width: 44, height: 44, border: "1px solid", borderColor: "divider" }}
+                />
 
                 <Box sx={{ flex: 1 }}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                     <TypeChip type={n.type} />
-                    {!n.read_at && <Chip size="small" color="info" label="New" variant="outlined" />}
+                    <Typography variant="caption" color="text.secondary">{formatTime(n.created_at)}</Typography>
                   </Stack>
 
                   <Typography sx={{ mt: 0.5 }}>
-                    {n.type === "group_created" && (
-                      <>
-                        <b>{n?.actor_name || n?.user?.name || "Someone"}</b> created group{" "}
-                        <b>{n?.group?.name || `#${n?.group?.id}`}</b>.
-                      </>
-                    )}
                     {n.type === "member_joined" && (
                       <>
-                        <b>{n?.actor_name || n?.user?.name || "Someone"}</b> joined{" "}
-                        <b>{n?.group?.name || `#${n?.group?.id}`}</b>.
+                        <Box component={Link} to={profileHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                          <b>{n.actor_name || "Someone"}</b>
+                        </Box>{" "}joined{" "}
+                        <Box component={Link} to={groupHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                          <b>{n?.group?.name || `#${n?.group?.id}`}</b>
+                        </Box>.
                       </>
                     )}
                     {n.type === "join_request" && (
                       <>
-                        <b>{n?.actor_name || n?.user?.name || "Someone"}</b> requested to join{" "}
-                        <b>{n?.group?.name || `#${n?.group?.id}`}</b>.
-                        {" "}
-                        <Chip
-                          size="small"
-                          label={(n.status || "pending").replace("_", " ")}
-                          color={
-                            n.status === "approved"
-                              ? "success"
-                              : n.status === "rejected"
-                              ? "error"
-                              : "warning"
-                          }
-                          sx={{ ml: 1 }}
-                        />
+                        <Box component={Link} to={profileHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                          <b>{n.actor_name || "Someone"}</b>
+                        </Box>{" "}requested to join{" "}
+                        <Box component={Link} to={groupHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                          <b>{n?.group?.name || `#${n?.group?.id}`}</b>
+                        </Box>{" "}
+                        <Chip size="small" label={(n.status || "pending").replace("_", " ")} color={n.status === "approved" ? "success" : n.status === "rejected" ? "error" : "warning"} sx={{ ml: 1 }} />
                       </>
                     )}
                   </Typography>
 
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-                    {formatTime(n.created_at)}
+                    {n.type === "member_joined" && "A member just joined one of your groups."}
+                    {n.type === "join_request" && "Approve or reject the request."}
                   </Typography>
                 </Box>
               </Stack>
             </CardContent>
 
             <CardActions sx={{ px: 2, pb: 2 }}>
-              <RowActions
-                n={n}
-                busy={busyId === n.id}
-                onApprove={approveJoin}
-                onReject={rejectJoin}
-                onMarkRead={markRead}
-              />
+              <RowActions n={n} busy={busyId === n.id} onApprove={approveJoin} onReject={rejectJoin} onMarkRead={markRead} />
             </CardActions>
           </Card>
         ))}
       </Stack>
 
       <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          onChange={(_, p) => setPage(p)}
-          color="primary"
-          shape="rounded"
-        />
+        <Pagination page={page} count={totalPages} onChange={(e, v) => setPage(v)} />
       </Stack>
 
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={2800}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          variant="filled"
-          severity={toast.type === "error" ? "error" : "success"}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-        >
+      <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast((t) => ({ ...t, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+        <Alert variant="filled" severity={toast.type === "error" ? "error" : "success"} onClose={() => setToast((t) => ({ ...t, open: false }))}>
           {toast.msg}
         </Alert>
       </Snackbar>
