@@ -402,21 +402,82 @@ function PostCard({ post, avatarUrl, actorName }) {
   const shareCount = Number(post?.metrics?.shares ?? 0);
 
   const normalizeUsers = (payload) => {
-    const rows = Array.isArray(payload?.results) ? payload.results : (Array.isArray(payload) ? payload : []);
-    return rows.map((r) => {
-      const u = r.user || r.actor || r.profile || r;
-      const id =
-        u?.id ?? u?.user_id ?? r.user_id ?? r.id;
-      const name =
-        u?.name || u?.full_name || u?.username ||
-        [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
-        (id ? `User #${id}` : "User");
-      const avatar =
-        u?.user_image || u?.user_image_url ||
-        u?.avatar || u?.photo || u?.image || u?.profile?.avatar ||
-        r.user_image || r.user_image_url || r.avatar || "";
-      return { id, name, avatar };
-    }).filter(Boolean);
+    const rows = Array.isArray(payload?.results)
+      ? payload.results
+      : Array.isArray(payload)
+      ? payload
+      : [];
+
+    const makeAbsolute = (url) =>
+      !url
+        ? ""
+        : /^https?:\/\//i.test(url)
+        ? url
+        : `${(import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN)}${
+            url.startsWith("/") ? "" : "/"
+          }${url}`;
+
+    return rows
+      .map((r) => {
+        const u =
+          r.user ||
+          r.actor ||
+          r.liker ||
+          r.owner ||
+          r.profile ||
+          r;
+        const profile =
+          u.profile ||
+          u.user_profile ||
+          u.userprofile ||
+          r.profile ||
+          {};
+
+        const id =
+          u?.id ??
+          u?.user_id ??
+          r.user_id ??
+          r.id;
+
+        const first =
+          u?.first_name ??
+          u?.firstName ??
+          r.user_first_name ??
+          "";
+        const last =
+          u?.last_name ??
+          u?.lastName ??
+          r.user_last_name ??
+          "";
+
+        const name =
+          u?.name ||
+          u?.full_name ||
+          `${first} ${last}`.trim() ||
+          u?.username ||
+          (id ? `User #${id}` : "User");
+
+        const avatarRaw =
+          profile.user_image_url ||
+          profile.user_image ||
+          u?.user_image_url ||
+          u?.user_image ||
+          r.user_image_url ||
+          r.user_image ||
+          u?.avatar ||
+          u?.profile_image ||
+          u?.photo ||
+          u?.image_url ||
+          u?.avatar_url ||
+          "";
+
+        return {
+          id,
+          name,
+          avatar: makeAbsolute(avatarRaw),
+        };
+      })
+      .filter(Boolean);
   };
 
   React.useEffect(() => {
@@ -441,6 +502,18 @@ function PostCard({ post, avatarUrl, actorName }) {
     })();
     return () => { cancelled = true; };
   }, [post.id]);
+
+  const primaryLiker = likers?.[0] || null;
+  const othersCount = Math.max(0, (likeCount || 0) - 1);
+
+  const likeLabel =
+    primaryLiker && likeCount > 0
+      ? likeCount === 1
+        ? `liked by ${primaryLiker.name}`
+        : `liked by ${primaryLiker.name} and ${othersCount} ${
+            othersCount === 1 ? "other" : "others"
+          }`
+      : `${(likeCount || 0).toLocaleString()} likes`;
 
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
@@ -523,11 +596,10 @@ function PostCard({ post, avatarUrl, actorName }) {
                 ))}
               </AvatarGroup>
 
-              <Typography variant="body2">
-                {likers?.[0]?.name
-                  ? `${likers[0].name} and ${Math.max(0, (likeCount || 0) - 1).toLocaleString()} others`
-                  : `${(likeCount || 0).toLocaleString()} likes`}
+                          <Typography variant="body2">
+                {likeLabel}
               </Typography>
+
             </Stack>
 
             {/* Right: "N SHARES" (click opens share list) */}
@@ -1551,10 +1623,26 @@ function SharesDialog({ open, postId, onClose }) {
 
   function normalizeUser(u) {
     if (!u) return { id: null, name: "User", avatar: "" };
-    const id = u.id ?? u.user_id ?? u.owner_id ?? null;
 
-    const first = u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
-    const last = u.last_name ?? u.lastName ?? u.user_last_name ?? u.user__last_name ?? "";
+    const id =
+      u.id ??
+      u.user_id ??
+      u.owner_id ??
+      null;
+
+    const first =
+      u.first_name ??
+      u.firstName ??
+      u.user_first_name ??
+      u.user__first_name ??
+      "";
+
+    const last =
+      u.last_name ??
+      u.lastName ??
+      u.user_last_name ??
+      u.user__last_name ??
+      "";
 
     const name =
       u.name ||
@@ -1562,8 +1650,16 @@ function SharesDialog({ open, postId, onClose }) {
       u.username ||
       (id ? `User #${id}` : "User");
 
-    // ⬇️ Prefer user_image first, then fallbacks
+    // 👇 also look into nested profile for user_image / user_image_url
+    const profile =
+      u.profile ||
+      u.userprofile ||
+      u.user_profile ||
+      {};
+
     const avatarRaw =
+      profile.user_image_url ||
+      profile.user_image ||
       u.user_image ||
       u.user_image_url ||
       u.avatar ||
@@ -1574,25 +1670,69 @@ function SharesDialog({ open, postId, onClose }) {
       "";
 
     const avatar = toAbsolute(avatarRaw);
-    const headline = u.headline || u.job_title || u.title || u.bio || u.about || "";
+
+    const headline =
+      u.headline ||
+      u.job_title ||
+      u.title ||
+      u.bio ||
+      u.about ||
+      "";
+
     return { id, name, avatar, headline };
   }
 
-
   function normalizeShareRow(row) {
     // Prefer nested user when available
-    const nested = row?.user || row?.owner || row?.actor || row?.shared_by || null;
-    if (nested && typeof nested === "object") return normalizeUser(nested);
-    // Fallback flattened forms
+    const nested =
+      row?.user ||
+      row?.owner ||
+      row?.actor ||
+      row?.shared_by ||
+      row?.created_by ||
+      row?.sharer ||
+      row?.sharer_user ||
+      null;
+
+    if (nested && typeof nested === "object") {
+      return normalizeUser(nested);
+    }
+
+    // Look for profile attached directly on the row as well
+    const profile =
+      row?.profile ||
+      row?.user_profile ||
+      row?.actor_profile ||
+      row?.user?.profile ||
+      row?.actor?.profile ||
+      null;
+
+    // Fallback flattened forms – use actor_* fields first (shares often return these)
     const u = {
       id: row?.user_id ?? row?.owner_id ?? row?.actor_id ?? null,
       first_name: row?.user_first_name ?? row?.user__first_name,
       last_name: row?.user_last_name ?? row?.user__last_name,
       username: row?.user_username ?? row?.user__username,
-      // ⬇️ Prefer user_image first
-      avatar: row?.user_image ?? row?.user_image_url ?? row?.user_avatar ?? row?.user__avatar,
+
+      // name from actor_* if available
+      name: row?.actor_name ?? row?.user_full_name ?? row?.full_name,
+
+      // avatar from actor_avatar first, then other user_* avatar fields,
+      // then profile.user_image(_url)
+      user_image:
+        row?.actor_avatar ??
+        row?.user_image ??
+        row?.user_image_url ??
+        row?.user_avatar ??
+        row?.user__avatar ??
+        profile?.user_image_url ??
+        profile?.user_image ??
+        "",
+
       headline: row?.user_headline,
+      profile: profile || undefined,
     };
+
     return normalizeUser(u);
   }
 
@@ -1610,10 +1750,10 @@ function SharesDialog({ open, postId, onClose }) {
         const data = await r.json();
         const rows =
           Array.isArray(data?.results) ? data.results :
-            Array.isArray(data) ? data :
-              Array.isArray(data?.items) ? data.items :
-                Array.isArray(data?.shares) ? data.shares :
-                  Array.isArray(data?.data) ? data.data : [];
+          Array.isArray(data) ? data :
+          Array.isArray(data?.items) ? data.items :
+          Array.isArray(data?.shares) ? data.shares :
+          Array.isArray(data?.data) ? data.data : [];
         return rows.map(normalizeShareRow);
       } catch { }
     }
@@ -1643,7 +1783,6 @@ function SharesDialog({ open, postId, onClose }) {
     return () => { mounted = false; };
   }, [open, postId]);
 
-
   return (
     <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{`Shared by${sharers.length ? ` (${sharers.length})` : ""}`}</DialogTitle>
@@ -1657,7 +1796,9 @@ function SharesDialog({ open, postId, onClose }) {
             {sharers.map((u) => (
               <ListItem key={`${u.id || u.name}-share`} disableGutters>
                 <ListItemAvatar>
-                  <Avatar src={u.avatar}>{(u.name || "U").slice(0, 1).toUpperCase()}</Avatar>
+                  <Avatar src={u.avatar}>
+                    {(u.name || "U").slice(0, 1).toUpperCase()}
+                  </Avatar>
                 </ListItemAvatar>
                 <ListItemText
                   primary={u.name}
@@ -2027,13 +2168,60 @@ function CommentsDialog({
     } catch { return null; }
   }
 
+  // Same user normalization as LikesDialog so profile images work
   function normalizeUser(u) {
     if (!u) return { id: null, name: "User", avatar: "" };
-    const id = u.id ?? u.user_id ?? null;
-    const name = (u.name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username || "User");
-    const avatar = u.avatar || u.profile_image || "";
-    return { id, name, avatar };
+
+    const id =
+      u.id ??
+      u.user_id ??
+      u.owner_id ??
+      null;
+
+    const first =
+      u.first_name ??
+      u.firstName ??
+      u.user_first_name ??
+      u.user__first_name ??
+      "";
+
+    const last =
+      u.last_name ??
+      u.lastName ??
+      u.user_last_name ??
+      u.user__last_name ??
+      "";
+
+    const name =
+      u.name ||
+      `${first} ${last}`.trim() ||
+      u.username ||
+      (id ? `User #${id}` : "User");
+
+    // Prefer user_image / user_image_url, then fallbacks
+    const avatarRaw =
+      u.user_image ||
+      u.user_image_url ||
+      u.avatar ||
+      u.profile_image ||
+      u.photo ||
+      u.image_url ||
+      u.avatar_url ||
+      "";
+
+    const avatar = toAbsolute(avatarRaw);
+
+    const headline =
+      u.headline ||
+      u.job_title ||
+      u.title ||
+      u.bio ||
+      u.about ||
+      "";
+
+    return { id, name, avatar, headline };
   }
+
 
   // inside CommentsDialog
   function normalizeComment(c, currentUserId = meId) {
