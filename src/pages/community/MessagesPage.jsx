@@ -605,20 +605,23 @@ function NewChatDialog({ open, onClose, onOpened }) {
         setFriends(ff);
         try { setFriends(await hydrateMissingAvatars(ff, "friend")); } catch { }
 
-        let gRes = await apiFetch(ENDPOINTS.chatGroups());
-        let gJson = await gRes.json();
-        if (!Array.isArray(gJson) || gJson.length === 0) {
+        // 🔒 Only load groups where the logged-in user is a member
+        let gJson = [];
+        try {
           const jg = await apiFetch(`${API_ROOT}/groups/joined-groups/`);
-          gJson = await jg.json();
-          if (!Array.isArray(gJson)) {
-            const eg = await apiFetch(`${API_ROOT}/groups/explore-groups/`);
-            gJson = await eg.json();
+          if (jg.ok) {
+            gJson = await jg.json();
           }
+        } catch (e) {
+          console.error("joined-groups load failed", e);
         }
 
-        const rawGroups = (Array.isArray(gJson?.results) ? gJson.results : Array.isArray(gJson) ? gJson : []);
+        const rawGroups = Array.isArray(gJson?.results)
+          ? gJson.results
+          : Array.isArray(gJson)
+            ? gJson
+            : [];
 
-        // 🔒 map + mark privacy & membership
         const gg = rawGroups
           .map((g) => {
             const id = g.id;
@@ -629,38 +632,22 @@ function NewChatDialog({ open, onClose, onOpened }) {
                 "cover_image", "banner", "banner_url", "cover", "header_image", "hero_image",
               ]) || "";
 
-            const privacy = (g.privacy || g.visibility || g.privacy_level || "").toLowerCase();
-            const isPrivate =
-              g.is_private === true ||
-              privacy === "private" ||
-              privacy === "hidden";
+            // everything returned by joined-groups is a group the user has joined
+            const isMember = true;
 
-            const membershipStatus = (
-              g.membership_status ||
-              g.my_membership_status ||
-              g.current_user_membership_status ||
-              ""
-            ).toLowerCase();
-
-            const isMember =
-              g.is_member === true ||
-              g.am_member === true ||
-              (g.membership && g.membership.is_member === true) ||
-              ["member", "owner", "admin", "moderator"].includes(membershipStatus);
-
-            return { id, name, avatar, isPrivate, isMember };
+            return { id, name, avatar, isMember };
           })
-          // ✅ hide private groups where the logged-in user is not a member
-          .filter((g) => g.id && (!g.isPrivate || g.isMember));
+          // ✅ final safety: only keep groups that have a valid id
+          .filter((g) => g.id && g.isMember);
 
         setGroups(gg);
         try {
           const hydrated = await hydrateMissingAvatars(gg, "group");
-          // keep the same privacy rule after hydration too
-          setGroups(hydrated.filter((g) => !g.isPrivate || g.isMember));
+          setGroups(hydrated.filter((g) => g.id && g.isMember));
         } catch {
           // ignore failures
         }
+
 
 
         let meId = null;
@@ -958,7 +945,7 @@ export default function MessagesPage() {
           : [];
 
       if (Array.isArray(data)) {
-        // 🔒 helper: hide any GROUP conversation whose group_id is not in joinedGroupIds
+        // 🔒 helper: hide any GROUP conversation where the logged-in user is NOT a member
         const isGroupConversationNotMember = (t) => {
           const g = t.group || t.context_group || t.chat_group || null;
           const gid =
@@ -968,18 +955,21 @@ export default function MessagesPage() {
             t.context_id ??
             null;
 
-          // if no group, it’s not a group chat → don’t filter here
+          // if no group id, it's not a group chat → don't filter here
           if (!gid) return false;
 
           const joinedIds = joinedGroupIdsRef.current;
-          // if we don't yet know joined groups, don't hide anything
+
+          // if we haven't loaded joined-groups yet, don't hide anything
           if (!joinedIds) return false;
 
+          // ✅ core rule: only allow group conversations whose group_id is in joined-groups
           return !joinedIds.has(String(gid));
         };
 
         // ✅ drop any group conversations where the current user is NOT a member of that group
         const filteredData = data.filter((t) => !isGroupConversationNotMember(t));
+
 
         setThreads((prev) => {
           const byId = new Map(prev.map((p) => [String(p.id), p]));
