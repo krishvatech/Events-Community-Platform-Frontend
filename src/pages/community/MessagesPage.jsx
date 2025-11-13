@@ -615,7 +615,11 @@ function NewChatDialog({ open, onClose, onOpened }) {
             gJson = await eg.json();
           }
         }
-        const gg = (Array.isArray(gJson?.results) ? gJson.results : Array.isArray(gJson) ? gJson : [])
+
+        const rawGroups = (Array.isArray(gJson?.results) ? gJson.results : Array.isArray(gJson) ? gJson : []);
+
+        // 🔒 map + mark privacy & membership
+        const gg = rawGroups
           .map((g) => {
             const id = g.id;
             const name = g.name || g.title || "Group";
@@ -624,11 +628,40 @@ function NewChatDialog({ open, onClose, onOpened }) {
                 "logo_url", "logo", "avatar", "image",
                 "cover_image", "banner", "banner_url", "cover", "header_image", "hero_image",
               ]) || "";
-            return { id, name, avatar };
+
+            const privacy = (g.privacy || g.visibility || g.privacy_level || "").toLowerCase();
+            const isPrivate =
+              g.is_private === true ||
+              privacy === "private" ||
+              privacy === "hidden";
+
+            const membershipStatus = (
+              g.membership_status ||
+              g.my_membership_status ||
+              g.current_user_membership_status ||
+              ""
+            ).toLowerCase();
+
+            const isMember =
+              g.is_member === true ||
+              g.am_member === true ||
+              (g.membership && g.membership.is_member === true) ||
+              ["member", "owner", "admin", "moderator"].includes(membershipStatus);
+
+            return { id, name, avatar, isPrivate, isMember };
           })
-          .filter((g) => g.id);
+          // ✅ hide private groups where the logged-in user is not a member
+          .filter((g) => g.id && (!g.isPrivate || g.isMember));
+
         setGroups(gg);
-        try { setGroups(await hydrateMissingAvatars(gg, "group")); } catch { }
+        try {
+          const hydrated = await hydrateMissingAvatars(gg, "group");
+          // keep the same privacy rule after hydration too
+          setGroups(hydrated.filter((g) => !g.isPrivate || g.isMember));
+        } catch {
+          // ignore failures
+        }
+
 
         let meId = null;
         try {
@@ -858,7 +891,15 @@ export default function MessagesPage() {
 
   const [me, setMe] = React.useState(null);
   const [topMembers, setTopMembers] = React.useState([]);
-  const active = React.useMemo(() => threads.find((t) => t.id === activeId) || null, [threads, activeId]);
+
+  // 🔹 all group IDs where the CURRENT user is a member
+  const joinedGroupIdsRef = React.useRef(null);
+
+  const active = React.useMemo(
+    () => threads.find((t) => t.id === activeId) || null,
+    [threads, activeId]
+  );
+
 
   // --- READ RECEIPT: throttle controls ---
   const markCooldown = React.useRef(false);
@@ -901,23 +942,55 @@ export default function MessagesPage() {
     setTimeout(() => { markCooldown.current = false; }, 800);
   }, [markAllReadNow]);
 
-  // fetch conversations
+
   const loadConversations = React.useCallback(async () => {
     try {
       const res = await apiFetch(ENDPOINTS.conversations());
-      if (res.status === 401) { console.warn("Not authenticated for conversations"); return; }
-      const data = await res.json();
+      if (res.status === 401) {
+        console.warn("Not authenticated for conversations");
+        return;
+      }
+      const raw = await res.json();
+      const data = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.results)
+          ? raw.results
+          : [];
+
       if (Array.isArray(data)) {
+        // 🔒 helper: hide any GROUP conversation whose group_id is not in joinedGroupIds
+        const isGroupConversationNotMember = (t) => {
+          const g = t.group || t.context_group || t.chat_group || null;
+          const gid =
+            g?.id ??
+            t.group_id ??
+            t.context_group_id ??
+            t.context_id ??
+            null;
+
+          // if no group, it’s not a group chat → don’t filter here
+          if (!gid) return false;
+
+          const joinedIds = joinedGroupIdsRef.current;
+          // if we don't yet know joined groups, don't hide anything
+          if (!joinedIds) return false;
+
+          return !joinedIds.has(String(gid));
+        };
+
+        // ✅ drop any group conversations where the current user is NOT a member of that group
+        const filteredData = data.filter((t) => !isGroupConversationNotMember(t));
+
         setThreads((prev) => {
-          // 🔧 key by String(id) so "1" and 1 are the same
           const byId = new Map(prev.map((p) => [String(p.id), p]));
 
-          const normalized = data
+          const normalized = filteredData
             .map((t) => {
               const serverTs = getLastTimeISO(t);
               const prevTs = byId.get(String(t.id))?._last_ts;
               const best =
-                new Date(serverTs || 0).getTime() >= new Date(prevTs || 0).getTime()
+                new Date(serverTs || 0).getTime() >=
+                  new Date(prevTs || 0).getTime()
                   ? serverTs
                   : prevTs;
 
@@ -928,25 +1001,27 @@ export default function MessagesPage() {
             })
             .sort(
               (a, b) =>
-                new Date(b._last_ts || 0).getTime() - new Date(a._last_ts || 0).getTime()
+                new Date(b._last_ts || 0).getTime() -
+                new Date(a._last_ts || 0).getTime()
             );
 
           if (!activeId && normalized.length) setActiveId(normalized[0].id);
           return normalized;
         });
 
-        // 👉 broadcast total unread to sidebar
-        const totalUnread = data.reduce(
+        // 👉 broadcast total unread to sidebar (only for visible conversations)
+        const totalUnread = filteredData.reduce(
           (sum, t) => sum + (t?.unread_count || 0),
           0
         );
         emitUnreadMessages(totalUnread);
       }
-
     } catch (e) {
       console.error("Failed to load conversations", e);
     }
   }, [activeId]);
+
+
   // Resolve group key from many possible shapes, then navigate
   const resolveActiveGroup = React.useCallback(() => {
     const g = active?.group || active?.context_group || null;
@@ -981,6 +1056,29 @@ export default function MessagesPage() {
     if (!uid) return;
     navigate(userProfilePath(uid));
   }, [navigate]);
+
+
+  // 🔹 Load all groups where THIS user is a member
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiFetch(`${API_ROOT}/groups/joined-groups/`);
+        if (!res.ok) return;
+        const json = await res.json();
+        const arr = Array.isArray(json?.results)
+          ? json.results
+          : Array.isArray(json)
+            ? json
+            : [];
+        const ids = new Set(arr.map((g) => String(g.id)));
+        joinedGroupIdsRef.current = ids;
+        // re-apply filter on conversations once we know membership
+        loadConversations();
+      } catch (e) {
+        console.error("Failed to load joined groups", e);
+      }
+    })();
+  }, [loadConversations]);
 
   React.useEffect(() => { loadConversations(); }, [loadConversations]);
 

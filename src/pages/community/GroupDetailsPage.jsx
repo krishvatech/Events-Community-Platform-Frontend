@@ -2,14 +2,40 @@
 import * as React from "react";
 import { useParams, Link as RouterLink, useNavigate } from "react-router-dom";
 import {
-  Avatar, Box, Button, Card, CardContent, CardHeader, Chip, Divider, Grid,
-  IconButton, List, ListItem, ListItemAvatar, ListItemText, Stack, Tab, Tabs,
-  TextField, Typography, InputAdornment, Pagination, Tooltip, CircularProgress,
-  Dialog, DialogTitle, DialogContent, DialogActions
+  Avatar,
+  AvatarGroup,
+  Box,
+  Button,
+  Card,
+  CardActions,
+  CardContent,
+  CardHeader,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Grid,
+  IconButton,
+  InputAdornment,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Pagination,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Tooltip,
+  Typography,
+  CircularProgress,
 } from "@mui/material";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
+import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import SearchIcon from "@mui/icons-material/Search";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
@@ -67,129 +93,446 @@ const avatarOf = (u = {}) =>
   "";
 // -----------------------------------------------------------------------------
 // Minimal PostCard (local) so we don't touch your existing files
-// -----------------------------------------------------------------------------
+
 function PostCard({ post }) {
-  const commentInputRef = React.useRef(null);
+  const [likers, setLikers] = React.useState(
+    () => post.likers || post.metrics?.likers || []
+  );
+
+  const likesCount = post.metrics?.likes ?? post.like_count ?? 0;
+  const commentCount = post.metrics?.comments ?? post.comment_count ?? 0;
+  const shareCount = post.metrics?.shares ?? post.share_count ?? 0;
+
+  const primaryLiker = likers[0];
+  const othersCount = likesCount > 1 ? likesCount - 1 : 0;
+
+  let likeLabel = "";
+  if (likesCount === 1 && primaryLiker) {
+    likeLabel = `Liked by ${primaryLiker.name || "someone"}`;
+  } else if (likesCount > 1 && primaryLiker) {
+    likeLabel = `Liked by ${primaryLiker.name || "someone"} and ${othersCount
+      } other${othersCount > 1 ? "s" : ""}`;
+  }
+
+  // load likers list (avatars) similar to HomePage
+  React.useEffect(() => {
+    let active = true;
+
+    async function loadLikers() {
+      try {
+        const res = await fetch(
+          `${API_ROOT}/engagements/reactions/likers/?target_type=activity_feed.feeditem&target_id=${post.id}`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              ...authHeader(),
+            },
+          }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const rows = data?.results || data?.likers || data || [];
+        if (!active) return;
+
+        const mapped = rows.map((row) => {
+          const user = row.user || row;
+          return {
+            id: user.id,
+            name: nameOf(user),
+            avatar: avatarOf(user),
+          };
+        });
+
+        setLikers(mapped);
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    if (likesCount > 0 && likers.length === 0) {
+      loadLikers();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [post.id, likesCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
+    <Card
+      variant="outlined"
+      sx={{
+        mb: 2,
+        borderRadius: 2,
+        borderColor: BORDER,
+        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
+      }}
+    >
+      {/* HEADER – same style as before */}
       <CardHeader
-        avatar={<Avatar src={post.actor_avatar || ""}>{(post.actor_name || "U").slice(0, 1)}</Avatar>}
-        title={<Typography fontWeight={600}>{post.actor_name || "Member"}</Typography>}
-        subheader={timeAgo(post.created_at)}
+        avatar={
+          <Avatar
+            src={post.actor_avatar || undefined}
+            alt={post.actor_name || "User"}
+          >
+            {(post.actor_name || "?").charAt(0).toUpperCase()}
+          </Avatar>
+        }
+        title={
+          <Typography variant="subtitle2" fontWeight={600}>
+            {post.actor_name || "Member"}
+          </Typography>
+        }
+        subheader={
+          <Typography variant="caption" color="text.secondary">
+            {new Date(post.created_at).toLocaleString()}
+          </Typography>
+        }
       />
+
+      {/* MAIN CONTENT (text + link/image/poll) */}
       <CardContent sx={{ pt: 0 }}>
         {post.content && (
-          <Typography sx={{ whiteSpace: "pre-wrap" }}>{post.content}</Typography>
-        )}
-
-        {post.type === "link" && post.link && (
-          <Button
-            size="small"
-            href={post.link}
-            target="_blank"
-            rel="noreferrer"
-            sx={{ mt: 1 }}
+          <Typography
+            variant="body2"
+            sx={{ whiteSpace: "pre-wrap", mb: 1.5 }}
           >
-            {post.link}
-          </Button>
+            {post.content}
+          </Typography>
         )}
 
-        {post.type === "image" && Array.isArray(post.images) && post.images.length > 0 && (
-          <Grid container spacing={1} sx={{ mt: 1 }}>
-            {post.images.map((src, idx) => (
-              <Grid key={idx} item xs={6} sm={4} md={3}>
-                <img
-                  src={src}
-                  alt={`post-${post.id}-img-${idx}`}
-                  style={{ width: "100%", height: 160, objectFit: "cover", borderRadius: 8 }}
-                />
-              </Grid>
-            ))}
-          </Grid>
-        )}
-
-        {post.type === "poll" && Array.isArray(post.options) && post.options.length > 0 && (
-          <List dense sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-            {post.options.map((opt, idx) => (
-              <ListItem key={idx} disableGutters sx={{ px: 1 }}>
-                <ListItemAvatar>
-                  <Avatar sx={{ width: 28, height: 28 }}>{idx + 1}</Avatar>
-                </ListItemAvatar>
-                <ListItemText primary={opt} />
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </CardContent>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 1.5, pb: 1 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <Tooltip title={post.liked_by_me ? "Unlike" : "Like"}>
-            <IconButton size="small" onClick={() => window.__toggleGroupPostLike?.(post.id)}>
-              {post.liked_by_me ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
-            </IconButton>
-          </Tooltip>
-          <Typography variant="caption">{post.like_count || 0}</Typography>
-        </Box>
-        <Tooltip title="Comments">
-          <IconButton
-            size="small"
-            onClick={() => {
-              if (commentInputRef?.current) commentInputRef.current.focus();
+        {post.link && (
+          <Box
+            sx={{
+              borderRadius: 1.5,
+              border: "1px solid",
+              borderColor: BORDER,
+              p: 1.5,
+              mt: 0.5,
             }}
           >
-            <ChatBubbleOutlineRoundedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+            {post.link.title && (
+              <Typography variant="subtitle2" gutterBottom>
+                {post.link.title}
+              </Typography>
+            )}
+            {post.link.description && (
+              <Typography variant="body2" color="text.secondary">
+                {post.link.description}
+              </Typography>
+            )}
+            {post.link.url && (
+              <Typography
+                variant="caption"
+                color="primary"
+                sx={{ mt: 0.5, display: "inline-block" }}
+              >
+                {post.link.url}
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        {post.image && (
+          <Box
+            sx={{
+              borderRadius: 1.5,
+              overflow: "hidden",
+              mt: 1,
+              border: "1px solid",
+              borderColor: BORDER,
+            }}
+          >
+            <img
+              src={post.image}
+              alt=""
+              style={{ width: "100%", display: "block" }}
+            />
+          </Box>
+        )}
+
+        {post.poll && Array.isArray(post.poll.options) && (
+          <Box sx={{ mt: 1.5 }}>
+            {post.poll.options.map((opt, idx) => (
+              <Box key={idx} sx={{ mb: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  sx={{
+                    justifyContent: "space-between",
+                    textTransform: "none",
+                    borderRadius: 999,
+                  }}
+                >
+                  <span>{opt.label || opt.text || opt}</span>
+                  {typeof opt.votes === "number" && (
+                    <Typography variant="caption" color="text.secondary">
+                      {opt.votes} votes
+                    </Typography>
+                  )}
+                </Button>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </CardContent>
+
+      {/* METRICS STRIP – same style as HomePage */}
+      <Box
+        sx={{
+          px: 2,
+          pb: 1,
+          pt: 0.5,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        {/* Left: avatars + “liked by …” */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            minWidth: 0,
+          }}
+        >
+          {likesCount > 0 && (
+            <>
+              <AvatarGroup
+                max={4}
+                sx={{
+                  "& .MuiAvatar-root": {
+                    width: 24,
+                    height: 24,
+                    fontSize: 12,
+                  },
+                }}
+              >
+                {likers.slice(0, 4).map((u) => (
+                  <Avatar
+                    key={u.id || u.name}
+                    src={u.avatar || undefined}
+                    alt={u.name || "User"}
+                  >
+                    {(u.name || "U").charAt(0).toUpperCase()}
+                  </Avatar>
+                ))}
+              </AvatarGroup>
+
+              <Typography
+                variant="body2"
+                sx={{
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                  overflow: "hidden",
+                  maxWidth: { xs: 160, sm: 260 },
+                }}
+                onClick={() => window.__openLikes?.(post.id)?.()}
+              >
+                {likeLabel ||
+                  `${likesCount} like${likesCount > 1 ? "s" : ""}`}
+              </Typography>
+            </>
+          )}
+        </Box>
+
+        {/* Right: comments / shares count */}
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{ ml: "auto" }}
+          alignItems="center"
+        >
+          <Typography variant="caption" color="text.secondary">
+            {commentCount || 0} comments
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {shareCount || 0} shares
+          </Typography>
+        </Stack>
       </Box>
-      <Box sx={{ px: 1.5, pb: 1.5 }}>
-        <CommentsDialog
-          inline
-          initialCount={3}
-          postId={post.id}
-          // groupId is optional; we omit it so it gracefully falls back to /posts/:id/comments
-          inputRef={commentInputRef}
-        />
-      </Box>
+
+      {/* ACTIONS ROW – like / comment / share SAME as HomePage */}
+      <CardActions
+        sx={{
+          px: 1.5,
+          pt: 0.5,
+          pb: 1,
+          display: "flex",
+          justifyContent: "space-around",
+          borderTop: "1px solid",
+          borderColor: BORDER,
+        }}
+      >
+        {/* LIKE */}
+        <Button
+          fullWidth
+          startIcon={
+            post.liked_by_me ? (
+              <FavoriteRoundedIcon sx={{ fontSize: 18 }} />
+            ) : (
+              <FavoriteBorderRoundedIcon sx={{ fontSize: 18 }} />
+            )
+          }
+          onClick={() => window.__toggleGroupPostLike?.(post.id)}
+          sx={{
+            textTransform: "uppercase",
+            fontSize: 11,
+            fontWeight: 600,
+            color: post.liked_by_me ? "error.main" : "text.secondary",
+            "& .MuiButton-startIcon": { mr: 0.5 },
+          }}
+        >
+          Like
+        </Button>
+
+        {/* COMMENT – uses group comments dialog */}
+        <Button
+          fullWidth
+          startIcon={<ChatBubbleOutlineRoundedIcon sx={{ fontSize: 18 }} />}
+          onClick={() => window.__openGroupComments?.(post.id)}
+          sx={{
+            textTransform: "uppercase",
+            fontSize: 11,
+            fontWeight: 600,
+            color: "text.secondary",
+            "& .MuiButton-startIcon": { mr: 0.5 },
+          }}
+        >
+          Comment
+        </Button>
+
+        {/* SHARE – uses same global share popup as HomePage (if defined) */}
+        <Button
+          fullWidth
+          startIcon={<IosShareRoundedIcon sx={{ fontSize: 18 }} />}
+          onClick={() => window.__openShares?.(post.id)?.()}
+          sx={{
+            textTransform: "uppercase",
+            fontSize: 11,
+            fontWeight: 600,
+            color: "text.secondary",
+            "& .MuiButton-startIcon": { mr: 0.5 },
+          }}
+        >
+          Share
+        </Button>
+      </CardActions>
     </Card>
   );
 }
 
-// Shape feed rows into UI posts (works with a few backend styles)
+
 function shapePost(row) {
   const m = row?.metadata || {};
   const actor =
-    row.actor || row.user || row.author || row.created_by || row.owner || {};
-  const type = (row?.type || m.type || "text").toLowerCase();
+    m.actor ||
+    row.actor ||
+    row.user ||
+    row.owner ||
+    row.created_by;
+
+  const type = m.post_type || row.post_type || row.type || "text";
+
+  const likeCount =
+    Number(
+      row.like_count ??
+      row.likes_count ??
+      row.likes ??
+      m.like_count ??
+      m.likes ??
+      0
+    ) || 0;
+
+  const commentCount =
+    Number(
+      row.comment_count ??
+      row.comments_count ??
+      row.comments ??
+      m.comment_count ??
+      m.comments ??
+      0
+    ) || 0;
+
+  const shareCount =
+    Number(
+      row.share_count ??
+      row.shares_count ??
+      row.shares ??
+      m.share_count ??
+      m.shares ??
+      0
+    ) || 0;
+
   const base = {
     id: row.id,
     created_at: row.created_at || row.created || row.timestamp || Date.now(),
     type,
     actor_name: nameOf(actor),
     actor_avatar: avatarOf(actor),
-    liked_by_me: !!(row.liked_by_me ?? row.liked ?? row.is_liked ?? row.me_liked),
-    like_count: Number(row.like_count ?? row.likes_count ?? row.likes ?? 0) || 0,
+    liked_by_me: !!(
+      row.liked_by_me ??
+      row.liked ??
+      row.is_liked ??
+      row.me_liked ??
+      m.liked_by_me
+    ),
+    like_count: likeCount,
+    comment_count: commentCount,
+    share_count: shareCount,
+    metrics: {
+      likes: likeCount,
+      comments: commentCount,
+      shares: shareCount,
+    },
+    // used for avatar strip “liked by X and 2 others”
+    likers: m.likers || row.likers || row.recent_likers || [],
   };
-  // common text post fields from DRF-style payloads
+
   const text =
-    row.content || row.text || row.body || row.message || m.text || "";
+    row.text ||
+    m.text ||
+    row.content ||
+    row.body ||
+    row.description ||
+    row.message ||
+    "";
+
   if (type === "link") {
     return {
       ...base,
-      content: row.description || m.description || text,
-      link: row.url || m.url || row.link || "",
+      content: text,
+      link: {
+        url: m.url || row.url,
+        title: m.link_title || row.link_title,
+        description: m.link_description || row.link_description,
+      },
     };
   }
+
   if (type === "image") {
     return {
       ...base,
-      content: row.caption || m.caption || text,
-      images: row.images || (m.image_url ? [m.image_url] : []),
+      content: text,
+      image: m.image || row.image || row.image_url,
     };
   }
+
   if (type === "poll") {
-    const opts = row.options || m.options;
-    return { ...base, content: row.question || m.question || text, options: Array.isArray(opts) ? opts : [] };
+    return {
+      ...base,
+      content: text,
+      poll: {
+        options: m.options || row.options || [],
+      },
+    };
   }
+
+  // default text post
   return { ...base, content: text };
 }
 
@@ -914,7 +1257,7 @@ function CommentsDialog({
 export default function GroupDetailsPage() {
   const navigate = useNavigate();
   const { groupId } = useParams();
-  const [tab, setTab] = React.useState(3); // Default to Overview tab
+  const [tab, setTab] = React.useState(2); // Default to Overview tab (after removing Chat)
   const [group, setGroup] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [me, setMe] = React.useState(null);
@@ -1037,28 +1380,47 @@ export default function GroupDetailsPage() {
                 direction={{ xs: "column", sm: "row" }}
                 spacing={2.5}
                 alignItems={{ xs: "flex-start", sm: "center" }}
+                justifyContent="space-between"
               >
-                <Avatar
-                  src={group?.avatar || ""}
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    bgcolor: "#e0f2fe",
-                    color: "#0284c7",
-                    fontSize: "2rem",
-                    fontWeight: 600
-                  }}
+                <Stack
+                  direction="row"
+                  spacing={2.5}
+                  alignItems="center"
+                  sx={{ flex: 1 }}
                 >
-                  {(group?.name || "G").slice(0, 1)}
-                </Avatar>
-                <Box flex={1}>
-                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
-                    {loading ? "Loading…" : (group?.name || "Group")}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {loading ? "" : `${group?.member_count ?? 0} members`}
-                  </Typography>
-                </Box>
+                  <Avatar
+                    src={group?.avatar || ""}
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      bgcolor: "#e0f2fe",
+                      color: "#0284c7",
+                      fontSize: "2rem",
+                      fontWeight: 600
+                    }}
+                  >
+                    {(group?.name || "G").slice(0, 1)}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      {loading ? "Loading…" : (group?.name || "Group")}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {loading ? "" : `${group?.member_count ?? 0} members`}
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Button
+                  variant="contained"
+                  startIcon={<ChatBubbleOutlineRoundedIcon />}
+                  onClick={() =>
+                    navigate(`/community?view=messages&groupId=${groupId}`)
+                  }
+                  sx={{ mt: { xs: 1, sm: 0 } }}
+                >
+                  Message
+                </Button>
               </Stack>
             </CardContent>
           </Card>
@@ -1082,11 +1444,6 @@ export default function GroupDetailsPage() {
                 }}
               >
                 <Tab
-                  icon={<ChatBubbleOutlineRoundedIcon />}
-                  iconPosition="start"
-                  label="CHAT"
-                />
-                <Tab
                   icon={<ArticleOutlinedIcon />}
                   iconPosition="start"
                   label="POSTS"
@@ -1105,10 +1462,9 @@ export default function GroupDetailsPage() {
             </Box>
 
             <CardContent sx={{ p: 3 }}>
-              {tab === 0 && <ChatTab groupId={groupId} />}
-              {tab === 1 && <PostsTab groupId={groupId} />}
-              {tab === 2 && <MembersTab groupId={groupId} />}
-              {tab === 3 && <OverviewTab group={group} />}
+              {tab === 0 && <PostsTab groupId={groupId} />}
+              {tab === 1 && <MembersTab groupId={groupId} />}
+              {tab === 2 && <OverviewTab group={group} />}
             </CardContent>
           </Card>
         </CommunityRightRailLayout>
