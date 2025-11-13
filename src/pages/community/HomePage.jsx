@@ -144,6 +144,7 @@ async function fetchProfileCore() {
   const data = await r.json();
   const prof = data.profile || {};
   return {
+    id: data.id ?? null,
     first_name: data.first_name || "",
     last_name: data.last_name || "",
     email: data.email || "",
@@ -157,6 +158,7 @@ async function fetchProfileCore() {
     education: [],
   };
 }
+
 
 
 async function fetchProfileExtras() {
@@ -216,6 +218,7 @@ function parseSkills(value) {
 }
 
 const EMPTY_PROFILE = {
+  id: null,
   first_name: "",
   last_name: "",
   email: "",
@@ -228,6 +231,7 @@ const EMPTY_PROFILE = {
   experience: [],
   education: [],
 };
+
 
 // -----------------------------------------------------------------------------
 // Post composer
@@ -405,16 +409,15 @@ function PostCard({ post, avatarUrl, actorName }) {
     const rows = Array.isArray(payload?.results)
       ? payload.results
       : Array.isArray(payload)
-      ? payload
-      : [];
+        ? payload
+        : [];
 
     const makeAbsolute = (url) =>
       !url
         ? ""
         : /^https?:\/\//i.test(url)
-        ? url
-        : `${(import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN)}${
-            url.startsWith("/") ? "" : "/"
+          ? url
+          : `${(import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN)}${url.startsWith("/") ? "" : "/"
           }${url}`;
 
     return rows
@@ -510,9 +513,8 @@ function PostCard({ post, avatarUrl, actorName }) {
     primaryLiker && likeCount > 0
       ? likeCount === 1
         ? `liked by ${primaryLiker.name}`
-        : `liked by ${primaryLiker.name} and ${othersCount} ${
-            othersCount === 1 ? "other" : "others"
-          }`
+        : `liked by ${primaryLiker.name} and ${othersCount} ${othersCount === 1 ? "other" : "others"
+        }`
       : `${(likeCount || 0).toLocaleString()} likes`;
 
   return (
@@ -596,7 +598,7 @@ function PostCard({ post, avatarUrl, actorName }) {
                 ))}
               </AvatarGroup>
 
-                          <Typography variant="body2">
+              <Typography variant="body2">
                 {likeLabel}
               </Typography>
 
@@ -618,10 +620,49 @@ function PostCard({ post, avatarUrl, actorName }) {
           <Button
             size="small"
             startIcon={post?.liked_by_me ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
-            onClick={(e) => { e.stopPropagation(); window.__toggleLike?.(post.id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+
+              const wasLiked = !!post?.liked_by_me;
+              const me = (typeof window !== "undefined" && window.__me) || null;
+
+              if (me) {
+                setLikers((prev) => {
+                  const exists = prev.some(
+                    (u) =>
+                      (me.id && u.id && u.id === me.id) ||
+                      (!me.id && u.name === me.name)
+                  );
+
+                  // If we are liking now (was not liked before)
+                  if (!wasLiked) {
+                    if (exists) return prev;
+                    const selfUser = {
+                      id: me.id || null,
+                      name: me.name || "You",
+                      avatar: me.avatar || "",
+                    };
+                    return [selfUser, ...prev];
+                  }
+
+                  // If we are unliking now – remove myself from the strip
+                  return prev.filter(
+                    (u) =>
+                      !(
+                        (me.id && u.id && u.id === me.id) ||
+                        (!me.id && u.name === me.name)
+                      )
+                  );
+                });
+              }
+
+              // Still call the global toggle to update metrics + backend
+              window.__toggleLike?.(post.id);
+            }}
           >
             LIKE
           </Button>
+
 
           {/* Comment — opens the comments popup (same as Admin) */}
           <Button
@@ -1150,15 +1191,29 @@ export default function HomePage() {
     try {
       const core = await fetchProfileCore();
       const extra = await fetchProfileExtras();
-      setProfile({
+      const merged = {
         ...core,
         experience: extra.experiences,
         education: extra.educations,
-      });
+      };
+
+      setProfile(merged);
+
+      // Expose current user globally so PostCard can update likers instantly
+      try {
+        window.__me = {
+          id: merged.id || null,
+          name: `${merged.first_name || ""} ${merged.last_name || ""}`.trim() || "You",
+          avatar: merged.avatar || "",
+        };
+      } catch {
+        // ignore if window not available
+      }
     } catch (e) {
       console.error("Failed to load profile:", e);
     }
   }, []);
+
 
   const fetchMyFriends = React.useCallback(async () => {
     const candidates = [
@@ -1750,10 +1805,10 @@ function SharesDialog({ open, postId, onClose }) {
         const data = await r.json();
         const rows =
           Array.isArray(data?.results) ? data.results :
-          Array.isArray(data) ? data :
-          Array.isArray(data?.items) ? data.items :
-          Array.isArray(data?.shares) ? data.shares :
-          Array.isArray(data?.data) ? data.data : [];
+            Array.isArray(data) ? data :
+              Array.isArray(data?.items) ? data.items :
+                Array.isArray(data?.shares) ? data.shares :
+                  Array.isArray(data?.data) ? data.data : [];
         return rows.map(normalizeShareRow);
       } catch { }
     }
