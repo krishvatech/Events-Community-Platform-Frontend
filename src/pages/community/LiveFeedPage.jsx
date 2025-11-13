@@ -2,7 +2,7 @@
 import * as React from "react";
 import {
   Avatar, AvatarGroup, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
- Paper, Stack, TextField, Typography, InputAdornment
+  Paper, Stack, TextField, Typography, InputAdornment
 } from "@mui/material";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -508,6 +508,16 @@ function mapFeedItem(item) {
   const displayName =
     item.actor_name || item.actor_username || `User #${item.actor_id}`;
 
+  // NEW: capture author / actor id so we can use it for mutual-share logic
+  const authorId =
+    item.actor_id ??
+    (typeof item.actor === "object" ? item.actor?.id : null) ??
+    m.author_id ??
+    (typeof m.author === "object" ? m.author?.id : null) ??
+    item.user_id ??
+    m.user_id ??
+    null;
+
   const community_id =
     item?.community_id ??
     m?.community_id ??
@@ -519,7 +529,9 @@ function mapFeedItem(item) {
   const base = {
     id: item.id,
     created_at: item.created_at,
+    author_id: authorId, // NEW
     author: {
+      id: authorId,      // NEW
       name: displayName,
       avatar: toMediaUrl(item.actor_avatar || m.author_avatar || ""),
     },
@@ -1315,7 +1327,7 @@ function CommentsDialog({
 }
 
 
-function ShareDialog({ open, onClose, postId, onShared, target }) {
+function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupId }) {
   const [loading, setLoading] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [friends, setFriends] = React.useState([]);
@@ -1338,10 +1350,84 @@ function ShareDialog({ open, onClose, postId, onShared, target }) {
     }).filter(x => x.id);
   }
 
-  // Try common endpoints until one works
   const fetchFriends = React.useCallback(async () => {
     if (!open) return;
     setLoading(true);
+
+    // figure out who is logged in (for excluding self from group members)
+    let meId = null;
+    try {
+      const meJson = await getMeCached();
+      meId = meJson?.id || meJson?.user?.id || null;
+    } catch (e) {
+      meId = null;
+    }
+
+    // 0) GROUP POST: prefer group members → share only to group members (B, C, …)
+    if (groupId) {
+      const groupCandidatePaths = [
+        `groups/${groupId}/members/`,
+        `groups/${groupId}/memberships/`,
+        `group-memberships/?group=${groupId}`,
+        `group-members/?group=${groupId}`,
+      ];
+      for (const path of groupCandidatePaths) {
+        try {
+          const r = await fetch(toApiUrl(path), {
+            headers: { Accept: "application/json", ...authHeaders() },
+          });
+          if (!r.ok) continue;
+
+          const j = await r.json();
+          const arr =
+            Array.isArray(j?.results) ? j.results :
+              Array.isArray(j) ? j :
+                j?.members || j?.data || [];
+
+          let norm = normalizeFriends(arr);
+          // ❌ don’t show current user in the list (A shouldn’t see themself)
+          if (meId) {
+            norm = norm.filter((u) => u.id !== meId);
+          }
+
+          setFriends(norm);
+          setLoading(false);
+          return; // ✅ group post handled, no need to fall back
+        } catch (e) {
+          // try next candidate path
+        }
+      }
+      // if all group endpoints fail, fall through to the normal friend logic below
+    }
+
+    // 1) Normal / admin post: mutual friends with the post author
+    if (authorId) {
+      try {
+        const r = await fetch(
+          toApiUrl(`friends/mutual/?user_id=${authorId}`),
+          { headers: { Accept: "application/json", ...authHeaders() } }
+        );
+        if (r.ok) {
+          const j = await r.json();
+          const arr = Array.isArray(j?.results)
+            ? j.results
+            : (Array.isArray(j) ? j : j?.data || []);
+          const norm = normalizeFriends(arr);
+
+          // ✅ If we found ANY mutuals → use them (friend posts)
+          if (norm.length > 0) {
+            setFriends(norm);
+            setLoading(false);
+            return;
+          }
+          // ⚠️ If 0 mutuals (typical for admin posts) → fall through to full friends list
+        }
+      } catch (e) {
+        // ignore and fall back to normal friends list below
+      }
+    }
+
+    // 2) Fallback: all accepted friends (e.g. admin posts with 0 mutuals → share to your friends)
     const candidates = [
       "friends?status=accepted",
       "friends/accepted",
@@ -1359,11 +1445,16 @@ function ShareDialog({ open, onClose, postId, onShared, target }) {
         setFriends(norm);
         setLoading(false);
         return;
-      } catch { /* try next */ }
+      } catch {
+        /* try next */
+      }
     }
+
     setFriends([]);
     setLoading(false);
-  }, [open]);
+  }, [open, authorId, groupId]);
+
+
 
   React.useEffect(() => { fetchFriends(); }, [fetchFriends]);
 
@@ -1497,36 +1588,36 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   }
   React.useEffect(() => { setLocal(post); refreshCounts(); }, [post]);
   React.useEffect(() => {
-  const target = engageTargetOf(post);
-  let cancelled = false;
-  (async () => {
-    try {
-      const urls = [
-        toApiUrl(`engagements/reactions/?reaction=like&target_id=${target.id}${target.type ? `&target_type=${encodeURIComponent(target.type)}` : ""}&page_size=5`),
-        toApiUrl(`engagements/reactions/who-liked/?${target.type ? `target_type=${encodeURIComponent(target.type)}&` : ""}target_id=${target.id}&page_size=5`),
-      ];
-      for (const url of urls) {
-        const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
-        if (!r.ok) continue;
-        const j = await r.json();
-        const rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
-        const norm = rows.map((row) => {
-          const u = row.user || row.actor || row.profile || row;
-          const name =
-            u?.name || u?.full_name ||
-            (u?.first_name || u?.last_name ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : u?.username) ||
-            "User";
-          const avatar = toMediaUrl(u?.avatar || u?.user_image || u?.photo || u?.image || "");
-          const id = u?.id || row.user_id || row.id;
-          return { id, name, avatar };
-        }).filter(Boolean);
-        if (!cancelled) setLikers(norm);
-        if (norm.length) break;
-      }
-    } catch { if (!cancelled) setLikers([]); }
-  })();
-  return () => { cancelled = true; };
-}, [post.id]);
+    const target = engageTargetOf(post);
+    let cancelled = false;
+    (async () => {
+      try {
+        const urls = [
+          toApiUrl(`engagements/reactions/?reaction=like&target_id=${target.id}${target.type ? `&target_type=${encodeURIComponent(target.type)}` : ""}&page_size=5`),
+          toApiUrl(`engagements/reactions/who-liked/?${target.type ? `target_type=${encodeURIComponent(target.type)}&` : ""}target_id=${target.id}&page_size=5`),
+        ];
+        for (const url of urls) {
+          const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+          if (!r.ok) continue;
+          const j = await r.json();
+          const rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+          const norm = rows.map((row) => {
+            const u = row.user || row.actor || row.profile || row;
+            const name =
+              u?.name || u?.full_name ||
+              (u?.first_name || u?.last_name ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : u?.username) ||
+              "User";
+            const avatar = toMediaUrl(u?.avatar || u?.user_image || u?.photo || u?.image || "");
+            const id = u?.id || row.user_id || row.id;
+            return { id, name, avatar };
+          }).filter(Boolean);
+          if (!cancelled) setLikers(norm);
+          if (norm.length) break;
+        }
+      } catch { if (!cancelled) setLikers([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [post.id]);
 
   async function toggleLike() {
     try {
@@ -1641,84 +1732,86 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
       </Box>
 
       {/* Actions */}
-{/* Meta strip: likers avatars + sentence | shares on right */}
-<Box sx={{ px: 0.5, pt: 0.5 }}>
-  <Stack direction="row" alignItems="center" justifyContent="space-between">
-    <Stack direction="row" spacing={1} alignItems="center">
-      <AvatarGroup max={3} sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}>
-        {(likers || []).slice(0, 3).map((u) => (
-          <Avatar key={u.id || u.name} src={u.avatar}>
-            {(u.name || "U").slice(0, 1)}
-          </Avatar>
-        ))}
-      </AvatarGroup>
-      <Typography variant="body2">
-        {likers?.[0]?.name
-          ? `${likers[0].name} and ${Math.max(0, (local.metrics?.likes || 0) - 1).toLocaleString()} others`
-          : `${(local.metrics?.likes || 0).toLocaleString()} likes`}
-      </Typography>
-    </Stack>
+      {/* Meta strip: likers avatars + sentence | shares on right */}
+      <Box sx={{ px: 0.5, pt: 0.5 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" spacing={1} alignItems="center">
+            <AvatarGroup max={3} sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}>
+              {(likers || []).slice(0, 3).map((u) => (
+                <Avatar key={u.id || u.name} src={u.avatar}>
+                  {(u.name || "U").slice(0, 1)}
+                </Avatar>
+              ))}
+            </AvatarGroup>
+            <Typography variant="body2">
+              {likers?.[0]?.name
+                ? `${likers[0].name} and ${Math.max(0, (local.metrics?.likes || 0) - 1).toLocaleString()} others`
+                : `${(local.metrics?.likes || 0).toLocaleString()} likes`}
+            </Typography>
+          </Stack>
 
-    <Button size="small" onClick={() => setShareOpen(true)}>
-      {(local.metrics?.shares || 0).toLocaleString()} SHARES
-    </Button>
-  </Stack>
-</Box>
+          <Button size="small" onClick={() => setShareOpen(true)}>
+            {(local.metrics?.shares || 0).toLocaleString()} SHARES
+          </Button>
+        </Stack>
+      </Box>
 
-<Divider sx={{ my: 1 }} />
+      <Divider sx={{ my: 1 }} />
 
-    {/* Action row: Like / Comment / Share */}
-    <Stack direction="row" justifyContent="space-around" alignItems="center" sx={{ px: 0.5, pb: 0.5 }}>
-      <Button
-        size="small"
-        startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderIcon />}
-        onClick={toggleLike}
-      >
-        LIKE
-      </Button>
+      {/* Action row: Like / Comment / Share */}
+      <Stack direction="row" justifyContent="space-around" alignItems="center" sx={{ px: 0.5, pb: 0.5 }}>
+        <Button
+          size="small"
+          startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderIcon />}
+          onClick={toggleLike}
+        >
+          LIKE
+        </Button>
 
-     <Button
-  size="small"
-  startIcon={<ChatBubbleOutlineIcon />}
-  onClick={() => {
-    setCommentsOpen((v) => {
-      const next = !v;
-      if (!v) setTimeout(() => commentInputRef.current?.focus?.(), 0); // focus when opening
-      return next;
-    });
-  }}
->
-  COMMENT
-</Button>
+        <Button
+          size="small"
+          startIcon={<ChatBubbleOutlineIcon />}
+          onClick={() => {
+            setCommentsOpen((v) => {
+              const next = !v;
+              if (!v) setTimeout(() => commentInputRef.current?.focus?.(), 0); // focus when opening
+              return next;
+            });
+          }}
+        >
+          COMMENT
+        </Button>
 
 
-      <Button
-        size="small"
-        startIcon={<IosShareIcon />}
-        onClick={() => setShareOpen(true)}
-      >
-        SHARE
-      </Button>
-    </Stack>
+        <Button
+          size="small"
+          startIcon={<IosShareIcon />}
+          onClick={() => setShareOpen(true)}
+        >
+          SHARE
+        </Button>
+      </Stack>
 
 
       {/* Inline comments, always visible like LinkedIn/Instagram */}
-   {commentsOpen && (
-  <CommentsDialog
-    inline
-    initialCount={3}
-    postId={post.id}
-    target={engageTargetOf(post)}
-    onBumpCount={bumpCommentCount}
-    inputRef={commentInputRef}
-  />
-)}
+      {commentsOpen && (
+        <CommentsDialog
+          inline
+          initialCount={3}
+          postId={post.id}
+          target={engageTargetOf(post)}
+          onBumpCount={bumpCommentCount}
+          inputRef={commentInputRef}
+        />
+      )}
 
       <ShareDialog
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         postId={post.id}
         target={engageTargetOf(post)}
+        authorId={post.author_id || post.author?.id}  // existing
+        groupId={post.group_id || null}               // 👈 NEW: pass group id
         onShared={bumpShareCount}
       />
     </Paper>
@@ -1768,7 +1861,8 @@ export default function LiveFeedPage({
   const [hasMore, setHasMore] = React.useState(true);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
-
+  const [focusPostId, setFocusPostId] = React.useState(null);
+  const focusHandledRef = React.useRef(false);
   // Composer (kept off per your UI; uncomment if needed)
   const MAX_LEN = 280;
   const [composeText, setComposeText] = React.useState("");
@@ -1891,6 +1985,33 @@ export default function LiveFeedPage({
     return () => ws.close();
   }, [websocketUrl, scope]);
 
+  // Check if we should focus a specific post (shared from messages)
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      let pid = params.get("post");
+
+      if (pid) {
+        const num = parseInt(pid, 10);
+        if (!Number.isNaN(num)) pid = num;
+      } else {
+        const stored = window.localStorage ? window.localStorage.getItem("ecp_livefeed_focus_post") : null;
+        if (stored) {
+          const num = parseInt(stored, 10);
+          pid = Number.isNaN(num) ? stored : num;
+        }
+      }
+
+      if (pid) {
+        setFocusPostId(pid);
+        try {
+          window.localStorage && window.localStorage.removeItem("ecp_livefeed_focus_post");
+        } catch (_) { }
+      }
+    } catch (_) { }
+  }, []);
+
+
   async function voteOnPoll(post, optionId, meta) {
     // Resolve optionId if missing (by label/index from the UI)
     if (!optionId) {
@@ -1985,6 +2106,21 @@ export default function LiveFeedPage({
     return () => { stop = true; clearInterval(t); };
   }, [displayPosts]);
 
+  // When navigated here from a shared message, scroll to the focused post once
+  React.useEffect(() => {
+    if (!focusPostId || focusHandledRef.current) return;
+    const el = document.querySelector(`[data-post-id="${focusPostId}"]`);
+    if (!el) return;
+
+    focusHandledRef.current = true;
+    try {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (e) {
+      el.scrollIntoView();
+    }
+  }, [focusPostId, displayPosts]);
+
+
 
   return (
     <Grid container spacing={2}>
@@ -2028,12 +2164,22 @@ export default function LiveFeedPage({
           ) : (
             displayPosts.map((p, idx) => (
               <React.Fragment key={p.id}>
-                <PostCard
-                  post={p}
-                  onReact={onReact}
-                  onOpenEvent={onOpenEvent}
-                  onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
-                />
+                <Box
+                  data-post-id={p.id}
+                  sx={{
+                    scrollMarginTop: 96,
+                    ...(focusPostId === p.id
+                      ? { outline: `2px solid ${BORDER}`, borderRadius: 3 }
+                      : null),
+                  }}
+                >
+                  <PostCard
+                    post={p}
+                    onReact={onReact}
+                    onOpenEvent={onOpenEvent}
+                    onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
+                  />
+                </Box>
                 {((idx + 1) % 4 === 0) && (
                   <SuggestedConnections list={suggested} />
                 )}

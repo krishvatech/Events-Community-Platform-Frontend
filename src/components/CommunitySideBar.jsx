@@ -2,7 +2,7 @@
 import * as React from "react";
 import {
   Paper, Typography, List, ListItem, ListItemText,
-  Stack, Divider, Chip, Button,Badge
+  Stack, Divider, Chip, Button, Badge
 } from "@mui/material";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 
@@ -46,44 +46,103 @@ async function getUnreadCount() {
   }
 }
 
+async function getMessagesUnreadCount() {
+  try {
+    const r = await fetch(`${API_BASE}/messaging/conversations/`, {
+      headers: { ...tokenHeader(), Accept: "application/json" },
+      credentials: "include",
+    });
+    if (!r.ok) return 0;
+
+    const j = await r.json().catch(() => ({}));
+    // conversations list – sum unread_count
+    const arr = Array.isArray(j) ? j : j?.results || [];
+    return arr.reduce((sum, t) => sum + (t?.unread_count || 0), 0);
+  } catch {
+    return 0;
+  }
+}
+
+
 // Same API as your in-file LeftNav:
 // props: { view, onChangeView, topics? }
-export default function CommunitySideBar({ view, onChangeView = () => {}, topics }) {
+export default function CommunitySideBar({ view, onChangeView = () => { }, topics }) {
   // unread notifications badge (seed from localStorage, live-update via custom event)
   const [notifCount, setNotifCount] = React.useState(
-  Number(localStorage.getItem("unread_notifications") || 0)
-);
+    Number(localStorage.getItem("unread_notifications") || 0)
+  );
 
-React.useEffect(() => {
-  let off = false;
+  const [messageCount, setMessageCount] = React.useState(
+    Number(localStorage.getItem("unread_messages") || 0)
+  );
 
-  const sync = async () => {
-    const cnt = await getUnreadCount();
-    if (!off) {
-      setNotifCount(cnt);
-      localStorage.setItem("unread_notifications", String(cnt));
-    }
-  };
+  React.useEffect(() => {
+    let off = false;
 
-  // initial fetch
-  sync();
+    const sync = async () => {
+      const cnt = await getMessagesUnreadCount();
+      if (!off) {
+        setMessageCount(cnt);
+        try {
+          localStorage.setItem("unread_messages", String(cnt));
+        } catch { }
+      }
+    };
 
-  // listen for broadcasts from NotificationsPage (still supported)
-  const onUnread = (e) => setNotifCount(Math.max(0, e?.detail?.count ?? 0));
-  window.addEventListener("notify:unread", onUnread);
+    // initial fetch
+    sync();
 
-  // light polling + refresh when window regains focus
-  const id = setInterval(sync, 30000); // 30s
-  const onFocus = () => sync();
-  window.addEventListener("focus", onFocus);
+    // listen for broadcasts from MessagesPage
+    const onUnread = (e) => {
+      const c = Math.max(0, e?.detail?.count ?? 0);
+      setMessageCount(c);
+      try {
+        localStorage.setItem("unread_messages", String(c));
+      } catch { }
+    };
+    window.addEventListener("messages:unread", onUnread);
 
-  return () => {
-    off = true;
-    clearInterval(id);
-    window.removeEventListener("notify:unread", onUnread);
-    window.removeEventListener("focus", onFocus);
-  };
-}, []);
+    // light polling
+    const id = setInterval(sync, 30000); // 30s
+
+    return () => {
+      off = true;
+      clearInterval(id);
+      window.removeEventListener("messages:unread", onUnread);
+    };
+  }, []);
+
+
+  React.useEffect(() => {
+    let off = false;
+
+    const sync = async () => {
+      const cnt = await getUnreadCount();
+      if (!off) {
+        setNotifCount(cnt);
+        localStorage.setItem("unread_notifications", String(cnt));
+      }
+    };
+
+    // initial fetch
+    sync();
+
+    // listen for broadcasts from NotificationsPage (still supported)
+    const onUnread = (e) => setNotifCount(Math.max(0, e?.detail?.count ?? 0));
+    window.addEventListener("notify:unread", onUnread);
+
+    // light polling + refresh when window regains focus
+    const id = setInterval(sync, 30000); // 30s
+    const onFocus = () => sync();
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      off = true;
+      clearInterval(id);
+      window.removeEventListener("notify:unread", onUnread);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
   const TOPICS = topics && topics.length
     ? topics
     : ["Eco-Friendly tips", "Sustainable Living", "Climate Action & Advocacy", "Recycling & Upcycling"];
@@ -134,12 +193,14 @@ React.useEffect(() => {
               <Badge color="primary" badgeContent={notifCount || 0} invisible={!notifCount}>
                 <NotificationsRoundedIcon sx={{ color: "#f59e0b" }} fontSize="small" />
               </Badge>
+            ) : it.key === "messages" ? (
+              <Badge color="primary" badgeContent={messageCount || 0} invisible={!messageCount}>
+                <span style={{ fontSize: 16 }}>{it.icon}</span>
+              </Badge>
             ) : (
-              <span style={{ width: 18, display: "inline-block", textAlign: "center" }}>
-                {it.icon}
-              </span>
+              <span style={{ fontSize: 16 }}>{it.icon}</span>
             );
-            const emitKey = it.key;
+          const emitKey = it.key;
           return (
             <ListItem
               key={it.key}

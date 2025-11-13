@@ -77,6 +77,90 @@ const bubbleSx = (mine) => (theme) => ({
   },
 });
 
+function SharePreview({ attachment, mine }) {
+  if (!attachment) return null;
+
+  // Try to extract the FeedItem / post id from different possible shapes
+  const getSharedFeedItemId = (a) => {
+    if (!a) return null;
+    if (a.feed_item_id) return a.feed_item_id;
+    if (a.feed_item) return a.feed_item;
+    if (a.target_object_id) return a.target_object_id;
+    if (a.object_id) return a.object_id;
+    if (a.target && (a.target.object_id || a.target.id)) {
+      return a.target.object_id || a.target.id;
+    }
+    if (a.meta && (a.meta.feed_item_id || a.meta.object_id)) {
+      return a.meta.feed_item_id || a.meta.object_id;
+    }
+    return null;
+  };
+
+  const feedItemId = getSharedFeedItemId(attachment);
+
+  const handleClick = () => {
+    // Your live feed URL
+    const basePath = "/community?view=live";
+
+    if (!feedItemId) {
+      // no specific post id → just open live feed
+      window.location.href = basePath;
+      return;
+    }
+
+    // store target post id so LiveFeedPage can focus/highlight it
+    try {
+      window.localStorage.setItem("ecp_livefeed_focus_post", String(feedItemId));
+    } catch (e) {
+      // ignore storage errors
+    }
+
+    // append post id as query param: /community?view=live&post=123
+    const url = `${basePath}&post=${encodeURIComponent(feedItemId)}`;
+    window.location.href = url;
+  };
+
+  return (
+    <Box
+      onClick={handleClick}
+      sx={{
+        mt: 0.75,
+        borderRadius: 1.5,
+        border: `1px solid ${BORDER}`,
+        bgcolor: mine ? "rgba(255,255,255,0.9)" : "#f8fafc",
+        overflow: "hidden",
+        cursor: "pointer",
+        "&:hover": {
+          bgcolor: mine ? "rgba(255,255,255,1)" : "#eef2ff",
+        },
+      }}
+    >
+      <Box sx={{ p: 1 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: "uppercase",
+            opacity: 0.8,
+            display: "block",
+            mb: 0.25,
+          }}
+        >
+          Post
+        </Typography>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+        >
+          View shared post in live feed
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
 // ---------- API helpers ----------
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 const MESSAGING = `${API_ROOT}/messaging`;
@@ -95,6 +179,15 @@ const ENDPOINTS = {
 
   // Messages
   messageRead: (mid) => `${MESSAGING}/messages/${mid}/read/`,
+};
+
+const emitUnreadMessages = (count) => {
+  try {
+    window.dispatchEvent(new CustomEvent("messages:unread", { detail: { count } }));
+    localStorage.setItem("unread_messages", String(count));
+  } catch {
+    // ignore
+  }
 };
 // ---------- SPA routes (taken from GroupsPage & MembersPage) ----------
 const groupPath = (objOrId) => {
@@ -300,6 +393,9 @@ function ConversationRow({ thread, active, onClick }) {
 
 function Bubble({ m, showSender }) {
   const mine = Boolean(m.mine);
+  const shareAttachment = (m.attachments || []).find(
+    (a) => a && a.type === "share"
+  );
 
   return (
     <Stack
@@ -340,10 +436,22 @@ function Bubble({ m, showSender }) {
           </Typography>
         )}
 
+        {/* 🔹 LinkedIn-style shared post preview (ONLY for shared messages) */}
+        {shareAttachment && (
+          <SharePreview attachment={shareAttachment} mine={mine} />
+        )}
+
         <Typography
           className="bubble-time"
           variant="caption"
-          sx={{ position: "absolute", right: 8, bottom: 4, fontSize: 11, lineHeight: 1, opacity: 0.75 }}
+          sx={{
+            position: "absolute",
+            right: 8,
+            bottom: 4,
+            fontSize: 11,
+            lineHeight: 1,
+            opacity: 0.75,
+          }}
         >
           {m._time}
         </Typography>
@@ -764,9 +872,20 @@ export default function MessagesPage() {
     try {
       const r = await postJSON(ENDPOINTS.convMarkAllRead(activeId));
       // Drop unread badge for this conversation immediately
-      setThreads((cur) => cur.map((t) => (t.id === activeId ? { ...t, unread_count: 0 } : t)));
+      setThreads((cur) => {
+        const next = cur.map((t) =>
+          t.id === activeId ? { ...t, unread_count: 0 } : t
+        );
+        const totalUnread = next.reduce(
+          (sum, th) => sum + (th?.unread_count || 0),
+          0
+        );
+        emitUnreadMessages(totalUnread);
+        return next;
+      });
       // Flip local messages' read_by_me (for UI)
       setMessages((cur) => cur.map((m) => (m.mine ? m : { ...m, read_by_me: true })));
+
     } catch (e) {
       // ignore errors silently; it's idempotent anyway
     } finally {
@@ -797,11 +916,11 @@ export default function MessagesPage() {
             .map((t) => {
               const serverTs = getLastTimeISO(t);
               const prevTs = byId.get(String(t.id))?._last_ts;
-              // 🔧 never roll back to an older time
               const best =
                 new Date(serverTs || 0).getTime() >= new Date(prevTs || 0).getTime()
                   ? serverTs
                   : prevTs;
+
               return {
                 ...t,
                 _last_ts: best || serverTs || t.updated_at || t.created_at,
@@ -815,6 +934,13 @@ export default function MessagesPage() {
           if (!activeId && normalized.length) setActiveId(normalized[0].id);
           return normalized;
         });
+
+        // 👉 broadcast total unread to sidebar
+        const totalUnread = data.reduce(
+          (sum, t) => sum + (t?.unread_count || 0),
+          0
+        );
+        emitUnreadMessages(totalUnread);
       }
 
     } catch (e) {
