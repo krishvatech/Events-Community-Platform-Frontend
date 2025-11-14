@@ -127,6 +127,7 @@ const Header = () => {
   });
 
   useEffect(() => {
+    if (isAdminUser()) return; // no cart for admins
     (async () => {
       try {
         const { data } = await axios.get(
@@ -141,6 +142,7 @@ const Header = () => {
       }
     })();
   }, []);
+
 
   useEffect(() => {
     const update = () => {
@@ -291,27 +293,30 @@ const Header = () => {
           <Box className="hidden md:flex flex-1 items-center justify-end gap-2.5">
             {authed ? (
               <Box className="flex items-center gap-3">
-                {/* Cart */}
-                <Tooltip title="Cart">
-                  <IconButton
-                    component={Link}
-                    to="/cart"
-                    size="large"
-                    sx={{ color: "text.primary" }}
-                  >
-                    <Badge
-                      badgeContent={cartCount}
-                      color="error"
-                      overlap="circular"
-                      invisible={!cartCount}     // hide when 0
-                      max={99}
-                    >
-                      <ShoppingCartOutlinedIcon />
-                    </Badge>
-                  </IconButton>
-                </Tooltip>
-
-                <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+                {/* Cart (hidden for admins) */}
+                {!isAdminUser() && (
+                  <>
+                    <Tooltip title="Cart">
+                      <IconButton
+                        component={Link}
+                        to="/cart"
+                        size="large"
+                        sx={{ color: "text.primary" }}
+                      >
+                        <Badge
+                          badgeContent={cartCount}
+                          color="error"
+                          overlap="circular"
+                          invisible={!cartCount}
+                          max={99}
+                        >
+                          <ShoppingCartOutlinedIcon />
+                        </Badge>
+                      </IconButton>
+                    </Tooltip>
+                    <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+                  </>
+                )}
 
                 {/* My Account */}
                 <Button
@@ -398,12 +403,14 @@ const Header = () => {
 
           {authed ? (
             <List>
-              <ListItemButton component={Link} to="/cart">
-                <ListItemIcon>
-                  <ShoppingCartOutlinedIcon />
-                </ListItemIcon>
-                <ListItemText primary="Cart" />
-              </ListItemButton>
+              {!isAdminUser() && (
+                <ListItemButton component={Link} to="/cart">
+                  <ListItemIcon>
+                    <ShoppingCartOutlinedIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Cart" />
+                </ListItemButton>
+              )}
               <ListItemButton component={Link} to={accountHref}>
                 <ListItemIcon>
                   <AccountCircleOutlinedIcon />

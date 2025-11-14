@@ -1,46 +1,63 @@
 // src/pages/AdminSettings.jsx
 import * as React from "react";
 import {
-  Box, Stack, Container, Card, CardHeader, CardContent, Divider,
-  Avatar, Button, TextField, Typography, Grid, Snackbar, Alert
+  Box,
+  Stack,
+  Container,
+  Card,
+  CardHeader,
+  CardContent,
+  Divider,
+  Avatar,
+  Button,
+  TextField,
+  Typography,
+  Grid,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 
-const API_ROOT = (import.meta?.env?.VITE_API_ROOT) || "/api";
-const getToken = () =>
-  localStorage.getItem("access_token") ||
-  localStorage.getItem("token") ||
-  sessionStorage.getItem("access") ||
-  sessionStorage.getItem("token");
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+const getToken = () => localStorage.getItem("access_token") || "";
 const authHeader = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
-// ---- Admin profile endpoints ----
-// GET/PATCH: /users/me/admin-profile/   (full_name, bio, headline, location, user_image)
-// POST:      /users/me/avatar/          (FormData: 'avatar' or 'user_image')
+/**
+ * BACKEND HOOKS
+ *
+ * We use the existing UserViewSet actions:
+ *   GET/PATCH  /api/users/me/        -> user + profile (UserSerializer)
+ *   POST       /api/users/me/avatar/ -> upload avatar file
+ */
+
 async function fetchAdminProfile() {
-  const url = `${API_ROOT}/users/me/admin-profile/`;
-  const r = await fetch(url, { headers: { accept: "application/json", ...authHeader() } });
-  if (!r.ok) throw new Error("Failed to load admin profile");
-  return r.json();
+  const url = `${API_ROOT}/users/me/`;
+  const r = await fetch(url, {
+    headers: { accept: "application/json", ...authHeader() },
+  });
+  if (!r.ok) throw new Error("Failed to load profile");
+  return r.json(); // { id, username, email, profile: {...}, ... }
 }
-async function updateAdminProfile(payload) {
-  const url = `${API_ROOT}/users/me/admin-profile/`;
+
+async function updateAdminProfile(profilePayload) {
+  const url = `${API_ROOT}/users/me/`;
   const r = await fetch(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeader() },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ profile: profilePayload }),
   });
-  if (!r.ok) throw new Error("Failed to save admin profile");
-  return r.json();
+  if (!r.ok) throw new Error("Failed to save profile");
+  return r.json(); // updated user object
 }
+
 async function uploadAvatar(file) {
   const fd = new FormData();
-  // Either key works server-side; using 'avatar' here
+  // backend accepts 'avatar' OR 'user_image'
   fd.append("avatar", file, file.name);
   const r = await fetch(`${API_ROOT}/users/me/avatar/`, {
     method: "POST",
@@ -54,9 +71,11 @@ async function uploadAvatar(file) {
 export default function AdminSettings() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
-  const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
-
-  const fileRef = React.useRef(null);
+  const [toast, setToast] = React.useState({
+    open: false,
+    type: "success",
+    msg: "",
+  });
 
   const [profile, setProfile] = React.useState({
     full_name: "",
@@ -66,9 +85,11 @@ export default function AdminSettings() {
     user_image_url: "",
   });
 
+  const fileRef = React.useRef(null);
+
+  // bust cache when avatar URL changes so new image shows immediately
   const avatarUrl = React.useMemo(() => {
     const raw = profile?.user_image_url || "";
-    // cache-bust so the new image shows immediately after upload
     return raw ? `${raw}${raw.includes("?") ? "&" : "?"}_=${Date.now()}` : "";
   }, [profile?.user_image_url]);
 
@@ -76,32 +97,53 @@ export default function AdminSettings() {
     setLoading(true);
     try {
       const data = await fetchAdminProfile();
+      const prof = data?.profile || {};
       setProfile({
-        full_name: data?.full_name || "",
-        bio: data?.bio || "",
-        headline: data?.headline || "",
-        location: data?.location || "",
-        user_image_url: data?.user_image_url || "",
+        full_name: prof.full_name || "",
+        bio: prof.bio || "",
+        headline: prof.headline || "",
+        location: prof.location || "",
+        user_image_url: prof.user_image_url || "",
       });
     } catch (e) {
-      setToast({ open: true, type: "error", msg: e?.message || "Load failed" });
+      setToast({
+        open: true,
+        type: "error",
+        msg: e?.message || "Load failed",
+      });
     } finally {
       setLoading(false);
     }
   }, []);
-  React.useEffect(() => { load(); }, [load]);
+
+  React.useEffect(() => {
+    load();
+  }, [load]);
 
   const onPickFile = () => fileRef.current?.click();
+
   const onFileChange = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
+
     setSaving(true);
     try {
-      await uploadAvatar(f);
-      await load(); // refresh to get new user_image_url
-      setToast({ open: true, type: "success", msg: "Profile photo updated" });
+      const res = await uploadAvatar(f);
+      setProfile((p) => ({
+        ...p,
+        user_image_url: res.user_image_url || p.user_image_url,
+      }));
+      setToast({
+        open: true,
+        type: "success",
+        msg: "Profile image updated",
+      });
     } catch (err) {
-      setToast({ open: true, type: "error", msg: err?.message || "Upload failed" });
+      setToast({
+        open: true,
+        type: "error",
+        msg: err?.message || "Avatar upload failed",
+      });
     } finally {
       setSaving(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -119,9 +161,17 @@ export default function AdminSettings() {
       };
       await updateAdminProfile(payload);
       await load();
-      setToast({ open: true, type: "success", msg: "Profile updated" });
+      setToast({
+        open: true,
+        type: "success",
+        msg: "Profile updated",
+      });
     } catch (err) {
-      setToast({ open: true, type: "error", msg: err?.message || "Update failed" });
+      setToast({
+        open: true,
+        type: "error",
+        msg: err?.message || "Update failed",
+      });
     } finally {
       setSaving(false);
     }
@@ -137,95 +187,149 @@ export default function AdminSettings() {
         <Card variant="outlined">
           <CardHeader
             title="Admin profile"
-            subheader="These details are visible on your profile"
+            subheader="Update how you appear as an admin across the community."
             action={
-              <Stack direction="row" spacing={1}>
-                <Button
-                  variant="outlined"
-                  startIcon={<RefreshRoundedIcon />}
-                  onClick={load}
-                  disabled={loading || saving}
-                >
-                  Refresh
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<SaveRoundedIcon />}
-                  onClick={onSave}
-                  disabled={saving || loading}
-                >
-                  Save
-                </Button>
-              </Stack>
+              <Button
+                size="small"
+                startIcon={<RefreshRoundedIcon />}
+                onClick={load}
+                disabled={loading || saving}
+              >
+                Refresh
+              </Button>
             }
           />
-          <Divider />
           <CardContent>
-            <Stack direction="row" spacing={3} alignItems="center" sx={{ mb: 3 }}>
-              <Avatar src={avatarUrl} sx={{ width: 88, height: 88 }} />
-              <div>
-                <Button
-                  variant="outlined"
-                  startIcon={<UploadRoundedIcon />}
-                  onClick={onPickFile}
-                  disabled={saving || loading}
-                  sx={{ mr: 1 }}
-                >
-                  Change photo
-                </Button>
-                <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFileChange} />
-                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                  JPG/PNG recommended. Large images are auto-resized by the server.
-                </Typography>
-              </div>
-            </Stack>
+            <Grid container spacing={3}>
+              {/* Avatar column */}
+              <Grid item xs={12} sm={4} md={3}>
+                <Stack spacing={2} alignItems="center">
+                  <Avatar
+                    src={avatarUrl || undefined}
+                    sx={{
+                      width: 96,
+                      height: 96,
+                      fontSize: 32,
+                      bgcolor: "primary.main",
+                    }}
+                  >
+                    {(profile.full_name || "A").charAt(0).toUpperCase()}
+                  </Avatar>
 
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  label="Full name"
-                  fullWidth
-                  value={profile.full_name}
-                  onChange={(e) => setProfile((p) => ({ ...p, full_name: e.target.value }))}
-                />
+                  <input
+                    ref={fileRef}
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    onChange={onFileChange}
+                  />
+
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<UploadRoundedIcon />}
+                    onClick={onPickFile}
+                    disabled={loading || saving}
+                  >
+                    Change photo
+                  </Button>
+                </Stack>
               </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Headline"
-                  placeholder="e.g., Building communities at X"
-                  fullWidth
-                  value={profile.headline}
-                  onChange={(e) => setProfile((p) => ({ ...p, headline: e.target.value }))}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Location"
-                  placeholder="City, Country"
-                  fullWidth
-                  value={profile.location}
-                  onChange={(e) => setProfile((p) => ({ ...p, location: e.target.value }))}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Bio"
-                  placeholder="Tell people a bit about yourself…"
-                  fullWidth
-                  multiline
-                  minRows={4}
-                  value={profile.bio}
-                  onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))}
-                />
+
+              {/* Text fields */}
+              <Grid item xs={12} sm={8} md={9}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Full name"
+                      fullWidth
+                      value={profile.full_name}
+                      onChange={(e) =>
+                        setProfile((p) => ({
+                          ...p,
+                          full_name: e.target.value,
+                        }))
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Headline"
+                      placeholder="e.g., Community manager at ABC"
+                      fullWidth
+                      value={profile.headline}
+                      onChange={(e) =>
+                        setProfile((p) => ({
+                          ...p,
+                          headline: e.target.value,
+                        }))
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Location"
+                      placeholder="City, Country"
+                      fullWidth
+                      value={profile.location}
+                      onChange={(e) =>
+                        setProfile((p) => ({
+                          ...p,
+                          location: e.target.value,
+                        }))
+                      }
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Bio"
+                      placeholder="Tell people a bit about yourself…"
+                      fullWidth
+                      multiline
+                      minRows={4}
+                      value={profile.bio}
+                      onChange={(e) =>
+                        setProfile((p) => ({
+                          ...p,
+                          bio: e.target.value,
+                        }))
+                      }
+                    />
+                  </Grid>
+                </Grid>
               </Grid>
             </Grid>
+
+            <Divider sx={{ my: 3 }} />
+
+            <Stack direction="row" justifyContent="flex-end" spacing={2}>
+              <Button
+                variant="text"
+                startIcon={<RefreshRoundedIcon />}
+                onClick={load}
+                disabled={loading || saving}
+              >
+                Reset
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<SaveRoundedIcon />}
+                onClick={onSave}
+                disabled={saving || loading}
+              >
+                Save changes
+              </Button>
+            </Stack>
           </CardContent>
         </Card>
       </Container>
 
       <Snackbar
         open={toast.open}
-        autoHideDuration={2500}
+        autoHideDuration={4000}
         onClose={() => setToast((t) => ({ ...t, open: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
