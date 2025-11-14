@@ -116,75 +116,42 @@ const avatarOf = (u = {}) =>
 // Minimal PostCard (local) so we don't touch your existing files
 // -----------------------------------------------------------------------------
 function PostCard({ post }) {
-  const [likers, setLikers] = React.useState(
-    () => post.likers || post.metrics?.likers || []
-  );
+  // --- normalize any incoming liker shape to {id,name,avatar} immediately
+  const normalizeUser = React.useCallback((u) => {
+    if (!u) return { id: null, name: "User", avatar: "" };
+    if (typeof u === "string") return { id: null, name: u, avatar: "" };
+    const id =
+      u.id ?? u.user_id ?? u.owner_id ?? u.profile?.id ?? null;
+    const name =
+      u.name || u.full_name || nameOf(u) || (id ? `User #${id}` : "User");
+    const avatar =
+      toAbsolute(
+        u.avatar ||
+        u.avatar_url ||
+        u.user_image ||
+        u.user_image_url ||
+        u.profile_image ||
+        u.image_url ||
+        u.photo ||
+        u.profile?.user_image_url ||
+        u.profile?.user_image ||
+        ""
+      );
+    return { id, name, avatar };
+  }, []);
+
+  const initLikers = React.useMemo(() => {
+    const raw = post.likers || post.metrics?.likers || [];
+    return Array.isArray(raw) ? raw.map(normalizeUser) : [];
+  }, [post.likers, post.metrics?.likers, normalizeUser]);
+
+  const [likers, setLikers] = React.useState(initLikers);
 
   const likesCount = post.metrics?.likes ?? post.like_count ?? 0;
   const commentCount = post.metrics?.comments ?? post.comment_count ?? 0;
   const [shareCount, setShareCount] = React.useState(post.metrics?.shares ?? post.share_count ?? 0);
 
-  const primaryLiker = likers[0];
-  const othersCount = likesCount > 1 ? likesCount - 1 : 0;
-
-  let likeLabel = "";
-  if (likesCount === 1 && primaryLiker) {
-    likeLabel = `${primaryLiker.name || "someone"}`;
-  } else if (likesCount > 1 && primaryLiker) {
-    likeLabel = `${primaryLiker.name || "someone"} and ${othersCount} other${othersCount > 1 ? "s" : ""}`;
-  }
-
-  // --- 2a) Normalize likers like Home (helper kept local to PostCard) ---
-  const normalizeUsers = React.useCallback((payload) => {
-    const rows = Array.isArray(payload?.results)
-      ? payload.results
-      : Array.isArray(payload)
-      ? payload
-      : [];
-    return rows.map((r) => {
-      const u = r.user || r.actor || r.liker || r.owner || r.profile || r;
-      const profile = u.profile || u.user_profile || r.profile || {};
-      const id =
-        u?.id ?? u?.user_id ?? r.user_id ?? r.id;
-      const first =
-        u?.first_name ?? u?.firstName ?? r.user_first_name ?? "";
-      const last =
-        u?.last_name ?? u?.lastName ?? r.user_last_name ?? "";
-      const name =
-        u?.name || u?.full_name || `${first} ${last}`.trim() || u?.username || (id ? `User #${id}` : "User");
-      const avatarRaw =
-        profile.user_image_url || profile.user_image ||
-        u?.user_image_url || u?.user_image ||
-        r.user_image_url || r.user_image ||
-        u?.avatar || u?.profile_image || u?.photo || u?.image_url || u?.avatar_url || "";
-      return { id, name, avatar: toAbsolute(avatarRaw) };
-    });
-  }, []);
-
-  // sync share count (fallback if API didn’t provide)
-  React.useEffect(() => {
-    let active = true;
-    async function loadShares() {
-      try {
-        const res = await fetch(
-          `${API_ROOT}/engagements/shares/?target_type=activity_feed.feeditem&target_id=${post.id}&page_size=200`,
-          { headers: { ...authHeader(), accept: "application/json" } }
-        );
-        if (!res.ok) return;
-        const data = await res.json();
-        const rows = Array.isArray(data?.results) ? data.results :
-                     Array.isArray(data) ? data :
-                     Array.isArray(data?.items) ? data.items :
-                     Array.isArray(data?.shares) ? data.shares : [];
-        if (active) setShareCount(rows.length || 0);
-      } catch {}
-    }
-    // only fetch if it’s 0 to avoid extra calls
-    if (!shareCount) loadShares();
-    return () => { active = false; };
-  }, [post.id]); // eslint-disable-line
-
-  // load likers list (avatars) similar to HomePage (your original effect kept)
+  // --- load likers list (avatars) similar to HomePage (only if needed)
   React.useEffect(() => {
     let active = true;
 
@@ -207,14 +174,14 @@ function PostCard({ post }) {
         const mapped = rows.map((row) => {
           const user = row.user || row;
           return {
-            id: user.id,
+            id: user.id ?? user.user_id ?? null,
             name: nameOf(user),
             avatar: avatarOf(user),
           };
         });
 
         setLikers(mapped);
-      } catch (err) {
+      } catch {
         // ignore
       }
     }
@@ -226,9 +193,9 @@ function PostCard({ post }) {
     return () => {
       active = false;
     };
-  }, [post.id, likesCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [post.id, likesCount, likers.length]);
 
-  // --- 2a) EXTRA: second pass using Home-style endpoints/normalization if still empty ---
+  // EXTRA: second pass using Home-style endpoints/normalization if still empty
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -242,7 +209,8 @@ function PostCard({ post }) {
           const r = await fetch(url, { headers: { Accept: "application/json", ...authHeader() } });
           if (!r.ok) continue;
           const j = await r.json();
-          const list = normalizeUsers(j);
+          const rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+          const list = rows.map((row) => normalizeUser(row.user || row));
           if (!cancelled && list.length) {
             setLikers(list);
             break;
@@ -251,19 +219,39 @@ function PostCard({ post }) {
       } catch {}
     })();
     return () => { cancelled = true; };
-  }, [post.id, likesCount, likers.length, normalizeUsers]);
+  }, [post.id, likesCount, likers.length, normalizeUser]);
 
-  // --- 2b) Override likeLabel to match Home: “liked by … and N others” ---
-  {
-    const likeCount = Number(post.metrics?.likes ?? post.like_count ?? 0);
-    const primary = likers?.[0] || null;
-    const others = Math.max(0, (likeCount || 0) - 1);
-    likeLabel = primary
-      ? (likeCount === 1
-          ? `liked by ${primary.name}`
-          : `liked by ${primary.name} and ${others} ${others === 1 ? "other" : "others"}`)
-      : `${(likeCount || 0).toLocaleString()} likes`;
-  }
+  // Label: “liked by X …”
+  const likeCount = Number(post.metrics?.likes ?? post.like_count ?? 0);
+  const primary = likers?.[0] || null;
+  const others = Math.max(0, (likeCount || 0) - 1);
+  const likeLabel = primary
+    ? (likeCount === 1
+        ? `liked by ${primary.name}`
+        : `liked by ${primary.name} and ${others} ${others === 1 ? "other" : "others"}`)
+    : `${(likeCount || 0).toLocaleString()} ${likeCount === 1 ? "like" : "likes"}`;
+
+  // sync share count (fallback if API didn’t provide)
+  React.useEffect(() => {
+    let active = true;
+    async function loadShares() {
+      try {
+        const res = await fetch(
+          `${API_ROOT}/engagements/shares/?target_type=activity_feed.feeditem&target_id=${post.id}&page_size=200`,
+          { headers: { ...authHeader(), accept: "application/json" } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const rows = Array.isArray(data?.results) ? data.results :
+                     Array.isArray(data) ? data :
+                     Array.isArray(data?.items) ? data.items :
+                     Array.isArray(data?.shares) ? data.shares : [];
+        if (active) setShareCount(rows.length || 0);
+      } catch {}
+    }
+    if (!shareCount) loadShares();
+    return () => { active = false; };
+  }, [post.id]); // eslint-disable-line
 
   return (
     <Card
@@ -442,8 +430,7 @@ function PostCard({ post }) {
                 }}
                 onClick={() => (window.__openLikes && window.__openLikes(post.id))}
               >
-                {likeLabel ||
-                  `${likesCount} like${likesCount > 1 ? "s" : ""}`}
+                {likeLabel}
               </Typography>
             </>
           )}
@@ -915,9 +902,9 @@ function MembersTab({ groupId }) {
     ];
     for (const url of candidates) {
       try {
-        const res = await fetch(url, {
-          headers: { ...authHeader(), accept: "application/json" },
-        });
+        const res = await fetch(url,
+          { headers: { ...authHeader(), accept: "application/json" } }
+        );
         if (!res.ok) continue;
         const data = await res.json();
         const rows =
@@ -1292,7 +1279,7 @@ function SharesDialog({ open, postId, onClose }) {
 }
 
 // -----------------------------------------------------------------------------
-// Comments dialog (group-aware) — now uses engagements endpoints + nests replies
+// Comments dialog (group-aware) — now posts replies reliably
 // -----------------------------------------------------------------------------
 function CommentsDialog({
   open,
@@ -1345,34 +1332,31 @@ function CommentsDialog({
     };
   }
 
-  function buildTree(rows) {
-    const byId = new Map();
-    rows.forEach(r => byId.set(r.id, { ...r, replies: [] }));
-    const roots = [];
-    rows.forEach(r => {
-      const node = byId.get(r.id);
-      if (r.parent && byId.has(r.parent)) {
-        byId.get(r.parent).replies.push(node);
-      } else {
-        roots.push(node);
-      }
+  function buildTreeWithReplies(roots, repliesByParent) {
+    const nodes = new Map();
+    roots.forEach(r => nodes.set(r.id, { ...r, replies: [] }));
+    roots.forEach(r => {
+      const kids = repliesByParent.get(r.id) || [];
+      const childNodes = kids.map(k => ({ ...k, replies: [] }));
+      nodes.get(r.id).replies = childNodes;
     });
     // newest first at root
-    roots.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
-    return roots;
+    const list = Array.from(nodes.values());
+    list.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+    return list;
   }
 
   async function fetchComments(feedId) {
-    const candidates = [
-      // engagements-first (works on HomePage)
+    // 1) roots
+    const rootCandidates = [
       `${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${feedId}&page_size=200`,
-      // group-scoped
       ...(groupId ? [`${API_ROOT}/groups/${groupId}/posts/${feedId}/comments/`] : []),
-      // generic fallbacks
       `${API_ROOT}/posts/${feedId}/comments/`,
       `${API_ROOT}/comments/?post=${feedId}`,
     ];
-    for (const url of candidates) {
+
+    let rootRows = [];
+    for (const url of rootCandidates) {
       try {
         const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
         if (!r.ok) continue;
@@ -1380,60 +1364,104 @@ function CommentsDialog({
         const rows = Array.isArray(data?.results) ? data.results :
                      Array.isArray(data) ? data :
                      Array.isArray(data?.comments) ? data.comments : [];
-        if (!rows.length) return [];
-        const flat = rows.map(normalizeFlat);
-        return buildTree(flat);
+        if (rows.length) {
+          rootRows = rows;
+          break;
+        }
       } catch {}
     }
-    return [];
+    if (!rootRows.length) return [];
+
+    const flatRoots = rootRows
+      .filter((x) => !x.parent && !x.parent_id) // only roots
+      .map(normalizeFlat);
+
+    // 2) replies for each root (parent=<id>)
+    const repliesByParent = new Map();
+    await Promise.all(
+      flatRoots.map(async (root) => {
+        const replyUrls = [
+          `${API_ROOT}/engagements/comments/?parent=${root.id}&page_size=200`,
+          ...(groupId ? [`${API_ROOT}/groups/${groupId}/posts/${feedId}/comments/?parent=${root.id}`] : []),
+          `${API_ROOT}/comments/?parent=${root.id}`,
+        ];
+        for (const u of replyUrls) {
+          try {
+            const rr = await fetch(u, { headers: { ...authHeader(), accept: "application/json" } });
+            if (!rr.ok) continue;
+            const dj = await rr.json();
+            const rows = Array.isArray(dj?.results) ? dj.results :
+                         Array.isArray(dj) ? dj :
+                         Array.isArray(dj?.comments) ? dj.comments : [];
+            if (rows.length) {
+              repliesByParent.set(
+                root.id,
+                rows.map(normalizeFlat)
+              );
+              break;
+            }
+          } catch {}
+        }
+      })
+    );
+
+    return buildTreeWithReplies(flatRoots, repliesByParent);
   }
 
+  // Robust createComment: covers root + reply with multiple payload shapes
   async function createComment(feedId, body, parentId = null) {
     const text = (body || "").trim();
     if (!text) return null;
 
-    // 1) engagements — correct shapes:
-    //    - root: needs target_type/target_id
-    //    - reply: ONLY parent (backend inherits target from parent)
+    // Build a payload that satisfies strict serializers (send redundant fields safely)
+    const base = {
+      text,
+      target_type: "activity_feed.feeditem",
+      target_id: feedId,
+      post: feedId,
+      object_id: feedId,
+      content_type: "activity_feed.feeditem",
+    };
+    const replyBits = parentId ? { parent: parentId, parent_id: parentId, reply_to: parentId } : {};
+
+    // 1) preferred engagements endpoint
     try {
-      const payload = parentId
-        ? { text, parent: parentId }                         // reply
-        : { text, target_type: "activity_feed.feeditem", target_id: feedId }; // root
       const r = await fetch(`${API_ROOT}/engagements/comments/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...(base), ...(replyBits) }),
       });
       if (r.ok) return normalizeFlat(await r.json());
     } catch {}
 
-    // 2) group-scoped fallback
+    // 2) group-scoped
     if (groupId) {
       try {
         const r = await fetch(`${API_ROOT}/groups/${groupId}/posts/${feedId}/comments/`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify(parentId ? { text, parent: parentId } : { text }),
+          body: JSON.stringify(parentId ? { text, parent: parentId, parent_id: parentId, reply_to: parentId } : { text }),
         });
         if (r.ok) return normalizeFlat(await r.json());
       } catch {}
     }
 
-    // 3) generic fallbacks
+    // 3) generic by post id
     try {
       const r = await fetch(`${API_ROOT}/posts/${feedId}/comments/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify(parentId ? { text, parent: parentId } : { text }),
+        body: JSON.stringify(parentId ? { text, parent: parentId, parent_id: parentId, reply_to: parentId } : { text }),
       });
       if (r.ok) return normalizeFlat(await r.json());
     } catch {}
 
+    // 4) bare comments collection
     try {
       const r = await fetch(`${API_ROOT}/comments/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ post: feedId, text, parent: parentId || undefined }),
+        body: JSON.stringify({ post: feedId, text, parent: parentId || undefined, parent_id: parentId || undefined }),
       });
       if (r.ok) return normalizeFlat(await r.json());
     } catch {}
@@ -1502,8 +1530,9 @@ function CommentsDialog({
     if (!text.trim()) return;
     setSubmitting(true);
     try {
-      const c = await createComment(postId, text.trim(), null);
-      setComments((prev) => [c, ...prev]); // newest at top
+      await createComment(postId, text.trim(), null);
+      const list = await fetchComments(postId); // reload to stay consistent
+      setComments(list);
       setText("");
     } catch (e) { alert(e.message || "Failed to add comment"); }
     setSubmitting(false);
@@ -1513,12 +1542,11 @@ function CommentsDialog({
     if (!replyingTo || !replyText.trim()) return;
     setSubmitting(true);
     try {
-      const c = await createComment(postId, replyText.trim(), replyingTo);
-      setComments((prev) =>
-        prev.map((p) => (p.id === replyingTo ? { ...p, replies: [...(p.replies || []), c] } : p))
-      );
+      await createComment(postId, replyText.trim(), replyingTo);
       setReplyingTo(null);
       setReplyText("");
+      const list = await fetchComments(postId); // reload so replies show immediately
+      setComments(list);
     } catch (e) { alert(e.message || "Failed to reply"); }
     setSubmitting(false);
   };
@@ -1636,9 +1664,6 @@ function CommentsDialog({
               }
             }}
           />
-          <Button variant="contained" onClick={onSubmitNew} disabled={submitting || !text.trim()}>
-            Post
-          </Button>
         </Stack>
 
         {loading ? (
@@ -1697,7 +1722,7 @@ function CommentsDialog({
 export default function GroupDetailsPage() {
   const navigate = useNavigate();
   const { groupId } = useParams();
-  const [tab, setTab] = React.useState(2); // default to OVERVIEW
+  const [tab, setTab] = React.useState(2); // default to OVERVIEW (keep your original)
   const [group, setGroup] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [me, setMe] = React.useState(null);
@@ -1721,7 +1746,7 @@ export default function GroupDetailsPage() {
         if (res.ok) {
           const user = await res.json();
           setMe(user);
-          // --- 2c) Expose current user for optimistic like avatars (same as Home) ---
+          // Expose current user for optimistic like avatars (same as Home)
           try {
             window.__me = {
               id: user.id ?? user.user?.id ?? null,
