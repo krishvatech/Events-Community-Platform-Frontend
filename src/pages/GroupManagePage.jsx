@@ -1596,6 +1596,9 @@ export default function GroupManagePage() {
     // --- Chat toggle state (Settings tab) ---
     const [chatOn, setChatOn] = React.useState(true);
     const [chatSaving, setChatSaving] = React.useState(false);
+    // confirm modal for chat toggle
+    const [chatConfirmOpen, setChatConfirmOpen] = React.useState(false);
+    const [chatNext, setChatNext] = React.useState(true);
 
     // keep the confirm text for delete group
     const [deleteGroupOpen, setDeleteGroupOpen] = React.useState(false);
@@ -1606,39 +1609,76 @@ export default function GroupManagePage() {
     // When group loads/changes, infer initial chat state from backend shape
     React.useEffect(() => {
         if (!group) return;
-        // supports either boolean chat_enabled OR message_mode = 'all'|'admins_only'
-        const initial =
-            typeof group.chat_enabled === "boolean"
-                ? group.chat_enabled
-                : (group.message_mode ? group.message_mode !== "admins_only" : true);
-        setChatOn(initial);
-    }, [group]);
+
+        // 1) If explicit flag exists on the group payload, use it.
+        if (typeof group.chat_enabled === "boolean") {
+            setChatOn(Boolean(group.chat_enabled));
+            return;
+        }
+
+        // 2) If message_mode exists on the group payload, use it.
+        if (typeof group.message_mode === "string") {
+            setChatOn(group.message_mode !== "admins_only");
+            return;
+        }
+
+        // 3) Neither field present on this payload — fetch authoritative setting.
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/settings/message-mode/`, {
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                });
+                const data = await res.json().catch(() => ({}));
+                if (cancelled) return;
+                if (res.ok && data) {
+                    const on = data.message_mode
+                        ? data.message_mode !== "admins_only"
+                        : !data.admins_only_effective;
+                    setChatOn(Boolean(on));
+                }
+                // If not ok, do nothing (avoid forcing a wrong default).
+            } catch {
+                // Swallow errors; don't force an incorrect default.
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [group, idOrSlug, token]);
 
     const saveChatToggle = async (next) => {
         if (!group) return;
         setChatSaving(true);
         try {
+            // Prefer explicit message_mode, keep legacy boolean as fallback
             const payload =
                 typeof group.chat_enabled === "boolean"
                     ? { chat_enabled: next }
                     : { message_mode: next ? "all" : "admins_only" };
 
-            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/settings/message-mode/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify(payload),
             });
-            if (!res.ok) {
-                const j = await res.json().catch(() => ({}));
-                throw new Error(j?.detail || `HTTP ${res.status}`);
-            }
-            const updated = await res.json();
-            setGroup(updated);
-            setChatOn(
-                typeof updated.chat_enabled === "boolean"
-                    ? updated.chat_enabled
-                    : (updated.message_mode ? updated.message_mode !== "admins_only" : next)
-            );
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+
+            // Normalize response into our boolean switch
+            const on = data.message_mode
+                ? data.message_mode === "all"
+                : (typeof data.chat_enabled === "boolean" ? data.chat_enabled : !data.admins_only_effective);
+
+            setChatOn(Boolean(on));
         } catch (e) {
             alert(`Could not update chat setting: ${e?.message || e}`);
             setChatOn((prev) => !prev); // revert UI
@@ -1646,6 +1686,7 @@ export default function GroupManagePage() {
             setChatSaving(false);
         }
     };
+
 
 
     // Load saved prefs per group from localStorage
@@ -2512,8 +2553,8 @@ export default function GroupManagePage() {
                                                         checked={!!chatOn}
                                                         onChange={(e) => {
                                                             const next = e.target.checked;
-                                                            setChatOn(next);        // optimistic
-                                                            saveChatToggle(next);   // persist
+                                                            setChatNext(next);
+                                                            setChatConfirmOpen(true);   // show confirm instead of saving immediately
                                                         }}
                                                         disabled={chatSaving}
                                                     />
@@ -2907,6 +2948,44 @@ export default function GroupManagePage() {
                                     sx={{ textTransform: "none" }}
                                 >
                                     OK
+                                </Button>
+                            </DialogActions>
+                        </Dialog>
+                        <Dialog
+                            open={chatConfirmOpen}
+                            onClose={() => setChatConfirmOpen(false)}
+                            fullWidth
+                            maxWidth="xs"
+                            PaperProps={{ sx: { borderRadius: 3 } }}
+                        >
+                            <DialogTitle sx={{ fontWeight: 800 }}>
+                                {chatNext ? "Allow everyone to chat?" : "Restrict chat to admins only?"}
+                            </DialogTitle>
+                            <DialogContent>
+                                <Alert severity={chatNext ? "info" : "warning"} sx={{ mb: 2 }}>
+                                    {chatNext
+                                        ? "Members will be able to send messages in this group."
+                                        : "Only owners/admins will be able to send messages. Members won’t be able to chat."}
+                                </Alert>
+                                <Typography variant="body2" color="text.secondary">
+                                    You can change this anytime in Settings.
+                                </Typography>
+                            </DialogContent>
+                            <DialogActions>
+                                <Button onClick={() => setChatConfirmOpen(false)} sx={{ textTransform: "none" }}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    disabled={chatSaving}
+                                    onClick={async () => {
+                                        setChatConfirmOpen(false);
+                                        setChatOn(chatNext);            // optimistic
+                                        await saveChatToggle(chatNext); // persist to DB as all/admins_only
+                                    }}
+                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                >
+                                    {chatNext ? "Allow all" : "Set to admins_only"}
                                 </Button>
                             </DialogActions>
                         </Dialog>

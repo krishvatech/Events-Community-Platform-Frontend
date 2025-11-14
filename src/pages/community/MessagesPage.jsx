@@ -879,6 +879,11 @@ export default function MessagesPage() {
   const [me, setMe] = React.useState(null);
   const [topMembers, setTopMembers] = React.useState([]);
 
+  // 🔹 Whether the current user is allowed to send messages to the ACTIVE group
+  // (for WhatsApp-style "Only admins can send messages" mode)
+  const [canSendToActiveGroup, setCanSendToActiveGroup] = React.useState(true);
+  // 'all' | 'admins_only' | null (null = unknown/not a group)
+  const [activeMessageMode, setActiveMessageMode] = React.useState(null);
   // 🔹 all group IDs where the CURRENT user is a member
   const joinedGroupIdsRef = React.useRef(null);
 
@@ -1034,6 +1039,62 @@ export default function MessagesPage() {
     const { id, slug } = resolveActiveGroup();
     return Boolean(id || slug);
   }, [resolveActiveGroup]);
+
+  // When this is true, we should show "Only admins can send messages" instead of input
+  // If server told us the mode, prefer it. Otherwise fall back to ok-flag only.
+  const groupReadOnly = hasActiveGroup && (
+    activeMessageMode
+      ? (activeMessageMode === "admins_only" && !canSendToActiveGroup) // members blocked, admins allowed
+      : !canSendToActiveGroup
+  );
+  // 🔹 Check if current user can send messages to the ACTIVE group
+  // Uses: GET /api/groups/{id}/can-send/ → { ok, reason, message_mode }
+
+
+  React.useEffect(() => {
+    const { id: groupId, slug: groupSlug } = resolveActiveGroup();
+    const key = groupId || groupSlug;  // support id OR slug
+
+    // If there is no group (DM / event / nothing selected), allow sending
+    if (!key) {
+      setCanSendToActiveGroup(true);
+      setActiveMessageMode(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await apiFetch(`${API_ROOT}/groups/${key}/can-send/`);
+        if (!res.ok) {
+          // Fail-open: if probe fails, don't block chat
+          if (!cancelled) {
+            setCanSendToActiveGroup(true);
+            setActiveMessageMode(null);
+          }
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+
+        // data.ok → whether THIS user can send (admins get true even in admins_only)
+        setCanSendToActiveGroup(Boolean(data?.ok ?? true));
+        // capture exact server mode for UI logic
+        setActiveMessageMode(data?.message_mode ?? null);
+      } catch (err) {
+        console.error("Failed to check can-send for group", err);
+        if (!cancelled) {
+          setCanSendToActiveGroup(true);
+          setActiveMessageMode(null);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [activeId, resolveActiveGroup]);
+
+
 
   const openActiveGroup = React.useCallback(() => {
     const { id, slug } = resolveActiveGroup();
@@ -1305,6 +1366,14 @@ export default function MessagesPage() {
     const text = draft.trim();
     if (!text || !activeId) return;
 
+    // WhatsApp-style: if this is a group AND backend says "admins only",
+    // non-admin members should NOT be able to send messages.
+    if (groupReadOnly) {
+      console.warn("Sending disabled: only admins can send messages in this group.");
+      return;
+    }
+
+
     const now = new Date();
     const nowStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -1553,29 +1622,52 @@ export default function MessagesPage() {
 
               <Divider sx={{ my: 1.25 }} />
 
-              <Stack direction="row" spacing={1}>
-                <Tooltip title="Attach file">
-                  <IconButton size="small">
-                    <AttachFileOutlinedIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <TextField
-                  size="small"
-                  placeholder="Type a message"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  fullWidth
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
+              {groupReadOnly ? (
+                // 🔒 WhatsApp-style read-only group banner
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    borderRadius: 1.5,
+                    border: `1px dashed ${BORDER}`,
+                    bgcolor: "#f9fafb",
+                    color: "text.secondary",
+                    fontSize: 13,
+                    textAlign: "center",
                   }}
-                />
-                <Button variant="contained" size="small" endIcon={<SendIcon />} onClick={handleSend}>
-                  Send
-                </Button>
-              </Stack>
+                >
+                  Only admins can send messages in this group.
+                </Box>
+              ) : (
+                <Stack direction="row" spacing={1}>
+                  <Tooltip title="Attach file">
+                    <IconButton size="small">
+                      <AttachFileOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <TextField
+                    size="small"
+                    placeholder="Type a message"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    fullWidth
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="contained"
+                    size="small"
+                    endIcon={<SendIcon />}
+                    onClick={handleSend}
+                  >
+                    Send
+                  </Button>
+                </Stack>
+              )}
             </Paper>
           </Box>
         </Grid>
