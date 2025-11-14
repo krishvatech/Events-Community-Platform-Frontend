@@ -1019,21 +1019,38 @@ export default function MessagesPage() {
 
   // Resolve group key from many possible shapes, then navigate
   const resolveActiveGroup = React.useCallback(() => {
-    const g = active?.group || active?.context_group || null;
+    // active.group can be:
+    //   - full group object  → { id, slug, ... }
+    //   - plain PK number    → 3
+    //   - string id/slug     → "3" or "main-group"
+    const raw = active?.group ?? active?.context_group ?? null;
+
+    let gid = null;
+    let gslug = null;
+
+    if (raw && typeof raw === "object") {
+      gid = raw.id ?? null;
+      gslug = raw.slug ?? null;
+    } else if (typeof raw === "number" || typeof raw === "string") {
+      // If backend sent just the pk, use it directly as id
+      gid = raw;
+    }
+
     return {
       id:
         active?.group_id ??
-        g?.id ??
+        gid ??
         active?.context_group_id ??
         active?.context_id ??
         null,
       slug:
         active?.group_slug ??
-        g?.slug ??
+        gslug ??
         active?.context_slug ??
         null,
     };
   }, [active]);
+
 
   const hasActiveGroup = React.useMemo(() => {
     const { id, slug } = resolveActiveGroup();
