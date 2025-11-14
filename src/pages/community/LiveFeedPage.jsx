@@ -27,7 +27,8 @@ function SuggestedConnections({ list = [] }) {
   const [connected, setConnected] = React.useState(() => new Set());
 
   // --- friend status (same idea as RichProfile) ---
-  const [friendStatusByUser, setFriendStatusByUser] = React.useState({});
+  const [friendStatusByUser, setFriendStatusByUser] = React.useState({})
+
 
   // normalize backend statuses (incoming_pending/outgoing_pending → pending_incoming/pending_outgoing)
   function normalizeFriendStatus(s) {
@@ -369,8 +370,8 @@ function toMediaUrl(p) {
   if (!p) return "";
   try { return new URL(p).toString(); } catch { }
   const rel = String(p).replace(/^\/+/, "");
-  // if backend already serves under /media/, keep it; else prefix /media/
-  return `${API_ORIGIN}/${rel.startsWith("media/") ? rel : `media/${rel}`}`;
+  const keepAsIs = /^(media|static|uploads|images|files|storage)\//i.test(rel);
+  return `${API_ORIGIN}/${keepAsIs ? rel : `media/${rel}`}`;
 }
 
 function toApiUrl(pathOrUrl) {
@@ -874,7 +875,11 @@ function normalizeCommentRow(c) {
       : rawAuthor.username) ||
     (author_id ? `User #${author_id}` : "User");
   const avatar = toMediaUrl(
-    rawAuthor.avatar || rawAuthor.profile?.avatar || c.author_avatar || ""
+    rawAuthor.avatar || rawAuthor.avatar_url || rawAuthor.user_image || rawAuthor.user_image_url ||
+    rawAuthor.image || rawAuthor.photo ||
+    rawAuthor.profile?.avatar || rawAuthor.profile?.avatar_url ||
+    rawAuthor.profile?.user_image || rawAuthor.profile?.user_image_url ||
+    c.author_avatar || c.avatar || c.avatar_url || c.user_image || c.user_image_url || c.image || c.photo || ""
   );
 
   return {
@@ -1345,7 +1350,13 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
         (u?.first_name || u?.last_name ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : null) ||
         u?.username ||
         `User #${id}`;
-      const avatar = u?.avatar || u?.profile?.avatar || f?.avatar || "";
+      const avatar = toMediaUrl(
+        u?.avatar || u?.avatar_url || u?.user_image || u?.user_image_url ||
+        u?.image || u?.photo ||
+        u?.profile?.avatar || u?.profile?.avatar_url || u?.profile?.user_image || u?.profile?.user_image_url ||
+        f?.avatar || f?.avatar_url || f?.user_image || f?.user_image_url || f?.image || f?.photo || ""
+      );
+
       return { id, name, avatar };
     }).filter(x => x.id);
   }
@@ -1559,6 +1570,52 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [likers, setLikers] = React.useState([]);
   const [shareOpen, setShareOpen] = React.useState(false);
+  // --- Normalize likers same as HomePage.jsx ---
+  function normalizeUsers(payload) {
+    const rows = Array.isArray(payload?.results)
+      ? payload.results
+      : Array.isArray(payload) ? payload : [];
+
+    // const makeAbsolute = (url) =>
+    //   !url
+    //     ? ""
+    //     : /^https?:\/\//i.test(url)
+    //       ? url
+    //       : `${import.meta.env.VITE_MEDIA_BASE_URL || ""}${url.startsWith("/") ? "" : "/"}${url}`;
+
+    return rows.map((r) => {
+      const u = r.user || r.actor || r.liker || r.owner || r.profile || r;
+      const profile = u.profile || u.user_profile || u.userprofile || {};
+
+      const id = u.id || u.user_id || r.user_id || r.id;
+      const first = u.first_name || u.firstName || r.user_first_name || "";
+      const last = u.last_name || u.lastName || r.user_last_name || "";
+      const name =
+        u.name ||
+        u.full_name ||
+        `${first} ${last}`.trim() ||
+        u.username ||
+        `User #${id}`;
+
+      const avatarRaw =
+        profile.user_image_url ||
+        profile.user_image ||
+        u.user_image_url ||
+        u.user_image ||
+        r.user_image_url ||
+        r.user_image ||
+        u.avatar ||
+        u.profile_image ||
+        "";
+
+      return {
+        id,
+        name,
+        avatar: makeAbsolute(avatarRaw),
+      };
+    });
+  }
+
 
   React.useEffect(() => { setLocal(post); }, [post]);
   const commentInputRef = React.useRef(null);
@@ -1606,11 +1663,17 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
             const name =
               u?.name || u?.full_name ||
               (u?.first_name || u?.last_name ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : u?.username) ||
-              "User";
-            const avatar = toMediaUrl(u?.avatar || u?.user_image || u?.photo || u?.image || "");
+              `User #${u?.id || row.user_id || row.id}`;
+            const avatar = toMediaUrl(
+              u?.avatar || u?.avatar_url || u?.user_image || u?.user_image_url ||
+              u?.image || u?.photo ||
+              u?.profile?.avatar || u?.profile?.avatar_url || u?.profile?.user_image || u?.profile?.user_image_url ||
+              row.actor_avatar || row.avatar || row.avatar_url || row.user_image || row.user_image_url || row.image || row.photo || ""
+            );
             const id = u?.id || row.user_id || row.id;
             return { id, name, avatar };
           }).filter(Boolean);
+
           if (!cancelled) setLikers(norm);
           if (norm.length) break;
         }
@@ -1661,7 +1724,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
     <Paper key={post.id} elevation={0} sx={{ p: 2, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
       {/* Header */}
       <Stack direction="row" spacing={1.5} alignItems="center">
-        <Avatar src={post.group_avatar || post.author?.avatar} alt={headingTitle} />
+        <Avatar src={toMediaUrl(post.group_avatar || post.author?.avatar)} alt={headingTitle} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
 
           <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -1743,14 +1806,23 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
                 </Avatar>
               ))}
             </AvatarGroup>
-            <Typography variant="body2">
+            <Typography
+              variant="body2"
+              sx={{ cursor: "pointer" }}
+              onClick={() => window.__openLikes?.(engageTargetOf(post))?.()}
+            >
               {likers?.[0]?.name
-                ? `${likers[0].name} and ${Math.max(0, (local.metrics?.likes || 0) - 1).toLocaleString()} others`
+                ? (
+                  local.metrics?.likes === 1
+                    ? `liked by ${likers[0].name}`
+                    : `liked by ${likers[0].name} and ${(local.metrics?.likes - 1)} others`
+                )
                 : `${(local.metrics?.likes || 0).toLocaleString()} likes`}
             </Typography>
+
           </Stack>
 
-          <Button size="small" onClick={() => setShareOpen(true)}>
+          <Button size="small" onClick={() => window.__openShares?.(engageTargetOf(post))?.()}>
             {(local.metrics?.shares || 0).toLocaleString()} SHARES
           </Button>
         </Stack>
@@ -1867,6 +1939,135 @@ export default function LiveFeedPage({
   const MAX_LEN = 280;
   const [composeText, setComposeText] = React.useState("");
   const [creating, setCreating] = React.useState(false);
+  // --- Likes modal state (global for this page) ---
+  const [likesOpen, setLikesOpen] = React.useState(false);
+  const [likesTarget, setLikesTarget] = React.useState(null); // {id, type|null}
+  const [likesLoading, setLikesLoading] = React.useState(false);
+  const [likesUsers, setLikesUsers] = React.useState([]);
+  // --- Shares modal state (global for this page) ---
+  const [sharesOpen, setSharesOpen] = React.useState(false);
+  const [sharesTarget, setSharesTarget] = React.useState(null);
+  const [sharesLoading, setSharesLoading] = React.useState(false);
+  const [sharesUsers, setSharesUsers] = React.useState([]);
+
+  // Install a global opener used by PostCard ("liked by X and N others" click)
+  React.useEffect(() => {
+    window.__openLikes = (t) => () => {
+      // accept either a number (feed item id) or an {id, type} object
+      const target = typeof t === "object" && t ? t : { id: t, type: null };
+      setLikesTarget(target);
+      setLikesOpen(true);
+    };
+    return () => { try { delete window.__openLikes; } catch { } };
+  }, []);
+
+  // Install a global opener used by PostCard for "X SHARES" click
+  React.useEffect(() => {
+    window.__openShares = (t) => () => {
+      // accept either a number or an {id, type} object
+      const target = typeof t === "object" && t ? t : { id: t, type: null };
+      setSharesTarget(target);
+      setSharesOpen(true);
+    };
+    return () => { try { delete window.__openShares; } catch { } };
+  }, []);
+
+
+  // Fetch who-liked for the current target
+  React.useEffect(() => {
+    if (!likesOpen || !likesTarget?.id) return;
+
+    (async () => {
+      setLikesLoading(true);
+      const { id, type } = likesTarget;
+      const urls = [
+        // if we know the concrete CT (events.event, content.resource, etc.)
+        type ? toApiUrl(`engagements/reactions/?reaction=like&target_type=${encodeURIComponent(type)}&target_id=${id}&page_size=100`) : null,
+        // dedicated feed-item helper
+        toApiUrl(`engagements/reactions/who-liked/?feed_item=${id}&page_size=100`),
+        // final fallback assumes FeedItem CT
+        toApiUrl(`engagements/reactions/?reaction=like&target_type=activity_feed.feeditem&target_id=${id}&page_size=100`),
+      ].filter(Boolean);
+
+      let rows = [];
+      for (const url of urls) {
+        try {
+          const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+          if (!r.ok) continue;
+          const j = await r.json();
+          rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+          if (rows.length) break;
+        } catch { }
+      }
+
+      const list = rows.map((row) => {
+        const u = row.user || row.actor || row.profile || row;
+        const id2 = u?.id || row.user_id || row.id;
+        const name =
+          u?.name || u?.full_name ||
+          ((u?.first_name || u?.last_name) ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : u?.username) ||
+          `User #${id2}`;
+        const avatar = toMediaUrl(
+          u?.avatar || u?.avatar_url || u?.user_image || u?.user_image_url ||
+          u?.image || u?.photo ||
+          u?.profile?.avatar || u?.profile?.avatar_url || u?.profile?.user_image || u?.profile?.user_image_url ||
+          row.actor_avatar || row.avatar || row.avatar_url || row.user_image || row.user_image_url || row.image || row.photo || ""
+        );
+        return { id: id2, name, avatar };
+      });
+
+
+      setLikesUsers(list);
+      setLikesLoading(false);
+    })();
+  }, [likesOpen, likesTarget]);
+
+  React.useEffect(() => {
+    if (!sharesOpen || !sharesTarget?.id) return;
+
+    (async () => {
+      setSharesLoading(true);
+      const { id, type } = sharesTarget;
+
+      // Try a few likely endpoints (handles FeedItem or typed targets)
+      const urls = [
+        type ? toApiUrl(`engagements/shares/?target_type=${encodeURIComponent(type)}&target_id=${id}&page_size=100`) : null,
+        toApiUrl(`engagements/shares/who-shared/?feed_item=${id}&page_size=100`),
+        toApiUrl(`engagements/shares/?target_type=activity_feed.feeditem&target_id=${id}&page_size=100`),
+      ].filter(Boolean);
+
+      let rows = [];
+      for (const url of urls) {
+        try {
+          const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+          if (!r.ok) continue;
+          const j = await r.json();
+          rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+          if (rows.length) break;
+        } catch { }
+      }
+
+      const list = rows.map((row) => {
+        const u = row.user || row.actor || row.profile || row.from_user || row.shared_by || row.owner || row;
+        const id2 = u?.id || row.user_id || row.from_user_id || row.id;
+        const name =
+          u?.name || u?.full_name ||
+          ((u?.first_name || u?.last_name) ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : u?.username) ||
+          `User #${id2}`;
+        const avatar = toMediaUrl(
+          u?.avatar || u?.avatar_url || u?.user_image || u?.user_image_url ||
+          u?.image || u?.photo ||
+          u?.profile?.avatar || u?.profile?.avatar_url || u?.profile?.user_image || u?.profile?.user_image_url ||
+          row.actor_avatar || row.avatar || row.avatar_url || row.user_image || row.user_image_url || row.image || row.photo || ""
+        );
+        return { id: id2, name, avatar };
+      });
+
+      setSharesUsers(list);
+      setSharesLoading(false);
+    })();
+  }, [sharesOpen, sharesTarget]);
+
 
   // Build initial URL based on scope + search
   const buildFeedPath = React.useCallback((sc, q) => {
@@ -2197,6 +2398,48 @@ export default function LiveFeedPage({
             </Stack>
           )}
         </Box>
+        <Dialog open={likesOpen} onClose={() => setLikesOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Likes</DialogTitle>
+          <DialogContent dividers>
+            {likesLoading ? (
+              <Stack alignItems="center" py={2}><CircularProgress size={22} /></Stack>
+            ) : likesUsers.length === 0 ? (
+              <Typography color="text.secondary">No likes yet.</Typography>
+            ) : (
+              <List dense>
+                {likesUsers.map(u => (
+                  <ListItem key={u.id}>
+                    <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0, 1)}</Avatar></ListItemAvatar>
+                    <ListItemText primary={u.name} />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </DialogContent>
+        </Dialog>
+        <Dialog open={sharesOpen} onClose={() => setSharesOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Shares</DialogTitle>
+          <DialogContent dividers>
+            {sharesLoading ? (
+              <Stack alignItems="center" py={2}><CircularProgress size={22} /></Stack>
+            ) : sharesUsers.length === 0 ? (
+              <Typography color="text.secondary">No shares yet.</Typography>
+            ) : (
+              <List dense>
+                {sharesUsers.map(u => (
+                  <ListItem key={u.id}>
+                    <ListItemAvatar>
+                      <Avatar src={u.avatar}>{(u.name || "U").slice(0, 1)}</Avatar>
+                    </ListItemAvatar>
+                    <ListItemText primary={u.name} />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </DialogContent>
+        </Dialog>
+
+
       </Grid>
 
       {/* Right rail */}

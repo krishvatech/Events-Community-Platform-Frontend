@@ -27,7 +27,7 @@ import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import {
-  Divider, List, ListItem, ListItemAvatar, ListItemText, AvatarGroup, Badge
+  Divider, List, ListItem, ListItemAvatar, ListItemText, AvatarGroup, Badge, Checkbox
 } from "@mui/material";
 import { IconButton, Tooltip, CircularProgress, DialogContentText } from "@mui/material";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -69,6 +69,101 @@ function toApiUrl(pathOrUrl) {
   }
 }
 function authHeaders() { return { ...authHeader() }; }
+
+// --- media URL helpers (ensure absolute) ---
+const API_HOST = API_ROOT.replace(/\/api\/?$/, "");
+function absMedia(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url) || url.startsWith("data:")) return url;
+  if (url.startsWith("/")) return `${API_HOST}${url}`;
+  return `${API_HOST}/${url}`;
+}
+
+function avatarFrom(u) {
+  if (!u) return "";
+  const raw =
+    // direct fields
+    u?.avatar_url ?? u?.avatar ??
+    u?.user_image_url ?? u?.user_image ??
+    u?.image ?? u?.photo ??
+    // nested profile shapes
+    u?.profile?.avatar_url ?? u?.profile?.avatar ?? u?.profile?.image ??
+    u?.profile?.user_image_url ?? u?.profile?.user_image ??
+    // some backends expose user_profile instead of profile
+    u?.user_profile?.avatar_url ?? u?.user_profile?.avatar ?? u?.user_profile?.image ??
+    u?.user_profile?.user_image ??
+    // occasional alternates
+    u?.profile_pic ?? u?.profile_picture ?? "";
+  return absMedia(raw);
+}
+
+
+function nameFrom(u) {
+  if (!u) return "";
+  return u.full_name || u.name || u.username ||
+    [u.first_name, u.last_name].filter(Boolean).join(" ") || "";
+}
+
+// Try nested author object first, then flat fields on the item
+function headerAvatarFromItem(item) {
+  // prefer a nested author-ish object first
+  const headerAuthor =
+    (typeof item?.created_by === "object" ? item.created_by : null) ||
+    (typeof item?.author === "object" ? item.author : null) ||
+    (typeof item?.owner === "object" ? item.owner : null) ||
+    (typeof item?.user === "object" ? item.user : null) ||
+    (typeof item?.user_profile === "object" ? item.user_profile : null) ||
+    (typeof item?.profile === "object" ? item.profile : null) ||
+    (typeof item?.creator === "object" ? item.creator : null) ||
+    (typeof item?.posted_by === "object" ? item.posted_by : null) ||
+    (typeof item?.actor === "object" ? item.actor : null);
+
+  const nested = avatarFrom(headerAuthor);
+  if (nested) return nested;
+
+  // fallback: direct fields on the item (cover *_user_image, *_image, *_photo variants)
+  const raw =
+    // author-based
+    item?.author_avatar || item?.author_avatar_url ||
+    item?.author_user_image || item?.author_user_image_url ||
+    item?.author_image || item?.author_photo ||
+    // created_by-based
+    item?.created_by_avatar || item?.created_by_avatar_url ||
+    item?.created_by_user_image || item?.created_by_user_image_url ||
+    item?.created_by_image || item?.created_by_photo ||
+    // other common aliases
+    item?.owner_avatar || item?.owner_avatar_url ||
+    item?.posted_by_avatar || item?.posted_by_avatar_url ||
+    item?.creator_avatar || item?.creator_avatar_url ||
+    // generic user fields
+    item?.user_image || item?.user_image_url ||
+    item?.avatar || item?.avatar_url ||
+    item?.image || item?.photo || "";
+
+  return absMedia(raw);
+}
+
+
+function headerNameFromItem(item) {
+  const headerAuthor =
+    (typeof item?.created_by === "object" ? item.created_by : null) ||
+    (typeof item?.author === "object" ? item.author : null) ||
+    (typeof item?.owner === "object" ? item.owner : null) ||
+    (typeof item?.user === "object" ? item.user : null) ||
+    (typeof item?.user_profile === "object" ? item.user_profile : null) ||
+    (typeof item?.profile === "object" ? item.profile : null) ||
+    (typeof item?.creator === "object" ? item.creator : null) ||
+    (typeof item?.posted_by === "object" ? item.posted_by : null) ||
+    (typeof item?.actor === "object" ? item.actor : null);
+
+  return (
+    nameFrom(headerAuthor) ||
+    item?.created_by_name || item?.author_name || item?.owner_name ||
+    item?.posted_by_name || item?.creator_name || item?.user_name ||
+    "Admins"
+  );
+}
+
 
 
 // Map a post to the correct engagement target (feed item | event | resource)
@@ -122,9 +217,12 @@ function PostCard({ item }) {
     <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
       <CardContent>
         <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-          <Avatar sx={{ width: 28, height: 28 }}>A</Avatar>
+          <Avatar src={headerAvatarFromItem(item)} sx={{ width: 28, height: 28 }}>
+            {headerNameFromItem(item).slice(0, 1)}
+          </Avatar>
+
           <Typography variant="subtitle2" color="text.secondary">
-            Admin • {new Date(item.created_at || Date.now()).toLocaleString()}
+            {headerNameFromItem(item)} • {new Date(item.created_at || Date.now()).toLocaleString()}
           </Typography>
         </Stack>
         {item.community?.name && (
@@ -539,16 +637,15 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
                 : [];
 
     return arr.map((r) => {
-      const u = r.user || r.actor || r.owner || r.created_by || r.author || r.profile || r;
+      const u = r.user || r.actor || r.owner || r.created_by || r.author || r.user_profile || r.profile || r;
       const id = u?.id ?? u?.user_id ?? r.user_id ?? r.id;
-      const name = u?.name || u?.full_name || u?.username ||
+      const name =
+        u?.full_name || u?.name || u?.username ||
         [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
         (id ? `User #${id}` : "User");
       const avatar =
-        u?.user_image || u?.user_image_url ||
-        u?.avatar || u?.photo || u?.image || u?.profile?.avatar ||
-        r.user_image || r.user_image_url || r.avatar || "";
-
+        avatarFrom(u) ||
+        absMedia(r.user_image || r.user_image_url || r.avatar || r.avatar_url || "");
       return id ? { id, name, avatar } : null;
     }).filter(Boolean);
   };
@@ -647,20 +744,22 @@ function SharesDialog({ open, onClose, communityId, postId, target: propTarget }
           : Array.isArray(payload?.items) ? payload.items
             : Array.isArray(payload?.shares) ? payload.shares
               : [];
+
     return arr.map((r) => {
-      const u = r.user || r.actor || r.owner || r.shared_by || r.created_by || r.author || r.profile || r;
-      const id = u?.id ?? u?.user_id ?? r.user_id ?? r.actor_id ?? r.owner_id ?? r.id;
+      const u = r.user || r.actor || r.owner || r.shared_by || r.sender || r.created_by || r.author || r.profile || r;
+      const id = u?.id ?? u?.user_id ?? r.user_id ?? r.actor_id ?? r.owner_id ?? r.shared_by_id ?? r.id;
       const name =
-        u?.name || u?.full_name || u?.username ||
+        u?.full_name || u?.name || u?.username ||
         [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
         (id ? `User #${id}` : "User");
-      const avatar =
-        u?.user_image || u?.user_image_url ||
-        u?.avatar || u?.photo || u?.image || u?.profile?.avatar ||
+      const rawAvatar =
+        u?.avatar_url || u?.user_image_url || u?.user_image ||
+        u?.avatar || u?.photo || u?.image || u?.profile?.avatar_url || u?.profile?.avatar ||
         r.user_image || r.user_image_url || r.avatar || "";
-      return id ? { id, name, avatar } : null;
+      return id ? { id, name, avatar: absMedia(rawAvatar) } : null;
     }).filter(Boolean);
   };
+
 
   const load = React.useCallback(async () => {
     if (!open) return;
@@ -668,15 +767,15 @@ function SharesDialog({ open, onClose, communityId, postId, target: propTarget }
 
     const tgt = propTarget?.id ? propTarget : { id: postId, type: null };
 
-    // Preferred → fallbacks. Both return the same user rows shape after normalization.
+    // Shares in your API are keyed by feed_item ⇒ query that first,
+    // then fall back to legacy/alternate routes.
     const urls = [
-      // preferred: engagements/shares with target_type
-      tgt.type
-        ? `${API_ROOT}/engagements/shares/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
-        : `${API_ROOT}/engagements/shares/?target_id=${tgt.id}&page_size=200`,
-      // alternate param occasionally present in your backend
       `${API_ROOT}/engagements/shares/?feed_item=${tgt.id}&page_size=200`,
-    ];
+      `${API_ROOT}/activity/feed/${tgt.id}/shares/`,
+      (tgt.type
+        ? `${API_ROOT}/engagements/shares/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
+        : null),
+    ].filter(Boolean);
 
     const collected = [];
     for (const url of urls) {
@@ -687,14 +786,16 @@ function SharesDialog({ open, onClose, communityId, postId, target: propTarget }
           if (!res.ok) break;
           const json = await res.json();
           collected.push(...normalizeUsers(json));
-          next = json?.next ? (/^https?:/i.test(json.next) ? json.next : `${API_ROOT}${json.next.startsWith("/") ? "" : "/"}${json.next}`) : null;
+          const n = json?.next;
+          next = n ? (/^https?:/i.test(n) ? n : `${API_ROOT}${n.startsWith("/") ? "" : "/"}${n}`) : null;
         }
-        if (collected.length) break; // stop once one worked
-      } catch { }
+        if (collected.length) break; // stop once one endpoint works
+      } catch { /* ignore and try next */ }
     }
 
-    // de-dupe by id (or name if id missing)
-    const seen = new Set(); const unique = [];
+    // de-dupe
+    const seen = new Set();
+    const unique = [];
     for (const u of collected) {
       const k = (u.id != null) ? `id:${u.id}` : `name:${(u.name || "").toLowerCase()}`;
       if (!seen.has(k)) { seen.add(k); unique.push(u); }
@@ -730,6 +831,7 @@ function SharesDialog({ open, onClose, communityId, postId, target: propTarget }
   );
 }
 
+
 // ---------- Comments dialog (engagements/comments + replies + comment-like) ----------
 function CommentsDialog({
   open,
@@ -764,7 +866,7 @@ function CommentsDialog({
       (typeof c.parent === "number" ? c.parent : (typeof c.parent === "object" ? c.parent?.id : null)) ??
       c.parentId ?? null;
 
-    const rawAuthor = c.author || c.user || c.created_by || c.owner || {};
+    const rawAuthor = c.author || c.user || c.created_by || c.owner || c.user_profile || c.profile || {};
     const author_id = rawAuthor.id ?? c.author_id ?? c.user_id ?? c.created_by_id ?? null;
     const name =
       rawAuthor.name || rawAuthor.full_name ||
@@ -772,7 +874,7 @@ function CommentsDialog({
         ? `${rawAuthor.first_name || ""} ${rawAuthor.last_name || ""}`.trim()
         : rawAuthor.username) ||
       (author_id ? `User #${author_id}` : "User");
-    const avatar = rawAuthor.avatar || rawAuthor.profile?.avatar || c.author_avatar || "";
+    const avatar = avatarFrom(rawAuthor) || absMedia(c.author_avatar || "");
     return { ...c, parent_id, author_id, author: { id: author_id, name, avatar } };
   };
 
@@ -1035,25 +1137,168 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
   const [selectedGroups, setSelectedGroups] = React.useState(new Set());
   const [sending, setSending] = React.useState(false);
   const [q, setQ] = React.useState("");
+  const [meId, setMeId] = React.useState(null);
+
+  // --- helpers ---
+  const fetchAllPages = React.useCallback(async (url) => {
+    const out = [];
+    let next = url;
+    while (next) {
+      const r = await fetch(next, { headers: { Accept: "application/json", ...authHeader() } });
+      if (!r.ok) break;
+      const j = await r.json();
+      const arr = Array.isArray(j?.results) ? j.results :
+        Array.isArray(j?.data) ? j.data :
+          Array.isArray(j?.items) ? j.items :
+            Array.isArray(j) ? j : [];
+      out.push(...arr);
+      const n = j?.next;
+      next = n ? (/^https?:/i.test(n) ? n : `${API_ROOT}${n.startsWith("/") ? "" : "/"}${n}`) : null;
+    }
+    return out;
+  }, []);
+
+  // pick “the other user” out of a connection row
+  const pickOtherUser = (row) => {
+    const pairs = [
+      ["from_user", "to_user"],
+      ["requester", "receiver"],
+      ["sender", "recipient"],
+      ["user_a", "user_b"],
+      ["user1", "user2"],
+      ["initiator", "friend"]
+    ];
+    for (const [a, b] of pairs) {
+      const A = row?.[a], B = row?.[b];
+      if (A && B) {
+        const aId = A?.id ?? A?.user_id;
+        const bId = B?.id ?? B?.user_id;
+        if (meId && aId === meId) return B;
+        if (meId && bId === meId) return A;
+        // if we don't know me yet, just return one
+        return A || B;
+      }
+    }
+    return null;
+  };
+
+  const normUser = (row) => {
+    // direct user-like shapes first
+    let u = row.friend || row.user || row.member || row.profile || row.owner || row.actor || null;
+
+    // connection shapes (two participants)
+    if (!u) u = pickOtherUser(row);
+
+    // some APIs wrap it again (e.g., { friend: { user: {...} } })
+    if (u && u.user && (u.user.id || u.user.user_id)) u = u.user;
+
+    // last-ditch: some rows store user object under 'counterparty' or 'other_user'
+    if (!u) u = row.counterparty || row.other_user || null;
+
+    const id = u?.id ?? u?.user_id ?? row.friend_id ?? row.user_id ?? null;
+    if (!id) return null;
+
+    const name = u?.full_name || u?.name || u?.username ||
+      [u?.first_name, u?.last_name].filter(Boolean).join(" ") || `User #${id}`;
+    const avatar = u?.user_image || u?.user_image_url || u?.avatar || u?.avatar_url ||
+      u?.photo || u?.image || u?.profile?.avatar || "";
+
+    return { id, name, avatar };
+  };
+
+  const normGroup = (row) => {
+    const g = row.group || row.target || row;
+    const id = g?.id ?? row.group_id ?? null;
+    if (!id) return null;
+    const name = g?.name || g?.title || `Group #${id}`;
+    const avatar = g?.avatar || g?.avatar_url || g?.icon || g?.image || g?.photo || "";
+    return { id, name, avatar };
+  };
+
+  const dedupe = (arr) => {
+    const seen = new Set();
+    const out = [];
+    for (const x of arr) {
+      const k = `${x.id}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(x);
+    }
+    return out;
+  };
 
   const load = React.useCallback(async () => {
     if (!open) return;
     setLoading(true);
+
+    // who am I? (needed to pick the counterparty in a friendship row)
     try {
-      // preferred helper (single round-trip)
-      const r = await fetch(`${API_ROOT}/engagements/share-targets/`, { headers: { Accept: "application/json", ...authHeader() }});
+      const meRes = await fetch(`${API_ROOT}/users/me/`, { headers: { Accept: "application/json", ...authHeader() } });
+      if (meRes.ok) {
+        const me = await meRes.json();
+        setMeId(me?.id || me?.user?.id || null);
+      }
+    } catch { }
+
+    const tgtId = target?.id;
+
+    // 1) single helper if you have it
+    try {
+      const url = tgtId
+        ? `${API_ROOT}/engagements/share-targets/?feed_item=${tgtId}`
+        : `${API_ROOT}/engagements/share-targets/`;
+      const r = await fetch(url, { headers: { Accept: "application/json", ...authHeader() } });
       if (r.ok) {
         const j = await r.json();
-        setUsers(Array.isArray(j.users) ? j.users : []);
-        setGroups(Array.isArray(j.groups) ? j.groups : []);
-      } else {
-        setUsers([]); setGroups([]);
+        const u1 = (Array.isArray(j.users) ? j.users : []).map(normUser).filter(Boolean);
+        const g1 = (Array.isArray(j.groups) ? j.groups : []).map(normGroup).filter(Boolean);
+        if (u1.length || g1.length) {
+          setUsers(dedupe(u1));
+          setGroups(dedupe(g1));
+          setLoading(false);
+          return;
+        }
       }
-    } catch {
-      setUsers([]); setGroups([]);
-    }
+    } catch { /* fall through */ }
+
+    // 2) Fallbacks – Friends (accepted connections; many possible routes)
+    let uAll = [];
+    try {
+      const friendUrls = [
+        `${API_ROOT}/friends/connections/?status=accepted&page_size=200`,
+        `${API_ROOT}/friends/friendships/?status=accepted&page_size=200`,
+        `${API_ROOT}/friends/?status=accepted&page_size=200`,
+        `${API_ROOT}/users/connections/?page_size=200`,
+        `${API_ROOT}/users/?connected=1&page_size=200`,
+        `${API_ROOT}/users/friends/?page_size=200`,
+      ];
+      for (const u of friendUrls) {
+        const rows = await fetchAllPages(u);
+        if (rows.length) uAll.push(...rows.map(normUser).filter(Boolean));
+        if (uAll.length) break;
+      }
+    } catch { /* ignore */ }
+
+    // 3) Fallbacks – My Groups (memberships I belong to)
+    let gAll = [];
+    try {
+      const groupUrls = [
+        `${API_ROOT}/groups/memberships/?me=1&status=member&page_size=200`,
+        `${API_ROOT}/groups/memberships/my/?page_size=200`,
+        `${API_ROOT}/groups/?member=me&page_size=200`,
+        `${API_ROOT}/groups/my/?page_size=200`,
+      ];
+      for (const g of groupUrls) {
+        const rows = await fetchAllPages(g);
+        if (rows.length) gAll.push(...rows.map(normGroup).filter(Boolean));
+        if (gAll.length) break;
+      }
+    } catch { /* ignore */ }
+
+    setUsers(dedupe(uAll));
+    setGroups(dedupe(gAll));
     setLoading(false);
-  }, [open]);
+  }, [open, target?.id, fetchAllPages, meId]);
 
   React.useEffect(() => { load(); }, [load]);
 
@@ -1070,21 +1315,30 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
 
   const doShare = async () => {
     if (!target?.id) return;
+    const toUsers = Array.from(selectedUsers);
+    const toGroups = Array.from(selectedGroups);
+    if (toUsers.length === 0 && toGroups.length === 0) return;
+
     setSending(true);
     try {
-      const body = {
-        // Send feed_item for posts; or use { target_type, target_id } if needed
-        feed_item: target.id,
-        to_user_ids: Array.from(selectedUsers),
-        to_group_ids: Array.from(selectedGroups),
-      };
-      const r = await fetch(`${API_ROOT}/engagements/shares/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) throw new Error();
-      onShared?.();  // e.g., refreshCounts()
+      // LiveFeedPage uses target_id (and target_type when available), not feed_item
+      const base = target.type
+        ? { target_type: target.type, target_id: target.id }
+        : { target_id: target.id };
+
+      const res = await fetch(
+        toApiUrl(`engagements/shares/`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ ...base, to_users: toUsers, to_groups: toGroups }),
+        }
+      );
+
+      if (!res.ok) throw new Error("share_failed");
+
+      // same UX as before: refresh counts + open "Shared by"
+      onShared?.();
       onClose?.();
     } catch {
       alert("Could not share. Please try again.");
@@ -1092,6 +1346,7 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
       setSending(false);
     }
   };
+
 
   return (
     <Dialog open={open} onClose={sending ? undefined : onClose} maxWidth="sm" fullWidth>
@@ -1111,7 +1366,7 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
                 <List dense>
                   {filteredUsers.map(u => (
                     <ListItem key={`u-${u.id}`} button onClick={() => toggleSel(selectedUsers, setSelectedUsers, u.id)}>
-                      <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0,1)}</Avatar></ListItemAvatar>
+                      <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0, 1)}</Avatar></ListItemAvatar>
                       <ListItemText primary={u.name || `User #${u.id}`} />
                       <Checkbox edge="end" checked={selectedUsers.has(u.id)} />
                     </ListItem>
@@ -1125,7 +1380,7 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
                 <List dense>
                   {filteredGroups.map(g => (
                     <ListItem key={`g-${g.id}`} button onClick={() => toggleSel(selectedGroups, setSelectedGroups, g.id)}>
-                      <ListItemAvatar><Avatar src={g.avatar}>{(g.name || "G").slice(0,1)}</Avatar></ListItemAvatar>
+                      <ListItemAvatar><Avatar src={g.avatar}>{(g.name || "G").slice(0, 1)}</Avatar></ListItemAvatar>
                       <ListItemText primary={g.name || `Group #${g.id}`} />
                       <Checkbox edge="end" checked={selectedGroups.has(g.id)} />
                     </ListItem>
@@ -1153,6 +1408,8 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
   );
 }
 
+
+
 // ---------- Social bar (uses engagements/*) ----------
 function PostSocialBar({ communityId, post, onCounts }) {
   const target = React.useMemo(() => engageTargetOf(post), [post]);
@@ -1165,8 +1422,7 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const [sharesOpen, setSharesOpen] = React.useState(false);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [likers, setLikers] = React.useState([]);
-  // const [sharePickerOpen, setSharePickerOpen] = React.useState(false);
-
+  const [sharePickerOpen, setSharePickerOpen] = React.useState(false);
   const normalizeUsers = (payload) => {
     const arr = Array.isArray(payload) ? payload
       : Array.isArray(payload?.results) ? payload.results
@@ -1179,14 +1435,14 @@ function PostSocialBar({ communityId, post, onCounts }) {
       const u = r.user || r.actor || r.owner || r.created_by || r.author || r.profile || r;
       const id = u?.id ?? u?.user_id ?? r.user_id ?? r.id;
       const name =
-        u?.name || u?.full_name || u?.username ||
+        u?.full_name || u?.name || u?.username ||
         [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
         (id ? `User #${id}` : "User");
-      const avatar =
-        u?.user_image || u?.user_image_url ||
-        u?.avatar || u?.photo || u?.image || u?.profile?.avatar ||
+      const rawAvatar =
+        u?.avatar_url || u?.user_image_url || u?.user_image ||
+        u?.avatar || u?.photo || u?.image || u?.profile?.avatar_url || u?.profile?.avatar ||
         r.user_image || r.user_image_url || r.avatar || "";
-      return { id, name, avatar };
+      return id ? { id, name, avatar: absMedia(rawAvatar) } : null;
     }).filter(Boolean);
   };
 
@@ -1273,10 +1529,15 @@ function PostSocialBar({ communityId, post, onCounts }) {
             </AvatarGroup>
 
             <Typography variant="body2">
-              {likers?.[0]?.name
-                ? `${likers[0].name} and ${Math.max(0, (likeCount || 0) - 1).toLocaleString()} others`
-                : `${(likeCount || 0).toLocaleString()} likes`}
+              {likers?.[0]?.name ? (
+                Math.max(0, (likeCount || 0) - 1) > 0
+                  ? `${likers[0].name} and ${Math.max(0, (likeCount || 0) - 1).toLocaleString()} others`
+                  : likers[0].name
+              ) : (
+                `${(likeCount || 0).toLocaleString()} ${Number(likeCount || 0) === 1 ? "like" : "likes"}`
+              )}
             </Typography>
+
           </Stack>
 
           {/* Right: shares */}
@@ -1309,7 +1570,7 @@ function PostSocialBar({ communityId, post, onCounts }) {
           Comment
         </Button>
 
-        <Button size="small" startIcon={<IosShareRoundedIcon />} onClick={() => setSharesOpen(true)}>
+        <Button size="small" startIcon={<IosShareRoundedIcon />} onClick={() => setSharePickerOpen(true)}>
           Share
         </Button>
 
@@ -1323,17 +1584,23 @@ function PostSocialBar({ communityId, post, onCounts }) {
       />
       <SharesDialog
         open={sharesOpen}
-        onClose={() => setSharesOpen(false)}
+        onClose={() => { setSharesOpen(false); refreshCounts(); }}
         communityId={communityId}
         postId={post.id}
         target={engageTargetOf(post)}
       />
       <CommentsDialog
         open={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
+        onClose={() => { setCommentsOpen(false); refreshCounts(); }}
         communityId={communityId}
         postId={post.id}
         target={target}
+      />
+      <SharePickerDialog
+        open={sharePickerOpen}
+        onClose={() => setSharePickerOpen(false)}
+        target={target}
+        onShared={() => { refreshCounts(); setSharesOpen(true); }}
       />
     </>
   );
