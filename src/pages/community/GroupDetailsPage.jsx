@@ -49,9 +49,14 @@ import CommunityRightRailLayout from "../../components/layout/CommunityRightRail
 const BORDER = "#e2e8f0";
 
 // -----------------------------------------------------------------------------
-// Keep helpers local (mirrors your HomePage style). No imports from your code.
+// Helpers
 // -----------------------------------------------------------------------------
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+const API_ORIGIN = (() => {
+  try { const u = new URL(API_ROOT); return `${u.protocol}//${u.host}`; } catch { return ""; }
+})();
+const MEDIA_ORIGIN = import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN;
+
 const getToken = () => {
   const keys = ["token", "access", "access_token", "accessToken", "jwt", "JWT"];
   for (const k of keys) {
@@ -83,17 +88,33 @@ const nameOf = (u = {}) =>
   u.email ||
   "Member";
 
+const toAbsolute = (url) =>
+  !url
+    ? ""
+    : /^https?:\/\//i.test(url)
+      ? url
+      : `${MEDIA_ORIGIN}${url.startsWith("/") ? "" : "/"}${url}`;
+
 const avatarOf = (u = {}) =>
-  u.avatar ||
-  u.avatar_url ||
-  u.photo ||
-  u.profile?.avatar ||
-  u.profile?.image_url ||
-  u.profile?.photo ||
-  "";
+  toAbsolute(
+    u.user_image_url ||
+    u.user_image ||
+    u.avatar ||
+    u.avatar_url ||
+    u.profile_image ||
+    u.image_url ||
+    u.photo ||
+    u.profile?.user_image_url ||
+    u.profile?.user_image ||
+    u.profile?.avatar ||
+    u.profile?.image_url ||
+    u.profile?.photo ||
+    ""
+  );
+
 // -----------------------------------------------------------------------------
 // Minimal PostCard (local) so we don't touch your existing files
-
+// -----------------------------------------------------------------------------
 function PostCard({ post }) {
   const [likers, setLikers] = React.useState(
     () => post.likers || post.metrics?.likers || []
@@ -101,20 +122,69 @@ function PostCard({ post }) {
 
   const likesCount = post.metrics?.likes ?? post.like_count ?? 0;
   const commentCount = post.metrics?.comments ?? post.comment_count ?? 0;
-  const shareCount = post.metrics?.shares ?? post.share_count ?? 0;
+  const [shareCount, setShareCount] = React.useState(post.metrics?.shares ?? post.share_count ?? 0);
 
   const primaryLiker = likers[0];
   const othersCount = likesCount > 1 ? likesCount - 1 : 0;
 
   let likeLabel = "";
   if (likesCount === 1 && primaryLiker) {
-    likeLabel = `Liked by ${primaryLiker.name || "someone"}`;
+    likeLabel = `${primaryLiker.name || "someone"}`;
   } else if (likesCount > 1 && primaryLiker) {
-    likeLabel = `Liked by ${primaryLiker.name || "someone"} and ${othersCount
-      } other${othersCount > 1 ? "s" : ""}`;
+    likeLabel = `${primaryLiker.name || "someone"} and ${othersCount} other${othersCount > 1 ? "s" : ""}`;
   }
 
-  // load likers list (avatars) similar to HomePage
+  // --- 2a) Normalize likers like Home (helper kept local to PostCard) ---
+  const normalizeUsers = React.useCallback((payload) => {
+    const rows = Array.isArray(payload?.results)
+      ? payload.results
+      : Array.isArray(payload)
+      ? payload
+      : [];
+    return rows.map((r) => {
+      const u = r.user || r.actor || r.liker || r.owner || r.profile || r;
+      const profile = u.profile || u.user_profile || r.profile || {};
+      const id =
+        u?.id ?? u?.user_id ?? r.user_id ?? r.id;
+      const first =
+        u?.first_name ?? u?.firstName ?? r.user_first_name ?? "";
+      const last =
+        u?.last_name ?? u?.lastName ?? r.user_last_name ?? "";
+      const name =
+        u?.name || u?.full_name || `${first} ${last}`.trim() || u?.username || (id ? `User #${id}` : "User");
+      const avatarRaw =
+        profile.user_image_url || profile.user_image ||
+        u?.user_image_url || u?.user_image ||
+        r.user_image_url || r.user_image ||
+        u?.avatar || u?.profile_image || u?.photo || u?.image_url || u?.avatar_url || "";
+      return { id, name, avatar: toAbsolute(avatarRaw) };
+    });
+  }, []);
+
+  // sync share count (fallback if API didn’t provide)
+  React.useEffect(() => {
+    let active = true;
+    async function loadShares() {
+      try {
+        const res = await fetch(
+          `${API_ROOT}/engagements/shares/?target_type=activity_feed.feeditem&target_id=${post.id}&page_size=200`,
+          { headers: { ...authHeader(), accept: "application/json" } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const rows = Array.isArray(data?.results) ? data.results :
+                     Array.isArray(data) ? data :
+                     Array.isArray(data?.items) ? data.items :
+                     Array.isArray(data?.shares) ? data.shares : [];
+        if (active) setShareCount(rows.length || 0);
+      } catch {}
+    }
+    // only fetch if it’s 0 to avoid extra calls
+    if (!shareCount) loadShares();
+    return () => { active = false; };
+  }, [post.id]); // eslint-disable-line
+
+  // load likers list (avatars) similar to HomePage (your original effect kept)
   React.useEffect(() => {
     let active = true;
 
@@ -158,6 +228,43 @@ function PostCard({ post }) {
     };
   }, [post.id, likesCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // --- 2a) EXTRA: second pass using Home-style endpoints/normalization if still empty ---
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!(likesCount > 0) || likers.length > 0) return;
+      try {
+        const urls = [
+          `${API_ROOT}/engagements/reactions/?reaction=like&target_type=activity_feed.feeditem&target_id=${post.id}&page_size=5`,
+          `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${post.id}&page_size=5`,
+        ];
+        for (const url of urls) {
+          const r = await fetch(url, { headers: { Accept: "application/json", ...authHeader() } });
+          if (!r.ok) continue;
+          const j = await r.json();
+          const list = normalizeUsers(j);
+          if (!cancelled && list.length) {
+            setLikers(list);
+            break;
+          }
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [post.id, likesCount, likers.length, normalizeUsers]);
+
+  // --- 2b) Override likeLabel to match Home: “liked by … and N others” ---
+  {
+    const likeCount = Number(post.metrics?.likes ?? post.like_count ?? 0);
+    const primary = likers?.[0] || null;
+    const others = Math.max(0, (likeCount || 0) - 1);
+    likeLabel = primary
+      ? (likeCount === 1
+          ? `liked by ${primary.name}`
+          : `liked by ${primary.name} and ${others} ${others === 1 ? "other" : "others"}`)
+      : `${(likeCount || 0).toLocaleString()} likes`;
+  }
+
   return (
     <Card
       variant="outlined"
@@ -168,7 +275,7 @@ function PostCard({ post }) {
         boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
       }}
     >
-      {/* HEADER – same style as before */}
+      {/* HEADER */}
       <CardHeader
         avatar={
           <Avatar
@@ -190,7 +297,7 @@ function PostCard({ post }) {
         }
       />
 
-      {/* MAIN CONTENT (text + link/image/poll) */}
+      {/* MAIN CONTENT */}
       <CardContent sx={{ pt: 0 }}>
         {post.content && (
           <Typography
@@ -278,7 +385,7 @@ function PostCard({ post }) {
         )}
       </CardContent>
 
-      {/* METRICS STRIP – same style as HomePage */}
+      {/* METRICS STRIP */}
       <Box
         sx={{
           px: 2,
@@ -302,8 +409,10 @@ function PostCard({ post }) {
           {likesCount > 0 && (
             <>
               <AvatarGroup
-                max={4}
+                max={3}
+                onClick={() => (window.__openLikes && window.__openLikes(post.id))}
                 sx={{
+                  cursor: "pointer",
                   "& .MuiAvatar-root": {
                     width: 24,
                     height: 24,
@@ -331,7 +440,7 @@ function PostCard({ post }) {
                   overflow: "hidden",
                   maxWidth: { xs: 160, sm: 260 },
                 }}
-                onClick={() => window.__openLikes?.(post.id)?.()}
+                onClick={() => (window.__openLikes && window.__openLikes(post.id))}
               >
                 {likeLabel ||
                   `${likesCount} like${likesCount > 1 ? "s" : ""}`}
@@ -341,22 +450,17 @@ function PostCard({ post }) {
         </Box>
 
         {/* Right: comments / shares count */}
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{ ml: "auto" }}
-          alignItems="center"
-        >
-          <Typography variant="caption" color="text.secondary">
-            {commentCount || 0} comments
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {shareCount || 0} shares
-          </Typography>
+        <Stack direction="row" spacing={2} sx={{ ml: "auto" }} alignItems="center">
+          <Button
+            size="small"
+            onClick={() => (window.__openShares && window.__openShares(post.id))}
+          >
+            {(shareCount || 0).toLocaleString()} SHARES
+          </Button>
         </Stack>
       </Box>
 
-      {/* ACTIONS ROW – like / comment / share SAME as HomePage */}
+      {/* ACTIONS ROW */}
       <CardActions
         sx={{
           px: 1.5,
@@ -373,7 +477,7 @@ function PostCard({ post }) {
           fullWidth
           startIcon={
             post.liked_by_me ? (
-              <FavoriteRoundedIcon sx={{ fontSize: 18 }} />
+              <FavoriteRoundedIcon sx={{ fontSize: 18, color: "primary.main" }} />
             ) : (
               <FavoriteBorderRoundedIcon sx={{ fontSize: 18 }} />
             )
@@ -383,18 +487,21 @@ function PostCard({ post }) {
             textTransform: "uppercase",
             fontSize: 11,
             fontWeight: 600,
-            color: post.liked_by_me ? "error.main" : "text.secondary",
+            color: post.liked_by_me ? "primary.main" : "text.secondary",
             "& .MuiButton-startIcon": { mr: 0.5 },
           }}
         >
           Like
         </Button>
 
-        {/* COMMENT – uses group comments dialog */}
+        {/* COMMENT */}
         <Button
           fullWidth
           startIcon={<ChatBubbleOutlineRoundedIcon sx={{ fontSize: 18 }} />}
-          onClick={() => window.__openGroupComments?.(post.id)}
+          onClick={() =>
+            (window.__openComments && window.__openComments(post.id)) ||
+            (window.__openGroupComments && window.__openGroupComments(post.id))
+          }
           sx={{
             textTransform: "uppercase",
             fontSize: 11,
@@ -406,11 +513,15 @@ function PostCard({ post }) {
           Comment
         </Button>
 
-        {/* SHARE – uses same global share popup as HomePage (if defined) */}
+        {/* SHARE */}
         <Button
           fullWidth
           startIcon={<IosShareRoundedIcon sx={{ fontSize: 18 }} />}
-          onClick={() => window.__openShares?.(post.id)?.()}
+          onClick={() =>
+            (window.__openShares && window.__openShares(post.id)) ||
+            (window.__openShareDialog && window.__openShareDialog(post.id)) ||
+            (window.__openShare && window.__openShare(post.id))
+          }
           sx={{
             textTransform: "uppercase",
             fontSize: 11,
@@ -425,7 +536,6 @@ function PostCard({ post }) {
     </Card>
   );
 }
-
 
 function shapePost(row) {
   const m = row?.metadata || {};
@@ -489,7 +599,6 @@ function shapePost(row) {
       comments: commentCount,
       shares: shareCount,
     },
-    // used for avatar strip “liked by X and 2 others”
     likers: m.likers || row.likers || row.recent_likers || [],
   };
 
@@ -532,12 +641,11 @@ function shapePost(row) {
     };
   }
 
-  // default text post
   return { ...base, content: text };
 }
 
 // -----------------------------------------------------------------------------
-// Tabs content
+// Tabs
 // -----------------------------------------------------------------------------
 function ChatTab({ groupId }) {
   const [messages, setMessages] = React.useState([]);
@@ -681,21 +789,52 @@ function PostsTab({ groupId }) {
   }, [groupId]);
 
   React.useEffect(() => { fetchPosts(); }, [fetchPosts]);
+  React.useEffect(() => {
+    window.__updateSharesCount = (pid, n) => {
+      setPosts(prev => prev.map(p => p.id === pid ? {
+        ...p,
+        share_count: n,
+        metrics: { ...(p.metrics || {}), shares: n }
+      } : p));
+    };
+    return () => { try { delete window.__updateSharesCount; } catch {} };
+  }, []);
 
   // Global toggler to avoid changing PostCard props
   React.useEffect(() => {
     window.__toggleGroupPostLike = async (postId) => {
-      // optimistic flip
+      // optimistic flip (also keep metrics.likes in sync)
       setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, liked_by_me: !p.liked_by_me, like_count: (p.liked_by_me ? Math.max(0, (p.like_count || 0) - 1) : (p.like_count || 0) + 1) }
-            : p
-        )
+        prev.map((p) => {
+          if (p.id !== postId) return p;
+          const delta = p.liked_by_me ? -1 : +1;
+          const me = (window.__me || null);
+          let newLikers = Array.isArray(p.likers) ? [...p.likers] : [];
+          if (delta > 0 && me) {
+            // add me if missing at front
+            if (!newLikers.find(x => String(x.id) === String(me.id))) {
+              newLikers = [{ id: me.id, name: me.name, avatar: me.avatar }, ...newLikers].slice(0, 3);
+            }
+          } else if (delta < 0 && me) {
+            newLikers = newLikers.filter(x => String(x.id) !== String(me.id));
+          }
+          return {
+            ...p,
+            liked_by_me: !p.liked_by_me,
+            like_count: Math.max(0, (p.like_count || 0) + delta),
+            metrics: {
+              ...(p.metrics || {}),
+              likes: Math.max(0, (p.metrics?.likes || 0) + delta),
+            },
+            likers: newLikers
+          };
+
+        })
       );
 
       // try common endpoints
       const endpoints = [
+        `${API_ROOT}/engagements/reactions/toggle/`, // preferred
         `${API_ROOT}/posts/${postId}/like/`,
         `${API_ROOT}/posts/${postId}/toggle-like/`,
         `${API_ROOT}/groups/${groupId}/posts/${postId}/like/`,
@@ -703,18 +842,36 @@ function PostsTab({ groupId }) {
       let ok = false;
       for (const url of endpoints) {
         try {
-          const r = await fetch(url, { method: "POST", headers: { ...authHeader(), accept: "application/json" } });
+          const r = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeader() },
+            body: url.endsWith("/toggle/") || url.includes("/reactions/")
+              ? JSON.stringify({
+                  target_type: "activity_feed.feeditem",
+                  target_id: postId,
+                  reaction: "like",
+                })
+              : undefined,
+          });
           if (r.ok) { ok = true; break; }
         } catch { }
       }
       if (!ok) {
         // revert if server failed
         setPosts((prev) =>
-          prev.map((p) =>
-            p.id === postId
-              ? { ...p, liked_by_me: !p.liked_by_me, like_count: (p.liked_by_me ? Math.max(0, (p.like_count || 0) - 1) : (p.like_count || 0) + 1) }
-              : p
-          )
+          prev.map((p) => {
+            if (p.id !== postId) return p;
+            const delta = p.liked_by_me ? -1 : +1; // reverse the above
+            return {
+              ...p,
+              liked_by_me: !p.liked_by_me,
+              like_count: Math.max(0, (p.like_count || 0) + delta),
+              metrics: {
+                ...(p.metrics || {}),
+                likes: Math.max(0, (p.metrics?.likes || 0) + delta),
+              },
+            };
+          })
         );
       }
     };
@@ -748,13 +905,11 @@ function MembersTab({ groupId }) {
   const perPage = 12;
 
   const fetchMembers = React.useCallback(async () => {
-    // Try your preferred endpoint first, then common variants
     const candidates = [
       `${API_ROOT}/groups/${groupId}/member/?page_size=100`,
       `${API_ROOT}/groups/${groupId}/members/?page_size=100`,
       `${API_ROOT}/groups/${groupId}/memberships/?page_size=100`,
       `${API_ROOT}/memberships/?group=${groupId}&page_size=100`,
-      // no-trailing-slash fallbacks
       `${API_ROOT}/groups/${groupId}/member`,
       `${API_ROOT}/groups/${groupId}/members`,
     ];
@@ -772,7 +927,6 @@ function MembersTab({ groupId }) {
                 (Array.isArray(data) ? data : []);
         if (!rows) continue;
         const normalized = rows.map((r) => {
-          // Common shapes your API might return
           const u = r.user || r.member || r.participant || r.account || r.profile || r;
           const displayName =
             r.user_full_name || r.member_name || r.display_name || null;
@@ -794,9 +948,7 @@ function MembersTab({ groupId }) {
         });
         setMembers(normalized);
         return;
-      } catch (e) {
-        // ignore and try next
-      }
+      } catch (e) {}
     }
     setMembers([]);
   }, [groupId]);
@@ -890,7 +1042,6 @@ function OverviewTab({ group }) {
       <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
         <CardHeader title={<Typography variant="h6" sx={{ fontWeight: 600 }}>Group info</Typography>} />
         <CardContent sx={{ pt: 0 }}>
-          {/* your info rows */}
           <Stack spacing={1} divider={<Divider />}>
             {group.parent_id && group.parent_id !== group.id && (
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
@@ -933,12 +1084,221 @@ function OverviewTab({ group }) {
   );
 }
 
+// -----------------------------------------------------------------------------
+// Likes / Shares dialogs (copied style from HomePage)
+// -----------------------------------------------------------------------------
+function LikesDialog({ open, postId, onClose }) {
+  const [loading, setLoading] = React.useState(false);
+  const [likers, setLikers] = React.useState([]);
+
+  function normalizeUser(u) {
+    if (!u) return { id: null, name: "User", avatar: "" };
+    const id = u.id ?? u.user_id ?? u.owner_id ?? null;
+    const first = u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
+    const last  = u.last_name  ?? u.lastName  ?? u.user_last_name  ?? u.user__last_name  ?? "";
+    const name  = u.name || `${first} ${last}`.trim() || u.username || (id ? `User #${id}` : "User");
+    const profile = u.profile || u.userprofile || u.user_profile || {};
+    const avatarRaw =
+      u.user_image || u.user_image_url || u.avatar || u.profile_image || u.photo || u.image_url || u.avatar_url ||
+      profile.user_image_url || profile.user_image || "";
+    return { id, name, avatar: toAbsolute(avatarRaw), headline: u.headline || u.job_title || u.title || u.bio || u.about || "" };
+  }
+
+  function normalizeRow(row) {
+    const nested = row?.user || row?.owner || row?.liked_by || row?.actor || null;
+    if (nested) return normalizeUser(nested);
+    const u = {
+      id: row?.user_id ?? row?.owner_id ?? row?.liked_by_id ?? null,
+      first_name: row?.user_first_name ?? row?.user__first_name,
+      last_name: row?.user_last_name ?? row?.user__last_name,
+      username: row?.user_username ?? row?.user__username,
+      user_image: row?.user_image ?? row?.user_image_url ?? row?.user_avatar ?? row?.user__avatar,
+      headline: row?.user_headline,
+    };
+    return normalizeUser(u);
+  }
+
+  async function fetchLikers(feedId) {
+    const urls = [
+      `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${feedId}&reaction=like&page_size=200`,
+      `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${feedId}`,
+    ];
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
+        if (!r.ok) continue;
+        const data = await r.json();
+        const rows =
+          Array.isArray(data?.results) ? data.results :
+          Array.isArray(data) ? data :
+          Array.isArray(data?.items) ? data.items :
+          Array.isArray(data?.likers) ? data.likers :
+          Array.isArray(data?.data) ? data.data : [];
+        return rows.map(normalizeRow);
+      } catch {}
+    }
+    return [];
+  }
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!open || !postId) return;
+      setLoading(true);
+      const list = await fetchLikers(postId);
+      if (mounted) setLikers(list);
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, [open, postId]);
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{`Liked by${likers.length ? ` (${likers.length})` : ""}`}</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Typography variant="body2" color="text.secondary">Loading…</Typography>
+        ) : likers.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No likes yet.</Typography>
+        ) : (
+          <List dense>
+            {likers.map((u) => (
+              <ListItem key={u.id || u.name} disableGutters>
+                <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0,1).toUpperCase()}</Avatar></ListItemAvatar>
+                <ListItemText
+                  primary={u.name}
+                  secondary={u.headline || null}
+                  primaryTypographyProps={{ variant: "body2", fontWeight: 600 }}
+                  secondaryTypographyProps={{ variant: "caption" }}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+function SharesDialog({ open, postId, onClose }) {
+  const [loading, setLoading] = React.useState(false);
+  const [sharers, setSharers] = React.useState([]);
+
+  function normalizeUser(u) {
+    if (!u) return { id: null, name: "User", avatar: "" };
+    const id = u.id ?? u.user_id ?? u.owner_id ?? null;
+    const first = u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
+    const last  = u.last_name  ?? u.lastName  ?? u.user_last_name  ?? u.user__last_name  ?? "";
+    const name  = u.name || `${first} ${last}`.trim() || u.username || (id ? `User #${id}` : "User");
+    const profile = u.profile || u.userprofile || u.user_profile || {};
+    const avatarRaw =
+      profile.user_image_url || profile.user_image ||
+      u.user_image || u.user_image_url || u.avatar || u.profile_image || u.photo || u.image_url || u.avatar_url || "";
+    return { id, name, avatar: toAbsolute(avatarRaw), headline: u.headline || u.job_title || u.title || u.bio || u.about || "" };
+  }
+  function normalizeShareRow(row) {
+    const nested = row?.user || row?.owner || row?.actor || row?.shared_by || row?.created_by || row?.sharer || row?.sharer_user || null;
+    if (nested) return normalizeUser(nested);
+    const profile = row?.profile || row?.user_profile || row?.actor_profile || row?.user?.profile || row?.actor?.profile || null;
+    const u = {
+      id: row?.user_id ?? row?.owner_id ?? row?.actor_id ?? null,
+      first_name: row?.user_first_name ?? row?.user__first_name,
+      last_name: row?.user_last_name ?? row?.user__last_name,
+      username: row?.user_username ?? row?.user__username,
+      name: row?.actor_name ?? row?.user_full_name ?? row?.full_name,
+      user_image:
+        row?.actor_avatar ?? row?.user_image ?? row?.user_image_url ?? row?.user_avatar ?? row?.user__avatar ??
+        profile?.user_image_url ?? profile?.user_image ?? "",
+      headline: row?.user_headline,
+      profile: profile || undefined,
+    };
+    return normalizeUser(u);
+  }
+
+  async function fetchSharers(feedId) {
+    const urls = [
+      `${API_ROOT}/engagements/shares/?target_type=activity_feed.feeditem&target_id=${feedId}&page_size=200`,
+      `${API_ROOT}/engagements/shares/?feed_item=${feedId}&page_size=200`,
+    ];
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
+        if (!r.ok) continue;
+        const data = await r.json();
+        const rows =
+          Array.isArray(data?.results) ? data.results :
+          Array.isArray(data) ? data :
+          Array.isArray(data?.items) ? data.items :
+          Array.isArray(data?.shares) ? data.shares :
+          Array.isArray(data?.data) ? data.data : [];
+        return rows.map(normalizeShareRow);
+      } catch {}
+    }
+    return [];
+  }
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!open || !postId) return;
+      setLoading(true);
+      const list = await fetchSharers(postId);
+
+      const seen = new Set();
+      const unique = [];
+      for (const u of list) {
+        const key = (u.id != null) ? `id:${u.id}` : `name:${(u.name || "").toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(u);
+      }
+
+      if (mounted) setSharers(unique);
+      try { window.__updateSharesCount && window.__updateSharesCount(postId, unique.length); } catch {}
+
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, [open, postId]);
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{`Shared by${sharers.length ? ` (${sharers.length})` : ""}`}</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Typography variant="body2" color="text.secondary">Loading…</Typography>
+        ) : sharers.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">No shares yet.</Typography>
+        ) : (
+          <List dense>
+            {sharers.map((u) => (
+              <ListItem key={`${u.id || u.name}-share`} disableGutters>
+                <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0,1).toUpperCase()}</Avatar></ListItemAvatar>
+                <ListItemText
+                  primary={u.name}
+                  secondary={u.headline || null}
+                  primaryTypographyProps={{ variant: "body2", fontWeight: 600 }}
+                  secondaryTypographyProps={{ variant: "caption" }}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Comments dialog (group-aware) — now uses engagements endpoints + nests replies
+// -----------------------------------------------------------------------------
 function CommentsDialog({
   open,
   postId,
   groupId,
   onClose,
-  // NEW inline mode (for per-post rendering)
   inline = false,
   initialCount = 3,
   inputRef = null,
@@ -954,78 +1314,152 @@ function CommentsDialog({
   function normalizeUser(u) {
     if (!u) return { id: null, name: "User", avatar: "" };
     const id = u.id ?? u.user_id ?? null;
-    const name = u.name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username || "User";
-    const avatar = u.avatar || u.profile_image || u.photo || "";
-    return { id, name, avatar };
-  }
-  function normalizeComment(c) {
-    const author = normalizeUser(c.author || c.user || c.created_by || c.owner);
-    const id = c.id;
-    const created = c.created_at || c.created || c.timestamp || null;
-    const body = c.text || c.body || c.content || "";
-    const likedByMe = !!(c.liked || c.liked_by_me);
-    const likeCount = Number(c.like_count ?? c.likes ?? 0) || 0;
-    const canDelete = !!(c.can_delete || c.is_owner);
-    const replies = Array.isArray(c.replies) ? c.replies.map(normalizeComment) : [];
-    return { id, created, body, author, likedByMe, likeCount, canDelete, replies };
+    const first = u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
+    const last  = u.last_name  ?? u.lastName  ?? u.user_last_name  ?? u.user__last_name  ?? "";
+    const name =
+      u.name ||
+      u.full_name ||
+      `${first} ${last}`.trim() ||
+      u.username ||
+      (id ? `User #${id}` : "User");
+
+    const profile = u.profile || u.userprofile || u.user_profile || {};
+    const avatarRaw =
+      u.user_image || u.user_image_url || u.avatar || u.profile_image || u.photo || u.image_url || u.avatar_url ||
+      profile.user_image_url || profile.user_image || "";
+    return { id, name, avatar: toAbsolute(avatarRaw) };
   }
 
-  async function fetchComments(postId) {
+  function normalizeFlat(row) {
+    const author = normalizeUser(row.author || row.user || row.created_by || row.owner || row.actor || {});
+    return {
+      id: row.id,
+      body: row.text || row.body || row.content || "",
+      created: row.created_at || row.created || row.timestamp || null,
+      likedByMe: !!(row.liked || row.liked_by_me || row.user_has_liked),
+      likeCount: Number(row.like_count ?? row.likes ?? 0) || 0,
+      canDelete: !!(row.can_delete || row.is_owner || row.is_mine),
+      parent: row.parent || row.parent_id || row.reply_to || null,
+      author,
+      replies: [],
+    };
+  }
+
+  function buildTree(rows) {
+    const byId = new Map();
+    rows.forEach(r => byId.set(r.id, { ...r, replies: [] }));
+    const roots = [];
+    rows.forEach(r => {
+      const node = byId.get(r.id);
+      if (r.parent && byId.has(r.parent)) {
+        byId.get(r.parent).replies.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+    // newest first at root
+    roots.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+    return roots;
+  }
+
+  async function fetchComments(feedId) {
     const candidates = [
-      ...(groupId ? [`${API_ROOT}/groups/${groupId}/posts/${postId}/comments/`] : []),
-      `${API_ROOT}/posts/${postId}/comments/`,
-      `${API_ROOT}/comments/?post=${postId}`,
+      // engagements-first (works on HomePage)
+      `${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${feedId}&page_size=200`,
+      // group-scoped
+      ...(groupId ? [`${API_ROOT}/groups/${groupId}/posts/${feedId}/comments/`] : []),
+      // generic fallbacks
+      `${API_ROOT}/posts/${feedId}/comments/`,
+      `${API_ROOT}/comments/?post=${feedId}`,
     ];
     for (const url of candidates) {
       try {
         const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
         if (!r.ok) continue;
         const data = await r.json();
-        const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : (data?.comments || []));
-        return rows.map(normalizeComment);
-      } catch { }
+        const rows = Array.isArray(data?.results) ? data.results :
+                     Array.isArray(data) ? data :
+                     Array.isArray(data?.comments) ? data.comments : [];
+        if (!rows.length) return [];
+        const flat = rows.map(normalizeFlat);
+        return buildTree(flat);
+      } catch {}
     }
     return [];
   }
 
-  async function createComment(postId, body, parentId = null) {
-    if (!body.trim()) return null;
-    const payload = parentId ? { text: body, parent: parentId } : { text: body };
-    const scoped = [
-      ...(groupId ? [{ url: `${API_ROOT}/groups/${groupId}/posts/${postId}/comments/`, body: payload }] : []),
-      { url: `${API_ROOT}/posts/${postId}/comments/`, body: payload },
-    ];
-    for (const { url, body: b } of scoped) {
+  async function createComment(feedId, body, parentId = null) {
+    const text = (body || "").trim();
+    if (!text) return null;
+
+    // 1) engagements — correct shapes:
+    //    - root: needs target_type/target_id
+    //    - reply: ONLY parent (backend inherits target from parent)
+    try {
+      const payload = parentId
+        ? { text, parent: parentId }                         // reply
+        : { text, target_type: "activity_feed.feeditem", target_id: feedId }; // root
+      const r = await fetch(`${API_ROOT}/engagements/comments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(payload),
+      });
+      if (r.ok) return normalizeFlat(await r.json());
+    } catch {}
+
+    // 2) group-scoped fallback
+    if (groupId) {
       try {
-        const r = await fetch(url, {
+        const r = await fetch(`${API_ROOT}/groups/${groupId}/posts/${feedId}/comments/`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify(b),
+          body: JSON.stringify(parentId ? { text, parent: parentId } : { text }),
         });
-        if (r.ok) return normalizeComment(await r.json());
-      } catch { }
+        if (r.ok) return normalizeFlat(await r.json());
+      } catch {}
     }
+
+    // 3) generic fallbacks
+    try {
+      const r = await fetch(`${API_ROOT}/posts/${feedId}/comments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(parentId ? { text, parent: parentId } : { text }),
+      });
+      if (r.ok) return normalizeFlat(await r.json());
+    } catch {}
+
     try {
       const r = await fetch(`${API_ROOT}/comments/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ post: postId, text: body, parent: parentId || undefined }),
+        body: JSON.stringify({ post: feedId, text, parent: parentId || undefined }),
       });
-      if (r.ok) return normalizeComment(await r.json());
-    } catch { }
+      if (r.ok) return normalizeFlat(await r.json());
+    } catch {}
+
     throw new Error("Could not create comment");
   }
 
+
   async function toggleLikeComment(commentId) {
     const candidates = [
-      `${API_ROOT}/comments/${commentId}/like/`,
       `${API_ROOT}/comments/${commentId}/toggle-like/`,
+      `${API_ROOT}/comments/${commentId}/like/`,
+      `${API_ROOT}/engagements/comments/${commentId}/toggle-like/`,
+      // generic reaction toggle against comment content type
+      { url: `${API_ROOT}/engagements/reactions/toggle/`, body: { target_type: "engagements.comment", target_id: commentId, reaction: "like" } },
     ];
-    for (const url of candidates) {
+    for (const c of candidates) {
       try {
-        const r = await fetch(url, { method: "POST", headers: { ...authHeader(), accept: "application/json" } });
-        if (r.ok) return true;
-      } catch { }
+        if (typeof c === "string") {
+          const r = await fetch(c, { method: "POST", headers: { ...authHeader(), accept: "application/json" } });
+          if (r.ok) return true;
+        } else {
+          const r = await fetch(c.url, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(c.body) });
+          if (r.ok) return true;
+        }
+      } catch {}
     }
     return false;
   }
@@ -1034,6 +1468,8 @@ function CommentsDialog({
     const candidates = [
       `${API_ROOT}/comments/${commentId}/`,
       `${API_ROOT}/comments/${commentId}/delete/`,
+      `${API_ROOT}/engagements/comments/${commentId}/`,
+      `${API_ROOT}/engagements/comments/${commentId}/delete/`,
     ];
     for (const url of candidates) {
       try {
@@ -1042,7 +1478,7 @@ function CommentsDialog({
           headers: { ...authHeader(), accept: "application/json" },
         });
         if (r.ok || r.status === 204) return true;
-      } catch { }
+      } catch {}
     }
     return false;
   }
@@ -1054,8 +1490,7 @@ function CommentsDialog({
       setLoading(true);
       const list = await fetchComments(postId);
       if (mounted) {
-        // newest first at root
-        setComments(list.sort((a, b) => (new Date(b.created || 0)) - (new Date(a.created || 0))));
+        setComments(list);
         setVisibleCount(initialCount);
       }
       setLoading(false);
@@ -1068,7 +1503,7 @@ function CommentsDialog({
     setSubmitting(true);
     try {
       const c = await createComment(postId, text.trim(), null);
-      setComments((prev) => [c, ...prev]);
+      setComments((prev) => [c, ...prev]); // newest at top
       setText("");
     } catch (e) { alert(e.message || "Failed to add comment"); }
     setSubmitting(false);
@@ -1160,7 +1595,14 @@ function CommentsDialog({
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Write a reply…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onSubmitReply();
+                  }
+                }}
               />
+
               <Button variant="contained" onClick={onSubmitReply} disabled={submitting || !replyText.trim()}>
                 Send
               </Button>
@@ -1172,9 +1614,8 @@ function CommentsDialog({
     </Box>
   );
 
-  // ---------- INLINE (Instagram/LinkedIn style) ----------
   if (inline) {
-    const roots = comments; // already normalized with nested replies (if your API returns flat, you can extend)
+    const roots = comments;
     const visibleRoots = roots.slice(0, visibleCount);
     const hasMore = roots.length > visibleRoots.length;
 
@@ -1221,7 +1662,6 @@ function CommentsDialog({
     );
   }
 
-  // ---------- ORIGINAL MODAL (kept for compatibility) ----------
   return (
     <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Comments</DialogTitle>
@@ -1257,26 +1697,61 @@ function CommentsDialog({
 export default function GroupDetailsPage() {
   const navigate = useNavigate();
   const { groupId } = useParams();
-  const [tab, setTab] = React.useState(2); // Default to Overview tab (after removing Chat)
+  const [tab, setTab] = React.useState(2); // default to OVERVIEW
   const [group, setGroup] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [me, setMe] = React.useState(null);
+
+  // comments dialog
   const [commentOpen, setCommentOpen] = React.useState(false);
   const [commentPostId, setCommentPostId] = React.useState(null);
+
+  // NEW: likes / shares dialogs (wire same as HomePage)
+  const [likesOpen, setLikesOpen] = React.useState(false);
+  const [likesPostId, setLikesPostId] = React.useState(null);
+  const [sharesOpen, setSharesOpen] = React.useState(false);
+  const [sharesPostId, setSharesPostId] = React.useState(null);
+
   React.useEffect(() => {
     (async () => {
       try {
         const res = await fetch(`${API_ROOT}/users/me/`, {
           headers: { ...authHeader(), accept: "application/json" },
         });
-        if (res.ok) setMe(await res.json());
-      } catch { }
+        if (res.ok) {
+          const user = await res.json();
+          setMe(user);
+          // --- 2c) Expose current user for optimistic like avatars (same as Home) ---
+          try {
+            window.__me = {
+              id: user.id ?? user.user?.id ?? null,
+              name: nameOf(user),
+              avatar: avatarOf(user),
+            };
+          } catch {}
+        }
+      } catch {}
     })();
   }, []);
 
+  // expose openers just like HomePage so PostCard hooks work
   React.useEffect(() => {
     window.__openGroupComments = (postId) => { setCommentPostId(postId); setCommentOpen(true); };
-    return () => { try { delete window.__openGroupComments; } catch { } };
+    window.__openComments = (postId) => { setCommentPostId(postId); setCommentOpen(true); };
+    window.__openLikes = (postId) => { setLikesPostId(postId); setLikesOpen(true); };
+    window.__openShares = (postId) => { setSharesPostId(postId); setSharesOpen(true); };
+    window.__openShare = (postId) => { setSharesPostId(postId); setSharesOpen(true); };
+    window.__openShareDialog = (postId) => { setSharesPostId(postId); setSharesOpen(true); };
+    return () => {
+      try {
+        delete window.__openGroupComments;
+        delete window.__openComments;
+        delete window.__openLikes;
+        delete window.__openShares;
+        delete window.__openShare;
+        delete window.__openShareDialog;
+      } catch {}
+    };
   }, []);
 
   const fetchGroup = React.useCallback(async () => {
@@ -1291,7 +1766,6 @@ export default function GroupDetailsPage() {
         if (!res.ok) continue;
         const data = await res.json();
 
-        // Detect parent info (various backend shapes)
         const parentId =
           data.parent_id ??
           data.parent?.id ??
@@ -1307,7 +1781,6 @@ export default function GroupDetailsPage() {
           data.parentGroup?.name ??
           null;
 
-        // If we have an id but no name, fetch the parent detail once for display
         if (parentId && !parentName) {
           try {
             const pres = await fetch(`${API_ROOT}/groups/${parentId}/`, {
@@ -1317,7 +1790,7 @@ export default function GroupDetailsPage() {
               const pdata = await pres.json();
               parentName = pdata.name || pdata.title || pdata.display_name || parentName;
             }
-          } catch { }
+          } catch {}
         }
 
         setGroup({
@@ -1333,7 +1806,7 @@ export default function GroupDetailsPage() {
         });
         setLoading(false);
         return;
-      } catch { }
+      } catch {}
     }
     setGroup(null);
     setLoading(false);
@@ -1344,7 +1817,7 @@ export default function GroupDetailsPage() {
   return (
     <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
       <Box sx={{ display: "flex", gap: 3, px: { xs: 2, sm: 2, md: 3 }, maxWidth: "1200px", mx: "auto" }}>
-        {/* LEFT: Community sidebar (sticky on desktop) */}
+        {/* LEFT: sidebar */}
         <Box
           sx={{
             width: 280,
@@ -1356,16 +1829,16 @@ export default function GroupDetailsPage() {
           }}
         >
           <CommunitySidebar
-            view="feed"  // highlight “Groups”
+            view="feed"
             onChangeView={(key) =>
               navigate(key === "home" ? "/community" : `/community?view=${key}`)
             }
           />
         </Box>
 
-        {/* RIGHT: Group content */}
+        {/* RIGHT: content */}
         <CommunityRightRailLayout user={me}>
-          {/* Header Card */}
+          {/* Header */}
           <Card
             variant="outlined"
             sx={{
@@ -1425,7 +1898,7 @@ export default function GroupDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Tabs Card */}
+          {/* Tabs */}
           <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
               <Tabs
@@ -1443,21 +1916,9 @@ export default function GroupDetailsPage() {
                   }
                 }}
               >
-                <Tab
-                  icon={<ArticleOutlinedIcon />}
-                  iconPosition="start"
-                  label="POSTS"
-                />
-                <Tab
-                  icon={<PeopleOutlineRoundedIcon />}
-                  iconPosition="start"
-                  label="MEMBERS"
-                />
-                <Tab
-                  icon={<InfoOutlinedIcon />}
-                  iconPosition="start"
-                  label="OVERVIEW"
-                />
+                <Tab icon={<ArticleOutlinedIcon />} iconPosition="start" label="POSTS" />
+                <Tab icon={<PeopleOutlineRoundedIcon />} iconPosition="start" label="MEMBERS" />
+                <Tab icon={<InfoOutlinedIcon />} iconPosition="start" label="OVERVIEW" />
               </Tabs>
             </Box>
 
@@ -1469,11 +1930,23 @@ export default function GroupDetailsPage() {
           </Card>
         </CommunityRightRailLayout>
       </Box>
+
+      {/* dialogs */}
       <CommentsDialog
         open={commentOpen}
         postId={commentPostId}
         groupId={groupId}
         onClose={() => setCommentOpen(false)}
+      />
+      <LikesDialog
+        open={likesOpen}
+        postId={likesPostId}
+        onClose={() => setLikesOpen(false)}
+      />
+      <SharesDialog
+        open={sharesOpen}
+        postId={sharesPostId}
+        onClose={() => setSharesOpen(false)}
       />
     </Box>
   );
