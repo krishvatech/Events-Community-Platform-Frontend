@@ -231,7 +231,26 @@ export default function MyRecordingsPage() {
         <div className="grid grid-cols-12 gap-6">
           <aside className="col-span-12 md:col-span-3">
             {HOST_MODE ? (
-              <AdminSidebar active="recordings" />
+             
+              <AdminSidebar
+                active="recordings"
+                onSelect={(key) => {
+                  if (key === "recordings") {
+                    if (!HOST_MODE) navigate("/account/recordings?scope=host");
+                    return;
+                  }
+                  // Send to the admin dashboard with a tab hint
+                  if (key === "events") navigate("/admin/events");
+                  else if (key === "posts") navigate("/admin/posts");
+                  else if (key === "resources") navigate("/admin/resources");
+                  else if (key === "groups") navigate("/admin/groups");
+                  else if (key === "notifications") navigate("/admin/notifications");
+                  else if (key === "settings") navigate("/admin/settings");
+                  else navigate("/admin/events");
+                }}
+                title="Admin"
+              />
+            
             ) : (
               <AccountSidebar activeKey="recordings" />
             )}
