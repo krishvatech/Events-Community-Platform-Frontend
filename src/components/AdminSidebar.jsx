@@ -12,7 +12,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-
+import { isOwnerUser, isStaffUser } from "../utils/adminRole";
 import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import LibraryBooksRoundedIcon from "@mui/icons-material/LibraryBooksRounded";
 import OndemandVideoRoundedIcon from "@mui/icons-material/OndemandVideoRounded";
@@ -49,7 +49,17 @@ export default function AdminSidebar({
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const listItems = items ?? defaultItems;
+
+   let listItems = items ?? defaultItems;
+  const owner = isOwnerUser();
+  const staffOnly = !owner && isStaffUser();
+
+  if (staffOnly) {
+    listItems = listItems.filter(
+      (item) => !["staff", "posts"].includes(item.key)
+    );
+  }
+
 
   const ListUI = (
     <Paper
@@ -66,7 +76,7 @@ export default function AdminSidebar({
         {listItems.map((item) => {
           const selected = active === item.key;
           const ItemIcon = item.Icon || item.icon || null;
-        {ItemIcon && <ItemIcon className="mr-2" fontSize="small" />}  
+          { ItemIcon && <ItemIcon className="mr-2" fontSize="small" /> }
           return (
             <ListItemButton
               selected={active === item.key}

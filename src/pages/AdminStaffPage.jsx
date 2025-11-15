@@ -1,4 +1,5 @@
 import * as React from "react";
+import { isOwnerUser } from "../utils/adminRole";
 import {
     Box, Container, Typography, TextField, InputAdornment,
     Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
@@ -16,6 +17,18 @@ import { useLocation } from "react-router-dom";
 export default function AdminStaffPage() {
 
     const location = useLocation();
+    const owner = isOwnerUser();
+
+    // Only owners/superadmins can view this page
+    if (!owner) {
+        return (
+            <Container maxWidth="md" sx={{ py: 6 }}>
+                <Typography variant="h6" align="center">
+                    Only owners can manage staff.
+                </Typography>
+            </Container>
+        );
+    }
     const communityId = React.useMemo(() => new URLSearchParams(location.search).get("community_id") || "1", [location.search]);
     const [rows, setRows] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
@@ -122,7 +135,7 @@ export default function AdminStaffPage() {
                                             <TableCell>
                                                 <Stack direction="row" spacing={1} alignItems="center">
                                                     <Chip size="small" label={u.username} />
-                                                    
+
                                                     {u.is_superuser && <Chip size="small" color="secondary" label="Superuser" />}
                                                 </Stack>
                                             </TableCell>

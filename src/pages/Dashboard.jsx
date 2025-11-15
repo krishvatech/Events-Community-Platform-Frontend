@@ -1,5 +1,6 @@
 // src/pages/Dashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import { isOwnerUser } from "../utils/adminRole";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Avatar,
@@ -1204,15 +1205,17 @@ function AdminEvents() {
           </Typography>
           <Typography className="text-slate-500">Manage sessions you’ve created. Start hosting with one click.</Typography>
         </div>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          startIcon={<AddRoundedIcon />}
-          variant="contained"
-          className="rounded-xl"
-          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-        >
-          Create Event
-        </Button>
+        {isOwnerUser() && (
+          <Button
+            onClick={() => setCreateOpen(true)}
+            startIcon={<AddRoundedIcon />}
+            variant="contained"
+            className="rounded-xl"
+            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+          >
+            Create Event
+          </Button>
+        )}
       </Box>
 
       {/* Search */}

@@ -1,5 +1,6 @@
 // src/pages/GroupsAdmin.jsx
 import React from "react";
+import { isOwnerUser } from "../utils/adminRole";
 import { useNavigate } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
@@ -796,15 +797,17 @@ export default function GroupsAdmin() {
           <Typography className="text-slate-500">Create and manage your groups.</Typography>
         </div>
 
-        <Button
-          onClick={() => setCreateOpen(true)}
-          startIcon={<AddRoundedIcon />}
-          variant="contained"
-          className="rounded-xl"
-          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-        >
-          Create Group
-        </Button>
+        {isOwnerUser() && (
+          <Button
+            onClick={() => setCreateOpen(true)}
+            startIcon={<AddRoundedIcon />}
+            variant="contained"
+            className="rounded-xl"
+            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+          >
+            Create Group
+          </Button>
+        )}
       </Box>
 
       {/* Search */}
@@ -840,16 +843,19 @@ export default function GroupsAdmin() {
               No groups found
             </Typography>
             <p className="text-slate-500 mt-1">Try a different search or create a new group.</p>
-            <Button
-              onClick={() => setCreateOpen(true)}
-              className="mt-4 rounded-xl"
-              sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-              variant="contained"
-            >
-              Create Group
-            </Button>
+            {isOwnerUser() && (
+              <Button
+                onClick={() => setCreateOpen(true)}
+                className="mt-4 rounded-xl"
+                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                variant="contained"
+              >
+                Create Group
+              </Button>
+            )}
           </Box>
         </Paper>
+
       ) : (
         <Box sx={{ flexGrow: 1 }}>
           <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-2 md:gap-3">
@@ -879,6 +885,7 @@ export default function GroupsAdmin() {
       <CreateGroupDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={onCreated} />
 
       {/* Edit Group Dialog */}
+      {console.log('isOwnerUser():', isOwnerUser())}
       <EditGroupDialog
         open={editOpen}
         group={editing}
