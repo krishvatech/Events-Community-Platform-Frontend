@@ -3346,7 +3346,7 @@ function AboutTab({ profile, groups, onUpdate }) {
         <DialogContent>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>*Required fields are marked with an asterisk</Typography>
           <TextField
-            label="Community name *"
+            label="Company name *"
             value={expForm.org}
             onChange={(e) => setExpForm((f) => ({ ...f, org: e.target.value }))}
             fullWidth

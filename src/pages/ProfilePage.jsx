@@ -10,7 +10,7 @@ import {
   List, ListItem, ListItemIcon, ListItemText,
   Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Chip,
   FormControlLabel, Checkbox, InputAdornment, Collapse, IconButton, Tooltip,
-  useMediaQuery, useTheme
+  useMediaQuery, useTheme, MenuItem
 } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -180,8 +180,19 @@ export default function ProfilePage() {
     school: "", degree: "", field: "", start: "", end: "", grade: ""
   });
   const [expForm, setExpForm] = useState({
-    org: "", position: "", start: "", end: "", current: false
+    org: "",
+    position: "",
+    start: "",
+    end: "",
+    current: false,
+    employment_type: "full_time", // compulsory (default)
+    work_schedule: "",            // "", "full_time", "part_time", "internship"
+    relationship_to_org: "",      // "", "employee", "independent", "third_party"
+    career_stage: "",             // "", "internship","apprenticeship","trainee","entry","mid","senior"
+    compensation_type: "",        // "", "paid","stipend","volunteer"
+    work_arrangement: "",         // "", "onsite","hybrid","remote"
   });
+
 
   // Controlled form state
   const [form, setForm] = useState({
@@ -376,36 +387,64 @@ export default function ProfilePage() {
     }
   }
 
+
   async function createExperience() {
     try {
       const url = editExpId
         ? `${API_BASE}/auth/me/experiences/${editExpId}/`
         : `${API_BASE}/auth/me/experiences/`;
+
       const r = await fetch(url, {
         method: editExpId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json", ...tokenHeader() },
         body: JSON.stringify({
-          community_name: expForm.org,       // map 'org'     -> 'community_name'
+          community_name: expForm.org,
           position: expForm.position,
-          start_date: expForm.start || null,    // map 'start'   -> 'start_date'
+          start_date: expForm.start || null,
           end_date: expForm.current ? null : (expForm.end || null),
-          currently_work_here: !!expForm.current, // map 'current' -> 'currently_work_here'
-          // optional fields in your model — leave empty for now
-          location: "",
+          currently_work_here: !!expForm.current,
+
+          // same as HomePage AboutTab createExperienceApi
           description: "",
+          employment_type: expForm.employment_type || "full_time",
+          work_schedule: expForm.work_schedule || "",
+          relationship_to_org: expForm.relationship_to_org || "",
+          career_stage: expForm.career_stage || "",
+          compensation_type: expForm.compensation_type || "",
+          work_arrangement: expForm.work_arrangement || "",
         }),
       });
+
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j?.detail || "Failed to save experience");
-      setSnack({ open: true, sev: "success", msg: editExpId ? "Experience updated" : "Experience added" });
+
+      setSnack({
+        open: true,
+        sev: "success",
+        msg: editExpId ? "Experience updated" : "Experience added",
+      });
+
       setExpOpen(false);
       setEditExpId(null);
-      setExpForm({ org: "", position: "", start: "", end: "", current: false });
+      setExpForm({
+        org: "",
+        position: "",
+        start: "",
+        end: "",
+        current: false,
+        employment_type: "full_time",
+        work_schedule: "",
+        relationship_to_org: "",
+        career_stage: "",
+        compensation_type: "",
+        work_arrangement: "",
+      });
       await loadMeExtras();
     } catch (e) {
       setSnack({ open: true, sev: "error", msg: e?.message || "Save failed" });
     }
   }
+
 
 
   async function loadMeExtras() {
@@ -505,14 +544,22 @@ export default function ProfilePage() {
   function onEditExperience(item) {
     setEditExpId(item.id);
     setExpForm({
-      org: item.community_name || "",
+      org: item.org || item.community_name || "",
       position: item.position || "",
-      start: item.start_date || "",
-      end: item.end_date || "",
-      current: !!item.currently_work_here,
+      start: item.start || item.start_date || "",
+      end: item.end || item.end_date || "",
+      current: !!(item.current || item.currently_work_here),
+
+      employment_type: item.employment_type || "full_time",
+      work_schedule: item.work_schedule || "",
+      relationship_to_org: item.relationship_to_org || "",
+      career_stage: item.career_stage || "",
+      compensation_type: item.compensation_type || "",
+      work_arrangement: item.work_arrangement || "",
     });
     setExpOpen(true);
   }
+
 
   async function onDeleteExperience(id) {
     if (!window.confirm("Delete this experience?")) return;
@@ -910,30 +957,209 @@ export default function ProfilePage() {
           {editExpId ? "Edit experience" : "Create experience"}
         </DialogTitle>
         <DialogContent dividers>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
             *Required fields are marked with an asterisk
           </Typography>
 
           <TextField
-            label="Community name *"
+            label="Company name *"
             value={expForm.org}
-            onChange={e => setExpForm(f => ({ ...f, org: e.target.value }))}
-            fullWidth sx={{ mb: 2 }}
+            onChange={(e) => setExpForm((f) => ({ ...f, org: e.target.value }))}
+            fullWidth
+            sx={{ mb: 2 }}
           />
+
           <TextField
             label="Position *"
             value={expForm.position}
-            onChange={e => setExpForm(f => ({ ...f, position: e.target.value }))}
-            fullWidth sx={{ mb: 2 }}
+            onChange={(e) => setExpForm((f) => ({ ...f, position: e.target.value }))}
+            fullWidth
+            sx={{ mb: 2 }}
           />
 
+          {/* NEW: Employment / work metadata (same as Home → About tab) */}
+          <TextField
+            select
+            label="Employment type *"
+            value={expForm.employment_type}
+            onChange={(e) => setExpForm((f) => ({ ...f, employment_type: e.target.value }))}
+            fullWidth
+            sx={{ mb: 2 }}
+          >
+            <MenuItem value="full_time">Full-time</MenuItem>
+            <MenuItem value="part_time">Part-time</MenuItem>
+            <MenuItem value="self_employed">Self-employed</MenuItem>
+            <MenuItem value="freelance">Freelance</MenuItem>
+          </TextField>
+
+          <Grid container spacing={2} sx={{ mb: 1 }}>
+            <Grid item xs={12} sm={6}>
+              {/* Work schedule (optional) */}
+              <TextField
+                select
+                value={expForm.work_schedule}
+                onChange={(e) => setExpForm((f) => ({ ...f, work_schedule: e.target.value }))}
+                fullWidth
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (v) =>
+                    v
+                      ? ({
+                        full_time: "Full-time",
+                        part_time: "Part-time",
+                        internship: "Internship",
+                      }[v] || v)
+                      : (
+                        <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                          Work schedule
+                        </span>
+                      ),
+                }}
+                sx={{ mb: 2 }}
+              >
+                <MenuItem value="">—</MenuItem>
+                <MenuItem value="full_time">Full-time</MenuItem>
+                <MenuItem value="part_time">Part-time</MenuItem>
+                <MenuItem value="internship">Internship</MenuItem>
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              {/* Relationship to organization (optional) */}
+              <TextField
+                select
+                value={expForm.relationship_to_org}
+                onChange={(e) =>
+                  setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))
+                }
+                fullWidth
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (v) =>
+                    v
+                      ? ({
+                        employee: "Employee (on payroll)",
+                        independent:
+                          "Independent (self-employed / contractor / freelance)",
+                        third_party:
+                          "Third-party (Agency / Consultancy / Temp)",
+                      }[v] || v)
+                      : (
+                        <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                          Relationship to organization
+                        </span>
+                      ),
+                }}
+              >
+                <MenuItem value="">—</MenuItem>
+                <MenuItem value="employee">Employee (on payroll)</MenuItem>
+                <MenuItem value="independent">
+                  Independent (self-employed / contractor / freelance)
+                </MenuItem>
+                <MenuItem value="third_party">
+                  Third-party (Agency / Consultancy / Temp)
+                </MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={2} sx={{ mb: 1 }}>
+            <Grid item xs={12} sm={6}>
+              {/* Career stage (optional) */}
+              <TextField
+                select
+                value={expForm.career_stage}
+                onChange={(e) =>
+                  setExpForm((f) => ({ ...f, career_stage: e.target.value }))
+                }
+                fullWidth
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (v) =>
+                    v
+                      ? ({
+                        internship: "Internship",
+                        apprenticeship: "Apprenticeship",
+                        trainee: "Trainee / Entry program",
+                        entry: "Entry level",
+                        mid: "Mid level",
+                        senior: "Senior level",
+                      }[v] || v)
+                      : (
+                        <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                          Career stage
+                        </span>
+                      ),
+                }}
+              >
+                <MenuItem value="">—</MenuItem>
+                <MenuItem value="internship">Internship</MenuItem>
+                <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
+                <MenuItem value="trainee">Trainee / Entry program</MenuItem>
+                <MenuItem value="entry">Entry level</MenuItem>
+                <MenuItem value="mid">Mid level</MenuItem>
+                <MenuItem value="senior">Senior level</MenuItem>
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              {/* Compensation type (optional) */}
+              <TextField
+                select
+                value={expForm.compensation_type}
+                onChange={(e) =>
+                  setExpForm((f) => ({ ...f, compensation_type: e.target.value }))
+                }
+                fullWidth
+                SelectProps={{
+                  displayEmpty: true,
+                  renderValue: (v) =>
+                    v
+                      ? ({
+                        paid: "Paid",
+                        stipend: "Stipend",
+                        volunteer: "Volunteer / Unpaid",
+                      }[v] || v)
+                      : (
+                        <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                          Compensation type
+                        </span>
+                      ),
+                }}
+              >
+                <MenuItem value="">—</MenuItem>
+                <MenuItem value="paid">Paid</MenuItem>
+                <MenuItem value="stipend">Stipend</MenuItem>
+                <MenuItem value="volunteer">Volunteer / Unpaid</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+
+          {/* Work arrangement (optional) */}
+          <TextField
+            select
+            label="Work arrangement"
+            value={expForm.work_arrangement}
+            onChange={(e) =>
+              setExpForm((f) => ({ ...f, work_arrangement: e.target.value }))
+            }
+            fullWidth
+            sx={{ mb: 2 }}
+          >
+            <MenuItem value="">—</MenuItem>
+            <MenuItem value="onsite">On-site</MenuItem>
+            <MenuItem value="hybrid">Hybrid</MenuItem>
+            <MenuItem value="remote">Remote</MenuItem>
+          </TextField>
+
+          {/* ⬇️ Existing date + checkbox UI remains the same below */}
           <Grid container spacing={2} sx={{ mb: 1 }}>
             <Grid item xs={12} sm={6}>
               <TextField
                 label="Start Date"
                 type="date"
                 value={expForm.start}
-                onChange={e => setExpForm(f => ({ ...f, start: e.target.value }))}
+                onChange={(e) => setExpForm((f) => ({ ...f, start: e.target.value }))}
                 fullWidth
                 InputLabelProps={{ shrink: true }}
                 InputProps={{
@@ -950,7 +1176,7 @@ export default function ProfilePage() {
                 label="End Date"
                 type="date"
                 value={expForm.end}
-                onChange={e => setExpForm(f => ({ ...f, end: e.target.value }))}
+                onChange={(e) => setExpForm((f) => ({ ...f, end: e.target.value }))}
                 fullWidth
                 disabled={expForm.current}
                 InputLabelProps={{ shrink: true }}
@@ -969,10 +1195,11 @@ export default function ProfilePage() {
             control={
               <Checkbox
                 checked={expForm.current}
-                onChange={(e) => setExpForm(f => ({ ...f, current: e.target.checked, end: e.target.checked ? "" : f.end }))}
+                onChange={(e) => setExpForm((f) => ({ ...f, current: e.target.checked }))}
               />
             }
             label="I currently work here"
+            sx={{ mb: 1 }}
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
