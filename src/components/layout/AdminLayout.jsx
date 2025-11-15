@@ -4,36 +4,45 @@ import { Box, Container } from "@mui/material";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import AdminSidebar from "../AdminSidebar";
 
-// Map current URL to the sidebar's active key
-function getActiveKey(pathname) {
-  if (pathname.startsWith("/admin/posts")) return "posts";
+function resolveActiveKey(pathname) {
+  if (pathname === "/admin" || pathname === "/admin/") return "resources"; // default tab for /admin
+  if (pathname.startsWith("/admin/events")) return "events";
   if (pathname.startsWith("/admin/resources")) return "resources";
   if (pathname.startsWith("/admin/recordings")) return "recordings";
+  if (pathname.startsWith("/admin/community/groups")) return "groups";
   if (pathname.startsWith("/admin/groups")) return "groups";
-  if (pathname.startsWith("/admin/events")) return "events";
-  if (pathname.startsWith("/admin/community/groups")) return "groups"; // group details alias
+  if (pathname.startsWith("/admin/posts")) return "posts";
   if (pathname.startsWith("/admin/notifications")) return "notifications";
   if (pathname.startsWith("/admin/settings")) return "settings";
-  return "resources"; // default
+  if (pathname.startsWith("/admin/staff")) return "staff";
+  return "resources";
 }
 
 export default function AdminLayout() {
-  const { pathname } = useLocation();
+  const location = useLocation();
   const navigate = useNavigate();
-  const active = getActiveKey(pathname);
+
+  const active = React.useMemo(
+    () => resolveActiveKey(location.pathname),
+    [location.pathname]
+  );
 
   const handleSelect = (key) => {
-    if (key === "recordings") {
-      // keep your current behavior for recordings
-      navigate("/account/recordings?scope=host");
-      return;
-    }
-    if (key === "events") {
-    navigate("/admin/events");
-    return;
-  }
-    // default: go to /admin/<key>
-    navigate(`/admin/${key}`);
+    if (!key) return;
+
+    // Explicit map keeps navigation stable and avoids accidental "/" fallbacks.
+    const map = {
+      resources: "/admin/resources",
+      recordings: "/admin/recordings",
+      groups: "/admin/groups",
+      events: "/admin/events",
+      posts: "/admin/posts",
+      notifications: "/admin/notifications",
+      settings: "/admin/settings",
+      staff: "/admin/staff",
+    };
+
+    navigate(map[key] ?? `/admin/${key}`);
   };
 
   return (
@@ -47,9 +56,15 @@ export default function AdminLayout() {
           }}
         >
           <Box>
-            <AdminSidebar active={active} onSelect={handleSelect} title="Admin" />
+            <AdminSidebar
+              active={active}
+              onSelect={handleSelect}
+              title="Admin"
+            />
           </Box>
+
           <Box>
+            {/* IMPORTANT: Without Outlet, /admin renders blank */}
             <Outlet />
           </Box>
         </Box>

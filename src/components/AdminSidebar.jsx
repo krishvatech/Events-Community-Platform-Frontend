@@ -9,59 +9,36 @@ import {
   ListItemText,
   Drawer,
   Typography,
-  useTheme,
   useMediaQuery,
+  useTheme,
 } from "@mui/material";
 
-// Prefer your custom icons if present; otherwise fall back to MUI
-import * as CI from "./CustomIcons";
-import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import LibraryBooksRoundedIcon from "@mui/icons-material/LibraryBooksRounded";
 import OndemandVideoRoundedIcon from "@mui/icons-material/OndemandVideoRounded";
-import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
-import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
-import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
-import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
-import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
-import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
+import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
 
-// Map to your custom icons when available
-const DashboardIcon   = CI?.CustomDashboardIcon   ?? DashboardRoundedIcon;
-const EventIcon       = CI?.CustomEventIcon       ?? EventNoteRoundedIcon;
-const ResourceIcon    = CI?.CustomResourcesIcon   ?? LibraryBooksRoundedIcon;
-const RecordingsIcon  = CI?.CustomRecordingsIcon  ?? OndemandVideoRoundedIcon;
-// const MessagesIcon    = CI?.CustomMessagesIcon    ?? ChatBubbleOutlineRoundedIcon;
-// const OrdersIcon      = CI?.CustomOrdersIcon      ?? ReceiptLongRoundedIcon;
-const MembersIcon     = CI?.CustomCommunityIcon   ?? PeopleAltRoundedIcon;
-// const SubsIcon        = CI?.CustomSubscriptionsIcon ?? AutorenewRoundedIcon;
-const NotifsIcon      = CI?.CustomNotificationsIcon ?? NotificationsNoneRoundedIcon;
-const SettingsIcon    = CI?.CustomSettingsIcon    ?? SettingsRoundedIcon;
-const PostsIcon = CI?.CustomPostsIcon ?? ArticleOutlinedIcon;
-
-// Palette to match your UI
-const TEAL        = "#14b8b1";   // active
-const TEXT        = "#334155";   // slate-700
-const HOVER_BG    = "#e6f7f6";   // soft teal hover
-const CARD_BG     = "#ffffff";
+const TEAL = "#14b8b1";
+const TEXT = "#334155";
+const HOVER_BG = "#e6f7f6";
+const CARD_BG = "#ffffff";
 const CARD_BORDER = "#e5e7eb";
 
-/**
- * AdminSidebar
- * ---------------------------------------------------------
- * Props:
- *  - active: one of
- *      'dashboard' | 'events' | 'resources' | 'recordings' |
- *      'messages'  | 'orders' | 'members'   | 'subscriptions' |
- *      'notifications' | 'settings'
- *  - onSelect: (key) => void
- *  - mobileOpen?: boolean
- *  - onMobileClose?: () => void
- *  - title?: string
- *  - items?: override items array if needed
- */
+const defaultItems = [
+  { key: "events", label: "My Events", Icon: EventNoteRoundedIcon },
+  { key: "posts", label: "Posts", Icon: ArticleOutlinedIcon },
+  { key: "resources", label: "My Resources", Icon: LibraryBooksRoundedIcon },
+  { key: "recordings", label: "My Recordings", Icon: OndemandVideoRoundedIcon },
+  { key: "groups", label: "Groups", Icon: GroupsRoundedIcon },
+  { key: "notifications", label: "Notifications", Icon: NotificationsNoneRoundedIcon },
+  { key: "settings", label: "Settings", Icon: SettingsRoundedIcon },
+  { key: "staff", label: "Staff", Icon: AdminPanelSettingsRoundedIcon },
+];
+
 export default function AdminSidebar({
   active = "events",
   onSelect,
@@ -72,58 +49,34 @@ export default function AdminSidebar({
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-
-  // Default admin tabs based on your system
-  const defaultItems = [
-    { key: "events",       label: "My Events",      Icon: EventIcon },
-    { key: "posts",     label: "Posts",       Icon: PostsIcon },
-    { key: "resources",    label: "My Resources",   Icon: ResourceIcon },
-    { key: "recordings",   label: "My Recordings",  Icon: RecordingsIcon },
-    // { key: "messages",     label: "Messages",       Icon: MessagesIcon },
-    // { key: "orders",       label: "Orders",         Icon: OrdersIcon },
-    { key: "groups",       label: "Groups",         Icon: GroupsRoundedIcon },
-    // { key: "subscriptions",label: "Subscriptions",  Icon: SubsIcon },
-    { key: "notifications",label: "Notifications",  Icon: NotifsIcon },
-    { key: "settings",     label: "Settings",       Icon: SettingsIcon },
-  ];
-
   const listItems = items ?? defaultItems;
 
   const ListUI = (
     <Paper
       elevation={0}
       variant="outlined"
-      sx={{
-        width: 280,
-        bgcolor: CARD_BG,
-        borderColor: CARD_BORDER,
-        borderRadius: 3,
-        p: 1,
-      }}
+      sx={{ width: 280, bgcolor: CARD_BG, borderColor: CARD_BORDER, borderRadius: 3, p: 1 }}
     >
       <Box sx={{ px: 2, pt: 1, pb: 1 }}>
-        <Typography variant="subtitle2" sx={{ color: "#64748b" }}>
+        <Typography variant="subtitle2" sx={{ color: TEXT, fontWeight: 700 }}>
           {title}
         </Typography>
       </Box>
-
       <List dense disablePadding>
-        {listItems.map(({ key, label, Icon }) => {
-          const selected = active === key;
+        {listItems.map((item) => {
+          const selected = active === item.key;
+          const ItemIcon = item.Icon || item.icon || null;
+        {ItemIcon && <ItemIcon className="mr-2" fontSize="small" />}  
           return (
             <ListItemButton
-              key={key}
-              onClick={() => onSelect?.(key)}
-              selected={selected}
+              selected={active === item.key}
+              onClick={() => onSelect?.(item.key)}
               sx={{
                 position: "relative",
                 m: "4px 8px",
                 borderRadius: 2,
                 color: selected ? TEAL : TEXT,
-                "& .MuiListItemIcon-root": {
-                  minWidth: 40,
-                  color: selected ? TEAL : "#525252",
-                },
+                "& .MuiListItemIcon-root": { minWidth: 40, color: selected ? TEAL : "#525252" },
                 "&.Mui-selected": { bgcolor: "rgba(20,184,177,0.08)" },
                 "&.Mui-selected:hover": { bgcolor: HOVER_BG },
                 "&:hover": { bgcolor: HOVER_BG },
@@ -139,13 +92,12 @@ export default function AdminSidebar({
                 },
               }}
             >
-              <ListItemIcon>
-                <Icon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText
-                primary={label}
-                primaryTypographyProps={{ sx: { fontSize: "0.95rem", fontWeight: 600 } }}
-              />
+              {ItemIcon && (
+                <ListItemIcon>
+                  <ItemIcon fontSize="small" />
+                </ListItemIcon>
+              )}
+              <ListItemText primary={item.label} />
             </ListItemButton>
           );
         })}
@@ -153,7 +105,6 @@ export default function AdminSidebar({
     </Paper>
   );
 
-  // Desktop: inline card; Mobile: drawer with same card inside
   return isMobile ? (
     <Drawer anchor="left" open={mobileOpen} onClose={onMobileClose}>
       <Box sx={{ p: 1 }}>{ListUI}</Box>

@@ -42,7 +42,7 @@ const hasRoleName = (arr, names) =>
     return names.some(x => n.includes(x));
   });
 
-/** Deep check: does object contain any admin/staff flags anywhere */
+/** Deep check: does object contain any /staff flags anywhere */
 const deepHasFlag = (obj, keys = ["is_staff","isSuperuser","is_superuser","is_admin","staff","admin","isStaff"]) => {
   const seen = new Set();
   const stack = [obj];

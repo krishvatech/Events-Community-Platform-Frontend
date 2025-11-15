@@ -93,3 +93,15 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// ===================== Admin • Staff Management =====================
+const ADMIN_USERS_BASE = "/auth/admin/users";
+
+export const listAdminUsers = (params = {}) =>
+  apiClient.get(`${ADMIN_USERS_BASE}/`, { params }).then((r) => r.data);
+
+export const patchStaff = (id, is_staff) =>
+  apiClient.patch(`${ADMIN_USERS_BASE}/${id}/`, { is_staff }).then((r) => r.data);
+
+export const bulkSetStaff = (ids, is_staff) =>
+  apiClient.post(`${ADMIN_USERS_BASE}/bulk-set-staff/`, { ids, is_staff }).then((r) => r.data);

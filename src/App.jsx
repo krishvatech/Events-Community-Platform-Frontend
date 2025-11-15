@@ -32,6 +32,7 @@ import MyResourcesAdmin from "./pages/MyResourcesAdmin.jsx";
 import GroupsAdmin from "./pages/GroupsAdmin.jsx";
 import AdminNotificationsPage from "./pages/AdminNotificationsPage.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
+import AdminStaffPage from "./pages/AdminStaffPage.jsx"
 
 import { useParams } from "react-router-dom";
 
@@ -72,7 +73,6 @@ const AppShell = () => {
         <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
         {/* Admin area driven by AdminSidebar */}
         <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
-          {/* default page under /admin */}
           <Route index element={<MyResourcesAdmin />} />
 
           {/* main admin pages */}
@@ -84,12 +84,13 @@ const AppShell = () => {
           <Route path="settings" element={<AdminSettings />} />
 
           {/* keep your recordings behavior same as before */}
-          <Route path="recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
+          <Route path="recordings" element={<Navigate to="/account/recordings?scope=host" replace />} />
 
           {/* aliases so the sidebar appears on group manage/details too */}
           <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
+          <Route path="staff" element={<AdminStaffPage />} />
         </Route>
-         <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
+        <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:id" element={<EventDetailsPage />} />
         <Route path="/cart" element={<CartPage />} />

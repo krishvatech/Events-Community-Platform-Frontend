@@ -25,7 +25,6 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import dayjs from "dayjs";
-import AdminSidebar from "../components/AdminSidebar";
 import GroupsAdmin from "../pages/GroupsAdmin";
 import MyResourcesAdmin from "./MyResourcesAdmin";
 import EmojiEmotionsRoundedIcon from '@mui/icons-material/EmojiEmotionsRounded';
@@ -46,6 +45,7 @@ import AdminPostsPage from "./AdminPostsPage.jsx";
 import MyRecordingsPage from "./MyRecordingsPage.jsx"
 import AdminNotificationsPage from "./AdminNotificationsPage.jsx";
 import AdminSettings from "./AdminSettings.jsx"
+import AdminSidebar from "../components/AdminSidebar";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
