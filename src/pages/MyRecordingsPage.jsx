@@ -112,12 +112,12 @@ export default function MyRecordingsPage() {
     user?.is_staff || user?.is_superuser || user?.is_admin || user?.is_host ||
     user?.role === "host" || user?.role === "admin"
   );
-  const showHero = !isHostUser;
 
   const HOST_MODE = React.useMemo(
     () => new URLSearchParams(location.search).get("scope") === "host",
     [location.search]
   );
+  const showHero = !HOST_MODE;
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]); // array of event objects
   const [error, setError] = useState("");
@@ -227,35 +227,16 @@ export default function MyRecordingsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {showHero && <AccountHero />}
-      <Container maxWidth="xl" sx={{ py: 3 }}>
-        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 md:gap-6">
-          <aside>
-            {isHostUser ? (
-              <AdminSidebar
-                active="recordings"
-                onSelect={(key) => {
-                  if (key === "recordings") {
-                    if (!HOST_MODE) navigate("/account/recordings?scope=host");
-                    return;
-                  }
-                  // Send to the admin dashboard with a tab hint
-                  if (key === "events") navigate("/admin/events");
-                  else if (key === "posts") navigate("/admin/posts");
-                  else if (key === "resources") navigate("/admin/resources");
-                  else if (key === "groups") navigate("/admin/groups");
-                  else if (key === "notifications") navigate("/admin/notifications");
-                  else if (key === "settings") navigate("/admin/settings");
-                  else navigate("/admin/events");
-                }}
-                title="Admin"
-              />
+      <Container maxWidth="lg" className="py-6 sm:py-8">
+        <div className="grid grid-cols-12 gap-6">
+          <aside className="col-span-12 md:col-span-3">
+            {HOST_MODE ? (
+              <AdminSidebar active="recordings" />
             ) : (
-              <AdminSidebar stickyTop={96} />
+              <AccountSidebar activeKey="recordings" />
             )}
           </aside>
-
-
-          <main>
+          <main className="col-span-12 md:col-span-9">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div>
                 <Typography variant="h5" className="font-semibold tracking-tight">

@@ -84,7 +84,7 @@ const AppShell = () => {
           <Route path="settings" element={<AdminSettings />} />
 
           {/* keep your recordings behavior same as before */}
-          <Route path="recordings" element={<Navigate to="/account/recordings?scope=host" replace />} />
+          <Route path="recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
 
           {/* aliases so the sidebar appears on group manage/details too */}
           <Route path="groups/:idOrSlug" element={<GroupManagePage />} />

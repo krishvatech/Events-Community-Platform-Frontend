@@ -43,6 +43,7 @@ import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import { IconButton, InputAdornment } from "@mui/material";
 import AdminPostsPage from "./AdminPostsPage.jsx";
+import MyRecordingsPage from "./MyRecordingsPage.jsx"
 import AdminNotificationsPage from "./AdminNotificationsPage.jsx";
 import AdminSettings from "./AdminSettings.jsx"
 
@@ -1340,10 +1341,12 @@ export default function Dashboard() {
               <MyResourcesAdmin />
             ) : active === "groups" ? (
               <GroupsAdmin />
+            ) : active === "recordings" ? (
+              <MyRecordingsPage />
             ) : active === "notifications" ? (
               <AdminNotificationsPage />
             ) : active === "settings" ? (
-              <AdminSettings/>
+              <AdminSettings />
             ) : (
               <MyResourcesAdmin />   // fallback unchanged
             )}
