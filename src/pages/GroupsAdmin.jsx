@@ -1,6 +1,6 @@
 // src/pages/GroupsAdmin.jsx
 import React from "react";
-import { isOwnerUser } from "../utils/adminRole";
+import { isOwnerUser, isStaffUser } from "../utils/adminRole";
 import { useNavigate } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
@@ -706,7 +706,8 @@ export default function GroupsAdmin() {
   // --- pagination (6 per page) ---
   const PAGE_SIZE = 6;
   const [page, setPage] = React.useState(1);
-
+  const owner = isOwnerUser();
+  const staff = isStaffUser();
 
   const onUpdated = (updated) => {
     setGroups((prev) =>
@@ -721,40 +722,64 @@ export default function GroupsAdmin() {
 
   React.useEffect(() => {
     let cancelled = false;
+
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_ROOT}/groups/?created_by=me`, {
+        const owner = isOwnerUser();
+        const staff = isStaffUser();
+
+        const url = owner
+          ? `${API_ROOT}/groups/?created_by=me`
+          : `${API_ROOT}/groups/?page_size=200`;
+
+        const res = await fetch(url, {
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
+
         let data = [];
         if (res.ok) {
           const json = await res.json();
           data = Array.isArray(json) ? json : Array.isArray(json?.results) ? json.results : [];
         }
+
         if (!cancelled) {
           let arr = Array.isArray(data) ? data : [];
-          if (myId) {
+
+          if (owner && myId) {
+            // Owner: only groups I created
             arr = arr.filter((g) => {
-              const creator = g.created_by?.id ?? g.created_by_id ?? g.owner_id ?? null;
-              return creator == null ? false : String(creator) === String(myId);
+              const creator =
+                g.created_by?.id ?? g.created_by_id ?? g.owner_id ?? null;
+              return creator != null && String(creator) === String(myId);
             });
           }
+
+          if (!owner && staff) {
+            // Staff: groups where I'm at least a member (any role)
+            arr = arr.filter((g) => !!g.current_user_role);
+          }
+
           setGroups(arr);
           setLoading(false);
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) {
           setGroups([]);
           setLoading(false);
         }
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [token, myId]);
+
+
 
   const filtered = React.useMemo(() => {
     const term = q.trim().toLowerCase();

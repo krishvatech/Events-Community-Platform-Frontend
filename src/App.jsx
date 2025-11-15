@@ -3,6 +3,7 @@
 import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toolbar } from "@mui/material";
+import { isOwnerUser, isStaffUser } from "./utils/adminRole";
 import Header from "./components/Header.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
@@ -46,6 +47,19 @@ function RedirectGroupDetailsToAdmin() {
   return <Navigate to={`/admin/community/groups/${groupId}`} replace />;
 }
 
+function AdminRecordingsRedirect() {
+  const isOwner = isOwnerUser();
+  const isStaff = isStaffUser();
+
+  // Owner (superadmin): host mode (events they created)
+  // Staff + normal users: their purchased events / registrations
+  const target = isOwner
+    ? "/account/recordings?scope=host"
+    : "/account/recordings";
+
+  return <Navigate to={target} replace />;
+}
+
 const AppShell = () => {
   const location = useLocation();
 
@@ -84,7 +98,7 @@ const AppShell = () => {
           <Route path="settings" element={<AdminSettings />} />
 
           {/* keep your recordings behavior same as before */}
-          <Route path="recordings" element={<Navigate to="/account/recordings?scope=host" replace />} />
+          <Route path="recordings" element={<AdminRecordingsRedirect />} />
 
           {/* aliases so the sidebar appears on group manage/details too */}
           <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
