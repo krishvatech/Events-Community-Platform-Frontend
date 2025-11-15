@@ -33,6 +33,7 @@ import {
   Checkbox,
   FormControlLabel,
   MenuItem,
+  Drawer,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
@@ -58,6 +59,7 @@ import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineR
 import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 
 
 // -----------------------------------------------------------------------------
@@ -1002,6 +1004,8 @@ function mapCreateResponseToUiPost(resp) {
 // -----------------------------------------------------------------------------
 // Main page
 // -----------------------------------------------------------------------------
+
+const TAB_LABELS = ["My Posts", "My Groups", "My Friends", "About"];
 export default function HomePage() {
   const PAGE_MAX_W = 1120;
   const [myCommunityId, setMyCommunityId] = React.useState(null);
@@ -1010,6 +1014,7 @@ export default function HomePage() {
   const [groups, setGroups] = React.useState([]);
   const [communities, setCommunities] = React.useState([]); // for composer picklist
   const [tabIndex, setTabIndex] = React.useState(0);
+  const [mobileTabsOpen, setMobileTabsOpen] = React.useState(false); // 👈 added
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [friends, setFriends] = React.useState([]);
   const [friendCount, setFriendCount] = React.useState(0); // ← ADD THIS
@@ -1424,13 +1429,44 @@ export default function HomePage() {
         </Card>
 
         {/* Tabs */}
+        {/* Tabs */}
         <Card variant="outlined" sx={{ borderRadius: 3, width: "100%" }}>
-          <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} variant="scrollable" allowScrollButtonsMobile>
-            <Tab label="My Posts" />
-            <Tab label="My Groups" />
-            <Tab label="My Friends" />
-            <Tab label="About" />
-          </Tabs>
+          {/* Desktop / tablet tab row */}
+          <Box sx={{ display: { xs: "none", sm: "block" } }}>
+            <Tabs
+              value={tabIndex}
+              onChange={(_, v) => setTabIndex(v)}
+              variant="scrollable"
+              allowScrollButtonsMobile
+            >
+              {TAB_LABELS.map((label) => (
+                <Tab key={label} label={label} />
+              ))}
+            </Tabs>
+          </Box>
+
+          {/* Mobile tab header with drawer trigger */}
+          <Box
+            sx={{
+              display: { xs: "flex", sm: "none" },
+              alignItems: "center",
+              justifyContent: "space-between",
+              px: 2,
+              py: 1,
+            }}
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              {TAB_LABELS[tabIndex] || "My Posts"}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => setMobileTabsOpen(true)}
+              aria-label="Open sections"
+            >
+              <MenuRoundedIcon />
+            </IconButton>
+          </Box>
+
           <Divider />
           <CardContent>
             {tabIndex === 0 && (
@@ -1452,10 +1488,70 @@ export default function HomePage() {
             )}
             {tabIndex === 1 && <MyGroups groups={groups} />}
             {tabIndex === 2 && <MyFriends friends={friends} />}     {/* ← NEW */}
-            {tabIndex === 3 && <AboutTab profile={profile} groups={groups} onUpdate={handleUpdateProfile} />}
+            {tabIndex === 3 && (
+              <AboutTab
+                profile={profile}
+                groups={groups}
+                onUpdate={handleUpdateProfile}
+              />
+            )}
           </CardContent>
         </Card>
+
+        {/* Mobile drawer for tabs – right side, like community sidebar */}
+        <Drawer
+          anchor="right"
+          open={mobileTabsOpen}
+          onClose={() => setMobileTabsOpen(false)}
+          sx={{
+            display: { xs: "block", sm: "none" },
+            "& .MuiBackdrop-root": {
+              backgroundColor: "rgba(15, 23, 42, 0.45)", // dim background like sidebar
+            },
+          }}
+          PaperProps={{
+            sx: {
+              width: 320,
+              maxWidth: "80vw",
+              borderTopLeftRadius: 24,
+              borderBottomLeftRadius: 24,
+              borderTopRightRadius: 0,
+              borderBottomRightRadius: 0,
+              pb: 2,
+            },
+          }}
+        >
+          <Box sx={{ p: 2 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ mb: 1, color: "text.secondary" }}
+            >
+              Go to section
+            </Typography>
+
+            <Stack spacing={1}>
+              {TAB_LABELS.map((label, index) => (
+                <Button
+                  key={label}
+                  fullWidth
+                  variant={index === tabIndex ? "contained" : "text"}
+                  sx={{
+                    justifyContent: "flex-start",
+                    fontWeight: index === tabIndex ? 700 : 500,
+                  }}
+                  onClick={() => {
+                    setTabIndex(index);
+                    setMobileTabsOpen(false);
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </Stack>
+          </Box>
+        </Drawer>
       </Box>
+
 
       {/* Create post dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
