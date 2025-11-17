@@ -623,7 +623,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 }
 
 // ---- Group Card ----
-function GroupCard({ g, onOpen, onEdit }) {
+function GroupCard({ g, onOpen, onEdit, canEdit }) {
   return (
     <Paper elevation={0} className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden">
       <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
@@ -646,11 +646,18 @@ function GroupCard({ g, onOpen, onEdit }) {
             <Chip
               size="small"
               label={g.visibility === "private" ? "Private" : "Public"}
-              className={g.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
+              className={
+                g.visibility === "private"
+                  ? "bg-slate-200 text-slate-700"
+                  : "bg-teal-50 text-teal-700"
+              }
             />
-            {/* NEW: join policy chip */}
             {g.join_policy && (
-              <Chip size="small" label={labelJoinPolicy(g.join_policy)} className="bg-slate-100 text-slate-700" />
+              <Chip
+                size="small"
+                label={labelJoinPolicy(g.join_policy)}
+                className="bg-slate-100 text-slate-700"
+              />
             )}
           </div>
           {typeof g.member_count === "number" && (
@@ -661,26 +668,36 @@ function GroupCard({ g, onOpen, onEdit }) {
         <Typography variant="h6" className="font-extrabold !leading-snug text-slate-900">
           {g.name}
         </Typography>
-        {g.description && <p className="text-sm text-slate-500 line-clamp-2">{g.description}</p>}
+        {g.description && (
+          <p className="text-sm text-slate-500 line-clamp-2">{g.description}</p>
+        )}
 
         <Box className="mt-auto flex items-center gap-1.5 pt-1">
           <Button
             onClick={() => onOpen?.(g)}
             variant="contained"
             className="rounded-xl"
-            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+            sx={{
+              textTransform: "none",
+              backgroundColor: "#10b8a6",
+              "&:hover": { backgroundColor: "#0ea5a4" },
+            }}
           >
             Open
           </Button>
-          <Button
-            onClick={() => onEdit?.(g)}
-            startIcon={<EditNoteRoundedIcon />}
-            variant="outlined"
-            className="rounded-xl"
-            sx={{ textTransform: "none" }}
-          >
-            Edit
-          </Button>
+
+          {/* Only show Edit for owner/admin, not staff */}
+          {canEdit && (
+            <Button
+              onClick={() => onEdit?.(g)}
+              startIcon={<EditNoteRoundedIcon />}
+              variant="outlined"
+              className="rounded-xl"
+              sx={{ textTransform: "none" }}
+            >
+              Edit
+            </Button>
+          )}
         </Box>
       </Box>
     </Paper>
@@ -889,10 +906,19 @@ export default function GroupsAdmin() {
                 <GroupCard
                   g={g}
                   onOpen={onOpen}
-                  onEdit={(grp) => { setEditing(grp); setEditOpen(true); }}
+                  canEdit={owner} // only true for real admin/owner
+                  onEdit={
+                    owner
+                      ? (grp) => {
+                        setEditing(grp);
+                        setEditOpen(true);
+                      }
+                      : undefined
+                  }
                 />
               </div>
             ))}
+
           </div>
           <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
             <Pagination
@@ -912,7 +938,7 @@ export default function GroupsAdmin() {
       {/* Edit Group Dialog */}
       {console.log('isOwnerUser():', isOwnerUser())}
       <EditGroupDialog
-        open={editOpen}
+        open={editOpen && owner}
         group={editing}
         onClose={() => { setEditOpen(false); setEditing(null); }}
         onUpdated={onUpdated}

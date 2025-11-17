@@ -34,6 +34,7 @@ import GroupsAdmin from "./pages/GroupsAdmin.jsx";
 import AdminNotificationsPage from "./pages/AdminNotificationsPage.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
 import AdminStaffPage from "./pages/AdminStaffPage.jsx"
+import AdminRecordingsPage from "./pages/AdminRecordingsPage.jsx";
 
 import { useParams } from "react-router-dom";
 
@@ -45,19 +46,6 @@ function RedirectGroupToAdmin() {
 function RedirectGroupDetailsToAdmin() {
   const { groupId } = useParams();
   return <Navigate to={`/admin/community/groups/${groupId}`} replace />;
-}
-
-function AdminRecordingsRedirect() {
-  const isOwner = isOwnerUser();
-  const isStaff = isStaffUser();
-
-  // Owner (superadmin): host mode (events they created)
-  // Staff + normal users: their purchased events / registrations
-  const target = isOwner
-    ? "/account/recordings?scope=host"
-    : "/account/recordings";
-
-  return <Navigate to={target} replace />;
 }
 
 const AppShell = () => {
@@ -98,7 +86,7 @@ const AppShell = () => {
           <Route path="settings" element={<AdminSettings />} />
 
           {/* keep your recordings behavior same as before */}
-          <Route path="recordings" element={<AdminRecordingsRedirect />} />
+          <Route path="recordings" element={<AdminRecordingsPage />} />
 
           {/* aliases so the sidebar appears on group manage/details too */}
           <Route path="groups/:idOrSlug" element={<GroupManagePage />} />

@@ -1560,6 +1560,7 @@ export default function GroupManagePage() {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
     const [group, setGroup] = React.useState(null);
+    const [isStaffUser, setIsStaffUser] = React.useState(false);
     // Is this group a child (has a parent)?
     const isChildGroup = Boolean(group?.parent_id || group?.parent?.id || group?.parent);
     // Show Sub-groups tab only on top-level groups
@@ -1572,6 +1573,35 @@ export default function GroupManagePage() {
     React.useEffect(() => {
         setTab(0);
     }, [idOrSlug]);
+
+    React.useEffect(() => {
+        try {
+            const raw = localStorage.getItem("user");
+            if (raw) {
+                const u = JSON.parse(raw);
+                if (u.is_staff || u.isStaff || u.role === "staff") {
+                    setIsStaffUser(true);
+                }
+            }
+        } catch {
+            // ignore parse error
+        }
+    }, []);
+
+    React.useEffect(() => {
+        if (!group) return;
+
+        if (group.current_user_role === "staff") {
+            setIsStaffUser(true);
+        }
+        if (group.current_user?.is_staff === true) {
+            setIsStaffUser(true);
+        }
+        if (group.current_user_is_staff === true) {
+            setIsStaffUser(true);
+        }
+    }, [group]);
+
     // If this is a child group, never allow tab index 2 (Sub-groups)
     React.useEffect(() => {
         if (!showSubgroupsTab && tab === 2) setTab(0);
@@ -1863,8 +1893,22 @@ export default function GroupManagePage() {
     const [removeMemberTarget, setRemoveMemberTarget] = React.useState(null);
 
 
-    // Moderation gate (same roles as canPost; separate for clarity)
-    const canModerate = ["owner", "admin", "moderator"].includes(group?.current_user_role || "member");
+    // ---- Role helpers for permissions ----
+    const myRole = group?.current_user_role || "member";
+    const isOwnerRole = myRole === "owner";
+    const isAdminRole = myRole === "admin";
+    const isModeratorRole = myRole === "moderator";
+
+    // ✅ Strong member management (only owner + admin can directly add/remove/change roles)
+    const canHardManageMembers = isOwnerRole || isAdminRole;
+
+    // ✅ Moderators can only "request" member changes (front-end only for now)
+    const canRequestMemberChanges = isModeratorRole;
+
+    // ✅ Posts: owner + admin + moderator can create/manage/delete posts
+    const canModerate = isOwnerRole || isAdminRole || isModeratorRole;
+    const canPost = canModerate;
+
 
     // Per-post menu open/close
     const openPostMenu = (evt, post) => {
@@ -1952,9 +1996,6 @@ export default function GroupManagePage() {
         setPostMenuAnchor(null);
     };
 
-
-    // Gate: only owner/admin/moderator can post (server should also enforce)
-    const canPost = ["owner", "admin", "moderator"].includes(group?.current_user_role || "member");
 
     // GET posts for this group
     const fetchPosts = React.useCallback(async () => {
@@ -2194,6 +2235,32 @@ export default function GroupManagePage() {
         }
     };
 
+    // For moderators: only send "requests" (front-end only placeholder)
+    const requestMemberChange = (action, member) => {
+        const label = member?.user?.name || member?.user?.email || "this member";
+        let msg = "";
+
+        switch (action) {
+            case "make_admin":
+                msg = `Request sent to group admins to make ${label} an Admin.`;
+                break;
+            case "make_moderator":
+                msg = `Request sent to group admins to make ${label} a Moderator.`;
+                break;
+            case "make_member":
+                msg = `Request sent to group admins to set ${label} as a Member.`;
+                break;
+            case "remove":
+                msg = `Request sent to group admins to remove ${label} from this group.`;
+                break;
+            default:
+                msg = "Request sent to group admins.";
+        }
+
+        alert(msg);
+        closeMemberMenu();
+    };
+
 
     const fetchGroup = React.useCallback(async () => {
         setLoading(true); setError("");
@@ -2279,15 +2346,17 @@ export default function GroupManagePage() {
                                 </Stack>
 
                                 <Stack direction="row" spacing={1}>
-                                    <Button
-                                        startIcon={<EditNoteRoundedIcon />}
-                                        onClick={() => setEditOpen(true)}
-                                        variant="contained"
-                                        className="rounded-xl"
-                                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                    >
-                                        Edit
-                                    </Button>
+                                    {!isStaffUser && (
+                                        <Button
+                                            startIcon={<EditNoteRoundedIcon />}
+                                            onClick={() => setEditOpen(true)}
+                                            variant="contained"
+                                            className="rounded-xl"
+                                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                        >
+                                            Edit
+                                        </Button>
+                                    )}
                                     <Button
                                         onClick={() => navigate(-1)}
                                         variant="outlined"
@@ -2355,15 +2424,35 @@ export default function GroupManagePage() {
                                     <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                         <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                             <Typography variant="h6" className="font-semibold">Members</Typography>
+
                                             {group?.visibility === "private" && (
-                                                <Button
-                                                    variant="contained"
-                                                    className="rounded-xl"
-                                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                                    onClick={() => setAddOpen(true)}
-                                                >
-                                                    Add members
-                                                </Button>
+                                                <>
+                                                    {canHardManageMembers && (
+                                                        // Owner + Admin → real "Add members" (opens dialog)
+                                                        <Button
+                                                            variant="contained"
+                                                            className="rounded-xl"
+                                                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                            onClick={() => setAddOpen(true)}
+                                                        >
+                                                            Add members
+                                                        </Button>
+                                                    )}
+
+                                                    {!canHardManageMembers && canRequestMemberChanges && (
+                                                        // Moderator → can only *request* adding members (no real add)
+                                                        <Button
+                                                            variant="outlined"
+                                                            className="rounded-xl"
+                                                            sx={{ textTransform: "none", borderColor: "#10b8a6", color: "#10b8a6" }}
+                                                            onClick={() => {
+                                                                alert("Request sent to group admins to add new members.");
+                                                            }}
+                                                        >
+                                                            Request to add members
+                                                        </Button>
+                                                    )}
+                                                </>
                                             )}
                                         </Stack>
 
@@ -2402,14 +2491,23 @@ export default function GroupManagePage() {
 
                                                                     <RoleBadge role={role} />
 
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        onClick={(e) => openMemberMenu(e, m)}
-                                                                        disabled={disabled}
-                                                                        title={isOwnerRow ? "Owner actions are locked" : "Manage role / remove"}
-                                                                    >
-                                                                        <MoreVertRoundedIcon fontSize="small" />
-                                                                    </IconButton>
+                                                                    {(canHardManageMembers || canRequestMemberChanges) && (
+                                                                        <IconButton
+                                                                            size="small"
+                                                                            onClick={(e) => openMemberMenu(e, m)}
+                                                                            disabled={disabled}
+                                                                            title={
+                                                                                isOwnerRow
+                                                                                    ? "Owner actions are locked"
+                                                                                    : canHardManageMembers
+                                                                                        ? "Manage role / remove"
+                                                                                        : "Request changes from admins"
+                                                                            }
+                                                                        >
+                                                                            <MoreVertRoundedIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    )}
+
                                                                 </Stack>
                                                             );
                                                         })}
@@ -2422,8 +2520,9 @@ export default function GroupManagePage() {
                                                     onClose={closeMemberMenu}
                                                     elevation={2}
                                                 >
-                                                    {activeMember && (
+                                                    {activeMember && canHardManageMembers && (
                                                         <>
+                                                            {/* Owner + Admin: real actions */}
                                                             <MenuItem
                                                                 onClick={() => setRole(activeMember.user.id, "admin")}
                                                                 disabled={activeMember.user.id === ownerId || activeMember.role === "admin"}
@@ -2457,10 +2556,37 @@ export default function GroupManagePage() {
                                                                 <ListItemIcon>🗑️</ListItemIcon>
                                                                 <ListItemText>Remove from Group</ListItemText>
                                                             </MenuItem>
+                                                        </>
+                                                    )}
 
+                                                    {activeMember && !canHardManageMembers && canRequestMemberChanges && (
+                                                        <>
+                                                            {/* Moderator: request-only actions */}
+                                                            <MenuItem onClick={() => requestMemberChange("make_admin", activeMember)}>
+                                                                <ListItemIcon>🛡️</ListItemIcon>
+                                                                <ListItemText>Request: make Admin</ListItemText>
+                                                            </MenuItem>
+
+                                                            <MenuItem onClick={() => requestMemberChange("make_moderator", activeMember)}>
+                                                                <ListItemIcon>🔧</ListItemIcon>
+                                                                <ListItemText>Request: make Moderator</ListItemText>
+                                                            </MenuItem>
+
+                                                            <MenuItem onClick={() => requestMemberChange("make_member", activeMember)}>
+                                                                <ListItemIcon>👤</ListItemIcon>
+                                                                <ListItemText>Request: make Member</ListItemText>
+                                                            </MenuItem>
+
+                                                            <Divider />
+
+                                                            <MenuItem onClick={() => requestMemberChange("remove", activeMember)}>
+                                                                <ListItemIcon>🗑️</ListItemIcon>
+                                                                <ListItemText>Request removal</ListItemText>
+                                                            </MenuItem>
                                                         </>
                                                     )}
                                                 </Menu>
+
                                             </>
                                         )}
                                     </Paper>
@@ -2565,23 +2691,27 @@ export default function GroupManagePage() {
                                         <Divider className="my-3" />
 
                                         <Stack direction="row" spacing={1}>
-                                            <Button
-                                                variant="contained"
-                                                className="rounded-xl"
-                                                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                                onClick={() => setEditOpen(true)}
-                                            >
-                                                Edit Details
-                                            </Button>
-                                            <Button
-                                                variant="outlined"
-                                                color="error"
-                                                className="rounded-xl"
-                                                sx={{ textTransform: "none" }}
-                                                onClick={() => setDeleteGroupOpen(true)}
-                                            >
-                                                Delete Group
-                                            </Button>
+                                            {!isStaffUser && (
+                                                <Button
+                                                    variant="contained"
+                                                    className="rounded-xl"
+                                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                    onClick={() => setEditOpen(true)}
+                                                >
+                                                    Edit Details
+                                                </Button>
+                                            )}
+                                            {!isStaffUser && (
+                                                <Button
+                                                    variant="outlined"
+                                                    color="error"
+                                                    className="rounded-xl"
+                                                    sx={{ textTransform: "none" }}
+                                                    onClick={() => setDeleteGroupOpen(true)}
+                                                >
+                                                    Delete Group
+                                                </Button>
+                                            )}
                                         </Stack>
                                     </Paper>
                                 )}
