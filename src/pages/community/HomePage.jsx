@@ -3001,7 +3001,7 @@ function AboutTab({ profile, groups, onUpdate }) {
   const [expForm, setExpForm] = React.useState({
     org: "", position: "", start: "", end: "", current: false,
     employment_type: "full_time",       // compulsory (default)
-    work_schedule: "",                   // optional: "", "full_time", "part_time", "internship"
+    work_schedule: "",                   // optional: "", "full_time", "part_time"
     relationship_to_org: "",            // optional: "", "employee", "independent", "third_party"
     career_stage: "",                   // optional: "", "internship","apprenticeship","trainee","entry","mid","senior"
     compensation_type: "",              // optional: "", "paid","stipend","volunteer"
@@ -3361,125 +3361,122 @@ function AboutTab({ profile, groups, onUpdate }) {
             sx={{ mb: 2 }}
           />
 
-          {/* Employment type (required) */}
+          {/* Relationship to organization (required) */}
+          <TextField
+              select
+              label="Relationship to organization *"
+              value={expForm.relationship_to_org}
+              onChange={(e) =>
+                setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))
+              }
+              fullWidth
+              sx={{ mb: 2 }}
+            >
+              <MenuItem value="">—</MenuItem>
+              <MenuItem value="employee">Employee (on payroll)</MenuItem>
+              <MenuItem value="independent">
+                Independent (self-employed / contractor / freelance)
+              </MenuItem>
+              <MenuItem value="third_party">
+                Third-party (Agency / Consultancy / Temp)
+              </MenuItem>
+          </TextField>
+
+          {/* Work schedule (optional) */}
           <TextField
             select
-            label="Employment type *"
-            value={expForm.employment_type}
-            onChange={(e) => setExpForm((f) => ({ ...f, employment_type: e.target.value }))}
+            value={expForm.work_schedule}
+            onChange={(e) =>
+              setExpForm((f) => ({ ...f, work_schedule: e.target.value }))
+            }
             fullWidth
+            SelectProps={{
+              displayEmpty: true,
+              renderValue: (v) =>
+                v
+                  ? ({ full_time: "Full-time", part_time: "Part-time" }[v] || v)
+                  : (
+                    <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                      Work schedule
+                    </span>
+                  ),
+            }}
             sx={{ mb: 2 }}
           >
             <MenuItem value="full_time">Full-time</MenuItem>
             <MenuItem value="part_time">Part-time</MenuItem>
-            <MenuItem value="self_employed">Self-employment</MenuItem>
-            <MenuItem value="freelance">Freelance</MenuItem>
           </TextField>
 
-          <Grid container spacing={2} sx={{ mb: 1 }}>
-            <Grid item xs={12} sm={6}>
-              {/* Work schedule (optional) */}
-              <TextField
-                select
-                value={expForm.work_schedule}
-                onChange={(e) => setExpForm((f) => ({ ...f, work_schedule: e.target.value }))}
-                fullWidth
-                SelectProps={{
-                  displayEmpty: true,
-                  renderValue: (v) =>
-                    v
-                      ? ({ full_time: "Full-time", part_time: "Part-time", internship: "Internship" }[v] || v)
-                      : <span style={{ color: "rgba(0,0,0,0.6)" }}>Work schedule</span>,
-                }}
-                sx={{ mb: 2 }}
-              >
-                <MenuItem value="">—</MenuItem>
-                <MenuItem value="full_time">Full-time</MenuItem>
-                <MenuItem value="part_time">Part-time</MenuItem>
-                <MenuItem value="internship">Internship</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              {/* Relationship to organization (optional) */}
-              <TextField
-                select
-                value={expForm.relationship_to_org}
-                onChange={(e) => setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))}
-                fullWidth
-                SelectProps={{
-                  displayEmpty: true,
-                  renderValue: (v) =>
-                    v
-                      ? ({
-                        employee: "Employee (on payroll)",
-                        independent: "Independent (self-employed / contractor / freelance)",
-                        third_party: "Third-party (Agency / Consultancy / Temp)",
-                      }[v] || v)
-                      : <span style={{ color: "rgba(0,0,0,0.6)" }}>Relationship to organization</span>,
-                }}
-              >
-                <MenuItem value="">—</MenuItem>
-                <MenuItem value="employee">Employee (on payroll)</MenuItem>
-                <MenuItem value="independent">Independent (self-employed / contractor / freelance)</MenuItem>
-                <MenuItem value="third_party">Third-party (Agency / Consultancy / Temp)</MenuItem>
-              </TextField>
-            </Grid>
-          </Grid>
-
-          <Grid container spacing={2} sx={{ mb: 1 }}>
-            <Grid item xs={12} sm={6}>
-              {/* Career stage (optional) */}
-              <TextField
-                select
-                value={expForm.career_stage}
-                onChange={(e) => setExpForm((f) => ({ ...f, career_stage: e.target.value }))}
-                fullWidth
-                SelectProps={{
-                  displayEmpty: true,
-                  renderValue: (v) =>
-                    v
-                      ? ({
-                        internship: "Internship",
-                        apprenticeship: "Apprenticeship",
-                        trainee: "Trainee / Entry program",
-                        entry: "Entry level",
-                        mid: "Mid level",
-                        senior: "Senior level",
-                      }[v] || v)
-                      : <span style={{ color: "rgba(0,0,0,0.6)" }}>Career stage</span>,
-                }}
-              >
-                <MenuItem value="">—</MenuItem>
-                <MenuItem value="internship">Internship</MenuItem>
-                <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
-                <MenuItem value="trainee">Trainee / Entry program</MenuItem>
-                <MenuItem value="entry">Entry level</MenuItem>
-                <MenuItem value="mid">Mid level</MenuItem>
-                <MenuItem value="senior">Senior level</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              {/* Compensation type (optional) */}
-              <TextField
-                select
-                value={expForm.compensation_type}
-                onChange={(e) => setExpForm((f) => ({ ...f, compensation_type: e.target.value }))}
-                fullWidth
-                SelectProps={{
-                  displayEmpty: true,
-                  renderValue: (v) =>
-                    v
-                      ? ({ paid: "Paid", stipend: "Stipend", volunteer: "Volunteer / Unpaid" }[v] || v)
-                      : <span style={{ color: "rgba(0,0,0,0.6)" }}>Compensation type</span>,
-                }}
-              >
-                <MenuItem value="">—</MenuItem>
-                <MenuItem value="paid">Paid</MenuItem>
-                <MenuItem value="stipend">Stipend</MenuItem>
-                <MenuItem value="volunteer">Volunteer / Unpaid</MenuItem>
-              </TextField>
-            </Grid>
-          </Grid>
+          {/* Career stage + Compensation type (half-half) */}
+                    <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
+                      {/* Career stage (optional) */}
+                      <TextField
+                        select
+                        value={expForm.career_stage}
+                        onChange={(e) =>
+                          setExpForm((f) => ({ ...f, career_stage: e.target.value }))
+                        }
+                        fullWidth
+                        sx={{ flex: 1 }}   // 👈 makes it use 50% of row
+                        SelectProps={{
+                          displayEmpty: true,
+                          renderValue: (v) =>
+                            v
+                              ? ({
+                                  internship: "Internship",
+                                  apprenticeship: "Apprenticeship",
+                                  trainee: "Trainee / Entry program",
+                                  entry: "Entry level",
+                                  mid: "Mid level",
+                                  senior: "Senior level",
+                                }[v] || v)
+                              : (
+                                  <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                                    Career stage
+                                  </span>
+                                ),
+                        }}
+                      >
+                        <MenuItem value="">—</MenuItem>
+                        <MenuItem value="internship">Internship</MenuItem>
+                        <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
+                        <MenuItem value="trainee">Trainee / Entry program</MenuItem>
+                        <MenuItem value="entry">Entry level</MenuItem>
+                        <MenuItem value="mid">Mid level</MenuItem>
+                        <MenuItem value="senior">Senior level</MenuItem>
+                      </TextField>
+          
+                      {/* Compensation type (optional) */}
+                      <TextField
+                        select
+                        value={expForm.compensation_type}
+                        onChange={(e) =>
+                          setExpForm((f) => ({ ...f, compensation_type: e.target.value }))
+                        }
+                        fullWidth
+                        sx={{ flex: 1 }}   // 👈 also 50% of row
+                        SelectProps={{
+                          displayEmpty: true,
+                          renderValue: (v) =>
+                            v
+                              ? ({
+                                  paid: "Paid",
+                                  stipend: "Stipend",
+                                  volunteer: "Volunteer / Unpaid",
+                                }[v] || v)
+                              : (
+                                  <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                                    Compensation type
+                                  </span>
+                                ),
+                        }}
+                      >
+                        <MenuItem value="">—</MenuItem>
+                        <MenuItem value="paid">Paid</MenuItem>
+                        <MenuItem value="stipend">Stipend</MenuItem>
+                        <MenuItem value="volunteer">Volunteer / Unpaid</MenuItem>
+                      </TextField>
+                    </Box>
 
           {/* Work arrangement (optional) */}
           <TextField
