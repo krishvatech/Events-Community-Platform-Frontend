@@ -5,3 +5,6 @@ dist/
 *.local
 coverage/
 *.log
+
+package-lock.json
+package.json
