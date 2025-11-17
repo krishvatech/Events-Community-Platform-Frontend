@@ -243,16 +243,50 @@ const EMPTY_PROFILE = {
 };
 
 function loadInitialProfile() {
+  // 1) First, try cached profile_core (fast return on second+ visits)
   try {
     const raw = localStorage.getItem("profile_core");
-    if (!raw) return EMPTY_PROFILE;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return EMPTY_PROFILE;
-    return { ...EMPTY_PROFILE, ...parsed };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return { ...EMPTY_PROFILE, ...parsed };
+      }
+    }
   } catch (e) {
     console.warn("Failed to read cached profile_core", e);
-    return EMPTY_PROFILE;
   }
+
+  // 2) Fallback: decode JWT token to get name instantly on FIRST visit
+  try {
+    const token = getToken();
+    const payload = decodeJwtPayload(token);
+    if (payload) {
+      const first_name =
+        payload.first_name ||
+        payload.given_name ||
+        (payload.name ? String(payload.name).split(" ")[0] : "") ||
+        "";
+      const last_name =
+        payload.last_name ||
+        payload.family_name ||
+        (payload.name ? String(payload.name).split(" ").slice(1).join(" ") : "") ||
+        "";
+      const email = payload.email || "";
+
+      return {
+        ...EMPTY_PROFILE,
+        id: payload.user_id || payload.id || null,
+        first_name,
+        last_name,
+        email,
+      };
+    }
+  } catch (e) {
+    console.warn("Failed to decode JWT payload", e);
+  }
+
+  // 3) Final fallback
+  return EMPTY_PROFILE;
 }
 
 
@@ -1214,54 +1248,54 @@ export default function HomePage() {
 
 
   const fetchMyProfileFromMe = React.useCallback(async () => {
-  try {
-    // 1) Start both calls in parallel
-    const corePromise = fetchProfileCore();
-    const extrasPromise = fetchProfileExtras().catch(() => ({
-      experiences: [],
-      educations: [],
-    }));
-
-    // 2) Wait for /users/me/ first → show name + job title fast
-    const core = await corePromise;
-
-    setProfile((prev) => ({
-      ...prev,
-      ...core,
-    }));
-
-    // Cache core locally so next time name is instant
     try {
-      localStorage.setItem("profile_core", JSON.stringify(core));
+      // 1) Start both calls in parallel
+      const corePromise = fetchProfileCore();
+      const extrasPromise = fetchProfileExtras().catch(() => ({
+        experiences: [],
+        educations: [],
+      }));
+
+      // 2) Wait for /users/me/ first → show name + job title fast
+      const core = await corePromise;
+
+      setProfile((prev) => ({
+        ...prev,
+        ...core,
+      }));
+
+      // Cache core locally so next time name is instant
+      try {
+        localStorage.setItem("profile_core", JSON.stringify(core));
+      } catch (e) {
+        console.warn("Failed to cache profile_core", e);
+      }
+
+      // Expose current user globally so PostCard & others can use it
+      try {
+        window.__me = {
+          id: core.id || null,
+          name:
+            `${core.first_name || ""} ${core.last_name || ""}`.trim() ||
+            "You",
+          avatar: core.avatar || "",
+        };
+      } catch {
+        // ignore
+      }
+
+      // 3) Now wait for slow extras and merge them later
+      const extra = await extrasPromise;
+
+      setProfile((prev) => ({
+        ...prev,
+        experience: extra.experiences,
+        education: extra.educations,
+      }));
     } catch (e) {
-      console.warn("Failed to cache profile_core", e);
+      console.error("Failed to load profile:", e);
     }
-
-    // Expose current user globally so PostCard & others can use it
-    try {
-      window.__me = {
-        id: core.id || null,
-        name:
-          `${core.first_name || ""} ${core.last_name || ""}`.trim() ||
-          "You",
-        avatar: core.avatar || "",
-      };
-    } catch {
-      // ignore
-    }
-
-    // 3) Now wait for slow extras and merge them later
-    const extra = await extrasPromise;
-
-    setProfile((prev) => ({
-      ...prev,
-      experience: extra.experiences,
-      education: extra.educations,
-    }));
-  } catch (e) {
-    console.error("Failed to load profile:", e);
-  }
-}, []);
+  }, []);
 
   const fetchMyFriends = React.useCallback(async () => {
     const candidates = [
@@ -2965,6 +2999,7 @@ async function createExperienceApi(payload) {
     body: JSON.stringify({
       community_name: payload.org,
       position: payload.position,
+      location: payload.location || "",
       start_date: payload.start || null,
       end_date: payload.current ? null : (payload.end || null),
       currently_work_here: !!payload.current,
@@ -2989,6 +3024,7 @@ async function updateExperienceApi(id, payload) {
     body: JSON.stringify({
       community_name: payload.org,
       position: payload.position,
+      location: payload.location || "",
       start_date: payload.start || null,
       end_date: payload.current ? null : (payload.end || null),
       currently_work_here: !!payload.current,
@@ -3034,7 +3070,7 @@ function AboutTab({ profile, groups, onUpdate }) {
   const [editExpId, setEditExpId] = React.useState(null);
   // NOTE: no "location" here anymore
   const [expForm, setExpForm] = React.useState({
-    org: "", position: "", start: "", end: "", current: false,
+    org: "", position: "", location: "", start: "", end: "", current: false,
     employment_type: "full_time",       // compulsory (default)
     work_schedule: "",                   // optional: "", "full_time", "part_time"
     relationship_to_org: "",            // optional: "", "employee", "independent", "third_party"
@@ -3042,7 +3078,7 @@ function AboutTab({ profile, groups, onUpdate }) {
     compensation_type: "",              // optional: "", "paid","stipend","volunteer"
     work_arrangement: "",               // optional: "", "onsite","hybrid","remote"
   });
-
+  const [syncProfileLocation, setSyncProfileLocation] = React.useState(false);
 
   // NEW: Edit Contact dialog (first, last, email, location, linkedin, job title)
   const [contactOpen, setContactOpen] = React.useState(false);
@@ -3137,7 +3173,7 @@ function AboutTab({ profile, groups, onUpdate }) {
   const openAddExperience = () => {
     setEditExpId(null);
     setExpForm({
-      org: "", position: "", start: "", end: "", current: false,
+      org: "", position: "", location: "", start: "", end: "", current: false,
       employment_type: "full_time",
       work_schedule: "",
       relationship_to_org: "",
@@ -3145,6 +3181,7 @@ function AboutTab({ profile, groups, onUpdate }) {
       compensation_type: "",
       work_arrangement: "",
     });
+    setSyncProfileLocation(false);
     setExpOpen(true);
   };
   const openEditExperience = (id) => {
@@ -3154,6 +3191,7 @@ function AboutTab({ profile, groups, onUpdate }) {
     setExpForm({
       org: x.org || x.community_name || "",
       position: x.position || "",
+      location: x.location || "",  
       start: x.start || x.start_date || "",
       end: x.end || x.end_date || "",
       current: !!(x.current || x.currently_work_here),
@@ -3171,6 +3209,32 @@ function AboutTab({ profile, groups, onUpdate }) {
     try {
       if (editExpId) await updateExperienceApi(editExpId, expForm);
       else await createExperienceApi(expForm);
+      // If user ticked "Make this location my profile’s work location"
+      if (syncProfileLocation && expForm.location) {
+        const payload = {
+          first_name: profile.first_name || "",
+          last_name: profile.last_name || "",
+          email: profile.email || "",
+          profile: {
+            full_name: fullName,
+            timezone: "",
+            bio: profile.bio || "",
+            headline: "",
+            job_title: profile.job_title || "",
+            company: "",
+            location: expForm.location,
+            skills: profile.skills || [],
+            links: profile.links || {},
+          },
+        };
+
+        try {
+          await saveProfileToMe(payload);
+          onUpdate?.({ ...profile, location: expForm.location });
+        } catch (err) {
+          console.error("Failed to sync profile location from experience", err);
+        }
+      }
       setExpOpen(false); setEditExpId(null);
       await reloadExtras();
     } catch (e) { alert(e.message || "Save failed"); }
@@ -3396,25 +3460,35 @@ function AboutTab({ profile, groups, onUpdate }) {
             sx={{ mb: 2 }}
           />
 
+          <TextField
+            label="Location *"
+            value={expForm.location}
+            onChange={(e) =>
+              setExpForm((f) => ({ ...f, location: e.target.value }))
+            }
+            fullWidth
+            sx={{ mb: 2 }}
+          />
+
           {/* Relationship to organization (required) */}
           <TextField
-              select
-              label="Relationship to organization *"
-              value={expForm.relationship_to_org}
-              onChange={(e) =>
-                setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))
-              }
-              fullWidth
-              sx={{ mb: 2 }}
-            >
-              <MenuItem value="">—</MenuItem>
-              <MenuItem value="employee">Employee (on payroll)</MenuItem>
-              <MenuItem value="independent">
-                Independent (self-employed / contractor / freelance)
-              </MenuItem>
-              <MenuItem value="third_party">
-                Third-party (Agency / Consultancy / Temp)
-              </MenuItem>
+            select
+            label="Employment type *"
+            value={expForm.relationship_to_org}
+            onChange={(e) =>
+              setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))
+            }
+            fullWidth
+            sx={{ mb: 2 }}
+          >
+            <MenuItem value="">—</MenuItem>
+            <MenuItem value="employee">Employee (on payroll)</MenuItem>
+            <MenuItem value="independent">
+              Independent (self-employed / contractor / freelance)
+            </MenuItem>
+            <MenuItem value="third_party">
+              Third-party (Agency / Consultancy / Temp)
+            </MenuItem>
           </TextField>
 
           {/* Work schedule (optional) */}
@@ -3443,75 +3517,75 @@ function AboutTab({ profile, groups, onUpdate }) {
           </TextField>
 
           {/* Career stage + Compensation type (half-half) */}
-                    <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
-                      {/* Career stage (optional) */}
-                      <TextField
-                        select
-                        value={expForm.career_stage}
-                        onChange={(e) =>
-                          setExpForm((f) => ({ ...f, career_stage: e.target.value }))
-                        }
-                        fullWidth
-                        sx={{ flex: 1 }}   // 👈 makes it use 50% of row
-                        SelectProps={{
-                          displayEmpty: true,
-                          renderValue: (v) =>
-                            v
-                              ? ({
-                                  internship: "Internship",
-                                  apprenticeship: "Apprenticeship",
-                                  trainee: "Trainee / Entry program",
-                                  entry: "Entry level",
-                                  mid: "Mid level",
-                                  senior: "Senior level",
-                                }[v] || v)
-                              : (
-                                  <span style={{ color: "rgba(0,0,0,0.6)" }}>
-                                    Career stage
-                                  </span>
-                                ),
-                        }}
-                      >
-                        <MenuItem value="">—</MenuItem>
-                        <MenuItem value="internship">Internship</MenuItem>
-                        <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
-                        <MenuItem value="trainee">Trainee / Entry program</MenuItem>
-                        <MenuItem value="entry">Entry level</MenuItem>
-                        <MenuItem value="mid">Mid level</MenuItem>
-                        <MenuItem value="senior">Senior level</MenuItem>
-                      </TextField>
-          
-                      {/* Compensation type (optional) */}
-                      <TextField
-                        select
-                        value={expForm.compensation_type}
-                        onChange={(e) =>
-                          setExpForm((f) => ({ ...f, compensation_type: e.target.value }))
-                        }
-                        fullWidth
-                        sx={{ flex: 1 }}   // 👈 also 50% of row
-                        SelectProps={{
-                          displayEmpty: true,
-                          renderValue: (v) =>
-                            v
-                              ? ({
-                                  paid: "Paid",
-                                  stipend: "Stipend",
-                                  volunteer: "Volunteer / Unpaid",
-                                }[v] || v)
-                              : (
-                                  <span style={{ color: "rgba(0,0,0,0.6)" }}>
-                                    Compensation type
-                                  </span>
-                                ),
-                        }}
-                      >
-                        <MenuItem value="">—</MenuItem>
-                        <MenuItem value="paid">Paid</MenuItem>
-                        <MenuItem value="stipend">Stipend</MenuItem>
-                        <MenuItem value="volunteer">Volunteer / Unpaid</MenuItem>
-                      </TextField>
-                    </Box>
+          <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
+            {/* Career stage (optional) */}
+            <TextField
+              select
+              value={expForm.career_stage}
+              onChange={(e) =>
+                setExpForm((f) => ({ ...f, career_stage: e.target.value }))
+              }
+              fullWidth
+              sx={{ flex: 1 }}   // 👈 makes it use 50% of row
+              SelectProps={{
+                displayEmpty: true,
+                renderValue: (v) =>
+                  v
+                    ? ({
+                      internship: "Internship",
+                      apprenticeship: "Apprenticeship",
+                      trainee: "Trainee / Entry program",
+                      entry: "Entry level",
+                      mid: "Mid level",
+                      senior: "Senior level",
+                    }[v] || v)
+                    : (
+                      <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                        Career stage
+                      </span>
+                    ),
+              }}
+            >
+              <MenuItem value="">—</MenuItem>
+              <MenuItem value="internship">Internship</MenuItem>
+              <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
+              <MenuItem value="trainee">Trainee / Entry program</MenuItem>
+              <MenuItem value="entry">Entry level</MenuItem>
+              <MenuItem value="mid">Mid level</MenuItem>
+              <MenuItem value="senior">Senior level</MenuItem>
+            </TextField>
+
+            {/* Compensation type (optional) */}
+            <TextField
+              select
+              value={expForm.compensation_type}
+              onChange={(e) =>
+                setExpForm((f) => ({ ...f, compensation_type: e.target.value }))
+              }
+              fullWidth
+              sx={{ flex: 1 }}   // 👈 also 50% of row
+              SelectProps={{
+                displayEmpty: true,
+                renderValue: (v) =>
+                  v
+                    ? ({
+                      paid: "Paid",
+                      stipend: "Stipend",
+                      volunteer: "Volunteer / Unpaid",
+                    }[v] || v)
+                    : (
+                      <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                        Compensation type
+                      </span>
+                    ),
+              }}
+            >
+              <MenuItem value="">—</MenuItem>
+              <MenuItem value="paid">Paid</MenuItem>
+              <MenuItem value="stipend">Stipend</MenuItem>
+              <MenuItem value="volunteer">Volunteer / Unpaid</MenuItem>
+            </TextField>
+          </Box>
 
           {/* Work arrangement (optional) */}
           <TextField
@@ -3562,6 +3636,15 @@ function AboutTab({ profile, groups, onUpdate }) {
               />
             }
             label="I currently work here"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={syncProfileLocation}
+                onChange={(e) => setSyncProfileLocation(e.target.checked)}
+              />
+            }
+            label="Make this location my profile’s work location"
           />
         </DialogContent>
         <DialogActions>
