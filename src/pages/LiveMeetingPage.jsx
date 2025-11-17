@@ -272,34 +272,42 @@ export default function LiveMeetingPage() {
 
   // 🧹 When meeting ends, exit fullscreen + close window / go back
   const handleMeetingEnd = React.useCallback(
-    (state) => {
-      console.log("Meeting ended with state:", state);
+  (state) => {
+    console.log("Meeting ended with state:", state);
 
-      // Exit fullscreen if active
-      if (document.fullscreenElement) {
-        try {
-          document.exitFullscreen();
-        } catch (e) {
-          console.warn("Failed to exit fullscreen", e);
-        }
-      }
-
-      // Try closing the window (works if opened via window.open)
+    if (eventId) {
       try {
-        window.close();
+        fetch(toApiUrl(`events/${eventId}/end-meeting/`), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader(),
+          },
+        }).catch((e) => {
+          console.warn("Failed to mark event as ended:", e);
+        });
       } catch (e) {
-        // ignore
+        console.warn("Failed to call end-meeting API:", e);
       }
+    }
 
-      // Fallback: navigate back in history
+    if (document.fullscreenElement) {
       try {
-        navigate(-1);
+        document.exitFullscreen();
       } catch (e) {
-        // ignore
+        console.warn("Failed to exit fullscreen", e);
       }
-    },
-    [navigate]
-  );
+    }
+
+    try {
+      window.close();
+    } catch (e) {}
+    try {
+      navigate(-1);
+    } catch (e) {}
+  },
+  [navigate, eventId]
+);
 
   if (loading) {
     return (
@@ -396,14 +404,16 @@ export default function LiveMeetingPage() {
   // Happy path: show Dyte meeting
   return (
     <Box
-      ref={pageRef} // 👈 used for fullscreen
-      sx={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        bgcolor: "grey.900",
-      }}
-    >
+    ref={pageRef}
+    sx={{
+      position: "fixed",
+      inset: 0,              // top:0, right:0, bottom:0, left:0
+      zIndex: 1300,
+      bgcolor: "#000",
+      display: "flex",
+      flexDirection: "column",
+    }}
+  >
       <Box sx={{ p: 1 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Button
