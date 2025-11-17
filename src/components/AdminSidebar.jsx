@@ -21,6 +21,7 @@ import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
+import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 
 const TEAL = "#14b8b1";
 const TEXT = "#334155";
@@ -34,6 +35,7 @@ const defaultItems = [
   { key: "resources", label: "My Resources", Icon: LibraryBooksRoundedIcon },
   { key: "recordings", label: "My Recordings", Icon: OndemandVideoRoundedIcon },
   { key: "groups", label: "Groups", Icon: GroupsRoundedIcon },
+  { key: "messages", label: "Messages", Icon: ChatBubbleOutlineRoundedIcon },
   { key: "notifications", label: "Notifications", Icon: NotificationsNoneRoundedIcon },
   { key: "settings", label: "Settings", Icon: SettingsRoundedIcon },
   { key: "staff", label: "Staff", Icon: AdminPanelSettingsRoundedIcon },

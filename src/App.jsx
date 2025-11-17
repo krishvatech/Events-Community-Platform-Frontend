@@ -35,6 +35,7 @@ import AdminNotificationsPage from "./pages/AdminNotificationsPage.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
 import AdminStaffPage from "./pages/AdminStaffPage.jsx"
 import AdminRecordingsPage from "./pages/AdminRecordingsPage.jsx";
+import AdminMessagesPage from "./pages/AdminMessagesPage.jsx";
 
 import { useParams } from "react-router-dom";
 
@@ -82,6 +83,7 @@ const AppShell = () => {
           <Route path="resources" element={<MyResourcesAdmin />} />
           <Route path="posts" element={<AdminPostsPage />} />
           <Route path="groups" element={<GroupsAdmin />} />
+          <Route path="messages" element={<AdminMessagesPage />} />
           <Route path="notifications" element={<AdminNotificationsPage />} />
           <Route path="settings" element={<AdminSettings />} />
 

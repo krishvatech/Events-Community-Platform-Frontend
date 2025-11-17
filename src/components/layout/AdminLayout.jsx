@@ -13,6 +13,7 @@ function resolveActiveKey(pathname) {
   if (pathname.startsWith("/admin/groups")) return "groups";
   if (pathname.startsWith("/admin/posts")) return "posts";
   if (pathname.startsWith("/admin/notifications")) return "notifications";
+  if (pathname.startsWith("/admin/messages")) return "messages";
   if (pathname.startsWith("/admin/settings")) return "settings";
   if (pathname.startsWith("/admin/staff")) return "staff";
   return "resources";
@@ -38,6 +39,7 @@ export default function AdminLayout() {
       events: "/admin/events",
       posts: "/admin/posts",
       notifications: "/admin/notifications",
+      messages: "/admin/messages",
       settings: "/admin/settings",
       staff: "/admin/staff",
     };
