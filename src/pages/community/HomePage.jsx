@@ -242,6 +242,19 @@ const EMPTY_PROFILE = {
   education: [],
 };
 
+function loadInitialProfile() {
+  try {
+    const raw = localStorage.getItem("profile_core");
+    if (!raw) return EMPTY_PROFILE;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return EMPTY_PROFILE;
+    return { ...EMPTY_PROFILE, ...parsed };
+  } catch (e) {
+    console.warn("Failed to read cached profile_core", e);
+    return EMPTY_PROFILE;
+  }
+}
+
 
 // -----------------------------------------------------------------------------
 // Post composer
@@ -1010,7 +1023,7 @@ export default function HomePage() {
   const PAGE_MAX_W = 1120;
   const [myCommunityId, setMyCommunityId] = React.useState(null);
   const [posts, setPosts] = React.useState([]);           // ← now real data
-  const [profile, setProfile] = React.useState(EMPTY_PROFILE);
+  const [profile, setProfile] = React.useState(() => loadInitialProfile());
   const [groups, setGroups] = React.useState([]);
   const [communities, setCommunities] = React.useState([]); // for composer picklist
   const [tabIndex, setTabIndex] = React.useState(0);
@@ -1201,32 +1214,54 @@ export default function HomePage() {
 
 
   const fetchMyProfileFromMe = React.useCallback(async () => {
+  try {
+    // 1) Start both calls in parallel
+    const corePromise = fetchProfileCore();
+    const extrasPromise = fetchProfileExtras().catch(() => ({
+      experiences: [],
+      educations: [],
+    }));
+
+    // 2) Wait for /users/me/ first → show name + job title fast
+    const core = await corePromise;
+
+    setProfile((prev) => ({
+      ...prev,
+      ...core,
+    }));
+
+    // Cache core locally so next time name is instant
     try {
-      const core = await fetchProfileCore();
-      const extra = await fetchProfileExtras();
-      const merged = {
-        ...core,
-        experience: extra.experiences,
-        education: extra.educations,
-      };
-
-      setProfile(merged);
-
-      // Expose current user globally so PostCard can update likers instantly
-      try {
-        window.__me = {
-          id: merged.id || null,
-          name: `${merged.first_name || ""} ${merged.last_name || ""}`.trim() || "You",
-          avatar: merged.avatar || "",
-        };
-      } catch {
-        // ignore if window not available
-      }
+      localStorage.setItem("profile_core", JSON.stringify(core));
     } catch (e) {
-      console.error("Failed to load profile:", e);
+      console.warn("Failed to cache profile_core", e);
     }
-  }, []);
 
+    // Expose current user globally so PostCard & others can use it
+    try {
+      window.__me = {
+        id: core.id || null,
+        name:
+          `${core.first_name || ""} ${core.last_name || ""}`.trim() ||
+          "You",
+        avatar: core.avatar || "",
+      };
+    } catch {
+      // ignore
+    }
+
+    // 3) Now wait for slow extras and merge them later
+    const extra = await extrasPromise;
+
+    setProfile((prev) => ({
+      ...prev,
+      experience: extra.experiences,
+      education: extra.educations,
+    }));
+  } catch (e) {
+    console.error("Failed to load profile:", e);
+  }
+}, []);
 
   const fetchMyFriends = React.useCallback(async () => {
     const candidates = [
