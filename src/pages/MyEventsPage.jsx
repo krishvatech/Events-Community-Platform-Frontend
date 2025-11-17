@@ -172,48 +172,65 @@ function EventCard({ ev, onJoinLive, isJoining }) {
           {ev.location ? ` • ${ev.location}` : ""}
         </Typography>
 
-        {/* Actions stick to bottom to keep equal heights */}
+       {/* Actions stick to bottom to keep equal heights */}
         <Box sx={{ mt: "auto", display: "flex", gap: 1 }}>
-          {(status === "live" && ev.status !== "ended") ? (
+          {(() => {
+            // Audience can join if:
+            // - event is not ended
+            // - AND either status is "live" OR a Dyte meeting already exists
+            const canJoinLive =
+              ev.status !== "ended" &&
+              (status === "live" || !!ev.dyte_meeting_id);
+
+            if (canJoinLive) {
+              return (
+                <Button
+                  onClick={() => onJoinLive?.(ev)}
+                  disabled={isJoining}
+                  variant="contained"
+                  sx={{
+                    textTransform: "none",
+                    backgroundColor: "#10B8A6",
+                    "&:hover": { backgroundColor: "#0EA5A4" },
+                    py: 0.5,
+                    px: 1.25,
+                    borderRadius: 2,
+                  }}
+                >
+                  {isJoining ? "Joining…" : "Join Live"}
+                </Button>
+              );
+            }
+
+            if (status === "past" && ev.recording_url) {
+              return (
+                <Button
+                  size="small"
+                  component="a"
+                  href={ev.recording_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="contained"
+                  sx={{ textTransform: "none", py: 0.5, px: 1.25, borderRadius: 2 }}
+                >
+                  Watch
+                </Button>
+              );
+            }
+
+            return (
               <Button
-                onClick={() => onJoinLive?.(ev)}
-                disabled={isJoining}
+                size="small"
+                component={Link}
+                to={`/events/${ev.slug || ev.id}`}
+                state={{ event: ev }}
                 variant="contained"
-                sx={{
-                  textTransform: "none",
-                  backgroundColor: "#10B8A6",
-                  "&:hover": { backgroundColor: "#0EA5A4" },
-                  py: 0.5,
-                  px: 1.25,
-                  borderRadius: 2,
-                }}
+                sx={{ textTransform: "none", py: 0.5, px: 1.25, borderRadius: 2 }}
               >
-                {isJoining ? "Joining…" : "Join Live"}
+                Details
               </Button>
-            ) : status === "past" && ev.recording_url ? (
-            <Button
-              size="small"
-              component="a"
-              href={ev.recording_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              variant="contained"
-              sx={{ textTransform: "none", py: 0.5, px: 1.25, borderRadius: 2 }}
-            >
-              Watch
-            </Button>
-          ) : (
-            <Button
-              size="small"
-              component={Link}
-              to={`/events/${ev.slug || ev.id}`}
-              state={{ event: ev }}
-              variant="contained"
-              sx={{ textTransform: "none", py: 0.5, px: 1.25, borderRadius: 2 }}
-            >
-              Details
-            </Button>
-          )}
+            );
+          })()}
 
           <Button
             size="small"
@@ -275,25 +292,6 @@ export default function MyEventsPage() {
       throw new Error(`${res.status}`);
     }
     return res.json();
-  }
-
-  // Small helper for JSON POST
-  async function postJSON(path, body) {
-    const headers = {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-    const res = await fetch(urlJoin(API_BASE, path), {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body || {}),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const msg = json?.detail || `HTTP ${res.status}`;
-      throw new Error(msg);
-    }
-    return json;
   }
 
   useEffect(() => {
@@ -402,51 +400,29 @@ export default function MyEventsPage() {
   //   2) sessionStorage key: live:EVENT_ID
   // -----------------------------------------------------------------------------
   const handleJoinLive = async (ev) => {
-    if (!ev?.id) return;
+  if (!ev?.id) return;
 
-    setJoiningId(ev.id);
-    try {
-      // Request audience token
-      // Send POST /events/<id>/token/ with role=audience to retrieve an RTC token
-      const payload = await postJSON(`/events/${ev.id}/token/`, { role: "audience" });
+  setJoiningId(ev.id);
+  try {
+    const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
 
-      if (!payload?.token) {
-        throw new Error("Token not generated");
-      }
-
-      try {
-        sessionStorage.setItem(`live:${ev.id}`, JSON.stringify(payload));
-      } catch {
-        // ignore quota errors
-      }
-
-      // Compose the live meeting route.  Use the slug if available; fall back to id.
-      // Include id and role in the querystring so the meeting page can recover them after refresh.
-      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
-
-      // Use navigate() instead of window.location to push a new history entry.
-      // Pass along the event details and Agora token via the router state.
-      navigate(livePath, {
-        state: {
-          event: ev,
-          agora: payload,
-          role: "audience",
-        },
-        replace: false,
-      });
-      // NOTE: We DO NOT redirect if token failed — handled by catch
-    } catch (e) {
-      // Show a user‑friendly error message without navigating away
-      setErrMsg(
-        typeof e?.message === "string" && e.message.length
-          ? `Unable to join live: ${e.message}`
-          : "Unable to join live at the moment."
-      );
-      setErrOpen(true);
-    } finally {
-      setJoiningId(null);
-    }
-  };
+    navigate(livePath, {
+      state: {
+        event: ev,
+      },
+      replace: false,
+    });
+  } catch (e) {
+    setErrMsg(
+      typeof e?.message === "string" && e.message.length
+        ? `Unable to join live: ${e.message}`
+        : "Unable to join live at the moment."
+    );
+    setErrOpen(true);
+  } finally {
+    setJoiningId(null);
+  }
+};
 
   return (
     <div className="min-h-screen bg-slate-50">

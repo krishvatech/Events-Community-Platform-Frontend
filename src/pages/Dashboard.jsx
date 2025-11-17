@@ -1158,37 +1158,22 @@ function AdminEvents() {
     const eventId = ev?.id ?? null;
     if (!eventId) return;
     setHostingId(eventId);
+
     try {
-      try {
-        await fetch(`${API_ROOT}/events/${eventId}/start/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-      } catch { }
-      const payload = await postJSON(
-        `${API_ROOT}/events/${eventId}/token/`,
-        { role: "publisher" },
-        token
-      );
-      if (!payload?.token) {
-        throw new Error("Token not generated");
-      }
-      try {
-        sessionStorage.setItem(`live:${eventId}`, JSON.stringify(payload));
-      } catch { }
+      // Just open the Dyte meeting page as 'publisher'
       const livePath = `/live/${ev.slug || eventId}?id=${eventId}&role=publisher`;
       window.open(livePath, "_blank");
     } catch (e) {
-      setErrMsg(typeof e?.message === "string" && e.message ? e.message : "Unable to create publisher token.");
+      setErrMsg(
+        typeof e?.message === "string" && e.message
+          ? e.message
+          : "Unable to start live meeting."
+      );
       setErrOpen(true);
     } finally {
       setHostingId(null);
     }
   };
-
   // When a new event is created from the dialog, show it immediately at the top
   const onCreated = (ev) => {
     setEvents((prev) => [ev, ...prev]);

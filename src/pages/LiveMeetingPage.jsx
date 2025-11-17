@@ -174,6 +174,7 @@ export default function LiveMeetingPage() {
   const navigate = useNavigate();
 
   const [eventId, setEventId] = useState(null);
+  const [role, setRole] = useState("audience");
   const [authToken, setAuthToken] = useState("");
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
@@ -192,6 +193,14 @@ export default function LiveMeetingPage() {
       return;
     }
     setEventId(idFromQuery);
+
+    const roleFromQuery = (search.get("role") || "audience").toLowerCase();
+    // Normalize to 'publisher' or 'audience' only
+    if (roleFromQuery === "publisher" || roleFromQuery === "host") {
+      setRole("publisher");
+    } else {
+      setRole("audience");
+    }
   }, [slug]);
 
   // Call backend /events/<id>/dyte/join/
@@ -210,6 +219,7 @@ export default function LiveMeetingPage() {
             "Content-Type": "application/json",
             ...authHeader(),
           },
+          body: JSON.stringify({ role }),   // 👈 send role to backend
         });
 
         if (!res.ok) {
