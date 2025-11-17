@@ -88,7 +88,6 @@ const cleanPollOptions = (arr) => {
     }
     return out;
 };
-
 function mapFeedPollToPost(row) {
     const m = row?.metadata || {};
     const t = (m.type || row.type || "").toLowerCase();
@@ -1924,11 +1923,22 @@ export default function GroupManagePage() {
         approve: (gid, id) => `${API_ROOT}/groups/${gid}/member-requests/approve/${id}/`,
         reject: (gid, id) => `${API_ROOT}/groups/${gid}/member-requests/reject/${id}/`,
     };
-
+    // ---- Promotion (role upgrade) API endpoints ----
+    const PROMOTION_API = {
+        list: (gid) => `${API_ROOT}/groups/${gid}/promotion/request-list/`,
+        request: (gid) => `${API_ROOT}/groups/${gid}/promotion/request/`,
+        approve: (gid) => `${API_ROOT}/groups/${gid}/promotion/request-approve/`,
+        reject: (gid) => `${API_ROOT}/groups/${gid}/promotion/request-reject/`,
+    };
     // ---- Notifications tab data ----
     const [reqs, setReqs] = React.useState([]);
     const [reqsLoading, setReqsLoading] = React.useState(false);
     const [reqsError, setReqsError] = React.useState("");
+
+    // Promotion requests (moderators → admins)
+    const [promotionReqs, setPromotionReqs] = React.useState([]);
+    const [promotionLoading, setPromotionLoading] = React.useState(false);
+    const [promotionError, setPromotionError] = React.useState("");
 
     // tiny helper to format dates
     const fmtWhen = (s) => {
@@ -1971,11 +1981,47 @@ export default function GroupManagePage() {
         }
     }, [group?.id, token]);
 
+    // Load promotion (role-upgrade) requests: moderators asking to become admin
+    const fetchPromotionRequests = React.useCallback(async () => {
+        if (!group?.id) return;
+        setPromotionLoading(true);
+        setPromotionError("");
+        try {
+            const r = await fetch(PROMOTION_API.list(group.id), {
+                headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d?.detail || "Failed to load promotion requests");
+
+            let items = [];
+            if (Array.isArray(d)) items = d;
+            else if (Array.isArray(d?.results)) items = d.results;
+            else if (Array.isArray(d?.requests)) items = d.requests;
+            else if (Array.isArray(d?.promotion_requests)) items = d.promotion_requests;
+
+            const normalized = items.map((it, i) => ({
+                ...it,
+                id: it.id ?? it.pk ?? it.request_id ?? i,
+                user: it.user || it.requester || it.moderator || it.member || it,
+                created_at: it.created_at || it.requested_at || it.createdAt,
+                status: it.status || it.state || "pending",
+            }));
+
+            setPromotionReqs(normalized);
+        } catch (e) {
+            setPromotionError(e?.message || "Failed to load promotion requests");
+            setPromotionReqs([]);
+        } finally {
+            setPromotionLoading(false);
+        }
+    }, [group?.id, token]);
+
     const takeAction = async (id, action) => {
         try {
-            const url = action === "approve"
-                ? API.approve(group.id, id)
-                : API.reject(group.id, id);
+            const url =
+                action === "approve"
+                    ? API.approve(group.id, id)
+                    : API.reject(group.id, id);
 
             const r = await fetch(url, {
                 method: "POST",
@@ -1990,21 +2036,80 @@ export default function GroupManagePage() {
                 throw new Error(d?.detail || `Failed to ${action}`);
             }
 
-            // 1) Remove the request from the notifications list immediately
             setReqs(prev => prev.filter(x => (x.id ?? x.pk) !== id));
-
-            // 2) If approved, refresh members and bump the visible count
             if (action === "approve") {
                 await fetchMembers();
-                setGroup(prev => prev ? {
-                    ...prev,
-                    member_count: (prev.member_count || 0) + 1
-                } : prev);
-                // Optional: jump to Members tab so they see the newly added person
-                // setTab(1);
+                setGroup(prev =>
+                    prev ? { ...prev, member_count: (prev.member_count || 0) + 1 } : prev
+                );
             }
         } catch (e) {
             alert(e?.message || `Failed to ${action}`);
+        }
+    };
+
+    // Approve / reject a promotion request (moderator → admin)
+    const takePromotionAction = async (req, action) => {
+        if (!req || !group?.id) return;
+
+        const id = req.id ?? req.pk ?? req.request_id;
+        const userId = req.user?.id ?? req.user_id;
+        const url =
+            action === "approve"
+                ? PROMOTION_API.approve(group.id)
+                : PROMOTION_API.reject(group.id);
+
+        const headers = {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
+
+        // Try a couple of payload shapes to be compatible with the backend
+        const payloadCandidates = [];
+        if (userId) payloadCandidates.push({ user_id: userId });
+        if (id) {
+            payloadCandidates.push({ id });
+            payloadCandidates.push({ request_id: id });
+        }
+        if (!payloadCandidates.length) payloadCandidates.push({}); // last resort
+
+        let ok = false;
+        let lastErr = "";
+        for (const body of payloadCandidates) {
+            try {
+                const r = await fetch(url, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify(body),
+                });
+                if (r.ok) {
+                    ok = true;
+                    break;
+                }
+                const d = await r.json().catch(() => ({}));
+                lastErr = d?.detail || `HTTP ${r.status}`;
+            } catch (e) {
+                lastErr = e?.message || String(e);
+            }
+        }
+
+        if (!ok) {
+            alert(lastErr || `Failed to ${action} promotion request`);
+            return;
+        }
+
+        // Remove from local list
+        setPromotionReqs(prev =>
+            prev.filter(p =>
+                (p.id ?? p.pk ?? p.request_id) !== id &&
+                (p.user?.id ?? p.user_id) !== userId
+            )
+        );
+
+        // On approve: refresh members so the role change is visible
+        if (action === "approve") {
+            await fetchMembers();
+            await fetchGroup();
         }
     };
     // Load sub-groups (tries multiple URL patterns; first that works wins)
@@ -2091,6 +2196,7 @@ export default function GroupManagePage() {
     const isOwnerRole = myRole === "owner";
     const isAdminRole = myRole === "admin";
     const isModeratorRole = myRole === "moderator";
+    const canReviewRequests = isOwnerRole || isAdminRole;
 
     // ✅ Strong member management (only owner + admin can directly add/remove/change roles)
     const canHardManageMembers = isOwnerRole || isAdminRole;
@@ -2108,7 +2214,7 @@ export default function GroupManagePage() {
     const canSeeSettingsTab = isOwnerRole || isAdminRole || isModeratorRole;
     const canSeeNotificationsTab = canModerate && showNotificationsTab;
 
-    + React.useEffect(() => {
+    React.useEffect(() => {
         if (!canCreateSubgroups && addSubOpen) setAddSubOpen(false);
     }, [canCreateSubgroups, addSubOpen]);
 
@@ -2284,8 +2390,11 @@ export default function GroupManagePage() {
 
     // auto-load join requests when landing on Notifications tab
     React.useEffect(() => {
-        if (canSeeNotificationsTab && tab === NOTIF_TAB_INDEX) fetchRequests();
-    }, [canSeeNotificationsTab, tab, fetchRequests]);
+        if (canSeeNotificationsTab && canReviewRequests && tab === NOTIF_TAB_INDEX) {
+            fetchRequests();
+            fetchPromotionRequests();
+        }
+    }, [canSeeNotificationsTab, canReviewRequests, tab, fetchRequests, fetchPromotionRequests]);
 
     // Helpers for poll options
     const updatePollOption = (idx, val) => {
@@ -2464,26 +2573,46 @@ export default function GroupManagePage() {
         }
     };
 
-    // For moderators: only send "requests" (front-end only placeholder)
-    const requestMemberChange = (action, member) => {
+    // For moderators: only send "requests" (now wired to promotion endpoints)
+    const requestMemberChange = async (action, member) => {
         const label = member?.user?.name || member?.user?.email || "this member";
         let msg = "";
 
-        switch (action) {
-            case "make_admin":
-                msg = `Request sent to group admins to make ${label} an Admin.`;
-                break;
-            case "make_moderator":
-                msg = `Request sent to group admins to make ${label} a Moderator.`;
-                break;
-            case "make_member":
-                msg = `Request sent to group admins to set ${label} as a Member.`;
-                break;
-            case "remove":
-                msg = `Request sent to group admins to remove ${label} from this group.`;
-                break;
-            default:
-                msg = "Request sent to group admins.";
+        if (action === "make_admin") {
+            try {
+                const headers = {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                };
+                const body = { user_id: member?.user?.id };
+
+                const r = await fetch(PROMOTION_API.request(group.id), {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify(body),
+                });
+                const d = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(d?.detail || "Failed to send promotion request");
+
+                msg = d?.detail || `Request sent to group admins to make ${label} an Admin.`;
+            } catch (e) {
+                msg = e?.message || "Could not send promotion request.";
+            }
+        } else {
+            // Fallback text for any other future "request" actions
+            switch (action) {
+                case "make_moderator":
+                    msg = `Request sent to group admins to make ${label} a Moderator.`;
+                    break;
+                case "make_member":
+                    msg = `Request sent to group admins to set ${label} as a Member.`;
+                    break;
+                case "remove":
+                    msg = `Request sent to group admins to remove ${label} from this group.`;
+                    break;
+                default:
+                    msg = "Request sent to group admins.";
+            }
         }
 
         alert(msg);
@@ -2679,7 +2808,10 @@ export default function GroupManagePage() {
                                                             variant="outlined"
                                                             className="rounded-xl"
                                                             sx={{ textTransform: "none", borderColor: "#10b8a6", color: "#10b8a6" }}
-                                                            onClick={() => setRequestAddOpen(true)}
+                                                            onClick={() => {
+                                                                fetchRequests();
+                                                                setRequestAddOpen(true);
+                                                            }}
                                                         >
                                                             Request to add members
                                                         </Button>
@@ -3208,66 +3340,159 @@ export default function GroupManagePage() {
                                         <Stack spacing={2}>
                                             <Typography variant="h6" className="font-semibold">Notifications</Typography>
 
-                                            {!!reqsError && <Alert severity="error">{reqsError}</Alert>}
+                                            {canReviewRequests ? (
+                                                <>
+                                                    {/* JOIN REQUESTS (existing UI) */}
+                                                    {!!reqsError && <Alert severity="error">{reqsError}</Alert>}
 
-                                            {reqsLoading ? (
-                                                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                                                    <CircularProgress />
-                                                </Box>
-                                            ) : reqs.length === 0 ? (
-                                                <Alert severity="info">No notifications — there are no pending join requests.</Alert>
+                                                    {reqsLoading ? (
+                                                        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                                                            <CircularProgress />
+                                                        </Box>
+                                                    ) : reqs.length === 0 ? (
+                                                        <Alert severity="info">
+                                                            No join requests for this group.
+                                                        </Alert>
+                                                    ) : (
+                                                        <List sx={{ width: "100%" }}>
+                                                            {reqs.map((r) => {
+                                                                const id = r.id ?? r.pk;
+                                                                const u = r.user || r.requester || r.member || {};
+                                                                const name = u.full_name || u.name || u.username || "Member";
+                                                                const avatar = u.avatar || u.photo_url || null;
+                                                                const when = r.created_at || r.requested_at || r.createdAt;
+                                                                const userId = r.user?.id;
+
+                                                                return (
+                                                                    <ListItem
+                                                                        key={id}
+                                                                        divider
+                                                                        secondaryAction={
+                                                                            <ButtonGroup variant="outlined" size="small">
+                                                                                <Button
+                                                                                    color="success"
+                                                                                    onClick={() => takeAction(userId, "approve")}
+                                                                                    disabled={reqsLoading}
+                                                                                >
+                                                                                    Approve
+                                                                                </Button>
+                                                                                <Button
+                                                                                    color="error"
+                                                                                    onClick={() => takeAction(userId, "reject")}
+                                                                                    disabled={reqsLoading}
+                                                                                >
+                                                                                    Reject
+                                                                                </Button>
+                                                                            </ButtonGroup>
+                                                                        }
+                                                                    >
+                                                                        <ListItemAvatar>
+                                                                            <Avatar src={avatar || undefined}>
+                                                                                {name?.[0]?.toUpperCase() || "U"}
+                                                                            </Avatar>
+                                                                        </ListItemAvatar>
+                                                                        <ListItemText
+                                                                            primary={<span><b>{name}</b> requested to join this group</span>}
+                                                                            secondary={when ? `Requested on ${fmtWhen(when)}` : null}
+                                                                        />
+                                                                    </ListItem>
+                                                                );
+                                                            })}
+                                                        </List>
+                                                    )}
+
+                                                    {/* PROMOTION REQUESTS */}
+                                                    <Divider sx={{ my: 2 }} />
+                                                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                                        Promotion requests
+                                                    </Typography>
+
+                                                    {!!promotionError && (
+                                                        <Alert severity="error">{promotionError}</Alert>
+                                                    )}
+
+                                                    {promotionLoading ? (
+                                                        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                                                            <CircularProgress />
+                                                        </Box>
+                                                    ) : promotionReqs.length === 0 ? (
+                                                        <Alert severity="info">
+                                                            No pending promotion requests.
+                                                        </Alert>
+                                                    ) : (
+                                                        <List sx={{ width: "100%" }}>
+                                                            {promotionReqs.map((r) => {
+                                                                const id = r.id ?? r.pk ?? r.request_id;
+                                                                const u = r.user || r.requester || r.moderator || {};
+                                                                const name = u.full_name || u.name || u.username || "Member";
+                                                                const avatar = u.avatar || u.photo_url || null;
+                                                                const when = r.created_at || r.requested_at || r.createdAt;
+
+                                                                return (
+                                                                    <ListItem
+                                                                        key={id}
+                                                                        divider
+                                                                        secondaryAction={
+                                                                            <ButtonGroup variant="outlined" size="small">
+                                                                                <Button
+                                                                                    color="success"
+                                                                                    onClick={() => takePromotionAction(r, "approve")}
+                                                                                    disabled={promotionLoading}
+                                                                                >
+                                                                                    Approve
+                                                                                </Button>
+                                                                                <Button
+                                                                                    color="error"
+                                                                                    onClick={() => takePromotionAction(r, "reject")}
+                                                                                    disabled={promotionLoading}
+                                                                                >
+                                                                                    Reject
+                                                                                </Button>
+                                                                            </ButtonGroup>
+                                                                        }
+                                                                    >
+                                                                        <ListItemAvatar>
+                                                                            <Avatar src={avatar || undefined}>
+                                                                                {name?.[0]?.toUpperCase() || "U"}
+                                                                            </Avatar>
+                                                                        </ListItemAvatar>
+                                                                        <ListItemText
+                                                                            primary={
+                                                                                <span>
+                                                                                    <b>{name}</b> requested to be promoted to <b>Admin</b>
+                                                                                </span>
+                                                                            }
+                                                                            secondary={when ? `Requested on ${fmtWhen(when)}` : null}
+                                                                        />
+                                                                    </ListItem>
+                                                                );
+                                                            })}
+                                                        </List>
+                                                    )}
+
+                                                    <Stack direction="row" spacing={1}>
+                                                        <Button
+                                                            variant="outlined"
+                                                            onClick={fetchRequests}
+                                                            disabled={reqsLoading}
+                                                        >
+                                                            Refresh join requests
+                                                        </Button>
+                                                        <Button
+                                                            variant="outlined"
+                                                            onClick={fetchPromotionRequests}
+                                                            disabled={promotionLoading}
+                                                        >
+                                                            Refresh promotion requests
+                                                        </Button>
+                                                    </Stack>
+                                                </>
                                             ) : (
-                                                <List sx={{ width: "100%" }}>
-                                                    {reqs.map((r) => {
-                                                        const id = r.id ?? r.pk; // tolerate pk/id
-                                                        const u = r.user || r.requester || r.member || {};
-                                                        const name = u.full_name || u.name || u.username || "Member";
-                                                        const avatar = u.avatar || u.photo_url || null;
-                                                        const when = r.created_at || r.requested_at || r.createdAt;
-
-                                                        return (
-                                                            <ListItem
-                                                                key={id}
-                                                                divider
-                                                                secondaryAction={
-                                                                    <ButtonGroup variant="outlined" size="small">
-                                                                        <Button
-                                                                            color="success"
-                                                                            onClick={() => takeAction(id, "approve")}
-                                                                            disabled={reqsLoading}
-                                                                        >
-                                                                            Approve
-                                                                        </Button>
-                                                                        <Button
-                                                                            color="error"
-                                                                            onClick={() => takeAction(id, "reject")}
-                                                                            disabled={reqsLoading}
-                                                                        >
-                                                                            Reject
-                                                                        </Button>
-                                                                    </ButtonGroup>
-                                                                }
-                                                            >
-                                                                <ListItemAvatar>
-                                                                    <Avatar src={avatar || undefined}>
-                                                                        {name?.[0]?.toUpperCase() || "U"}
-                                                                    </Avatar>
-                                                                </ListItemAvatar>
-                                                                <ListItemText
-                                                                    primary={<span><b>{name}</b> requested to join this group</span>}
-                                                                    secondary={when ? `Requested on ${fmtWhen(when)}` : null}
-                                                                />
-                                                            </ListItem>
-                                                        );
-                                                    })}
-                                                </List>
+                                                <Alert severity="info">
+                                                    You can see this tab, but only <b>Owners</b> and <b>Admins</b> can review
+                                                    join and promotion requests.
+                                                </Alert>
                                             )}
-
-                                            <Stack direction="row" spacing={1}>
-                                                <Button variant="outlined" onClick={fetchRequests} disabled={reqsLoading}>
-                                                    Refresh
-                                                </Button>
-                                            </Stack>
                                         </Stack>
                                     </Paper>
                                 )}
@@ -3299,7 +3524,12 @@ export default function GroupManagePage() {
                             open={requestAddOpen}
                             onClose={() => setRequestAddOpen(false)}
                             groupIdOrSlug={idOrSlug}
-                            existingIds={members.map(m => m.user.id)}
+                            existingIds={[
+                                ...new Set([
+                                    ...members.map(m => m.user.id),                 // active members
+                                    ...reqs.map(r => r.user?.id).filter(Boolean),   // pending (status = "pending")
+                                ]),
+                            ]}
                             onRequested={(n) => {
                                 setRequestAddOpen(false);
                                 alert(`Request sent to admins to add ${n} member(s).`);
