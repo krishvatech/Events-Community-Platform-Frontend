@@ -1895,6 +1895,17 @@ export default function GroupManagePage() {
     const [removeMemberOpen, setRemoveMemberOpen] = React.useState(false);
     const [removeMemberTarget, setRemoveMemberTarget] = React.useState(null);
 
+    // Who am I? (prefer backend, fallback to localStorage user)
+    const currentUserId = React.useMemo(() => {
+        const fromPayload = group?.current_user?.id ?? group?.current_user_id ?? null;
+        if (fromPayload) return Number(fromPayload);
+        try {
+            const raw = localStorage.getItem("user");
+            if (raw) return Number(JSON.parse(raw)?.id) || null;
+        } catch { }
+        return null;
+    }, [group?.current_user?.id, group?.current_user_id]);
+
 
     // ---- Role helpers for permissions ----
     const myRole = group?.current_user_role || "member";
@@ -2204,10 +2215,19 @@ export default function GroupManagePage() {
     const ownerId = group?.created_by?.id ?? null;
 
     // action menu handlers
-    const openMemberMenu = (evt, m) => { setActiveMember(m); setMemMenuAnchor(evt.currentTarget); };
+    const openMemberMenu = (evt, m) => {
+        if (myRole === "admin" && currentUserId && Number(m.user.id) === Number(currentUserId)) return;
+        setActiveMember(m);
+        setMemMenuAnchor(evt.currentTarget);
+    };
     const closeMemberMenu = () => { setActiveMember(null); setMemMenuAnchor(null); };
 
     const setRole = async (userId, role) => {
+        if (currentUserId && Number(userId) === Number(currentUserId)) {
+            setRoleErrorMsg("You can’t change your own role.");
+            setRoleErrorOpen(true);
+            return;
+        }
         setBusyUserId(userId);
         try {
             const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/set-role/`, {
@@ -2231,6 +2251,10 @@ export default function GroupManagePage() {
     };
 
     const removeMember = async (userId) => {
+        if (currentUserId && Number(userId) === Number(currentUserId)) {
+            alert("You can’t remove yourself from the group.");
+            return;
+        }
         setBusyUserId(userId);
         try {
             const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/members/remove-member/`, {
@@ -2500,7 +2524,9 @@ export default function GroupManagePage() {
                                                         .map((m) => {
                                                             const isOwnerRow = ownerId && Number(m.user.id) === Number(ownerId);
                                                             const role = isOwnerRow ? "owner" : m.role;
-                                                            const disabled = busyUserId === m.user.id || isOwnerRow;
+                                                            const isSelfAdminRow =
+                                                                myRole === "admin" && currentUserId && Number(m.user.id) === Number(currentUserId);
+                                                            const disabled = busyUserId === m.user.id || isOwnerRow || isSelfAdminRow;
                                                             return (
                                                                 <Stack key={m.user.id} direction="row" alignItems="center" spacing={2} className="py-2">
                                                                     <Avatar src={toAbs(m.user.avatar)}>{(m.user.name || "U").slice(0, 1).toUpperCase()}</Avatar>
