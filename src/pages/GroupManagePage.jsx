@@ -1566,7 +1566,9 @@ export default function GroupManagePage() {
     // Show Sub-groups tab only on top-level groups
     const showSubgroupsTab = !isChildGroup;
     // Show Notifications tab only when Public + Approval
-    const showNotificationsTab = (group?.visibility === "public") && (group?.join_policy === "approval");
+    const showNotificationsTab =
+        (group?.visibility === "public" && group?.join_policy === "approval") ||
+        (group?.visibility === "private" && group?.join_policy === "invite");
     // Keep indexes stable: Overview=0, Members=1, Sub-groups=2, Settings=3, Posts=4, Notifications=5
     const NOTIF_TAB_INDEX = 5;
     // Default to "Overview" whenever /groups/:idOrSlug changes (main or sub)
@@ -1606,6 +1608,7 @@ export default function GroupManagePage() {
     React.useEffect(() => {
         if (!showSubgroupsTab && tab === 2) setTab(0);
     }, [showSubgroupsTab, tab]);
+
     const [editOpen, setEditOpen] = React.useState(false);
     const [members, setMembers] = React.useState([]);
     const [memLoading, setMemLoading] = React.useState(true);
@@ -1909,8 +1912,15 @@ export default function GroupManagePage() {
     const canModerate = isOwnerRole || isAdminRole || isModeratorRole;
     const canPost = canModerate;
 
+    const canSeeSettingsTab = isOwnerRole || isAdminRole || isModeratorRole;
+    const canSeeNotificationsTab = canModerate && showNotificationsTab;
 
-    // Per-post menu open/close
+    // If user can't see Settings, never allow tab index 3
+    React.useEffect(() => {
+        if (!canSeeSettingsTab && tab === 3) setTab(0);
+    }, [canSeeSettingsTab, tab]);
+
+    // Per-post menu open/close 
     const openPostMenu = (evt, post) => {
         if (!post) return;
         const fid = Number(post.feed_item_id ?? post.id);
@@ -2077,8 +2087,8 @@ export default function GroupManagePage() {
 
     // auto-load join requests when landing on Notifications tab
     React.useEffect(() => {
-        if (showNotificationsTab && tab === NOTIF_TAB_INDEX) fetchRequests();
-    }, [showNotificationsTab, tab, fetchRequests]);
+        if (canSeeNotificationsTab && tab === NOTIF_TAB_INDEX) fetchRequests();
+    }, [canSeeNotificationsTab, tab, fetchRequests]);
 
     // Helpers for poll options
     const updatePollOption = (idx, val) => {
@@ -2381,9 +2391,14 @@ export default function GroupManagePage() {
                                     // keep index #2 but hide it so other tabs keep their indices
                                     <Tab sx={{ display: "none" }} disabled />
                                 )}
-                                <Tab label="Settings" />
+                                {canSeeSettingsTab ? (
+                                    <Tab label="Settings" />
+                                ) : (
+                                    // keep index #3 but hide it, so Posts/Notifications keep their indices
+                                    <Tab sx={{ display: "none" }} disabled />
+                                )}
                                 <Tab label="Posts" />
-                                {showNotificationsTab && <Tab label="Notifications" />}
+                                {canSeeNotificationsTab && <Tab label="Notifications" />}
                             </Tabs>
                         </Paper>
 
@@ -2964,7 +2979,7 @@ export default function GroupManagePage() {
                                     </Paper>
                                 )}
 
-                                {showNotificationsTab && tab === NOTIF_TAB_INDEX && (
+                                {canSeeNotificationsTab && tab === NOTIF_TAB_INDEX && (
                                     <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                         <Stack spacing={2}>
                                             <Typography variant="h6" className="font-semibold">Notifications</Typography>
