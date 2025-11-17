@@ -577,6 +577,184 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }
     );
 }
 
+function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onRequested }) {
+    const token = getToken();
+
+    const [q, setQ] = React.useState("");
+    const [rows, setRows] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState("");
+    const [selected, setSelected] = React.useState(new Set());
+
+    const toggle = (id) => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    };
+
+    const USER_SEARCH_ENDPOINTS = [
+        (q) => `${API_ROOT}/users-lookup/?search=${encodeURIComponent(q)}&limit=30`, // ✅ the one AddMembersDialog uses
+        (q) => `${API_ROOT}/users/?search=${encodeURIComponent(q)}&limit=30`,
+        (q) => `${API_ROOT}/users/search/?q=${encodeURIComponent(q)}&limit=30`,
+        (q) => `${API_ROOT}/accounts/users/?search=${encodeURIComponent(q)}&limit=30`,
+    ];
+
+    const fetchUsers = React.useCallback(async () => {
+        if (!open) return;
+        const term = (q || "").trim(); // can be empty
+
+        setLoading(true);
+        setError("");
+
+        try {
+            // Prefer the same endpoint used by the admin AddMembersDialog
+            const primaryUrl = `${API_ROOT}/users-lookup/?search=${encodeURIComponent(term)}&limit=30`;
+            let res = await fetch(primaryUrl, {
+                headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+
+            // Fallbacks only if primary fails
+            if (!res.ok) {
+                for (const makeUrl of USER_SEARCH_ENDPOINTS.slice(1)) {
+                    res = await fetch(makeUrl(term), {
+                        headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                    });
+                    if (res.ok) break;
+                }
+            }
+
+            const json = await res.json().catch(() => ([]));
+            if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+
+            const items = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
+            const exist = new Set(existingIds || []);
+            setRows(items.filter((u) => !exist.has(u.id))); // exclude already-in-group
+        } catch (e) {
+            setError(String(e?.message || e));
+            setRows([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [open, q, token, existingIds]);
+
+
+    React.useEffect(() => { if (open) fetchUsers(); }, [open, fetchUsers]);
+
+    const submit = async () => {
+        if (selected.size === 0) return;
+
+        const ids = Array.from(selected).map(Number);
+        const url = `${API_ROOT}/groups/${groupIdOrSlug}/moderator/request-add-members/`;
+        const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+
+        // include group_id in body if the path param is numeric (backend allows it as a sanity check)
+        const groupIdInt = Number(groupIdOrSlug);
+        const maybeGroupId = Number.isFinite(groupIdInt) ? { group_id: groupIdInt } : {};
+
+        try {
+            // 1) Try bulk first (for backends that accept user_ids)
+            const bulkBody = JSON.stringify({ user_ids: ids, ...maybeGroupId });
+            let res = await fetch(url, { method: "POST", headers, body: bulkBody });
+            let j = await res.json().catch(() => ({}));
+
+            // 2) If backend says "user_id is required" (no bulk), send one request per user_id
+            const needsSingle =
+                !res.ok &&
+                (String(j?.detail || "").toLowerCase().includes("user_id is required") ||
+                    j?.user_id === "This field is required.");
+
+            if (needsSingle) {
+                // fire requests sequentially to keep error handling simple
+                for (const uid of ids) {
+                    const body = JSON.stringify({ user_id: uid, ...maybeGroupId });
+                    const r = await fetch(url, { method: "POST", headers, body });
+                    if (!r.ok) {
+                        const jj = await r.json().catch(() => ({}));
+                        throw new Error(jj?.detail || `HTTP ${r.status}`);
+                    }
+                }
+            } else if (!res.ok) {
+                // some other error
+                throw new Error(j?.detail || `HTTP ${res.status}`);
+            }
+
+            onRequested?.(ids.length);
+            onClose?.();
+        } catch (e) {
+        }
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ className: "rounded-2xl" }}>
+            <DialogTitle className="font-extrabold">Request to add members</DialogTitle>
+            <DialogContent dividers>
+                <TextField
+                    placeholder="Search users…"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    fullWidth
+                    size="small"
+                    className="mb-3"
+                    onKeyDown={(e) => { if (e.key === 'Enter') fetchUsers(); }}
+                />
+
+                {loading ? (
+                    <>
+                        <LinearProgress />
+                        <Typography className="mt-2 text-slate-500">Searching…</Typography>
+                    </>
+                ) : error ? (
+                    <Alert severity="error">{error}</Alert>
+                ) : rows.length === 0 ? (
+                    <Typography className="text-slate-500">No users found.</Typography>
+                ) : (
+                    <Stack spacing={1} divider={<Divider />}>
+                        {rows.map((u) => {
+                            const checked = selected.has(u.id);
+                            return (
+                                <Stack
+                                    key={u.id}
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={2}
+                                    className="py-2 cursor-pointer hover:bg-slate-50 rounded-lg px-1"
+                                    onClick={() => toggle(u.id)}
+                                >
+                                    <input type="checkbox" checked={checked} readOnly />
+                                    <Avatar src={toAbs(u.avatar)}>
+                                        {(u.name || u.email || "U").slice(0, 1).toUpperCase()}
+                                    </Avatar>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography className="font-medium">{u.name || u.email || u.id}</Typography>
+                                        {u.email && <Typography variant="caption" className="text-slate-500">{u.email}</Typography>}
+                                    </Box>
+                                </Stack>
+                            );
+                        })}
+                    </Stack>
+                )}
+            </DialogContent>
+
+            <DialogActions sx={{ position: 'sticky', bottom: 0, background: 'white' }} className="px-6 py-4">
+                <Typography sx={{ flex: 1 }} className="text-slate-600">
+                    {selected.size} selected
+                </Typography>
+                <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
+                <Button
+                    onClick={submit} disabled={selected.size === 0}
+                    variant="contained"
+                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                >
+                    Send request
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
+
 // ---- Add Sub-group Dialog (same UI as Create Group) ----
 function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
     const token = getToken();
@@ -1614,6 +1792,7 @@ export default function GroupManagePage() {
     const [memLoading, setMemLoading] = React.useState(true);
     const [memError, setMemError] = React.useState("");
     const [addOpen, setAddOpen] = React.useState(false);
+    const [requestAddOpen, setRequestAddOpen] = React.useState(false);
     const [memMenuAnchor, setMemMenuAnchor] = React.useState(null);
     const [activeMember, setActiveMember] = React.useState(null);
     // Sub-groups state
@@ -2217,6 +2396,15 @@ export default function GroupManagePage() {
     // action menu handlers
     const openMemberMenu = (evt, m) => {
         if (myRole === "admin" && currentUserId && Number(m.user.id) === Number(currentUserId)) return;
+
+        // NEW: moderators cannot open menu for others or for admin/owner rows
+        if (myRole === "moderator") {
+            const isSelf = currentUserId && Number(m.user.id) === Number(currentUserId);
+            const isOwner = ownerId && Number(m.user.id) === Number(ownerId);
+            if (!isSelf) return;
+            if (isOwner || m.role === "admin") return;
+        }
+
         setActiveMember(m);
         setMemMenuAnchor(evt.currentTarget);
     };
@@ -2491,9 +2679,7 @@ export default function GroupManagePage() {
                                                             variant="outlined"
                                                             className="rounded-xl"
                                                             sx={{ textTransform: "none", borderColor: "#10b8a6", color: "#10b8a6" }}
-                                                            onClick={() => {
-                                                                alert("Request sent to group admins to add new members.");
-                                                            }}
+                                                            onClick={() => setRequestAddOpen(true)}
                                                         >
                                                             Request to add members
                                                         </Button>
@@ -2524,9 +2710,20 @@ export default function GroupManagePage() {
                                                         .map((m) => {
                                                             const isOwnerRow = ownerId && Number(m.user.id) === Number(ownerId);
                                                             const role = isOwnerRow ? "owner" : m.role;
-                                                            const isSelfAdminRow =
-                                                                myRole === "admin" && currentUserId && Number(m.user.id) === Number(currentUserId);
-                                                            const disabled = busyUserId === m.user.id || isOwnerRow || isSelfAdminRow;
+                                                            const isSelfAdminRow = myRole === "admin" && currentUserId && Number(m.user.id) === Number(currentUserId);
+                                                            const isSelf = currentUserId && Number(m.user.id) === Number(currentUserId);
+                                                            const isAdminRow = role === "admin";
+
+                                                            // previous:
+                                                            let disabled = busyUserId === m.user.id || isOwnerRow || isSelfAdminRow;
+
+                                                            // NEW rules for moderators:
+                                                            if (myRole === "moderator") {
+                                                                // cannot act on Admin or Owner
+                                                                if (isAdminRow || isOwnerRow) disabled = true;
+                                                                // cannot act on other members — only self
+                                                                if (!isSelf) disabled = true;
+                                                            }
                                                             return (
                                                                 <Stack key={m.user.id} direction="row" alignItems="center" spacing={2} className="py-2">
                                                                     <Avatar src={toAbs(m.user.avatar)}>{(m.user.name || "U").slice(0, 1).toUpperCase()}</Avatar>
@@ -2564,7 +2761,13 @@ export default function GroupManagePage() {
                                                 {/* Per-member action menu */}
                                                 <Menu
                                                     anchorEl={memMenuAnchor}
-                                                    open={Boolean(memMenuAnchor)}
+                                                    open={
+                                                        Boolean(memMenuAnchor)
+                                                        && !(myRole === "admin" && activeMember && Number(activeMember.user.id) === Number(currentUserId))
+                                                        && !(myRole === "moderator" && activeMember && Number(activeMember.user.id) !== Number(currentUserId))
+                                                        && !(myRole === "moderator" && activeMember && (activeMember.role === "admin" || (ownerId && Number(activeMember.user.id) === Number(ownerId))))
+                                                    }
+
                                                     onClose={closeMemberMenu}
                                                     elevation={2}
                                                 >
@@ -2607,32 +2810,18 @@ export default function GroupManagePage() {
                                                         </>
                                                     )}
 
-                                                    {activeMember && !canHardManageMembers && canRequestMemberChanges && (
-                                                        <>
-                                                            {/* Moderator: request-only actions */}
-                                                            <MenuItem onClick={() => requestMemberChange("make_admin", activeMember)}>
-                                                                <ListItemIcon>🛡️</ListItemIcon>
-                                                                <ListItemText>Request: make Admin</ListItemText>
-                                                            </MenuItem>
-
-                                                            <MenuItem onClick={() => requestMemberChange("make_moderator", activeMember)}>
-                                                                <ListItemIcon>🔧</ListItemIcon>
-                                                                <ListItemText>Request: make Moderator</ListItemText>
-                                                            </MenuItem>
-
-                                                            <MenuItem onClick={() => requestMemberChange("make_member", activeMember)}>
-                                                                <ListItemIcon>👤</ListItemIcon>
-                                                                <ListItemText>Request: make Member</ListItemText>
-                                                            </MenuItem>
-
-                                                            <Divider />
-
-                                                            <MenuItem onClick={() => requestMemberChange("remove", activeMember)}>
-                                                                <ListItemIcon>🗑️</ListItemIcon>
-                                                                <ListItemText>Request removal</ListItemText>
-                                                            </MenuItem>
-                                                        </>
-                                                    )}
+                                                    {activeMember
+                                                        && !canHardManageMembers
+                                                        && canRequestMemberChanges
+                                                        && Number(activeMember?.user?.id) === Number(currentUserId)   // ⭐ self only
+                                                        && (
+                                                            <>
+                                                                <MenuItem onClick={() => requestMemberChange("make_admin", activeMember)}>
+                                                                    <ListItemIcon>🛡️</ListItemIcon>
+                                                                    <ListItemText>Request: make Admin</ListItemText>
+                                                                </MenuItem>
+                                                            </>
+                                                        )}
                                                 </Menu>
 
                                             </>
@@ -3106,6 +3295,17 @@ export default function GroupManagePage() {
                                 } : prev);
                             }}
                         />
+                        <RequestAddMembersDialog
+                            open={requestAddOpen}
+                            onClose={() => setRequestAddOpen(false)}
+                            groupIdOrSlug={idOrSlug}
+                            existingIds={members.map(m => m.user.id)}
+                            onRequested={(n) => {
+                                setRequestAddOpen(false);
+                                alert(`Request sent to admins to add ${n} member(s).`);
+                            }}
+                        />
+
 
                         {/* Role assign — error modal */}
                         <Dialog
