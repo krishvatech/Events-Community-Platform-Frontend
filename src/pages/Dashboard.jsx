@@ -338,7 +338,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               />
 
               <TextField
-                label="Type & select the location *"
+                label="Location *"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 fullWidth
@@ -438,14 +438,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Grid>
             <Grid item xs={12} md={3}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker label="Start time *" ampm minutesStep={30} value={dayjs(`1970-01-01T${startTime}`)}
+                <TimePicker label="Start time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${startTime}`)}
                   onChange={(v) => setStartTime(v ? dayjs(v).format("HH:mm") : startTime)}
                   slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
             </Grid>
             <Grid item xs={12} md={3}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker label="End time *" ampm minutesStep={30} value={dayjs(`1970-01-01T${endTime}`)}
+                <TimePicker label="End time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${endTime}`)}
                   onChange={(v) => setEndTime(v ? dayjs(v).format("HH:mm") : endTime)}
                   slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
@@ -922,7 +922,7 @@ function EditEventDialog({ open, onClose, event, onUpdated }) {
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <TimePicker
-                  label="Start time *" ampm minutesStep={30}
+                  label="Start time *" ampm minutesStep={1}
                   value={dayjs(`1970-01-01T${startTime}`)}
                   onChange={(val) => setStartTime(val ? dayjs(val).format("HH:mm") : startTime)}
                   slotProps={{ textField: { fullWidth: true, error: !!errors.startTime, helperText: errors.startTime } }}
@@ -930,7 +930,7 @@ function EditEventDialog({ open, onClose, event, onUpdated }) {
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <TimePicker
-                  label="End time *" ampm minutesStep={30}
+                  label="End time *" ampm minutesStep={1}
                   value={dayjs(`1970-01-01T${endTime}`)}
                   onChange={(val) => setEndTime(val ? dayjs(val).format("HH:mm") : endTime)}
                   slotProps={{ textField: { fullWidth: true, error: !!errors.endTime, helperText: errors.endTime } }}
