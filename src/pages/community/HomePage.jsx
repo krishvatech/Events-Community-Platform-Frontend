@@ -1417,7 +1417,11 @@ export default function HomePage() {
     }
   };
 
-  const handleUpdateProfile = (updated) => setProfile(updated);
+  const handleUpdateProfile = (updater) => {
+    setProfile((prev) =>
+      typeof updater === "function" ? updater(prev) : updater
+    );
+  };
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User";
 
   return (
@@ -3110,8 +3114,12 @@ function AboutTab({ profile, groups, onUpdate }) {
 
   const reloadExtras = React.useCallback(async () => {
     const extra = await fetchProfileExtras();
-    onUpdate?.({ ...profile, experience: extra.experiences, education: extra.educations });
-  }, [onUpdate, profile]);
+    onUpdate?.((prev) => ({
+      ...prev,
+      experience: extra.experiences,
+      education: extra.educations,
+    }));
+  }, [onUpdate]);
 
   // ----- About (summary + skills) -----
   const openEditAbout = () => setAboutOpen(true);
@@ -3191,7 +3199,7 @@ function AboutTab({ profile, groups, onUpdate }) {
     setExpForm({
       org: x.org || x.community_name || "",
       position: x.position || "",
-      location: x.location || "",  
+      location: x.location || "",
       start: x.start || x.start_date || "",
       end: x.end || x.end_date || "",
       current: !!(x.current || x.currently_work_here),
@@ -3207,6 +3215,28 @@ function AboutTab({ profile, groups, onUpdate }) {
 
   const saveExperience = async () => {
     try {
+      const { start, end, current } = expForm;
+
+      // Convert to ISO yyyy-mm-dd for safe string comparison
+      const todayStr = new Date().toISOString().slice(0, 10);
+
+      // 1) Start date cannot be in the future
+      if (start && start > todayStr) {
+        alert("Start date cannot be after today.");
+        return;
+      }
+
+      // 2) End date cannot be in the future (only when not 'currently work here')
+      if (!current && end && end > todayStr) {
+        alert("End date cannot be after today.");
+        return;
+      }
+
+      // 3) End date cannot be before start date
+      if (!current && start && end && end < start) {
+        alert("End date cannot be before start date.");
+        return;
+      }
       if (editExpId) await updateExperienceApi(editExpId, expForm);
       else await createExperienceApi(expForm);
       // If user ticked "Make this location my profile’s work location"
