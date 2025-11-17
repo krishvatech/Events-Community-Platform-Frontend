@@ -3072,7 +3072,7 @@ function AboutTab({ profile, groups, onUpdate }) {
 
   const [expOpen, setExpOpen] = React.useState(false);
   const [editExpId, setEditExpId] = React.useState(null);
-  // NOTE: no "location" here anymore
+
   const [expForm, setExpForm] = React.useState({
     org: "", position: "", location: "", start: "", end: "", current: false,
     employment_type: "full_time",       // compulsory (default)

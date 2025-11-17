@@ -205,8 +205,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
     const s = dayjs(`${startDate}T${startTime}:00`);
     const ed = dayjs(`${endDate}T${endTime}:00`);
-    if (!ed.isAfter(s)) e.endTime = "End must be after start";
-
+    if (s.isValid() && ed.isValid() && !ed.isAfter(s)) {
+      // ⛔ End before or same as start → show error on end date + end time
+      e.endTime = "End must be after start";
+      e.endDate = "End must be after start";
+    }
     if (!resourcesPublishNow) {
       const pdt = dayjs(`${resPublishDate}T${resPublishTime}:00`);
       if (!pdt.isValid()) e.resource_publish_at = "Choose valid publish date & time";
@@ -361,7 +364,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               </Grid>
 
               <TextField
-                label="Price (₹)"
+                label="Price ($)"
                 type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
@@ -429,12 +432,20 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             <Grid item xs={12} md={3}>
               <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} fullWidth
                 InputLabelProps={{ shrink: true }}
-                InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }} />
+                InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
+                // 🔻 show error if needed
+                error={!!errors.startDate}
+                helperText={errors.startDate}
+              />
             </Grid>
             <Grid item xs={12} md={3}>
               <TextField label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth
                 InputLabelProps={{ shrink: true }}
-                InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }} />
+                InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
+                // 🔻 show error when end < start
+                error={!!errors.endDate}
+                helperText={errors.endDate}
+              />
             </Grid>
             <Grid item xs={12} md={3}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -733,7 +744,11 @@ function EditEventDialog({ open, onClose, event, onUpdated }) {
     if (startDate && endDate) {
       const s = new Date(`${startDate}T${startTime}:00`);
       const ed = new Date(`${endDate}T${endTime}:00`);
-      if (ed <= s) e.endTime = "End must be after start";
+      if (ed <= s) {
+        // ⛔ End before or same as start → show error on end date + end time
+        e.endTime = "End must be after start";
+        e.endDate = "End must be after start";
+      }
     }
     setErrors(e);
     return Object.keys(e).length === 0;
