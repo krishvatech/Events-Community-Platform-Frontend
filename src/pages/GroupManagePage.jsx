@@ -1912,8 +1912,15 @@ export default function GroupManagePage() {
     const canModerate = isOwnerRole || isAdminRole || isModeratorRole;
     const canPost = canModerate;
 
+    // ✅ Sub-group creation is restricted to Owner + Admin only
+    const canCreateSubgroups = isOwnerRole;
+
     const canSeeSettingsTab = isOwnerRole || isAdminRole || isModeratorRole;
     const canSeeNotificationsTab = canModerate && showNotificationsTab;
+
+    + React.useEffect(() => {
+        if (!canCreateSubgroups && addSubOpen) setAddSubOpen(false);
+    }, [canCreateSubgroups, addSubOpen]);
 
     // If user can't see Settings, never allow tab index 3
     React.useEffect(() => {
@@ -2612,7 +2619,7 @@ export default function GroupManagePage() {
                                     <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                         <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                             <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
-                                            {canModerate && (
+                                            {canCreateSubgroups && (
                                                 <Button
                                                     variant="contained"
                                                     className="rounded-xl"
@@ -2665,12 +2672,14 @@ export default function GroupManagePage() {
                                             </Stack>
                                         )}
 
-                                        <AddSubgroupDialog
-                                            open={addSubOpen}
-                                            onClose={() => setAddSubOpen(false)}
-                                            parentGroup={group}
-                                            onCreated={(g) => { setSubgroups((prev) => [g, ...prev]); }}
-                                        />
+                                        {canCreateSubgroups && (
+                                            <AddSubgroupDialog
+                                                open={addSubOpen}
+                                                onClose={() => setAddSubOpen(false)}
+                                                parentGroup={group}
+                                                onCreated={(g) => { setSubgroups((prev) => [g, ...prev]); }}
+                                            />
+                                        )}
                                     </Paper>
                                 )}
 
