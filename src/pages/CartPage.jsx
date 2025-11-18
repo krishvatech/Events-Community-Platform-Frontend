@@ -156,9 +156,9 @@ function SuccessToast({ open, onClose, title = "Payment successful", subtitle = 
 
 
 const authHeaders = () => {
-   const t = getToken();
-   return t ? { Authorization: `Bearer ${t}` } : {};
- };
+  const t = getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
 
 const fmt = (n) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n || 0);
@@ -179,40 +179,40 @@ export default function CartPage() {
   const [couponCode, setCouponCode] = useState("");   // optional: wire later to backend
   const [discount, setDiscount] = useState(0);
   const [subtotal, setSubtotal] = useState(0);
-  const [total,   setTotal]   = useState(0);
+  const [total, setTotal] = useState(0);
   const [showPaid, setShowPaid] = useState(false);
 
- useEffect(() => {
-   (async () => {
-     try {
-       const res = await fetch(`${API_BASE}/cart/`, { headers: authHeaders() });
-       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-       const data = await res.json();
-       setCart(Array.isArray(data?.items) ? data.items : []);
-       setSubtotal(Number(data?.subtotal ?? 0));
-       setTotal(Number(data?.total ?? 0));
-       // update header badge
-       const count = (data?.items || []).reduce((s, it) => s + (it.quantity || 0), 0);
-       localStorage.setItem("cart_count", String(count));
-       window.dispatchEvent(new Event("cart:update"));
-     } catch (e) {
-       setCart([]); setSubtotal(0); setTotal(0);
-     }
-   })();
- }, []);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/cart/`, { headers: authHeaders() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setCart(Array.isArray(data?.items) ? data.items : []);
+        setSubtotal(Number(data?.subtotal ?? 0));
+        setTotal(Number(data?.total ?? 0));
+        // update header badge
+        const count = (data?.items || []).reduce((s, it) => s + (it.quantity || 0), 0);
+        localStorage.setItem("cart_count", String(count));
+        window.dispatchEvent(new Event("cart:update"));
+      } catch (e) {
+        setCart([]); setSubtotal(0); setTotal(0);
+      }
+    })();
+  }, []);
 
   // normalize server items to the view you already render
- const viewItems = useMemo(() => {
-   return (cart || []).map((it) => ({
-     id: it.id,                       
-     eventId: it.event?.id || null,                 
-     title: it.event?.title || "Event",
-     slug: it.event?.slug,
-     price: Number(it.unit_price ?? it.event?.price ?? 0),
-     qty: Number(it.quantity ?? 1),
-     image: it.event?.preview_image || it.event?.image_preview || it.event?.thumbnail || it.event?.image || null,
-   }));
- }, [cart]);
+  const viewItems = useMemo(() => {
+    return (cart || []).map((it) => ({
+      id: it.id,
+      eventId: it.event?.id || null,
+      title: it.event?.title || "Event",
+      slug: it.event?.slug,
+      price: Number(it.unit_price ?? it.event?.price ?? 0),
+      qty: Number(it.quantity ?? 1),
+      image: it.event?.preview_image || it.event?.image_preview || it.event?.thumbnail || it.event?.image || null,
+    }));
+  }, [cart]);
 
   const applyCoupon = () => {
     // demo rules: IMAA10 => 10% | SAVE200 => $200 off
@@ -224,33 +224,33 @@ export default function CartPage() {
     localStorage.setItem("cart_coupon_code", couponCode.trim());
   };
   async function refreshCart() {
-   const res = await fetch(`${API_BASE}/cart/`, { headers: authHeaders() });
-   const data = await res.json();
-   setCart(Array.isArray(data?.items) ? data.items : []);
-   setSubtotal(Number(data?.subtotal ?? 0));
-   setTotal(Number(data?.total ?? 0));
-   const count = (data?.items || []).reduce((s, it) => s + (it.quantity || 0), 0);
-   localStorage.setItem("cart_count", String(count));
-   window.dispatchEvent(new Event("cart:update"));
- }
- 
- const updateQty = async (orderItemId, qty) => {
-   const q = Math.max(1, Number(qty) || 1);
-   await fetch(`${API_BASE}/cart/items/${orderItemId}/`, {
-     method: "PATCH",
-     headers: { "Content-Type": "application/json", ...authHeaders() },
-     body: JSON.stringify({ quantity: q }),
-   });
-   await refreshCart();
- };
- 
- const removeItem = async (orderItemId) => {
-   await fetch(`${API_BASE}/cart/items/${orderItemId}/`, {
-     method: "DELETE",
-     headers: authHeaders(),
-   });
-   await refreshCart();
- };
+    const res = await fetch(`${API_BASE}/cart/`, { headers: authHeaders() });
+    const data = await res.json();
+    setCart(Array.isArray(data?.items) ? data.items : []);
+    setSubtotal(Number(data?.subtotal ?? 0));
+    setTotal(Number(data?.total ?? 0));
+    const count = (data?.items || []).reduce((s, it) => s + (it.quantity || 0), 0);
+    localStorage.setItem("cart_count", String(count));
+    window.dispatchEvent(new Event("cart:update"));
+  }
+
+  const updateQty = async (orderItemId, qty) => {
+    const q = Math.max(1, Number(qty) || 1);
+    await fetch(`${API_BASE}/cart/items/${orderItemId}/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ quantity: q }),
+    });
+    await refreshCart();
+  };
+
+  const removeItem = async (orderItemId) => {
+    await fetch(`${API_BASE}/cart/items/${orderItemId}/`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+    await refreshCart();
+  };
   const proceedCheckout = async () => {
     if (!viewItems.length) return;
 
@@ -271,22 +271,22 @@ export default function CartPage() {
       // 2) (optional) clear the cart on server if you have an endpoint; ignore errors
       try {
         await fetch(`${API_BASE}/cart/clear/`, { method: "POST", headers: authHeaders() });
-      } catch {}
+      } catch { }
 
       setShowPaid(true);
       setTimeout(() => {
-      setShowPaid(false);
-      // Example: clear locally (comment out if you don't want to clear)
-      // setCart([]); setSubtotal(0); setTotal(0);
-      // localStorage.setItem("cart_count", "0");
-      // window.dispatchEvent(new Event("cart:update"));
-      // navigate("/myevents"); // or stay on cart
-    }, 2000);
+        setShowPaid(false);
+        // Example: clear locally (comment out if you don't want to clear)
+        // setCart([]); setSubtotal(0); setTotal(0);
+        // localStorage.setItem("cart_count", "0");
+        // window.dispatchEvent(new Event("cart:update"));
+        // navigate("/myevents"); // or stay on cart
+      }, 2000);
 
       // 3) refresh cart UI + badge
       await refreshCart();
 
-      
+
     } catch (err) {
       console.error(err);
       // TODO: show a toast/snackbar error for the user
@@ -297,25 +297,25 @@ export default function CartPage() {
       {/* Shared Account hero */}
       <AccountHero
         actions={
-            <>
+          <>
             <Button component={Link} to="/events" variant="contained" className="rounded-xl px-4"
-                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}>
-                Explore events
+              sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}>
+              Explore events
             </Button>
             <Button onClick={proceedCheckout} variant="outlined" className="rounded-xl px-4"
-                sx={{ textTransform: "none", borderColor: "rgba(255,255,255,0.35)", color: "white" }}>
-                Checkout
+              sx={{ textTransform: "none", borderColor: "rgba(255,255,255,0.35)", color: "white" }}>
+              Checkout
             </Button>
-            </>
+          </>
         }
-        />
-      <Container maxWidth="xl" className="py-6 sm:py-8">
+      />
+      <Container maxWidth="lg" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-6 items-start">
-            <aside className="col-span-12 md:col-span-3">
-                <AccountSidebar />
-            </aside>
+          <aside className="col-span-12 lg:col-span-3">
+            <AccountSidebar />
+          </aside>
           {/* MAIN */}
-          <main className="col-span-12 md:col-span-9">
+          <main className="col-span-12 lg:col-span-9">
             {/* Tabs row (Cart | Orders | Addresses | Account details) */}
             <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
               <Tabs
@@ -357,63 +357,66 @@ export default function CartPage() {
                     </Box>
                   ) : (
                     <>
-                      <Table sx={{ minWidth: 700 }}>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell />
-                            <TableCell className="font-semibold text-slate-600">Product</TableCell>
-                            <TableCell className="font-semibold text-slate-600">Price</TableCell>
-                            <TableCell className="font-semibold text-slate-600">Quantity</TableCell>
-                            <TableCell className="font-semibold text-slate-600">Subtotal</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {viewItems.map((it) => (
-                            <TableRow key={it.id}>
-                              <TableCell width={44}>
-                                <IconButton size="small" onClick={() => removeItem(it.id)} aria-label="remove">
-                                  <CloseOutlinedIcon />
-                                </IconButton>
-                              </TableCell>
-                              <TableCell>
-                                <Box className="flex items-center gap-3">
-                                  {it.image ? (
-                                    <img
-                                      src={toAbs(it.image)}
-                                      alt={it.title}
-                                      className="w-12 h-12 rounded-md object-cover border border-slate-200"
-                                      loading="lazy"
-                                    />
-                                  ) : (
-                                    <div className="w-12 h-12 rounded-md bg-slate-200" />
-                                  )}
-                                  <div className="min-w-0">
-                                    <Link
-                                      to={it.slug ? `/events/${it.slug}` : "#"}
-                                      className="text-slate-800 font-medium hover:text-teal-700 line-clamp-2"
-                                    >
-                                      {it.title}
-                                    </Link>
-                                  </div>
-                                </Box>
-                              </TableCell>
-                              <TableCell>{fmt(Number(it.price) || 0)}</TableCell>
-                              <TableCell width={120}>
-                                <TextField
-                                  type="number"
-                                  size="small"
-                                  value={it.qty}
-                                  onChange={(e) => updateQty(it.id, e.target.value)}
-                                  inputProps={{ min: 1 }}
-                                />
-                              </TableCell>
-                              <TableCell className="font-semibold">
-                                {fmt((Number(it.price) || 0) * (it.qty || 1))}
-                              </TableCell>
+                      {/* 👇 Scroll container so Subtotal is always visible on laptop/desktop & mobile */}
+                      <Box sx={{ width: "100%", overflowX: "auto" }}>
+                        <Table sx={{ minWidth: 700 }} size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell />
+                              <TableCell className="font-semibold text-slate-600">Product</TableCell>
+                              <TableCell className="font-semibold text-slate-600">Price</TableCell>
+                              <TableCell className="font-semibold text-slate-600">Quantity</TableCell>
+                              <TableCell className="font-semibold text-slate-600">Subtotal</TableCell>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHead>
+                          <TableBody>
+                            {viewItems.map((it) => (
+                              <TableRow key={it.id}>
+                                <TableCell width={44}>
+                                  <IconButton size="small" onClick={() => removeItem(it.id)} aria-label="remove">
+                                    <CloseOutlinedIcon />
+                                  </IconButton>
+                                </TableCell>
+                                <TableCell>
+                                  <Box className="flex items-center gap-3">
+                                    {it.image ? (
+                                      <img
+                                        src={toAbs(it.image)}
+                                        alt={it.title}
+                                        className="w-12 h-12 rounded-md object-cover border border-slate-200"
+                                        loading="lazy"
+                                      />
+                                    ) : (
+                                      <div className="w-12 h-12 rounded-md bg-slate-200" />
+                                    )}
+                                    <div className="min-w-0">
+                                      <Link
+                                        to={it.slug ? `/events/${it.slug}` : "#"}
+                                        className="text-slate-800 font-medium hover:text-teal-700 line-clamp-2"
+                                      >
+                                        {it.title}
+                                      </Link>
+                                    </div>
+                                  </Box>
+                                </TableCell>
+                                <TableCell>{fmt(Number(it.price) || 0)}</TableCell>
+                                <TableCell width={120}>
+                                  <TextField
+                                    type="number"
+                                    size="small"
+                                    value={it.qty}
+                                    onChange={(e) => updateQty(it.id, e.target.value)}
+                                    inputProps={{ min: 1 }}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-semibold">
+                                  {fmt((Number(it.price) || 0) * (it.qty || 1))}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </Box>
                       <Divider />
                       <Box className="p-4 sm:p-5 flex flex-col sm:flex-row gap-3 sm:items-center">
                         <TextField
@@ -485,7 +488,7 @@ export default function CartPage() {
           </main>
         </div>
       </Container>
-       {/* Centered animated toast */}
+      {/* Centered animated toast */}
       <SuccessToast open={showPaid} onClose={() => setShowPaid(false)} />
     </div>
   );
