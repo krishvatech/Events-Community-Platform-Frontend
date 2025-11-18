@@ -198,13 +198,22 @@ const countryColor = (name) => {
 
 /* -------------------------- Member card (left) -------------------------- */
 function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
+  // email for the second line
+  const email = u?.email || "";
+
+  // username taken from email before "@"
+  const usernameFromEmail = email ? email.split("@")[0] : "";
+
+  // what to show in bold (top line)
   const name =
     u?.profile?.full_name ||
     `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
-    u?.email;
-  const email = u?.email;
+    usernameFromEmail ||     // 👈 use "username" if no name
+    email;                   // final fallback
+
   const company = u?.company_from_experience ?? "—";
-  const title = u?.position_from_experience || u?.profile?.job_title || u?.job_title || "—";
+  const title =
+    u?.position_from_experience || u?.profile?.job_title || u?.job_title || "—";
   const status = (friendStatus || "").toLowerCase();
   const iso2 = resolveCountryCode(u);
   const flag = flagEmojiFromISO2(iso2);

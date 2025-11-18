@@ -130,50 +130,55 @@ const SignUpPage = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrors({});  
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      const username =
-        (formData.username && formData.username.toLowerCase().trim()) ||
-        `${(formData.firstName || "user").toLowerCase()}${Date.now()}`;
+  e.preventDefault();
+  setErrors({});
+  if (!validate()) return;
+  setLoading(true);
 
-      const payload = {
-        username,
-        firstName: (formData.firstName || "").trim(),
-        lastName: (formData.lastName || "").trim(),
-        email: (formData.email || "").toLowerCase().trim(),
-        password: formData.password, // don't trim passwords
-      };
+  try {
+    const username =
+      (formData.username && formData.username.toLowerCase().trim()) ||
+      `${(formData.firstName || "user").toLowerCase()}${Date.now()}`;
 
-      await registerUser(payload);
+    const firstName = (formData.firstName || "").trim();
+    const lastName  = (formData.lastName || "").trim();
 
-      toast.success("✅ Account created! You can now sign in.");
-      navigate("/signin", { replace: true, state: { email: payload.email, justSignedUp: true } });
-      // ^ change "/signin" to your login route if different
-    } catch (err) {
-        const { fieldErrors, items } = normalizeApiErrors(err);
+    // 👇 IMPORTANT: keys must be firstName / lastName here,
+    // NOT first_name / last_name
+    await registerUser({
+      username,
+      firstName,
+      lastName,
+      email: (formData.email || "").toLowerCase().trim(),
+      password: formData.password,
+    });
 
-        if (Object.keys(fieldErrors).length) {
-          setErrors((prev) => ({ ...prev, ...fieldErrors })); // inline field errors
-        }
+    toast.success("✅ Account created! You can now sign in.");
+    navigate("/signin", {
+      replace: true,
+      state: { email: (formData.email || "").toLowerCase().trim(), justSignedUp: true },
+    });
+  } catch (err) {
+    const { fieldErrors, items } = normalizeApiErrors(err);
 
-        toast.error(
-          <div>
-            <strong>Could not create account</strong>
-            <ul style={{ margin: "6px 0 0 18px" }}>
-              {items.map((t, i) => (
-                <li key={i}>{t}</li>
-              ))}
-            </ul>
-          </div>
-        );
-      } finally {
-      setLoading(false);
+    if (Object.keys(fieldErrors).length) {
+      setErrors((prev) => ({ ...prev, ...fieldErrors }));
     }
-  };
 
+    toast.error(
+      <div>
+        <strong>Could not create account</strong>
+        <ul style={{ margin: "6px 0 0 18px" }}>
+          {items.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <>
