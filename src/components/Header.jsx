@@ -279,7 +279,7 @@ const Header = () => {
           {/* Center: Nav */}
           <Box
             component="nav"
-            className="hidden md:flex flex-1 items-center justify-center"
+            className="hidden lg:flex flex-1 items-center justify-center"
           >
             <div className="flex items-center gap-6 md:gap-8">
               <NavLink to="/events">Events</NavLink>
@@ -290,7 +290,7 @@ const Header = () => {
           </Box>
 
           {/* Right: Actions */}
-          <Box className="hidden md:flex flex-1 items-center justify-end gap-2.5">
+          <Box className="hidden lg:flex flex-1 items-center justify-end gap-2.5">
             {authed ? (
               <Box className="flex items-center gap-3">
                 {/* Cart (hidden for admins) */}
@@ -365,7 +365,7 @@ const Header = () => {
           </Box>
 
           {/* Mobile burger */}
-          <Box className="md:hidden">
+          <Box className="lg:hidden">
             <IconButton onClick={openDrawer} aria-label="Open menu">
               <MenuRoundedIcon />
             </IconButton>
