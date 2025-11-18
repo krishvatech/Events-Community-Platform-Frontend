@@ -457,7 +457,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 }
 
 
-function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }) {
+function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, ownerId }) {
     const token = getToken();
     const [q, setQ] = React.useState("");
     const [rows, setRows] = React.useState([]);
@@ -466,6 +466,7 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }
     const [selected, setSelected] = React.useState(new Set());
 
     const toggle = (id) => {
+        if (id === ownerId) return; // 👈 safety
         setSelected((prev) => {
             const next = new Set(prev);
             next.has(id) ? next.delete(id) : next.add(id);
@@ -483,7 +484,9 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }
             const json = await res.json().catch(() => ([]));
             if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
             const exist = new Set(existingIds || []);
-            const filtered = (Array.isArray(json) ? json : []).filter(u => !exist.has(u.id));
+            const filtered = (Array.isArray(json) ? json : [])
+                .filter(u => u?.id !== ownerId)       // 👈 hide owner from picker
+                .filter(u => !exist.has(u.id));       // already-in-group filter
             setRows(filtered);
         } catch (e) {
             setError(String(e?.message || e));
@@ -576,7 +579,7 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded }
     );
 }
 
-function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onRequested }) {
+function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onRequested, ownerId }) {
     const token = getToken();
 
     const [q, setQ] = React.useState("");
@@ -586,6 +589,7 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
     const [selected, setSelected] = React.useState(new Set());
 
     const toggle = (id) => {
+        if (id === ownerId) return;
         setSelected((prev) => {
             const next = new Set(prev);
             next.has(id) ? next.delete(id) : next.add(id);
@@ -629,7 +633,11 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
 
             const items = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
             const exist = new Set(existingIds || []);
-            setRows(items.filter((u) => !exist.has(u.id))); // exclude already-in-group
+            setRows(
+                items
+                    .filter((u) => u?.id !== ownerId)   // 👈 hide owner from picker
+                    .filter((u) => !exist.has(u.id))    // exclude already-in-group/pending
+            );
         } catch (e) {
             setError(String(e?.message || e));
             setRows([]);
@@ -644,7 +652,9 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
     const submit = async () => {
         if (selected.size === 0) return;
 
-        const ids = Array.from(selected).map(Number);
+        // ignore owner id if somehow selected
+        const ids = Array.from(selected).map(Number).filter((x) => x !== Number(ownerId));
+        if (ids.length === 0) return;
         const url = `${API_ROOT}/groups/${groupIdOrSlug}/moderator/request-add-members/`;
         const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 
@@ -2502,6 +2512,33 @@ export default function GroupManagePage() {
     // Owner id (used to lock Owner row)
     const ownerId = group?.created_by?.id ?? null;
 
+    // Owner user (from the group payload)
+    const ownerUser = group?.created_by || null;
+
+    // Members + an "owner" row (if the owner isn't already in /members/)
+    const membersWithOwner = React.useMemo(() => {
+        const base = Array.isArray(members) ? members.slice() : [];
+        const oid = ownerUser?.id;
+        if (!oid) return base;
+
+        const coerced = base.map(m =>
+            Number(m?.user?.id) === Number(oid) ? { ...m, role: "owner" } : m
+        );
+
+        const hasOwnerRow = coerced.some(m => Number(m?.user?.id) === Number(oid));
+        return hasOwnerRow ? coerced : [{ user: ownerUser, role: "owner" }, ...coerced];
+    }, [members, ownerUser?.id]);
+
+    // Unique member count including owner (deduped)
+    const memberCount = React.useMemo(() => {
+        const ids = new Set();
+        (membersWithOwner || []).forEach(m => {
+            const id = Number(m?.user?.id);
+            if (!Number.isNaN(id)) ids.add(id);
+        });
+        return ids.size; // => at least 1 when owner exists
+    }, [membersWithOwner]);
+
     // action menu handlers
     const openMemberMenu = (evt, m) => {
         if (myRole === "admin" && currentUserId && Number(m.user.id) === Number(currentUserId)) return;
@@ -2696,8 +2733,8 @@ export default function GroupManagePage() {
                                                 label={group?.visibility === "private" ? "Private" : "Public"}
                                                 className={group?.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
                                             />
-                                            {typeof group?.member_count === "number" && (
-                                                <Typography variant="body2">{group.member_count} members</Typography>
+                                            {typeof memberCount === "number" && (
+                                                <Typography variant="body2">{memberCount} members</Typography>
                                             )}
                                         </Stack>
                                     </Box>
@@ -2824,12 +2861,12 @@ export default function GroupManagePage() {
                                             <><LinearProgress /><Typography className="mt-2 text-slate-500">Loading members…</Typography></>
                                         ) : memError ? (
                                             <Alert severity="error">{memError}</Alert>
-                                        ) : members.length === 0 ? (
+                                        ) : membersWithOwner.length === 0 ? (
                                             <Typography className="text-slate-500">No members yet.</Typography>
                                         ) : (
                                             <>
                                                 <Stack divider={<Divider />} spacing={1}>
-                                                    {members
+                                                    {membersWithOwner
                                                         .slice()
                                                         .sort((a, b) => {
                                                             // Owner → Admin → Moderator → Member → Name
@@ -3501,35 +3538,30 @@ export default function GroupManagePage() {
                         )}
 
                         {/* Edit dialog */}
-                        <EditGroupDialog
-                            open={editOpen}
-                            group={group}
-                            onClose={() => setEditOpen(false)}
-                            onUpdated={(g) => { setEditOpen(false); setGroup(g); }}
-                        />
                         <AddMembersDialog
                             open={addOpen}
                             onClose={() => setAddOpen(false)}
                             groupIdOrSlug={idOrSlug}
-                            existingIds={members.map(m => m.user.id)}
+                            existingIds={[...members.map(m => m.user.id), ownerId].filter(Boolean)} // 👈 add owner too
+                            ownerId={ownerId}                                                     // 👈 new prop
                             onAdded={async (n) => {
-                                await fetchMembers();                         // refresh list
-                                setGroup((prev) => prev ? {
-                                    ...prev,         // bump visible count
-                                    member_count: (prev.member_count || 0) + n
-                                } : prev);
+                                await fetchMembers();
+                                setGroup((prev) => prev ? { ...prev, member_count: (prev.member_count || 0) + n } : prev);
                             }}
                         />
+
                         <RequestAddMembersDialog
                             open={requestAddOpen}
                             onClose={() => setRequestAddOpen(false)}
                             groupIdOrSlug={idOrSlug}
                             existingIds={[
                                 ...new Set([
-                                    ...members.map(m => m.user.id),                 // active members
-                                    ...reqs.map(r => r.user?.id).filter(Boolean),   // pending (status = "pending")
+                                    ...members.map(m => m.user.id),
+                                    ...reqs.map(r => r.user?.id).filter(Boolean),
+                                    ownerId,                                  // 👈 add owner here too
                                 ]),
-                            ]}
+                            ].filter(Boolean)}
+                            ownerId={ownerId}                              // 👈 new prop
                             onRequested={(n) => {
                                 setRequestAddOpen(false);
                                 alert(`Request sent to admins to add ${n} member(s).`);
