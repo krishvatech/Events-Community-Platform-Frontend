@@ -671,8 +671,21 @@ function PostCard({ post, avatarUrl, actorName }) {
         </Box>
 
         {/* Action row: Like / Comment / Share (same as Admin social bar) */}
-        <Stack direction="row" justifyContent="space-around" alignItems="center"
-          sx={{ mt: 0.25, pt: 0.5, borderTop: (t) => `1px solid ${t.palette.divider}`, px: 0.5, pb: 0.5 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent={{ xs: "space-between", sm: "space-around" }}
+          spacing={{ xs: 0.5, sm: 1.5 }}
+          sx={{
+            mt: 0.25,
+            pt: 0.5,
+            borderTop: (t) => `1px solid ${t.palette.divider}`,
+            px: { xs: 0.25, sm: 0.5 },
+            pb: 0.5,
+            flexWrap: "nowrap",           //  always one line, even on 320px
+          }}
+        >
+
           {/* Like — uses your existing toggle + opens likers dialog (Admin behavior) */}
           <Button
             size="small"
@@ -716,6 +729,16 @@ function PostCard({ post, avatarUrl, actorName }) {
               // Still call the global toggle to update metrics + backend
               window.__toggleLike?.(post.id);
             }}
+            sx={{
+              //  Equal width on small phones; natural width on bigger screens
+              flex: { xs: 1, sm: "0 0 auto" },
+              minWidth: 0,
+              px: { xs: 0.25, sm: 1 },
+              fontSize: { xs: 11, sm: 12 },
+              "& .MuiButton-startIcon": {
+                mr: { xs: 0.25, sm: 0.5 },
+              },
+            }}
           >
             LIKE
           </Button>
@@ -726,6 +749,15 @@ function PostCard({ post, avatarUrl, actorName }) {
             size="small"
             startIcon={<ChatBubbleOutlineRoundedIcon />}
             onClick={() => window.__openComments?.(post.id)?.()}
+            sx={{
+              flex: { xs: 1, sm: "0 0 auto" },
+              minWidth: 0,
+              px: { xs: 0.25, sm: 1 },
+              fontSize: { xs: 11, sm: 12 },
+              "& .MuiButton-startIcon": {
+                mr: { xs: 0.25, sm: 0.5 },
+              },
+            }}
           >
             COMMENT
           </Button>
@@ -735,6 +767,15 @@ function PostCard({ post, avatarUrl, actorName }) {
             size="small"
             startIcon={<IosShareRoundedIcon />}
             onClick={() => window.__openShares?.(post.id)?.()}
+            sx={{
+              flex: { xs: 1, sm: "0 0 auto" },
+              minWidth: 0,
+              px: { xs: 0.25, sm: 1 },
+              fontSize: { xs: 11, sm: 12 },
+              "& .MuiButton-startIcon": {
+                mr: { xs: 0.25, sm: 0.5 },
+              },
+            }}
           >
             SHARE
           </Button>
@@ -1467,8 +1508,12 @@ export default function HomePage() {
             </Box>
             <Box
               sx={{
-                flex: "0 0 auto",
-                width: { xs: "100%", sm: 700, md: 780 },   // adjust numbers if you want
+                // grow / shrink on tablet & desktop so counts always fit
+                flex: { xs: "0 0 auto", sm: 1 },
+                minWidth: 0,
+                width: { xs: "100%", sm: "auto" },
+                // keep your previous feel on larger screens
+                maxWidth: { sm: 700, md: 780 },
                 alignSelf: { xs: "flex-start", sm: "center" },
               }}
             >
