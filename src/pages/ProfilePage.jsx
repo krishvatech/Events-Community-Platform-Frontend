@@ -143,7 +143,6 @@ export default function ProfilePage() {
   const [expOpen, setExpOpen] = useState(false);
   const [editEduId, setEditEduId] = useState(null);   // number | null
   const [editExpId, setEditExpId] = useState(null);   // number | null
-  const [syncProfileLocation, setSyncProfileLocation] = React.useState(false);
   // Lists (render in cards)
   const [eduList, setEduList] = useState([]);
   const [expList, setExpList] = useState([]);
@@ -183,6 +182,7 @@ export default function ProfilePage() {
   const [expForm, setExpForm] = useState({
     org: "",
     position: "",
+    location: "",
     start: "",
     end: "",
     current: false,
@@ -401,6 +401,7 @@ export default function ProfilePage() {
         body: JSON.stringify({
           community_name: expForm.org,
           position: expForm.position,
+          location: expForm.location || "",
           start_date: expForm.start || null,
           end_date: expForm.current ? null : (expForm.end || null),
           currently_work_here: !!expForm.current,
@@ -430,6 +431,7 @@ export default function ProfilePage() {
       setExpForm({
         org: "",
         position: "",
+        location: "",
         start: "",
         end: "",
         current: false,
@@ -547,6 +549,7 @@ export default function ProfilePage() {
     setExpForm({
       org: item.org || item.community_name || "",
       position: item.position || "",
+      location: item.location || "",   
       start: item.start || item.start_date || "",
       end: item.end || item.end_date || "",
       current: !!(item.current || item.currently_work_here),
@@ -985,10 +988,20 @@ export default function ProfilePage() {
             sx={{ mb: 2 }}
           />
 
+          <TextField
+            label="Location *"
+            value={expForm.location}
+            onChange={(e) =>
+              setExpForm((f) => ({ ...f, location: e.target.value }))
+            }
+            fullWidth
+            sx={{ mb: 2 }}
+          />
+
           {/* Relationship to organization (required) */}
           <TextField
             select
-            label="Relationship to organization *"
+            label="Employment type *"
             value={expForm.relationship_to_org}
             onChange={(e) =>
               setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))
@@ -1165,31 +1178,12 @@ export default function ProfilePage() {
             control={
               <Checkbox
                 checked={expForm.current}
-                onChange={(e) => {
-                  const current = e.target.checked;
-                  setExpForm((prev) => ({
-                    ...prev,
-                    current,
-                    end_date: current ? "" : prev.end_date,
-                  }));
-                }}
+                onChange={(e) => setExpForm((f) => ({ ...f, current: e.target.checked }))}
               />
             }
             label="I currently work here"
+            sx={{ mb: 1 }}
           />
-
-          {expForm.current && (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={syncProfileLocation}
-                  onChange={(e) => setSyncProfileLocation(e.target.checked)}
-                />
-              }
-              label="Make this location my profile’s work location"
-            />
-          )}
-
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           {!!editExpId && (
