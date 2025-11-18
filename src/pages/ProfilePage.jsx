@@ -74,7 +74,7 @@ function SectionCard({ title, action, children, sx }) {
         borderRadius: 2,
         width: '100%',
         // 👇 On phones/tablets: make cards a bit narrower and center them
-        maxWidth: { xs: 560, sm: 640, md: 'unset' },
+        // maxWidth: { xs: 560, sm: 640, md: 'unset' },
         mx: { xs: 'auto', md: 0 },
         ...sx,
       }}
@@ -618,18 +618,26 @@ export default function ProfilePage() {
         }
       />
       <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6">
-          <aside>
+        <div className="grid grid-cols-12 gap-4 md:gap-6">
+          <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar stickyTop={96} />
           </aside>
 
-          <main>
+          <main className="col-span-12 lg:col-span-9">
             {loading && <LinearProgress />}
             {!loading && mode === 'preview' && (
               <Box>
-                <Grid container spacing={{ xs: 2, md: 2.5 }}>
+                <Grid
+                  container
+                  spacing={{ xs: 2, md: 2.5 }}
+                  sx={{
+                    // same pattern as HomePage About tab
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                  }}
+                >
                   {/* LEFT */}
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} lg={6}>
                     <SectionCard
                       title="About"
                       action={<Button size="small" onClick={openAbout}>Edit</Button>}
@@ -763,7 +771,6 @@ export default function ProfilePage() {
                                 primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{e.degree} - {e.school}</Typography>}
                                 secondary={<Typography variant="caption" color="text.secondary">
                                   {rangeLinkedIn(e.start_date, e.end_date, false)}
-                                  {e.field_of_study ? ` · ${e.field_of_study}` : ""}
                                 </Typography>}
                               />
                             </ListItem>
@@ -782,7 +789,7 @@ export default function ProfilePage() {
                   </Grid>
 
                   {/* RIGHT */}
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} lg={6}>
                     <SectionCard title="Contact" action={<Button size="small">Edit</Button>}>
                       <Label>Social Media Links</Label>
                       <List dense disablePadding>
@@ -1040,18 +1047,18 @@ export default function ProfilePage() {
                 renderValue: (v) =>
                   v
                     ? ({
-                        internship: "Internship",
-                        apprenticeship: "Apprenticeship",
-                        trainee: "Trainee / Entry program",
-                        entry: "Entry level",
-                        mid: "Mid level",
-                        senior: "Senior level",
-                      }[v] || v)
+                      internship: "Internship",
+                      apprenticeship: "Apprenticeship",
+                      trainee: "Trainee / Entry program",
+                      entry: "Entry level",
+                      mid: "Mid level",
+                      senior: "Senior level",
+                    }[v] || v)
                     : (
-                        <span style={{ color: "rgba(0,0,0,0.6)" }}>
-                          Career stage
-                        </span>
-                      ),
+                      <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                        Career stage
+                      </span>
+                    ),
               }}
             >
               <MenuItem value="">—</MenuItem>
@@ -1077,15 +1084,15 @@ export default function ProfilePage() {
                 renderValue: (v) =>
                   v
                     ? ({
-                        paid: "Paid",
-                        stipend: "Stipend",
-                        volunteer: "Volunteer / Unpaid",
-                      }[v] || v)
+                      paid: "Paid",
+                      stipend: "Stipend",
+                      volunteer: "Volunteer / Unpaid",
+                    }[v] || v)
                     : (
-                        <span style={{ color: "rgba(0,0,0,0.6)" }}>
-                          Compensation type
-                        </span>
-                      ),
+                      <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                        Compensation type
+                      </span>
+                    ),
               }}
             >
               <MenuItem value="">—</MenuItem>
