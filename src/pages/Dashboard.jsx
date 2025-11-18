@@ -22,7 +22,9 @@ import {
   DialogContent,
   DialogActions,
   MenuItem,
-  FormControlLabel, Switch
+  FormControlLabel, Switch,
+  Tab,
+  Tabs,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import dayjs from "dayjs";
@@ -94,8 +96,12 @@ const computeStatus = (ev) => {
   const now = Date.now();
   const s = ev.start_time ? new Date(ev.start_time).getTime() : 0;
   const e = ev.end_time ? new Date(ev.end_time).getTime() : 0;
-  if (ev.is_live) return "live";
-  if (s && e && now >= s && now <= e) return "live";
+
+  // If meeting is manually ended, always treat as past
+  if (ev.status === "ended") return "past";
+
+  if (ev.is_live && ev.status !== "ended") return "live";
+  if (s && e && now >= s && now <= e && ev.status !== "ended") return "live";
   if (s && now < s) return "upcoming";
   if (e && now > e) return "past";
   return "upcoming";
@@ -1088,6 +1094,8 @@ function AdminEvents() {
   // ➕ Pagination
   const PAGE_SIZE = 6;
   const [page, setPage] = useState(1);
+  // Tabs: 0=All, 1=Upcoming, 2=Live, 3=Past
+  const [tab, setTab] = useState(0);
 
   // NEW: create dialog state
   const [createOpen, setCreateOpen] = useState(false);
@@ -1147,15 +1155,26 @@ function AdminEvents() {
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return events;
-    return events.filter((ev) =>
-      `${ev.title || ""} ${ev.category || ""} ${ev.location || ""}`.toLowerCase().includes(term)
-    );
-  }, [events, q]);
+    return events.filter((ev) => {
+      const searchHit =
+        !term ||
+        `${ev.title || ""} ${ev.category || ""} ${ev.location || ""}`
+          .toLowerCase()
+          .includes(term);
+
+      if (!searchHit) return false;
+
+      const status = computeStatus(ev);
+      if (tab === 1) return status === "upcoming";
+      if (tab === 2) return status === "live";
+      if (tab === 3) return status === "past";
+      return true; // All
+    });
+  }, [events, q, tab]);
 
   useEffect(() => {
     setPage(1);
-  }, [q]);
+  }, [q,tab]);
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -1217,6 +1236,26 @@ function AdminEvents() {
           </Button>
         )}
       </Box>
+      {/* Tabs: All / Upcoming / Live / Past */}
+      <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            px: 1,
+            "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
+            "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
+            "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
+          }}
+        >
+          <Tab label="All" />
+          <Tab label="Upcoming" />
+          <Tab label="Live" />
+          <Tab label="Past" />
+        </Tabs>
+      </Paper>
 
       {/* Search */}
       <Stack
