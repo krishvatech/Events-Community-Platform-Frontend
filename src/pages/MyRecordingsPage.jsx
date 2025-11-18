@@ -147,11 +147,11 @@ export default function MyRecordingsPage() {
       <AccountHero />
       <Container maxWidth="lg" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-6">
-          <aside className="col-span-12 md:col-span-3">
+          <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar activeKey="recordings" />
           </aside>
 
-          <main className="col-span-12 md:col-span-9">
+          <main className="col-span-12 lg:col-span-9">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div>
                 <Typography variant="h5" className="font-semibold tracking-tight">My Recordings</Typography>
@@ -192,49 +192,148 @@ export default function MyRecordingsPage() {
 
             {!loading && !error && filtered.length > 0 && (
               <>
-                <Grid container spacing={2}>
+                <Grid
+                  container
+                  spacing={{ xs: 2, sm: 2.5, md: 3 }}
+                  sx={{ alignItems: "stretch" }}
+                >
                   {paged.map((ev) => {
                     const hasRec = !!ev.recording_url;
                     return (
-                      <Grid key={ev.id} item xs={12} sm={6} md={4}>
-                        <MUICard elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
-                          <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", background: hasRec ? "#0b1220" : "#E5E7EB" }}>
+                      <Grid
+                        key={ev.id}
+                        item
+                        xs={12}   // 1 card per row on small mobiles (<600px)
+                        sm={4}    // 3 cards per row on 768px tablet (>=600px)
+                        md={4}    // 3 cards per row on 1024px and desktops
+                        lg={4}    // 3 per row on large screens too
+                      >
+                        <MUICard
+                          elevation={0}
+                          className="rounded-2xl border border-slate-200 overflow-hidden"
+                          sx={{
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                          }}
+                        >
+                          <div
+                            style={{
+                              position: "relative",
+                              width: "100%",
+                              aspectRatio: "16/9",
+                              background: hasRec ? "#0b1220" : "#E5E7EB",
+                            }}
+                          >
                             {hasRec ? (
                               <video
                                 src={`${S3_BUCKET_URL}/${ev.recording_url}`}
                                 controls
-                                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                                style={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
                               />
                             ) : (
-                              <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "text.secondary", fontSize: 14 }}>
+                              <Box
+                                sx={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "text.secondary",
+                                  fontSize: 14,
+                                  textAlign: "center",
+                                  px: 2,
+                                }}
+                              >
                                 Recording not available yet
                               </Box>
                             )}
                           </div>
 
-                          <CardContent>
-                            <Typography variant="subtitle1" className="font-semibold line-clamp-2">{ev.title || "Untitled Event"}</Typography>
+                          <CardContent
+                            sx={{
+                              display: "flex",
+                              flexDirection: "column",
+                              flexGrow: 1,
+                            }}
+                          >
+                            <Typography
+                              variant="subtitle1"
+                              className="font-semibold line-clamp-2"
+                            >
+                              {ev.title || "Untitled Event"}
+                            </Typography>
+
                             <Box className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-                              <CalendarMonthIcon fontSize="small" /><span>{fmtDateRange(ev.start_time, ev.end_time)}</span>
+                              <span>{fmtDateRange(ev.start_time, ev.end_time)}</span>
                             </Box>
+
                             {ev.location && (
                               <Box className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-                                <PlaceIcon fontSize="small" /><span className="truncate">{ev.location}</span>
+                                <span className="truncate">{ev.location}</span>
                               </Box>
                             )}
+
                             <Divider className="my-3" />
-                            <Box className="flex items-center gap-1.5 flex-wrap">
+
+                            <Box
+                              className="flex flex-wrap"
+                              sx={{
+                                mt: 1.5,
+                                display: "flex",
+                                flexDirection: { xs: "column", sm: "row" },
+                                gap: 1.5,
+                                alignItems: { xs: "stretch", sm: "center" },
+                              }}
+                            >
                               {hasRec ? (
                                 <>
-                                  <Button size="small" variant="contained" startIcon={<PlayCircleOutlineRoundedIcon />} component="a"
-                                    href={`${S3_BUCKET_URL}/${ev.recording_url}`} target="_blank" rel="noopener noreferrer" sx={{ textTransform: "none", borderRadius: 2 }}>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    startIcon={<PlayCircleOutlineRoundedIcon />}
+                                    component="a"
+                                    href={`${S3_BUCKET_URL}/${ev.recording_url}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    sx={{
+                                      textTransform: "none",
+                                      borderRadius: 2,
+                                      width: { xs: "100%", sm: "auto" },
+                                    }}
+                                  >
                                     Watch
                                   </Button>
-                                  <Button size="small" variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={() => handleDownload(ev.recording_url)} sx={{ textTransform: "none", borderRadius: 2 }}>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<DownloadRoundedIcon />}
+                                    onClick={() => handleDownload(ev.recording_url)}
+                                    sx={{
+                                      textTransform: "none",
+                                      borderRadius: 2,
+                                      width: { xs: "100%", sm: "auto" },
+                                    }}
+                                  >
                                     Download
                                   </Button>
                                 </>
-                              ) : (<Chip size="small" label="No recording yet" />)}
+                              ) : (
+                                <Chip
+                                  size="small"
+                                  label="No recording yet"
+                                  sx={{
+                                    width: { xs: "100%", sm: "auto" },
+                                    textAlign: "center",
+                                  }}
+                                />
+                              )}
                             </Box>
                           </CardContent>
                         </MUICard>
@@ -244,7 +343,13 @@ export default function MyRecordingsPage() {
                 </Grid>
 
                 <Box className="mt-4 flex justify-center">
-                  <Pagination count={totalPages} page={page} onChange={(_, v) => setPage(v)} color="primary" shape="rounded" />
+                  <Pagination
+                    count={totalPages}
+                    page={page}
+                    onChange={(_, v) => setPage(v)}
+                    color="primary"
+                    shape="rounded"
+                  />
                 </Box>
               </>
             )}
