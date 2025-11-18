@@ -54,7 +54,18 @@ export default function CommunityHubPage() {
   };
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, py: 2, maxWidth: 1480, mx: "auto" }}>
+    <Box
+      sx={{
+        // less padding on small screens so content doesn’t get cropped
+        px: { xs: 1, sm: 1.5, md: 3 },
+        py: 2,
+        maxWidth: 1480,
+        mx: "auto",
+        width: "100%",
+        boxSizing: "border-box",
+        overflowX: "hidden", // avoid horizontal cut / scrollbar on 768px
+      }}
+    >
       {/* Top header + mobile menu trigger */}
       <Paper
         elevation={0}
@@ -64,7 +75,7 @@ export default function CommunityHubPage() {
           py: 1.5,
           borderRadius: 3,
           border: "1px solid #e2e8f0",
-          // 👇 show only on mobile / tablet, hide on desktop
+          // show only on mobile / tablet, hide on desktop
           display: { xs: "flex", md: "none" },
           alignItems: "center",
           justifyContent: "space-between",
@@ -107,8 +118,17 @@ export default function CommunityHubPage() {
       <Drawer
         open={navOpen}
         onClose={() => setNavOpen(false)}
-        PaperProps={{ sx: { width: 280 } }}
         sx={{ display: { xs: "block", md: "none" } }}
+        PaperProps={{
+          sx: {
+            width: 280,
+
+            // 👇 ONLY for very small screens (e.g. 375–425px)
+            // move drawer below header + keep full visible height
+            mt: { xs: 7, sm: 0 },                     // 7 * 8px = 56px ≈ header height
+            height: { xs: "calc(100% - 56px)", sm: "100%" },
+          },
+        }}
       >
         <Box sx={{ p: 2 }}>
           <CommunitySideBar
@@ -122,24 +142,39 @@ export default function CommunityHubPage() {
         </Box>
       </Drawer>
 
-      <Grid container spacing={2}>
+      {/* ===== MAIN LAYOUT (desktop/tablet) ===== */}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          alignItems: "flex-start",
+          gap: { xs: 2, md: 3 },
+        }}
+      >
         {/* Left rail (desktop) */}
-        <Grid
-          item
-          xs={12}
-          md={3}
-          order={{ xs: 2, md: 1 }}
-          sx={{ display: { xs: "none", md: "block" } }}
+        <Box
+          sx={{
+            width: { xs: "100%", md: 260 }, // fixed-ish width on md+ (works at 1024px and 1440px)
+            flexShrink: 0,
+            display: { xs: "none", md: "block" },
+          }}
         >
           <CommunitySideBar
             view={view}
             topics={TOPICS}
             onChangeView={handleChangeView}
           />
-        </Grid>
+        </Box>
 
         {/* Main area */}
-        <Grid item xs={12} md={9} order={{ xs: 1, md: 2 }}>
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            width: "100%",
+            maxWidth: "100%", // prevent inner Box from being wider than viewport
+          }}
+        >
           {view === "home" ? (
             <HomePage />
           ) : view === "live" ? (
@@ -153,8 +188,8 @@ export default function CommunityHubPage() {
           ) : (
             <GroupsPage />
           )}
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </Box>
   );
 }

@@ -1584,13 +1584,16 @@ export default function HomePage() {
           }}
           PaperProps={{
             sx: {
-              width: 320,
-              maxWidth: "80vw",
+              width: { xs: "88vw", sm: 320 },   // narrower on very small phones
+              maxWidth: "100vw",
+
               borderTopLeftRadius: 24,
               borderBottomLeftRadius: 24,
               borderTopRightRadius: 0,
               borderBottomRightRadius: 0,
               pb: 2,
+              mt: { xs: 7, sm: 0 },
+              height: { xs: "calc(100% - 56px)", sm: "100%" },
             },
           }}
         >
@@ -3456,10 +3459,39 @@ function AboutTab({ profile, groups, onUpdate }) {
           <TextField label="School *" value={eduForm.school} onChange={(e) => setEduForm((f) => ({ ...f, school: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <TextField label="Degree *" value={eduForm.degree} onChange={(e) => setEduForm((f) => ({ ...f, degree: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <TextField label="Field of Study *" value={eduForm.field} onChange={(e) => setEduForm((f) => ({ ...f, field: e.target.value }))} fullWidth sx={{ mb: 2 }} />
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={6}><TextField label="Start Date" type="date" value={eduForm.start} onChange={(e) => setEduForm((f) => ({ ...f, start: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
-            <Grid item xs={12} sm={6}><TextField label="End Date" type="date" value={eduForm.end} onChange={(e) => setEduForm((f) => ({ ...f, end: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
-          </Grid>
+          {/* 👇 Date row – 50% + 50% on sm+, full width stacked on mobile */}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2,
+              mb: 2,
+            }}
+          >
+            <TextField
+              label="Start Date"
+              type="date"
+              value={eduForm.start}
+              onChange={(e) =>
+                setEduForm((f) => ({ ...f, start: e.target.value }))
+              }
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: 1 }}
+            />
+
+            <TextField
+              label="End Date"
+              type="date"
+              value={eduForm.end}
+              onChange={(e) =>
+                setEduForm((f) => ({ ...f, end: e.target.value }))
+              }
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: 1 }}
+            />
+          </Box>
           <TextField label="Grade *" value={eduForm.grade} onChange={(e) => setEduForm((f) => ({ ...f, grade: e.target.value }))} fullWidth />
         </DialogContent>
         <DialogActions>
@@ -3632,29 +3664,40 @@ function AboutTab({ profile, groups, onUpdate }) {
             <MenuItem value="remote">Remote</MenuItem>
           </TextField>
 
-          <Grid container spacing={2} sx={{ mb: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Start Date"
-                type="date"
-                value={expForm.start}
-                onChange={(e) => setExpForm((f) => ({ ...f, start: e.target.value }))}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="End Date"
-                type="date"
-                value={expForm.end}
-                onChange={(e) => setExpForm((f) => ({ ...f, end: e.target.value }))}
-                fullWidth
-                disabled={expForm.current}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-          </Grid>
+          {/* Date row – 50% + 50% on sm+, full width stacked on mobile */}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2,
+              mb: 1,
+            }}
+          >
+            <TextField
+              label="Start Date"
+              type="date"
+              value={expForm.start}
+              onChange={(e) =>
+                setExpForm((f) => ({ ...f, start: e.target.value }))
+              }
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: 1 }}
+            />
+
+            <TextField
+              label="End Date"
+              type="date"
+              value={expForm.end}
+              onChange={(e) =>
+                setExpForm((f) => ({ ...f, end: e.target.value }))
+              }
+              fullWidth
+              disabled={expForm.current}
+              InputLabelProps={{ shrink: true }}
+              sx={{ flex: 1 }}
+            />
+          </Box>
 
           <FormControlLabel
             control={
@@ -3689,10 +3732,10 @@ function AboutTab({ profile, groups, onUpdate }) {
         <DialogTitle>Edit Contact</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}><TextField label="First name" value={contactForm.first_name} onChange={(e) => setContactForm({ ...contactForm, first_name: e.target.value })} fullWidth /></Grid>
-              <Grid item xs={12} sm={6}><TextField label="Last name" value={contactForm.last_name} onChange={(e) => setContactForm({ ...contactForm, last_name: e.target.value })} fullWidth /></Grid>
-            </Grid>
+            <Box sx={{ display: "flex", gap: 2, width: "100%" }}>
+              <TextField label="First name" value={contactForm.first_name} onChange={(e) => setContactForm({ ...contactForm, first_name: e.target.value })} fullWidth sx={{ flex: 1 }} />
+              <TextField label="Last name" value={contactForm.last_name} onChange={(e) => setContactForm({ ...contactForm, last_name: e.target.value })} fullWidth sx={{ flex: 1 }} />
+            </Box>
             <TextField label="Job title" value={contactForm.job_title} onChange={(e) => setContactForm({ ...contactForm, job_title: e.target.value })} fullWidth />
             <TextField label="Email" value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} fullWidth />
             <Autocomplete
