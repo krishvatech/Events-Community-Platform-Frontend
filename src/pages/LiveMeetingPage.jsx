@@ -56,10 +56,11 @@ function DyteMeetingUI() {
   );
 }
 
-function DyteMeetingWrapper({ authToken, onMeetingEnd }) {
+function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
   const [meeting, initMeeting] = useDyteClient();
   const [initError, setInitError] = useState("");
   const [initDone, setInitDone] = useState(false);
+  const [liveStatusSent, setLiveStatusSent] = useState(false);
 
   // Init meeting with auth token
   useEffect(() => {
@@ -80,6 +81,202 @@ function DyteMeetingWrapper({ authToken, onMeetingEnd }) {
       }
     })();
   }, [authToken, initMeeting]);
+
+  useEffect(() => {
+    // Only host should mark event as LIVE
+    if (!meeting || !eventId || role !== "publisher" || liveStatusSent) return;
+
+    const sendLiveStatus = async () => {
+      try {
+        await fetch(toApiUrl(`events/${eventId}/live-status/`), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader(),
+          },
+          body: JSON.stringify({ action: "start" }),
+        });
+        setLiveStatusSent(true);
+      } catch (e) {
+        console.warn("Failed to update live-status (start):", e);
+      }
+    };
+
+    sendLiveStatus();
+  }, [meeting, eventId, role, liveStatusSent]);
+
+    useEffect(() => {
+    if (!meeting || !eventId) return;
+
+    let lastSent = undefined;
+
+    const sendActiveSpeaker = (userId) => {
+      // avoid spamming same value
+      if (userId === lastSent) return;
+      lastSent = userId;
+
+      try {
+        fetch(toApiUrl(`events/${eventId}/active-speaker/`), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader(),
+          },
+          body: JSON.stringify({ user_id: userId }),
+        }).catch((e) => {
+          console.warn("Failed to update active speaker:", e);
+        });
+      } catch (e) {
+        console.warn("Error while calling active-speaker endpoint:", e);
+      }
+    };
+
+    const handleActiveSpeaker = (participant) => {
+      try {
+        // When there is no remote active speaker, Dyte can pass null/undefined
+        if (!participant) {
+          // On HOST tab (publisher), fall back to marking host as active
+          if (role === "publisher" && meeting.self) {
+            const hostId =
+              meeting.self.customParticipantId || meeting.self.userId;
+            if (hostId) {
+              sendActiveSpeaker(hostId);
+            }
+          } else {
+            // viewers just clear it
+            sendActiveSpeaker(null);
+          }
+          return;
+        }
+
+        // Normal case: some remote participant is speaking
+        const userId =
+          participant.customParticipantId ||
+          participant.userId ||
+          participant.id;
+
+        if (!userId) {
+          console.warn(
+            "Active speaker event without customParticipantId/userId",
+            participant
+          );
+          return;
+        }
+
+        sendActiveSpeaker(userId);
+      } catch (e) {
+        console.warn("Error handling activeSpeaker event:", e);
+      }
+    };
+
+    try {
+      meeting.participants.on("activeSpeaker", handleActiveSpeaker);
+    } catch (e) {
+      console.warn("Failed to subscribe to activeSpeaker:", e);
+    }
+
+    // 🔹 On host side, as soon as they actually join the room, mark them as initial active speaker
+    const markHostOnJoin = () => {
+      if (role !== "publisher" || !meeting.self) return;
+      const hostId =
+        meeting.self.customParticipantId || meeting.self.userId;
+      if (hostId) {
+        sendActiveSpeaker(hostId);
+      }
+    };
+
+    try {
+      meeting.self.on("roomJoined", markHostOnJoin);
+    } catch (e) {
+      // optional, older SDKs might not have this
+      console.warn("Failed to subscribe to roomJoined", e);
+    }
+
+    return () => {
+      try {
+        meeting.participants.off("activeSpeaker", handleActiveSpeaker);
+      } catch (e) {
+        // ignore
+      }
+      try {
+        meeting.self.off?.("roomJoined", markHostOnJoin);
+      } catch (e) {
+        // ignore
+      }
+
+      // Optional: clear on unmount/leave
+      sendActiveSpeaker(null);
+    };
+  }, [meeting, eventId, role]);
+
+
+  // 🔢 SYNC PARTICIPANT COUNT → Event.attending_count
+  useEffect(() => {
+    if (!meeting || !eventId) return;
+
+    let lastSent = -1;
+
+    const pushCount = (total) => {
+      if (!Number.isFinite(total) || total <= 0) return;
+      if (total === lastSent) return;
+      lastSent = total;
+
+      try {
+        fetch(toApiUrl(`events/${eventId}/attending/`), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader(),
+          },
+          body: JSON.stringify({
+            op: "set",
+            value: total,
+          }),
+        }).catch((e) => {
+          console.warn("Failed to sync attending_count:", e);
+        });
+      } catch (e) {
+        console.warn("Error while calling attending endpoint:", e);
+      }
+    };
+
+    const computeAndPushCount = () => {
+      try {
+        const participants = meeting.participants;
+        if (!participants) return;
+
+        // Dyte Web Core: participants.count = remote participants only (no local user)
+        // So total = remote + 1 (self)
+        let remoteCount = 0;
+
+        if (typeof participants.count === "number") {
+          remoteCount = participants.count;
+        } else if (participants.joined) {
+          const joined = participants.joined;
+          if (typeof joined.size === "number") {
+            remoteCount = joined.size;
+          } else if (typeof joined.toArray === "function") {
+            remoteCount = joined.toArray().length;
+          }
+        }
+
+        const total = remoteCount + 1; // include local user
+        pushCount(total);
+      } catch (e) {
+        console.warn("Failed to compute participant count:", e);
+      }
+    };
+
+    // Initial sync once meeting is ready
+    computeAndPushCount();
+
+    // Periodic sync every 10 seconds
+    const intervalId = window.setInterval(computeAndPushCount, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [meeting, eventId]);
 
   // 🔔 Listen for "roomLeft" (user left / meeting ended) and auto-close
   useEffect(() => {
@@ -219,7 +416,7 @@ export default function LiveMeetingPage() {
             "Content-Type": "application/json",
             ...authHeader(),
           },
-          body: JSON.stringify({ role }),   // 👈 send role to backend
+          body: JSON.stringify({ role }), // 👈 send role to backend
         });
 
         if (!res.ok) {
@@ -233,6 +430,10 @@ export default function LiveMeetingPage() {
 
         const data = await res.json();
         setAuthToken(data.authToken);
+        // backend may downgrade role; keep it in state if returned
+        if (data.role) {
+          setRole(data.role);
+        }
       } catch (err) {
         console.error(err);
         setError(err.message || "Failed to get Dyte auth token");
@@ -243,7 +444,7 @@ export default function LiveMeetingPage() {
     };
 
     join();
-  }, [eventId]);
+  }, [eventId, role]);
 
   const handleBack = () => {
     navigate(-1);
@@ -272,42 +473,42 @@ export default function LiveMeetingPage() {
 
   // 🧹 When meeting ends, exit fullscreen + close window / go back
   const handleMeetingEnd = React.useCallback(
-  (state) => {
-    console.log("Meeting ended with state:", state);
+    (state) => {
+      console.log("Meeting ended with state:", state);
 
-    if (eventId) {
-      try {
-        fetch(toApiUrl(`events/${eventId}/end-meeting/`), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...authHeader(),
-          },
-        }).catch((e) => {
-          console.warn("Failed to mark event as ended:", e);
-        });
-      } catch (e) {
-        console.warn("Failed to call end-meeting API:", e);
+      if (eventId) {
+        try {
+          fetch(toApiUrl(`events/${eventId}/end-meeting/`), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...authHeader(),
+            },
+          }).catch((e) => {
+            console.warn("Failed to mark event as ended:", e);
+          });
+        } catch (e) {
+          console.warn("Failed to call end-meeting API:", e);
+        }
       }
-    }
 
-    if (document.fullscreenElement) {
-      try {
-        document.exitFullscreen();
-      } catch (e) {
-        console.warn("Failed to exit fullscreen", e);
+      if (document.fullscreenElement) {
+        try {
+          document.exitFullscreen();
+        } catch (e) {
+          console.warn("Failed to exit fullscreen", e);
+        }
       }
-    }
 
-    try {
-      window.close();
-    } catch (e) {}
-    try {
-      navigate(-1);
-    } catch (e) {}
-  },
-  [navigate, eventId]
-);
+      try {
+        window.close();
+      } catch (e) {}
+      try {
+        navigate(-1);
+      } catch (e) {}
+    },
+    [navigate, eventId]
+  );
 
   if (loading) {
     return (
@@ -404,16 +605,16 @@ export default function LiveMeetingPage() {
   // Happy path: show Dyte meeting
   return (
     <Box
-    ref={pageRef}
-    sx={{
-      position: "fixed",
-      inset: 0,              // top:0, right:0, bottom:0, left:0
-      zIndex: 1300,
-      bgcolor: "#000",
-      display: "flex",
-      flexDirection: "column",
-    }}
-  >
+      ref={pageRef}
+      sx={{
+        position: "fixed",
+        inset: 0, // top:0, right:0, bottom:0, left:0
+        zIndex: 1300,
+        bgcolor: "#000",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <Box sx={{ p: 1 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Button
@@ -434,6 +635,8 @@ export default function LiveMeetingPage() {
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <DyteMeetingWrapper
           authToken={authToken}
+          eventId={eventId}
+          role={role}
           onMeetingEnd={handleMeetingEnd}
         />
       </Box>
