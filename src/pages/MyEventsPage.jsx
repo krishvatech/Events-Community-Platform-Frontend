@@ -62,10 +62,10 @@ function computeStatus(ev) {
   const now = Date.now();
   const s = ev.start_time ? new Date(ev.start_time).getTime() : 0;
   const e = ev.end_time ? new Date(ev.end_time).getTime() : 0;
-  
+
   // FIRST check if meeting has been manually ended - return "past" immediately
   if (ev.status === "ended") return "past";
-  
+
   // DON'T check is_live if status is ended
   if (ev.is_live && ev.status !== "ended") return "live";
   if (s && e && now >= s && now <= e && ev.status !== "ended") return "live";
@@ -169,10 +169,15 @@ function EventCard({ ev, onJoinLive, isJoining }) {
 
         <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12.5 }}>
           {fmtDateRange(ev.start_time, ev.end_time)}
-          {ev.location ? ` • ${ev.location}` : ""}
+          {ev.location && (
+            <>
+              <br />
+              {ev.location}
+            </>
+          )}
         </Typography>
 
-       {/* Actions stick to bottom to keep equal heights */}
+        {/* Actions stick to bottom to keep equal heights */}
         <Box sx={{ mt: "auto", display: "flex", gap: 1 }}>
           {(() => {
             // Audience can join if:
@@ -400,39 +405,39 @@ export default function MyEventsPage() {
   //   2) sessionStorage key: live:EVENT_ID
   // -----------------------------------------------------------------------------
   const handleJoinLive = async (ev) => {
-  if (!ev?.id) return;
+    if (!ev?.id) return;
 
-  setJoiningId(ev.id);
-  try {
-    const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+    setJoiningId(ev.id);
+    try {
+      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
 
-    navigate(livePath, {
-      state: {
-        event: ev,
-      },
-      replace: false,
-    });
-  } catch (e) {
-    setErrMsg(
-      typeof e?.message === "string" && e.message.length
-        ? `Unable to join live: ${e.message}`
-        : "Unable to join live at the moment."
-    );
-    setErrOpen(true);
-  } finally {
-    setJoiningId(null);
-  }
-};
+      navigate(livePath, {
+        state: {
+          event: ev,
+        },
+        replace: false,
+      });
+    } catch (e) {
+      setErrMsg(
+        typeof e?.message === "string" && e.message.length
+          ? `Unable to join live: ${e.message}`
+          : "Unable to join live at the moment."
+      );
+      setErrOpen(true);
+    } finally {
+      setJoiningId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
       <AccountHero greeting={`Hi ${first},`} subtitle="Your purchased & registered events" />
       <Container maxWidth="lg" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-6">
-          <aside className="col-span-12 md:col-span-3">
+          <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar />
           </aside>
-          <main className="col-span-12 md:col-span-9">
+          <main className="col-span-12 lg:col-span-9">
             <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
               <Tabs
                 value={tab}
@@ -512,7 +517,7 @@ export default function MyEventsPage() {
                   <Grid
                     container
                     spacing={{ xs: 2, md: 3 }}
-                    columns={{ xs: 4, sm: 8, md: 12 }}
+                    columns={{ xs: 4, sm: 12, md: 12 }}
                   >
                     {paged.map((ev) => (
                       <Grid key={ev.id ?? ev.slug} size={{ xs: 4, sm: 4, md: 4 }}>

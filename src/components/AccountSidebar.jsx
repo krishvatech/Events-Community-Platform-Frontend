@@ -21,16 +21,16 @@ import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 
 const NAV_ITEMS = [
-  { key: "activity",      label: "Activity",      icon: <TimelineOutlinedIcon />, to: "/account" },
-  { key: "courses",       label: "My Events",     icon: <SchoolOutlinedIcon />,   to: "/myevents" },
-  { key: "profile",       label: "Profile",       icon: <PersonOutlineOutlinedIcon />, to: "/account/profile" },
-  { key: "elibrary",      label: "My Recordings", icon: <MenuBookOutlinedIcon />, to: "/account/recordings" },
-  { key: "forums",        label: "Forums",        icon: <ForumOutlinedIcon /> },
-  { key: "orders",        label: "Orders",        icon: <ReceiptLongOutlinedIcon />, to: "/cart" },
-  { key: "memberships",   label: "Memberships",   icon: <WorkspacePremiumOutlinedIcon /> },
+  { key: "activity", label: "Activity", icon: <TimelineOutlinedIcon />, to: "/account" },
+  { key: "courses", label: "My Events", icon: <SchoolOutlinedIcon />, to: "/myevents" },
+  { key: "profile", label: "Profile", icon: <PersonOutlineOutlinedIcon />, to: "/account/profile" },
+  { key: "elibrary", label: "My Recordings", icon: <MenuBookOutlinedIcon />, to: "/account/recordings" },
+  { key: "forums", label: "Forums", icon: <ForumOutlinedIcon /> },
+  { key: "orders", label: "Orders", icon: <ReceiptLongOutlinedIcon />, to: "/cart" },
+  { key: "memberships", label: "Memberships", icon: <WorkspacePremiumOutlinedIcon /> },
   { key: "subscriptions", label: "Subscriptions", icon: <AutorenewOutlinedIcon /> },
-  { key: "friends",       label: "Friends",       icon: <PeopleAltOutlinedIcon /> },
-  { key: "settings",      label: "Settings",      icon: <SettingsOutlinedIcon /> },
+  { key: "friends", label: "Friends", icon: <PeopleAltOutlinedIcon /> },
+  { key: "settings", label: "Settings", icon: <SettingsOutlinedIcon /> },
 ];
 
 export default function AccountSidebar({ stickyTop = 96 }) {
@@ -50,7 +50,7 @@ export default function AccountSidebar({ stickyTop = 96 }) {
     <List disablePadding>
       {NAV_ITEMS.map((item) => {
         const active = activeKey === item.key;
-        const btnProps = item.to ? { component: Link, to: item.to } : { onClick: onItem || (() => {}) };
+        const btnProps = item.to ? { component: Link, to: item.to } : { onClick: onItem || (() => { }) };
         return (
           <ListItem key={item.key} disablePadding>
             <ListItemButton
@@ -71,8 +71,8 @@ export default function AccountSidebar({ stickyTop = 96 }) {
 
   return (
     <>
-      {/* Mobile trigger */}
-      <div className="md:hidden mb-3">
+      {/* Mobile trigger (mobile + tablet) */}
+      <div className="lg:hidden mb-3">
         <Button
           onClick={() => setMobileOpen(true)}
           startIcon={<MenuRoundedIcon />}
@@ -84,11 +84,11 @@ export default function AccountSidebar({ stickyTop = 96 }) {
         </Button>
       </div>
 
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar (lg+) */}
       <Paper
         elevation={0}
-        className="rounded-2xl border border-slate-200 sticky hidden md:block"
-        sx={{ top: { md: stickyTop }, position: { md: "sticky" } }}
+        className="rounded-2xl border border-slate-200 sticky hidden lg:block"
+        sx={{ top: { lg: stickyTop }, position: { lg: "sticky" } }}
       >
         <ListUI />
       </Paper>
