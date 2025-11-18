@@ -3748,22 +3748,30 @@ function AboutTab({ profile, groups, onUpdate }) {
             control={
               <Checkbox
                 checked={expForm.current}
-                onChange={(e) =>
-                  setExpForm((f) => ({ ...f, current: e.target.checked, end: e.target.checked ? "" : f.end }))
-                }
+                onChange={(e) => {
+                  const current = e.target.checked;
+                  setExpForm((prev) => ({
+                    ...prev,
+                    current,
+                    end_date: current ? "" : prev.end_date,
+                  }));
+                }}
               />
             }
             label="I currently work here"
           />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={syncProfileLocation}
-                onChange={(e) => setSyncProfileLocation(e.target.checked)}
-              />
-            }
-            label="Make this location my profile’s work location"
-          />
+
+          {expForm.current && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={syncProfileLocation}
+                  onChange={(e) => setSyncProfileLocation(e.target.checked)}
+                />
+              }
+              label="Make this location my profile’s work location"
+            />
+          )}
         </DialogContent>
         <DialogActions>
           {editExpId && (<Button color="error" onClick={() => deleteExperience(editExpId)}>Delete</Button>)}

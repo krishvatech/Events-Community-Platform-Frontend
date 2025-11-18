@@ -222,7 +222,7 @@ const SignInPage = () => {
       localStorage.setItem("user", JSON.stringify(userObj || {}));
 
       // Toast + persist auth bits
-      toast.success(`✅ Login successful. Welcome ${formData.email}`);
+      // toast.success(`✅ Login successful. Welcome ${formData.email}`);
       saveLoginPayload(data, { email: formData.email });
 
       // Decide destination

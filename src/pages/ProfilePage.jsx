@@ -143,6 +143,7 @@ export default function ProfilePage() {
   const [expOpen, setExpOpen] = useState(false);
   const [editEduId, setEditEduId] = useState(null);   // number | null
   const [editExpId, setEditExpId] = useState(null);   // number | null
+  const [syncProfileLocation, setSyncProfileLocation] = React.useState(false);
   // Lists (render in cards)
   const [eduList, setEduList] = useState([]);
   const [expList, setExpList] = useState([]);
@@ -1164,12 +1165,31 @@ export default function ProfilePage() {
             control={
               <Checkbox
                 checked={expForm.current}
-                onChange={(e) => setExpForm((f) => ({ ...f, current: e.target.checked }))}
+                onChange={(e) => {
+                  const current = e.target.checked;
+                  setExpForm((prev) => ({
+                    ...prev,
+                    current,
+                    end_date: current ? "" : prev.end_date,
+                  }));
+                }}
               />
             }
             label="I currently work here"
-            sx={{ mb: 1 }}
           />
+
+          {expForm.current && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={syncProfileLocation}
+                  onChange={(e) => setSyncProfileLocation(e.target.checked)}
+                />
+              }
+              label="Make this location my profile’s work location"
+            />
+          )}
+
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           {!!editExpId && (
