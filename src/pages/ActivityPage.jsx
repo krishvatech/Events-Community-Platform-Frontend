@@ -170,79 +170,82 @@ export default function ActivityPage() {
     }
   }, [registeredEvents, page, searchQuery, filterType, sortBy, activeTab]);
 
-  // Fetch activities with pagination
   useEffect(() => {
-    const fetchActivities = async () => {
-      if (registeredEvents.length === 0) {
-        setActivities([]);
-        setActivitiesTotal(0);
-        return;
-      }
-      
-      setActivitiesLoading(true);
-      try {
-        const token = localStorage.getItem("access_token");
-        const offset = (page - 1) * itemsPerPage;
-        
-        // Build query parameters
-        const params = new URLSearchParams({
-          limit: itemsPerPage.toString(),
-          offset: offset.toString(),
-        });
-        
-        // Add search query if exists
-        if (searchQuery) {
-          params.append('search', searchQuery);
-        }
-        
-        // Add type filter if exists
-        if (filterType) {
-          params.append('resource_type', filterType);
-        }
-        
-        // Add ordering
-        if (sortBy === 'newest') {
-          params.append('ordering', '-created_at');
-        } else if (sortBy === 'oldest') {
-          params.append('ordering', 'created_at');
-        }
-        
-        const response = await fetch(`${API_URL}/activity/feed/?${params.toString()}`, {
-          headers: { "Authorization": `Bearer ${token}` },
-        });
-        
-        if (!response.ok) throw new Error("Failed to fetch activities");
-        const data = await response.json();
-        
-        // Handle both paginated and non-paginated responses
-        if (data.results) {
-          const allActivities = data.results;
-          const filteredActivities = allActivities.filter(activity =>
-            activity.event_id && registeredEvents.includes(activity.event_id)
-          );
-          setActivities(filteredActivities);
-          setActivitiesTotal(data.count || filteredActivities.length);
-        } else {
-          const allActivities = Array.isArray(data) ? data : [];
-          const filteredActivities = allActivities.filter(activity =>
-            activity.event_id && registeredEvents.includes(activity.event_id)
-          );
-          setActivities(filteredActivities);
-          setActivitiesTotal(filteredActivities.length);
-        }
-      } catch (error) {
-        console.error("Error fetching activities:", error);
-        setActivities([]);
-        setActivitiesTotal(0);
-      } finally {
-        setActivitiesLoading(false);
-      }
-    };
-    
-    if (activeTab === 1) {
-      fetchActivities();
+  const fetchActivities = async () => {
+    if (registeredEvents.length === 0) {
+      setActivities([]);
+      setActivitiesTotal(0);
+      return;
     }
-  }, [registeredEvents, page, searchQuery, filterType, sortBy, activeTab]);
+
+    setActivitiesLoading(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      const offset = (page - 1) * itemsPerPage;
+
+      // Build query parameters (same style as resources)
+      const params = new URLSearchParams({
+        limit: itemsPerPage.toString(),
+        offset: offset.toString(),
+      });
+
+      if (searchQuery) {
+        params.append("search", searchQuery);
+      }
+
+      // For content resources, the field name is `type`
+      if (filterType) {
+        params.append("type", filterType);
+      }
+
+      if (sortBy === "newest") {
+        params.append("ordering", "-created_at");
+      } else if (sortBy === "oldest") {
+        params.append("ordering", "created_at");
+      }
+
+      // 👉 CHANGED ENDPOINT: use content/resources instead of activity/feed
+      const response = await fetch(
+        `${API_URL}/content/resources/?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch activities");
+      const data = await response.json();
+
+      if (data.results) {
+        // Paginated response
+        const allResources = data.results;
+        const filtered = allResources.filter(
+          (r) => registeredEvents.includes(r.event_id) && r.is_published
+        );
+        setActivities(filtered);
+        setActivitiesTotal(data.count || filtered.length);
+      } else {
+        // Non-paginated response
+        const allResources = Array.isArray(data) ? data : [];
+        const filtered = allResources.filter(
+          (r) => registeredEvents.includes(r.event_id) && r.is_published
+        );
+        setActivities(filtered);
+        setActivitiesTotal(filtered.length);
+      }
+    } catch (error) {
+      console.error("Error fetching activities:", error);
+      setActivities([]);
+      setActivitiesTotal(0);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
+  if (activeTab === 1) {
+    fetchActivities();
+  }
+}, [registeredEvents, page, searchQuery, filterType, sortBy, activeTab]);
+
 
   const getResourceIcon = (type) => {
     switch (type) {
@@ -253,24 +256,30 @@ export default function ActivityPage() {
     }
   };
 
-  const getActivityIcon = (activity) => {
-    const type = activity.metadata?.resource_type;
-    switch (type) {
-      case "file": return <PictureAsPdfRoundedIcon />;
-      case "video": return <VideoLibraryRoundedIcon />;
-      case "link": return <LinkRoundedIcon />;
-      default: return <CloudUploadRoundedIcon />;
-    }
+  const getActivityIcon = (resource) => {
+    // Reuse the same icon logic as resources tab
+    return getResourceIcon(resource.type);
   };
 
-  const getActivityText = (activity) => {
-    const actor = activity.metadata?.actor_name || "Someone";
-    const title = activity.metadata?.title || "a resource";
-    const resourceType = activity.metadata?.resource_type || "resource";
-    switch (activity.verb) {
-      case "uploaded_resource": return `${actor} uploaded ${resourceType}: "${title}"`;
-      default: return `${actor} ${activity.verb}`;
+  const getActivityText = (resource) => {
+    // Try to derive uploader name safely
+    let actor = "Someone";
+
+    const uploader = resource.uploaded_by;
+    if (uploader && typeof uploader === "object") {
+      actor =
+        uploader.full_name ||
+        uploader.name ||
+        uploader.username ||
+        "Someone";
+    } else if (typeof uploader === "string") {
+      actor = uploader;
     }
+
+    const resourceType = resource.type || "resource";
+    const title = resource.title || "Untitled resource";
+
+    return `${actor} uploaded ${resourceType}: "${title}"`;
   };
 
   const getResourceUrl = (resource) => {
@@ -501,20 +510,56 @@ export default function ActivityPage() {
                         {activities.map((activity, index) => (
                           <React.Fragment key={activity.id}>
                             {index > 0 && <Divider />}
-                            <ListItem>
+                            <ListItem
+                              button
+                              onClick={() => navigate(`/resource/${activity.id}`)}
+                              sx={{
+                                cursor: "pointer",
+                                "&:hover": {
+                                  bgcolor: "#f0fdfa",
+                                },
+                              }}
+                            >
                               <ListItemIcon>
-                                <Avatar sx={{ bgcolor: "#14b8a6", width: 40, height: 40 }}>{getActivityIcon(activity)}</Avatar>
+                                <Avatar sx={{ bgcolor: "#14b8a6", width: 40, height: 40 }}>
+                                  {getActivityIcon(activity)}
+                                </Avatar>
                               </ListItemIcon>
                               <ListItemText
-                                primary={<Typography variant="body1">{getActivityText(activity)}</Typography>}
+                                primary={
+                                  <Typography variant="body1">
+                                    {getActivityText(activity)}
+                                  </Typography>
+                                }
                                 secondary={
                                   <>
-                                    <Typography component="span" variant="caption" color="text.secondary">
-                                      {new Date(activity.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                                    <Typography
+                                      component="span"
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      {new Date(activity.created_at).toLocaleString("en-IN", {
+                                        dateStyle: "short",
+                                        timeStyle: "short",
+                                      })}
                                     </Typography>
-                                    {activity.metadata?.tags && activity.metadata.tags.length > 0 && (
-                                      <Box sx={{ mt: 1, display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                                        {activity.metadata.tags.map((tag, idx) => <Chip key={idx} label={tag} size="small" variant="outlined" />)}
+                                    {activity.tags && activity.tags.length > 0 && (
+                                      <Box
+                                        sx={{
+                                          mt: 1,
+                                          display: "flex",
+                                          gap: 0.5,
+                                          flexWrap: "wrap",
+                                        }}
+                                      >
+                                        {activity.tags.map((tag, idx) => (
+                                          <Chip
+                                            key={idx}
+                                            label={tag}
+                                            size="small"
+                                            variant="outlined"
+                                          />
+                                        ))}
                                       </Box>
                                     )}
                                   </>
