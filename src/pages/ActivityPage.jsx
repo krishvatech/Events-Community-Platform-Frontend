@@ -5,7 +5,7 @@ import {
   Box, Container, Avatar, Divider, TextField, Tabs, Tab,
   List, ListItem, ListItemIcon, ListItemText, Chip, Paper,
   Typography, InputAdornment, Stack, Pagination, CircularProgress,
-  IconButton, FormControl, Select, MenuItem, Button,
+  IconButton, FormControl, Select, MenuItem, Button, useTheme, useMediaQuery, Menu,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import AccountSidebar from "../components/AccountSidebar.jsx";
@@ -23,12 +23,15 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import VideoLibraryRoundedIcon from "@mui/icons-material/VideoLibraryRounded";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 
 const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
 const API_URL = API.endsWith("/api") ? API : `${API}/api`;
 
 export default function ActivityPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [activeTab, setActiveTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("");
@@ -39,16 +42,31 @@ export default function ActivityPage() {
 
   const [currentUser, setCurrentUser] = useState(null);
   const [registeredEvents, setRegisteredEvents] = useState([]);
-  
+
   // Resources state with pagination
   const [resources, setResources] = useState([]);
   const [resourcesTotal, setResourcesTotal] = useState(0);
   const [resourcesLoading, setResourcesLoading] = useState(true);
-  
+
   // Activities state with pagination
   const [activities, setActivities] = useState([]);
   const [activitiesTotal, setActivitiesTotal] = useState(0);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
+
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const [menuResource, setMenuResource] = useState(null);
+
+  const handleMenuOpen = (event, resource) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMenuAnchor(event.currentTarget);
+    setMenuResource(resource);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+    setMenuResource(null);
+  };
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -102,42 +120,42 @@ export default function ActivityPage() {
         setResourcesTotal(0);
         return;
       }
-      
+
       setResourcesLoading(true);
       try {
         const token = localStorage.getItem("access_token");
         const offset = (page - 1) * itemsPerPage;
-        
+
         // Build query parameters
         const params = new URLSearchParams({
           limit: itemsPerPage.toString(),
           offset: offset.toString(),
         });
-        
+
         // Add search query if exists
         if (searchQuery) {
           params.append('search', searchQuery);
         }
-        
+
         // Add type filter if exists
         if (filterType) {
           params.append('type', filterType);
         }
-        
+
         // Add ordering
         if (sortBy === 'newest') {
           params.append('ordering', '-created_at');
         } else if (sortBy === 'oldest') {
           params.append('ordering', 'created_at');
         }
-        
+
         const response = await fetch(`${API_URL}/content/resources/?${params.toString()}`, {
           headers: { "Authorization": `Bearer ${token}` },
         });
-        
+
         if (!response.ok) throw new Error("Failed to fetch resources");
         const data = await response.json();
-        
+
         // Handle both paginated and non-paginated responses
         if (data.results) {
           // Paginated response
@@ -164,87 +182,87 @@ export default function ActivityPage() {
         setResourcesLoading(false);
       }
     };
-    
+
     if (activeTab === 0) {
       fetchResources();
     }
   }, [registeredEvents, page, searchQuery, filterType, sortBy, activeTab]);
 
   useEffect(() => {
-  const fetchActivities = async () => {
-    if (registeredEvents.length === 0) {
-      setActivities([]);
-      setActivitiesTotal(0);
-      return;
-    }
-
-    setActivitiesLoading(true);
-    try {
-      const token = localStorage.getItem("access_token");
-      const offset = (page - 1) * itemsPerPage;
-
-      // Build query parameters (same style as resources)
-      const params = new URLSearchParams({
-        limit: itemsPerPage.toString(),
-        offset: offset.toString(),
-      });
-
-      if (searchQuery) {
-        params.append("search", searchQuery);
+    const fetchActivities = async () => {
+      if (registeredEvents.length === 0) {
+        setActivities([]);
+        setActivitiesTotal(0);
+        return;
       }
 
-      // For content resources, the field name is `type`
-      if (filterType) {
-        params.append("type", filterType);
-      }
+      setActivitiesLoading(true);
+      try {
+        const token = localStorage.getItem("access_token");
+        const offset = (page - 1) * itemsPerPage;
 
-      if (sortBy === "newest") {
-        params.append("ordering", "-created_at");
-      } else if (sortBy === "oldest") {
-        params.append("ordering", "created_at");
-      }
+        // Build query parameters (same style as resources)
+        const params = new URLSearchParams({
+          limit: itemsPerPage.toString(),
+          offset: offset.toString(),
+        });
 
-      // 👉 CHANGED ENDPOINT: use content/resources instead of activity/feed
-      const response = await fetch(
-        `${API_URL}/content/resources/?${params.toString()}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
+        if (searchQuery) {
+          params.append("search", searchQuery);
         }
-      );
 
-      if (!response.ok) throw new Error("Failed to fetch activities");
-      const data = await response.json();
+        // For content resources, the field name is `type`
+        if (filterType) {
+          params.append("type", filterType);
+        }
 
-      if (data.results) {
-        // Paginated response
-        const allResources = data.results;
-        const filtered = allResources.filter(
-          (r) => registeredEvents.includes(r.event_id) && r.is_published
+        if (sortBy === "newest") {
+          params.append("ordering", "-created_at");
+        } else if (sortBy === "oldest") {
+          params.append("ordering", "created_at");
+        }
+
+        // 👉 CHANGED ENDPOINT: use content/resources instead of activity/feed
+        const response = await fetch(
+          `${API_URL}/content/resources/?${params.toString()}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
         );
-        setActivities(filtered);
-        setActivitiesTotal(data.count || filtered.length);
-      } else {
-        // Non-paginated response
-        const allResources = Array.isArray(data) ? data : [];
-        const filtered = allResources.filter(
-          (r) => registeredEvents.includes(r.event_id) && r.is_published
-        );
-        setActivities(filtered);
-        setActivitiesTotal(filtered.length);
+
+        if (!response.ok) throw new Error("Failed to fetch activities");
+        const data = await response.json();
+
+        if (data.results) {
+          // Paginated response
+          const allResources = data.results;
+          const filtered = allResources.filter(
+            (r) => registeredEvents.includes(r.event_id) && r.is_published
+          );
+          setActivities(filtered);
+          setActivitiesTotal(data.count || filtered.length);
+        } else {
+          // Non-paginated response
+          const allResources = Array.isArray(data) ? data : [];
+          const filtered = allResources.filter(
+            (r) => registeredEvents.includes(r.event_id) && r.is_published
+          );
+          setActivities(filtered);
+          setActivitiesTotal(filtered.length);
+        }
+      } catch (error) {
+        console.error("Error fetching activities:", error);
+        setActivities([]);
+        setActivitiesTotal(0);
+      } finally {
+        setActivitiesLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching activities:", error);
-      setActivities([]);
-      setActivitiesTotal(0);
-    } finally {
-      setActivitiesLoading(false);
-    }
-  };
+    };
 
-  if (activeTab === 1) {
-    fetchActivities();
-  }
-}, [registeredEvents, page, searchQuery, filterType, sortBy, activeTab]);
+    if (activeTab === 1) {
+      fetchActivities();
+    }
+  }, [registeredEvents, page, searchQuery, filterType, sortBy, activeTab]);
 
 
   const getResourceIcon = (type) => {
@@ -323,13 +341,13 @@ export default function ActivityPage() {
   };
 
   // Reset to page 1 when filters change
-  useEffect(() => { 
-    setPage(1); 
+  useEffect(() => {
+    setPage(1);
   }, [activeTab, searchQuery, filterType, filterTime, sortBy]);
 
   const loading = resourcesLoading || activitiesLoading;
-  const totalPages = activeTab === 0 
-    ? Math.ceil(resourcesTotal / itemsPerPage) 
+  const totalPages = activeTab === 0
+    ? Math.ceil(resourcesTotal / itemsPerPage)
     : Math.ceil(activitiesTotal / itemsPerPage);
 
   if (!currentUser) {
@@ -348,23 +366,23 @@ export default function ActivityPage() {
   return (
     <>
       <AccountHero user={currentUser} />
-      
+
       <Container maxWidth="lg" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-6">
-          <aside className="col-span-12 md:col-span-3">
+          <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar activeKey="activity" onNavigate={(k) => console.log(k)} />
           </aside>
 
-          <main className="col-span-12 md:col-span-9">
+          <main className="col-span-12 lg:col-span-9">
             <Typography variant="h4" sx={{ mb: 1 }}>My Activity</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Access resources and activities from your registered events
             </Typography>
 
-            <Tabs 
-              value={activeTab} 
-              onChange={(e, v) => setActiveTab(v)} 
-              sx={{ 
+            <Tabs
+              value={activeTab}
+              onChange={(e, v) => setActiveTab(v)}
+              sx={{
                 mb: 3,
                 px: 0.5,
                 "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
@@ -376,7 +394,14 @@ export default function ActivityPage() {
               <Tab label={`ACTIVITY FEED (${activitiesTotal})`} />
             </Tabs>
 
-            <Stack direction="row" spacing={2} sx={{ mb: 3, flexWrap: "wrap" }}>
+            <Stack
+              direction={{ xs: "column", sm: "column", md: "row" }}
+              spacing={2}
+              sx={{
+                mb: 3,
+                flexWrap: { xs: "nowrap", md: "wrap" }, // row wrap only on desktop
+              }}
+            >
               <TextField
                 placeholder={activeTab === 0 ? "Search resources..." : "Search activities..."}
                 value={searchQuery}
@@ -384,10 +409,18 @@ export default function ActivityPage() {
                 InputProps={{
                   startAdornment: <InputAdornment position="start"><SearchRoundedIcon /></InputAdornment>,
                 }}
-                sx={{ flexGrow: 1, minWidth: 250 }}
+                sx={{
+                  flexGrow: 1,
+                  minWidth: { xs: "100%", sm: "100%", md: 250 }, // full width on mobile/tablet
+                }}
                 size="small"
               />
-              <FormControl size="small" sx={{ minWidth: 120 }}>
+              <FormControl
+                size="small"
+                sx={{
+                  minWidth: { xs: "100%", sm: 220, md: 120 }, // full width below search
+                }}
+              >
                 <Select value={filterType} onChange={(e) => setFilterType(e.target.value)} displayEmpty>
                   <MenuItem value="">Type</MenuItem>
                   <MenuItem value="file">File</MenuItem>
@@ -395,9 +428,33 @@ export default function ActivityPage() {
                   <MenuItem value="link">Link</MenuItem>
                 </Select>
               </FormControl>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography variant="body2">Sort</Typography>
-                <FormControl size="small" sx={{ minWidth: 140 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  width: { xs: "100%", sm: "100%", md: "auto" }, // full width on mobile/tablet
+                  justifyContent: { xs: "flex-start", sm: "flex-start" },
+                }}
+              >
+                {/* Show "Sort" label only on laptop/desktop */}
+                <Typography
+                  variant="body2"
+                  sx={{
+                    display: { xs: "none", sm: "none", md: "inline" },
+                  }}
+                >
+                  Sort
+                </Typography>
+
+                <FormControl
+                  size="small"
+                  sx={{
+                    // 👉 Same style as Type box on mobile & tablet
+                    minWidth: { xs: "100%", sm: 220, md: 140 },
+                    flexGrow: { xs: 1, sm: 0, md: 0 }, // stretches on small screens
+                  }}
+                >
                   <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                     <MenuItem value="newest">Newest first</MenuItem>
                     <MenuItem value="oldest">Oldest first</MenuItem>
@@ -429,7 +486,7 @@ export default function ActivityPage() {
                         {resources.map((resource, index) => (
                           <React.Fragment key={resource.id}>
                             {index > 0 && <Divider />}
-                            <ListItem 
+                            <ListItem
                               button
                               onClick={() => navigate(`/resource/${resource.id}`)}
                               sx={{
@@ -439,24 +496,35 @@ export default function ActivityPage() {
                                 }
                               }}
                               secondaryAction={
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <Chip label={resource.type} size="small" />
-                                  <IconButton size="small" onClick={(e) => handleDetails(resource, e)} title="Details">
-                                    <InfoRoundedIcon />
+                                isMobile ? (
+                                  // 👇 MOBILE: three-dot menu
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleMenuOpen(e, resource)}
+                                    title="More actions"
+                                  >
+                                    <MoreVertRoundedIcon />
                                   </IconButton>
-                                  <IconButton size="small" onClick={(e) => handleView(resource, e)} title="View">
-                                    <VisibilityRoundedIcon />
-                                  </IconButton>
-                                  {resource.type === 'file' ? (
-                                    <IconButton size="small" onClick={(e) => handleDownload(resource, e)} title="Download">
-                                      <DownloadRoundedIcon />
+                                ) : (
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Chip label={resource.type} size="small" />
+                                    <IconButton size="small" onClick={(e) => handleDetails(resource, e)} title="Details">
+                                      <InfoRoundedIcon />
                                     </IconButton>
-                                  ) : (
-                                    <IconButton size="small" disabled title="Download not available" sx={{ cursor: 'not-allowed', opacity: 0.4 }}>
-                                      <BlockRoundedIcon />
+                                    <IconButton size="small" onClick={(e) => handleView(resource, e)} title="View">
+                                      <VisibilityRoundedIcon />
                                     </IconButton>
-                                  )}
-                                </Stack>
+                                    {resource.type === 'file' ? (
+                                      <IconButton size="small" onClick={(e) => handleDownload(resource, e)} title="Download">
+                                        <DownloadRoundedIcon />
+                                      </IconButton>
+                                    ) : (
+                                      <IconButton size="small" disabled title="Download not available" sx={{ cursor: 'not-allowed', opacity: 0.4 }}>
+                                        <BlockRoundedIcon />
+                                      </IconButton>
+                                    )}
+                                  </Stack>
+                                )
                               }
                             >
                               <ListItemIcon>{getResourceIcon(resource.type)}</ListItemIcon>
@@ -483,6 +551,57 @@ export default function ActivityPage() {
                           <Pagination count={totalPages} page={page} onChange={(e, value) => setPage(value)} color="primary" shape="rounded" />
                         </Box>
                       )}
+                      {/* 👇 MOBILE ACTION MENU – used by the three-dot button */}
+                      <Menu
+                        anchorEl={menuAnchor}
+                        open={Boolean(menuAnchor)}
+                        onClose={handleMenuClose}
+                        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                        transformOrigin={{ vertical: "top", horizontal: "right" }}
+                      >
+                        <MenuItem
+                          onClick={(e) => {
+                            if (menuResource) handleDetails(menuResource, e);
+                            handleMenuClose();
+                          }}
+                        >
+                          <ListItemIcon>
+                            <InfoRoundedIcon fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText primary="Details" />
+                        </MenuItem>
+                        <MenuItem
+                          onClick={(e) => {
+                            if (menuResource) handleView(menuResource, e);
+                            handleMenuClose();
+                          }}
+                        >
+                          <ListItemIcon>
+                            <VisibilityRoundedIcon fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText primary="View" />
+                        </MenuItem>
+                        {menuResource?.type === "file" ? (
+                          <MenuItem
+                            onClick={(e) => {
+                              if (menuResource) handleDownload(menuResource, e);
+                              handleMenuClose();
+                            }}
+                          >
+                            <ListItemIcon>
+                              <DownloadRoundedIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText primary="Download" />
+                          </MenuItem>
+                        ) : (
+                          <MenuItem disabled>
+                            <ListItemIcon>
+                              <BlockRoundedIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText primary="Download not available" />
+                          </MenuItem>
+                        )}
+                      </Menu>
                     </>
                   )}
                 </Paper>

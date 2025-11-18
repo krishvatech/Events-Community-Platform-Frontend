@@ -23,16 +23,22 @@ import AccountHero from "../components/AccountHero.jsx";
 import AccountSidebar from "../components/AccountSidebar.jsx";
 
 const TEAL = "#0ea5a4";
-const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
+const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
+  .toString()
+  .replace(/\/+$/, "");
 const API_URL = API.endsWith("/api") ? API : `${API}/api`;
 
 const TypeIcon = ({ type }) => {
   const common = { sx: { color: TEAL } };
   switch (type) {
-    case "file": return <PictureAsPdfRoundedIcon {...common} />;
-    case "video": return <MovieRoundedIcon {...common} />;
-    case "link": return <LinkRoundedIcon {...common} />;
-    default: return <ArticleRoundedIcon {...common} />;
+    case "file":
+      return <PictureAsPdfRoundedIcon {...common} />;
+    case "video":
+      return <MovieRoundedIcon {...common} />;
+    case "link":
+      return <LinkRoundedIcon {...common} />;
+    default:
+      return <ArticleRoundedIcon {...common} />;
   }
 };
 
@@ -50,7 +56,7 @@ export default function ResourceDetails() {
       try {
         const token = localStorage.getItem("access_token");
         const response = await fetch(`${API_URL}/users/me/`, {
-          headers: { "Authorization": `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) throw new Error("Failed to fetch user");
         const data = await response.json();
@@ -67,25 +73,31 @@ export default function ResourceDetails() {
       setLoading(true);
       try {
         const token = localStorage.getItem("access_token");
-        
+
         // Fetch resource details
-        const resourceResponse = await fetch(`${API_URL}/content/resources/${id}/`, {
-          headers: { "Authorization": `Bearer ${token}` },
-        });
-        
+        const resourceResponse = await fetch(
+          `${API_URL}/content/resources/${id}/`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
         if (!resourceResponse.ok) {
           throw new Error("Resource not found");
         }
-        
+
         const resourceData = await resourceResponse.json();
         setResource(resourceData);
-        
+
         // Fetch associated event details
         if (resourceData.event_id) {
           try {
-            const eventResponse = await fetch(`${API_URL}/events/${resourceData.event_id}/`, {
-              headers: { "Authorization": `Bearer ${token}` },
-            });
+            const eventResponse = await fetch(
+              `${API_URL}/events/${resourceData.event_id}/`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
             if (eventResponse.ok) {
               const eventData = await eventResponse.json();
               setEvent(eventData);
@@ -108,17 +120,17 @@ export default function ResourceDetails() {
   }, [id]);
 
   const handleDownload = () => {
-    if (resource.type !== 'file') return;
+    if (resource.type !== "file") return;
     const downloadUrl = `${API_URL}/content/resources/${resource.id}/download/`;
-    const token = localStorage.getItem('access_token');
-    fetch(downloadUrl, { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(response => {
-        if (!response.ok) throw new Error('Download failed');
+    const token = localStorage.getItem("access_token");
+    fetch(downloadUrl, { headers: { Authorization: `Bearer ${token}` } })
+      .then((response) => {
+        if (!response.ok) throw new Error("Download failed");
         return response.blob();
       })
-      .then(blob => {
+      .then((blob) => {
         const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
         link.download = `${resource.title}`;
         document.body.appendChild(link);
@@ -126,9 +138,9 @@ export default function ResourceDetails() {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
       })
-      .catch(error => {
-        console.error('Download error:', error);
-        alert('Failed to download file');
+      .catch((error) => {
+        console.error("Download error:", error);
+        alert("Failed to download file");
       });
   };
 
@@ -137,8 +149,8 @@ export default function ResourceDetails() {
     if (resource.type === "file") url = resource.file;
     else if (resource.type === "link") url = resource.link_url;
     else if (resource.type === "video") url = resource.video_url;
-    
-    if (url) window.open(url, '_blank');
+
+    if (url) window.open(url, "_blank");
   };
 
   if (loading) {
@@ -146,7 +158,14 @@ export default function ResourceDetails() {
       <>
         <AccountHero user={currentUser} />
         <Container maxWidth="lg" className="py-6 sm:py-8">
-          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: "400px",
+            }}
+          >
             <CircularProgress />
           </Box>
         </Container>
@@ -166,7 +185,7 @@ export default function ResourceDetails() {
             <Button
               variant="contained"
               startIcon={<ArrowBackRoundedIcon />}
-              onClick={() => navigate('/account')}
+              onClick={() => navigate("/account")}
               sx={{ mt: 2 }}
             >
               Back to Activity
@@ -180,38 +199,81 @@ export default function ResourceDetails() {
   return (
     <>
       <AccountHero user={currentUser} />
-      
+
       <Container maxWidth="lg" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-6">
-          <aside className="col-span-12 md:col-span-3">
-            <AccountSidebar activeKey="activity" onNavigate={(k) => console.log(k)} />
+          <aside className="col-span-12 lg:col-span-3">
+            <AccountSidebar
+              activeKey="activity"
+              onNavigate={(k) => console.log(k)}
+            />
           </aside>
 
-          <main className="col-span-12 md:col-span-9">
+          <main className="col-span-12 lg:col-span-9">
             <Breadcrumbs sx={{ mb: 2 }}>
-              <Link to="/account" style={{ textDecoration: "none", color: "#666" }}>
+              <Link
+                to="/account"
+                style={{ textDecoration: "none", color: "#666" }}
+              >
                 My Activity
               </Link>
               <Typography color="text.primary">{resource.title}</Typography>
             </Breadcrumbs>
 
             <Paper sx={{ p: 4, borderRadius: 2 }} elevation={1}>
-              <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ mb: 3 }}>
-                <Box sx={{ fontSize: 48 }}>
-                  <TypeIcon type={resource.type} />
-                </Box>
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="h4" gutterBottom>
-                    {resource.title}
-                  </Typography>
-                  <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                    <Chip label={resource.type} size="small" color="primary" />
-                    {resource.is_published ? (
-                      <Chip label="Published" size="small" color="success" />
-                    ) : (
-                      <Chip label="Draft" size="small" color="default" />
-                    )}
-                  </Stack>
+              {/* 🔹 TOP HEADER: icon + title + chips + BACK button on right */}
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                justifyContent="space-between"
+                sx={{ mb: 3 }}
+              >
+                {/* Left side: icon + title + chips */}
+                <Stack
+                  direction="row"
+                  spacing={2}
+                  alignItems="flex-start"
+                  sx={{ flexGrow: 1, minWidth: 0 }}
+                >
+                  <Box sx={{ fontSize: 48 }}>
+                    <TypeIcon type={resource.type} />
+                  </Box>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="h4" gutterBottom>
+                      {resource.title}
+                    </Typography>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mb: 2, flexWrap: "wrap" }}
+                    >
+                      <Chip label={resource.type} size="small" color="primary" />
+                      {resource.is_published ? (
+                        <Chip
+                          label="Published"
+                          size="small"
+                          color="success"
+                        />
+                      ) : (
+                        <Chip label="Draft" size="small" color="default" />
+                      )}
+                    </Stack>
+                  </Box>
+                </Stack>
+
+                {/* Right side: Back button aligned to title end */}
+                <Box sx={{ mt: { xs: 1, sm: 0 } }}>
+                  <Button
+                    variant="text"
+                    startIcon={<ArrowBackRoundedIcon />}
+                    onClick={() => navigate("/account")}
+                    sx={{
+                      textTransform: "none",
+                    }}
+                  >
+                    Back
+                  </Button>
                 </Box>
               </Stack>
 
@@ -249,7 +311,12 @@ export default function ResourceDetails() {
                     </Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap">
                       {resource.tags.map((tag, idx) => (
-                        <Chip key={idx} label={tag} size="small" variant="outlined" />
+                        <Chip
+                          key={idx}
+                          label={tag}
+                          size="small"
+                          variant="outlined"
+                        />
                       ))}
                     </Stack>
                   </Box>
@@ -264,15 +331,17 @@ export default function ResourceDetails() {
                 </Typography>
                 <Stack spacing={1}>
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Created:</strong> {new Date(resource.created_at).toLocaleString('en-IN', {
-                      dateStyle: 'long',
-                      timeStyle: 'short'
+                    <strong>Created:</strong>{" "}
+                    {new Date(resource.created_at).toLocaleString("en-IN", {
+                      dateStyle: "long",
+                      timeStyle: "short",
                     })}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Last Updated:</strong> {new Date(resource.updated_at).toLocaleString('en-IN', {
-                      dateStyle: 'long',
-                      timeStyle: 'short'
+                    <strong>Last Updated:</strong>{" "}
+                    {new Date(resource.updated_at).toLocaleString("en-IN", {
+                      dateStyle: "long",
+                      timeStyle: "short",
                     })}
                   </Typography>
                 </Stack>
@@ -280,31 +349,34 @@ export default function ResourceDetails() {
 
               <Divider sx={{ my: 3 }} />
 
-              <Stack direction="row" spacing={2}>
+              {/* 🔹 Bottom buttons – responsive for all devices */}
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                sx={{ mt: 1 }}
+              >
                 <Button
                   variant="contained"
                   startIcon={<OpenInNewRoundedIcon />}
                   onClick={handleView}
-                  sx={{ bgcolor: TEAL, '&:hover': { bgcolor: '#0d9493' } }}
+                  sx={{
+                    bgcolor: TEAL,
+                    "&:hover": { bgcolor: "#0d9493" },
+                    width: { xs: "100%", sm: "auto" },
+                  }}
                 >
                   View Resource
                 </Button>
-                {resource.type === 'file' && (
+                {resource.type === "file" && (
                   <Button
                     variant="outlined"
                     startIcon={<DownloadRoundedIcon />}
                     onClick={handleDownload}
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
                   >
                     Download
                   </Button>
                 )}
-                <Button
-                  variant="outlined"
-                  startIcon={<ArrowBackRoundedIcon />}
-                  onClick={() => navigate('/account')}
-                >
-                  Back
-                </Button>
               </Stack>
             </Paper>
           </main>
