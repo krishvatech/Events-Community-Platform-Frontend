@@ -34,6 +34,25 @@ const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 const API_ORIGIN = BASE.replace(/\/api$/, "") || BASE;
 
+// ---- Messaging API endpoints (shared between tabs) ----
+// Adjust these URLs to match your existing messaging backend
+const MESSAGING_API = {
+    // Group-level chat (one shared thread per group)
+    // ✅ use a dedicated "ensure group conversation" endpoint (POST)
+    ensureGroupThread: () => `${API_ROOT}/messaging/conversations/ensure-group/`,
+
+    // Direct chat with a specific user (DM)
+    // ✅ use a dedicated "ensure direct conversation" endpoint (POST)
+    ensureDirectThread: () => `${API_ROOT}/messaging/conversations/ensure-direct/`,
+
+    // List messages in a conversation
+    listMessages: (cid) => `${API_ROOT}/messaging/conversations/${cid}/messages/`,
+
+    // Send a new message to a conversation
+    sendMessage: (cid) => `${API_ROOT}/messaging/conversations/${cid}/messages/`,
+};
+
+
 const toAbs = (u) => {
     if (!u) return u;
     if (/^https?:\/\//i.test(u)) return u;
@@ -1735,6 +1754,521 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
     );
 }
 
+// -------- Group Chat Tab (group chat + 1-1 with members) --------
+function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }) {
+    const [activePeer, setActivePeer] = React.useState({ type: "group", user: null }); // {type:"group"} or {type:"dm", user}
+    const [conversation, setConversation] = React.useState(null);
+    const [convLoading, setConvLoading] = React.useState(false);
+    const [messages, setMessages] = React.useState([]);
+    const [messagesLoading, setMessagesLoading] = React.useState(false);
+    const [error, setError] = React.useState("");
+    const [text, setText] = React.useState("");
+    const [sending, setSending] = React.useState(false);
+
+    const listRef = React.useRef(null);
+
+    const canSend =
+        !!conversation &&
+        (!!chatOn || myRole === "owner" || myRole === "admin"); // when chat is OFF, only owner/admin can still post
+
+    const myId = Number(currentUserId) || null;
+
+
+    const userDisplayName = (u, fallbackId) =>
+        u?.name ||
+        u?.full_name ||
+        u?.display_name ||
+        u?.sender_display ||
+        u?.sender_name ||
+        (u?.first_name || u?.last_name
+            ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim()
+            : "") ||
+        u?.username ||
+        u?.email ||
+        (fallbackId ? `User #${fallbackId}` : "Member");
+
+    const normalizeMessage = (raw) => {
+        // Prefer nested sender/user objects if present
+        const senderBase =
+            (raw.sender && typeof raw.sender === "object" ? raw.sender : null) ||
+            (raw.user && typeof raw.user === "object" ? raw.user : null) ||
+            (raw.author && typeof raw.author === "object" ? raw.author : null) ||
+            (raw.from_user && typeof raw.from_user === "object" ? raw.from_user : null) ||
+            (raw.from && typeof raw.from === "object" ? raw.from : null) ||
+            {};
+
+        // Best-effort sender id (similar to MessagesPage)
+        const sender_id =
+            raw.sender_id ??
+            raw.user_id ??
+            raw.author_id ??
+            raw.from_user_id ??
+            raw.from_id ??
+            senderBase.id ??
+            raw.user ??
+            raw.sender ??
+            raw.author ??
+            raw.from_user ??
+            raw.from ??
+            null;
+
+        // Merge root-level name fields so we can reuse the same display logic
+        const senderForName = {
+            ...senderBase,
+            display_name: raw.sender_display ?? senderBase.display_name,
+            sender_display: raw.sender_display ?? senderBase.sender_display,
+            sender_name: raw.sender_name ?? senderBase.sender_name,
+        };
+
+        const sender = {
+            ...senderBase,
+            id: sender_id,
+            // friendly name just like MessagesPage (falls back to "User #id")
+            name: userDisplayName(senderForName, sender_id),
+            avatar:
+                senderBase.avatar ||
+                senderBase.photo ||
+                senderBase.photo_url ||
+                senderBase.image ||
+                raw.sender_avatar ||
+                null,
+        };
+
+        return {
+            ...raw,
+            sender_id,
+            sender,
+            text: raw.text ?? raw.body ?? raw.message ?? raw.content ?? "",
+            created_at:
+                raw.created_at ?? raw.timestamp ?? raw.sent_at ?? raw.createdAt ?? raw.created,
+        };
+    };
+
+    const fetchConversation = React.useCallback(
+        async (peer) => {
+            if (!group?.id) return null;
+            setConvLoading(true);
+            setError("");
+            try {
+                const token = getToken();
+                const headers = {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                };
+
+                let conv = null;
+
+                if (peer.type === "group") {
+                    // 👇 Be tolerant to backend expecting group_id / group / group_slug
+                    const url = MESSAGING_API.ensureGroupThread();
+                    const payloadVariants = [
+                        { group_id: group.id },
+                        { group: group.id },
+                        group.slug ? { group_slug: group.slug } : null,
+                    ].filter(Boolean);
+
+                    let lastErr = "";
+
+                    for (const body of payloadVariants) {
+                        const res = await fetch(url, {
+                            method: "POST",
+                            headers,
+                            body: JSON.stringify(body),
+                        });
+                        const data = await res.json().catch(() => ({}));
+
+                        if (res.ok) {
+                            conv = data.conversation || data;
+                            break;
+                        } else {
+                            lastErr = data?.detail || `HTTP ${res.status}`;
+                        }
+                    }
+
+                    if (!conv) {
+                        throw new Error(lastErr || "Could not create/load group conversation");
+                    }
+                } else {
+                    // Direct DM with a member (keep as-is, since it's already working)
+                    const url = MESSAGING_API.ensureDirectThread();
+                    const body = {
+                        user_id: peer.user.id,
+                        group_id: group.id, // optional context
+                    };
+
+                    const res = await fetch(url, {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify(body),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+
+                    conv = data.conversation || data;
+                }
+
+                setConversation(conv);
+                return conv;
+            } catch (e) {
+                setError(e?.message || String(e));
+                setConversation(null);
+                return null;
+            } finally {
+                setConvLoading(false);
+            }
+        },
+        [group?.id, group?.slug]
+    );
+
+
+    const fetchMessages = React.useCallback(
+        async (convId, withSpinner = true) => {
+            if (!convId) return;
+            if (withSpinner) setMessagesLoading(true);
+            try {
+                const token = getToken();
+                const headers = {
+                    Accept: "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                };
+                const res = await fetch(MESSAGING_API.listMessages(convId), { headers });
+                const data = await res.json().catch(() => ([]));
+                let arr = [];
+                if (Array.isArray(data)) arr = data;
+                else if (Array.isArray(data?.results)) arr = data.results;
+                else if (Array.isArray(data?.messages)) arr = data.messages;
+                setMessages(arr.map(normalizeMessage));
+            } catch (e) {
+                setError(e?.message || String(e));
+                setMessages([]);
+            } finally {
+                if (withSpinner) setMessagesLoading(false);
+            }
+        },
+        []
+    );
+
+    // auto scroll to bottom when messages change
+    React.useEffect(() => {
+        if (listRef.current) {
+            listRef.current.scrollTop = listRef.current.scrollHeight;
+        }
+    }, [messages.length]);
+
+    // whenever active peer changes, ensure conversation + load messages
+    React.useEffect(() => {
+        (async () => {
+            const conv = await fetchConversation(activePeer);
+            if (conv?.id) await fetchMessages(conv.id, true);
+        })();
+    }, [activePeer, fetchConversation, fetchMessages]);
+
+    // light polling (8s) to keep chat updated while open
+    React.useEffect(() => {
+        if (!conversation?.id) return;
+        const id = setInterval(() => {
+            fetchMessages(conversation.id, false);
+        }, 8000);
+        return () => clearInterval(id);
+    }, [conversation?.id, fetchMessages]);
+
+    const handleSend = async () => {
+        const trimmed = text.trim();
+        if (!trimmed || !conversation?.id) return;
+
+        setSending(true);
+        try {
+            const token = getToken();
+            const headers = {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            };
+            const url = MESSAGING_API.sendMessage(conversation.id);
+
+            // 👇 Try different payload shapes: text / body / message / content
+            const payloadVariants = [
+                { text: trimmed },
+                { body: trimmed },
+                { message: trimmed },
+                { content: trimmed },
+            ];
+
+            let ok = false;
+            let lastErr = "";
+
+            for (const payload of payloadVariants) {
+                const res = await fetch(url, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    ok = true;
+                    setText("");
+                    await fetchMessages(conversation.id, false);
+                    break;
+                } else {
+                    lastErr = data?.detail || `HTTP ${res.status}`;
+                }
+            }
+
+            if (!ok) {
+                throw new Error(lastErr || "Could not send message");
+            }
+        } catch (e) {
+            setError(e?.message || String(e));
+        } finally {
+            setSending(false);
+        }
+    };
+
+
+    const disabledForMember =
+        !chatOn && myRole !== "owner" && myRole !== "admin";
+
+    const displayTitle =
+        activePeer.type === "group"
+            ? (group?.name || "Group chat")
+            : (activePeer.user?.name ||
+                activePeer.user?.email ||
+                `User #${activePeer.user?.id}`);
+
+    const memberList = (membersWithOwner || []).filter(
+        (m) => Number(m?.user?.id) !== myId  // don't show self for DM
+    );
+
+    return (
+        <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 2 }}>
+            {/* Left: target list (group + members) */}
+            <Paper
+                elevation={0}
+                className="rounded-2xl border border-slate-200"
+                sx={{ width: { xs: "100%", md: 280 }, maxHeight: 480, overflowY: "auto" }}
+            >
+                <Box sx={{ p: 2, borderBottom: "1px solid #e2e8f0" }}>
+                    <Typography variant="subtitle1" className="font-semibold">
+                        Chats
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Group chat + direct messages
+                    </Typography>
+                </Box>
+
+                <List dense disablePadding>
+                    {/* Group chat item */}
+                    <ListItem
+                        button
+                        selected={activePeer.type === "group"}
+                        onClick={() => setActivePeer({ type: "group", user: null })}
+                    >
+                        <ListItemAvatar>
+                            <Avatar src={group?.cover_image ? toAbs(group.cover_image) : undefined}>
+                                {(group?.name || "G").slice(0, 1).toUpperCase()}
+                            </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                            primary={group?.name || "Group chat"}
+                            secondary="Group conversation"
+                        />
+                    </ListItem>
+
+                    <Divider />
+
+                    {/* Direct messages with members */}
+                    {memberList.map((m) => (
+                        <ListItem
+                            key={m.user.id}
+                            button
+                            selected={
+                                activePeer.type === "dm" &&
+                                activePeer.user &&
+                                Number(activePeer.user.id) === Number(m.user.id)
+                            }
+                            onClick={() => setActivePeer({ type: "dm", user: m.user })}
+                        >
+                            <ListItemAvatar>
+                                <Avatar src={toAbs(m.user.avatar)}>
+                                    {(m.user.name || m.user.email || "U").slice(0, 1).toUpperCase()}
+                                </Avatar>
+                            </ListItemAvatar>
+                            <ListItemText
+                                primary={m.user.name || m.user.email || `User #${m.user.id}`}
+                                secondary={m.role ? (m.role.charAt(0).toUpperCase() + m.role.slice(1)) : "Member"}
+                            />
+                        </ListItem>
+                    ))}
+                </List>
+            </Paper>
+
+            {/* Right: conversation */}
+            <Paper
+                elevation={0}
+                className="rounded-2xl border border-slate-200 flex-1"
+                sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: 320,
+                    maxHeight: 520,
+                }}
+            >
+                <Box sx={{ p: 2, borderBottom: "1px solid #e2e8f0" }}>
+                    <Typography variant="subtitle1" className="font-semibold">
+                        {displayTitle}
+                    </Typography>
+                    {activePeer.type === "group" ? (
+                        <Typography variant="caption" color="text.secondary">
+                            Group messages visible to all members.
+                        </Typography>
+                    ) : (
+                        <Typography variant="caption" color="text.secondary">
+                            1-to-1 chat with this member.
+                        </Typography>
+                    )}
+                </Box>
+
+                {error && (
+                    <Box sx={{ p: 2 }}>
+                        <Alert severity="error" onClose={() => setError("")}>{error}</Alert>
+                    </Box>
+                )}
+
+                {!chatOn && (
+                    <Box sx={{ p: 2 }}>
+                        <Alert severity="info">
+                            Group chat is currently <b>disabled</b> in Settings.
+                            {myRole === "owner" || myRole === "admin"
+                                ? " You can still send messages as Owner/Admin."
+                                : " You can read past messages but cannot send new ones."}
+                        </Alert>
+                    </Box>
+                )}
+
+                {/* Messages list */}
+                <Box
+                    ref={listRef}
+                    sx={{
+                        flex: 1,
+                        overflowY: "auto",
+                        px: 2,
+                        py: 1.5,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 1,
+                    }}
+                >
+                    {convLoading || messagesLoading ? (
+                        <Stack alignItems="center" justifyContent="center" sx={{ flex: 1 }}>
+                            <CircularProgress size={22} />
+                        </Stack>
+                    ) : messages.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                            No messages yet. Start the conversation!
+                        </Typography>
+                    ) : (
+                        messages.map((msg) => {
+                            const mine = myId && Number(msg.sender_id) === myId;
+                            return (
+                                <Box
+                                    key={msg.id}
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: mine ? "flex-end" : "flex-start",
+                                    }}
+                                >
+                                    <Box
+                                        sx={{
+                                            maxWidth: "80%",
+                                            px: 1.5,
+                                            py: 1,
+                                            borderRadius: 2,
+                                            bgcolor: mine ? "#10b8a6" : "#e2e8f0",
+                                            color: mine ? "white" : "inherit",
+                                        }}
+                                    >
+                                        {!mine && (
+                                            <Typography
+                                                variant="caption"
+                                                sx={{ fontWeight: 600, display: "block", mb: 0.2 }}
+                                            >
+                                                {userDisplayName(msg.sender, msg.sender_id)}
+                                            </Typography>
+                                        )}
+                                        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                                            {msg.text}
+                                        </Typography>
+                                        {msg.created_at && (
+                                            <Typography
+                                                variant="caption"
+                                                sx={{ opacity: 0.7, display: "block", mt: 0.3 }}
+                                            >
+                                                {new Date(msg.created_at).toLocaleString()}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Box>
+                            );
+                        })
+                    )}
+                </Box>
+
+                {/* Composer */}
+                <Box sx={{ p: 1.5, borderTop: "1px solid #e2e8f0" }}>
+                    <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        component="form"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!disabledForMember && canSend) handleSend();
+                        }}
+                    >
+                        <TextField
+                            size="small"
+                            fullWidth
+                            placeholder={
+                                disabledForMember
+                                    ? "Chat is disabled for members."
+                                    : "Type a message…"
+                            }
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            disabled={disabledForMember || !conversation || sending}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    if (!disabledForMember && canSend) handleSend();
+                                }
+                            }}
+                        />
+                        <Button
+                            variant="contained"
+                            type="submit"
+                            disabled={
+                                disabledForMember ||
+                                !conversation ||
+                                !text.trim() ||
+                                sending
+                            }
+                            sx={{
+                                textTransform: "none",
+                                backgroundColor: "#10b8a6",
+                                "&:hover": { backgroundColor: "#0ea5a4" },
+                            }}
+                        >
+                            Send
+                        </Button>
+                    </Stack>
+                </Box>
+            </Paper>
+        </Box>
+    );
+}
+
 
 
 // ---- Main page ----
@@ -1940,6 +2474,8 @@ export default function GroupManagePage() {
         approve: (gid) => `${API_ROOT}/groups/${gid}/promotion/request-approve/`,
         reject: (gid) => `${API_ROOT}/groups/${gid}/promotion/request-reject/`,
     };
+
+
     // ---- Notifications tab data ----
     const [reqs, setReqs] = React.useState([]);
     const [reqsLoading, setReqsLoading] = React.useState(false);
@@ -2223,6 +2759,7 @@ export default function GroupManagePage() {
 
     const canSeeSettingsTab = isOwnerRole || isAdminRole || isModeratorRole;
     const canSeeNotificationsTab = canModerate && showNotificationsTab;
+    const CHAT_TAB_INDEX = canSeeNotificationsTab ? 6 : 5;
 
     React.useEffect(() => {
         if (!canCreateSubgroups && addSubOpen) setAddSubOpen(false);
@@ -2784,6 +3321,7 @@ export default function GroupManagePage() {
                                 )}
                                 <Tab label="Posts" />
                                 {canSeeNotificationsTab && <Tab label="Notifications" />}
+                                <Tab label="Chat" />
                             </Tabs>
                         </Paper>
 
@@ -3369,6 +3907,20 @@ export default function GroupManagePage() {
                                                 </Stack>
                                             )}
                                         </Stack>
+                                    </Paper>
+                                )}
+                                {tab === CHAT_TAB_INDEX && (
+                                    <Paper
+                                        elevation={0}
+                                        className="rounded-2xl border border-slate-200 p-4"
+                                    >
+                                        <GroupChatTab
+                                            group={group}
+                                            membersWithOwner={membersWithOwner}
+                                            currentUserId={currentUserId}
+                                            chatOn={chatOn}
+                                            myRole={myRole}
+                                        />
                                     </Paper>
                                 )}
 
