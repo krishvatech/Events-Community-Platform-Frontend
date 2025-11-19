@@ -1404,8 +1404,48 @@ export default function HomePage() {
 
   // ---- Create post (always visibility=friends) ----
   async function createCommunityPost(draft) {
-    const communityId = myCommunityId;           // ← always post to your single community
+    const communityId = myCommunityId;
     if (!communityId) { alert("Community not loaded yet."); return; }
+
+    // 1. INTERCEPT POLLS: Send to the dedicated polls/create endpoint
+    if (draft.type === "poll") {
+      const payload = {
+        question: draft.content || "",
+        options: draft.options || [],
+        community_id: Number(communityId),
+        // backend 'polls_create' expects JSON, not FormData
+      };
+
+      // Note: based on your views.py, the path is likely /activity/feed/polls/create/
+      const res = await fetch(`${API_ROOT}/activity/feed/polls/create/`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          ...authHeader() 
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to create poll");
+      }
+      // The backend returns { ok: true, poll: {...}, feed_item_id: ... }
+      // We need to map this back to your UI format so it appears immediately
+      const data = await res.json();
+      
+      // Return a shape that mapCreateResponseToUiPost understands
+      return {
+        id: data.feed_item_id,
+        type: "poll",
+        created_at: new Date().toISOString(),
+        question: data.poll.question,
+        options: data.poll.options,
+        community: { id: communityId },
+      };
+    }
+
+    // 2. STANDARD POSTS (Text, Image, Link) - Keep existing FormData logic
     const fd = new FormData();
     fd.append("visibility", "friends");
 
@@ -1422,11 +1462,6 @@ export default function HomePage() {
         fd.append("image", draft.files[0], draft.files[0].name);
       }
       if (draft.content) fd.append("caption", draft.content);
-    } else if (draft.type === "poll") {
-      fd.append("type", "poll");
-      // question = content, options = repeated keys
-      fd.append("question", draft.content || "");
-      (draft.options || []).forEach((opt) => fd.append("options", opt));
     } else {
       fd.append("type", "text");
       fd.append("content", draft.content || "");
