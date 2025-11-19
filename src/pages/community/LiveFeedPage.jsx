@@ -564,8 +564,27 @@ function mapFeedItem(item) {
   const t = (m.type || "").toLowerCase();
 
   // ---- Image post ----
-  if (t === "image" || m.image) {
-    return { ...base, type: "image", text: m.text || "", image_url: m.image };
+  if (t === "image" || m.image || m.image_url || m.imageUrl) {
+    const img =
+      m.image ||
+      m.image_url ||
+      m.imageUrl ||
+      m.url ||
+      m.file_url ||
+      m.file;
+
+    const caption =
+      m.text ||
+      m.caption ||   // 👈 your metadata
+      m.title ||
+      "";
+
+    return {
+      ...base,
+      type: "image",
+      text: caption,
+      image_url: img,
+    };
   }
 
   // ---- Poll post ----
@@ -1766,7 +1785,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
             {post.text && <Typography variant="body2" sx={{ mb: 1 }}>{post.text}</Typography>}
             <Box
               component="img"
-              src={post.image_url}
+              src={toMediaUrl(post.image_url)}
               alt={post.text || "post image"}
               sx={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 2, border: `1px solid ${BORDER}` }}
             />
