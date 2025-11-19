@@ -2169,23 +2169,35 @@ export default function AdminPostsPage() {
   return (
     <Box sx={{ py: 3 }}>
       <Container maxWidth="lg">
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="center">
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          justifyContent="space-between"
+          spacing={2}
+          sx={{ mb: 2 }}
+        >
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ width: "100%" }}>
             <Avatar sx={{ bgcolor: "#14b8b1" }}>A</Avatar>
             <Box>
-              <Typography variant="h5" fontWeight={800}>Admin Posts</Typography>
-              <Typography color="text.secondary">Publish community-wide updates from the dashboard.</Typography>
+              <Typography variant="h5" fontWeight={800}>Community Posts</Typography>
+              <Typography color="text.secondary">
+                Publish community-wide updates from the dashboard.
+              </Typography>
             </Box>
           </Stack>
-          <Button
-            variant="contained"
-            startIcon={<AddRoundedIcon />}
-            onClick={() => setCreateOpen(true)}
-            sx={{ borderRadius: 2 }}
-            disabled={!activeCommunityId}   // ← guard
-          >
-            Create Post
-          </Button>
+
+          <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
+            <Button
+              fullWidth
+              variant="contained"
+              startIcon={<AddRoundedIcon />}
+              onClick={() => setCreateOpen(true)}
+              sx={{ borderRadius: 2 }}
+              disabled={!activeCommunityId}   // ← guard
+            >
+              Create Post
+            </Button>
+          </Box>
         </Stack>
 
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
