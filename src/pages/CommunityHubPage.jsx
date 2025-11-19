@@ -115,18 +115,31 @@ export default function CommunityHubPage() {
       </Paper>
 
       {/* Mobile drawer for the left nav */}
+      {/* Mobile + tablet drawer for the left nav */}
       <Drawer
         open={navOpen}
         onClose={() => setNavOpen(false)}
-        sx={{ display: { xs: "block", md: "none" } }}
+        sx={{
+          // drawer is used on xs + sm (320–899, includes 768), hidden on md+
+          display: { xs: "block", md: "none" },
+          "& .MuiBackdrop-root": {
+            backgroundColor: "rgba(15, 23, 42, 0.45)", // dim background
+          },
+        }}
         PaperProps={{
           sx: {
-            width: 280,
+            width: { xs: "80vw", sm: 280 },      // mobile narrower, tablet fixed 280
+            maxWidth: "100vw",
+            borderRadius: 0,
+            borderTopRightRadius: 24,
+            borderBottomRightRadius: 24,
 
-            // 👇 ONLY for very small screens (e.g. 375–425px)
-            // move drawer below header + keep full visible height
-            mt: { xs: 7, sm: 0 },                     // 7 * 8px = 56px ≈ header height
-            height: { xs: "calc(100% - 56px)", sm: "100%" },
+            // 👉 same top spacing for mobile + tablet (like your header)
+            position: "fixed",
+            left: 0,
+            right: "auto",
+            top: 56,                              // adjust if header is taller/shorter
+            height: "calc(100% - 56px)",
           },
         }}
       >
@@ -154,9 +167,24 @@ export default function CommunityHubPage() {
         {/* Left rail (desktop) */}
         <Box
           sx={{
-            width: { xs: "100%", md: 260 }, // fixed-ish width on md+ (works at 1024px and 1440px)
+            width: { xs: "100%", md: 260 },
             flexShrink: 0,
             display: { xs: "none", md: "block" },
+
+            // we draw our own full-height vertical line on the right (md+ only)
+            position: "relative",
+            pr: { md: 3 },
+            mr: { md: 3 },
+            "&::after": {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: "1px",
+              height: "100%",        // full height of the column
+              backgroundColor: "#e2e8f0",
+              display: { xs: "none", md: "block" },
+            },
           }}
         >
           <CommunitySideBar

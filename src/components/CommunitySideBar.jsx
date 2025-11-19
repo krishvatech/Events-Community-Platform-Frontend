@@ -163,10 +163,10 @@ export default function CommunitySideBar({ view, onChangeView = () => { }, topic
         p: 2,
         border: `1px solid ${BORDER}`,
         borderRadius: 3,
-        position: { md: "sticky" },
-        top: { md: 16 },
-        maxHeight: { md: "calc(100vh - 120px)" },
-        overflowY: { md: "auto" },
+        position: { xs: "static", lg: "sticky" },
+        top: { lg: 16 },
+        maxHeight: { xs: "none", lg: "calc(100vh - 120px)" },
+        overflowY: { xs: "visible", lg: "auto" },
       }}
     >
       <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5, color: SLATE_700 }}>

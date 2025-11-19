@@ -1639,26 +1639,60 @@ export default function HomePage() {
               pb: 2,
               mt: { xs: 7, sm: 0 },
               height: { xs: "calc(100% - 56px)", sm: "100%" },
+
+              // 💄 match left sidebar theme
+              background: "radial-gradient(circle at top, #1e293b 0, #020617 55%, #020617 100%)",
+              color: "#e5e7eb",
             },
           }}
         >
           <Box sx={{ p: 2 }}>
             <Typography
               variant="subtitle2"
-              sx={{ mb: 1, color: "text.secondary" }}
+              sx={{
+                mb: 1,
+                fontWeight: 600,
+                letterSpacing: 0.5,
+                textTransform: "uppercase",
+                fontSize: 11,
+                color: "rgba(248, 250, 252, 0.9)",
+              }}
             >
               Go to section
             </Typography>
 
-            <Stack spacing={1}>
+            <Stack spacing={0.75}>
               {TAB_LABELS.map((label, index) => (
                 <Button
                   key={label}
                   fullWidth
-                  variant={index === tabIndex ? "contained" : "text"}
+                  variant="text"
                   sx={{
                     justifyContent: "flex-start",
+                    textTransform: "none",
+                    borderRadius: 2,
+                    px: 1.5,
+                    py: 0.75,
+                    fontSize: 14,
                     fontWeight: index === tabIndex ? 700 : 500,
+
+                    // text + bg same feel as left sidebar items
+                    color:
+                      index === tabIndex
+                        ? "#020617" // dark text when active
+                        : "rgba(248, 250, 252, 0.92)",
+                    backgroundColor:
+                      index === tabIndex
+                        ? "rgba(248, 250, 252, 1)" // active pill
+                        : "transparent",
+
+                    // hover state similar to sidebar hover
+                    "&:hover": {
+                      backgroundColor:
+                        index === tabIndex
+                          ? "rgba(248, 250, 252, 1)"
+                          : "rgba(148, 163, 184, 0.2)", // soft slate hover
+                    },
                   }}
                   onClick={() => {
                     setTabIndex(index);
@@ -1672,7 +1706,6 @@ export default function HomePage() {
           </Box>
         </Drawer>
       </Box>
-
 
       {/* Create post dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
