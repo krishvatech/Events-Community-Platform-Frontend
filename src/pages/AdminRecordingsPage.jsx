@@ -81,6 +81,7 @@ export default function AdminRecordingsPage() {
   const [eventType, setEventType] = useState("all");
   const [page, setPage] = useState(1);
   const PER_PAGE = 6;
+  const [me, setMe] = useState(null);
 
   // Make sure the URL shows ?scope=host (as you requested)
   useEffect(() => {
@@ -97,14 +98,71 @@ export default function AdminRecordingsPage() {
 
     (async () => {
       try {
-        setLoading(true); setError("");
-        const url = new URL(`${API}/events/`);
-        url.searchParams.set("limit", "1000");
-        url.searchParams.set("created_by", "me");
-        const res = await fetch(url, { headers: getTokenHeader(), signal: ctrl.signal });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
-        const past = asList(json).filter(isPast);
+        const res = await fetch(`${API}/users/me/`, {
+          headers: getTokenHeader(),
+          signal: ctrl.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+
+        if (!alive) return;
+        setMe(data);            // data.is_superuser will be used below
+      } catch (e) {
+        if (e?.name === "AbortError") return;
+        if (!alive) return;
+        setError(e?.message || "Failed to load user");
+      }
+    })();
+
+    return () => {
+      alive = false;
+      ctrl.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    // wait until we know who the user is
+    if (!me) return;
+
+    let alive = true;
+    const ctrl = new AbortController();
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        let past = [];
+
+        if (me.is_superuser) {
+          // 🔹 SUPERUSER → all events with recordings / past
+          const url = new URL(`${API}/events/`);
+          url.searchParams.set("limit", "1000");
+          const res = await fetch(url, {
+            headers: getTokenHeader(),
+            signal: ctrl.signal,
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+
+          past = asList(json).filter(isPast);
+        } else {
+          // 🔹 NORMAL USER → only events they registered for (same as MyRecordingsPage)
+          const url = new URL(`${API}/event-registrations/mine/`);
+          url.searchParams.set("limit", "1000");
+          const res = await fetch(url, {
+            headers: getTokenHeader(),
+            signal: ctrl.signal,
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+
+          past = asList(json)
+            .map((r) => r?.event || null)
+            .filter(Boolean)
+            .filter(isPast);
+        }
+
         if (!alive) return;
         setItems(past);
       } catch (e) {
@@ -117,8 +175,11 @@ export default function AdminRecordingsPage() {
       }
     })();
 
-    return () => { alive = false; ctrl.abort(); };
-  }, []);
+    return () => {
+      alive = false;
+      ctrl.abort();
+    };
+  }, [me]);
 
   const uniqueTypes = useMemo(() => {
     const set = new Set(items.map((e) => (e?.event_type ?? e?.type ?? e?.category ?? "").toString().trim()).filter(Boolean));
