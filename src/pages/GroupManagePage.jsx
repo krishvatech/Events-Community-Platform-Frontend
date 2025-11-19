@@ -2738,12 +2738,46 @@ export default function GroupManagePage() {
         return null;
     }, [group?.current_user?.id, group?.current_user_id]);
 
-
     // ---- Role helpers for permissions ----
     const myRole = group?.current_user_role || "member";
     const isOwnerRole = myRole === "owner";
     const isAdminRole = myRole === "admin";
     const isModeratorRole = myRole === "moderator";
+
+    // ---- Which sub-groups should be visible to this user? ----
+    // Owner/Admin → see ALL sub-groups
+    // Moderator/Member → see ONLY sub-groups they have joined
+    const visibleSubgroups = React.useMemo(() => {
+        if (!Array.isArray(subgroups)) return [];
+
+        // Owners & Admins see all sub-groups
+        if (isOwnerRole || isAdminRole) return subgroups;
+
+        // Moderators & members → only sub-groups they are part of
+        return subgroups.filter((sg) => {
+            // If backend gives an explicit membership flag, use it
+            if (typeof sg.current_user_is_member === "boolean") {
+                return sg.current_user_is_member;
+            }
+            if (typeof sg.is_member === "boolean") {
+                return sg.is_member;
+            }
+
+            // If subgroup has a current_user_role, treat any non-"none" value as membership
+            if (typeof sg.current_user_role === "string" && sg.current_user_role) {
+                return sg.current_user_role !== "none";
+            }
+
+            // Fallback: if current user created the subgroup, treat as joined
+            if (currentUserId) {
+                if (Number(sg.created_by_id) === currentUserId) return true;
+                if (sg.created_by?.id && Number(sg.created_by.id) === currentUserId) return true;
+            }
+
+            return false;
+        });
+    }, [subgroups, isOwnerRole, isAdminRole, currentUserId]);
+
     const canEditGroup = isOwnerRole || isAdminRole;
     const canReviewRequests = isOwnerRole || isAdminRole;
 
@@ -3561,11 +3595,15 @@ export default function GroupManagePage() {
                                             <LinearProgress />
                                         ) : subError ? (
                                             <Alert severity="error">{subError}</Alert>
-                                        ) : subgroups.length === 0 ? (
-                                            <Typography className="text-slate-500">No sub-groups yet.</Typography>
+                                        ) : visibleSubgroups.length === 0 ? (
+                                            <Typography className="text-slate-500">
+                                                {isOwnerRole || isAdminRole
+                                                    ? "No sub-groups yet."
+                                                    : "You haven't joined any sub-groups yet."}
+                                            </Typography>
                                         ) : (
                                             <Stack spacing={1.5}>
-                                                {subgroups.map((sg) => (
+                                                {visibleSubgroups.map((sg) => (
                                                     <Paper key={sg.id || sg.slug} variant="outlined" className="p-2 rounded-xl">
                                                         <Stack direction="row" alignItems="center" spacing={2} justifyContent="space-between">
                                                             <Stack direction="row" alignItems="center" spacing={2}>
@@ -3579,7 +3617,8 @@ export default function GroupManagePage() {
                                                                 <Box>
                                                                     <Typography className="font-semibold">{sg.name}</Typography>
                                                                     <Typography variant="caption" className="text-slate-500">
-                                                                        {(sg.visibility === "private" ? "Private" : "Public")} • {(sg.member_count ?? sg.members_count ?? 0)} members
+                                                                        {(sg.visibility === "private" ? "Private" : "Public")} •{" "}
+                                                                        {(sg.member_count ?? sg.members_count ?? 0)} members
                                                                     </Typography>
                                                                 </Box>
                                                             </Stack>

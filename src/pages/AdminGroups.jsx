@@ -776,8 +776,22 @@ export default function AdminGroups() {
           }
 
           if (!owner && staff) {
-            // Staff: groups where I'm at least a member (any role)
-            arr = arr.filter((g) => !!g.current_user_role);
+            // Staff: show only groups where I'm a member,
+            // and ONLY top-level groups (no sub-groups).
+            arr = arr.filter((g) => {
+              if (!g.current_user_role) return false;
+
+              // Try to detect if this group has a parent (is a sub-group)
+              const parentId =
+                g.parent_group?.id ??
+                g.parent_group_id ??
+                g.parent?.id ??
+                g.parent_id ??
+                null;
+
+              // Keep only groups WITHOUT parent => main groups only
+              return !parentId;
+            });
           }
 
           setGroups(arr);
