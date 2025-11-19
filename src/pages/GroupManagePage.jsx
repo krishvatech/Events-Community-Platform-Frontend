@@ -2714,6 +2714,8 @@ export default function GroupManagePage() {
     const [eventStart, setEventStart] = React.useState("");
     const [eventEnd, setEventEnd] = React.useState("");
     const [creating, setCreating] = React.useState(false);
+    const [notifTab, setNotifTab] = React.useState(0);
+
 
     // ==== Post actions UI state (add-only) ====
     const [postMenuAnchor, setPostMenuAnchor] = React.useState(null);
@@ -2742,6 +2744,7 @@ export default function GroupManagePage() {
     const isOwnerRole = myRole === "owner";
     const isAdminRole = myRole === "admin";
     const isModeratorRole = myRole === "moderator";
+    const canEditGroup = isOwnerRole || isAdminRole;
     const canReviewRequests = isOwnerRole || isAdminRole;
 
     // ✅ Strong member management (only owner + admin can directly add/remove/change roles)
@@ -3278,7 +3281,7 @@ export default function GroupManagePage() {
                                 </Stack>
 
                                 <Stack direction="row" spacing={1}>
-                                    {!isStaffUser && (
+                                    {canEditGroup && (
                                         <Button
                                             startIcon={<EditNoteRoundedIcon />}
                                             onClick={() => setEditOpen(true)}
@@ -3637,7 +3640,7 @@ export default function GroupManagePage() {
                                         <Divider className="my-3" />
 
                                         <Stack direction="row" spacing={1}>
-                                            {!isStaffUser && (
+                                            {canEditGroup && (
                                                 <Button
                                                     variant="contained"
                                                     className="rounded-xl"
@@ -3647,7 +3650,7 @@ export default function GroupManagePage() {
                                                     Edit Details
                                                 </Button>
                                             )}
-                                            {!isStaffUser && (
+                                            {canEditGroup && (
                                                 <Button
                                                     variant="outlined"
                                                     color="error"
@@ -3931,148 +3934,223 @@ export default function GroupManagePage() {
 
                                             {canReviewRequests ? (
                                                 <>
-                                                    {/* JOIN REQUESTS (existing UI) */}
-                                                    {!!reqsError && <Alert severity="error">{reqsError}</Alert>}
+                                                    {/* Filter Tabs */}
+                                                    <Box sx={{ display: "flex", gap: 1, mb: 2, pb: 1, borderBottom: "2px solid #e2e8f0" }}>
+                                                        <Button
+                                                            onClick={() => setNotifTab(0)}
+                                                            sx={{
+                                                                textTransform: "none",
+                                                                fontWeight: notifTab === 0 ? 600 : 400,
+                                                                color: notifTab === 0 ? "#10b8a6" : "#64748b",
+                                                                borderBottom: notifTab === 0 ? "3px solid #10b8a6" : "none",
+                                                                paddingBottom: "8px",
+                                                                marginBottom: "-2px",
+                                                                "&:hover": { backgroundColor: "transparent", color: "#10b8a6" },
+                                                            }}
+                                                        >
+                                                            All Notifications
+                                                            {(reqs.length + promotionReqs.length > 0) && (
+                                                                <Chip
+                                                                    label={reqs.length + promotionReqs.length}
+                                                                    size="small"
+                                                                    sx={{ ml: 1, height: 20, backgroundColor: "#10b8a6", color: "white" }}
+                                                                />
+                                                            )}
+                                                        </Button>
 
-                                                    {reqsLoading ? (
-                                                        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-                                                            <CircularProgress />
-                                                        </Box>
-                                                    ) : reqs.length === 0 ? (
+                                                        <Button
+                                                            onClick={() => setNotifTab(1)}
+                                                            sx={{
+                                                                textTransform: "none",
+                                                                fontWeight: notifTab === 1 ? 600 : 400,
+                                                                color: notifTab === 1 ? "#10b8a6" : "#64748b",
+                                                                borderBottom: notifTab === 1 ? "3px solid #10b8a6" : "none",
+                                                                paddingBottom: "8px",
+                                                                marginBottom: "-2px",
+                                                                "&:hover": { backgroundColor: "transparent", color: "#10b8a6" },
+                                                            }}
+                                                        >
+                                                            Join Requests
+                                                            {reqs.length > 0 && (
+                                                                <Chip
+                                                                    label={reqs.length}
+                                                                    size="small"
+                                                                    sx={{ ml: 1, height: 20, backgroundColor: "#10b8a6", color: "white" }}
+                                                                />
+                                                            )}
+                                                        </Button>
+
+                                                        <Button
+                                                            onClick={() => setNotifTab(2)}
+                                                            sx={{
+                                                                textTransform: "none",
+                                                                fontWeight: notifTab === 2 ? 600 : 400,
+                                                                color: notifTab === 2 ? "#10b8a6" : "#64748b",
+                                                                borderBottom: notifTab === 2 ? "3px solid #10b8a6" : "none",
+                                                                paddingBottom: "8px",
+                                                                marginBottom: "-2px",
+                                                                "&:hover": { backgroundColor: "transparent", color: "#10b8a6" },
+                                                            }}
+                                                        >
+                                                            Promotion Requests
+                                                            {promotionReqs.length > 0 && (
+                                                                <Chip
+                                                                    label={promotionReqs.length}
+                                                                    size="small"
+                                                                    sx={{ ml: 1, height: 20, backgroundColor: "#10b8a6", color: "white" }}
+                                                                />
+                                                            )}
+                                                        </Button>
+                                                    </Box>
+
+                                                    {/* Combined list or empty state */}
+                                                    {(notifTab === 0 || notifTab === 1) && (
+                                                        <>
+                                                            {reqsError && <Alert severity="error">{reqsError}</Alert>}
+
+                                                            {reqsLoading ? (
+                                                                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                                                                    <CircularProgress />
+                                                                </Box>
+                                                            ) : reqs.length === 0 && notifTab !== 0 ? (
+                                                                <Alert severity="info">
+                                                                    No join requests for this group.
+                                                                </Alert>
+                                                            ) : reqs.length > 0 ? (
+                                                                <List sx={{ width: "100%" }}>
+                                                                    {reqs.map((r) => {
+                                                                        const id = r.id ?? r.pk;
+                                                                        const u = r.user || r.requester || r.member || {};
+                                                                        const name = u.full_name || u.name || u.username || "Member";
+                                                                        const avatar = u.avatar || u.photo_url || null;
+                                                                        const when = r.created_at || r.requested_at || r.createdAt;
+                                                                        const userId = r.user?.id;
+
+                                                                        return (
+                                                                            <ListItem
+                                                                                key={id}
+                                                                                divider
+                                                                                secondaryAction={
+                                                                                    <ButtonGroup variant="outlined" size="small">
+                                                                                        <Button
+                                                                                            color="success"
+                                                                                            onClick={() => takeAction(userId, "approve")}
+                                                                                            disabled={reqsLoading}
+                                                                                        >
+                                                                                            Approve
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                            color="error"
+                                                                                            onClick={() => takeAction(userId, "reject")}
+                                                                                            disabled={reqsLoading}
+                                                                                        >
+                                                                                            Reject
+                                                                                        </Button>
+                                                                                    </ButtonGroup>
+                                                                                }
+                                                                            >
+                                                                                <ListItemAvatar>
+                                                                                    <Avatar src={avatar || undefined}>
+                                                                                        {name?.[0]?.toUpperCase() || "U"}
+                                                                                    </Avatar>
+                                                                                </ListItemAvatar>
+                                                                                <ListItemText
+                                                                                    primary={<span><b>{name}</b> requested to join this group</span>}
+                                                                                    secondary={when ? `Requested on ${fmtWhen(when)}` : null}
+                                                                                />
+                                                                            </ListItem>
+                                                                        );
+                                                                    })}
+                                                                </List>
+                                                            ) : notifTab === 0 ? (
+                                                                <Typography className="text-slate-500">No notifications yet.</Typography>
+                                                            ) : null}
+                                                        </>
+                                                    )}
+
+                                                    {/* Promotion Requests */}
+                                                    {(notifTab === 0 || notifTab === 2) && (
+                                                        <>
+                                                            {promotionError && <Alert severity="error">{promotionError}</Alert>}
+
+                                                            {promotionLoading ? (
+                                                                <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                                                                    <CircularProgress />
+                                                                </Box>
+                                                            ) : promotionReqs.length === 0 && notifTab !== 0 ? (
+                                                                <Alert severity="info">
+                                                                    No pending promotion requests.
+                                                                </Alert>
+                                                            ) : promotionReqs.length > 0 ? (
+                                                                <List sx={{ width: "100%" }}>
+                                                                    {promotionReqs.map((r) => {
+                                                                        const id = r.id ?? r.pk ?? r.request_id;
+                                                                        const u = r.user || r.requester || r.moderator || {};
+                                                                        const name = u.full_name || u.name || u.username || "Member";
+                                                                        const avatar = u.avatar || u.photo_url || null;
+                                                                        const when = r.created_at || r.requested_at || r.createdAt;
+
+                                                                        return (
+                                                                            <ListItem
+                                                                                key={id}
+                                                                                divider
+                                                                                secondaryAction={
+                                                                                    <ButtonGroup variant="outlined" size="small">
+                                                                                        <Button
+                                                                                            color="success"
+                                                                                            onClick={() => takePromotionAction(r, "approve")}
+                                                                                            disabled={promotionLoading}
+                                                                                        >
+                                                                                            Approve
+                                                                                        </Button>
+                                                                                        <Button
+                                                                                            color="error"
+                                                                                            onClick={() => takePromotionAction(r, "reject")}
+                                                                                            disabled={promotionLoading}
+                                                                                        >
+                                                                                            Reject
+                                                                                        </Button>
+                                                                                    </ButtonGroup>
+                                                                                }
+                                                                            >
+                                                                                <ListItemAvatar>
+                                                                                    <Avatar src={avatar || undefined}>
+                                                                                        {name?.[0]?.toUpperCase() || "U"}
+                                                                                    </Avatar>
+                                                                                </ListItemAvatar>
+                                                                                <ListItemText
+                                                                                    primary={
+                                                                                        <span>
+                                                                                            <b>{name}</b> requested to be promoted to <b>Admin</b>
+                                                                                        </span>
+                                                                                    }
+                                                                                    secondary={when ? `Requested on ${fmtWhen(when)}` : null}
+                                                                                />
+                                                                            </ListItem>
+                                                                        );
+                                                                    })}
+                                                                </List>
+                                                            ) : notifTab === 0 ? (
+                                                                <Typography className="text-slate-500">No notifications yet.</Typography>
+                                                            ) : null}
+                                                        </>
+                                                    )}
+
+                                                    {/* All Notifications Combined View */}
+                                                    {notifTab === 0 && reqs.length === 0 && promotionReqs.length === 0 && (
                                                         <Alert severity="info">
-                                                            No join requests for this group.
+                                                            No notifications. Your group is all caught up! ✓
                                                         </Alert>
-                                                    ) : (
-                                                        <List sx={{ width: "100%" }}>
-                                                            {reqs.map((r) => {
-                                                                const id = r.id ?? r.pk;
-                                                                const u = r.user || r.requester || r.member || {};
-                                                                const name = u.full_name || u.name || u.username || "Member";
-                                                                const avatar = u.avatar || u.photo_url || null;
-                                                                const when = r.created_at || r.requested_at || r.createdAt;
-                                                                const userId = r.user?.id;
-
-                                                                return (
-                                                                    <ListItem
-                                                                        key={id}
-                                                                        divider
-                                                                        secondaryAction={
-                                                                            <ButtonGroup variant="outlined" size="small">
-                                                                                <Button
-                                                                                    color="success"
-                                                                                    onClick={() => takeAction(userId, "approve")}
-                                                                                    disabled={reqsLoading}
-                                                                                >
-                                                                                    Approve
-                                                                                </Button>
-                                                                                <Button
-                                                                                    color="error"
-                                                                                    onClick={() => takeAction(userId, "reject")}
-                                                                                    disabled={reqsLoading}
-                                                                                >
-                                                                                    Reject
-                                                                                </Button>
-                                                                            </ButtonGroup>
-                                                                        }
-                                                                    >
-                                                                        <ListItemAvatar>
-                                                                            <Avatar src={avatar || undefined}>
-                                                                                {name?.[0]?.toUpperCase() || "U"}
-                                                                            </Avatar>
-                                                                        </ListItemAvatar>
-                                                                        <ListItemText
-                                                                            primary={<span><b>{name}</b> requested to join this group</span>}
-                                                                            secondary={when ? `Requested on ${fmtWhen(when)}` : null}
-                                                                        />
-                                                                    </ListItem>
-                                                                );
-                                                            })}
-                                                        </List>
                                                     )}
 
-                                                    {/* PROMOTION REQUESTS */}
-                                                    <Divider sx={{ my: 2 }} />
-                                                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                                        Promotion requests
-                                                    </Typography>
-
-                                                    {!!promotionError && (
-                                                        <Alert severity="error">{promotionError}</Alert>
-                                                    )}
-
-                                                    {promotionLoading ? (
-                                                        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                                                            <CircularProgress />
-                                                        </Box>
-                                                    ) : promotionReqs.length === 0 ? (
-                                                        <Alert severity="info">
-                                                            No pending promotion requests.
-                                                        </Alert>
-                                                    ) : (
-                                                        <List sx={{ width: "100%" }}>
-                                                            {promotionReqs.map((r) => {
-                                                                const id = r.id ?? r.pk ?? r.request_id;
-                                                                const u = r.user || r.requester || r.moderator || {};
-                                                                const name = u.full_name || u.name || u.username || "Member";
-                                                                const avatar = u.avatar || u.photo_url || null;
-                                                                const when = r.created_at || r.requested_at || r.createdAt;
-
-                                                                return (
-                                                                    <ListItem
-                                                                        key={id}
-                                                                        divider
-                                                                        secondaryAction={
-                                                                            <ButtonGroup variant="outlined" size="small">
-                                                                                <Button
-                                                                                    color="success"
-                                                                                    onClick={() => takePromotionAction(r, "approve")}
-                                                                                    disabled={promotionLoading}
-                                                                                >
-                                                                                    Approve
-                                                                                </Button>
-                                                                                <Button
-                                                                                    color="error"
-                                                                                    onClick={() => takePromotionAction(r, "reject")}
-                                                                                    disabled={promotionLoading}
-                                                                                >
-                                                                                    Reject
-                                                                                </Button>
-                                                                            </ButtonGroup>
-                                                                        }
-                                                                    >
-                                                                        <ListItemAvatar>
-                                                                            <Avatar src={avatar || undefined}>
-                                                                                {name?.[0]?.toUpperCase() || "U"}
-                                                                            </Avatar>
-                                                                        </ListItemAvatar>
-                                                                        <ListItemText
-                                                                            primary={
-                                                                                <span>
-                                                                                    <b>{name}</b> requested to be promoted to <b>Admin</b>
-                                                                                </span>
-                                                                            }
-                                                                            secondary={when ? `Requested on ${fmtWhen(when)}` : null}
-                                                                        />
-                                                                    </ListItem>
-                                                                );
-                                                            })}
-                                                        </List>
-                                                    )}
-
-                                                    <Stack direction="row" spacing={1}>
+                                                    {/* Refresh buttons */}
+                                                    <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                                                         <Button
                                                             variant="outlined"
                                                             onClick={fetchRequests}
                                                             disabled={reqsLoading}
                                                         >
-                                                            Refresh join requests
-                                                        </Button>
-                                                        <Button
-                                                            variant="outlined"
-                                                            onClick={fetchPromotionRequests}
-                                                            disabled={promotionLoading}
-                                                        >
-                                                            Refresh promotion requests
+                                                            Refresh
                                                         </Button>
                                                     </Stack>
                                                 </>

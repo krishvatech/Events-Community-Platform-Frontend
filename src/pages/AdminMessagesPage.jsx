@@ -22,7 +22,6 @@ import SearchIcon from "@mui/icons-material/Search";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
-import { listAdminUsers } from "../utils/api";
 
 // ---- API helpers ----
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
@@ -59,7 +58,7 @@ function displayName(user) {
     user.display_name ||
     user.username ||
     user.email;
-  return full || "Moderator";
+  return full || "Staff";
 }
 
 export default function AdminMessagesPage() {
@@ -83,17 +82,34 @@ export default function AdminMessagesPage() {
     }
   }, []);
 
-  // load staff / moderators
+  // load staff
   const fetchUsers = React.useCallback(async () => {
     setLoadingUsers(true);
     try {
-      const data = await listAdminUsers({ ordering: "-date_joined", page_size: 200 });
-      let rows = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-      // only staff (moderators), skip superusers in list
-      rows = rows.filter((u) => !!u.is_staff && !u.is_superuser);
+      const res = await fetch(`${MESSAGING_BASE}/conversations/staff-list/`, {
+        headers: { Accept: "application/json", ...authHeader() },
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json().catch(() => []);
+      let rows = Array.isArray(data) ? data : [];
+
+      // include both staff + owners (backend already does this, but keep as safeguard)
+      rows = rows.filter((u) => u.is_staff || u.is_superuser);
+
+      // don't show yourself in the list
+      const meLocal = JSON.parse(localStorage.getItem("user") || "{}");
+      if (meLocal?.id) {
+        rows = rows.filter((u) => u.id !== meLocal.id);
+      }
+
       setUsers(rows);
     } catch (e) {
       console.error("Failed to load staff users", e);
+      setUsers([]);
     } finally {
       setLoadingUsers(false);
     }
@@ -118,7 +134,7 @@ export default function AdminMessagesPage() {
     [selectedUserId, users]
   );
 
-  // open / create conversation with moderator
+  // open / create conversation with staff
   const openConversation = async (user) => {
     if (!user) return;
     setSelectedUserId(user.id);
@@ -234,7 +250,7 @@ export default function AdminMessagesPage() {
             display: { xs: "block", md: "flex" },
           }}
         >
-          {/* LEFT 40% – moderator list */}
+          {/* LEFT 40% – staff list */}
           <Box
             sx={{
               width: { xs: "100%", md: "40%" },
@@ -249,7 +265,7 @@ export default function AdminMessagesPage() {
           >
             <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
               <Typography variant="h6" className="font-semibold tracking-tight">
-                Moderator Messages
+                Staff Messages
               </Typography>
               <IconButton size="small" onClick={fetchUsers}>
                 <RefreshRoundedIcon fontSize="small" />
@@ -258,7 +274,7 @@ export default function AdminMessagesPage() {
 
             <TextField
               size="small"
-              placeholder="Search moderators…"
+              placeholder="Search staff..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
               InputProps={{
@@ -278,7 +294,7 @@ export default function AdminMessagesPage() {
                 </Box>
               ) : filteredUsers.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                  No moderators found.
+                  No staff found.
                 </Typography>
               ) : (
                 <List dense disablePadding>
@@ -346,7 +362,7 @@ export default function AdminMessagesPage() {
                         {displayName(activeUser)}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Moderator chat
+                        Staff chat
                       </Typography>
                     </Box>
                   </Stack>
@@ -471,7 +487,7 @@ export default function AdminMessagesPage() {
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
-                  Select a moderator on the left to start a conversation.
+                  Select a Staff on the left to start a conversation.
                 </Typography>
               </Box>
             )}
