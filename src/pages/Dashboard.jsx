@@ -1382,7 +1382,7 @@ function AdminEvents() {
               <EditEventDialog
                 open={editOpen}
                 onClose={() => setEditOpen(false)}
-               AdminGroupsting}
+                event={editing}
                 onUpdated={onUpdated}
               />
             )}
@@ -1454,7 +1454,7 @@ export default function Dashboard() {
             ) : active === "resources" ? (
               <MyResourcesAdmin />
             ) : active === "groups" ? (
-              <GroupsAdmin />
+              <AdminGroups />
             ) : active === "recordings" ? (
               <MyRecordingsPage />
             ) : active === "notifications" ? (

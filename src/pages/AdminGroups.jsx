@@ -1,4 +1,4 @@
-// src/pages/GroupsAdmin.jsx
+// src/pages/AdminGroups.jsx
 import React from "react";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole";
 import { useNavigate } from "react-router-dom";
@@ -705,7 +705,7 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
 }
 
 // ---- Page ----
-export default function GroupsAdmin() {
+export default function AdminGroups() {
   const token = getToken();
   const user = React.useMemo(() => {
     try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
