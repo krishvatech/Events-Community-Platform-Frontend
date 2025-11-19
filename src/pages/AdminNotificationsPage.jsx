@@ -20,6 +20,8 @@ import {
   Snackbar,
   Alert,
   Pagination,
+  useMediaQuery,
+  Menu, MenuItem,
 } from "@mui/material";
 
 import { Link } from "react-router-dom";
@@ -32,6 +34,8 @@ import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DoneAllRoundedIcon from "@mui/icons-material/DoneAllRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 
 // --- Config: reuse same API root style as community pages ---
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
@@ -214,19 +218,26 @@ function RowActions({ n, onApprove, onReject, onMarkRead, busy }) {
       </Stack>
     );
   }
+
   if (n._source === "notif") {
     return (
-      <Button
-        size="small"
-        startIcon={<DoneAllRoundedIcon />}
-        disabled={busy || !!n.read_at}
-        onClick={() => onMarkRead?.(n)}
-        sx={{ textTransform: "none", borderRadius: 2 }}
-      >
-        {n.read_at ? "Read" : "Mark read"}
-      </Button>
+      <Tooltip title={n.read_at ? "Already read" : "Mark as read"}>
+        <span>
+          <IconButton
+            size="small"
+            disabled={busy || !!n.read_at}
+            onClick={() => onMarkRead?.(n)}
+          >
+            <MarkEmailReadOutlinedIcon
+              fontSize="small"
+              color={n.read_at ? "disabled" : "primary"}
+            />
+          </IconButton>
+        </span>
+      </Tooltip>
     );
   }
+
   return null;
 }
 
@@ -239,18 +250,22 @@ function groupHref(n) {
 }
 
 export default function AdminNotificationsPage() {
+  const isMobile = useMediaQuery("(max-width:600px)");
   const [tab, setTab] = React.useState("all");
   const [onlyUnread, setOnlyUnread] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [items, setItems] = React.useState([]);
   const [count, setCount] = React.useState(0);
   const [page, setPage] = React.useState(1);
-  const pageSize = 10;
+  const pageSize = 5;
   const start = (page - 1) * pageSize;
   const pageItems = items.slice(start, start + pageSize);
 
   const [busyId, setBusyId] = React.useState(null);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
+
+  const [filterAnchor, setFilterAnchor] = React.useState(null);
+  const filterMenuOpen = Boolean(filterAnchor);
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
@@ -362,43 +377,126 @@ export default function AdminNotificationsPage() {
   };
 
   const Header = (
-    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-      <Stack direction="row" alignItems="center" spacing={1.5}>
-        <NotificationsRoundedIcon />
-        <Typography variant="h6" fontWeight={800}>
-          Admin Notifications
-        </Typography>
+    <Stack
+      direction={{ xs: "column", sm: "row" }}
+      alignItems={{ xs: "flex-start", sm: "center" }}
+      justifyContent="space-between"
+      spacing={2}
+      sx={{ mb: 2 }}
+    >
+      <Stack direction="row" alignItems="center" spacing={2}>
+        <Avatar sx={{ bgcolor: "#14b8b1" }}>A</Avatar>
+        <Box>
+          <Typography variant="h6" fontWeight={800}>
+            Admin Notifications
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Manage group notifications and join requests.
+          </Typography>
+        </Box>
       </Stack>
 
-      <Stack direction="row" spacing={1}>
-        <Tooltip title="Refresh">
-          <IconButton onClick={fetchData} disabled={loading}>
-            <RefreshRoundedIcon />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+      {/* 🔹 Show refresh only on tablet/desktop, hide on mobile */}
+      {!isMobile && (
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Refresh">
+            <IconButton onClick={fetchData} disabled={loading}>
+              <RefreshRoundedIcon />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      )}
     </Stack>
   );
 
+
   return (
-    <Box sx={{ p: 2, maxWidth: 960 }}>
+    <Box sx={{ p: { xs: 1.25, sm: 2 }, maxWidth: 960 }}>
       {Header}
 
-      <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ mb: 1 }}>
+      <Tabs
+        value={tab}
+        onChange={(e, v) => setTab(v)}
+        sx={{ mb: 1 }}
+        variant={isMobile ? "scrollable" : "standard"}
+        scrollButtons={isMobile ? "auto" : false}
+        allowScrollButtonsMobile
+      >
         {TABS.map((t) => (
-          <Tab key={t.key} iconPosition="start" icon={t.icon} label={t.label} value={t.key} />
+          <Tab
+            key={t.key}
+            iconPosition="start"
+            icon={t.icon}
+            label={t.label}
+            value={t.key}
+          />
         ))}
       </Tabs>
 
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <FormControlLabel
-          control={<Checkbox checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} />}
-          label="Only unread"
-        />
-        <Typography variant="body2" color="text.secondary">
-          {count} total
-        </Typography>
-      </Stack>
+      {/* Filters: full bar on desktop, three-dots menu on mobile */}
+      {!isMobile ? (
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ mb: 1 }}
+        >
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={onlyUnread}
+                onChange={(e) => setOnlyUnread(e.target.checked)}
+              />
+            }
+            label="Only unread"
+          />
+          <Typography variant="body2" color="text.secondary">
+            {count} total
+          </Typography>
+        </Stack>
+      ) : (
+        <Box
+          sx={{
+            mb: 1,
+            display: "flex",
+            justifyContent: "flex-end", // three dots at right end
+          }}
+        >
+          <IconButton
+            size="small"
+            onClick={(e) => setFilterAnchor(e.currentTarget)}
+          >
+            <MoreVertRoundedIcon />
+          </IconButton>
+
+          <Menu
+            anchorEl={filterAnchor}
+            open={filterMenuOpen}
+            onClose={() => setFilterAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+          >
+            <MenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setOnlyUnread((prev) => !prev);
+              }}
+            >
+              <FormControlLabel
+                sx={{ ml: 0 }}
+                control={<Checkbox checked={onlyUnread} />}
+                label="Only unread"
+              />
+            </MenuItem>
+            <MenuItem disabled>
+              <Typography variant="body2" color="text.secondary">
+                {count} total
+              </Typography>
+            </MenuItem>
+          </Menu>
+        </Box>
+      )}
+
 
       <Divider sx={{ mb: 2 }} />
       {loading && <LinearProgress sx={{ mb: 2 }} />}
@@ -425,56 +523,85 @@ export default function AdminNotificationsPage() {
               borderColor: n.read_at ? "divider" : "primary.light",
             }}
           >
-            <CardContent sx={{ pb: 1.5 }}>
-              <Stack direction="row" spacing={2} alignItems="flex-start">
+            <CardContent sx={{ pb: 1.5, px: isMobile ? 1.25 : 2 }}>
+              {/* Layout copied from NotificationsPage -> avatar | text | actions */}
+              <Stack direction="row" spacing={1.25} alignItems="flex-start">
+                {/* avatar */}
                 <Avatar
                   component={Link}
                   to={profileHref(n)}
                   src={n.actor_avatar || n?.user?.avatar || ""}
                   alt={n.actor_name || n?.user?.name || ""}
-                  sx={{ width: 44, height: 44, border: "1px solid", borderColor: "divider" }}
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    flexShrink: 0,
+                  }}
                 />
 
-                <Box sx={{ flex: 1 }}>
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                    <TypeChip type={n.type} />
-                    <Typography variant="caption" color="text.secondary">
-                      {formatTime(n.created_at)}
-                    </Typography>
-                  </Stack>
-
-                  <Typography sx={{ mt: 0.5 }}>
+                {/* text area */}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  {/* main title – “avinash joined Imma Connect.” */}
+                  <Typography variant="body2">
                     {n.type === "member_joined" && (
                       <>
-                        <Box component={Link} to={profileHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                        <Box
+                          component={Link}
+                          to={profileHref(n)}
+                          sx={{ textDecoration: "none", color: "inherit" }}
+                        >
                           <b>{n.actor_name || "Someone"}</b>
                         </Box>{" "}
                         joined{" "}
-                        <Box component={Link} to={groupHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                        <Box
+                          component={Link}
+                          to={groupHref(n)}
+                          sx={{ textDecoration: "none", color: "inherit" }}
+                        >
                           <b>{n?.group?.name || `#${n?.group?.id}`}</b>
                         </Box>
                         .
                       </>
                     )}
+
                     {n.type === "group_created" && (
                       <>
-                        <Box component={Link} to={profileHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                        <Box
+                          component={Link}
+                          to={profileHref(n)}
+                          sx={{ textDecoration: "none", color: "inherit" }}
+                        >
                           <b>{n.actor_name || "Someone"}</b>
                         </Box>{" "}
                         created the group{" "}
-                        <Box component={Link} to={groupHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                        <Box
+                          component={Link}
+                          to={groupHref(n)}
+                          sx={{ textDecoration: "none", color: "inherit" }}
+                        >
                           <b>{n?.group?.name || `#${n?.group?.id}`}</b>
                         </Box>
                         .
                       </>
                     )}
+
                     {n.type === "join_request" && (
                       <>
-                        <Box component={Link} to={profileHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                        <Box
+                          component={Link}
+                          to={profileHref(n)}
+                          sx={{ textDecoration: "none", color: "inherit" }}
+                        >
                           <b>{n.actor_name || "Someone"}</b>
                         </Box>{" "}
                         requested to join{" "}
-                        <Box component={Link} to={groupHref(n)} sx={{ textDecoration: "none", color: "inherit" }}>
+                        <Box
+                          component={Link}
+                          to={groupHref(n)}
+                          sx={{ textDecoration: "none", color: "inherit" }}
+                        >
                           <b>{n?.group?.name || `#${n?.group?.id}`}</b>
                         </Box>{" "}
                         <Chip
@@ -484,33 +611,75 @@ export default function AdminNotificationsPage() {
                             n.status === "approved"
                               ? "success"
                               : n.status === "rejected"
-                              ? "error"
-                              : "warning"
+                                ? "error"
+                                : "warning"
                           }
-                          sx={{ ml: 1 }}
+                          sx={{ ml: 0.75 }}
                         />
                       </>
                     )}
                   </Typography>
 
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-                    {n.type === "member_joined" && "A member just joined one of your groups."}
-                    {n.type === "group_created" && "A new group was created in your community."}
-                    {n.type === "join_request" && "Approve or reject the request."}
+                  {/* type + time – stack like NotificationsPage */}
+                  <Stack
+                    direction={isMobile ? "column" : "row"}
+                    alignItems={isMobile ? "flex-start" : "center"}
+                    spacing={isMobile ? 0.5 : 1}
+                    sx={{ mt: 0.75 }}
+                  >
+                    <TypeChip type={n.type} />
+                    <Typography variant="caption" color="text.secondary">
+                      {formatTime(n.created_at)}
+                    </Typography>
+                  </Stack>
+
+                  {/* small description line */}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.25 }}
+                  >
+                    {n.type === "member_joined" &&
+                      "A member just joined one of your groups."}
+                    {n.type === "group_created" &&
+                      "A new group was created in your community."}
+                    {n.type === "join_request" &&
+                      "Approve or reject the request."}
                   </Typography>
                 </Box>
+
+                {/* right-side actions – always visible like NotificationRow */}
+                <Stack spacing={0.5} alignItems="flex-end" sx={{ flexShrink: 0 }}>
+                  {n._source === "notif" && (
+                    <IconButton
+                      size="small"
+                      title={n.read_at ? "Already read" : "Mark as read"}
+                      disabled={busyId === n.id || !!n.read_at}
+                      onClick={() => markRead(n)}
+                      sx={{ p: 0.5 }}
+                    >
+                      <MarkEmailReadOutlinedIcon
+                        fontSize="small"
+                        color={n.read_at ? "disabled" : "primary"}
+                      />
+                    </IconButton>
+                  )}
+                </Stack>
               </Stack>
             </CardContent>
 
-            <CardActions sx={{ px: 2, pb: 2 }}>
-              <RowActions
-                n={n}
-                busy={busyId === n.id}
-                onApprove={approveJoin}
-                onReject={rejectJoin}
-                onMarkRead={markRead}
-              />
-            </CardActions>
+            {/* keep bottom Approve/Reject buttons for join requests */}
+            {n._source !== "notif" && (
+              <CardActions sx={{ px: 2, pb: 2 }}>
+                <RowActions
+                  n={n}
+                  busy={busyId === n.id}
+                  onApprove={approveJoin}
+                  onReject={rejectJoin}
+                  onMarkRead={markRead}
+                />
+              </CardActions>
+            )}
           </Card>
         ))}
       </Stack>
