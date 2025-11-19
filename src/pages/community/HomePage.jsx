@@ -1629,9 +1629,8 @@ export default function HomePage() {
           }}
           PaperProps={{
             sx: {
-              width: { xs: "88vw", sm: 320 },   // narrower on very small phones
+              width: { xs: "88vw", sm: 320 }, // narrower on very small phones
               maxWidth: "100vw",
-
               borderTopLeftRadius: 24,
               borderBottomLeftRadius: 24,
               borderTopRightRadius: 0,
@@ -1639,29 +1638,26 @@ export default function HomePage() {
               pb: 2,
               mt: { xs: 7, sm: 0 },
               height: { xs: "calc(100% - 56px)", sm: "100%" },
-
-              // 💄 match left sidebar theme
-              background: "radial-gradient(circle at top, #1e293b 0, #020617 55%, #020617 100%)",
-              color: "#e5e7eb",
             },
           }}
         >
           <Box sx={{ p: 2 }}>
+            {/* title – same dark color as brand text */}
             <Typography
-              variant="subtitle2"
+              variant="subtitle1"
               sx={{
-                mb: 1,
-                fontWeight: 600,
-                letterSpacing: 0.5,
-                textTransform: "uppercase",
-                fontSize: 11,
-                color: "rgba(248, 250, 252, 0.9)",
+                mb: 2,
+                fontWeight: 700,
+                letterSpacing: 0,
+                textTransform: "none",
+                fontSize: 16,
+                color: "#262626", // same kind of dark as "IMAA Connect"
               }}
             >
               Go to section
             </Typography>
 
-            <Stack spacing={0.75}>
+            <Stack spacing={1}>
               {TAB_LABELS.map((label, index) => (
                 <Button
                   key={label}
@@ -1670,28 +1666,23 @@ export default function HomePage() {
                   sx={{
                     justifyContent: "flex-start",
                     textTransform: "none",
-                    borderRadius: 2,
+                    borderRadius: 999, // pill
                     px: 1.5,
                     py: 0.75,
                     fontSize: 14,
                     fontWeight: index === tabIndex ? 700 : 500,
 
-                    // text + bg same feel as left sidebar items
-                    color:
-                      index === tabIndex
-                        ? "#020617" // dark text when active
-                        : "rgba(248, 250, 252, 0.92)",
-                    backgroundColor:
-                      index === tabIndex
-                        ? "rgba(248, 250, 252, 1)" // active pill
-                        : "transparent",
+                    // text color same as left sidebar items
+                    color: "#262626",
 
-                    // hover state similar to sidebar hover
+                    // active background same as "Home" pill in left sidebar
+                    backgroundColor: index === tabIndex ? "#E6F7F6" : "transparent",
+
                     "&:hover": {
                       backgroundColor:
                         index === tabIndex
-                          ? "rgba(248, 250, 252, 1)"
-                          : "rgba(148, 163, 184, 0.2)", // soft slate hover
+                          ? "#E6F7F6"             // keep same on hover for active
+                          : "#F3F4F6",            // light grey hover for inactive
                     },
                   }}
                   onClick={() => {
