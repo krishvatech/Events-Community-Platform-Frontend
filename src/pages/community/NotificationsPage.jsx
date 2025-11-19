@@ -554,36 +554,74 @@ export default function NotificationsPage({
               <Chip size="small" label={`${unreadCount} unread`} />
             </Stack>
 
-            <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: "flex-start", sm: "flex-end" }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={showOnlyUnread}
-                    onChange={(e) => setShowOnlyUnread(e.target.checked)}
-                    size="small"
-                  />
-                }
-                label="Unread only"
-              />
-              <Select
-                size="small"
-                value={kind}
-                onChange={(e) => setKind(e.target.value)}
-                sx={{ minWidth: 140 }}
-              >
-                {["All", "Requests", "Follows", "Mentions", "Comments", "Reactions", "Events", "System"].map((k) => (
-                  <MenuItem key={k} value={k}>{k}</MenuItem>
-                ))}
-              </Select>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<DoneAllIcon />}
-                onClick={handleMarkAllRead}
-              >
-                Mark all read
-              </Button>
-            </Stack>
+            <Stack
+  direction={{ xs: "column", sm: "row" }}
+  spacing={1}
+  alignItems={{ xs: "flex-start", sm: "center" }}
+  justifyContent={{ xs: "flex-start", sm: "flex-end" }}
+  sx={{ width: "100%" }}
+>
+  <FormControlLabel
+    control={
+      <Switch
+        checked={showOnlyUnread}
+        onChange={(e) => setShowOnlyUnread(e.target.checked)}
+        size="small"
+      />
+    }
+    label="Unread only"
+    sx={{
+      m: 0,
+      "& .MuiFormControlLabel-label": {
+        fontSize: { xs: 12, sm: 14 },   // smaller label on tiny screens
+      },
+    }}
+  />
+
+  <Stack
+    direction={{ xs: "column", sm: "row" }}
+    spacing={1}
+    sx={{ width: { xs: "100%", sm: "auto" } }}
+  >
+    <Select
+      size="small"
+      value={kind}
+      onChange={(e) => setKind(e.target.value)}
+      sx={{
+        minWidth: { xs: "100%", sm: 140 },          // full width on mobile
+      }}
+    >
+      {[
+        "All",
+        "Requests",
+        "Follows",
+        "Mentions",
+        "Comments",
+        "Reactions",
+        "Events",
+        "System",
+      ].map((k) => (
+        <MenuItem key={k} value={k}>
+          {k}
+        </MenuItem>
+      ))}
+    </Select>
+
+    <Button
+      size="small"
+      variant="outlined"
+      startIcon={<DoneAllIcon />}
+      onClick={handleMarkAllRead}
+      sx={{
+        width: { xs: "100%", sm: "auto" },         // full width button on phone
+        whiteSpace: "nowrap",
+      }}
+    >
+      Mark all read
+    </Button>
+  </Stack>
+</Stack>
+
           </Box>
         </Paper>
 
@@ -611,13 +649,6 @@ export default function NotificationsPage({
             </Box>
           ) : null
         )}
-      </Grid>
-
-      {/* right column */}
-      <Grid item xs={12} md={3} sx={{ display: { xs: "none", md: "block" } }}>
-        <Box sx={{ position: "sticky", top: 88, alignSelf: "flex-start" }}>
-          <CommunityProfileCard user={user} stats={stats} tags={tags} />
-        </Box>
       </Grid>
     </Grid>
   );

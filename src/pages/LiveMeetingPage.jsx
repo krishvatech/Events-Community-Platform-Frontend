@@ -50,9 +50,14 @@ function toApiUrl(pathOrUrl) {
 function DyteMeetingUI() {
   const { meeting } = useDyteMeeting();
   return (
-    <Box sx={{ flex: 1, minHeight: 0 }}>
-      <DyteMeeting meeting={meeting} mode="fill" showSetupScreen={false} />
-    </Box>
+    <Box sx={{ flex: 1, minHeight: 0, height: "100%", width: "100%" }}>
+     <DyteMeeting
+       meeting={meeting}
+       mode="fill"
+       showSetupScreen={false}
+       style={{ width: "100%", height: "100%" }}
+     />
+   </Box>
   );
 }
 
@@ -517,6 +522,8 @@ export default function LiveMeetingPage() {
           height: "100vh",
           display: "flex",
           flexDirection: "column",
+          height: "100vh",
+          width: "100vw",
         }}
       >
         <Box sx={{ p: 2 }}>
