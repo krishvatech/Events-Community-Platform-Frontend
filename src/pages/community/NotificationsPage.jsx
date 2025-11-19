@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Avatar, Badge, Box, Button, Chip, Grid, IconButton,
   List, ListItem, ListItemAvatar, ListItemText, Paper, Stack,
-  TextField, Typography, Switch, FormControlLabel, MenuItem, Select
+  TextField, Typography, Switch, FormControlLabel, MenuItem, Select,useMediaQuery, useTheme
 } from "@mui/material";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
@@ -72,7 +72,6 @@ function kindChip(kind) {
   return KIND_LABEL[kind] || "Other";
 }
 
-/* ------------------- row with actions ------------------- */
 function NotificationRow({
   item,
   onOpen,
@@ -83,17 +82,17 @@ function NotificationRow({
 }) {
   const navigate = useNavigate();
   const unread = !item.is_read;
+  const theme = useTheme();
+
+  // CHANGE: Trigger this layout on screens below 600px (standard mobile width)
+  // distinct from the previous 400px limit.
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); 
 
   const ActionsByKind = () => {
-    // LinkedIn-style connection/friend request
-    if (item.kind === "friend_request" || item.kind === "connection_request") {
-      if (item.state === "accepted") {
-        return null;
-      }
-
-      if (item.state === "declined") {
-        return null;
-      }
+     // ... (Keep this section exactly as it is) ...
+     if (item.kind === "friend_request" || item.kind === "connection_request") {
+      if (item.state === "accepted") return null;
+      if (item.state === "declined") return null;
       return (
         <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
           <Button
@@ -120,7 +119,6 @@ function NotificationRow({
       );
     }
 
-    // Follow
     if (item.kind === "follow") {
       return item.following_back ? (
         <Chip size="small" variant="outlined" label="Following" sx={{ ml: 1 }} />
@@ -147,7 +145,8 @@ function NotificationRow({
       sx={{
         p: 1.25,
         mb: 1,
-        width: 1,                 // ⬅ make each row same width as header
+        width: "100%",
+        flexGrow: 1,
         boxSizing: "border-box",
         border: `1px solid ${BORDER}`,
         borderRadius: 2,
@@ -192,21 +191,29 @@ function NotificationRow({
             </Typography>
           ) : null}
 
-          {/* meta */}
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.75 }}>
+          {/* ----------------- UPDATED META BLOCK -----------------
+             Now checks 'isMobile' (max-width: 600px).
+             When < 600px, direction becomes 'column', forcing the Date 
+             to its own line (effectively 100% width relative to the content box).
+          */}
+          <Stack
+            direction={isMobile ? "column" : "row"}
+            alignItems={isMobile ? "flex-start" : "center"}
+            spacing={isMobile ? 0.5 : 1}
+            sx={{ mt: 0.75 }}
+          >
             <Chip size="small" label={kindChip(item.kind)} />
             <Typography variant="caption" color="text.secondary">
               {formatWhen(item.created_at)}
             </Typography>
           </Stack>
+          {/* ----------------------------------------------------- */}
 
-          {/* kind-specific actions (accept/decline, follow back) */}
           <ActionsByKind />
         </Box>
 
         {/* general actions */}
         <Stack spacing={0.5} alignItems="flex-end">
-          {/* icons row (unchanged behavior) */}
           <Stack direction="row" spacing={0.5}>
             <IconButton
               size="small"
@@ -225,10 +232,10 @@ function NotificationRow({
             </IconButton>
           </Stack>
 
-          {/* status pill for ALL cases */}
+          {/* status pill logic */}
           {(() => {
             const s = (item.state || "").toLowerCase();
-            if (!s) return null; // no state => no pill
+            if (!s) return null;
 
             const common = {
               size: "small",
@@ -243,78 +250,21 @@ function NotificationRow({
             };
 
             if (s === "accepted" || s === "approved") {
-              return (
-                <Chip
-                  {...common}
-                  icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />}
-                  label="Accepted"
-                  sx={{
-                    ...common.sx,
-                    bgcolor: "#e6f4ea",
-                    borderColor: "#e6f4ea",
-                    color: "#1a7f37",
-                    "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 },
-                  }}
-                />
-              );
+              return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Accepted" sx={{...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 }}} />;
             }
-
             if (s === "declined" || s === "rejected") {
-              return (
-                <Chip
-                  {...common}
-                  icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />}
-                  label="Declined"
-                  sx={{
-                    ...common.sx,
-                    bgcolor: "#fde7e9",
-                    borderColor: "#fde7e9",
-                    color: "#b42318",
-                    "& .MuiChip-icon": { color: "#b42318", mr: 0.5 },
-                  }}
-                />
-              );
+              return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Declined" sx={{...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 }}} />;
             }
-
             if (s === "pending" || s === "requested" || s === "waiting" || s === "sent") {
-              return (
-                <Chip
-                  {...common}
-                  icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />}
-                  label={s === "sent" ? "Sent" : "Pending"}
-                  sx={{
-                    ...common.sx,
-                    bgcolor: "#eef2f6",
-                    borderColor: "#eef2f6",
-                    color: "#374151",
-                    "& .MuiChip-icon": { color: "#374151", mr: 0.5 },
-                  }}
-                />
-              );
+              return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label={s === "sent" ? "Sent" : "Pending"  } sx={{...common.sx, bgcolor: "#eef2f6", borderColor: "#eef2f6", color: "#374151", "& .MuiChip-icon": { color: "#374151", mr: 0.5 }}} />;
             }
-
-            // fallback: show the raw state
-            return (
-              <Chip
-                {...common}
-                icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />}
-                label={item.state}
-                sx={{
-                  ...common.sx,
-                  bgcolor: "#f3f4f6",
-                  borderColor: "#f3f4f6",
-                  color: "#111827",
-                  "& .MuiChip-icon": { color: "#6b7280", mr: 0.5 },
-                }}
-              />
-            );
+            return <Chip {...common} icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />} label={item.state} sx={{...common.sx, bgcolor: "#f3f4f6", borderColor: "#f3f4f6", color: "#111827", "& .MuiChip-icon": { color: "#6b7280", mr: 0.5 }}} />;
           })()}
         </Stack>
       </Stack>
     </Paper>
   );
 }
-
 /* ------------------- main page component ------------------- */
 export default function NotificationsPage({
   items: initialItems,
@@ -532,13 +482,24 @@ export default function NotificationsPage({
   return (
     <Grid container spacing={2}>
       {/* center column */}
-      <Grid item xs={12} md={9}>
-        {/* header */}
-        <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 2 }}>
+      <Grid item xs={12} sm={12} md={9} sx={{ width: '100%' }}>
+                {/* header */}
+        <Paper
+          sx={{
+            p: 2,
+            border: `1px solid ${BORDER}`,
+            borderRadius: 3,
+            mb: 2,
+            // ------------- FIX START -------------
+            width: "100%",           // Forces the header to fill the screen width
+            boxSizing: "border-box", // Ensures padding doesn't break the width
+            // ------------- FIX END ---------------
+          }}
+        >
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, // ← equal widths from sm+
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
               alignItems: "center",
               columnGap: 1,
               rowGap: 1,
@@ -555,76 +516,74 @@ export default function NotificationsPage({
             </Stack>
 
             <Stack
-  direction={{ xs: "column", sm: "row" }}
-  spacing={1}
-  alignItems={{ xs: "flex-start", sm: "center" }}
-  justifyContent={{ xs: "flex-start", sm: "flex-end" }}
-  sx={{ width: "100%" }}
->
-  <FormControlLabel
-    control={
-      <Switch
-        checked={showOnlyUnread}
-        onChange={(e) => setShowOnlyUnread(e.target.checked)}
-        size="small"
-      />
-    }
-    label="Unread only"
-    sx={{
-      m: 0,
-      "& .MuiFormControlLabel-label": {
-        fontSize: { xs: 12, sm: 14 },   // smaller label on tiny screens
-      },
-    }}
-  />
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              justifyContent={{ xs: "flex-start", sm: "flex-end" }}
+              sx={{ width: "100%" }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showOnlyUnread}
+                    onChange={(e) => setShowOnlyUnread(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="Unread only"
+                sx={{
+                  m: 0,
+                  "& .MuiFormControlLabel-label": {
+                    fontSize: { xs: 12, sm: 14 },
+                  },
+                }}
+              />
 
-  <Stack
-    direction={{ xs: "column", sm: "row" }}
-    spacing={1}
-    sx={{ width: { xs: "100%", sm: "auto" } }}
-  >
-    <Select
-      size="small"
-      value={kind}
-      onChange={(e) => setKind(e.target.value)}
-      sx={{
-        minWidth: { xs: "100%", sm: 140 },          // full width on mobile
-      }}
-    >
-      {[
-        "All",
-        "Requests",
-        "Follows",
-        "Mentions",
-        "Comments",
-        "Reactions",
-        "Events",
-        "System",
-      ].map((k) => (
-        <MenuItem key={k} value={k}>
-          {k}
-        </MenuItem>
-      ))}
-    </Select>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1}
+                sx={{ width: { xs: "100%", sm: "auto" } }}
+              >
+                <Select
+                  size="small"
+                  value={kind}
+                  onChange={(e) => setKind(e.target.value)}
+                  sx={{
+                    minWidth: { xs: "100%", sm: 140 },
+                  }}
+                >
+                  {[
+                    "All",
+                    "Requests",
+                    "Follows",
+                    "Mentions",
+                    "Comments",
+                    "Reactions",
+                    "Events",
+                    "System",
+                  ].map((k) => (
+                    <MenuItem key={k} value={k}>
+                      {k}
+                    </MenuItem>
+                  ))}
+                </Select>
 
-    <Button
-      size="small"
-      variant="outlined"
-      startIcon={<DoneAllIcon />}
-      onClick={handleMarkAllRead}
-      sx={{
-        width: { xs: "100%", sm: "auto" },         // full width button on phone
-        whiteSpace: "nowrap",
-      }}
-    >
-      Mark all read
-    </Button>
-  </Stack>
-</Stack>
-
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<DoneAllIcon />}
+                  onClick={handleMarkAllRead}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" },
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Mark all read
+                </Button>
+              </Stack>
+            </Stack>
           </Box>
         </Paper>
-
         {/* day groups */}
         {["Today", "Yesterday", "Earlier"].map((section) =>
           grouped[section]?.length ? (
