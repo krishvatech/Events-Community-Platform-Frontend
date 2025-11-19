@@ -1501,7 +1501,7 @@ export default function HomePage() {
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User";
 
   return (
-    <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 2 }}>
+    <Box sx={{ px: { xs: 1, sm: 2, md: 0 }, py: 2 }}>
       <Box sx={{ width: "100%", maxWidth: "100%", mx: 0 }}>
 
         {/* Header */}

@@ -6,7 +6,7 @@ import {
   IconButton, InputAdornment, MenuItem, Stack,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography, FormControlLabel, Paper,
-  Tabs, Tab, Select, Pagination, Switch, FormControl, useMediaQuery,
+  Select, Pagination, Switch, FormControl, useMediaQuery,
   Menu, ListItemIcon, ListItemText,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -20,20 +20,24 @@ import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
-import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import axios from "axios";
 
-const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
+const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
+  .toString()
+  .replace(/\/+$/, "");
 const API = RAW_API.endsWith("/api") ? RAW_API : `${RAW_API}/api`;
 
 const iconForType = (t) => {
   switch (t) {
-    case "file": return <PictureAsPdfRoundedIcon />;
-    case "video": return <VideoLibraryRoundedIcon />;
-    case "link": return <LinkRoundedIcon />;
-    default: return <CloudUploadRoundedIcon />;
+    case "file":
+      return <PictureAsPdfRoundedIcon />;
+    case "video":
+      return <VideoLibraryRoundedIcon />;
+    case "link":
+      return <LinkRoundedIcon />;
+    default:
+      return <CloudUploadRoundedIcon />;
   }
 };
 
@@ -71,7 +75,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
         title: initial.title || "",
         description: initial.description || "",
         type: initial.type || "file",
-        event_id: eventId,         // ← string
+        event_id: eventId, // string
         file: null,
         link_url: initial.link_url || "",
         video_url: initial.video_url || "",
@@ -86,7 +90,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
         title: "",
         description: "",
         type: "file",
-        event_id: "",              // ← string
+        event_id: "",
         file: null,
         link_url: "",
         video_url: "",
@@ -98,7 +102,6 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
       });
     }
   }, [initial, open]);
-
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -159,7 +162,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
       const token = localStorage.getItem("access_token");
 
       // 1) Find the selected event
-      const selectedEvent = events.find(e => String(e.id) === String(form.event_id));
+      const selectedEvent = events.find((e) => String(e.id) === String(form.event_id));
 
       // 2) Resolve community id from various possible shapes
       const rawCommunityId =
@@ -176,8 +179,8 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
 
       // 3) Build FormData with the CORRECT keys expected by DRF
       const formData = new FormData();
-      formData.append("community_id", String(rawCommunityId));  // ✅ correct key
-      formData.append("event_id", String(form.event_id));       // ✅ correct key
+      formData.append("community_id", String(rawCommunityId)); // correct key
+      formData.append("event_id", String(form.event_id)); // correct key
 
       formData.append("title", form.title);
       formData.append("description", form.description);
@@ -201,9 +204,8 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
         formData.append("video_url", form.video_url);
       }
 
-      form.tags.forEach(tag => formData.append("tags", tag));
+      form.tags.forEach((tag) => formData.append("tags", tag));
 
-      // Let axios set the multipart boundary for you
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       if (initial) {
@@ -214,21 +216,19 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
 
       onSaved();
       onClose();
-
-
     } catch (error) {
       console.error("Error saving resource:", error);
 
       let errorMsg = "An error occurred";
       if (error.response?.data) {
         const errors = error.response.data;
-        if (typeof errors === 'object') {
+        if (typeof errors === "object") {
           errorMsg = Object.entries(errors)
             .map(([field, messages]) => {
-              const msgs = Array.isArray(messages) ? messages.join(', ') : messages;
+              const msgs = Array.isArray(messages) ? messages.join(", ") : messages;
               return `${field}: ${msgs}`;
             })
-            .join('\n');
+            .join("\n");
         } else {
           errorMsg = errors;
         }
@@ -260,6 +260,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
               <MenuItem value="video">Video URL</MenuItem>
             </Select>
           </FormControl>
+
           <TextField
             label="Title"
             value={form.title}
@@ -277,8 +278,6 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
             fullWidth
           />
 
-
-
           <FormControl fullWidth required>
             <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
               Select Event
@@ -288,19 +287,15 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
               onChange={(e) => handleChange("event_id", String(e.target.value))}
               displayEmpty
             >
-              <MenuItem value="" disabled>Choose an event</MenuItem>
+              <MenuItem value="" disabled>
+                Choose an event
+              </MenuItem>
               {events.map((ev) => (
                 <MenuItem key={ev.id} value={String(ev.id)}>
                   {ev.title || ev.name}
                 </MenuItem>
               ))}
             </Select>
-            {/* Show current file info when editing */}
-            {initial && initial.file && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                {/* Current file: {initial.file.split('/').pop()} */}
-              </Typography>
-            )}
           </FormControl>
 
           {form.type === "file" && (
@@ -309,11 +304,19 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
                 Upload File
               </Typography>
 
-              {/* Show current file info when editing */}
               {initial && initial.file && !form.file && (
-                <Box sx={{ mb: 1, p: 1, bgcolor: 'success.50', borderRadius: 1, border: '1px solid', borderColor: 'success.200' }}>
+                <Box
+                  sx={{
+                    mb: 1,
+                    p: 1,
+                    bgcolor: "success.50",
+                    borderRadius: 1,
+                    border: "1px solid",
+                    borderColor: "success.200",
+                  }}
+                >
                   <Typography variant="caption" color="success.main">
-                    ✓ Current file: {initial.file.split('/').pop()}
+                    ✓ Current file: {initial.file.split("/").pop()}
                   </Typography>
                 </Box>
               )}
@@ -324,9 +327,9 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
                 startIcon={<CloudUploadRoundedIcon />}
                 fullWidth
                 sx={{
-                  justifyContent: 'flex-start',
-                  textTransform: 'none',
-                  color: form.file ? 'success.main' : 'text.secondary'
+                  justifyContent: "flex-start",
+                  textTransform: "none",
+                  color: form.file ? "success.main" : "text.secondary",
                 }}
               >
                 {form.file ? form.file.name : initial ? "Change File" : "Choose File"}
@@ -339,12 +342,18 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
               </Button>
 
               {form.file && (
-                <Typography variant="caption" color="success.main" sx={{ mt: 0.5, display: 'block' }}>
-                  ✓ New file selected: {form.file.name} ({(form.file.size / 1024).toFixed(2)} KB)
+                <Typography
+                  variant="caption"
+                  color="success.main"
+                  sx={{ mt: 0.5, display: "block" }}
+                >
+                  ✓ New file selected: {form.file.name} (
+                  {(form.file.size / 1024).toFixed(2)} KB)
                 </Typography>
               )}
             </Box>
           )}
+
           {form.type === "link" && (
             <TextField
               label="Link URL"
@@ -450,10 +459,8 @@ export default function MyResourcesAdmin() {
   const [currentUser, setCurrentUser] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [currentTab, setCurrentTab] = useState(0);
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [actionMenuRow, setActionMenuRow] = useState(null);
-
 
   // Resources state with pagination
   const [items, setItems] = useState([]);
@@ -465,20 +472,10 @@ export default function MyResourcesAdmin() {
   const [resourcePage, setResourcePage] = useState(1);
   const RESOURCE_ITEMS_PER_PAGE = 10;
 
-  // Activity Feed State with pagination
-  const [feedItems, setFeedItems] = useState([]);
-  const [feedTotal, setFeedTotal] = useState(0);
-  const [feedLoading, setFeedLoading] = useState(false);
-  const [feedQuery, setFeedQuery] = useState("");
-  const [feedFilterType, setFeedFilterType] = useState("");
-  const [feedSort, setFeedSort] = useState("newest");
-  const [feedPage, setFeedPage] = useState(1);
-  const FEED_ITEMS_PER_PAGE = 10;
-
   const fetchCurrentUser = async () => {
     try {
       const token = localStorage.getItem("access_token");
-      const config = { headers: { "Authorization": `Bearer ${token}` } };
+      const config = { headers: { Authorization: `Bearer ${token}` } };
       const response = await axios.get(`${API}/users/me/`, config);
       setCurrentUser(response.data);
       return response.data;
@@ -490,7 +487,6 @@ export default function MyResourcesAdmin() {
 
   const handleResourceSaved = () => {
     fetchResources();
-    fetchFeed();
   };
 
   const isActionMenuOpen = Boolean(actionMenuAnchor);
@@ -504,7 +500,6 @@ export default function MyResourcesAdmin() {
     setActionMenuAnchor(null);
     setActionMenuRow(null);
   };
-
 
   // Fetch resources with server-side pagination
   const fetchResources = async () => {
@@ -520,18 +515,22 @@ export default function MyResourcesAdmin() {
         offset: offset.toString(),
       });
 
-      if (resourceQuery) params.append('search', resourceQuery);
-      if (resourceFilterType) params.append('type', resourceFilterType);
-      if (resourceSort === 'newest') params.append('ordering', '-created_at');
-      else if (resourceSort === 'oldest') params.append('ordering', 'created_at');
+      if (resourceQuery) params.append("search", resourceQuery);
+      if (resourceFilterType) params.append("type", resourceFilterType);
+      if (resourceSort === "newest") params.append("ordering", "-created_at");
+      else if (resourceSort === "oldest") params.append("ordering", "created_at");
 
-      const config = { headers: { "Authorization": `Bearer ${token}` } };
-      const response = await axios.get(`${API}/content/resources/?${params.toString()}`, config);
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const response = await axios.get(
+        `${API}/content/resources/?${params.toString()}`,
+        config
+      );
 
       if (response.data.results) {
         const allResources = response.data.results;
         const userResources = allResources.filter((r) => {
-          const isOwner = r.uploaded_by_id === currentUser.id ||
+          const isOwner =
+            r.uploaded_by_id === currentUser.id ||
             r.created_by === currentUser.id ||
             r.user_id === currentUser.id ||
             r.uploaded_by === currentUser.id ||
@@ -543,7 +542,8 @@ export default function MyResourcesAdmin() {
       } else {
         const allResources = Array.isArray(response.data) ? response.data : [];
         const userResources = allResources.filter((r) => {
-          const isOwner = r.uploaded_by_id === currentUser.id ||
+          const isOwner =
+            r.uploaded_by_id === currentUser.id ||
             r.created_by === currentUser.id ||
             r.user_id === currentUser.id ||
             r.uploaded_by === currentUser.id ||
@@ -562,58 +562,19 @@ export default function MyResourcesAdmin() {
     }
   };
 
-  // Fetch feed with server-side pagination
-  const fetchFeed = async () => {
-    if (!currentUser) return;
-
-    setFeedLoading(true);
-    try {
-      const token = localStorage.getItem("access_token");
-      const offset = (feedPage - 1) * FEED_ITEMS_PER_PAGE;
-
-      const params = new URLSearchParams({
-        limit: FEED_ITEMS_PER_PAGE.toString(),
-        offset: offset.toString(),
-      });
-
-      if (feedQuery) params.append('search', feedQuery);
-      if (feedFilterType) params.append('resource_type', feedFilterType);
-      if (feedSort === 'newest') params.append('ordering', '-created_at');
-      else if (feedSort === 'oldest') params.append('ordering', 'created_at');
-
-      const config = { headers: { "Authorization": `Bearer ${token}` } };
-      const response = await axios.get(`${API}/activity/feed/?${params.toString()}`, config);
-
-      if (response.data.results) {
-        setFeedItems(response.data.results);
-        setFeedTotal(response.data.count || response.data.results.length);
-      } else {
-        const data = Array.isArray(response.data) ? response.data : [];
-        setFeedItems(data);
-        setFeedTotal(data.length);
-      }
-    } catch (error) {
-      console.error("Error fetching activity feed:", error);
-      setFeedItems([]);
-      setFeedTotal(0);
-    } finally {
-      setFeedLoading(false);
-    }
-  };
-
   const fetchEvents = async () => {
     try {
       const token = localStorage.getItem("access_token");
-      const config = { headers: { "Authorization": `Bearer ${token}` } };
+      const config = { headers: { Authorization: `Bearer ${token}` } };
       let response;
       try {
         response = await axios.get(`${API}/events/`, config);
       } catch {
         response = await axios.get(`${API}/events/list/`, config);
       }
-      const allEvents = Array.isArray(response.data) ? response.data : response.data.results || [];
-
-      // Show ALL events, not just user's events
+      const allEvents = Array.isArray(response.data)
+        ? response.data
+        : response.data.results || [];
       setEvents(allEvents);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -635,47 +596,27 @@ export default function MyResourcesAdmin() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser && currentTab === 0) {
+    if (currentUser) {
       fetchResources();
     }
-  }, [currentUser, currentTab, resourcePage, resourceQuery, resourceFilterType, resourceSort]);
+  }, [currentUser, resourcePage, resourceQuery, resourceFilterType, resourceSort]);
 
   useEffect(() => {
-    if (currentUser && currentTab === 1) {
-      fetchFeed();
-    }
-  }, [currentUser, currentTab, feedPage, feedQuery, feedFilterType, feedSort]);
+    setResourcePage(1);
+  }, [resourceQuery, resourceFilterType, resourceSort]);
 
-  useEffect(() => { setResourcePage(1); }, [resourceQuery, resourceFilterType, resourceSort]);
-  useEffect(() => { setFeedPage(1); }, [feedQuery, feedFilterType, feedSort]);
-
-  const totalResourcePages = Math.ceil(resourcesTotal / RESOURCE_ITEMS_PER_PAGE);
-  const totalFeedPages = Math.ceil(feedTotal / FEED_ITEMS_PER_PAGE);
+  const totalResourcePages = Math.ceil(
+    resourcesTotal / RESOURCE_ITEMS_PER_PAGE
+  );
 
   const onDelete = async (row) => {
     try {
       const token = localStorage.getItem("access_token");
-      const config = { headers: { "Authorization": `Bearer ${token}` } };
+      const config = { headers: { Authorization: `Bearer ${token}` } };
       await axios.delete(`${API}/content/resources/${row.id}/`, config);
       fetchResources();
-      fetchFeed();
     } catch (error) {
       console.error("Error deleting resource:", error);
-    }
-  };
-  const onTogglePublish = async (row) => {
-    try {
-      const token = localStorage.getItem("access_token");
-      const config = { headers: { "Authorization": `Bearer ${token}` } };
-      await axios.patch(
-        `${API}/content/resources/${row.id}/`,
-        { is_published: !row.is_published },
-        config
-      );
-      fetchResources();
-      fetchFeed();
-    } catch (error) {
-      console.error("Error toggling publish status:", error);
     }
   };
 
@@ -694,39 +635,27 @@ export default function MyResourcesAdmin() {
             My Resources
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage resources and activities for your events
+            Manage resources for your events
           </Typography>
         </Box>
 
-        {currentTab === 0 && (
-          <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
-            <Button
-              fullWidth
-              variant="contained"
-              startIcon={<AddRoundedIcon />}
-              onClick={() => {
-                setEditing(null);
-                setDialogOpen(true);
-              }}
-              sx={{ whiteSpace: "nowrap" }}
-            >
-              Upload Resource
-            </Button>
-          </Box>
-        )}
+        <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
+          <Button
+            fullWidth
+            variant="contained"
+            startIcon={<AddRoundedIcon />}
+            onClick={() => {
+              setEditing(null);
+              setDialogOpen(true);
+            }}
+            sx={{ whiteSpace: "nowrap" }}
+          >
+            Upload Resource
+          </Button>
+        </Box>
       </Stack>
 
-      {/* Tabs */}
-      <Tabs
-        value={currentTab}
-        onChange={(e, newValue) => setCurrentTab(newValue)}
-        sx={{ mb: 3 }}
-      >
-        <Tab label={`RESOURCES (${resourcesTotal})`} />
-        <Tab label={`ACTIVITY FEED (${feedTotal})`} />
-      </Tabs>
-
-      {/* Filter bar – responsive on all devices */}
+      {/* Filter bar – only for Resources now */}
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
@@ -734,13 +663,9 @@ export default function MyResourcesAdmin() {
         alignItems={{ xs: "stretch", md: "center" }}
       >
         <TextField
-          placeholder={currentTab === 0 ? "Search resources..." : "Search activities..."}
-          value={currentTab === 0 ? resourceQuery : feedQuery}
-          onChange={(e) =>
-            currentTab === 0
-              ? setResourceQuery(e.target.value)
-              : setFeedQuery(e.target.value)
-          }
+          placeholder="Search resources..."
+          value={resourceQuery}
+          onChange={(e) => setResourceQuery(e.target.value)}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -761,12 +686,8 @@ export default function MyResourcesAdmin() {
           sx={{ width: { xs: "100%", md: "auto" } }}
         >
           <Select
-            value={currentTab === 0 ? resourceFilterType : feedFilterType}
-            onChange={(e) =>
-              currentTab === 0
-                ? setResourceFilterType(e.target.value)
-                : setFeedFilterType(e.target.value)
-            }
+            value={resourceFilterType}
+            onChange={(e) => setResourceFilterType(e.target.value)}
             displayEmpty
             size="small"
             sx={{ minWidth: { xs: "100%", sm: 120 } }}
@@ -792,12 +713,8 @@ export default function MyResourcesAdmin() {
               Sort
             </Typography>
             <Select
-              value={currentTab === 0 ? resourceSort : feedSort}
-              onChange={(e) =>
-                currentTab === 0
-                  ? setResourceSort(e.target.value)
-                  : setFeedSort(e.target.value)
-              }
+              value={resourceSort}
+              onChange={(e) => setResourceSort(e.target.value)}
               size="small"
               sx={{ minWidth: { xs: "100%", sm: 140 }, flex: 1 }}
             >
@@ -808,245 +725,165 @@ export default function MyResourcesAdmin() {
         </Stack>
       </Stack>
 
-      {currentTab === 0 && (
-        <>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Showing {items.length > 0 ? ((resourcePage - 1) * RESOURCE_ITEMS_PER_PAGE) + 1 : 0}–{Math.min(resourcePage * RESOURCE_ITEMS_PER_PAGE, resourcesTotal)} of {resourcesTotal} resources
+      {/* Resources table */}
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Showing{" "}
+        {items.length > 0
+          ? (resourcePage - 1) * RESOURCE_ITEMS_PER_PAGE + 1
+          : 0}
+        –
+        {Math.min(resourcePage * RESOURCE_ITEMS_PER_PAGE, resourcesTotal)} of{" "}
+        {resourcesTotal} resources
+      </Typography>
+
+      {loading ? (
+        <Box sx={{ p: 8, textAlign: "center" }}>Loading...</Box>
+      ) : items.length === 0 ? (
+        <Box sx={{ p: 8, textAlign: "center" }}>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            No resources found
           </Typography>
-          {loading ? (
-            <Box sx={{ p: 8, textAlign: "center" }}>Loading...</Box>
-          ) : items.length === 0 ? (
-            <Box sx={{ p: 8, textAlign: "center" }}>
-              <Typography variant="h6" color="text.secondary" gutterBottom>No resources found</Typography>
-              <Typography variant="body2" color="text.secondary">Upload your first resource to get started</Typography>
-            </Box>
-          ) : (
-            <>
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Title</TableCell>
-                      <TableCell
-                        sx={{ display: { xs: "none", sm: "table-cell" } }}
-                      >
-                        Type
-                      </TableCell>
-                      <TableCell
-                        sx={{ display: { xs: "none", md: "table-cell" } }}
-                      >
-                        Created
-                      </TableCell>
-                      <TableCell
-                        sx={{ display: { xs: "none", sm: "table-cell" } }}
-                      >
-                        Status
-                      </TableCell>
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {items.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            {iconForType(row.type)}
-                            <span>{row.title}</span>
-                          </Stack>
-                        </TableCell>
+          <Typography variant="body2" color="text.secondary">
+            Upload your first resource to get started
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Title</TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    Type
+                  </TableCell>
+                  <TableCell>Event</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {items.map((row) => {
+                  // Try to resolve the event name from different shapes
+                  const ev =
+                    row.event ||
+                    events.find((e) => String(e.id) === String(row.event_id));
+                  const eventLabel =
+                    ev?.title ||
+                    ev?.name ||
+                    row.event_title ||
+                    row.event_name ||
+                    row.event_id ||
+                    "-";
 
-                        <TableCell
-                          sx={{ display: { xs: "none", sm: "table-cell" } }}
-                        >
-                          <Chip
-                            label={row.type}
-                            size="small"
-                            sx={{ textTransform: "capitalize" }}
-                          />
-                        </TableCell>
-
-                        <TableCell
-                          sx={{ display: { xs: "none", md: "table-cell" } }}
-                        >
-                          {row.created_at
-                            ? new Date(row.created_at).toLocaleDateString(
-                              "en-IN",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              }
-                            )
-                            : "-"}
-                        </TableCell>
-
-                        <TableCell
-                          sx={{ display: { xs: "none", sm: "table-cell" } }}
-                        >
-                          <Chip
-                            label={row.is_published ? "Published" : "Draft"}
-                            size="small"
-                            icon={
-                              row.is_published ? (
-                                <PublicRoundedIcon />
-                              ) : (
-                                <PublicOutlinedIcon />
-                              )
-                            }
-                            sx={
-                              row.is_published
-                                ? {
-                                  bgcolor: "#d1fae5",
-                                  color: "#065f46",
-                                  fontWeight: 600,
-                                  "& .MuiChip-icon": { color: "#059669" },
-                                }
-                                : {
-                                  bgcolor: "#f3f4f6",
-                                  color: "#6b7280",
-                                  fontWeight: 500,
-                                }
-                            }
-                          />
-                        </TableCell>
-
-                        <TableCell align="right">
-                          {isDesktop ? (
-                            <Stack
-                              direction="row"
-                              spacing={1}
-                              justifyContent="flex-end"
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        {(row.file || row.link_url || row.video_url) && (
+                          <Tooltip>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                const url =
+                                  row.file || row.link_url || row.video_url;
+                                window.open(url, "_blank");
+                              }}
                             >
-                              {(row.file ||
-                                row.link_url ||
-                                row.video_url) && (
-                                  <Tooltip title="View">
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => {
-                                        const url =
-                                          row.file ||
-                                          row.link_url ||
-                                          row.video_url;
-                                        window.open(url, "_blank");
-                                      }}
-                                    >
-                                      <VisibilityRoundedIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                )}
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                {iconForType(row.type)}
+                                <span>{row.title}</span>
+                              </Stack>
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </TableCell>
 
-                              <Tooltip title="Edit">
+                      <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                        <Chip
+                          label={row.type}
+                          size="small"
+                          sx={{ textTransform: "capitalize" }}
+                        />
+                      </TableCell>
+
+                      {/* 🆕 Event column */}
+                      <TableCell>{eventLabel}</TableCell>
+
+                      <TableCell align="right">
+                        {isDesktop ? (
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            justifyContent="flex-end"
+                          >
+                            {(row.file || row.link_url || row.video_url) && (
+                              <Tooltip title="View">
                                 <IconButton
                                   size="small"
                                   onClick={() => {
-                                    setEditing(row);
-                                    setDialogOpen(true);
+                                    const url =
+                                      row.file || row.link_url || row.video_url;
+                                    window.open(url, "_blank");
                                   }}
                                 >
-                                  <EditRoundedIcon />
+                                  <VisibilityRoundedIcon />
                                 </IconButton>
                               </Tooltip>
+                            )}
 
-                              <Tooltip title="Delete">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => setPendingDelete(row)}
-                                >
-                                  <DeleteRoundedIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </Stack>
-                          ) : (
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleOpenActionsMenu(e, row)}
-                            >
-                              <MoreVertRoundedIcon />
-                            </IconButton>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                            <Tooltip title="Edit">
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setEditing(row);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                <EditRoundedIcon />
+                              </IconButton>
+                            </Tooltip>
 
-              {totalResourcePages > 1 && (
-                <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
-                  <Pagination
-                    count={totalResourcePages}
-                    page={resourcePage}
-                    onChange={(e, value) => setResourcePage(value)}
-                    color="primary"
-                    shape="rounded"
-                  />
-                </Box>
-              )}
-            </>
-          )}
-        </>
-      )}
-
-      {currentTab === 1 && (
-        <>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Showing {feedItems.length > 0 ? ((feedPage - 1) * FEED_ITEMS_PER_PAGE) + 1 : 0}–{Math.min(feedPage * FEED_ITEMS_PER_PAGE, feedTotal)} of {feedTotal} activities
-          </Typography>
-          {feedLoading ? (
-            <Box sx={{ p: 8, textAlign: "center" }}>Loading...</Box>
-          ) : feedItems.length === 0 ? (
-            <Box sx={{ p: 8, textAlign: "center" }}>
-              <Typography variant="h6" color="text.secondary" gutterBottom>No activity found</Typography>
-              <Typography variant="body2" color="text.secondary">Activity will appear here when resources are uploaded</Typography>
-            </Box>
-          ) : (
-            <>
-              <Stack spacing={2}>
-                {feedItems.map((item) => (
-                  <Paper key={item.id} sx={{ p: 2 }}>
-                    <Stack direction="row" spacing={2} alignItems="flex-start">
-                      {iconForType(item.metadata?.resource_type)}
-                      <Box sx={{ flexGrow: 1 }}>
-                        <Typography variant="body1">
-                          {item.metadata?.actor_name || "Someone"} uploaded resource: "{item.metadata?.title || "Untitled"}"
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(item.created_at).toLocaleString('en-IN', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short'
-                          })}
-                        </Typography>
-                        {item.metadata?.tags && item.metadata.tags.length > 0 && (
-                          <Box sx={{ mt: 1, display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                            {item.metadata.tags.map((tag, idx) => (
-                              <Chip key={idx} label={tag} size="small" variant="outlined" />
-                            ))}
-                          </Box>
+                            <Tooltip title="Delete">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => setPendingDelete(row)}
+                              >
+                                <DeleteRoundedIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        ) : (
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleOpenActionsMenu(e, row)}
+                          >
+                            <MoreVertRoundedIcon />
+                          </IconButton>
                         )}
-                      </Box>
-                    </Stack>
-                  </Paper>
-                ))}
-              </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
 
-              {totalFeedPages > 1 && (
-                <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
-                  <Pagination
-                    count={totalFeedPages}
-                    page={feedPage}
-                    onChange={(e, value) => setFeedPage(value)}
-                    color="primary"
-                    shape="rounded"
-                  />
-                </Box>
-              )}
-            </>
+            </Table>
+          </TableContainer>
+
+          {totalResourcePages > 1 && (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
+              <Pagination
+                count={totalResourcePages}
+                page={resourcePage}
+                onChange={(e, value) => setResourcePage(value)}
+                color="primary"
+                shape="rounded"
+              />
+            </Box>
           )}
         </>
       )}
 
+      {/* Mobile Actions menu */}
       <Menu
         anchorEl={actionMenuAnchor}
         open={isActionMenuOpen}
@@ -1104,6 +941,8 @@ export default function MyResourcesAdmin() {
           </MenuItem>
         )}
       </Menu>
+
+      {/* Upload/Edit dialog */}
       <ResourceDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
@@ -1111,6 +950,7 @@ export default function MyResourcesAdmin() {
         events={events}
         onSaved={handleResourceSaved}
       />
+
       {/* Confirm Delete Dialog */}
       <Dialog
         open={!!pendingDelete}
@@ -1122,12 +962,14 @@ export default function MyResourcesAdmin() {
           {pendingDelete ? <>Delete "{pendingDelete.title}"?</> : "Delete resource?"}
         </DialogTitle>
         <DialogContent>
-          <Typography>
-            Are you sure you want to delete this resource?
-          </Typography>
+          <Typography>Are you sure you want to delete this resource?</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPendingDelete(null)} color="secondary" variant="outlined">
+          <Button
+            onClick={() => setPendingDelete(null)}
+            color="secondary"
+            variant="outlined"
+          >
             Cancel
           </Button>
           <Button

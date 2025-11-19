@@ -29,7 +29,7 @@ import {
 import Grid from "@mui/material/Grid";
 import dayjs from "dayjs";
 import AdminGroups from "../pages/AdminGroups";
-import MyResourcesAdmin from "./MyResourcesAdmin";
+import AdminResources from "./AdminResources.jsx";
 import EmojiEmotionsRoundedIcon from '@mui/icons-material/EmojiEmotionsRounded';
 import InsertPhotoRoundedIcon from '@mui/icons-material/InsertPhotoRounded';
 import { LocalizationProvider, TimePicker } from "@mui/x-date-pickers";
@@ -63,6 +63,14 @@ const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 // const API_BASE = RAW_BASE.replace(/\/+$/, "");
 // Origin without the /api suffix
 const API_ORIGIN = API_BASE.replace(/\/api$/, "");
+
+// Small helpers reused from MyEventsPage
+const urlJoin = (base, path) => {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+};
+
+const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
 const toAbs = (u) => {
   if (!u) return u;
@@ -1010,91 +1018,214 @@ function EditEventDialog({ open, onClose, event, onUpdated }) {
 /* ===========================================
    Existing Admin cards list (unchanged)
    =========================================== */
-function AdminEventCard({ ev, onHost, isHosting, onEdit }) {
+function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, isOwner }) {
   const status = computeStatus(ev);
   const chip = statusChip(status);
+
+  // audience can join if event is not ended AND either live OR Dyte meeting exists
+  const canJoinLive =
+    ev?.status !== "ended" &&
+    (status === "live" || !!ev?.dyte_meeting_id);
+
   return (
-    <Paper elevation={0} className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden">
+    <Paper
+      elevation={0}
+      className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+    >
       <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
         {ev.preview_image ? (
           <img
             src={toAbs(ev.preview_image)}
             alt={ev.title}
             loading="lazy"
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
           />
         ) : (
-          <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "#E5E7EB",
+            }}
+          />
         )}
       </Box>
+
       <Box className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <Chip size="small" label={chip.label} className={`${chip.className} font-medium`} />
-          {ev.category && <span className="text-xs text-slate-500">{ev.category}</span>}
+          <Chip
+            size="small"
+            label={chip.label}
+            className={`${chip.className} font-medium`}
+          />
+          {ev.category && (
+            <span className="text-xs text-slate-500">{ev.category}</span>
+          )}
         </div>
-        <Typography variant="h6" className="font-extrabold !leading-snug text-slate-900">
+
+        <Typography
+          variant="h6"
+          className="font-extrabold !leading-snug text-slate-900"
+        >
           {ev.title}
         </Typography>
+
         <p
           className="text-sm text-slate-500 truncate"
-          title={`${fmtDateRange(ev.start_time, ev.end_time)}${ev.location ? ` • ${ev.location}` : ""}`}
+          title={`${fmtDateRange(ev.start_time, ev.end_time)}${ev.location ? ` • ${ev.location}` : ""
+            }`}
         >
           {fmtDateRange(ev.start_time, ev.end_time)}
           {ev.location ? ` • ${ev.location}` : ""}
         </p>
+
         <Box className="mt-auto flex items-center gap-1.5 pt-1">
-          <Button
-            onClick={() => onHost(ev)}
-            startIcon={<LiveTvRoundedIcon />}
-            variant="contained"
-            className="rounded-xl"
-            sx={{
-              textTransform: "none",
-              backgroundColor: "#10b8a6",
-              "&:hover": { backgroundColor: "#0ea5a4" },
-              minWidth: { xs: 40, lg: 120 },
-              px: { xs: 1, lg: 2 },
-            }}
-            disabled={isHosting}
-          >
-            {isHosting ? (
-              <span className="flex items-center gap-2">
-                <CircularProgress size={18} />
+          {isOwner ? (
+            <>
+              {/* OWNER: Host Now */}
+              <Button
+                onClick={() => onHost(ev)}
+                startIcon={<LiveTvRoundedIcon />}
+                variant="contained"
+                className="rounded-xl"
+                sx={{
+                  textTransform: "none",
+                  backgroundColor: "#10b8a6",
+                  "&:hover": { backgroundColor: "#0ea5a4" },
+                  minWidth: { xs: 40, lg: 120 },
+                  px: { xs: 1, lg: 2 },
+                }}
+                disabled={isHosting}
+              >
+                {isHosting ? (
+                  <span className="flex items-center gap-2">
+                    <CircularProgress size={18} />
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "none", lg: "inline" } }}
+                    >
+                      Hosting…
+                    </Box>
+                  </span>
+                ) : (
+                  <Box
+                    component="span"
+                    sx={{ display: { xs: "none", lg: "inline" } }}
+                  >
+                    Host Now
+                  </Box>
+                )}
+              </Button>
+
+              {/* OWNER: Edit */}
+              <Button
+                onClick={() => onEdit?.(ev)}
+                startIcon={<EditNoteRoundedIcon />}
+                variant="outlined"
+                className="rounded-xl"
+                sx={{
+                  textTransform: "none",
+                  minWidth: { xs: 36, lg: 96 },
+                  px: { xs: 1, lg: 2 },
+                }}
+              >
                 <Box
                   component="span"
                   sx={{ display: { xs: "none", lg: "inline" } }}
                 >
-                  Hosting…
+                  Edit
                 </Box>
-              </span>
-            ) : (
-              <Box
-                component="span"
-                sx={{ display: { xs: "none", lg: "inline" } }}
-              >
-                Host Now
-              </Box>
-            )}
-          </Button>
+              </Button>
+            </>
+          ) : (
+            <>
+              {/* STAFF: Join (instead of Host) */}
+              {canJoinLive ? (
+                <Button
+                  onClick={() => onJoinLive?.(ev)}
+                  variant="contained"
+                  className="rounded-xl"
+                  sx={{
+                    textTransform: "none",
+                    backgroundColor: "#10b8a6",
+                    "&:hover": { backgroundColor: "#0ea5a4" },
+                    minWidth: { xs: 40, lg: 120 },
+                    px: { xs: 1, lg: 2 },
+                  }}
+                  disabled={isJoining}
+                >
+                  {isJoining ? (
+                    <span className="flex items-center gap-2">
+                      <CircularProgress size={18} />
+                      <Box
+                        component="span"
+                        sx={{ display: { xs: "none", lg: "inline" } }}
+                      >
+                        Joining…
+                      </Box>
+                    </span>
+                  ) : (
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "none", lg: "inline" } }}
+                    >
+                      Join
+                    </Box>
+                  )}
+                </Button>
+              ) : (
+                // If not live / no dyte meeting yet, just show Details
+                <Button
+                  component={Link}
+                  to={`/admin/events/${ev.slug || ev.id}`}
+                  state={{ event: ev }}
+                  variant="contained"
+                  className="rounded-xl"
+                  sx={{
+                    textTransform: "none",
+                    backgroundColor: "#10b8a6",
+                    "&:hover": { backgroundColor: "#0ea5a4" },
+                    minWidth: { xs: 40, lg: 120 },
+                    px: { xs: 1, lg: 2 },
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{ display: { xs: "none", lg: "inline" } }}
+                  >
+                    Details
+                  </Box>
+                </Button>
+              )}
 
-          <Button
-            onClick={() => onEdit?.(ev)}
-            startIcon={<EditNoteRoundedIcon />}
-            variant="outlined"
-            className="rounded-xl"
-            sx={{
-              textTransform: "none",
-              minWidth: { xs: 36, lg: 96 },
-              px: { xs: 1, lg: 2 },
-            }}
-          >
-            <Box
-              component="span"
-              sx={{ display: { xs: "none", lg: "inline" } }}
-            >
-              Edit
-            </Box>
-          </Button>
+              {/* STAFF: View (instead of Edit) */}
+              <Button
+                component={Link}
+                to={`/admin/events/${ev.slug || ev.id}`}
+                state={{ event: ev }}
+                variant="outlined"
+                className="rounded-xl"
+                sx={{
+                  textTransform: "none",
+                  minWidth: { xs: 36, lg: 96 },
+                  px: { xs: 1, lg: 2 },
+                }}
+              >
+                <Box
+                  component="span"
+                  sx={{ display: { xs: "none", lg: "inline" } }}
+                >
+                  View
+                </Box>
+              </Button>
+            </>
+          )}
         </Box>
       </Box>
     </Paper>
@@ -1103,6 +1234,8 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit }) {
 
 function AdminEvents() {
   const token = getToken();
+  const isOwner = isOwnerUser();
+  const navigate = useNavigate();
   const user = useMemo(() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "{}");
@@ -1119,6 +1252,7 @@ function AdminEvents() {
   const [editing, setEditing] = useState(null);
   // hosting flow state
   const [hostingId, setHostingId] = useState(null);
+  const [joiningId, setJoiningId] = useState(null);
   const [errOpen, setErrOpen] = useState(false);
   const [errMsg, setErrMsg] = useState("");
   // ➕ Pagination
@@ -1141,47 +1275,106 @@ function AdminEvents() {
     setEvents((prev) => prev.map((e) => (String(e.id) === String(updated.id) ? updated : e)));
   };
 
-  // Fetch current user's events (unchanged)
+  // Fetch events:
+  // - Owner: see ALL events
+  // - Staff: see only purchased / registered events (same logic as MyEventsPage)
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    const fetchJSON = async (path) => {
+      const fullUrl = path.startsWith("http") ? path : urlJoin(API_BASE, path);
+      const res = await fetch(fullUrl, { headers });
+      if (!res.ok) {
+        throw new Error(`${res.status}`);
+      }
+      return res.json();
+    };
+
+    const loadOwnerEvents = async () => {
+      const res = await fetch(`${API_ROOT}/events/`, { headers });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const json = await res.json().catch(() => ({}));
+      const data = asList(json);
+      return Array.isArray(data) ? data : [];
+    };
+
+    const loadStaffEvents = async () => {
+      let me = null;
+      try {
+        me = await fetchJSON("/users/me/");
+      } catch {
+        // ignore, we'll still try user=me endpoints
+      }
+
+      const candidates = [
+        "/events/mine/",
+        "/event-registrations/mine/",
+        "/registrations/mine/",
+        "/event-registrations/?user=me",
+        me?.id ? `/event-registrations/?user=${me.id}` : null,
+      ].filter(Boolean);
+
+      let raw = [];
+      for (const p of candidates) {
+        try {
+          const data = await fetchJSON(p);
+          const list = asList(data);
+          if (Array.isArray(list)) {
+            raw = list;
+            if (list.length > 0) break; // first non-empty wins (same behaviour as MyEventsPage)
+          }
+        } catch {
+          // try next candidate
+        }
+      }
+
+      // If these are registrations, pull out the event object
+      let list = [];
+      if (raw.length > 0 && raw[0] && raw[0].event) {
+        list = raw.map((r) => r.event).filter(Boolean);
+      } else {
+        list = raw;
+      }
+
+      // de-duplicate by id/slug (same as MyEventsPage)
+      const seen = new Set();
+      const dedup = [];
+      for (const ev of list) {
+        const key = ev?.id ?? ev?.slug;
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        dedup.push(ev);
+      }
+      return dedup;
+    };
+
+    const load = async () => {
       setLoading(true);
       try {
-        const url = `${API_ROOT}/events/?created_by=me`;
-        const res = await fetch(url, {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        let data = [];
-        if (res.ok) {
-          const json = await res.json();
-          data = Array.isArray(json) ? json : Array.isArray(json?.results) ? json.results : [];
-        }
+        const arr = isOwner ? await loadOwnerEvents() : await loadStaffEvents();
         if (!cancelled) {
-          let arr = Array.isArray(data) ? data : [];
-          if (myId) {
-            arr = arr.filter((ev) => {
-              const creator =
-                ev.created_by?.id ?? ev.created_by_id ?? ev.creator_id ?? ev.owner_id ?? null;
-              return creator == null ? false : String(creator) === String(myId);
-            });
-          }
           setEvents(arr);
           setLoading(false);
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) {
           setEvents([]);
           setLoading(false);
         }
       }
-    })();
+    };
+
+    load();
     return () => {
       cancelled = true;
     };
-  }, [token, myId]);
+  }, [token, isOwner]);
+
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -1238,6 +1431,32 @@ function AdminEvents() {
       setHostingId(null);
     }
   };
+
+  const handleJoinLive = async (ev) => {
+    if (!ev?.id) return;
+
+    setJoiningId(ev.id);
+    try {
+      // same pattern as MyEventsPage: /live/:slug?id=...&role=audience
+      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+
+      navigate(livePath, {
+        state: { event: ev },
+        replace: false,
+      });
+    } catch (e) {
+      setErrMsg(
+        typeof e?.message === "string" && e.message.length
+          ? `Unable to join live: ${e.message}`
+          : "Unable to join live at the moment."
+      );
+      setErrOpen(true);
+    } finally {
+      setJoiningId(null);
+    }
+  };
+
+
   // When a new event is created from the dialog, show it immediately at the top
   const onCreated = (ev) => {
     setEvents((prev) => [ev, ...prev]);
@@ -1344,15 +1563,23 @@ function AdminEvents() {
             <Typography variant="h6" className="font-semibold text-slate-700">
               No events found
             </Typography>
-            <p className="text-slate-500 mt-1">Try a different search or create a new event.</p>
-            <Button
-              onClick={() => setCreateOpen(true)}
-              className="mt-4 rounded-xl"
-              sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-              variant="contained"
-            >
-              Create Event
-            </Button>
+            <p className="text-slate-500 mt-1">
+              Try a different search{isOwner ? " or create a new event." : "."}
+            </p>
+            {isOwner && (
+              <Button
+                onClick={() => setCreateOpen(true)}
+                className="mt-4 rounded-xl"
+                sx={{
+                  textTransform: "none",
+                  backgroundColor: "#10b8a6",
+                  "&:hover": { backgroundColor: "#0ea5a4" },
+                }}
+                variant="contained"
+              >
+                Create Event
+              </Button>
+            )}
           </Box>
         </Paper>
       ) : (
@@ -1373,6 +1600,9 @@ function AdminEvents() {
                     onHost={onHost}
                     isHosting={hostingId === (ev.id ?? null)}
                     onEdit={onEdit}
+                    onJoinLive={handleJoinLive}
+                    isJoining={joiningId === (ev.id ?? null)}
+                    isOwner={isOwner}
                   />
                 </Grid>
               ))}
@@ -1452,7 +1682,7 @@ export default function Dashboard() {
             ) : active === "posts" ? (
               <AdminPostsPage />
             ) : active === "resources" ? (
-              <MyResourcesAdmin />
+              <AdminResources />
             ) : active === "groups" ? (
               <AdminGroups />
             ) : active === "recordings" ? (
@@ -1462,7 +1692,7 @@ export default function Dashboard() {
             ) : active === "settings" ? (
               <AdminSettings />
             ) : (
-              <MyResourcesAdmin />   // fallback unchanged
+              <AdminResources />   // fallback unchanged
             )}
           </Grid>
         </Grid>

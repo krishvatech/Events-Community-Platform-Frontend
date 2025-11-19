@@ -22,20 +22,21 @@ import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
 import ProfilePage from "./pages/ProfilePage.jsx";
 import ConversationPage from "./pages/ConversationPage.jsx";
 import MessagesDirectory from "./pages/MessagesDirectory.jsx";
-import ResourceDetails from "./pages/ResourceDetails.jsx";
+import MyResourcePage from "./pages/MyResourcePage.jsx";
 import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
 import RichProfile from "./pages/community/RichProfile.jsx";
 import GroupDetailsPage from "./pages/community/GroupDetailsPage.jsx";
 import AdminLayout from "./components/layout/AdminLayout.jsx";
 import AdminPostsPage from "./pages/AdminPostsPage.jsx";
-import MyResourcesAdmin from "./pages/MyResourcesAdmin.jsx";
+import AdminResources from "./pages/AdminResources.jsx";
 import AdminGroups from "./pages/AdminGroups.jsx";
 import AdminNotificationsPage from "./pages/AdminNotificationsPage.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
 import AdminStaffPage from "./pages/AdminStaffPage.jsx"
 import AdminRecordingsPage from "./pages/AdminRecordingsPage.jsx";
 import AdminMessagesPage from "./pages/AdminMessagesPage.jsx";
+import EventManagePage from "./pages/EventManagePage.jsx";
 
 import { useParams } from "react-router-dom";
 
@@ -76,17 +77,17 @@ const AppShell = () => {
         <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
         {/* Admin area driven by AdminSidebar */}
         <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
-          <Route index element={<MyResourcesAdmin />} />
+          <Route index element={<AdminResources />} />
 
           {/* main admin pages */}
           <Route path="events" element={<Dashboard />} />
-          <Route path="resources" element={<MyResourcesAdmin />} />
+          <Route path="resources" element={<AdminResources />} />
           <Route path="posts" element={<AdminPostsPage />} />
           <Route path="groups" element={<AdminGroups />} />
           <Route path="messages" element={<AdminMessagesPage />} />
           <Route path="notifications" element={<AdminNotificationsPage />} />
           <Route path="settings" element={<AdminSettings />} />
-
+          <Route path="/admin/events/:eventId" element={<EventManagePage />} />
           {/* keep your recordings behavior same as before */}
           <Route path="recordings" element={<AdminRecordingsPage />} />
 
@@ -115,7 +116,7 @@ const AppShell = () => {
         <Route path="/account/messages/:conversationId" element={<RequireAuth><ConversationPage /></RequireAuth>} />
 
         {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
-        <Route path="/resource/:id" element={<RequireAuth><ResourceDetails /></RequireAuth>} />
+        <Route path="/resource/:id" element={<RequireAuth><MyResourcePage /></RequireAuth>} />
         {/* ADD THIS ROUTE FOR RICH PROFILE */}
         {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
         <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
