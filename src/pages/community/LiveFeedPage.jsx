@@ -2343,10 +2343,20 @@ export default function LiveFeedPage({
 
 
   return (
-    <Grid container spacing={2}>
+    <Grid
+      container
+      rowSpacing={2}
+      columnSpacing={{ xs: 2, md: 4 }}   // 🔹 more gap between feed and right rail on md+
+    >
       {/* Center: scope + search + feed */}
       <Grid item xs={12} md={9}>
-        <Box sx={{ width: "100%", maxWidth: { md: 680 }, mx: "auto" }}>
+        <Box
+          sx={{
+            width: "100%",
+            maxWidth: "100%",      // no clamping, fill the whole 9-column area
+            mx: 0,                 // no centering gap
+          }}
+        >
           {/* Scope toggle */}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 2 }} alignItems="center">
             <Stack direction="row" spacing={1}>
@@ -2463,7 +2473,14 @@ export default function LiveFeedPage({
 
       {/* Right rail */}
       <Grid item xs={12} md={3} sx={{ display: { xs: "none", md: "block" } }}>
-        <Box sx={{ position: "sticky", top: 88, alignSelf: "flex-start" }}>
+        <Box
+          sx={{
+            position: "sticky",
+            top: 55,
+            alignSelf: "flex-start",
+            width: "180%",       // take full 3-column width
+          }}
+        >
           <CommunityProfileCard user={user} stats={stats} tags={tags} />
         </Box>
       </Grid>

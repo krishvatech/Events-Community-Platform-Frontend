@@ -56,14 +56,15 @@ export default function CommunityHubPage() {
   return (
     <Box
       sx={{
-        // less padding on small screens so content doesn’t get cropped
-        px: { xs: 1, sm: 1.5, md: 3 },
+        // keep left padding, reduce right padding on desktop
+        pl: { xs: 1, sm: 1.5, md: 3 },
+        pr: { xs: 1, sm: 1.5, md: 1 },   // 🔑 less blank space on far right
         py: 2,
         maxWidth: 1480,
         mx: "auto",
         width: "100%",
         boxSizing: "border-box",
-        overflowX: "hidden", // avoid horizontal cut / scrollbar on 768px
+        overflowX: "hidden",
       }}
     >
       {/* Top header + mobile menu trigger */}
