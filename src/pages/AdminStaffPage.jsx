@@ -29,7 +29,7 @@ export default function AdminStaffPage() {
             </Container>
         );
     }
-    const communityId = React.useMemo(() => new URLSearchParams(location.search).get("community_id") || "1", [location.search]);
+    const communityId = React.useMemo(() => new URLSearchParams(location.search).get("community_id") || "16", [location.search]);
     const [rows, setRows] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [q, setQ] = React.useState("");

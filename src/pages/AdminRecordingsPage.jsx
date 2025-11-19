@@ -4,11 +4,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Box, Button, Chip, Container, Divider, Grid,
+  Box, Button, Chip, Container, Divider,
   Card as MUICard, CardContent, LinearProgress, Paper,
   Typography, TextField, InputAdornment, Pagination,
   Select, MenuItem, FormControl, InputLabel,
 } from "@mui/material";
+import Grid from "@mui/material/Grid";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
@@ -251,49 +252,102 @@ export default function AdminRecordingsPage() {
 
           {!loading && !error && filtered.length > 0 && (
             <>
-              <Grid container spacing={2}>
+              <Grid
+                container
+                spacing={{ xs: 2, md: 3 }}
+                columns={{ xs: 4, sm: 12, md: 12 }}   // same grid as Dashboard
+              >
                 {paged.map((ev) => {
                   const hasRec = !!ev.recording_url;
                   return (
-                    <Grid key={ev.id} item xs={12} sm={6} md={4}>
-                      <MUICard elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
-                        <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", background: hasRec ? "#0b1220" : "#E5E7EB" }}>
+                    <Grid
+                      key={ev.id}
+                      size={{ xs: 4, sm: 4, md: 4 }}   // 1 per row on mobile, 3 per row on tablet/desktop
+                    >
+                      <MUICard
+                        elevation={0}
+                        className="rounded-2xl border border-slate-200 overflow-hidden"
+                      >
+                        <div
+                          style={{
+                            position: "relative",
+                            width: "100%",
+                            aspectRatio: "16/9",
+                            background: hasRec ? "#0b1220" : "#E5E7EB",
+                          }}
+                        >
                           {hasRec ? (
                             <video
                               src={`${S3_BUCKET_URL}/${ev.recording_url}`}
                               controls
-                              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                              style={{
+                                position: "absolute",
+                                inset: 0,
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
                             />
                           ) : (
-                            <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "text.secondary", fontSize: 14 }}>
+                            <Box
+                              sx={{
+                                position: "absolute",
+                                inset: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "text.secondary",
+                                fontSize: 14,
+                              }}
+                            >
                               Recording not available yet
                             </Box>
                           )}
                         </div>
 
                         <CardContent>
-                          <Typography variant="subtitle1" className="font-semibold line-clamp-2">{ev.title || "Untitled Event"}</Typography>
+                          <Typography
+                            variant="subtitle1"
+                            className="font-semibold line-clamp-2"
+                          >
+                            {ev.title || "Untitled Event"}
+                          </Typography>
+
                           <Box className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-                            <CalendarMonthIcon fontSize="small" /><span>{fmtDateRange(ev.start_time, ev.end_time)}</span>
+                            <CalendarMonthIcon fontSize="small" />
+                            <span>{fmtDateRange(ev.start_time, ev.end_time)}</span>
                           </Box>
-                          {ev.location && (
-                            <Box className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-                              <PlaceIcon fontSize="small" /><span className="truncate">{ev.location}</span>
-                            </Box>
-                          )}
+
                           <Divider className="my-3" />
+
                           <Box className="flex items-center gap-1.5 flex-wrap">
                             {hasRec ? (
                               <>
-                                <Button size="small" variant="contained" startIcon={<PlayCircleOutlineRoundedIcon />} component="a"
-                                  href={`${S3_BUCKET_URL}/${ev.recording_url}`} target="_blank" rel="noopener noreferrer" sx={{ textTransform: "none", borderRadius: 2 }}>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  startIcon={<PlayCircleOutlineRoundedIcon />}
+                                  component="a"
+                                  href={`${S3_BUCKET_URL}/${ev.recording_url}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  sx={{ textTransform: "none", borderRadius: 2 }}
+                                >
                                   Watch
                                 </Button>
-                                <Button size="small" variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={() => handleDownload(ev.recording_url)} sx={{ textTransform: "none", borderRadius: 2 }}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  startIcon={<DownloadRoundedIcon />}
+                                  onClick={() => handleDownload(ev.recording_url)}
+                                  sx={{ textTransform: "none", borderRadius: 2 }}
+                                >
                                   Download
                                 </Button>
                               </>
-                            ) : (<Chip size="small" label="No recording yet" />)}
+                            ) : (
+                              <Chip size="small" label="No recording yet" />
+                            )}
                           </Box>
                         </CardContent>
                       </MUICard>
