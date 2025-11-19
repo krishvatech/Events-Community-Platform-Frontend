@@ -194,6 +194,8 @@ export default function ProfilePage() {
     work_arrangement: "",         // "", "onsite","hybrid","remote"
   });
 
+  const [syncProfileLocation, setSyncProfileLocation] = useState(false);
+
 
   // Controlled form state
   const [form, setForm] = useState({
@@ -420,6 +422,45 @@ export default function ProfilePage() {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j?.detail || "Failed to save experience");
 
+      // If user ticked "Make this location my profile’s work location"
+      if (syncProfileLocation && expForm.location) {
+        try {
+          const payload = {
+            first_name: form.first_name,
+            last_name: form.last_name,
+            email: form.email,
+            profile: {
+              full_name: form.full_name,
+              timezone: form.timezone,
+              bio: form.bio,
+              headline: form.headline,
+              job_title: form.job_title,
+              company: form.company,
+              location: expForm.location,
+              skills: parseSkills(form.skillsText),
+              links: parseLinks(form.linksText),
+            },
+          };
+
+          const resp = await fetch(`${API_BASE}/users/me/`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", ...tokenHeader() },
+            body: JSON.stringify(payload),
+          });
+
+          const respJson = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            console.error("Failed to sync profile location", respJson);
+          } else {
+            // Update local state so Contact card shows new location immediately
+            setForm((prev) => ({ ...prev, location: expForm.location }));
+          }
+        } catch (err) {
+          console.error("Failed to sync profile location from experience", err);
+        }
+      }
+
+
       setSnack({
         open: true,
         sev: "success",
@@ -544,12 +585,35 @@ export default function ProfilePage() {
     }
   }
 
+  const initialExpForm = {
+    org: "",
+    position: "",
+    location: "",
+    start: "",
+    end: "",
+    current: false,
+    employment_type: "full_time",
+    work_schedule: "",
+    relationship_to_org: "",
+    career_stage: "",
+    compensation_type: "",
+    work_arrangement: "",
+  };
+
+  function openAddExperience() {
+    setEditExpId(null);
+    setExpForm(initialExpForm);
+    setSyncProfileLocation(false);
+    setExpOpen(true);
+  }
+
+
   function onEditExperience(item) {
     setEditExpId(item.id);
     setExpForm({
       org: item.org || item.community_name || "",
       position: item.position || "",
-      location: item.location || "",   
+      location: item.location || "",
       start: item.start || item.start_date || "",
       end: item.end || item.end_date || "",
       current: !!(item.current || item.currently_work_here),
@@ -696,7 +760,7 @@ export default function ProfilePage() {
                       sx={{ mt: 2 }}
                       title="Experience"
                       action={
-                        <Button size="small" variant="outlined" onClick={() => setExpOpen(true)}>
+                        <Button size="small" variant="outlined" onClick={openAddExperience}>
                           Add more
                         </Button>
                       }
@@ -1178,12 +1242,31 @@ export default function ProfilePage() {
             control={
               <Checkbox
                 checked={expForm.current}
-                onChange={(e) => setExpForm((f) => ({ ...f, current: e.target.checked }))}
+                onChange={(e) => {
+                  const current = e.target.checked;
+                  setExpForm((prev) => ({
+                    ...prev,
+                    current,
+                    end: current ? "" : prev.end,
+                  }));
+                }}
               />
             }
             label="I currently work here"
             sx={{ mb: 1 }}
           />
+          {expForm.current && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={syncProfileLocation}
+                  onChange={(e) => setSyncProfileLocation(e.target.checked)}
+                />
+              }
+              label="Make this location my profile’s work location"
+              sx={{ mb: 1 }}
+            />
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           {!!editExpId && (
