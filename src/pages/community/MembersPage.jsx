@@ -1,5 +1,5 @@
 // src/pages/community/MembersPage.jsx
-import React, { useEffect, useMemo, useRef, useState , useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Avatar,
@@ -20,11 +20,15 @@ import {
   FormControlLabel,
   Chip,
   Card,
+  useMediaQuery,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
-import { geoNaturalEarth1,geoCentroid } from "d3-geo";
+import MapRoundedIcon from "@mui/icons-material/MapRounded";
+import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import { geoNaturalEarth1, geoCentroid } from "d3-geo";
 import { feature as topoFeature } from "topojson-client";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -187,8 +191,8 @@ function useCountryCentroids(geoUrl) {
 
 // pastel country fills
 const PALETTE = [
-  "#e3f2fd","#e8f5e9","#fff3e0","#f3e5f5","#ede7f6",
-  "#fffde7","#e0f2f1","#fce4ec","#e8eaf6","#f1f8e9",
+  "#e3f2fd", "#e8f5e9", "#fff3e0", "#f3e5f5", "#ede7f6",
+  "#fffde7", "#e0f2f1", "#fce4ec", "#e8eaf6", "#f1f8e9",
 ];
 const countryColor = (name) => {
   let h = 0;
@@ -198,6 +202,7 @@ const countryColor = (name) => {
 
 /* -------------------------- Member card (left) -------------------------- */
 function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
+  const isMobile = useMediaQuery("(max-width:600px)");
   // email for the second line
   const email = u?.email || "";
 
@@ -271,31 +276,37 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
         {/* actions on the right */}
         <Stack direction="row" spacing={1} alignItems="center" flexShrink={0}>
           {status === "friends" ? (
-              <Tooltip title="Open profile">
-                <IconButton size="small" onClick={() => onOpenProfile?.(u)}>
-                  <OpenInNewOutlinedIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            ) : status === "pending_outgoing" ? (
-              <Button
+            <Tooltip title="Open profile">
+              <IconButton size="small" onClick={() => onOpenProfile?.(u)}>
+                <OpenInNewOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : status === "pending_outgoing" ? (
+            <Tooltip title="Request sent">
+              <IconButton size="small" disabled>
+                <CheckCircleRoundedIcon fontSize="small" color="success" />
+              </IconButton>
+            </Tooltip>
+          ) : isMobile ? (
+            <Tooltip title="Add friend">
+              <IconButton
                 size="small"
-                variant="outlined"
-                sx={{ textTransform: "none", borderRadius: 2 }}
-                disabled
-              >
-                Request pending
-              </Button>
-            ) : (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={{ textTransform: "none", borderRadius: 2 }}
-                startIcon={<PersonAddAlt1RoundedIcon />}
                 onClick={() => onAddFriend?.(u)}
               >
-                Add friend
-              </Button>
-            )}
+                <PersonAddAlt1RoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Button
+              size="small"
+              variant="outlined"
+              sx={{ textTransform: "none", borderRadius: 2 }}
+              startIcon={<PersonAddAlt1RoundedIcon />}
+              onClick={() => onAddFriend?.(u)}
+            >
+              Add friend
+            </Button>
+          )}
         </Stack>
       </Stack>
     </Card>
@@ -305,6 +316,8 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
 /* ------------------------------ page component ------------------------------ */
 export default function MembersPage() {
   const navigate = useNavigate();
+  const isCompact = useMediaQuery("(max-width:1024px)"); // mobile + tablet + 1024
+  const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
 
   const getCenterForISO2 = useCountryCentroids(geoUrl);
 
@@ -345,7 +358,7 @@ export default function MembersPage() {
 
   // pagination
   const [page, setPage] = useState(1);
-  const ROWS_PER_PAGE = 10;
+  const ROWS_PER_PAGE = 5;
 
   // friend + unread
   const [friendStatusByUser, setFriendStatusByUser] = useState({});
@@ -492,7 +505,7 @@ export default function MembersPage() {
           })
         );
         if (alive) setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
-      } catch {}
+      } catch { }
     })();
     return () => { alive = false; };
   }, [filtered.map((u) => u.id).join("|")]); // eslint-disable-line
@@ -529,29 +542,29 @@ export default function MembersPage() {
   }, [filtered, friendStatusByUser]);
 
   const countryAgg = useMemo(() => {
-  const map = {};
-  for (const u of filtered) {
-    const code = resolveCountryCode(u).toLowerCase();
-    const center = getCenterForISO2(code);
-    if (!center) continue;
-    const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
-    if (!map[code]) {
-      map[code] = {
-        code,
-        center,
-        users: [],
-        friends: 0,
-        label: displayCountry(u) || code.toUpperCase(),
-      };
+    const map = {};
+    for (const u of filtered) {
+      const code = resolveCountryCode(u).toLowerCase();
+      const center = getCenterForISO2(code);
+      if (!center) continue;
+      const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
+      if (!map[code]) {
+        map[code] = {
+          code,
+          center,
+          users: [],
+          friends: 0,
+          label: displayCountry(u) || code.toUpperCase(),
+        };
+      }
+      map[code].users.push(userDisplayName(u));
+      if (isFriend) map[code].friends += 1;
     }
-    map[code].users.push(userDisplayName(u));
-    if (isFriend) map[code].friends += 1;
-  }
-  return Object.values(map).map((e) => ({ ...e, total: e.users.length }));
-}, [filtered, friendStatusByUser]);
+    return Object.values(map).map((e) => ({ ...e, total: e.users.length }));
+  }, [filtered, friendStatusByUser]);
 
-// Use preview when switch is ON, otherwise live markers;
-// if live is empty, auto-fallback to preview so the map isn’t blank.
+  // Use preview when switch is ON, otherwise live markers;
+  // if live is empty, auto-fallback to preview so the map isn’t blank.
   const markers = liveMarkers;
 
   // pagination
@@ -574,7 +587,7 @@ export default function MembersPage() {
           })
         );
         if (alive) setFriendStatusByUser((m) => ({ ...m, ...Object.fromEntries(entries) }));
-      } catch {}
+      } catch { }
     })();
     return () => { alive = false; };
   }, [current.map((u) => u.id).join(",")]); // eslint-line-disable
@@ -595,108 +608,465 @@ export default function MembersPage() {
 
   /* -------------------------------- UI -------------------------------- */
   return (
-    <Grid container spacing={2}>
-      {/* Left: Member list (card style) */}
-      <Grid item xs={12} md={6}>
-        <Paper sx={{ p: 1.5, mb: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }} justifyContent="space-between">
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Members ({filtered.length})
-            </Typography>
-            <TextField
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              size="small"
-              placeholder="Search members"
-              sx={{ width: { xs: "100%", sm: 320 } }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
+    <>
+      <Grid container spacing={2}>
+        {/* Left: Member list (card style) */}
+        <Grid item xs={12} md={6} lg={5} xl={4}>
+          <Box
+            sx={{
+              width: "100%",   // take full width of the grid item
+              mx: 0,           // follow container padding exactly (same as drawer)
+            }}
+          >
+            {/* 👇 your updated Paper with search + map button is here */}
+            <Paper sx={{ p: 1.5, mb: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1}
+                alignItems={{ xs: "stretch", sm: "center" }}
+                justifyContent="space-between"
+              >
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Members ({filtered.length})
+                </Typography>
+
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ width: { xs: "100%", sm: "100%", md: "auto" } }}
+                >
+                  <TextField
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    size="small"
+                    placeholder="Search members"
+                    sx={{
+                      width: {
+                        xs: "100%", // 320 / 375 / 425
+                        sm: "100%", // 768 tablet etc.
+                        md: 320,    // desktop – fixed width search bar
+                      },
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+
+                  {isCompact && (
+                    <Tooltip title="View map">
+                      <IconButton
+                        size="small"
+                        onClick={() => setMapOverlayOpen(true)}
+                        sx={{ flexShrink: 0 }}
+                      >
+                        <MapRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Stack>
+              </Stack>
+            </Paper>
+
+            {loading && <LinearProgress />}
+
+            {!loading && error && (
+              <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+                <Typography color="error">⚠️ {error}</Typography>
+              </Paper>
+            )}
+
+            {!loading && !error && (
+              <>
+                {/* Member cards */}
+                <Stack spacing={1.25}>
+                  {current.map((u) => (
+                    <MemberCard
+                      key={u.id}
+                      u={u}
+                      friendStatus={friendStatusByUser[u.id]}
+                      onOpenProfile={handleOpenProfile}
+                      onAddFriend={() => sendFriendRequest(u.id)}
+                    />
+                  ))}
+
+                  {filtered.length === 0 && (
+                    <Paper
+                      sx={{
+                        p: 4,
+                        borderRadius: 3,
+                        textAlign: "center",
+                        border: `1px solid ${BORDER}`,
+                      }}
+                    >
+                      <Typography>No members match your search.</Typography>
+                    </Paper>
+                  )}
+                </Stack>
+
+                {/* Pagination at bottom */}
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  justifyContent="space-between"
+                  spacing={1}
+                  sx={{ mt: 2 }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    Showing{" "}
+                    {filtered.length === 0
+                      ? "0"
+                      : `${startIdx + 1}–${Math.min(
+                        startIdx + ROWS_PER_PAGE,
+                        filtered.length
+                      )} of ${filtered.length}`}
+                  </Typography>
+                  <Pagination
+                    count={pageCount}
+                    page={page}
+                    onChange={(_, p) => setPage(p)}
+                    color="primary"
+                    size="small"
+                  />
+                </Stack>
+              </>
+            )}
+          </Box>
+        </Grid>
+
+        {/* Right: map panel only on desktop / large */}
+        {!isCompact && (
+          <Grid item xs={12} md={6} lg={7} xl={8}>
+            <Paper
+              sx={{
+                p: 1.5,
+                border: `1px solid ${BORDER}`,
+                borderRadius: 3,
+                position: { md: "sticky" },
+                top: 88,
+                height: { xs: 520, md: "calc(100vh - 140px)" },
+                display: "flex",
+                flexDirection: "column",
+                gap: 1,
               }}
-            />
-          </Stack>
-        </Paper>
+            >
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                justifyContent="space-between"
+                spacing={1}
+              >
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Where members are from
+                </Typography>
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={showMap}
+                        onChange={(_, v) => setShowMap(v)}
+                        size="small"
+                      />
+                    }
+                    label="Show map"
+                  />
+                </Stack>
+              </Stack>
 
-        {loading && <LinearProgress />}
+              {/* Legend */}
+              <Stack
+                direction="row"
+                spacing={2}
+                alignItems="center"
+                justifyContent="space-between"
+              >
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        bgcolor: "#ef4444",
+                        border: "1px solid #fff",
+                      }}
+                    />
+                    <Typography variant="caption">Members</Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: "50%",
+                        bgcolor: "#10b981",
+                        border: "1px solid #fff",
+                      }}
+                    />
+                    <Typography variant="caption">Friends</Typography>
+                  </Stack>
+                </Stack>
+              </Stack>
 
-        {!loading && error && (
-          <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-            <Typography color="error">⚠️ {error}</Typography>
-          </Paper>
-        )}
+              <Box
+                ref={mapBoxRef}
+                sx={{
+                  position: "relative",
+                  flex: 1,
+                  minHeight: 360,
+                  userSelect: "none",
+                  "& svg": { display: "block" },
+                  "& *:focus, & *:focus-visible": {
+                    outline: "none !important",
+                  },
+                }}
+              >
+                {showMap ? (
+                  <ComposableMap
+                    projection={geoNaturalEarth1()}
+                    width={mapSize.w}
+                    height={mapSize.h}
+                    preserveAspectRatio="xMidYMid slice"
+                  >
+                    <ZoomableGroup
+                      center={mapPos.coordinates}
+                      zoom={mapPos.zoom}
+                      minZoom={MIN_ZOOM}
+                      maxZoom={MAX_ZOOM}
+                      onMoveStart={() => hideTip()}
+                      onMoveEnd={(pos) => setMapPos(pos)}
+                    >
+                      <Geographies geography={geoUrl}>
+                        {({ geographies }) =>
+                          geographies.map((geo) => (
+                            <Geography
+                              key={geo.rsmKey}
+                              geography={geo}
+                              fill={countryColor(geo.properties.name)}
+                              stroke="#ffffff"
+                              strokeWidth={0.3}
+                            />
+                          ))
+                        }
+                      </Geographies>
 
-        {!loading && !error && (
-          <>
-            <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1} sx={{ mb: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                Showing {filtered.length === 0 ? "0" : `${startIdx + 1}–${Math.min(startIdx + ROWS_PER_PAGE, filtered.length)} of ${filtered.length}`}
-              </Typography>
-              <Pagination count={pageCount} page={page} onChange={(_, p) => setPage(p)} color="primary" size="small" />
-            </Stack>
+                      {countryAgg.map((c) => (
+                        <Marker
+                          key={`hover-${c.code}`}
+                          coordinates={c.center}
+                          onMouseEnter={(e) =>
+                            showTip(
+                              e,
+                              <div>
+                                <div style={{ fontWeight: 700 }}>
+                                  {c.label}
+                                </div>
+                                <div>
+                                  {c.total} people
+                                  {c.friends
+                                    ? ` • ${c.friends} friends`
+                                    : ""}
+                                </div>
+                                <div
+                                  style={{
+                                    marginTop: 4,
+                                    opacity: 0.9,
+                                  }}
+                                >
+                                  {c.users.slice(0, 6).join(", ")}
+                                  {c.total > 6
+                                    ? ` +${c.total - 6} more`
+                                    : ""}
+                                </div>
+                              </div>
+                            )
+                          }
+                          onMouseMove={moveTip}
+                          onMouseLeave={hideTip}
+                        >
+                          <circle
+                            r={14}
+                            fill="transparent"
+                            stroke="transparent"
+                            style={{ pointerEvents: "all" }}
+                          />
+                        </Marker>
+                      ))}
 
-            <Stack spacing={1.25}>
-              {current.map((u) => (
-                <MemberCard
-                  key={u.id}
-                  u={u}
-                  friendStatus={friendStatusByUser[u.id]}
-                  onOpenProfile={handleOpenProfile}
-                  onAddFriend={() => sendFriendRequest(u.id)}
-                />
-              ))}
+                      {markers.map((m, i) => (
+                        <Marker
+                          key={i}
+                          coordinates={m.coordinates}
+                          onMouseEnter={(e) =>
+                            showTip(
+                              e,
+                              <div>
+                                <div style={{ fontWeight: 600 }}>
+                                  {m.userName}
+                                </div>
+                                <div style={{ opacity: 0.85 }}>
+                                  {m.isFriend ? "Friend" : "Member"}
+                                </div>
+                              </div>
+                            )
+                          }
+                          onMouseMove={moveTip}
+                          onMouseLeave={hideTip}
+                        >
+                          <circle
+                            r={3.2}
+                            fill={m.isFriend ? "#10b981" : "#ef4444"}
+                            stroke="#ffffff"
+                            strokeWidth={1}
+                            style={{ pointerEvents: "all" }}
+                          />
+                        </Marker>
+                      ))}
+                    </ZoomableGroup>
+                  </ComposableMap>
+                ) : (
+                  <Stack
+                    alignItems="center"
+                    justifyContent="center"
+                    sx={{ height: "100%", color: "text.secondary" }}
+                  >
+                    <Typography>Map hidden.</Typography>
+                  </Stack>
+                )}
 
-              {filtered.length === 0 && (
-                <Paper sx={{ p: 4, borderRadius: 3, textAlign: "center", border: `1px solid ${BORDER}` }}>
-                  <Typography>No members match your search.</Typography>
-                </Paper>
-              )}
-            </Stack>
-          </>
+                {tip?.node && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      left: tip.x,
+                      top: tip.y,
+                      pointerEvents: "none",
+                      backgroundColor: "rgba(0,0,0,0.92)",
+                      color: "#fff",
+                      px: 1.25,
+                      py: 0.75,
+                      borderRadius: 1,
+                      fontSize: 12,
+                      lineHeight: 1.35,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                      maxWidth: 280,
+                      zIndex: 10,
+                      border: "none",
+                      outline: "none",
+                    }}
+                  >
+                    {tip.node}
+                  </Box>
+                )}
+              </Box>
+            </Paper>
+          </Grid>
         )}
       </Grid>
 
-      {/* Right: Colorful map with red/green dots + pan/zoom */}
-      <Grid item xs={12} md={6}>
-        <Paper
+      {/* 🔹 Full-screen map overlay for mobile / tablet / 1024 */}
+      {isCompact && mapOverlayOpen && (
+        <Box
           sx={{
-            p: 1.5,
-            border: `1px solid ${BORDER}`,
-            borderRadius: 3,
-            position: { md: "sticky" },
-            top: 88,
-            height: { xs: 520, md: "calc(100vh - 140px)" },
+            position: "fixed",
+            inset: 0,
+            zIndex: 1300,
+            bgcolor: "background.default",
             display: "flex",
             flexDirection: "column",
-            gap: 1,
           }}
         >
-          <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Where members are from
-            </Typography>
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <FormControlLabel control={<Switch checked={showMap} onChange={(_, v) => setShowMap(v)} size="small" />} label="Show map" />
+          <Paper
+            sx={{
+              flex: 1,
+              borderRadius: 0,
+              display: "flex",
+              flexDirection: "column",
+              p: 1.5,
+              gap: 1,
+            }}
+          >
+            {/* Top bar with back button */}
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              sx={{ mb: 0.5 }}
+            >
+              <IconButton
+                size="small"
+                onClick={() => setMapOverlayOpen(false)}
+              >
+                <ArrowBackIosNewRoundedIcon fontSize="small" />
+              </IconButton>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                Members map
+              </Typography>
             </Stack>
-          </Stack>
 
-          {/* Legend + zoom controls */}
-          <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: "#ef4444", border: "1px solid #fff" }} />
-                <Typography variant="caption">Members</Typography>
-              </Stack>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: "#10b981", border: "1px solid #fff" }} />
-                <Typography variant="caption">Friends</Typography>
+            {/* Header + legend (similar to desktop map) */}
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              justifyContent="space-between"
+              spacing={1}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Where members are from
+              </Typography>
+              <Stack direction="row" alignItems="center" spacing={2}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={showMap}
+                      onChange={(_, v) => setShowMap(v)}
+                      size="small"
+                    />
+                  }
+                  label="Show map"
+                />
               </Stack>
             </Stack>
-          </Stack>
 
-          <Box
+            <Stack
+              direction="row"
+              spacing={2}
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      bgcolor: "#ef4444",
+                      border: "1px solid #fff",
+                    }}
+                  />
+                  <Typography variant="caption">Members</Typography>
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      bgcolor: "#10b981",
+                      border: "1px solid #fff",
+                    }}
+                  />
+                  <Typography variant="caption">Friends</Typography>
+                </Stack>
+              </Stack>
+            </Stack>
+
+            <Box
               ref={mapBoxRef}
               sx={{
                 position: "relative",
@@ -704,115 +1074,153 @@ export default function MembersPage() {
                 minHeight: 360,
                 userSelect: "none",
                 "& svg": { display: "block" },
-                "& *:focus, & *:focus-visible": { outline: "none !important" }, // remove focus rectangle
+                "& *:focus, & *:focus-visible": {
+                  outline: "none !important",
+                },
               }}
             >
-            {showMap ? (
-              <ComposableMap
+              {showMap ? (
+                <ComposableMap
                   projection={geoNaturalEarth1()}
                   width={mapSize.w}
                   height={mapSize.h}
-                  preserveAspectRatio="xMidYMid slice"   // like CSS object-fit: cover
+                  preserveAspectRatio="xMidYMid slice"
                 >
-                <ZoomableGroup
-                  center={mapPos.coordinates}
-                  zoom={mapPos.zoom}
-                  minZoom={MIN_ZOOM}
-                  maxZoom={MAX_ZOOM}
-                  onMoveStart={() => hideTip()}       // hide tooltip when you start dragging
-                  onMoveEnd={(pos) => setMapPos(pos)} // and when drag ends
-                >
-                  <Geographies geography={geoUrl}>
-                    {({ geographies }) =>
-                      geographies.map((geo) => (
-                        <Geography
-                          key={geo.rsmKey}
-                          geography={geo}
-                          fill={countryColor(geo.properties.name)}
-                          stroke="#ffffff"
-                          strokeWidth={0.3}
-                        />
-                      ))
-                    }
-                  </Geographies>
-                  {/* Country-level hover (summary tooltip) */}
-                  {countryAgg.map((c) => (
-                    <Marker key={`hover-${c.code}`} coordinates={c.center}
-                    onMouseEnter={(e) =>
-                      showTip(
-                        e,
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{c.label}</div>
-                          <div>{c.total} people{c.friends ? ` • ${c.friends} friends` : ""}</div>
-                          <div style={{ marginTop: 4, opacity: 0.9 }}>
-                            {c.users.slice(0, 6).join(", ")}
-                            {c.total > 6 ? ` +${c.total - 6} more` : ""}
-                          </div>
-                        </div>
-                      )
-                    }
-                    onMouseMove={moveTip}
-                    onMouseLeave={hideTip}
-                    >
-                      {/* big invisible hit circle so hover is easy */}
-                      <circle r={14} fill="transparent" stroke="transparent" style={{ pointerEvents: "all" }} />
-                    </Marker>
-                  ))}
+                  <ZoomableGroup
+                    center={mapPos.coordinates}
+                    zoom={mapPos.zoom}
+                    minZoom={MIN_ZOOM}
+                    maxZoom={MAX_ZOOM}
+                    onMoveStart={() => hideTip()}
+                    onMoveEnd={(pos) => setMapPos(pos)}
+                  >
+                    <Geographies geography={geoUrl}>
+                      {({ geographies }) =>
+                        geographies.map((geo) => (
+                          <Geography
+                            key={geo.rsmKey}
+                            geography={geo}
+                            fill={countryColor(geo.properties.name)}
+                            stroke="#ffffff"
+                            strokeWidth={0.3}
+                          />
+                        ))
+                      }
+                    </Geographies>
 
-                  {markers.map((m, i) => (
-                    <Marker key={i} coordinates={m.coordinates}
-                    onMouseEnter={(e) => showTip(e, (
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{m.userName}</div>
-                        <div style={{ opacity: 0.85 }}>{m.isFriend ? "Friend" : "Member"}</div>
-                      </div>
+                    {countryAgg.map((c) => (
+                      <Marker
+                        key={`hover-mobile-${c.code}`}
+                        coordinates={c.center}
+                        onMouseEnter={(e) =>
+                          showTip(
+                            e,
+                            <div>
+                              <div style={{ fontWeight: 700 }}>
+                                {c.label}
+                              </div>
+                              <div>
+                                {c.total} people
+                                {c.friends
+                                  ? ` • ${c.friends} friends`
+                                  : ""}
+                              </div>
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  opacity: 0.9,
+                                }}
+                              >
+                                {c.users.slice(0, 6).join(", ")}
+                                {c.total > 6
+                                  ? ` +${c.total - 6} more`
+                                  : ""}
+                              </div>
+                            </div>
+                          )
+                        }
+                        onMouseMove={moveTip}
+                        onMouseLeave={hideTip}
+                      >
+                        <circle
+                          r={14}
+                          fill="transparent"
+                          stroke="transparent"
+                          style={{ pointerEvents: "all" }}
+                        />
+                      </Marker>
                     ))}
-                    onMouseMove={moveTip}
-                    onMouseLeave={hideTip}>
-                      <circle
-                        r={3.2}
-                        fill={m.isFriend ? "#10b981" : "#ef4444"}
-                        stroke="#ffffff"
-                        strokeWidth={1}
-                        style={{ pointerEvents: "all" }}
-                      />
-                    </Marker>
-                  ))}
-                </ZoomableGroup>
-              </ComposableMap>
-              
-            ) : (
-              <Stack alignItems="center" justifyContent="center" sx={{ height: "100%", color: "text.secondary" }}>
-                <Typography>Map hidden.</Typography>
-              </Stack>
-            )}
-            {tip?.node && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  left: tip.x,
-                  top: tip.y,
-                  pointerEvents: "none",
-                  backgroundColor: "rgba(0,0,0,0.92)",
-                  color: "#fff",
-                  px: 1.25,
-                  py: 0.75,
-                  borderRadius: 1,
-                  fontSize: 12,
-                  lineHeight: 1.35,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
-                  maxWidth: 280,
-                  zIndex: 10,
-                  border: "none",
-                  outline: "none",
-                }}
-              >
-                {tip.node}
-              </Box>
-            )}
-          </Box>
-        </Paper>
-      </Grid>
-    </Grid>
+
+                    {markers.map((m, i) => (
+                      <Marker
+                        key={`mobile-${i}`}
+                        coordinates={m.coordinates}
+                        onMouseEnter={(e) =>
+                          showTip(
+                            e,
+                            <div>
+                              <div style={{ fontWeight: 600 }}>
+                                {m.userName}
+                              </div>
+                              <div style={{ opacity: 0.85 }}>
+                                {m.isFriend ? "Friend" : "Member"}
+                              </div>
+                            </div>
+                          )
+                        }
+                        onMouseMove={moveTip}
+                        onMouseLeave={hideTip}
+                      >
+                        <circle
+                          r={3.2}
+                          fill={m.isFriend ? "#10b981" : "#ef4444"}
+                          stroke="#ffffff"
+                          strokeWidth={1}
+                          style={{ pointerEvents: "all" }}
+                        />
+                      </Marker>
+                    ))}
+                  </ZoomableGroup>
+                </ComposableMap>
+              ) : (
+                <Stack
+                  alignItems="center"
+                  justifyContent="center"
+                  sx={{ height: "100%", color: "text.secondary" }}
+                >
+                  <Typography>Map hidden.</Typography>
+                </Stack>
+              )}
+
+              {tip?.node && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: tip.x,
+                    top: tip.y,
+                    pointerEvents: "none",
+                    backgroundColor: "rgba(0,0,0,0.92)",
+                    color: "#fff",
+                    px: 1.25,
+                    py: 0.75,
+                    borderRadius: 1,
+                    fontSize: 12,
+                    lineHeight: 1.35,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                    maxWidth: 280,
+                    zIndex: 10,
+                    border: "none",
+                    outline: "none",
+                  }}
+                >
+                  {tip.node}
+                </Box>
+              )}
+            </Box>
+          </Paper>
+        </Box>
+      )}
+    </>
   );
 }
+

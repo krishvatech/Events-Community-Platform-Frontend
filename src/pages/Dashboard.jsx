@@ -1035,7 +1035,10 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit }) {
         <Typography variant="h6" className="font-extrabold !leading-snug text-slate-900">
           {ev.title}
         </Typography>
-        <p className="text-sm text-slate-500">
+        <p
+          className="text-sm text-slate-500 truncate"
+          title={`${fmtDateRange(ev.start_time, ev.end_time)}${ev.location ? ` • ${ev.location}` : ""}`}
+        >
           {fmtDateRange(ev.start_time, ev.end_time)}
           {ev.location ? ` • ${ev.location}` : ""}
         </p>
@@ -1045,25 +1048,52 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit }) {
             startIcon={<LiveTvRoundedIcon />}
             variant="contained"
             className="rounded-xl"
-            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+            sx={{
+              textTransform: "none",
+              backgroundColor: "#10b8a6",
+              "&:hover": { backgroundColor: "#0ea5a4" },
+              minWidth: { xs: 40, lg: 120 },
+              px: { xs: 1, lg: 2 },
+            }}
             disabled={isHosting}
           >
             {isHosting ? (
               <span className="flex items-center gap-2">
-                <CircularProgress size={18} /> Hosting…
+                <CircularProgress size={18} />
+                <Box
+                  component="span"
+                  sx={{ display: { xs: "none", lg: "inline" } }}
+                >
+                  Hosting…
+                </Box>
               </span>
             ) : (
-              "Host Now"
+              <Box
+                component="span"
+                sx={{ display: { xs: "none", lg: "inline" } }}
+              >
+                Host Now
+              </Box>
             )}
           </Button>
+
           <Button
             onClick={() => onEdit?.(ev)}
             startIcon={<EditNoteRoundedIcon />}
             variant="outlined"
             className="rounded-xl"
-            sx={{ textTransform: "none" }}
+            sx={{
+              textTransform: "none",
+              minWidth: { xs: 36, lg: 96 },
+              px: { xs: 1, lg: 2 },
+            }}
           >
-            Edit
+            <Box
+              component="span"
+              sx={{ display: { xs: "none", lg: "inline" } }}
+            >
+              Edit
+            </Box>
           </Button>
         </Box>
       </Box>
@@ -1174,7 +1204,7 @@ function AdminEvents() {
 
   useEffect(() => {
     setPage(1);
-  }, [q,tab]);
+  }, [q, tab]);
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -1214,26 +1244,51 @@ function AdminEvents() {
   };
 
   return (
-    <Container maxWidth="lg" disableGutters className="py-6 sm:py-8">
+    <Container
+      maxWidth="lg"
+      disableGutters
+      className="pt-6 pb-6 sm:pt-1 sm:pb-8"
+    >
       {/* Header */}
-      <Box className="flex items-center gap-3 mb-4">
-        <Avatar sx={{ bgcolor: "#0ea5a4" }}>{(user?.first_name || "A")[0].toUpperCase()}</Avatar>
-        <div className="flex-1">
+      <Box
+        className="mb-4"
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: { xs: "flex-start", sm: "center" },
+          gap: 2,
+        }}
+      >
+        <Avatar sx={{ bgcolor: "#0ea5a4" }}>
+          {(user?.first_name || "A")[0].toUpperCase()}
+        </Avatar>
+
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="h5" className="font-extrabold">
-            Admin Events
+            Events
           </Typography>
-          <Typography className="text-slate-500">Manage sessions you’ve created. Start hosting with one click.</Typography>
-        </div>
+          <Typography className="text-slate-500">
+            Manage sessions you’ve created. Start hosting with one click.
+          </Typography>
+        </Box>
+
         {isOwnerUser() && (
-          <Button
-            onClick={() => setCreateOpen(true)}
-            startIcon={<AddRoundedIcon />}
-            variant="contained"
-            className="rounded-xl"
-            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-          >
-            Create Event
-          </Button>
+          <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
+            <Button
+              fullWidth
+              onClick={() => setCreateOpen(true)}
+              startIcon={<AddRoundedIcon />}
+              variant="contained"
+              className="rounded-xl"
+              sx={{
+                textTransform: "none",
+                backgroundColor: "#10b8a6",
+                "&:hover": { backgroundColor: "#0ea5a4" },
+              }}
+            >
+              Create Event
+            </Button>
+          </Box>
         )}
       </Box>
       {/* Tabs: All / Upcoming / Live / Past */}
@@ -1272,7 +1327,7 @@ function AdminEvents() {
           InputProps={{ startAdornment: <SearchRoundedIcon className="mr-2 text-slate-400" /> }}
           sx={{ width: { xs: "100%", sm: 360 } }}
         />
-        <Box sx={{ flex: 1 }} />
+        <Box sx={{ flex: 1, display: { xs: "none", sm: "block" } }} />
       </Stack>
 
       {/* Grid */}
@@ -1303,15 +1358,26 @@ function AdminEvents() {
       ) : (
         <>
           <Box sx={{ flexGrow: 1 }}>
-            <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 8, md: 12 }}>
+            <Grid
+              container
+              spacing={{ xs: 2, md: 3 }}
+              columns={{ xs: 4, sm: 12, md: 12 }}   // ✅ same as MyEventsPage
+            >
               {paged.map((ev) => (
-                <Grid key={ev.id || ev.slug} size={{ xs: 4, sm: 4, md: 4 }}>
-                  <AdminEventCard ev={ev} onHost={onHost} isHosting={hostingId === (ev.id ?? null)} onEdit={onEdit} />
+                <Grid
+                  key={ev.id || ev.slug}
+                  size={{ xs: 4, sm: 4, md: 4 }}     // ✅ 1 card on mobile, 3 on tablet/desktop
+                >
+                  <AdminEventCard
+                    ev={ev}
+                    onHost={onHost}
+                    isHosting={hostingId === (ev.id ?? null)}
+                    onEdit={onEdit}
+                  />
                 </Grid>
               ))}
             </Grid>
 
-            {/* ⬇️ Put the dialog HERE (mounted once, outside the map) */}
             {editing && (
               <EditEventDialog
                 open={editOpen}
@@ -1365,7 +1431,13 @@ export default function Dashboard() {
 
   return (
     <Box className="min-h-screen bg-slate-50">
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Container
+        maxWidth="xl"
+        sx={{
+          py: 3,
+          px: { xs: 1, sm: 2 },   // xs = 8px, sm+ = 16px (same as before)
+        }}
+      >
         <Grid
           container
           columnSpacing={{ xs: 2, md: 3 }}   // 16px on mobile, 24px on md+
