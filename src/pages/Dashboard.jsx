@@ -28,7 +28,7 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import dayjs from "dayjs";
-import GroupsAdmin from "../pages/GroupsAdmin";
+import AdminGroups from "../pages/AdminGroups";
 import MyResourcesAdmin from "./MyResourcesAdmin";
 import EmojiEmotionsRoundedIcon from '@mui/icons-material/EmojiEmotionsRounded';
 import InsertPhotoRoundedIcon from '@mui/icons-material/InsertPhotoRounded';
@@ -1382,7 +1382,7 @@ function AdminEvents() {
               <EditEventDialog
                 open={editOpen}
                 onClose={() => setEditOpen(false)}
-                event={editing}
+               AdminGroupsting}
                 onUpdated={onUpdated}
               />
             )}

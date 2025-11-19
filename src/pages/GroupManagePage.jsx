@@ -28,7 +28,7 @@ import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 
 
 
-// ---- API helpers (reuse same pattern as GroupsAdmin.jsx) ----
+// ---- API helpers (reuse same pattern as AdminGroups.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;

@@ -30,7 +30,7 @@ import GroupDetailsPage from "./pages/community/GroupDetailsPage.jsx";
 import AdminLayout from "./components/layout/AdminLayout.jsx";
 import AdminPostsPage from "./pages/AdminPostsPage.jsx";
 import MyResourcesAdmin from "./pages/MyResourcesAdmin.jsx";
-import GroupsAdmin from "./pages/GroupsAdmin.jsx";
+import AdminGroups from "./pages/AdminGroups.jsx";
 import AdminNotificationsPage from "./pages/AdminNotificationsPage.jsx";
 import AdminSettings from "./pages/AdminSettings.jsx";
 import AdminStaffPage from "./pages/AdminStaffPage.jsx"
@@ -82,7 +82,7 @@ const AppShell = () => {
           <Route path="events" element={<Dashboard />} />
           <Route path="resources" element={<MyResourcesAdmin />} />
           <Route path="posts" element={<AdminPostsPage />} />
-          <Route path="groups" element={<GroupsAdmin />} />
+          <Route path="groups" element={<AdminGroups />} />
           <Route path="messages" element={<AdminMessagesPage />} />
           <Route path="notifications" element={<AdminNotificationsPage />} />
           <Route path="settings" element={<AdminSettings />} />
