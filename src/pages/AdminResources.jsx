@@ -456,6 +456,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
 export default function MyResourcesAdmin() {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const [events, setEvents] = useState([]);
+  const [registeredEventIds, setRegisteredEventIds] = useState([]);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -489,12 +490,37 @@ export default function MyResourcesAdmin() {
     }
   };
 
+  const fetchRegisteredEvents = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const response = await axios.get(`${API}/event-registrations/mine/`, config);
+
+      const data = response.data;
+      const registrations = Array.isArray(data) ? data : data.results || [];
+
+      const ids = registrations
+        .map((reg) => {
+          if (reg.event && typeof reg.event === "object") return reg.event.id;
+          return reg.event_id || reg.event;
+        })
+        .filter(Boolean)
+        .map((id) => String(id));
+
+      setRegisteredEventIds(ids);
+    } catch (error) {
+      console.error("Error fetching registered events:", error);
+      setRegisteredEventIds([]);
+    }
+  };
+
+
   const filterResourcesForUser = (allResources) => {
     if (!currentUser) return [];
 
     const ownerUser = isOwnerUser(currentUser);
 
-    // ✅ Owner: show only resources uploaded/owned by this user (same logic as before)
+    // ✅ Owner: show only resources uploaded/owned by this user
     if (ownerUser) {
       return allResources.filter((r) => {
         const isOwner =
@@ -507,8 +533,12 @@ export default function MyResourcesAdmin() {
       });
     }
 
-    // ✅ Staff: show resources only for events that this user has access to / joined
-    const joinedEventIds = new Set(events.map((e) => String(e.id)));
+    // ✅ Staff: ONLY events they purchased / registered for
+    if (!registeredEventIds || registeredEventIds.length === 0) {
+      return [];
+    }
+
+    const allowedEventIds = new Set(registeredEventIds.map((id) => String(id)));
 
     return allResources.filter((r) => {
       const rawEventId =
@@ -517,13 +547,26 @@ export default function MyResourcesAdmin() {
         null;
 
       if (!rawEventId) return false;
-      return joinedEventIds.has(String(rawEventId));
+      return allowedEventIds.has(String(rawEventId));
     });
   };
 
   // Fetch resources with server-side pagination
   const fetchResources = async () => {
     if (!currentUser) return;
+
+    const ownerUser = isOwnerUser(currentUser);
+
+    // ✅ Staff: if no purchased events -> no resources, skip API call
+    if (
+      !ownerUser &&
+      (!registeredEventIds || registeredEventIds.length === 0)
+    ) {
+      setItems([]);
+      setResourcesTotal(0);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -618,9 +661,15 @@ export default function MyResourcesAdmin() {
 
   useEffect(() => {
     if (currentUser) {
+      fetchRegisteredEvents();
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (currentUser) {
       fetchResources();
     }
-  }, [currentUser, events, resourcePage, resourceQuery, resourceFilterType, resourceSort]);
+  }, [currentUser, events, registeredEventIds, resourcePage, resourceQuery, resourceFilterType, resourceSort]);
 
   useEffect(() => {
     setResourcePage(1);
