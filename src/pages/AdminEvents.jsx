@@ -1035,7 +1035,16 @@ function EditEventDialog({ open, onClose, event, onUpdated }) {
 /* ===========================================
    Existing Admin cards list (unchanged)
    =========================================== */
-function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, isOwner }) {
+function AdminEventCard({
+  ev,
+  onHost,
+  isHosting,
+  onJoinLive,
+  isJoining,
+  isOwner,
+}) {
+  const navigate = useNavigate();
+
   const status = computeStatus(ev);
   const chip = statusChip(status);
 
@@ -1049,11 +1058,19 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
   // If event is live OR within early-join window, show enabled Join button
   const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
 
+  const handleOpenDetails = () => {
+    if (!ev?.id) return;
+    navigate(`/admin/events/${ev.id}`, { state: { event: ev } });
+  };
+
   return (
     <Paper
       elevation={0}
       className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+      onClick={handleOpenDetails}
+      sx={{ cursor: "pointer" }}
     >
+      {/* Top image area */}
       <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
         {ev.preview_image ? (
           <img
@@ -1079,6 +1096,7 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
         )}
       </Box>
 
+      {/* Content */}
       <Box className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-center justify-between gap-2">
           <Chip
@@ -1107,13 +1125,18 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
           {ev.location ? ` • ${ev.location}` : ""}
         </p>
 
-        <Box className="mt-auto flex items-center gap-1.5 pt-1">
+        {/* Actions – stop click bubbling so buttons don't trigger card navigation */}
+        <Box
+          className="mt-auto pt-1"
+          sx={{ display: "flex" }}
+          onClick={(e) => e.stopPropagation()}
+        >
           {isOwner ? (
             <>
-              {/* OWNER: primary action depends on status */}
+              {/* OWNER: single full-width button */}
               {isPast ? (
                 ev.recording_url ? (
-                  // ✅ Event ended & recording available → Watch Recording
+                  // Event ended & recording available → Watch Recording
                   <Button
                     component="a"
                     href={ev.recording_url}
@@ -1121,12 +1144,11 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                     rel="noopener noreferrer"
                     variant="contained"
                     className="rounded-xl"
+                    fullWidth
                     sx={{
                       textTransform: "none",
                       backgroundColor: "#10b8a6",
                       "&:hover": { backgroundColor: "#0ea5a4" },
-                      minWidth: { xs: 40, lg: 120 },
-                      px: { xs: 1, lg: 2 },
                     }}
                   >
                     <Box
@@ -1135,18 +1157,23 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                     >
                       Watch Recording
                     </Box>
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "inline", lg: "none" } }}
+                    >
+                      Watch
+                    </Box>
                   </Button>
                 ) : (
-                  // ✅ Event ended, no recording → disabled Event Ended
+                  // Event ended, no recording → disabled Event Ended
                   <Button
                     disabled
                     variant="contained"
                     className="rounded-xl"
+                    fullWidth
                     sx={{
                       textTransform: "none",
                       backgroundColor: "#CBD5E1",
-                      minWidth: { xs: 40, lg: 120 },
-                      px: { xs: 1, lg: 2 },
                     }}
                   >
                     <Box
@@ -1155,21 +1182,26 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                     >
                       Event Ended
                     </Box>
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "inline", lg: "none" } }}
+                    >
+                      Ended
+                    </Box>
                   </Button>
                 )
               ) : (
-                // ✅ Upcoming / Live → Host Now (same as before)
+                // Upcoming / Live → Host Now
                 <Button
                   onClick={() => onHost(ev)}
                   startIcon={<LiveTvRoundedIcon />}
                   variant="contained"
                   className="rounded-xl"
+                  fullWidth
                   sx={{
                     textTransform: "none",
                     backgroundColor: "#10b8a6",
                     "&:hover": { backgroundColor: "#0ea5a4" },
-                    minWidth: { xs: 40, lg: 120 },
-                    px: { xs: 1, lg: 2 },
                   }}
                   disabled={isHosting}
                 >
@@ -1184,51 +1216,38 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                       </Box>
                     </span>
                   ) : (
-                    <Box
-                      component="span"
-                      sx={{ display: { xs: "none", lg: "inline" } }}
-                    >
-                      Host Now
-                    </Box>
+                    <>
+                      <Box
+                        component="span"
+                        sx={{ display: { xs: "none", lg: "inline" } }}
+                      >
+                        Host Now
+                      </Box>
+                      <Box
+                        component="span"
+                        sx={{ display: { xs: "inline", lg: "none" } }}
+                      >
+                        Host
+                      </Box>
+                    </>
                   )}
                 </Button>
               )}
-
-              {/* OWNER: Edit stays same */}
-              <Button
-                onClick={() => onEdit?.(ev)}
-                startIcon={<EditNoteRoundedIcon />}
-                variant="outlined"
-                className="rounded-xl"
-                sx={{
-                  textTransform: "none",
-                  minWidth: { xs: 36, lg: 96 },
-                  px: { xs: 1, lg: 2 },
-                }}
-              >
-                <Box
-                  component="span"
-                  sx={{ display: { xs: "none", lg: "inline" } }}
-                >
-                  Edit
-                </Box>
-              </Button>
             </>
           ) : (
             <>
-              {/* STAFF: primary action depends on status */}
+              {/* STAFF: single full-width button */}
               {canShowActiveJoin ? (
-                // 🔴 Live OR within 15 min before start → active Join button
+                // Live OR within 15 min before start → Join
                 <Button
                   onClick={() => onJoinLive?.(ev)}
                   variant="contained"
                   className="rounded-xl"
+                  fullWidth
                   sx={{
                     textTransform: "none",
                     backgroundColor: "#10b8a6",
                     "&:hover": { backgroundColor: "#0ea5a4" },
-                    minWidth: { xs: 40, lg: 120 },
-                    px: { xs: 1, lg: 2 },
                   }}
                   disabled={isJoining}
                 >
@@ -1243,16 +1262,24 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                       </Box>
                     </span>
                   ) : (
-                    <Box
-                      component="span"
-                      sx={{ display: { xs: "none", lg: "inline" } }}
-                    >
-                      {isLive ? "Join Live" : "Join"}
-                    </Box>
+                    <>
+                      <Box
+                        component="span"
+                        sx={{ display: { xs: "none", lg: "inline" } }}
+                      >
+                        {isLive ? "Join Live" : "Join"}
+                      </Box>
+                      <Box
+                        component="span"
+                        sx={{ display: { xs: "inline", lg: "none" } }}
+                      >
+                        {isLive ? "Live" : "Join"}
+                      </Box>
+                    </>
                   )}
                 </Button>
               ) : isPast && ev.recording_url ? (
-                // ✅ Ended + recording → Watch Recording
+                // Ended + recording → Watch Recording
                 <Button
                   component="a"
                   href={ev.recording_url}
@@ -1260,12 +1287,11 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                   rel="noopener noreferrer"
                   variant="contained"
                   className="rounded-xl"
+                  fullWidth
                   sx={{
                     textTransform: "none",
                     backgroundColor: "#10b8a6",
                     "&:hover": { backgroundColor: "#0ea5a4" },
-                    minWidth: { xs: 40, lg: 120 },
-                    px: { xs: 1, lg: 2 },
                   }}
                 >
                   <Box
@@ -1274,18 +1300,23 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                   >
                     Watch Recording
                   </Box>
+                  <Box
+                    component="span"
+                    sx={{ display: { xs: "inline", lg: "none" } }}
+                  >
+                    Watch
+                  </Box>
                 </Button>
               ) : isPast && !ev.recording_url ? (
-                // ✅ Ended, no recording → disabled Event Ended
+                // Ended, no recording → disabled Event Ended
                 <Button
                   disabled
                   variant="contained"
                   className="rounded-xl"
+                  fullWidth
                   sx={{
                     textTransform: "none",
                     backgroundColor: "#CBD5E1",
-                    minWidth: { xs: 40, lg: 120 },
-                    px: { xs: 1, lg: 2 },
                   }}
                 >
                   <Box
@@ -1294,18 +1325,23 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                   >
                     Event Ended
                   </Box>
+                  <Box
+                    component="span"
+                    sx={{ display: { xs: "inline", lg: "none" } }}
+                  >
+                    Ended
+                  </Box>
                 </Button>
               ) : (
-                // ✅ Upcoming but more than 15 min away → disabled Join
+                // Upcoming but more than 15 min away → disabled Join
                 <Button
                   disabled
                   variant="contained"
                   className="rounded-xl"
+                  fullWidth
                   sx={{
                     textTransform: "none",
                     backgroundColor: "#CBD5E1",
-                    minWidth: { xs: 40, lg: 120 },
-                    px: { xs: 1, lg: 2 },
                   }}
                 >
                   <Box
@@ -1314,37 +1350,22 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                   >
                     Join (Not Live Yet)
                   </Box>
+                  <Box
+                    component="span"
+                    sx={{ display: { xs: "inline", lg: "none" } }}
+                  >
+                    Not Live
+                  </Box>
                 </Button>
               )}
-
-              {/* STAFF: View (instead of Edit) */}
-              <Button
-                component={Link}
-                to={`/admin/events/${ev.id}`}
-                state={{ event: ev }}
-                variant="outlined"
-                className="rounded-xl"
-                sx={{
-                  textTransform: "none",
-                  minWidth: { xs: 36, lg: 96 },
-                  px: { xs: 1, lg: 2 },
-                }}
-              >
-                <Box
-                  component="span"
-                  sx={{ display: { xs: "none", lg: "inline" } }}
-                >
-                  View
-                </Box>
-              </Button>
             </>
           )}
         </Box>
-
       </Box>
     </Paper>
   );
 }
+
 
 function EventsPage() {
   const token = getToken();
@@ -1362,8 +1383,6 @@ function EventsPage() {
   const [events, setEvents] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
   // hosting flow state
   const [hostingId, setHostingId] = useState(null);
   const [joiningId, setJoiningId] = useState(null);
@@ -1377,17 +1396,6 @@ function EventsPage() {
 
   // NEW: create dialog state
   const [createOpen, setCreateOpen] = useState(false);
-
-  // when a card clicks Edit:
-  const onEdit = (ev) => {
-    setEditing(ev);
-    setEditOpen(true);
-  };
-
-  // when PATCH succeeds:
-  const onUpdated = (updated) => {
-    setEvents((prev) => prev.map((e) => (String(e.id) === String(updated.id) ? updated : e)));
-  };
 
   // Fetch events:
   // - Owner: see ALL events
@@ -1713,7 +1721,6 @@ function EventsPage() {
                     ev={ev}
                     onHost={onHost}
                     isHosting={hostingId === (ev.id ?? null)}
-                    onEdit={onEdit}
                     onJoinLive={handleJoinLive}
                     isJoining={joiningId === (ev.id ?? null)}
                     isOwner={isOwner}
@@ -1722,14 +1729,6 @@ function EventsPage() {
               ))}
             </Grid>
 
-            {editing && (
-              <EditEventDialog
-                open={editOpen}
-                onClose={() => setEditOpen(false)}
-                event={editing}
-                onUpdated={onUpdated}
-              />
-            )}
           </Box>
 
           {/* Pagination */}
@@ -1748,15 +1747,6 @@ function EventsPage() {
 
       {/* Create Event Dialog */}
       <CreateEventDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={onCreated} />
-      {/* Edit dialog (mounted once) */}
-      {editing && (
-        <EditEventDialog
-          open={editOpen}
-          onClose={() => setEditOpen(false)}
-          event={editing}
-          onUpdated={onUpdated}
-        />
-      )}
     </Container>
   );
 }

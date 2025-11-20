@@ -25,6 +25,7 @@ import MovieRoundedIcon from "@mui/icons-material/MovieRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import VideoLibraryRoundedIcon from "@mui/icons-material/VideoLibraryRounded";
 import LiveTvRoundedIcon from "@mui/icons-material/LiveTvRounded";
+import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");

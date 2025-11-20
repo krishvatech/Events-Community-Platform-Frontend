@@ -45,6 +45,8 @@ import PlaceIcon from "@mui/icons-material/Place";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
+import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 
 import { isOwnerUser } from "../utils/adminRole";
 
@@ -120,6 +122,28 @@ async function uploadAvatar(file) {
   if (!r.ok) throw new Error("Avatar upload failed");
   return r.json(); // { user_image, user_image_url }
 }
+
+async function deleteAvatar() {
+  // Try dedicated DELETE endpoint first
+  try {
+    const r = await fetch(`${API_ROOT}/users/me/avatar/`, {
+      method: "DELETE",
+      headers: { ...authHeader() },
+    });
+    if (r.ok) return;
+  } catch (e) {
+    // ignore, we’ll try PATCH fallback
+  }
+
+  // Fallback: clear image via PATCH on /users/me/
+  const r2 = await fetch(`${API_ROOT}/users/me/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify({ profile: { user_image: null } }),
+  });
+  if (!r2.ok) throw new Error("Avatar delete failed");
+}
+
 
 // -------------------- Helpers copied from ProfilePage --------------------
 
@@ -295,6 +319,7 @@ export default function AdminSettings() {
   const [expList, setExpList] = React.useState([]);
 
   const fileRef = React.useRef(null);
+  const avatarDialogInputRef = React.useRef(null);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -357,6 +382,13 @@ export default function AdminSettings() {
     id: null,
     label: "",
   });
+
+  const [avatarDialogOpen, setAvatarDialogOpen] = React.useState(false);
+  const [avatarFile, setAvatarFile] = React.useState(null);     // new file (if chosen)
+  const [avatarPreview, setAvatarPreview] = React.useState(""); // what dialog shows
+  const [avatarMode, setAvatarMode] = React.useState(null);     // null | "upload" | "remove"
+  const avatarFileRef = React.useRef(null);
+
 
   const openAbout = () => {
     setAboutForm({
@@ -552,6 +584,91 @@ export default function AdminSettings() {
         msg: e?.message || "Delete failed",
       });
       closeConfirm();
+    }
+  };
+
+  const openAvatarDialog = () => {
+    setAvatarMode(null);
+    setAvatarFile(null);
+    setAvatarPreview(avatarUrl || "");
+    setAvatarDialogOpen(true);
+  };
+
+  const closeAvatarDialog = () => {
+    if (avatarPreview && avatarPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+    setAvatarDialogOpen(false);
+    setAvatarFile(null);
+    setAvatarPreview("");
+    setAvatarMode(null);
+  };
+
+  const onAvatarFileChange = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    if (avatarPreview && avatarPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+
+    const url = URL.createObjectURL(f);
+    setAvatarFile(f);
+    setAvatarPreview(url);
+    setAvatarMode("upload");
+
+    if (avatarFileRef.current) avatarFileRef.current.value = "";
+  };
+
+  const handleAvatarRemoveClick = () => {
+    if (avatarPreview && avatarPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+    setAvatarFile(null);
+    setAvatarPreview("");
+    setAvatarMode("remove");
+  };
+
+  const saveAvatarDialog = async () => {
+    if (!avatarMode) {
+      // nothing changed
+      closeAvatarDialog();
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      if (avatarMode === "upload" && avatarFile) {
+        const res = await uploadAvatar(avatarFile);
+        setProfile((p) => ({
+          ...p,
+          user_image_url: res.user_image_url || p.user_image_url,
+        }));
+        setToast({
+          open: true,
+          type: "success",
+          msg: "Profile image updated",
+        });
+      } else if (avatarMode === "remove") {
+        await deleteAvatar();
+        setProfile((p) => ({ ...p, user_image_url: "" }));
+        setToast({
+          open: true,
+          type: "success",
+          msg: "Profile image removed",
+        });
+      }
+
+      closeAvatarDialog();
+    } catch (err) {
+      setToast({
+        open: true,
+        type: "error",
+        msg: err?.message || "Failed to update profile photo",
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -997,27 +1114,50 @@ export default function AdminSettings() {
                     py: { xs: 1.5, md: 2 },
                   }}
                 >
-                  <Avatar
-                    src={avatarUrl || undefined}
-                    sx={{
-                      width: 56,
-                      height: 56,
-                      bgcolor: "grey.300",
-                      fontSize: 24,
-                      mr: 2,
-                    }}
-                  >
-                    {displayName.charAt(0).toUpperCase()}
-                  </Avatar>
+                  <Box sx={{ position: "relative", display: "inline-flex", mr: 2 }}>
+                    <Avatar
+                      src={avatarUrl || undefined}
+                      sx={{
+                        width: 56,
+                        height: 56,
+                        bgcolor: "grey.300",
+                        fontSize: 24,
+                      }}
+                    >
+                      {displayName.charAt(0).toUpperCase()}
+                    </Avatar>
+
+                    {/* camera when no avatar, pencil when avatar exists */}
+                    <IconButton
+                      size="small"
+                      onClick={openAvatarDialog}
+                      sx={{
+                        position: "absolute",
+                        bottom: -4,
+                        right: -4,
+                        width: 26,
+                        height: 26,
+                        bgcolor: "background.paper",
+                        borderRadius: "50%",
+                        border: "1px solid",
+                        borderColor: "divider",
+                        boxShadow: 1,
+                        "&:hover": { bgcolor: "grey.100" },
+                      }}
+                    >
+                      {avatarUrl ? (
+                        <EditOutlinedIcon sx={{ fontSize: 16 }} />
+                      ) : (
+                        <PhotoCameraRoundedIcon sx={{ fontSize: 16 }} />
+                      )}
+                    </IconButton>
+                  </Box>
 
                   <Box sx={{ minWidth: 0 }}>
-                    <Typography
-                      variant="subtitle1"
-                      sx={{ fontWeight: 700 }}
-                    >
+                    {/* existing name + work line */}
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                       {displayName}
                     </Typography>
-
                     {workLine && (
                       <Typography
                         variant="body2"
@@ -1434,6 +1574,85 @@ export default function AdminSettings() {
           )}
         </Container>
       )}
+
+      {/* --- Update avatar dialog --- */}
+      <Dialog
+        open={avatarDialogOpen}
+        onClose={closeAvatarDialog}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Update profile photo</DialogTitle>
+        <DialogContent
+          sx={{
+            pt: 3,
+            pb: 2,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+          }}
+        >
+          <Avatar
+            src={avatarPreview || avatarUrl || undefined}
+            sx={{
+              width: 96,
+              height: 96,
+              mb: 2,
+              bgcolor: "grey.300",
+              fontSize: 32,
+            }}
+          >
+            {displayName.charAt(0).toUpperCase()}
+          </Avatar>
+
+          <input
+            ref={avatarFileRef}
+            hidden
+            type="file"
+            accept="image/*"
+            onChange={onAvatarFileChange}
+          />
+
+          <Button
+            variant="outlined"
+            startIcon={<UploadRoundedIcon />}
+            onClick={() => avatarFileRef.current?.click()}
+            sx={{ borderRadius: 999, px: 3, mb: 1 }}
+            disabled={saving}
+          >
+            Choose image
+          </Button>
+
+          <Typography variant="caption" color="text.secondary">
+            JPG/PNG, recommended square image
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          {/* remove option, only if there is an existing avatar */}
+          {avatarUrl && (
+            <Button
+              color="error"
+              onClick={handleAvatarRemoveClick}
+              disabled={saving}
+            >
+              Remove photo
+            </Button>
+          )}
+          <Box sx={{ flexGrow: 1 }} />
+          <Button onClick={closeAvatarDialog} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={saveAvatarDialog}
+            disabled={saving || !avatarMode}
+          >
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* --- Edit Contact dialog --- */}
       <Dialog

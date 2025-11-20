@@ -180,6 +180,7 @@ function toCard(ev) {
 // ————————————————————————————————————————
 function EventCard({ ev }) {
   const navigate = useNavigate();
+  const owner = isOwnerUser();
 
   const handleRegisterCard = async () => {
     const token =
@@ -318,29 +319,31 @@ function EventCard({ ev }) {
       <div className="flex items-center justify-between border-t p-6">
         <div className="text-xl font-semibold text-neutral-900">{priceStr(ev.price)}</div>
 
-        {ev.isRegistered ? (
-          <Button
-            variant="contained"
-            size="large"
-            disabled
-            className="normal-case rounded-full px-5 bg-emerald-500/80"
-            title="You are already registered for this event"
-          >
-            Registered
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            size="large"
-            color="primary"
-            onClick={handleRegisterCard}
-            className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
-          >
-            Register Now
-          </Button>
+        {/* Hide register button for owner users */}
+        {!owner && (
+          ev.isRegistered ? (
+            <Button
+              variant="contained"
+              size="large"
+              disabled
+              className="normal-case rounded-full px-5 bg-emerald-500/80"
+              title="You are already registered for this event"
+            >
+              Registered
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              size="large"
+              color="primary"
+              onClick={handleRegisterCard}
+              className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
+            >
+              Register Now
+            </Button>
+          )
         )}
       </div>
-
     </MUICard>
   );
 }
