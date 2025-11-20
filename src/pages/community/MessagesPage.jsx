@@ -28,12 +28,16 @@ import {
   Tabs,
   Tab,
   CircularProgress,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
-
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import SearchIcon from "@mui/icons-material/Search";
 import SendIcon from "@mui/icons-material/Send";
 import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
 import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
@@ -805,7 +809,17 @@ function NewChatDialog({ open, onClose, onOpened }) {
 /** ---------- PAGE ---------- */
 export default function MessagesPage() {
   const navigate = useNavigate();
+  // 🔹 Responsive breakpoints
+  const theme = useTheme();
+  const isMobileOrTablet = useMediaQuery(theme.breakpoints.down("md"));   // < 900px
+  const isLaptop = useMediaQuery(theme.breakpoints.between("md", "lg"));  // 900–1199px
+  const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));            // ≥ 1200px
 
+  // For small screens: which pane to show: 'list' | 'chat'
+  const [mobileView, setMobileView] = React.useState("list");
+
+  // Details popup (members + attachments)
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
   // LEFT: conversations list
   const [q, setQ] = React.useState("");
   const [threads, setThreads] = React.useState([]); // API: /conversations/
@@ -1494,6 +1508,96 @@ export default function MessagesPage() {
     || active?.event_cover
     || "";
 
+  // 🔹 Reusable "details" content (Members + Attachments)
+  const renderDetailsContent = () => (
+    <Stack spacing={1.25}>
+      <Typography
+        variant="subtitle1"
+        sx={{
+          fontWeight: 800,
+          cursor: hasActiveGroup ? "pointer" : "default",
+          "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
+        }}
+        onClick={hasActiveGroup ? openActiveGroup : undefined}
+      >
+        {topTitle}
+      </Typography>
+      <Accordion disableGutters defaultExpanded sx={{ border: "none", boxShadow: "none" }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            Members
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 0 }}>
+          <Button
+            size="small"
+            startIcon={<PersonAddAltOutlinedIcon />}
+            sx={{ mb: 1, textTransform: "none" }}
+          >
+            Add Member
+          </Button>
+          <Stack spacing={1}>
+            {topMembers.map((p) => (
+              <Stack
+                key={p.id}
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                role="button"
+                tabIndex={0}
+                sx={{ cursor: "pointer" }}
+                onClick={() => { if (p.id) openUserProfile(p.id); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && p.id) openUserProfile(p.id); }}
+                title="Open user profile"
+              >
+                <Avatar
+                  src={p.avatar}
+                  sx={{ width: 28, height: 28, cursor: "pointer" }}
+                  onClick={() => openUserProfile(p.id)}
+                />
+                +                <Typography
+                  variant="body2"
+                  sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                  onClick={() => openUserProfile(p.id)}
+                >
+                  {p.name}
+                </Typography>
+                <Box sx={{ ml: "auto" }}>
+                  {p.is_you ? (
+                    <Chip size="small" color="primary" label="You" sx={CHIP_TINY_SX} />
+                  ) : p.role ? (
+                    <Chip size="small" variant="outlined" label={p.role} sx={CHIP_TINY_SX} />
+                  ) : null}
+                </Box>
+              </Stack>
+            ))}
+          </Stack>
+        </AccordionDetails>
+      </Accordion>
+
+      <Accordion disableGutters defaultExpanded sx={{ border: "none", boxShadow: "none" }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            Attachments
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 0 }}>
+          <Stack spacing={1}>
+            {attachmentSummary.map((a) => (
+              <Stack key={a.key} direction="row" spacing={1} alignItems="center">
+                {a.icon}
+                <Typography variant="body2">{a.label}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+                  {a.count} file{a.count === 1 ? "" : "s"}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </AccordionDetails>
+      </Accordion>
+    </Stack>
+  );
+
   return (
     <>
       <NewChatDialog
@@ -1508,10 +1612,39 @@ export default function MessagesPage() {
         }}
       />
 
-      <Grid container spacing={2}>
+      <Grid
+        container
+        spacing={2}
+        sx={{
+          width: "100%",   // 🔹 make inner grid use full width of page
+        }}
+      >
         {/* LEFT: Conversation list */}
-        <Grid item xs={12} md={3}>
-          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, display: "flex", Width: 350, flexDirection: "column" }}>
+        <Grid
+          item
+          xs={12}
+          md={3}
+          sx={{
+            // Mobile / tablet: only show when in "list" mode
+            display: {
+              xs: mobileView === "list" ? "block" : "none",
+              md: "block", // from md and up, list is always visible
+            },
+          }}
+        >
+          <Paper
+            sx={{
+              p: 1.5,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 3,
+              height: PANEL_H,
+              display: "flex",
+              flexDirection: "column",
+              // 🔹 full width on mobile / tablet (320, 375, 420, 768)
+              width: 1,          // = 100% of Grid item, all breakpoints
+              maxWidth: "none",  // 🔹 remove 360px cap so tablet also fills
+            }}
+          >
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>Messages</Typography>
               <IconButton size="small"><AttachFileOutlinedIcon fontSize="small" /></IconButton>
@@ -1537,7 +1670,17 @@ export default function MessagesPage() {
             </Typography>
             <List dense sx={{ flex: 1, overflowY: "auto" }}>
               {filtered.map((t) => (
-                <ConversationRow key={t.id} thread={t} active={t.id === activeId} onClick={() => setActiveId(t.id)} />
+                <ConversationRow
+                  key={t.id}
+                  thread={t}
+                  active={t.id === activeId}
+                  onClick={() => {
+                    setActiveId(t.id);
+                    if (isMobileOrTablet) {
+                      setMobileView("chat");   // 🔹 switch to chat on mobile/tablet
+                    }
+                  }}
+                />
               ))}
             </List>
 
@@ -1548,8 +1691,28 @@ export default function MessagesPage() {
         </Grid>
 
         {/* CENTER: Chat */}
-        <Grid item xs={12} md={6}>
-          <Box sx={{ height: PANEL_H, display: "flex", flexDirection: "column", minHeight: 0, Width: 520 }}>
+        <Grid
+          item
+          xs={12}
+          md={6}
+          sx={{
+            display: {
+              xs: mobileView === "chat" ? "block" : "none",
+              md: "block", // from md and up, chat is always visible
+            },
+          }}
+        >
+          <Box
+            sx={{
+              height: PANEL_H,
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+              // 🔹 full width on mobile / tablet
+              width: 1,          // 100% of Grid item
+              maxWidth: "none",  // no cap on tablet/mobile
+            }}
+          >
             {/* Top bar */}
             <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 1 }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
@@ -1565,6 +1728,18 @@ export default function MessagesPage() {
                   onKeyDown={(e) => { if (e.key === "Enter" && hasActiveGroup) openActiveGroup(); }}
                   title={hasActiveGroup ? "Open group details" : undefined}
                 >
+                  {/* 🔙 Back button on Mobile / Tablet */}
+                  {isMobileOrTablet && (
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMobileView("list");
+                      }}
+                    >
+                      <ArrowBackRoundedIcon fontSize="small" />
+                    </IconButton>
+                  )}
                   <Avatar
                     src={topLogo}
                     sx={{ width: 40, height: 40, cursor: hasActiveGroup ? "pointer" : "default" }}
@@ -1587,9 +1762,15 @@ export default function MessagesPage() {
 
                 {/* Right actions */}
                 <Stack direction="row" alignItems="center" spacing={1.25}>
-                  <IconButton size="small"><PhoneOutlinedIcon fontSize="small" /></IconButton>
-                  <IconButton size="small"><VideocamOutlinedIcon fontSize="small" /></IconButton>
-                  <IconButton size="small"><MoreVertOutlinedIcon fontSize="small" /></IconButton>
+                  {/* ℹ️ Details icon – opens members/attachments popup */}
+                  {(isMobileOrTablet || isLaptop) && (
+                    <IconButton
+                      size="small"
+                      onClick={() => setDetailsOpen(true)}
+                    >
+                      <InfoOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  )}
                 </Stack>
               </Stack>
             </Paper>
@@ -1689,95 +1870,62 @@ export default function MessagesPage() {
           </Box>
         </Grid>
 
-        {/* RIGHT: Members + Attachments */}
-        <Grid item xs={12} md={3}>
-          <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, height: PANEL_H, Width: 260, display: "flex", flexDirection: "column" }}>
-            <Stack spacing={1.25}>
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  fontWeight: 800,
-                  cursor: hasActiveGroup ? "pointer" : "default",
-                  "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
-                }}
-                onClick={hasActiveGroup ? openActiveGroup : undefined}
-              >
-                {topTitle}
-              </Typography>
-
-              <Accordion disableGutters defaultExpanded sx={{ border: "none", boxShadow: "none" }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Members
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ pt: 0 }}>
-                  <Button size="small" startIcon={<PersonAddAltOutlinedIcon />} sx={{ mb: 1, textTransform: "none" }}>
-                    Add Member
-                  </Button>
-                  <Stack spacing={1}>
-                    {topMembers.map((p) => (
-                      <Stack
-                        key={p.id}
-                        direction="row"
-                        spacing={1}
-                        alignItems="center"
-                        role="button"
-                        tabIndex={0}
-                        sx={{ cursor: "pointer" }}
-                        onClick={() => { if (p.id) openUserProfile(p.id); }}
-                        onKeyDown={(e) => { if (e.key === "Enter" && p.id) openUserProfile(p.id); }}
-                        title="Open user profile"
-                      >
-                        <Avatar
-                          src={p.avatar}
-                          sx={{ width: 28, height: 28, cursor: "pointer" }}
-                          onClick={() => openUserProfile(p.id)}
-                        />
-                        <Typography
-                          variant="body2"
-                          sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
-                          onClick={() => openUserProfile(p.id)}
-                        >
-                          {p.name}
-                        </Typography>
-                        <Box sx={{ ml: "auto" }}>
-                          {p.is_you ? (
-                            <Chip size="small" color="primary" label="You" sx={CHIP_TINY_SX} />
-                          ) : p.role ? (
-                            <Chip size="small" variant="outlined" label={p.role} sx={CHIP_TINY_SX} />
-                          ) : null}
-                        </Box>
-                      </Stack>
-                    ))}
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
-
-              <Accordion disableGutters defaultExpanded sx={{ border: "none", boxShadow: "none" }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Attachments
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ pt: 0 }}>
-                  <Stack spacing={1}>
-                    {attachmentSummary.map((a) => (
-                      <Stack key={a.key} direction="row" spacing={1} alignItems="center">
-                        {a.icon}
-                        <Typography variant="body2">{a.label}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
-                          {a.count} file{a.count === 1 ? "" : "s"}
-                        </Typography>
-                      </Stack>
-                    ))}
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
-            </Stack>
+        {/* RIGHT: Members + Attachments (Desktop only) */}
+        <Grid
+          item
+          xs={12}
+          md={3}
+          sx={{
+            display: { xs: "none", lg: "block" }, // show only ≥ lg (desktop)
+          }}
+        >
+          <Paper
+            sx={{
+              p: 1.5,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 3,
+              height: PANEL_H,
+              Width: 260,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {renderDetailsContent()}
           </Paper>
         </Grid>
       </Grid>
+      {/* 🔹 Details popup for mobile / tablet / laptop */}
+      <Dialog
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        fullScreen={isMobileOrTablet}
+        sx={{
+          // 🔹 make paper full-width on mobile & remove side margins
+          "& .MuiDialog-paper": {
+            width: "100%",
+            m: 0,
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            pr: 1,
+          }}
+        >
+          <Typography variant="h6">Chat details</Typography>
+          <IconButton size="small" onClick={() => setDetailsOpen(false)}>
+            <CloseRoundedIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {renderDetailsContent()}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
