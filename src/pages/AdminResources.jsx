@@ -1,6 +1,7 @@
 // src/pages/MyResourcesAdmin.jsx
 
 import React, { useEffect, useState } from "react";
+import { isOwnerUser } from "../utils/adminRole";
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   IconButton, InputAdornment, MenuItem, Stack,
@@ -463,6 +464,8 @@ export default function MyResourcesAdmin() {
   const [actionMenuRow, setActionMenuRow] = useState(null);
   const [viewResource, setViewResource] = useState(null);
 
+  const isOwner = currentUser ? isOwnerUser(currentUser) : false;
+
   // Resources state with pagination
   const [items, setItems] = useState([]);
   const [resourcesTotal, setResourcesTotal] = useState(0);
@@ -486,20 +489,36 @@ export default function MyResourcesAdmin() {
     }
   };
 
-  const handleResourceSaved = () => {
-    fetchResources();
-  };
+  const filterResourcesForUser = (allResources) => {
+    if (!currentUser) return [];
 
-  const isActionMenuOpen = Boolean(actionMenuAnchor);
+    const ownerUser = isOwnerUser(currentUser);
 
-  const handleOpenActionsMenu = (event, row) => {
-    setActionMenuAnchor(event.currentTarget);
-    setActionMenuRow(row);
-  };
+    // ✅ Owner: show only resources uploaded/owned by this user (same logic as before)
+    if (ownerUser) {
+      return allResources.filter((r) => {
+        const isOwner =
+          r.uploaded_by_id === currentUser.id ||
+          r.created_by === currentUser.id ||
+          r.user_id === currentUser.id ||
+          r.uploaded_by === currentUser.id ||
+          r.author === currentUser.id;
+        return isOwner;
+      });
+    }
 
-  const handleCloseActionsMenu = () => {
-    setActionMenuAnchor(null);
-    setActionMenuRow(null);
+    // ✅ Staff: show resources only for events that this user has access to / joined
+    const joinedEventIds = new Set(events.map((e) => String(e.id)));
+
+    return allResources.filter((r) => {
+      const rawEventId =
+        r.event_id ??
+        (r.event && (r.event.id ?? r.event)) ??
+        null;
+
+      if (!rawEventId) return false;
+      return joinedEventIds.has(String(rawEventId));
+    });
   };
 
   // Fetch resources with server-side pagination
@@ -529,30 +548,14 @@ export default function MyResourcesAdmin() {
 
       if (response.data.results) {
         const allResources = response.data.results;
-        const userResources = allResources.filter((r) => {
-          const isOwner =
-            r.uploaded_by_id === currentUser.id ||
-            r.created_by === currentUser.id ||
-            r.user_id === currentUser.id ||
-            r.uploaded_by === currentUser.id ||
-            r.author === currentUser.id;
-          return isOwner;
-        });
-        setItems(userResources);
-        setResourcesTotal(response.data.count || userResources.length);
+        const visibleResources = filterResourcesForUser(allResources);
+        setItems(visibleResources);
+        setResourcesTotal(response.data.count || visibleResources.length);
       } else {
         const allResources = Array.isArray(response.data) ? response.data : [];
-        const userResources = allResources.filter((r) => {
-          const isOwner =
-            r.uploaded_by_id === currentUser.id ||
-            r.created_by === currentUser.id ||
-            r.user_id === currentUser.id ||
-            r.uploaded_by === currentUser.id ||
-            r.author === currentUser.id;
-          return isOwner;
-        });
-        setItems(userResources);
-        setResourcesTotal(userResources.length);
+        const visibleResources = filterResourcesForUser(allResources);
+        setItems(visibleResources);
+        setResourcesTotal(visibleResources.length);
       }
     } catch (error) {
       console.error("Error fetching resources:", error);
@@ -562,6 +565,23 @@ export default function MyResourcesAdmin() {
       setLoading(false);
     }
   };
+
+  const handleResourceSaved = () => {
+    fetchResources();
+  };
+
+  const isActionMenuOpen = Boolean(actionMenuAnchor);
+
+  const handleOpenActionsMenu = (event, row) => {
+    setActionMenuAnchor(event.currentTarget);
+    setActionMenuRow(row);
+  };
+
+  const handleCloseActionsMenu = () => {
+    setActionMenuAnchor(null);
+    setActionMenuRow(null);
+  };
+
 
   const fetchEvents = async () => {
     try {
@@ -600,7 +620,7 @@ export default function MyResourcesAdmin() {
     if (currentUser) {
       fetchResources();
     }
-  }, [currentUser, resourcePage, resourceQuery, resourceFilterType, resourceSort]);
+  }, [currentUser, events, resourcePage, resourceQuery, resourceFilterType, resourceSort]);
 
   useEffect(() => {
     setResourcePage(1);
@@ -655,20 +675,23 @@ export default function MyResourcesAdmin() {
           </Typography>
         </Box>
 
-        <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
-          <Button
-            fullWidth
-            variant="contained"
-            startIcon={<AddRoundedIcon />}
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-            sx={{ whiteSpace: "nowrap" }}
-          >
-            Upload Resource
-          </Button>
-        </Box>
+        {isOwner && (
+          <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
+            <Button
+              fullWidth
+              variant="contained"
+              startIcon={<AddRoundedIcon />}
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+              sx={{ whiteSpace: "nowrap" }}
+            >
+              Upload Resource
+            </Button>
+          </Box>
+        )}
+
       </Stack>
 
       {/* Filter bar – only for Resources now */}
@@ -832,27 +855,31 @@ export default function MyResourcesAdmin() {
                               </Tooltip>
                             )}
 
-                            <Tooltip title="Edit">
-                              <IconButton
-                                size="small"
-                                onClick={() => {
-                                  setEditing(row);
-                                  setDialogOpen(true);
-                                }}
-                              >
-                                <EditRoundedIcon />
-                              </IconButton>
-                            </Tooltip>
+                            {isOwner && (
+                              <>
+                                <Tooltip title="Edit">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                      setEditing(row);
+                                      setDialogOpen(true);
+                                    }}
+                                  >
+                                    <EditRoundedIcon />
+                                  </IconButton>
+                                </Tooltip>
 
-                            <Tooltip title="Delete">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => setPendingDelete(row)}
-                              >
-                                <DeleteRoundedIcon />
-                              </IconButton>
-                            </Tooltip>
+                                <Tooltip title="Delete">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => setPendingDelete(row)}
+                                  >
+                                    <DeleteRoundedIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            )}
                           </Stack>
                         ) : (
                           <IconButton
@@ -911,7 +938,7 @@ export default function MyResourcesAdmin() {
           )}
 
 
-        {actionMenuRow && (
+        {isOwner && actionMenuRow && (
           <MenuItem
             onClick={() => {
               setEditing(actionMenuRow);
@@ -926,7 +953,7 @@ export default function MyResourcesAdmin() {
           </MenuItem>
         )}
 
-        {actionMenuRow && (
+        {isOwner && actionMenuRow && (
           <MenuItem
             onClick={() => {
               setPendingDelete(actionMenuRow);
