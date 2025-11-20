@@ -848,7 +848,7 @@ export default function AdminGroups() {
         <Avatar sx={{ bgcolor: "#0ea5a4" }}>{(user?.first_name || "A")[0].toUpperCase()}</Avatar>
         <div className="flex-1">
           <Typography variant="h5" className="font-extrabold">
-            Admin Groups
+            Community Groups
           </Typography>
           <Typography className="text-slate-500">Create and manage your groups.</Typography>
         </div>
