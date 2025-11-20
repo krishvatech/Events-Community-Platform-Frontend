@@ -1,4 +1,4 @@
-// src/pages/ResourceDetails.jsx
+// src/pages/ResourceDetailsPage.jsx
 
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
@@ -42,7 +42,7 @@ const TypeIcon = ({ type }) => {
   }
 };
 
-export default function ResourceDetails() {
+export default function ResourceDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [resource, setResource] = useState(null);
@@ -185,10 +185,10 @@ export default function ResourceDetails() {
             <Button
               variant="contained"
               startIcon={<ArrowBackRoundedIcon />}
-              onClick={() => navigate("/account")}
+              onClick={() => navigate("/account/resources")}
               sx={{ mt: 2 }}
             >
-              Back to Activity
+              Back to resources
             </Button>
           </Box>
         </Container>
@@ -204,7 +204,7 @@ export default function ResourceDetails() {
         <div className="grid grid-cols-12 gap-6">
           <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar
-              activeKey="activity"
+              activeKey="resources"
               onNavigate={(k) => console.log(k)}
             />
           </aside>
@@ -212,10 +212,10 @@ export default function ResourceDetails() {
           <main className="col-span-12 lg:col-span-9">
             <Breadcrumbs sx={{ mb: 2 }}>
               <Link
-                to="/account"
+                to="/account/resources"
                 style={{ textDecoration: "none", color: "#666" }}
               >
-                My Activity
+                My Resources
               </Link>
               <Typography color="text.primary">{resource.title}</Typography>
             </Breadcrumbs>
@@ -267,7 +267,7 @@ export default function ResourceDetails() {
                   <Button
                     variant="text"
                     startIcon={<ArrowBackRoundedIcon />}
-                    onClick={() => navigate("/account")}
+                    onClick={() => navigate("/account/resources")}
                     sx={{
                       textTransform: "none",
                     }}

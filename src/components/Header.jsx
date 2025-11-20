@@ -110,7 +110,7 @@ const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { pathname, search } = location;
-  const accountHref = isAdminUser() ? "/admin/events" : "/account";
+  const accountHref = isAdminUser() ? "/admin/events" : "/account/resources";
   const [mobileOpen, setMobileOpen] = useState(false);
   const openDrawer = () => setMobileOpen(true);
   const closeDrawer = () => setMobileOpen(false);

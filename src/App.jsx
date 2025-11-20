@@ -12,7 +12,7 @@ import AdminEvents from "./pages/AdminEvents.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
 import GuestOnly from "./components/PublicGate.jsx";
 import EventsPage from "./pages/EventsPage.jsx";
-import ActivityPage from "./pages/ActivityPage.jsx";
+import MyResourcesPage from "./pages/MyResourcesPage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
@@ -22,7 +22,7 @@ import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
 import ProfilePage from "./pages/ProfilePage.jsx";
 import ConversationPage from "./pages/ConversationPage.jsx";
 import MessagesDirectory from "./pages/MessagesDirectory.jsx";
-import MyResourcePage from "./pages/MyResourcePage.jsx";
+import ResourceDetailsPage from "./pages/ResourceDetailsPage.jsx";
 import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
 import RichProfile from "./pages/community/RichProfile.jsx";
@@ -103,20 +103,20 @@ const AppShell = () => {
         <Route path="/groups/:idOrSlug" element={<RequireAuth><RedirectGroupToAdmin /></RequireAuth>} />
 
         {/* My Events list and details */}
-        <Route path="/myevents" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
-        <Route path="/myevents/:id" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
+        <Route path="/account/events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
+        <Route path="/account/events/:id" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
 
         {/* LIVE meeting page — no header/footer */}
         <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />
 
-        <Route path="/account" element={<RequireAuth><ActivityPage /></RequireAuth>} />
+        <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
         <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
         <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
         <Route path="/account/messages" element={<RequireAuth><MessagesDirectory /></RequireAuth>} />
         <Route path="/account/messages/:conversationId" element={<RequireAuth><ConversationPage /></RequireAuth>} />
 
         {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
-        <Route path="/resource/:id" element={<RequireAuth><MyResourcePage /></RequireAuth>} />
+        <Route path="/resource/:id" element={<RequireAuth><ResourceDetailsPage /></RequireAuth>} />
         {/* ADD THIS ROUTE FOR RICH PROFILE */}
         {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
         <Route path="/community/rich-profile/:userId" element={<RichProfile />} />

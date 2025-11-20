@@ -49,7 +49,7 @@ import AccountHero from "../components/AccountHero.jsx";
 import { API_BASE, getToken } from "../utils/api";
 const navItems = [
   { key: "activity", label: "Activity", icon: <TimelineOutlinedIcon /> },
-  { key: "courses", label: "Courses", icon: <SchoolOutlinedIcon /> },
+  { key: "events", label: "Courses", icon: <SchoolOutlinedIcon /> },
   { key: "profile", label: "Profile", icon: <PersonOutlineOutlinedIcon /> },
   { key: "elibrary", label: "E-Library", icon: <MenuBookOutlinedIcon /> },
   { key: "forums", label: "Forums", icon: <ForumOutlinedIcon /> },
@@ -280,7 +280,7 @@ export default function CartPage() {
         // setCart([]); setSubtotal(0); setTotal(0);
         // localStorage.setItem("cart_count", "0");
         // window.dispatchEvent(new Event("cart:update"));
-        // navigate("/myevents"); // or stay on cart
+        // navigate("/account/events"); // or stay on cart
       }, 2000);
 
       // 3) refresh cart UI + badge

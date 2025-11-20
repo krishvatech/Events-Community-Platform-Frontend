@@ -21,8 +21,8 @@ import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 
 const NAV_ITEMS = [
-  { key: "activity", label: "Activity", icon: <TimelineOutlinedIcon />, to: "/account" },
-  { key: "courses", label: "My Events", icon: <SchoolOutlinedIcon />, to: "/myevents" },
+  { key: "resources", label: "My Resources", icon: <TimelineOutlinedIcon />, to: "/account/resources" },
+  { key: "events", label: "My Events", icon: <SchoolOutlinedIcon />, to: "/account/events" },
   { key: "profile", label: "Profile", icon: <PersonOutlineOutlinedIcon />, to: "/account/profile" },
   { key: "elibrary", label: "My Recordings", icon: <MenuBookOutlinedIcon />, to: "/account/recordings" },
   { key: "forums", label: "Forums", icon: <ForumOutlinedIcon /> },
@@ -39,11 +39,11 @@ export default function AccountSidebar({ stickyTop = 96 }) {
 
   const activeKey = useMemo(() => {
     if (pathname.startsWith("/cart")) return "orders";
-    if (pathname.startsWith("/myevents")) return "courses";
-    if (pathname.startsWith("/events/")) return "courses"; // event details keeps highlight
+    if (pathname.startsWith("/account/events")) return "events";
+    if (pathname.startsWith("/events/")) return "events"; // event details keeps highlight
     if (pathname.startsWith("/account/recordings")) return "elibrary";
     if (pathname.startsWith("/account/profile")) return "profile";
-    return "activity";
+    return "resources";
   }, [pathname]);
 
   const ListUI = ({ onItem }) => (
