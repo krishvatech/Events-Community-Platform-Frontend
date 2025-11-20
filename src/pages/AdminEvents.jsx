@@ -126,6 +126,23 @@ const statusChip = (status) => {
       return { label: "—", className: "bg-slate-100 text-slate-700" };
   }
 };
+
+// Allow join X minutes before the event start (used for staff view)
+const canJoinEarly = (ev, minutes = 15) => {
+  if (!ev?.start_time) return false;
+
+  const startMs = new Date(ev.start_time).getTime();
+  if (!Number.isFinite(startMs)) return false;
+
+  const now = Date.now();
+  const diff = startMs - now;           // ms until start
+  const windowMs = minutes * 60 * 1000; // e.g. 15 minutes
+
+  // true only if event hasn't started yet, but is within the early-join window
+  return diff > 0 && diff <= windowMs;
+};
+
+
 async function postJSON(url, body, token) {
   const res = await fetch(url, {
     method: "POST",
@@ -1026,6 +1043,12 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
   const isPast = status === "past" || ev.status === "ended";
   const isLive = status === "live" && ev.status !== "ended";
 
+  // ✅ allow staff to join up to 15 minutes before the start time
+  const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
+
+  // If event is live OR within early-join window, show enabled Join button
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
+
   return (
     <Paper
       elevation={0}
@@ -1145,8 +1168,8 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
           ) : (
             <>
               {/* STAFF: primary action depends on status */}
-              {isLive ? (
-                // 🔴 Live → active Join button
+              {canShowActiveJoin ? (
+                // 🔴 Live OR within 15 min before start → active Join button
                 <Button
                   onClick={() => onJoinLive?.(ev)}
                   variant="contained"
@@ -1175,7 +1198,7 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                       component="span"
                       sx={{ display: { xs: "none", lg: "inline" } }}
                     >
-                      Join Live
+                      {isLive ? "Join Live" : "Join"}
                     </Box>
                   )}
                 </Button>
@@ -1224,7 +1247,7 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                   </Box>
                 </Button>
               ) : (
-                // ✅ Upcoming / published but not live yet → disabled Join
+                // ✅ Upcoming but more than 15 min away → disabled Join
                 <Button
                   disabled
                   variant="contained"

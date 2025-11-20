@@ -74,6 +74,21 @@ function computeStatus(ev) {
   return "upcoming";
 }
 
+// Allow join X minutes before the event start (same as staff view)
+function canJoinEarly(ev, minutes = 15) {
+  if (!ev?.start_time) return false;
+
+  const startMs = new Date(ev.start_time).getTime();
+  if (!Number.isFinite(startMs)) return false;
+
+  const now = Date.now();
+  const diff = startMs - now;             // ms until start
+  const windowMs = minutes * 60 * 1000;   // e.g. 15 minutes
+
+  // true only if event hasn't started yet, but is within the early-join window
+  return diff > 0 && diff <= windowMs;
+}
+
 
 
 
@@ -184,8 +199,12 @@ function EventCard({ ev, onJoinLive, isJoining }) {
             const isPast = status === "past" || ev.status === "ended";
             const isLive = status === "live" && ev.status !== "ended";
 
-            // 1) LIVE → active Join button
-            if (isLive) {
+            // ✅ allow users to join up to 15 minutes before the start time
+            const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
+            const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
+
+            // 1) LIVE or within 15 min before start → active Join button
+            if (canShowActiveJoin) {
               return (
                 <Button
                   onClick={() => onJoinLive?.(ev)}
@@ -200,7 +219,11 @@ function EventCard({ ev, onJoinLive, isJoining }) {
                     borderRadius: 2,
                   }}
                 >
-                  {isJoining ? "Joining…" : "Join Live"}
+                  {isJoining
+                    ? "Joining…"
+                    : isLive
+                      ? "Join Live"
+                      : "Join"}
                 </Button>
               );
             }
@@ -242,7 +265,7 @@ function EventCard({ ev, onJoinLive, isJoining }) {
               );
             }
 
-            // 3) NOT LIVE YET (published/upcoming) → disabled Join button
+            // 3) Upcoming but more than 15 min away → disabled Join
             return (
               <Button
                 size="small"
@@ -272,6 +295,7 @@ function EventCard({ ev, onJoinLive, isJoining }) {
             Details
           </Button>
         </Box>
+
       </Box>
     </Paper>
   );
