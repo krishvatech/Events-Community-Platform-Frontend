@@ -232,7 +232,7 @@ const SignInPage = () => {
       // TEMP: one-time debug (you can comment this out)
       console.log("redirect check", { userObj, goDashboard: isStaffUser(userObj), intended });
 
-      // Staff → dashboard (hard redirect so nothing else can override it)
+      // Staff → AdminEvents (hard redirect so nothing else can override it)
       if (isStaffUser(userObj)) {
         window.location.replace("/admin/events");
         return;

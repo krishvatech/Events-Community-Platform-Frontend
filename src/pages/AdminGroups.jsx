@@ -13,7 +13,7 @@ import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
-// ---- API helpers (same style as your Dashboard.jsx) ----
+// ---- API helpers (same style as your AdminEvents.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
 const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;

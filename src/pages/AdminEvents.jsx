@@ -1,6 +1,6 @@
-// src/pages/Dashboard.jsx
+// src/pages/AdminEvents.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { isOwnerUser } from "../utils/adminRole";
+import { isOwnerUser } from "../utils/adminRole.js";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Avatar,
@@ -28,7 +28,7 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import dayjs from "dayjs";
-import AdminGroups from "../pages/AdminGroups";
+import AdminGroups from "./AdminGroups.jsx";
 import AdminResources from "./AdminResources.jsx";
 import EmojiEmotionsRoundedIcon from '@mui/icons-material/EmojiEmotionsRounded';
 import InsertPhotoRoundedIcon from '@mui/icons-material/InsertPhotoRounded';
@@ -48,7 +48,7 @@ import AdminPostsPage from "./AdminPostsPage.jsx";
 import MyRecordingsPage from "./MyRecordingsPage.jsx"
 import AdminNotificationsPage from "./AdminNotificationsPage.jsx";
 import AdminSettings from "./AdminSettings.jsx"
-import AdminSidebar from "../components/AdminSidebar";
+import AdminSidebar from "../components/AdminSidebar.jsx";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -144,7 +144,7 @@ async function postJSON(url, body, token) {
 }
 
 /* ===========================================
-   CreateEventDialog (popup inside Dashboard)
+   CreateEventDialog (popup inside AdminEvents)
    – mirrors CreateEventPage form & payload
    =========================================== */
 const categories = ["Workshop", "Strategy", "Legal", "Leadership", "Networking", "Q&A", "Live"];
@@ -1022,10 +1022,9 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
   const status = computeStatus(ev);
   const chip = statusChip(status);
 
-  // audience can join if event is not ended AND either live OR Dyte meeting exists
-  const canJoinLive =
-    ev?.status !== "ended" &&
-    (status === "live" || !!ev?.dyte_meeting_id);
+  // Staff side status helpers
+  const isPast = status === "past" || ev.status === "ended";
+  const isLive = status === "live" && ev.status !== "ended";
 
   return (
     <Paper
@@ -1089,6 +1088,7 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
           {isOwner ? (
             <>
               {/* OWNER: Host Now */}
+              {/* (unchanged owner buttons) */}
               <Button
                 onClick={() => onHost(ev)}
                 startIcon={<LiveTvRoundedIcon />}
@@ -1123,7 +1123,6 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                 )}
               </Button>
 
-              {/* OWNER: Edit */}
               <Button
                 onClick={() => onEdit?.(ev)}
                 startIcon={<EditNoteRoundedIcon />}
@@ -1145,8 +1144,9 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
             </>
           ) : (
             <>
-              {/* STAFF: Join (instead of Host) */}
-              {canJoinLive ? (
+              {/* STAFF: primary action depends on status */}
+              {isLive ? (
+                // 🔴 Live → active Join button
                 <Button
                   onClick={() => onJoinLive?.(ev)}
                   variant="contained"
@@ -1175,16 +1175,17 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                       component="span"
                       sx={{ display: { xs: "none", lg: "inline" } }}
                     >
-                      Join
+                      Join Live
                     </Box>
                   )}
                 </Button>
-              ) : (
-                // If not live / no dyte meeting yet, just show Details
+              ) : isPast && ev.recording_url ? (
+                // ✅ Ended + recording → Watch Recording
                 <Button
-                  component={Link}
-                  to={`/admin/events/${ev.id}`}
-                  state={{ event: ev }}
+                  component="a"
+                  href={ev.recording_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   variant="contained"
                   className="rounded-xl"
                   sx={{
@@ -1199,7 +1200,47 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                     component="span"
                     sx={{ display: { xs: "none", lg: "inline" } }}
                   >
-                    Details
+                    Watch Recording
+                  </Box>
+                </Button>
+              ) : isPast && !ev.recording_url ? (
+                // ✅ Ended, no recording → disabled Event Ended
+                <Button
+                  disabled
+                  variant="contained"
+                  className="rounded-xl"
+                  sx={{
+                    textTransform: "none",
+                    backgroundColor: "#CBD5E1",
+                    minWidth: { xs: 40, lg: 120 },
+                    px: { xs: 1, lg: 2 },
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{ display: { xs: "none", lg: "inline" } }}
+                  >
+                    Event Ended
+                  </Box>
+                </Button>
+              ) : (
+                // ✅ Upcoming / published but not live yet → disabled Join
+                <Button
+                  disabled
+                  variant="contained"
+                  className="rounded-xl"
+                  sx={{
+                    textTransform: "none",
+                    backgroundColor: "#CBD5E1",
+                    minWidth: { xs: 40, lg: 120 },
+                    px: { xs: 1, lg: 2 },
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{ display: { xs: "none", lg: "inline" } }}
+                  >
+                    Join (Not Live Yet)
                   </Box>
                 </Button>
               )}
@@ -1227,6 +1268,7 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
             </>
           )}
         </Box>
+
       </Box>
     </Paper>
   );
@@ -1647,7 +1689,7 @@ function EventsPage() {
   );
 }
 
-export default function Dashboard() {
+export default function DashbAdminEventsoard() {
   const navigate = useNavigate();
   const location = useLocation();
   const [active, setActive] = React.useState(

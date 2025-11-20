@@ -8,7 +8,7 @@ import Header from "./components/Header.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
 import SignUpPage from "./pages/SignUpPage.jsx";
-import Dashboard from "./pages/Dashboard.jsx";
+import AdminEvents from "./pages/AdminEvents.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
 import GuestOnly from "./components/PublicGate.jsx";
 import EventsPage from "./pages/EventsPage.jsx";
@@ -74,13 +74,13 @@ const AppShell = () => {
         <Route path="/" element={<HomePage />} />
         <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
         <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
-        <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+        <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
         {/* Admin area driven by AdminSidebar */}
         <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
           <Route index element={<AdminResources />} />
 
           {/* main admin pages */}
-          <Route path="events" element={<Dashboard />} />
+          <Route path="events" element={<AdminEvents />} />
           <Route path="resources" element={<AdminResources />} />
           <Route path="posts" element={<AdminPostsPage />} />
           <Route path="groups" element={<AdminGroups />} />
