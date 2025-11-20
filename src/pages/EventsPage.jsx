@@ -1,4 +1,4 @@
-// src/pages/AdminEvents.jsx
+// src/pages/EventsPage.jsx
 // Public Events listing page — static only (no API / dynamic fetch).
 // Reuses existing Header/Footer and our MUI + Tailwind setup.
 
@@ -499,7 +499,7 @@ function EventRow({ ev }) {
 // ————————————————————————————————————————
 // Page
 // ————————————————————————————————————————
-export default function AdminEvents() {
+export default function EventsPage() {
   // which events the logged-in user has registered for
   const [registeredIds, setRegisteredIds] = useState(new Set());
   // raw events payload coming from the server (we'll enrich it with the "registered" flag)

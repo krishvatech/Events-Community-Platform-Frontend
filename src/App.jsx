@@ -11,7 +11,7 @@ import SignUpPage from "./pages/SignUpPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
 import GuestOnly from "./components/PublicGate.jsx";
-import AdminEvents from "./pages/AdminEvents.jsx";
+import EventsPage from "./pages/EventsPage.jsx";
 import ActivityPage from "./pages/ActivityPage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
@@ -96,7 +96,7 @@ const AppShell = () => {
           <Route path="staff" element={<AdminStaffPage />} />
         </Route>
         <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
-        <Route path="/events" element={<AdminEvents />} />
+        <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:id" element={<EventDetailsPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/community" element={<CommunityHubPage />} />

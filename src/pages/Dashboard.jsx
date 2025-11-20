@@ -1232,7 +1232,7 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
   );
 }
 
-function AdminEvents() {
+function EventsPage() {
   const token = getToken();
   const isOwner = isOwnerUser();
   const navigate = useNavigate();
@@ -1678,7 +1678,7 @@ export default function Dashboard() {
           {/* Right: Content */}
           <Grid size={{ xs: 12, md: 9 }}>
             {active === "events" ? (
-              <AdminEvents />
+              <EventsPage />
             ) : active === "posts" ? (
               <AdminPostsPage />
             ) : active === "resources" ? (
