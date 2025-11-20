@@ -837,26 +837,6 @@ export default function AdminMessagesPage() {
             </Typography>
           </Box>
         </Stack>
-
-        <Button
-          variant="contained"
-          startIcon={<RefreshRoundedIcon />}
-          onClick={() => {
-            fetchUsers();
-            loadConversations();
-          }}
-          sx={{
-            textTransform: "none",
-            borderRadius: 999,
-            px: 2.5,
-            boxShadow: "0 8px 20px rgba(15,23,42,0.15)",
-            "&:hover": {
-              boxShadow: "0 10px 24px rgba(15,23,42,0.18)",
-            },
-          }}
-        >
-          Refresh list
-        </Button>
       </Stack>
 
       {/* outer card */}
