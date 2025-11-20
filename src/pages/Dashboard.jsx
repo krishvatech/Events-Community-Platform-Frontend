@@ -1183,7 +1183,7 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
                 // If not live / no dyte meeting yet, just show Details
                 <Button
                   component={Link}
-                  to={`/admin/events/${ev.slug || ev.id}`}
+                  to={`/admin/events/${ev.id}`}
                   state={{ event: ev }}
                   variant="contained"
                   className="rounded-xl"
@@ -1207,7 +1207,7 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
               {/* STAFF: View (instead of Edit) */}
               <Button
                 component={Link}
-                to={`/admin/events/${ev.slug || ev.id}`}
+                to={`/admin/events/${ev.id}`}
                 state={{ event: ev }}
                 variant="outlined"
                 className="rounded-xl"

@@ -180,14 +180,12 @@ function EventCard({ ev, onJoinLive, isJoining }) {
         {/* Actions stick to bottom to keep equal heights */}
         <Box sx={{ mt: "auto", display: "flex", gap: 1 }}>
           {(() => {
-            // Audience can join if:
-            // - event is not ended
-            // - AND either status is "live" OR a Dyte meeting already exists
-            const canJoinLive =
-              ev.status !== "ended" &&
-              (status === "live" || !!ev.dyte_meeting_id);
+            // derive simple flags from status
+            const isPast = status === "past" || ev.status === "ended";
+            const isLive = status === "live" && ev.status !== "ended";
 
-            if (canJoinLive) {
+            // 1) LIVE → active Join button
+            if (isLive) {
               return (
                 <Button
                   onClick={() => onJoinLive?.(ev)}
@@ -207,7 +205,8 @@ function EventCard({ ev, onJoinLive, isJoining }) {
               );
             }
 
-            if (status === "past" && ev.recording_url) {
+            // 2) ENDED → Watch Recording (if URL present)
+            if (isPast && ev.recording_url) {
               return (
                 <Button
                   size="small"
@@ -218,21 +217,46 @@ function EventCard({ ev, onJoinLive, isJoining }) {
                   variant="contained"
                   sx={{ textTransform: "none", py: 0.5, px: 1.25, borderRadius: 2 }}
                 >
-                  Watch
+                  Watch Recording
                 </Button>
               );
             }
 
+            // 2b) ENDED but no recording → disabled info button
+            if (isPast && !ev.recording_url) {
+              return (
+                <Button
+                  size="small"
+                  disabled
+                  variant="contained"
+                  sx={{
+                    textTransform: "none",
+                    py: 0.5,
+                    px: 1.25,
+                    borderRadius: 2,
+                    backgroundColor: "#CBD5E1",
+                  }}
+                >
+                  Event Ended
+                </Button>
+              );
+            }
+
+            // 3) NOT LIVE YET (published/upcoming) → disabled Join button
             return (
               <Button
                 size="small"
-                component={Link}
-                to={`/events/${ev.slug || ev.id}`}
-                state={{ event: ev }}
+                disabled
                 variant="contained"
-                sx={{ textTransform: "none", py: 0.5, px: 1.25, borderRadius: 2 }}
+                sx={{
+                  textTransform: "none",
+                  py: 0.5,
+                  px: 1.25,
+                  borderRadius: 2,
+                  backgroundColor: "#CBD5E1",
+                }}
               >
-                Details
+                Join (Not Live Yet)
               </Button>
             );
           })()}
@@ -245,7 +269,7 @@ function EventCard({ ev, onJoinLive, isJoining }) {
             variant="outlined"
             sx={{ textTransform: "none", py: 0.5, px: 1.25, borderRadius: 2 }}
           >
-            Page
+            Details
           </Button>
         </Box>
       </Box>
