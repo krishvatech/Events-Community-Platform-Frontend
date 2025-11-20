@@ -13,6 +13,7 @@ function resolveActiveKey(pathname) {
   if (pathname.startsWith("/admin/community/groups")) return "groups";
   if (pathname.startsWith("/admin/groups")) return "groups";
   if (pathname.startsWith("/admin/posts")) return "posts";
+  if (pathname.startsWith("/admin/carts")) return "carts";            
   if (pathname.startsWith("/admin/notifications")) return "notifications";
   if (pathname.startsWith("/admin/messages")) return "messages";
   if (pathname.startsWith("/admin/settings")) return "settings";
@@ -41,6 +42,7 @@ export default function AdminLayout() {
       groups: "/admin/groups",
       events: "/admin/events",
       posts: "/admin/posts",
+      carts: "/admin/carts",
       notifications: "/admin/notifications",
       messages: "/admin/messages",
       settings: "/admin/settings",

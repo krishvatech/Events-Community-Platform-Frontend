@@ -2,7 +2,7 @@
 // Public Events listing page — static only (no API / dynamic fetch).
 // Reuses existing Header/Footer and our MUI + Tailwind setup.
 
-import React, {useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
@@ -29,6 +29,7 @@ import { Slider } from "@mui/material";
 import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
+import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -78,13 +79,13 @@ async function addToCart(eventId, qty = 1) {
     }
     const item = await res.json();
 
-   // refresh badge count from server
-   try {
-     const r2 = await fetch(`${API_BASE}/cart/count/`, { headers: authHeaders() });
-     const d2 = await r2.json();
-     localStorage.setItem("cart_count", String(d2?.count ?? 0));
-     window.dispatchEvent(new Event("cart:update"));
-   } catch {}
+    // refresh badge count from server
+    try {
+      const r2 = await fetch(`${API_BASE}/cart/count/`, { headers: authHeaders() });
+      const d2 = await r2.json();
+      localStorage.setItem("cart_count", String(d2?.count ?? 0));
+      window.dispatchEvent(new Event("cart:update"));
+    } catch { }
 
     return item;
   } catch {
@@ -207,10 +208,10 @@ function EventCard({ ev }) {
         (prev || []).map(e =>
           e.id === ev.id
             ? {
-                ...e,
-                // bump whichever field is present so toCard() shows the new number
-                registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1,
-              }
+              ...e,
+              // bump whichever field is present so toCard() shows the new number
+              registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1,
+            }
             : e
         )
       );
@@ -221,7 +222,17 @@ function EventCard({ ev }) {
     const item = await addToCart(ev.id);
     if (item) {
       bumpCartCount(1);
-      navigate("/cart");
+
+      const staff = isStaffUser();
+      const owner = isOwnerUser();
+
+      // staff (but not owner) → admin carts
+      if (staff && !owner) {
+        navigate("/admin/carts");
+      } else {
+        // normal users + owners → account cart
+        navigate("/account/cart");
+      }
     }
   };
 
@@ -374,7 +385,15 @@ function EventRow({ ev }) {
     const item = await addToCart(ev.id);
     if (item) {
       bumpCartCount(1);
-      navigate("/cart");
+
+      const staff = isStaffUser();
+      const owner = isOwnerUser();
+
+      if (staff && !owner) {
+        navigate("/admin/carts");
+      } else {
+        navigate("/account/cart");
+      }
     }
   };
 
@@ -521,7 +540,7 @@ export default function EventsPage() {
   const [formats, setFormats] = useState([]);
   const [selectedFormats, setSelectedFormats] = useState([]);
   const [startDMY, setStartDMY] = useState(""); // "dd-mm-yyyy"
-  const [endDMY, setEndDMY]   = useState("");   // "dd-mm-yyyy"
+  const [endDMY, setEndDMY] = useState("");   // "dd-mm-yyyy"
   const [q, setQ] = useState("");
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState("");
@@ -538,86 +557,86 @@ export default function EventsPage() {
   });
 
   // ✅ TOP-LEVEL: build UI objects with the isRegistered flag
-useEffect(() => {
-  setEvents(
-    (rawEvents || []).map(ev => {
-      const ui = toCard(ev);
-      return { ...ui, isRegistered: registeredIds.has(ev.id) };
-    })
-  );
-}, [rawEvents, registeredIds]);
+  useEffect(() => {
+    setEvents(
+      (rawEvents || []).map(ev => {
+        const ui = toCard(ev);
+        return { ...ui, isRegistered: registeredIds.has(ev.id) };
+      })
+    );
+  }, [rawEvents, registeredIds]);
 
 
   useEffect(() => {
-  fetch(`${EVENTS_URL}locations/`, { headers: authHeaders() })
-    .then(r => r.json())
-    .then(d => setLocations(d?.results || []))
-    .catch(() => setLocations([]));
-}, []);
+    fetch(`${EVENTS_URL}locations/`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => setLocations(d?.results || []))
+      .catch(() => setLocations([]));
+  }, []);
 
-// Get my registrations (only if logged-in)
-// /api/event-registrations/mine/?limit=1000 returns [{ id, event: { id, ... }, ... }, ...]
-useEffect(() => {
-  const token =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("access");
+  // Get my registrations (only if logged-in)
+  // /api/event-registrations/mine/?limit=1000 returns [{ id, event: { id, ... }, ... }, ...]
+  useEffect(() => {
+    const token =
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("access");
 
-  // if not logged-in, clear any old state
-  if (!token) {
-    setRegisteredIds(new Set());
-    return;
-  }
-
-  const ctrl = new AbortController();
-  (async () => {
-    try {
-      const url = new URL(`${API_BASE}/event-registrations/mine/`);
-      url.searchParams.set("limit", "1000"); // plenty for typical accounts
-      const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
-      const items = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-      const ids = new Set(items.map(x => (x?.event?.id ?? x?.event_id)).filter(Boolean));
-      setRegisteredIds(ids);
-    } catch {
-      setRegisteredIds(new Set()); // fallback: treat as none
+    // if not logged-in, clear any old state
+    if (!token) {
+      setRegisteredIds(new Set());
+      return;
     }
-  })();
-  return () => ctrl.abort();
-}, []); // run once on page load
+
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const url = new URL(`${API_BASE}/event-registrations/mine/`);
+        url.searchParams.set("limit", "1000"); // plenty for typical accounts
+        const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        const items = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+        const ids = new Set(items.map(x => (x?.event?.id ?? x?.event_id)).filter(Boolean));
+        setRegisteredIds(ids);
+      } catch {
+        setRegisteredIds(new Set()); // fallback: treat as none
+      }
+    })();
+    return () => ctrl.abort();
+  }, []); // run once on page load
 
 
   useEffect(() => {
-  const ctrl = new AbortController();
-  (async () => {
-    try {
-      const url = new URL(`${EVENTS_URL}max-price/`);
-      // same params you already send for the list:
-      const topicsToSend = selectedTopics.length ? selectedTopics : (topic ? [topic] : []);
-      topicsToSend.forEach((t) => url.searchParams.append("category", t));
-      if (dateRange) url.searchParams.set("date_range", dateRange);
-      if (selectedLocation) url.searchParams.set("location", selectedLocation);
-      const preset   = presetRangeISO(dateRange);
-      const startISO = dmyToISO(startDMY) || preset.start || todayISO();
-      const endISO   = dmyToISO(endDMY)   || preset.end || "";
-      url.searchParams.set("exclude_ended", "1");
-      
-      if (startISO) url.searchParams.set("start_date", startISO);
-      if (endISO)   url.searchParams.set("end_date", endISO);
-      const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
-      fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
-      
-      if (q) url.searchParams.set("search", q);
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const url = new URL(`${EVENTS_URL}max-price/`);
+        // same params you already send for the list:
+        const topicsToSend = selectedTopics.length ? selectedTopics : (topic ? [topic] : []);
+        topicsToSend.forEach((t) => url.searchParams.append("category", t));
+        if (dateRange) url.searchParams.set("date_range", dateRange);
+        if (selectedLocation) url.searchParams.set("location", selectedLocation);
+        const preset = presetRangeISO(dateRange);
+        const startISO = dmyToISO(startDMY) || preset.start || todayISO();
+        const endISO = dmyToISO(endDMY) || preset.end || "";
+        url.searchParams.set("exclude_ended", "1");
 
-      const r = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
-      const d = await r.json();
-      if (typeof d?.max_price !== "undefined") setMaxPrice(Number(d.max_price) || 0);
-    } catch (_) {}
-  })();
-  return () => ctrl.abort();
-}, [topic, selectedTopics, format, selectedFormats, dateRange, startDMY, endDMY, selectedLocation, q]);
+        if (startISO) url.searchParams.set("start_date", startISO);
+        if (endISO) url.searchParams.set("end_date", endISO);
+        const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
+        fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
+
+        if (q) url.searchParams.set("search", q);
+
+        const r = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
+        const d = await r.json();
+        if (typeof d?.max_price !== "undefined") setMaxPrice(Number(d.max_price) || 0);
+      } catch (_) { }
+    })();
+    return () => ctrl.abort();
+  }, [topic, selectedTopics, format, selectedFormats, dateRange, startDMY, endDMY, selectedLocation, q]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -626,9 +645,9 @@ useEffect(() => {
         setLoading(true);
         const headers = { "Content-Type": "application/json" };
         const token =
-        localStorage.getItem("access_token") ||
-        localStorage.getItem("token") ||
-        localStorage.getItem("access"); // last for backwards compat
+          localStorage.getItem("access_token") ||
+          localStorage.getItem("token") ||
+          localStorage.getItem("access"); // last for backwards compat
         if (token) headers.Authorization = `Bearer ${token}`;
 
         const url = new URL(EVENTS_URL);
@@ -642,11 +661,11 @@ useEffect(() => {
         if (dateRange) url.searchParams.set("date_range", dateRange);
         if (selectedLocation) url.searchParams.set("location", selectedLocation);
 
-        const preset   = presetRangeISO(dateRange);
-        const startISO = dmyToISO(startDMY) || preset.start || todayISO();  
-        const endISO   = dmyToISO(endDMY)   || preset.end || "";
+        const preset = presetRangeISO(dateRange);
+        const startISO = dmyToISO(startDMY) || preset.start || todayISO();
+        const endISO = dmyToISO(endDMY) || preset.end || "";
         if (startISO) url.searchParams.set("start_date", startISO);
-        if (endISO)   url.searchParams.set("end_date", endISO);
+        if (endISO) url.searchParams.set("end_date", endISO);
         url.searchParams.set("exclude_ended", "1");
         const fmtsToSend = selectedFormats.length ? selectedFormats : (format ? [format] : []);
         fmtsToSend.forEach((f) => url.searchParams.append("event_format", f));
@@ -665,9 +684,9 @@ useEffect(() => {
       }
     })();
     return () => controller.abort();
-  }, [page, topic, format, selectedFormats, selectedTopics,dateRange, startDMY, endDMY,selectedLocation,q,priceRange]);
+  }, [page, topic, format, selectedFormats, selectedTopics, dateRange, startDMY, endDMY, selectedLocation, q, priceRange]);
 
-  useEffect(() => { setPage(1); }, [topic, format,selectedTopics, dateRange, startDMY, endDMY,selectedLocation]);
+  useEffect(() => { setPage(1); }, [topic, format, selectedTopics, dateRange, startDMY, endDMY, selectedLocation]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -675,143 +694,143 @@ useEffect(() => {
       try {
         // Build a categories URL that only returns topics having future/ongoing events
         const url = new URL(CATEGORIES_URL);
-        const preset   = presetRangeISO(dateRange);
+        const preset = presetRangeISO(dateRange);
         const startISO = dmyToISO(startDMY) || preset.start || todayISO();
-        const endISO   = dmyToISO(endDMY)   || preset.end || "";
+        const endISO = dmyToISO(endDMY) || preset.end || "";
 
         // mirror the list filters so “past-only” topics drop out
         url.searchParams.set("exclude_ended", "1"); // hide topics with only ended events
         if (startISO) url.searchParams.set("start_date", startISO);
-        if (endISO)   url.searchParams.set("end_date", endISO);
+        if (endISO) url.searchParams.set("end_date", endISO);
         if (dateRange) url.searchParams.set("date_range", dateRange);
         if (selectedLocation) url.searchParams.set("location", selectedLocation);
 
-        
+
         if (q) url.searchParams.set("search", q);
 
         const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setCategories(Array.isArray(data?.results) ? data.results : []);
-      } catch (_) {}
+      } catch (_) { }
     })();
     return () => ctrl.abort();
   }, [dateRange, startDMY, endDMY, selectedLocation, format, selectedFormats, q]);
 
 
   useEffect(() => {
-  const ctrl = new AbortController();
-  (async () => {
-    try {
-      const url = new URL(FORMATS_URL);
-      const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
-      const payload = await res.json();
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const url = new URL(FORMATS_URL);
+        const res = await fetch(url, { signal: ctrl.signal, headers: authHeaders() });
+        const payload = await res.json();
 
-      // Accept many payload shapes then normalize to slugs
-      const arr =
-        Array.isArray(payload?.results) ? payload.results :
-        Array.isArray(payload?.formats) ? payload.formats :
-        Array.isArray(payload)          ? payload :
-        [];
+        // Accept many payload shapes then normalize to slugs
+        const arr =
+          Array.isArray(payload?.results) ? payload.results :
+            Array.isArray(payload?.formats) ? payload.formats :
+              Array.isArray(payload) ? payload :
+                [];
 
-      const values = arr
-        .map(f => typeof f === "string"
-          ? toSlug(f)
-          : toSlug(f?.value ?? f?.slug ?? f?.name ?? "")
-        )
-        .filter(Boolean);
+        const values = arr
+          .map(f => typeof f === "string"
+            ? toSlug(f)
+            : toSlug(f?.value ?? f?.slug ?? f?.name ?? "")
+          )
+          .filter(Boolean);
 
-      const distinct = Array.from(new Set(values));
-      setFormats(distinct.length ? distinct : ["in_person", "online", "hybrid"]);
-    } catch {
-      // optionally keep a fallback
-      // setFormats(["in_person", "online", "hybrid"]);
-    }
-  })();
-  return () => ctrl.abort();
-}, [dateRange, startDMY, endDMY, selectedLocation, q]);
+        const distinct = Array.from(new Set(values));
+        setFormats(distinct.length ? distinct : ["in_person", "online", "hybrid"]);
+      } catch {
+        // optionally keep a fallback
+        // setFormats(["in_person", "online", "hybrid"]);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [dateRange, startDMY, endDMY, selectedLocation, q]);
 
-  
+
   const selectSx = {
-   height: 42,                       // 12 * 4px
-   borderRadius: 1,                 // rounded-xl
-   bgcolor: "white",
-   minWidth: { xs: 200, sm: 190, lg: 160 },
-   "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
-   "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#CBD5E1" },
-   "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-     borderColor: "primary.main",
-     borderWidth: 2,
-   },
-   "& .MuiSelect-icon": { color: "text.secondary" },
- };
+    height: 42,                       // 12 * 4px
+    borderRadius: 1,                 // rounded-xl
+    bgcolor: "white",
+    minWidth: { xs: 200, sm: 190, lg: 160 },
+    "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
+    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#CBD5E1" },
+    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+      borderColor: "primary.main",
+      borderWidth: 2,
+    },
+    "& .MuiSelect-icon": { color: "text.secondary" },
+  };
 
- const selectMenuProps = {
-  // render in a portal so it won’t be clipped by parent containers
-  disablePortal: false,
-  container: () => document.body,
+  const selectMenuProps = {
+    // render in a portal so it won’t be clipped by parent containers
+    disablePortal: false,
+    container: () => document.body,
 
-  // position
-  anchorOrigin:    { vertical: "bottom", horizontal: "left" },
-  transformOrigin: { vertical: "top",    horizontal: "left" },
-  marginThreshold: 0,
+    // position
+    anchorOrigin: { vertical: "bottom", horizontal: "left" },
+    transformOrigin: { vertical: "top", horizontal: "left" },
+    marginThreshold: 0,
 
-  // IMPORTANT: keep body from scrolling when the menu is open
-  disableScrollLock: false,
+    // IMPORTANT: keep body from scrolling when the menu is open
+    disableScrollLock: false,
 
-  PaperProps: {
-    elevation: 8,
-    // prevent wheel/touch inside the menu from bubbling to window
-    onWheel: (e) => e.stopPropagation(),
-    onTouchMove: (e) => e.stopPropagation(),
-    sx: {
-      zIndex: 2100,
-      mt: 0.5,
-      maxHeight: "60vh",
-      overflowY: "auto",
-      borderRadius: 1,
-      minWidth: 220,
-      boxShadow: "0 12px 28px rgba(16,24,40,.12)",
-      "& .MuiMenuItem-root": {
-        py: 1.25, px: 2, borderRadius: 1, fontSize: 13,
-        "&.Mui-selected, &.Mui-selected:hover": { bgcolor: "grey.100" },
-        "&:hover": { bgcolor: "grey.100" },
+    PaperProps: {
+      elevation: 8,
+      // prevent wheel/touch inside the menu from bubbling to window
+      onWheel: (e) => e.stopPropagation(),
+      onTouchMove: (e) => e.stopPropagation(),
+      sx: {
+        zIndex: 2100,
+        mt: 0.5,
+        maxHeight: "60vh",
+        overflowY: "auto",
+        borderRadius: 1,
+        minWidth: 220,
+        boxShadow: "0 12px 28px rgba(16,24,40,.12)",
+        "& .MuiMenuItem-root": {
+          py: 1.25, px: 2, borderRadius: 1, fontSize: 13,
+          "&.Mui-selected, &.Mui-selected:hover": { bgcolor: "grey.100" },
+          "&:hover": { bgcolor: "grey.100" },
+        },
       },
     },
-  },
-};
-  
+  };
+
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  
+
   useEffect(() => {
     // if the total dropped (e.g., 4 items total), don’t stay on page 2
     const pc = Math.max(1, Math.ceil(total / PAGE_SIZE));
     if (page > pc) setPage(pc);
-  }, [total]);  
+  }, [total]);
 
   useEffect(() => {
-  setPage(1);
-}, [topic, format,q]);
+    setPage(1);
+  }, [topic, format, q]);
 
-    useEffect(() => {
-  setPriceRange(([min]) => [Math.min(min, Number(maxPrice) || 0), Number(maxPrice) || 0]);
-}, [maxPrice]);
+  useEffect(() => {
+    setPriceRange(([min]) => [Math.min(min, Number(maxPrice) || 0), Number(maxPrice) || 0]);
+  }, [maxPrice]);
 
 
   useEffect(() => {
-  const close = () => setOpenSelect(null);
-  const onPageScroll = () => close();
-  const onResize = () => close();
+    const close = () => setOpenSelect(null);
+    const onPageScroll = () => close();
+    const onResize = () => close();
 
-  window.addEventListener("scroll", onPageScroll, { passive: true });
-  window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onPageScroll, { passive: true });
+    window.addEventListener("resize", onResize);
 
-  return () => {
-    window.removeEventListener("scroll", onPageScroll);
-    window.removeEventListener("resize", onResize);
-  };
-}, []);
+    return () => {
+      window.removeEventListener("scroll", onPageScroll);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
 
 
 
@@ -825,57 +844,57 @@ useEffect(() => {
     <>
       <Header />
       {/* Hero (background image) */}
-            <section className="relative">
-              <div
-                className="relative text-white text-center"
-                style={{
-                  backgroundImage: "url(/images/events-hero-bg.png)",
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-b from-[#0d2046]/80 to-[#0d2046]/95" />
-                <Container maxWidth={false} disableGutters>
-                  <div className="relative mx-auto max-w-7xl px-6 py-16 md:py-20">
-                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
-                      Explore M&A Events
-                    </h1>
-                    <p className="mx-auto max-w-3xl text-lg md:text-xl text-white/80">
-                      The leading platform for M&A professionals to connect, learn, and grow
-                    </p>
-                    <div className="mt-8 flex flex-wrap justify-center items-center gap-4">
-                      <Button
-                        component={Link}
-                        to="/events"
-                        size="large"
-                        variant="contained"
-                        className="normal-case rounded-xl bg-teal-500 hover:bg-teal-600"
-                      >
-                        Explore events
-                      </Button>
-                      <Button
-                        component={Link}
-                        to="/signup"
-                        size="large"
-                        variant="outlined"
-                        className="normal-case rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10"
-                      >
-                        Join Community
-                      </Button>
-                      <Button
-                        component={Link}
-                        to="/signup"
-                        size="large"
-                        variant="outlined"
-                        className="normal-case rounded-xl border-white/30 text-white hover:border-white hover:bg-white/10"
-                      >
-                        Post an event
-                      </Button>
-                    </div>
-                  </div>
-                </Container>
+      <section className="relative">
+        <div
+          className="relative text-white text-center"
+          style={{
+            backgroundImage: "url(/images/events-hero-bg.png)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0d2046]/80 to-[#0d2046]/95" />
+          <Container maxWidth={false} disableGutters>
+            <div className="relative mx-auto max-w-7xl px-6 py-16 md:py-20">
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
+                Explore M&A Events
+              </h1>
+              <p className="mx-auto max-w-3xl text-lg md:text-xl text-white/80">
+                The leading platform for M&A professionals to connect, learn, and grow
+              </p>
+              <div className="mt-8 flex flex-wrap justify-center items-center gap-4">
+                <Button
+                  component={Link}
+                  to="/events"
+                  size="large"
+                  variant="contained"
+                  className="normal-case rounded-xl bg-teal-500 hover:bg-teal-600"
+                >
+                  Explore events
+                </Button>
+                <Button
+                  component={Link}
+                  to="/signup"
+                  size="large"
+                  variant="outlined"
+                  className="normal-case rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10"
+                >
+                  Join Community
+                </Button>
+                <Button
+                  component={Link}
+                  to="/signup"
+                  size="large"
+                  variant="outlined"
+                  className="normal-case rounded-xl border-white/30 text-white hover:border-white hover:bg-white/10"
+                >
+                  Post an event
+                </Button>
               </div>
-            </section>  
+            </div>
+          </Container>
+        </div>
+      </section>
 
       {/* Top filters / controls bar */}
       <Container maxWidth={false} disableGutters className="mt-6 px-4 sm:px-6">
@@ -889,7 +908,7 @@ useEffect(() => {
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
-                          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </span>
                 <input
@@ -958,8 +977,10 @@ useEffect(() => {
                   renderValue={(v) => v || "Event Format"}
                   MenuProps={selectMenuProps}
                   {...getOpenProps("format")}
-                  sx={{ ...selectSx, "& .MuiOutlinedInput-root": { height: 44, borderRadius: 12 },
-                        "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" } }}
+                  sx={{
+                    ...selectSx, "& .MuiOutlinedInput-root": { height: 44, borderRadius: 12 },
+                    "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" }
+                  }}
                 >
                   {(formats || []).map((f, idx) => (
                     <MenuItem key={`${f}-${idx}`} value={f}>{f}</MenuItem>

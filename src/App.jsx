@@ -13,7 +13,7 @@ import RequireAuth from "./components/RequireAuth.jsx";
 import GuestOnly from "./components/PublicGate.jsx";
 import EventsPage from "./pages/EventsPage.jsx";
 import MyResourcesPage from "./pages/MyResourcesPage.jsx";
-import CartPage from "./pages/CartPage.jsx";
+import MyCartPage from "./pages/MyCartPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
 import LiveMeetingPage from "./pages/LiveMeetingPage.jsx";
@@ -37,6 +37,7 @@ import AdminStaffPage from "./pages/AdminStaffPage.jsx"
 import AdminRecordingsPage from "./pages/AdminRecordingsPage.jsx";
 import AdminMessagesPage from "./pages/AdminMessagesPage.jsx";
 import EventManagePage from "./pages/EventManagePage.jsx";
+import AdminCarts from "./pages/AdminCarts.jsx";
 
 import { useParams } from "react-router-dom";
 
@@ -90,15 +91,14 @@ const AppShell = () => {
           <Route path="/admin/events/:eventId" element={<EventManagePage />} />
           {/* keep your recordings behavior same as before */}
           <Route path="recordings" element={<AdminRecordingsPage />} />
-
-          {/* aliases so the sidebar appears on group manage/details too */}
           <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
+          <Route path="carts" element={<AdminCarts />} />
           <Route path="staff" element={<AdminStaffPage />} />
         </Route>
         <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:id" element={<EventDetailsPage />} />
-        <Route path="/cart" element={<CartPage />} />
+        <Route path="/account/cart" element={<MyCartPage />} />
         <Route path="/community" element={<CommunityHubPage />} />
         <Route path="/groups/:idOrSlug" element={<RequireAuth><RedirectGroupToAdmin /></RequireAuth>} />
 

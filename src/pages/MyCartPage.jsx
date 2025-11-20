@@ -1,4 +1,4 @@
-// src/pages/CartPage.jsx
+// src/pages/MyCartPage.jsx
 import React, { useMemo, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -46,7 +46,7 @@ import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNone
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import AccountHero from "../components/AccountHero.jsx";
-import { API_BASE, getToken } from "../utils/api";
+import { API_BASE, getToken } from "../utils/api.js";
 const navItems = [
   { key: "activity", label: "Activity", icon: <TimelineOutlinedIcon /> },
   { key: "events", label: "Courses", icon: <SchoolOutlinedIcon /> },
@@ -162,7 +162,7 @@ const authHeaders = () => {
 
 const fmt = (n) =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n || 0);
-export default function CartPage() {
+export default function MyCartPage() {
   const navigate = useNavigate();
   const storedUser = useMemo(() => {
     try {

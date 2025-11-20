@@ -25,6 +25,7 @@ import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { authConfig } from "../utils/api";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
+import { isOwnerUser, isStaffUser } from "../utils/adminRole.js";
 
 const apiBase =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
@@ -111,6 +112,8 @@ const Header = () => {
   const navigate = useNavigate();
   const { pathname, search } = location;
   const accountHref = isAdminUser() ? "/admin/events" : "/account/resources";
+  const owner = isOwnerUser();
+  const staff = isStaffUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const openDrawer = () => setMobileOpen(true);
   const closeDrawer = () => setMobileOpen(false);
@@ -127,7 +130,7 @@ const Header = () => {
   });
 
   useEffect(() => {
-    if (isAdminUser()) return; // no cart for admins
+    if (owner) return; // no cart fetching for owners
     (async () => {
       try {
         const { data } = await axios.get(
@@ -141,7 +144,8 @@ const Header = () => {
         // keep whatever is in localStorage
       }
     })();
-  }, []);
+  }, [owner]);
+
 
 
   useEffect(() => {
@@ -294,12 +298,12 @@ const Header = () => {
             {authed ? (
               <Box className="flex items-center gap-3">
                 {/* Cart (hidden for admins) */}
-                {!isAdminUser() && (
+                {!owner && (
                   <>
                     <Tooltip title="Cart">
                       <IconButton
                         component={Link}
-                        to="/cart"
+                        to={staff ? "/admin/carts" : "/account/cart"}
                         size="large"
                         sx={{ color: "text.primary" }}
                       >
@@ -403,8 +407,11 @@ const Header = () => {
 
           {authed ? (
             <List>
-              {!isAdminUser() && (
-                <ListItemButton component={Link} to="/cart">
+              {!owner && (
+                <ListItemButton
+                  component={Link}
+                  to={staff ? "/admin/carts" : "/account/cart"}
+                >
                   <ListItemIcon>
                     <ShoppingCartOutlinedIcon />
                   </ListItemIcon>

@@ -92,6 +92,22 @@ async function updateAdminProfile(profilePayload) {
   return r.json(); // updated user object
 }
 
+async function updateAdminContact(userPayload, profilePayload) {
+  const url = `${API_ROOT}/users/me/`;
+  const body = { ...userPayload };
+  if (profilePayload && Object.keys(profilePayload).length) {
+    body.profile = profilePayload;
+  }
+
+  const r = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error("Failed to save contact");
+  return r.json();
+}
+
 async function uploadAvatar(file) {
   const fd = new FormData();
   // backend accepts 'avatar' OR 'user_image'
@@ -250,6 +266,8 @@ export default function AdminSettings() {
   });
 
   const [profile, setProfile] = React.useState({
+    first_name: "",
+    last_name: "",
     full_name: "",
     bio: "",
     headline: "",
@@ -261,6 +279,17 @@ export default function AdminSettings() {
     skillsText: "",
     linksText: "",
   });
+
+  const [contactOpen, setContactOpen] = React.useState(false);
+  const [contactForm, setContactForm] = React.useState({
+    firstName: "",
+    lastName: "",
+    jobTitle: "",
+    email: "",
+    location: "",
+    linkedinUrl: "",
+  });
+
 
   const [eduList, setEduList] = React.useState([]);
   const [expList, setExpList] = React.useState([]);
@@ -335,6 +364,81 @@ export default function AdminSettings() {
       skillsText: profile.skillsText || "",
     });
     setAboutOpen(true);
+  };
+
+  const openContact = () => {
+    const links = parseLinks(profile.linksText);
+    setContactForm({
+      firstName: profile.first_name || "",
+      lastName: profile.last_name || "",
+      jobTitle: profile.job_title || "",
+      email: profile.email || "",
+      location: profile.location || "",
+      linkedinUrl:
+        typeof links.linkedin === "string" ? links.linkedin : "",
+    });
+    setContactOpen(true);
+  };
+
+  const saveContact = async () => {
+    try {
+      setSaving(true);
+
+      const links = parseLinks(profile.linksText);
+      const linkedin = (contactForm.linkedinUrl || "").trim();
+      const newLinks = { ...links };
+      if (linkedin) newLinks.linkedin = linkedin;
+      else delete newLinks.linkedin;
+
+      const userPayload = {
+        first_name: contactForm.firstName || "",
+        last_name: contactForm.lastName || "",
+        email: contactForm.email || "",
+      };
+
+      const profilePayload = {
+        job_title: contactForm.jobTitle || "",
+        location: contactForm.location || "",
+        links: newLinks,
+      };
+
+      const updated = await updateAdminContact(userPayload, profilePayload);
+      const updatedProfile = updated.profile || {};
+
+      const linksText =
+        updatedProfile.links != null
+          ? JSON.stringify(updatedProfile.links)
+          : JSON.stringify(newLinks);
+
+      setProfile((prev) => ({
+        ...prev,
+        first_name: updated.first_name ?? userPayload.first_name,
+        last_name: updated.last_name ?? userPayload.last_name,
+        full_name:
+          updatedProfile.full_name ||
+          prev.full_name ||
+          `${userPayload.first_name} ${userPayload.last_name}`.trim(),
+        email: updated.email ?? userPayload.email,
+        job_title: updatedProfile.job_title ?? profilePayload.job_title,
+        location: updatedProfile.location ?? profilePayload.location,
+        linksText,
+      }));
+
+      setToast({
+        open: true,
+        type: "success",
+        msg: "Contact updated",
+      });
+      setContactOpen(false);
+    } catch (err) {
+      setToast({
+        open: true,
+        type: "error",
+        msg: err?.message || "Failed to update contact",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveAbout = async () => {
@@ -462,13 +566,15 @@ export default function AdminSettings() {
       const skillsText = Array.isArray(prof.skills)
         ? prof.skills.join(", ")
         : typeof prof.skills === "string"
-        ? prof.skills
-        : "";
+          ? prof.skills
+          : "";
 
       const linksText = prof.links ? JSON.stringify(prof.links) : "";
 
       setProfile({
-        full_name: prof.full_name || "",
+        first_name: data?.first_name || "",
+        last_name: data?.last_name || "",
+        full_name: prof.full_name || data?.full_name || "",
         bio: prof.bio || "",
         headline: prof.headline || "",
         location: prof.location || "",
@@ -479,6 +585,7 @@ export default function AdminSettings() {
         skillsText,
         linksText,
       });
+
     } catch (e) {
       setToast({
         open: true,
@@ -698,6 +805,17 @@ export default function AdminSettings() {
     }
   };
 
+  const displayNameRaw =
+    profile.full_name ||
+    `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
+
+  const displayName = displayNameRaw || "—";
+
+  const workLine =
+    profile.job_title || profile.company
+      ? [profile.job_title, profile.company].filter(Boolean).join(" – ")
+      : profile.headline || ""
+
   // ---------- RENDER ----------
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
@@ -862,401 +980,545 @@ export default function AdminSettings() {
           {loading && <LinearProgress />}
 
           {!loading && (
-            <Grid
-              container
-              spacing={{ xs: 2, md: 2.5 }}
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-              }}
-            >
-              {/* LEFT COLUMN */}
-              <Grid item xs={12} lg={6}>
-                {/* About */}
-                <SectionCard
-                  title="About"
-                  action={
-                    <Button size="small" onClick={openAbout}>
-                      Edit
-                    </Button>
-                  }
+            <>
+              {/* Top profile strip: avatar + name + work line */}
+              <Card
+                variant="outlined"
+                sx={{
+                  mb: 2.5,
+                  borderRadius: 3,
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    px: { xs: 2, md: 3 },
+                    py: { xs: 1.5, md: 2 },
+                  }}
                 >
-                  <Label>Summary:</Label>
-                  {profile.bio ? (
-                    <Typography variant="body2">{profile.bio}</Typography>
-                  ) : (
-                    <PlaceholderLine />
-                  )}
+                  <Avatar
+                    src={avatarUrl || undefined}
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      bgcolor: "grey.300",
+                      fontSize: 24,
+                      mr: 2,
+                    }}
+                  >
+                    {displayName.charAt(0).toUpperCase()}
+                  </Avatar>
 
-                  <Label sx={{ mt: 2 }}>Skills:</Label>
-                  {parseSkills(profile.skillsText).length ? (
-                    <Box
-                      sx={{
-                        mt: 1,
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 1,
-                      }}
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{ fontWeight: 700 }}
                     >
-                      {parseSkills(profile.skillsText).map((s, i) => (
-                        <Chip key={i} size="small" label={s} />
-                      ))}
-                    </Box>
-                  ) : (
-                    <PlaceholderLine />
-                  )}
-                </SectionCard>
+                      {displayName}
+                    </Typography>
 
-                {/* Experience */}
-                <SectionCard
-                  sx={{ mt: 2 }}
-                  title="Experience"
-                  action={
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={openAddExperience}
-                    >
-                      Add more
-                    </Button>
-                  }
-                >
-                  {expList.length ? (
-                    <List dense disablePadding>
-                      {expList.map((x) => (
-                        <ListItem
-                          key={x.id}
-                          disableGutters
-                          sx={{ py: 0.5, pr: { xs: 0, md: 9 } }}
-                          secondaryAction={
-                            <Box
-                              sx={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 1.5,
-                              }}
-                            >
-                              <Tooltip title="Edit">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => onEditExperience(x)}
-                                >
-                                  <EditOutlinedIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Delete">
-                                <IconButton
-                                  size="small"
-                                  onClick={() =>
-                                    askDeleteExperience(
-                                      x.id,
-                                      `${x.community_name} — ${x.position}`
-                                    )
-                                  }
-                                >
-                                  <DeleteOutlineIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          }
-                        >
-                          <ListItemText
-                            primary={
-                              <Typography
-                                variant="body2"
-                                sx={{ fontWeight: 600 }}
-                              >
-                                {x.position} - {x.community_name}
-                              </Typography>
-                            }
-                            secondary={
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {rangeLinkedIn(
-                                  x.start_date,
-                                  x.end_date,
-                                  x.current || x.currently_work_here
-                                )}
-                                {x.location ? ` · ${x.location}` : ""}
-                              </Typography>
-                            }
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Box sx={{ textAlign: "center", py: 4 }}>
-                      <Avatar
-                        sx={{
-                          width: 64,
-                          height: 64,
-                          bgcolor: "grey.200",
-                          mx: "auto",
-                        }}
-                      />
+                    {workLine && (
                       <Typography
                         variant="body2"
                         color="text.secondary"
-                        sx={{ mt: 1 }}
+                        sx={{ mt: 0.25 }}
+                        noWrap
                       >
-                        This section is empty
+                        {workLine}
                       </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                      >
-                        Add an experience to your profile
-                      </Typography>
-                      <Box>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          sx={{ mt: 1.5 }}
-                          onClick={openAddExperience}
-                        >
-                          Create
-                        </Button>
-                      </Box>
-                    </Box>
-                  )}
-                </SectionCard>
+                    )}
+                  </Box>
+                </Box>
+              </Card>
 
-                {/* Education */}
-                <SectionCard
-                  sx={{ mt: 2 }}
-                  title="Education"
-                  action={
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => setEduOpen(true)}
-                    >
-                      Add more
-                    </Button>
-                  }
-                >
-                  {eduList.length ? (
-                    <List dense disablePadding>
-                      {eduList.map((e) => (
-                        <ListItem
-                          key={e.id}
-                          disableGutters
-                          sx={{ py: 0.5, pr: { xs: 0, md: 9 } }}
-                          secondaryAction={
-                            <Box
-                              sx={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 1.5,
-                              }}
-                            >
-                              <Tooltip title="Edit">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => onEditEducation(e)}
-                                >
-                                  <EditOutlinedIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Delete">
-                                <IconButton
-                                  size="small"
-                                  onClick={() =>
-                                    askDeleteEducation(
-                                      e.id,
-                                      `${e.school} — ${e.degree}`
-                                    )
-                                  }
-                                >
-                                  <DeleteOutlineIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          }
-                        >
-                          <ListItemText
-                            primary={
-                              <Typography
-                                variant="body2"
-                                sx={{ fontWeight: 600 }}
+              <Grid
+                container
+                spacing={{ xs: 2, md: 2.5 }}
+                sx={{
+                  // same pattern as HomePage / ProfilePage
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                }}
+              >
+
+                {/* LEFT COLUMN */}
+                <Grid item xs={12} lg={6}>
+                  {/* About */}
+                  <SectionCard
+                    title="About"
+                    action={
+                      <Button size="small" onClick={openAbout}>
+                        Edit
+                      </Button>
+                    }
+                  >
+                    <Label>Summary:</Label>
+                    {profile.bio ? (
+                      <Typography variant="body2">{profile.bio}</Typography>
+                    ) : (
+                      <PlaceholderLine />
+                    )}
+
+                    <Label sx={{ mt: 2 }}>Skills:</Label>
+                    {parseSkills(profile.skillsText).length ? (
+                      <Box
+                        sx={{
+                          mt: 1,
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 1,
+                        }}
+                      >
+                        {parseSkills(profile.skillsText).map((s, i) => (
+                          <Chip key={i} size="small" label={s} />
+                        ))}
+                      </Box>
+                    ) : (
+                      <PlaceholderLine />
+                    )}
+                  </SectionCard>
+
+                  {/* Experience */}
+                  <SectionCard
+                    sx={{ mt: 2 }}
+                    title="Experience"
+                    action={
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={openAddExperience}
+                      >
+                        Add more
+                      </Button>
+                    }
+                  >
+                    {expList.length ? (
+                      <List dense disablePadding>
+                        {expList.map((x) => (
+                          <ListItem
+                            key={x.id}
+                            disableGutters
+                            sx={{ py: 0.5, pr: { xs: 0, md: 9 } }}
+                            secondaryAction={
+                              <Box
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 1.5,
+                                }}
                               >
-                                {e.degree} - {e.school}
-                              </Typography>
+                                <Tooltip title="Edit">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => onEditExperience(x)}
+                                  >
+                                    <EditOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() =>
+                                      askDeleteExperience(
+                                        x.id,
+                                        `${x.community_name} — ${x.position}`
+                                      )
+                                    }
+                                  >
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
                             }
-                            secondary={
+                          >
+                            <ListItemText
+                              primary={
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: 600 }}
+                                >
+                                  {x.position} - {x.community_name}
+                                </Typography>
+                              }
+                              secondary={
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {rangeLinkedIn(
+                                    x.start_date,
+                                    x.end_date,
+                                    x.current || x.currently_work_here
+                                  )}
+                                  {x.location ? ` · ${x.location}` : ""}
+                                </Typography>
+                              }
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    ) : (
+                      <Box sx={{ textAlign: "center", py: 4 }}>
+                        <Avatar
+                          sx={{
+                            width: 64,
+                            height: 64,
+                            bgcolor: "grey.200",
+                            mx: "auto",
+                          }}
+                        />
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 1 }}
+                        >
+                          This section is empty
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          Add an experience to your profile
+                        </Typography>
+                        <Box>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            sx={{ mt: 1.5 }}
+                            onClick={openAddExperience}
+                          >
+                            Create
+                          </Button>
+                        </Box>
+                      </Box>
+                    )}
+                  </SectionCard>
+
+                  {/* Education */}
+                  <SectionCard
+                    sx={{ mt: 2 }}
+                    title="Education"
+                    action={
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => setEduOpen(true)}
+                      >
+                        Add more
+                      </Button>
+                    }
+                  >
+                    {eduList.length ? (
+                      <List dense disablePadding>
+                        {eduList.map((e) => (
+                          <ListItem
+                            key={e.id}
+                            disableGutters
+                            sx={{ py: 0.5, pr: { xs: 0, md: 9 } }}
+                            secondaryAction={
+                              <Box
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 1.5,
+                                }}
+                              >
+                                <Tooltip title="Edit">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => onEditEducation(e)}
+                                  >
+                                    <EditOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() =>
+                                      askDeleteEducation(
+                                        e.id,
+                                        `${e.school} — ${e.degree}`
+                                      )
+                                    }
+                                  >
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            }
+                          >
+                            <ListItemText
+                              primary={
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: 600 }}
+                                >
+                                  {e.degree} - {e.school}
+                                </Typography>
+                              }
+                              secondary={
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {rangeLinkedIn(
+                                    e.start_date,
+                                    e.end_date,
+                                    false
+                                  )}
+                                </Typography>
+                              }
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    ) : (
+                      <Box sx={{ textAlign: "center", py: 4 }}>
+                        <Avatar
+                          sx={{
+                            width: 64,
+                            height: 64,
+                            bgcolor: "grey.200",
+                            mx: "auto",
+                          }}
+                        />
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 1 }}
+                        >
+                          This section is empty
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          Add an education to your profile
+                        </Typography>
+                        <Box>
+                          <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            sx={{ mt: 1.5 }}
+                            onClick={() => setEduOpen(true)}
+                          >
+                            Create
+                          </Button>
+                        </Box>
+                      </Box>
+                    )}
+                  </SectionCard>
+                </Grid>
+
+                {/* RIGHT COLUMN */}
+                <Grid item xs={12} lg={6}>
+                  {/* Contact */}
+                  <SectionCard
+                    title="Contact"
+                    action={
+                      <Button size="small" onClick={openContact}>
+                        Edit
+                      </Button>
+                    }
+                  >
+                    <Label>Social Media Links</Label>
+                    <List dense disablePadding>
+                      {(() => {
+                        const links = parseLinks(profile.linksText);
+                        const hasLinkedIn =
+                          typeof links.linkedin === "string" &&
+                          links.linkedin.trim();
+                        return (
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 34, mr: 0.5 }}>
+                              <LinkedInIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={
+                                <Typography
+                                  variant="body2"
+                                  sx={{ wordBreak: "break-word" }}
+                                >
+                                  {hasLinkedIn || "—"}
+                                </Typography>
+                              }
+                            />
+                          </ListItem>
+                        );
+                      })()}
+                    </List>
+
+                    <Label sx={{ mt: 2 }}>Emails</Label>
+                    <List dense disablePadding>
+                      <ListItem sx={{ px: 0 }}>
+                        <ListItemIcon sx={{ minWidth: 34 }}>
+                          <EmailIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body2">
+                              {profile.email || "—"}
+                            </Typography>
+                          }
+                          secondary={
+                            <>
                               <Typography
                                 variant="caption"
                                 color="text.secondary"
+                                display="block"
                               >
-                                {rangeLinkedIn(
-                                  e.start_date,
-                                  e.end_date,
-                                  false
-                                )}
+                                Private field, visible by you and admins only.
+                                Editable in your
                               </Typography>
-                            }
-                          />
-                        </ListItem>
-                      ))}
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                display="block"
+                              >
+                                Privacy settings.
+                              </Typography>
+                            </>
+                          }
+                        />
+                      </ListItem>
                     </List>
-                  ) : (
-                    <Box sx={{ textAlign: "center", py: 4 }}>
-                      <Avatar
+
+                    <Label sx={{ mt: 2, mb: 1 }}>Live Location</Label>
+                    {profile.location ? (
+                      <Box
                         sx={{
-                          width: 64,
-                          height: 64,
-                          bgcolor: "grey.200",
-                          mx: "auto",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
+                      >
+                        <PlaceIcon fontSize="small" />
+                        <Typography variant="body2">
+                          {profile.location}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Box
+                        sx={{
+                          height: { xs: 120, sm: 160, md: 170 },
+                          borderRadius: 1,
+                          bgcolor: "grey.100",
+                          border: "1px solid",
+                          borderColor: "divider",
                         }}
                       />
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 1 }}
-                      >
-                        This section is empty
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                      >
-                        Add an education to your profile
-                      </Typography>
-                      <Box>
-                        <Button
-                          variant="contained"
-                          color="success"
-                          size="small"
-                          sx={{ mt: 1.5 }}
-                          onClick={() => setEduOpen(true)}
-                        >
-                          Create
-                        </Button>
-                      </Box>
-                    </Box>
-                  )}
-                </SectionCard>
+                    )}
+                  </SectionCard>
+
+                  {/* About your work */}
+                  <SectionCard
+                    sx={{ mt: 2 }}
+                    title="About your work"
+                    action={<Button size="small">Edit</Button>}
+                  >
+                    <KV label="Job Title" value={profile.job_title} />
+                    <Divider sx={{ my: 0.5 }} />
+                    <KV label="Community" value={profile.company} />
+                    <Divider sx={{ my: 0.5 }} />
+                    <KV label="Sector" value={""} />
+                    <Divider sx={{ my: 0.5 }} />
+                    <KV label="Industry" value={""} />
+                    <Divider sx={{ my: 0.5 }} />
+                    <KV label="Number of Employees" value={""} />
+                  </SectionCard>
+                </Grid>
               </Grid>
-
-              {/* RIGHT COLUMN */}
-              <Grid item xs={12} lg={6}>
-                {/* Contact */}
-                <SectionCard
-                  title="Contact"
-                  action={<Button size="small">Edit</Button>}
-                >
-                  <Label>Social Media Links</Label>
-                  <List dense disablePadding>
-                    {(() => {
-                      const links = parseLinks(profile.linksText);
-                      const hasLinkedIn =
-                        typeof links.linkedin === "string" &&
-                        links.linkedin.trim();
-                      return (
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 34, mr: 0.5 }}>
-                            <LinkedInIcon fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={
-                              <Typography
-                                variant="body2"
-                                sx={{ wordBreak: "break-word" }}
-                              >
-                                {hasLinkedIn || "—"}
-                              </Typography>
-                            }
-                          />
-                        </ListItem>
-                      );
-                    })()}
-                  </List>
-
-                  <Label sx={{ mt: 2 }}>Emails</Label>
-                  <List dense disablePadding>
-                    <ListItem sx={{ px: 0 }}>
-                      <ListItemIcon sx={{ minWidth: 34 }}>
-                        <EmailIcon fontSize="small" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={
-                          <Typography variant="body2">
-                            {profile.email || "—"}
-                          </Typography>
-                        }
-                        secondary={
-                          <>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              display="block"
-                            >
-                              Private field, visible by you and admins only.
-                              Editable in your
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              display="block"
-                            >
-                              Privacy settings.
-                            </Typography>
-                          </>
-                        }
-                      />
-                    </ListItem>
-                  </List>
-
-                  <Label sx={{ mt: 2, mb: 1 }}>Live Location</Label>
-                  {profile.location ? (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                      }}
-                    >
-                      <PlaceIcon fontSize="small" />
-                      <Typography variant="body2">
-                        {profile.location}
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <Box
-                      sx={{
-                        height: { xs: 120, sm: 160, md: 170 },
-                        borderRadius: 1,
-                        bgcolor: "grey.100",
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    />
-                  )}
-                </SectionCard>
-
-                {/* About your work */}
-                <SectionCard
-                  sx={{ mt: 2 }}
-                  title="About your work"
-                  action={<Button size="small">Edit</Button>}
-                >
-                  <KV label="Job Title" value={profile.job_title} />
-                  <Divider sx={{ my: 0.5 }} />
-                  <KV label="Community" value={profile.company} />
-                  <Divider sx={{ my: 0.5 }} />
-                  <KV label="Sector" value={""} />
-                  <Divider sx={{ my: 0.5 }} />
-                  <KV label="Industry" value={""} />
-                  <Divider sx={{ my: 0.5 }} />
-                  <KV label="Number of Employees" value={""} />
-                </SectionCard>
-              </Grid>
-            </Grid>
+            </>
           )}
         </Container>
       )}
+
+      {/* --- Edit Contact dialog --- */}
+      <Dialog
+        open={contactOpen}
+        onClose={() => setContactOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        fullScreen={isMobile}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Edit Contact</DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="First name"
+                fullWidth
+                value={contactForm.firstName}
+                onChange={(e) =>
+                  setContactForm((f) => ({ ...f, firstName: e.target.value }))
+                }
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Last name"
+                fullWidth
+                value={contactForm.lastName}
+                onChange={(e) =>
+                  setContactForm((f) => ({ ...f, lastName: e.target.value }))
+                }
+              />
+            </Grid>
+          </Grid>
+
+          <TextField
+            label="Job title"
+            fullWidth
+            sx={{ mb: 2 }}
+            value={contactForm.jobTitle}
+            onChange={(e) =>
+              setContactForm((f) => ({ ...f, jobTitle: e.target.value }))
+            }
+          />
+
+          <TextField
+            label="Email"
+            type="email"
+            fullWidth
+            sx={{ mb: 2 }}
+            value={contactForm.email}
+            onChange={(e) =>
+              setContactForm((f) => ({ ...f, email: e.target.value }))
+            }
+          />
+
+          <TextField
+            label="Location"
+            fullWidth
+            sx={{ mb: 2 }}
+            value={contactForm.location}
+            onChange={(e) =>
+              setContactForm((f) => ({ ...f, location: e.target.value }))
+            }
+          />
+
+          <TextField
+            label="LinkedIn URL"
+            fullWidth
+            value={contactForm.linkedinUrl}
+            onChange={(e) =>
+              setContactForm((f) => ({ ...f, linkedinUrl: e.target.value }))
+            }
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setContactOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={saveContact}
+            disabled={saving}
+          >
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* --- Education Dialog --- */}
       <Dialog
@@ -1513,13 +1775,13 @@ export default function AdminSettings() {
                 renderValue: (v) =>
                   v
                     ? ({
-                        internship: "Internship",
-                        apprenticeship: "Apprenticeship",
-                        trainee: "Trainee / Entry program",
-                        entry: "Entry level",
-                        mid: "Mid level",
-                        senior: "Senior level",
-                      }[v] || v)
+                      internship: "Internship",
+                      apprenticeship: "Apprenticeship",
+                      trainee: "Trainee / Entry program",
+                      entry: "Entry level",
+                      mid: "Mid level",
+                      senior: "Senior level",
+                    }[v] || v)
                     : (
                       <span style={{ color: "rgba(0,0,0,0.6)" }}>
                         Career stage
@@ -1552,10 +1814,10 @@ export default function AdminSettings() {
                 renderValue: (v) =>
                   v
                     ? ({
-                        paid: "Paid",
-                        stipend: "Stipend",
-                        volunteer: "Volunteer / Unpaid",
-                      }[v] || v)
+                      paid: "Paid",
+                      stipend: "Stipend",
+                      volunteer: "Volunteer / Unpaid",
+                    }[v] || v)
                     : (
                       <span style={{ color: "rgba(0,0,0,0.6)" }}>
                         Compensation type

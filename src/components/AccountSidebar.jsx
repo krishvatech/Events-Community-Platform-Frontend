@@ -26,7 +26,7 @@ const NAV_ITEMS = [
   { key: "profile", label: "Profile", icon: <PersonOutlineOutlinedIcon />, to: "/account/profile" },
   { key: "elibrary", label: "My Recordings", icon: <MenuBookOutlinedIcon />, to: "/account/recordings" },
   { key: "forums", label: "Forums", icon: <ForumOutlinedIcon /> },
-  { key: "orders", label: "Orders", icon: <ReceiptLongOutlinedIcon />, to: "/cart" },
+  { key: "orders", label: "Orders", icon: <ReceiptLongOutlinedIcon />, to: "/account/cart" },
   { key: "memberships", label: "Memberships", icon: <WorkspacePremiumOutlinedIcon /> },
   { key: "subscriptions", label: "Subscriptions", icon: <AutorenewOutlinedIcon /> },
   { key: "friends", label: "Friends", icon: <PeopleAltOutlinedIcon /> },
@@ -38,7 +38,7 @@ export default function AccountSidebar({ stickyTop = 96 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const activeKey = useMemo(() => {
-    if (pathname.startsWith("/cart")) return "orders";
+    if (pathname.startsWith("/account/cart")) return "orders";
     if (pathname.startsWith("/account/events")) return "events";
     if (pathname.startsWith("/events/")) return "events"; // event details keeps highlight
     if (pathname.startsWith("/account/recordings")) return "elibrary";

@@ -22,6 +22,7 @@ import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneR
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
 
 const TEAL = "#14b8b1";
 const TEXT = "#334155";
@@ -36,9 +37,10 @@ const defaultItems = [
   { key: "recordings", label: "My Recordings", Icon: OndemandVideoRoundedIcon },
   { key: "groups", label: "Groups", Icon: GroupsRoundedIcon },
   { key: "messages", label: "Messages", Icon: ChatBubbleOutlineRoundedIcon },
+  { key: "carts", label: "Cart", Icon: ShoppingCartRoundedIcon },
+  { key: "staff", label: "Staff", Icon: AdminPanelSettingsRoundedIcon },
   { key: "notifications", label: "Notifications", Icon: NotificationsNoneRoundedIcon },
   { key: "settings", label: "Settings", Icon: SettingsRoundedIcon },
-  { key: "staff", label: "Staff", Icon: AdminPanelSettingsRoundedIcon },
 ];
 
 export default function AdminSidebar({
@@ -55,7 +57,9 @@ export default function AdminSidebar({
    let listItems = items ?? defaultItems;
   const owner = isOwnerUser();
   const staffOnly = !owner && isStaffUser();
-
+  if (owner) {
+    listItems = listItems.filter((item) => item.key !== "carts");
+  }
   if (staffOnly) {
     listItems = listItems.filter(
       (item) => !["staff", "posts"].includes(item.key)
