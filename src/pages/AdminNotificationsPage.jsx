@@ -11,21 +11,19 @@ import {
   Button,
   IconButton,
   Tooltip,
-  Tabs,
-  Tab,
   Divider,
-  Checkbox,
   FormControlLabel,
   LinearProgress,
   Snackbar,
   Alert,
   Pagination,
   useMediaQuery,
-  Menu, MenuItem,
+  MenuItem,
+  Switch,
+  FormControl,
+  Select,
 } from "@mui/material";
-
 import { Link } from "react-router-dom";
-
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import GroupRoundedIcon from "@mui/icons-material/GroupRounded";
 import GroupAddRoundedIcon from "@mui/icons-material/GroupAddRounded";
@@ -33,7 +31,6 @@ import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DoneAllRoundedIcon from "@mui/icons-material/DoneAllRounded";
-import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 
@@ -256,6 +253,7 @@ export default function AdminNotificationsPage() {
   const [loading, setLoading] = React.useState(true);
   const [items, setItems] = React.useState([]);
   const [count, setCount] = React.useState(0);
+  const [unreadCount, setUnreadCount] = React.useState(0);
   const [page, setPage] = React.useState(1);
   const pageSize = 5;
   const start = (page - 1) * pageSize;
@@ -299,6 +297,13 @@ export default function AdminNotificationsPage() {
           out.count = out.items.length;
         }
       }
+      const unread = out.items.filter((x) =>
+        x.type === "join_request"
+          ? x.status === "pending"
+          : !x.read_at
+      ).length;
+      setUnreadCount(unread);
+
       setItems(out.items);
       setCount(out.count);
     } catch (e) {
@@ -335,6 +340,46 @@ export default function AdminNotificationsPage() {
       setBusyId(null);
     }
   };
+
+  const handleMarkAllRead = async () => {
+    const ids = items
+      .filter((n) => n._source === "notif" && !n.read_at)
+      .map((n) => n.id);
+
+    if (!ids.length) return;
+
+    setBusyId("bulk");
+    try {
+      const res = await fetch(ENDPOINTS.notifMarkReadBulk(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const now = new Date().toISOString();
+      setItems((prev) =>
+        prev.map((n) =>
+          ids.includes(n.id) ? { ...n, read_at: n.read_at || now } : n
+        )
+      );
+      setUnreadCount(0);
+      setToast({
+        open: true,
+        type: "success",
+        msg: "All notifications marked as read.",
+      });
+    } catch (e) {
+      setToast({
+        open: true,
+        type: "error",
+        msg: `Could not mark all read: ${e?.message || e}`,
+      });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
 
   const approveJoin = async (n) => {
     if (!n?.group?.id || !n?.user_id) return;
@@ -387,119 +432,127 @@ export default function AdminNotificationsPage() {
       <Stack direction="row" alignItems="center" spacing={2}>
         <Avatar sx={{ bgcolor: "#14b8b1" }}>A</Avatar>
         <Box>
-          <Typography variant="h6" fontWeight={800}>
-            Admin Notifications
-          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="h6" fontWeight={800}>
+              Admin Notifications
+            </Typography>
+            <Chip
+              size="small"
+              label={`${unreadCount} unread`}
+              sx={{
+                borderRadius: 999,
+                bgcolor: "grey.100",
+                fontSize: 11,
+                height: 22,
+              }}
+            />
+          </Stack>
           <Typography variant="body2" color="text.secondary">
             Manage group notifications and join requests.
           </Typography>
         </Box>
       </Stack>
 
-      {/* 🔹 Show refresh only on tablet/desktop, hide on mobile */}
       {!isMobile && (
         <Stack direction="row" spacing={1}>
-          <Tooltip title="Refresh">
-            <IconButton onClick={fetchData} disabled={loading}>
-              <RefreshRoundedIcon />
-            </IconButton>
-          </Tooltip>
+          <Button
+            variant="outlined"
+            startIcon={<DoneAllRoundedIcon />}
+            onClick={handleMarkAllRead}
+            disabled={loading || unreadCount === 0}
+            sx={{
+              borderRadius: 999,
+              textTransform: "uppercase",
+              fontSize: 12,
+              px: 2.5,
+            }}
+          >
+            Mark all read
+          </Button>
         </Stack>
       )}
+
     </Stack>
   );
+
 
 
   return (
     <Box sx={{ p: { xs: 1.25, sm: 2 }, maxWidth: 960 }}>
       {Header}
 
-      <Tabs
-        value={tab}
-        onChange={(e, v) => setTab(v)}
-        sx={{ mb: 1 }}
-        variant={isMobile ? "scrollable" : "standard"}
-        scrollButtons={isMobile ? "auto" : false}
-        allowScrollButtonsMobile
+      {/* Filter row – responsive */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1.5}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        sx={{ mb: 1.5 }}
       >
-        {TABS.map((t) => (
-          <Tab
-            key={t.key}
-            iconPosition="start"
-            icon={t.icon}
-            label={t.label}
-            value={t.key}
-          />
-        ))}
-      </Tabs>
-
-      {/* Filters: full bar on desktop, three-dots menu on mobile */}
-      {!isMobile ? (
+        {/* Unread switch + mobile Mark-all-read */}
         <Stack
           direction="row"
+          spacing={1}
           alignItems="center"
-          justifyContent="space-between"
-          sx={{ mb: 1 }}
+          sx={{ width: { xs: "100%", sm: "auto" } }}
         >
           <FormControlLabel
+            sx={{ ml: 0 }}
             control={
-              <Checkbox
+              <Switch
                 checked={onlyUnread}
                 onChange={(e) => setOnlyUnread(e.target.checked)}
+                color="primary"
               />
             }
-            label="Only unread"
+            label="Unread only"
           />
-          <Typography variant="body2" color="text.secondary">
-            {count} total
-          </Typography>
-        </Stack>
-      ) : (
-        <Box
-          sx={{
-            mb: 1,
-            display: "flex",
-            justifyContent: "flex-end", // three dots at right end
-          }}
-        >
-          <IconButton
-            size="small"
-            onClick={(e) => setFilterAnchor(e.currentTarget)}
-          >
-            <MoreVertRoundedIcon />
-          </IconButton>
 
-          <Menu
-            anchorEl={filterAnchor}
-            open={filterMenuOpen}
-            onClose={() => setFilterAnchor(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-            transformOrigin={{ vertical: "top", horizontal: "right" }}
-          >
-            <MenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                setOnlyUnread((prev) => !prev);
+          {/* mobile-only Mark all read, right of switch */}
+          {isMobile && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<DoneAllRoundedIcon fontSize="small" />}
+              onClick={handleMarkAllRead}
+              disabled={loading || unreadCount === 0}
+              sx={{
+                borderRadius: 999,
+                textTransform: "uppercase",
+                fontSize: 11,
+                ml: "auto",
+                px: 1.5,
+                whiteSpace: "nowrap",
               }}
             >
-              <FormControlLabel
-                sx={{ ml: 0 }}
-                control={<Checkbox checked={onlyUnread} />}
-                label="Only unread"
-              />
-            </MenuItem>
-            <MenuItem disabled>
-              <Typography variant="body2" color="text.secondary">
-                {count} total
-              </Typography>
-            </MenuItem>
-          </Menu>
-        </Box>
-      )}
+              Mark all read
+            </Button>
+          )}
+        </Stack>
 
+        {/* spacer only on bigger screens */}
+        <Box sx={{ flexGrow: 1, display: { xs: "none", sm: "block" } }} />
+
+        {/* Tab filter */}
+        <FormControl
+          size="small"
+          sx={{ minWidth: 160, width: { xs: "100%", sm: "auto" } }}
+        >
+          <Select
+            value={tab}
+            onChange={(e) => setTab(e.target.value)}
+            displayEmpty
+          >
+            <MenuItem value="all">All</MenuItem>
+            <MenuItem value="member_joined">User joined</MenuItem>
+            <MenuItem value="group_created">Group created</MenuItem>
+            <MenuItem value="join_request">Join requests</MenuItem>
+          </Select>
+        </FormControl>
+      </Stack>
 
       <Divider sx={{ mb: 2 }} />
       {loading && <LinearProgress sx={{ mb: 2 }} />}
+
 
       <Stack spacing={1.5}>
         {!loading && items.length === 0 && (
