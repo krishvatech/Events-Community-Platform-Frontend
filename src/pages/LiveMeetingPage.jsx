@@ -179,11 +179,9 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd, onOpenQnA 
         await initMeeting({
           authToken,
           defaults: {
-            audio: false, // Audience usually starts muted
+            audio: false,
             video: false,
-            args: {
-              // Prevents audience from consuming bandwidth in waiting state if needed
-            }
+            args: {},
           },
         });
         setInitDone(true);
@@ -194,7 +192,7 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd, onOpenQnA 
     })();
   }, [authToken, initMeeting]);
 
-  // 🆕 HOST DETECTION LOGIC
+  // 🆕 HOST DETECTION LOGIC (With Polling Fix)
   useEffect(() => {
     if (!meeting || !initDone) return;
 
@@ -204,38 +202,128 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd, onOpenQnA 
       return;
     }
 
-    // Function to check if a host is currently in the meeting
-    const checkHostPresence = () => {
-      const participants = meeting.participants.joined;
-      let foundHost = false;
+    // Helper to scan the participant list
+    const scanForHost = () => {
+      // 1. Get all joined participants
+      const participants = Array.from(meeting.participants.joined.values());
+      
+      // 2. Check if ANY of them look like a host
+      const foundHost = participants.some((p) => {
+        const preset = (p.presetName || "").toLowerCase();
+        const customId = (p.customParticipantId || "").toLowerCase();
+        
+        // DEBUG: Uncomment to see who is in the room in your console
+        // console.log(`User: ${p.name}, Preset: ${preset}, ID: ${customId}`);
 
-      // Iterate through joined participants to find a 'publisher' or 'host' preset
-      // Note: Adjust the strings inside match() if your specific Dyte preset names are different
-      for (const p of participants.values()) {
-        if (p.presetName && p.presetName.match(/host|publisher|presenter/i)) {
-          foundHost = true;
-          break;
-        }
+        return (
+          preset.includes("host") || 
+          preset.includes("publisher") || 
+          preset.includes("presenter") ||
+          customId.includes("host") ||
+          customId.includes("publisher")
+        );
+      });
+
+      if (foundHost) {
+        setHostJoined(true);
       }
-      setHostJoined(foundHost);
     };
 
-    // 1. Check immediately upon load
-    checkHostPresence();
+    // --- 1. Check Immediately ---
+    scanForHost();
 
-    // 2. Listen for new joins
-    const handleParticipantJoin = () => checkHostPresence();
-    // 3. Listen for leaves (if host leaves, go back to waiting screen)
-    const handleParticipantLeave = () => checkHostPresence();
-
-    meeting.participants.joined.on("participantJoined", handleParticipantJoin);
-    meeting.participants.joined.on("participantLeft", handleParticipantLeave);
+    // --- 2. Listen for Joins (Instant reaction) ---
+    const handleJoin = () => scanForHost();
+    meeting.participants.joined.on("participantJoined", handleJoin);
+    
+    // --- 3. POLLING INTERVAL (The Fix) ---
+    // This checks every 3 seconds. If the event listener missed the data 
+    // (e.g., presetName wasn't loaded yet), this will catch it.
+    const intervalId = setInterval(() => {
+      if (!hostJoined) {
+        scanForHost();
+      }
+    }, 3000);
 
     return () => {
-      meeting.participants.joined.off("participantJoined", handleParticipantJoin);
-      meeting.participants.joined.off("participantLeft", handleParticipantLeave);
+      meeting.participants.joined.off("participantJoined", handleJoin);
+      clearInterval(intervalId);
     };
-  }, [meeting, initDone, role]);
+  }, [meeting, initDone, role, hostJoined]);
+
+
+  // If the event is already live when an audience member joins,
+  // skip the waiting screen immediately.
+  useEffect(() => {
+    if (!eventId) return;
+    if (role === "publisher") return;   // host never waits
+    if (!meeting) return;
+    if (hostJoined) return;             // already detected host
+
+    let cancelled = false;
+
+    const checkEventLive = async () => {
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/`), {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader(),
+          },
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        // ✅ STRONGER CONDITION
+        if (
+          !cancelled &&
+          data.live_started_at &&      // only when real live start time is set
+          !data.live_ended_at          // and it's not ended
+        ) {
+          setHostJoined(true);
+        }
+      } catch (e) {
+        console.warn("Failed to check event live status:", e);
+      }
+    };
+
+    // Run once right after we join
+    checkEventLive();
+
+    // Optional: poll a couple of times in case backend is slightly delayed
+    const id = window.setInterval(() => {
+      if (cancelled || hostJoined) {
+        window.clearInterval(id);
+        return;
+      }
+      checkEventLive();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [eventId, role, meeting, hostJoined]);
+
+  // --- Existing Logic (Live Status) ---
+  useEffect(() => {
+    if (!meeting || !eventId || role !== "publisher" || liveStatusSent) return;
+    const sendLiveStatus = async () => {
+      try {
+        await fetch(toApiUrl(`events/${eventId}/live-status/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ action: "start" }),
+        });
+        setLiveStatusSent(true);
+      } catch (e) {
+        console.warn("Failed to update live-status (start):", e);
+      }
+    };
+    sendLiveStatus();
+  }, [meeting, eventId, role, liveStatusSent]);
 
   // --- Existing Logic (Live Status) ---
   useEffect(() => {
@@ -269,7 +357,7 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd, onOpenQnA 
           headers: { "Content-Type": "application/json", ...authHeader() },
           body: JSON.stringify({ user_id: userId }),
         }).catch((e) => console.warn("Failed to update active speaker:", e));
-      } catch (e) { console.warn("Error active-speaker endpoint:", e); }
+      } catch (e) {}
     };
 
     const handleActiveSpeaker = (participant) => {
@@ -288,7 +376,6 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd, onOpenQnA 
 
     meeting.participants.on("activeSpeaker", handleActiveSpeaker);
 
-    // Mark host on join
     const markHostOnJoin = () => {
         if (role !== "publisher" || !meeting.self) return;
         const hostId = meeting.self.customParticipantId || meeting.self.userId;
@@ -329,7 +416,6 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd, onOpenQnA 
         if (typeof participants.count === "number") {
           remoteCount = participants.count;
         } else if (participants.joined) {
-            // Safe size check
            remoteCount = participants.joined.size || 0;
         }
         pushCount(remoteCount + 1);
