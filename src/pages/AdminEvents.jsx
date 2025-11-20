@@ -1110,42 +1110,91 @@ function AdminEventCard({ ev, onHost, isHosting, onEdit, onJoinLive, isJoining, 
         <Box className="mt-auto flex items-center gap-1.5 pt-1">
           {isOwner ? (
             <>
-              {/* OWNER: Host Now */}
-              {/* (unchanged owner buttons) */}
-              <Button
-                onClick={() => onHost(ev)}
-                startIcon={<LiveTvRoundedIcon />}
-                variant="contained"
-                className="rounded-xl"
-                sx={{
-                  textTransform: "none",
-                  backgroundColor: "#10b8a6",
-                  "&:hover": { backgroundColor: "#0ea5a4" },
-                  minWidth: { xs: 40, lg: 120 },
-                  px: { xs: 1, lg: 2 },
-                }}
-                disabled={isHosting}
-              >
-                {isHosting ? (
-                  <span className="flex items-center gap-2">
-                    <CircularProgress size={18} />
+              {/* OWNER: primary action depends on status */}
+              {isPast ? (
+                ev.recording_url ? (
+                  // ✅ Event ended & recording available → Watch Recording
+                  <Button
+                    component="a"
+                    href={ev.recording_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="contained"
+                    className="rounded-xl"
+                    sx={{
+                      textTransform: "none",
+                      backgroundColor: "#10b8a6",
+                      "&:hover": { backgroundColor: "#0ea5a4" },
+                      minWidth: { xs: 40, lg: 120 },
+                      px: { xs: 1, lg: 2 },
+                    }}
+                  >
                     <Box
                       component="span"
                       sx={{ display: { xs: "none", lg: "inline" } }}
                     >
-                      Hosting…
+                      Watch Recording
                     </Box>
-                  </span>
+                  </Button>
                 ) : (
-                  <Box
-                    component="span"
-                    sx={{ display: { xs: "none", lg: "inline" } }}
+                  // ✅ Event ended, no recording → disabled Event Ended
+                  <Button
+                    disabled
+                    variant="contained"
+                    className="rounded-xl"
+                    sx={{
+                      textTransform: "none",
+                      backgroundColor: "#CBD5E1",
+                      minWidth: { xs: 40, lg: 120 },
+                      px: { xs: 1, lg: 2 },
+                    }}
                   >
-                    Host Now
-                  </Box>
-                )}
-              </Button>
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "none", lg: "inline" } }}
+                    >
+                      Event Ended
+                    </Box>
+                  </Button>
+                )
+              ) : (
+                // ✅ Upcoming / Live → Host Now (same as before)
+                <Button
+                  onClick={() => onHost(ev)}
+                  startIcon={<LiveTvRoundedIcon />}
+                  variant="contained"
+                  className="rounded-xl"
+                  sx={{
+                    textTransform: "none",
+                    backgroundColor: "#10b8a6",
+                    "&:hover": { backgroundColor: "#0ea5a4" },
+                    minWidth: { xs: 40, lg: 120 },
+                    px: { xs: 1, lg: 2 },
+                  }}
+                  disabled={isHosting}
+                >
+                  {isHosting ? (
+                    <span className="flex items-center gap-2">
+                      <CircularProgress size={18} />
+                      <Box
+                        component="span"
+                        sx={{ display: { xs: "none", lg: "inline" } }}
+                      >
+                        Hosting…
+                      </Box>
+                    </span>
+                  ) : (
+                    <Box
+                      component="span"
+                      sx={{ display: { xs: "none", lg: "inline" } }}
+                    >
+                      Host Now
+                    </Box>
+                  )}
+                </Button>
+              )}
 
+              {/* OWNER: Edit stays same */}
               <Button
                 onClick={() => onEdit?.(ev)}
                 startIcon={<EditNoteRoundedIcon />}
