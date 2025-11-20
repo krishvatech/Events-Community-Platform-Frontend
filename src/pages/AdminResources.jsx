@@ -461,6 +461,7 @@ export default function MyResourcesAdmin() {
   const [editing, setEditing] = useState(null);
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [actionMenuRow, setActionMenuRow] = useState(null);
+  const [viewResource, setViewResource] = useState(null);
 
   // Resources state with pagination
   const [items, setItems] = useState([]);
@@ -620,6 +621,21 @@ export default function MyResourcesAdmin() {
     }
   };
 
+  function getEventLabel(row) {
+    const ev =
+      row.event ||
+      events.find((e) => String(e.id) === String(row.event_id));
+
+    return (
+      ev?.title ||
+      ev?.name ||
+      row.event_title ||
+      row.event_name ||
+      row.event_id ||
+      "-"
+    );
+  }
+
   return (
     <Box sx={{ p: 4 }}>
       {/* Header: title + Upload button aligned */}
@@ -763,17 +779,7 @@ export default function MyResourcesAdmin() {
               </TableHead>
               <TableBody>
                 {items.map((row) => {
-                  // Try to resolve the event name from different shapes
-                  const ev =
-                    row.event ||
-                    events.find((e) => String(e.id) === String(row.event_id));
-                  const eventLabel =
-                    ev?.title ||
-                    ev?.name ||
-                    row.event_title ||
-                    row.event_name ||
-                    row.event_id ||
-                    "-";
+                  const eventLabel = getEventLabel(row);
 
                   return (
                     <TableRow key={row.id}>
@@ -816,14 +822,10 @@ export default function MyResourcesAdmin() {
                             justifyContent="flex-end"
                           >
                             {(row.file || row.link_url || row.video_url) && (
-                              <Tooltip title="View">
+                              <Tooltip title="View details">
                                 <IconButton
                                   size="small"
-                                  onClick={() => {
-                                    const url =
-                                      row.file || row.link_url || row.video_url;
-                                    window.open(url, "_blank");
-                                  }}
+                                  onClick={() => setViewResource(row)}
                                 >
                                   <VisibilityRoundedIcon />
                                 </IconButton>
@@ -897,20 +899,17 @@ export default function MyResourcesAdmin() {
             actionMenuRow.video_url) && (
             <MenuItem
               onClick={() => {
-                const url =
-                  actionMenuRow.file ||
-                  actionMenuRow.link_url ||
-                  actionMenuRow.video_url;
-                window.open(url, "_blank");
+                setViewResource(actionMenuRow);
                 handleCloseActionsMenu();
               }}
             >
               <ListItemIcon>
                 <VisibilityRoundedIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText primary="View" />
+              <ListItemText primary="View details" />
             </MenuItem>
           )}
+
 
         {actionMenuRow && (
           <MenuItem
@@ -941,6 +940,119 @@ export default function MyResourcesAdmin() {
           </MenuItem>
         )}
       </Menu>
+
+      {/* View Details dialog */}
+      <Dialog
+        open={!!viewResource}
+        onClose={() => setViewResource(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {viewResource ? viewResource.title : "Resource details"}
+        </DialogTitle>
+
+        <DialogContent dividers>
+          {viewResource && (
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                {iconForType(viewResource.type)}
+                <Chip
+                  label={viewResource.type}
+                  size="small"
+                  sx={{ textTransform: "capitalize" }}
+                />
+              </Stack>
+
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Event
+                </Typography>
+                <Typography variant="body2">
+                  {getEventLabel(viewResource)}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Description
+                </Typography>
+                <Typography variant="body2">
+                  {viewResource.description || "—"}
+                </Typography>
+              </Box>
+
+              {Array.isArray(viewResource.tags) &&
+                viewResource.tags.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Tags
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      {viewResource.tags.map((tag) => (
+                        <Chip key={tag} label={tag} size="small" />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Publish status
+                </Typography>
+                <Typography variant="body2">
+                  {viewResource.is_published ? "Published" : "Not published"}
+                </Typography>
+                {viewResource.publish_at && (
+                  <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    Scheduled / published at:{" "}
+                    {new Date(viewResource.publish_at).toLocaleString()}
+                  </Typography>
+                )}
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Timestamps
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Created:{" "}
+                  {viewResource.created_at
+                    ? new Date(viewResource.created_at).toLocaleString()
+                    : "—"}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Updated:{" "}
+                  {viewResource.updated_at
+                    ? new Date(viewResource.updated_at).toLocaleString()
+                    : "—"}
+                </Typography>
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+
+        <DialogActions>
+          {viewResource &&
+            (viewResource.file ||
+              viewResource.link_url ||
+              viewResource.video_url) && (
+              <Button
+                startIcon={<VisibilityRoundedIcon />}
+                onClick={() => {
+                  const url =
+                    viewResource.file ||
+                    viewResource.link_url ||
+                    viewResource.video_url;
+                  window.open(url, "_blank");
+                }}
+              >
+                Open resource
+              </Button>
+            )}
+          <Button onClick={() => setViewResource(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Upload/Edit dialog */}
       <ResourceDialog
