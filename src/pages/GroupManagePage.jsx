@@ -2281,6 +2281,16 @@ export default function GroupManagePage() {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
     const [group, setGroup] = React.useState(null);
+
+    // 👇 already there
+    const [editOpen, setEditOpen] = React.useState(false);
+
+    // 👇 ADD THIS HELPER
+    const handleOpenEditDialog = () => {
+        if (!group) return;
+        setEditOpen(true);
+    };
+
     const [isStaffUser, setIsStaffUser] = React.useState(false);
     // Is this group a child (has a parent)?
     const isChildGroup = Boolean(group?.parent_id || group?.parent?.id || group?.parent);
@@ -2329,8 +2339,6 @@ export default function GroupManagePage() {
     React.useEffect(() => {
         if (!showSubgroupsTab && tab === 2) setTab(0);
     }, [showSubgroupsTab, tab]);
-
-    const [editOpen, setEditOpen] = React.useState(false);
     const [members, setMembers] = React.useState([]);
     const [memLoading, setMemLoading] = React.useState(true);
     const [memError, setMemError] = React.useState("");
@@ -3318,7 +3326,7 @@ export default function GroupManagePage() {
                                     {canEditGroup && (
                                         <Button
                                             startIcon={<EditNoteRoundedIcon />}
-                                            onClick={() => setEditOpen(true)}
+                                            onClick={handleOpenEditDialog}
                                             variant="contained"
                                             className="rounded-xl"
                                             sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
@@ -3326,6 +3334,7 @@ export default function GroupManagePage() {
                                             Edit
                                         </Button>
                                     )}
+
                                     <Button
                                         onClick={() => navigate(-1)}
                                         variant="outlined"
@@ -3683,8 +3692,9 @@ export default function GroupManagePage() {
                                                 <Button
                                                     variant="contained"
                                                     className="rounded-xl"
+                                                    startIcon={<EditNoteRoundedIcon fontSize="small" />}
                                                     sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                                    onClick={() => setEditOpen(true)}
+                                                    onClick={handleOpenEditDialog}
                                                 >
                                                     Edit Details
                                                 </Button>
@@ -3958,6 +3968,7 @@ export default function GroupManagePage() {
                                     >
                                         <GroupChatTab
                                             group={group}
+                                            onEditGroup={() => setEditOpen(true)}
                                             membersWithOwner={membersWithOwner}
                                             currentUserId={currentUserId}
                                             chatOn={chatOn}
@@ -4711,6 +4722,13 @@ export default function GroupManagePage() {
                     </Container>
                     {/* ↑↑↑ END of pasted original content ↑↑↑ */}
                 </main>
+                {/* 👇 ADD THIS ANYWHERE INSIDE RETURN (typically here) */}
+                <EditGroupDialog
+                    open={editOpen}
+                    group={group}
+                    onClose={() => setEditOpen(false)}
+                    onUpdated={onUpdated}
+                />
             </div>
         </div>
     );
