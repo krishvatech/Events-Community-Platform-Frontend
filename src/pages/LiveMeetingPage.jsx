@@ -15,7 +15,14 @@ import {
   useDyteClient,
   useDyteMeeting,
 } from "@dytesdk/react-web-core";
-import { DyteMeeting } from "@dytesdk/react-ui-kit";
+
+import {
+  DyteMeeting,
+  registerAddons,            // ⬅️ registerAddons from react-ui-kit
+} from "@dytesdk/react-ui-kit";
+
+import CustomControlbarButton from "@dytesdk/ui-kit-addons/custom-controlbar-button";
+import LiveQnAPanel from "../components/LiveQnAPanel.jsx";
 
 // --- API base (same pattern as other pages) ---
 const API_ROOT = (
@@ -47,25 +54,29 @@ function toApiUrl(pathOrUrl) {
 
 // -------- Dyte meeting UI wrapper --------
 
-function DyteMeetingUI() {
+function DyteMeetingUI({ config }) {
   const { meeting } = useDyteMeeting();
+
   return (
     <Box sx={{ flex: 1, minHeight: 0, height: "100%", width: "100%" }}>
-     <DyteMeeting
-       meeting={meeting}
-       mode="fill"
-       showSetupScreen={false}
-       style={{ width: "100%", height: "100%" }}
-     />
-   </Box>
+      <DyteMeeting
+        meeting={meeting}
+        mode="fill"
+        showSetupScreen={false}
+        style={{ width: "100%", height: "100%" }}
+        // ⬇ Only pass config when it exists
+        {...(config ? { config } : {})}
+      />
+    </Box>
   );
 }
 
-function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
+function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd, onOpenQnA }) {
   const [meeting, initMeeting] = useDyteClient();
   const [initError, setInitError] = useState("");
   const [initDone, setInitDone] = useState(false);
   const [liveStatusSent, setLiveStatusSent] = useState(false);
+  const [dyteConfig, setDyteConfig] = useState(null); // 👈 for controlbar addons
 
   // Init meeting with auth token
   useEffect(() => {
@@ -87,8 +98,8 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
     })();
   }, [authToken, initMeeting]);
 
+  // Only host should mark event as LIVE
   useEffect(() => {
-    // Only host should mark event as LIVE
     if (!meeting || !eventId || role !== "publisher" || liveStatusSent) return;
 
     const sendLiveStatus = async () => {
@@ -110,13 +121,13 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
     sendLiveStatus();
   }, [meeting, eventId, role, liveStatusSent]);
 
-    useEffect(() => {
+  // 🔊 Active speaker sync
+  useEffect(() => {
     if (!meeting || !eventId) return;
 
     let lastSent = undefined;
 
     const sendActiveSpeaker = (userId) => {
-      // avoid spamming same value
       if (userId === lastSent) return;
       lastSent = userId;
 
@@ -138,9 +149,7 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
 
     const handleActiveSpeaker = (participant) => {
       try {
-        // When there is no remote active speaker, Dyte can pass null/undefined
         if (!participant) {
-          // On HOST tab (publisher), fall back to marking host as active
           if (role === "publisher" && meeting.self) {
             const hostId =
               meeting.self.customParticipantId || meeting.self.userId;
@@ -148,13 +157,11 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
               sendActiveSpeaker(hostId);
             }
           } else {
-            // viewers just clear it
             sendActiveSpeaker(null);
           }
           return;
         }
 
-        // Normal case: some remote participant is speaking
         const userId =
           participant.customParticipantId ||
           participant.userId ||
@@ -180,7 +187,6 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
       console.warn("Failed to subscribe to activeSpeaker:", e);
     }
 
-    // 🔹 On host side, as soon as they actually join the room, mark them as initial active speaker
     const markHostOnJoin = () => {
       if (role !== "publisher" || !meeting.self) return;
       const hostId =
@@ -193,29 +199,22 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
     try {
       meeting.self.on("roomJoined", markHostOnJoin);
     } catch (e) {
-      // optional, older SDKs might not have this
       console.warn("Failed to subscribe to roomJoined", e);
     }
 
     return () => {
       try {
         meeting.participants.off("activeSpeaker", handleActiveSpeaker);
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
       try {
         meeting.self.off?.("roomJoined", markHostOnJoin);
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
 
-      // Optional: clear on unmount/leave
       sendActiveSpeaker(null);
     };
   }, [meeting, eventId, role]);
 
-
-  // 🔢 SYNC PARTICIPANT COUNT → Event.attending_count
+  // 👥 SYNC PARTICIPANT COUNT → Event.attending_count
   useEffect(() => {
     if (!meeting || !eventId) return;
 
@@ -250,8 +249,6 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
         const participants = meeting.participants;
         if (!participants) return;
 
-        // Dyte Web Core: participants.count = remote participants only (no local user)
-        // So total = remote + 1 (self)
         let remoteCount = 0;
 
         if (typeof participants.count === "number") {
@@ -265,17 +262,14 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
           }
         }
 
-        const total = remoteCount + 1; // include local user
+        const total = remoteCount + 1;
         pushCount(total);
       } catch (e) {
         console.warn("Failed to compute participant count:", e);
       }
     };
 
-    // Initial sync once meeting is ready
     computeAndPushCount();
-
-    // Periodic sync every 10 seconds
     const intervalId = window.setInterval(computeAndPushCount, 10000);
 
     return () => {
@@ -283,13 +277,12 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
     };
   }, [meeting, eventId]);
 
-  // 🔔 Listen for "roomLeft" (user left / meeting ended) and auto-close
+  // 🚪 Listen for "roomLeft" (user left / meeting ended)
   useEffect(() => {
     if (!meeting || !meeting.self) return;
 
     const handleRoomLeft = ({ state }) => {
       console.log("Dyte roomLeft:", state);
-      // state can be: 'left', 'ended', 'kicked', 'rejected', etc.
       if (
         state === "left" ||
         state === "ended" ||
@@ -311,12 +304,35 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
     return () => {
       try {
         meeting.self.off?.("roomLeft", handleRoomLeft);
-      } catch (e) {
-        // ignore if off is not available
-      }
+      } catch (e) {}
     };
   }, [meeting, onMeetingEnd]);
 
+  // 🔘 Add a "Q&A" button into Dyte's bottom control bar
+  useEffect(() => {
+    if (!meeting) return;
+
+    try {
+      const qnaButton = new CustomControlbarButton({
+        position: "right",
+        label: "Q&A",
+        icon: "?",
+        onClick: () => {
+          // 2) Then open your Q&A panel
+          if (typeof onOpenQnA === "function") {
+            onOpenQnA();
+          }
+        },
+      });
+
+      const config = registerAddons([qnaButton], meeting);
+      setDyteConfig(config); // ✅ now we have a real config object
+    } catch (e) {
+      console.warn("Failed to register QnA controlbar button", e);
+    }
+  }, [meeting, onOpenQnA]);
+
+  // === Render states ===
   if (!authToken) {
     return (
       <Box sx={{ p: 3 }}>
@@ -364,11 +380,10 @@ function DyteMeetingWrapper({ authToken, eventId, role, onMeetingEnd }) {
         </Box>
       }
     >
-      <DyteMeetingUI />
+      <DyteMeetingUI config={dyteConfig} />
     </DyteProvider>
   );
 }
-
 // ------------- Page component -------------
 
 export default function LiveMeetingPage() {
@@ -381,9 +396,36 @@ export default function LiveMeetingPage() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
+  const [showQnA, setShowQnA] = useState(false);
 
   // 👇 For fullscreen
   const pageRef = useRef(null);
+
+  const handleOpenQnA = React.useCallback(() => {
+    if (typeof document !== "undefined") {
+      try {
+        // If some element is fullscreen and it's NOT our page wrapper,
+        // it's probably Dyte's internal video container.
+        if (
+          document.fullscreenElement &&
+          document.fullscreenElement !== pageRef.current
+        ) {
+          const exitFs =
+            document.exitFullscreen ||
+            document.webkitExitFullscreen ||
+            document.msExitFullscreen;
+
+          if (exitFs) {
+            exitFs.call(document);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to exit fullscreen before opening QnA", e);
+      }
+    }
+
+    setShowQnA(true);
+  }, []);
 
   // Extract eventId from query (?id=123)
   useEffect(() => {
@@ -458,10 +500,9 @@ export default function LiveMeetingPage() {
   // 🔲 Auto fullscreen when we have an authToken (meeting view)
   useEffect(() => {
     if (!authToken) return;
+    if (!pageRef.current) return;   // wait for wrapper to mount
 
-    const el = pageRef.current || document.documentElement;
-    if (!el) return;
-
+    const el = pageRef.current;     // 👉 fullscreen the outer meeting wrapper
     const requestFs =
       el.requestFullscreen ||
       el.webkitRequestFullscreen ||
@@ -614,15 +655,36 @@ export default function LiveMeetingPage() {
       ref={pageRef}
       sx={{
         position: "fixed",
-        inset: 0, // top:0, right:0, bottom:0, left:0
+        inset: 0,
         zIndex: 1300,
         bgcolor: "#000",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      <Box sx={{ p: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+      {/* 🔝 Header overlay ABOVE Dyte */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          p: 1,
+          zIndex: 9998, // higher than Dyte, lower than QnA Drawer
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          pointerEvents: "none", // let clicks pass through, except where we override
+          bgcolor: "rgba(0,0,0,0.5)",
+          backdropFilter: "blur(6px)",
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{ pointerEvents: "auto" }} // clickable
+        >
           <Button
             startIcon={<ArrowBackIcon />}
             onClick={handleBack}
@@ -636,16 +698,25 @@ export default function LiveMeetingPage() {
             Live meeting powered by Dyte
           </Typography>
         </Stack>
+
       </Box>
 
+      {/* Meeting fills the background */}
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <DyteMeetingWrapper
           authToken={authToken}
           eventId={eventId}
           role={role}
           onMeetingEnd={handleMeetingEnd}
+          onOpenQnA={handleOpenQnA}
         />
       </Box>
+
+      <LiveQnAPanel
+        open={showQnA}
+        onClose={() => setShowQnA(false)}
+        eventId={eventId}
+      />
     </Box>
   );
 }

@@ -228,11 +228,17 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
     <Card
       variant="outlined"
       sx={{
+        width: "100% !important",
+        maxWidth: "100% !important",
+        m: 0,
         borderRadius: 3,
         borderColor: BORDER,
         px: 1.5,
         py: 1.25,
-        "&:hover": { boxShadow: "0 6px 24px rgba(0,0,0,0.06)", borderColor: "#cbd5e1" },
+        "&:hover": {
+          boxShadow: "0 6px 24px rgba(0,0,0,0.06)",
+          borderColor: "#cbd5e1",
+        },
       }}
     >
       <Stack direction="row" spacing={1.5} alignItems="center">
@@ -321,7 +327,7 @@ export default function MembersPage() {
 
   const getCenterForISO2 = useCountryCentroids(geoUrl);
 
-
+  
   // state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -331,6 +337,8 @@ export default function MembersPage() {
   // map controls
   const [showMap, setShowMap] = useState(true);
   const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 }); // pan/zoom state
+
+  const hasSideMap = !isCompact && showMap;
 
   // Tooltip state
   const [tip, setTip] = React.useState(null); // { x, y, node }
@@ -609,9 +617,15 @@ export default function MembersPage() {
   /* -------------------------------- UI -------------------------------- */
   return (
     <>
-      <Grid container spacing={2}>
+      <Grid container spacing={hasSideMap ? 2 : 0}>
         {/* Left: Member list (card style) */}
-        <Grid item xs={12} md={6} lg={5} xl={4}>
+        <Grid
+          item
+          xs={12}
+          md={hasSideMap ? 6 : 12}
+          lg={hasSideMap ? 5 : 12}
+          xl={hasSideMap ? 4 : 12}
+        >
           <Box
             sx={{
               width: "100%",   // take full width of the grid item
@@ -683,7 +697,17 @@ export default function MembersPage() {
             {!loading && !error && (
               <>
                 {/* Member cards */}
-                <Stack spacing={1.25}>
+                <Stack
+                  spacing={1.25}
+                  alignItems="stretch"
+                  sx={{
+                    width: "100%",
+                    "& > *": {
+                      width: "100% !important",
+                      maxWidth: "100% !important",
+                    },
+                  }}
+                >
                   {current.map((u) => (
                     <MemberCard
                       key={u.id}
@@ -739,7 +763,7 @@ export default function MembersPage() {
         </Grid>
 
         {/* Right: map panel only on desktop / large */}
-        {!isCompact && (
+        {hasSideMap && (
           <Grid item xs={12} md={6} lg={7} xl={8}>
             <Paper
               sx={{
@@ -749,6 +773,7 @@ export default function MembersPage() {
                 position: { md: "sticky" },
                 top: 88,
                 height: { xs: 520, md: "calc(100vh - 140px)" },
+                width: 605,
                 display: "flex",
                 flexDirection: "column",
                 gap: 1,
@@ -817,7 +842,7 @@ export default function MembersPage() {
                 sx={{
                   position: "relative",
                   flex: 1,
-                  minHeight: 360,
+                  minHeight: 580,
                   userSelect: "none",
                   "& svg": { display: "block" },
                   "& *:focus, & *:focus-visible": {

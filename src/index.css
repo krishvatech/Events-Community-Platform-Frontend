@@ -38,3 +38,8 @@ html, body, #root {
   min-height:calc(1.5em * 3);    /* reserves exactly 3 lines */
 }
 .meta-rows{ min-height:96px; }   
+
+button[aria-label="Enter full screen"],
+button[aria-label="Exit full screen"] {
+  display: none !important;
+}
