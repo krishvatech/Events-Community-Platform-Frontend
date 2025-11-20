@@ -13,6 +13,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import SearchIcon from "@mui/icons-material/Search";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, List, ListItem, ListItemAvatar, ListItemText, Divider
@@ -1740,7 +1741,19 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
       ? (post.community || (post.community_id ? `Community #${post.community_id}` : "—"))
       : (post.author?.name || "—"));
   return (
-    <Paper key={post.id} elevation={0} sx={{ p: 2, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+    <Paper
+      key={post.id}
+      elevation={0}
+      sx={{
+        p: 2,
+        mb: 2,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 3,
+        // 🔹 Make each post card itself fixed-width on desktop
+        maxWidth: { xs: "100%", md: 720 },
+        mx: { xs: 0, md: "auto" },
+      }}
+    >
       {/* Header */}
       <Stack direction="row" spacing={1.5} alignItems="center">
         <Avatar src={toMediaUrl(post.group_avatar || post.author?.avatar)} alt={headingTitle} />
@@ -1787,7 +1800,17 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
               component="img"
               src={toMediaUrl(post.image_url)}
               alt={post.text || "post image"}
-              sx={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 2, border: `1px solid ${BORDER}` }}
+              sx={{
+                width: "100%",
+                // 🔹 Clamp actual image size so long/large files don’t stretch the layout
+                maxWidth: { xs: "100%", md: 640 },
+                maxHeight: 420,
+                objectFit: "cover",
+                borderRadius: 2,
+                border: `1px solid ${BORDER}`,
+                display: "block",
+                mx: "auto",
+              }}
             />
           </>
         )}
@@ -1968,6 +1991,25 @@ export default function LiveFeedPage({
   const [sharesTarget, setSharesTarget] = React.useState(null);
   const [sharesLoading, setSharesLoading] = React.useState(false);
   const [sharesUsers, setSharesUsers] = React.useState([]);
+
+  // 🔼 Show "scroll to top" button after user scrolls down
+  const [showScrollTop, setShowScrollTop] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window === "undefined") return;
+      setShowScrollTop(window.scrollY > 300); // show after 300px
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const handleScrollTop = () => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
 
   // Install a global opener used by PostCard ("liked by X and N others" click)
   React.useEffect(() => {
@@ -2353,8 +2395,10 @@ export default function LiveFeedPage({
         <Box
           sx={{
             width: "100%",
-            maxWidth: "100%",      // no clamping, fill the whole 9-column area
-            mx: 0,                 // no centering gap
+            // 🔹 Mobile & tablet: full width
+            // 🔹 md+ (≥ 900px): clamp the feed to a fixed width and center it
+            maxWidth: { xs: "100%", md: 760 },
+            mx: { xs: 0, md: "auto" },
           }}
         >
           {/* Scope toggle */}
@@ -2472,18 +2516,44 @@ export default function LiveFeedPage({
       </Grid>
 
       {/* Right rail */}
-      <Grid item xs={12} md={3} sx={{ display: { xs: "none", md: "block" } }}>
+      <Grid item xs={12} lg={3} sx={{ display: { xs: "none", lg: "block" } }}>
         <Box
           sx={{
             position: "sticky",
             top: 55,
             alignSelf: "flex-start",
-            width: "180%",       // take full 3-column width
+            width: "120%",       // take full 3-column width
           }}
         >
           <CommunityProfileCard user={user} stats={stats} tags={tags} />
         </Box>
       </Grid>
+      {showScrollTop && (
+        <Box
+          sx={{
+            position: "fixed",
+            bottom: { xs: 72, md: 32 },
+            right: { xs: 16, md: 32 },
+            zIndex: 1300,
+          }}
+        >
+          <IconButton
+            onClick={handleScrollTop}
+            size="large"
+            sx={{
+              bgcolor: "primary.main",
+              color: "#fff",
+              boxShadow: 4,
+              borderRadius: "999px",
+              "&:hover": {
+                bgcolor: "primary.dark",
+              },
+            }}
+          >
+            <KeyboardArrowUpRoundedIcon />
+          </IconButton>
+        </Box>
+      )}
     </Grid>
   );
 }

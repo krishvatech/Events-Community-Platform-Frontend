@@ -1381,7 +1381,7 @@ export default function AdminMessagesPage() {
                                 maxWidth: "75%",
                                 px: 1.5,
                                 py: 1,
-                                borderRadius: 3,
+                                borderRadius: 1,
                                 bgcolor: "#ffffff",
                                 border: "1px solid #e2e8f0",
                                 boxShadow: "0 6px 16px rgba(15,23,42,0.06)",
