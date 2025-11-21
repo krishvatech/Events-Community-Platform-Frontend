@@ -5,7 +5,7 @@ import {
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
     TextField, Typography, Switch, FormControlLabel, CircularProgress,
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup,
-    IconButton, Menu, ListItemIcon, Popper
+    IconButton, Menu, ListItemIcon, Popper, Drawer
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
@@ -15,18 +15,16 @@ import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import PollRoundedIcon from "@mui/icons-material/PollRounded";
+import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
-import AdminSidebar from "../components/AdminSidebar";
-import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
-
-
-
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 
 // ---- API helpers (reuse same pattern as AdminGroups.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -1764,6 +1762,8 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
     const [error, setError] = React.useState("");
     const [text, setText] = React.useState("");
     const [sending, setSending] = React.useState(false);
+    const [mobileView, setMobileView] = React.useState("list"); // "list" | "chat"
+
 
     const listRef = React.useRef(null);
 
@@ -2047,7 +2047,12 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
             <Paper
                 elevation={0}
                 className="rounded-2xl border border-slate-200"
-                sx={{ width: { xs: "100%", md: 280 }, maxHeight: 480, overflowY: "auto" }}
+                sx={{
+                    width: { xs: "100%", md: 280 },
+                    maxHeight: 480,
+                    overflowY: "auto",
+                    display: { xs: mobileView === "list" ? "block" : "none", md: "block" },
+                }}
             >
                 <Box sx={{ p: 2, borderBottom: "1px solid #e2e8f0" }}>
                     <Typography variant="subtitle1" className="font-semibold">
@@ -2063,7 +2068,10 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                     <ListItem
                         button
                         selected={activePeer.type === "group"}
-                        onClick={() => setActivePeer({ type: "group", user: null })}
+                        onClick={() => {
+                            setActivePeer({ type: "group", user: null });
+                            setMobileView("chat");
+                        }}
                     >
                         <ListItemAvatar>
                             <Avatar src={group?.cover_image ? toAbs(group.cover_image) : undefined}>
@@ -2088,7 +2096,10 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                                 activePeer.user &&
                                 Number(activePeer.user.id) === Number(m.user.id)
                             }
-                            onClick={() => setActivePeer({ type: "dm", user: m.user })}
+                            onClick={() => {
+                                setActivePeer({ type: "dm", user: m.user });
+                                setMobileView("chat");
+                            }}
                         >
                             <ListItemAvatar>
                                 <Avatar src={toAbs(m.user.avatar)}>
@@ -2109,16 +2120,33 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                 elevation={0}
                 className="rounded-2xl border border-slate-200 flex-1"
                 sx={{
-                    display: "flex",
+                    display: {
+                        xs: mobileView === "chat" ? "flex" : "none",
+                        md: "flex",
+                    },
                     flexDirection: "column",
                     minHeight: 320,
                     maxHeight: 520,
                 }}
             >
                 <Box sx={{ p: 2, borderBottom: "1px solid #e2e8f0" }}>
-                    <Typography variant="subtitle1" className="font-semibold">
-                        {displayTitle}
-                    </Typography>
+                    <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        sx={{ mb: 0.5 }}
+                    >
+                        <IconButton
+                            size="small"
+                            sx={{ display: { xs: "inline-flex", md: "none" }, mr: 0.5 }}
+                            onClick={() => setMobileView("list")}
+                        >
+                            <ArrowBackRoundedIcon fontSize="small" />
+                        </IconButton>
+                        <Typography variant="subtitle1" className="font-semibold">
+                            {displayTitle}
+                        </Typography>
+                    </Stack>
                     {activePeer.type === "group" ? (
                         <Typography variant="caption" color="text.secondary">
                             Group messages visible to all members.
@@ -2270,6 +2298,17 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
 }
 
 
+const GROUP_TAB_LABELS = [
+    "Overview",
+    "Members",
+    "Sub-groups",
+    "Settings",
+    "Posts",
+    "Notifications",
+    "Chat",
+];
+
+
 
 // ---- Main page ----
 export default function GroupManagePage() {
@@ -2278,6 +2317,7 @@ export default function GroupManagePage() {
     const token = getToken();
 
     const [tab, setTab] = React.useState(0);
+    const [mobileTabsOpen, setMobileTabsOpen] = React.useState(false);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
     const [group, setGroup] = React.useState(null);
@@ -2804,7 +2844,12 @@ export default function GroupManagePage() {
 
     const canSeeSettingsTab = isOwnerRole || isAdminRole || isModeratorRole;
     const canSeeNotificationsTab = canModerate && showNotificationsTab;
-    const CHAT_TAB_INDEX = canSeeNotificationsTab ? 6 : 5;
+
+    // Keep logical indexes fixed (same as GROUP_TAB_LABELS)
+    // 0: Overview, 1: Members, 2: Sub-groups, 3: Settings,
+    // 4: Posts, 5: Notifications, 6: Chat
+    const CHAT_TAB_INDEX = 6;
+
 
     React.useEffect(() => {
         if (!canCreateSubgroups && addSubOpen) setAddSubOpen(false);
@@ -3296,9 +3341,19 @@ export default function GroupManagePage() {
                     <Container maxWidth="lg" disableGutters className="py-0">
                         {/* Cover banner */}
                         {/* Header (no cover image) */}
-                        <Box sx={{ px: 3, py: 2 }}>
-                            <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-                                <Stack direction="row" alignItems="center" spacing={2}>
+                        <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+                            <Stack
+                                direction={{ xs: "column", sm: "row" }}
+                                alignItems={{ xs: "flex-start", sm: "center" }}
+                                justifyContent="space-between"
+                                spacing={2}
+                            >
+                                <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={2}
+                                    sx={{ width: { xs: "100%", sm: "auto" } }}
+                                >
                                     <Avatar
                                         sx={{ width: 64, height: 64, bgcolor: "#10b8a6", border: "3px solid white" }}
                                         src={group?.cover_image ? bust(group.cover_image, group.updated_at || group._cache) : undefined}
@@ -3307,8 +3362,14 @@ export default function GroupManagePage() {
                                         {(group?.name || "G").slice(0, 1).toUpperCase()}
                                     </Avatar>
 
-                                    <Box>
-                                        <Typography variant="h5" className="font-extrabold">{group?.name || "Group"}</Typography>
+                                    <Box sx={{ minWidth: 0 }}>
+                                        <Typography
+                                            variant="h5"
+                                            className="font-extrabold"
+                                            sx={{ wordBreak: "break-word" }}
+                                        >
+                                            {group?.name || "Group"}
+                                        </Typography>
                                         <Stack direction="row" spacing={1} alignItems="center">
                                             <Chip
                                                 size="small"
@@ -3322,7 +3383,15 @@ export default function GroupManagePage() {
                                     </Box>
                                 </Stack>
 
-                                <Stack direction="row" spacing={1}>
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    sx={{
+                                        mt: { xs: 1, sm: 0 },
+                                        width: { xs: "100%", sm: "auto" },
+                                        justifyContent: { xs: "flex-start", sm: "flex-end" },
+                                    }}
+                                >
                                     {canEditGroup && (
                                         <Button
                                             startIcon={<EditNoteRoundedIcon />}
@@ -3348,28 +3417,82 @@ export default function GroupManagePage() {
                         </Box>
 
 
-                        {/* Tabs */}
-                        <Paper elevation={0} className="rounded-none">
-                            <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
-                                <Tab label="Overview" />
-                                <Tab label="Members" />
+                        {/* Tabs – desktop / tablet */}
+                        <Paper
+                            elevation={0}
+                            className="rounded-none"
+                            sx={{ display: { xs: "none", sm: "block" } }}
+                        >
+                            <Tabs
+                                value={tab}
+                                onChange={(_, v) => setTab(v)}
+                                variant="scrollable"
+                                allowScrollButtonsMobile
+                            >
+                                <Tab label="Overview" value={0} />
+                                <Tab label="Members" value={1} />
+
                                 {showSubgroupsTab ? (
-                                    <Tab label="Sub-groups" />
+                                    <Tab label="Sub-groups" value={2} />
                                 ) : (
                                     // keep index #2 but hide it so other tabs keep their indices
-                                    <Tab sx={{ display: "none" }} disabled />
+                                    <Tab sx={{ display: "none" }} disabled value={2} />
                                 )}
+
                                 {canSeeSettingsTab ? (
-                                    <Tab label="Settings" />
+                                    <Tab label="Settings" value={3} />
                                 ) : (
-                                    // keep index #3 but hide it, so Posts/Notifications keep their indices
-                                    <Tab sx={{ display: "none" }} disabled />
+                                    // keep index #3 but hide it so other tabs keep their indices
+                                    <Tab sx={{ display: "none" }} disabled value={3} />
                                 )}
-                                <Tab label="Posts" />
-                                {canSeeNotificationsTab && <Tab label="Notifications" />}
-                                <Tab label="Chat" />
+
+                                <Tab label="Posts" value={4} />
+
+                                {canSeeNotificationsTab && (
+                                    <Tab
+                                        value={NOTIF_TAB_INDEX} // 5
+                                        label={
+                                            <Badge
+                                                color="error"
+                                                variant="dot"
+                                                invisible={
+                                                    tab !== NOTIF_TAB_INDEX ||
+                                                    unreadJoinRequestsCount === 0
+                                                }
+                                            >
+                                                Notifications
+                                            </Badge>
+                                        }
+                                    />
+                                )}
+
+                                <Tab label="Chat" value={CHAT_TAB_INDEX} /> {/* 6 */}
                             </Tabs>
                         </Paper>
+
+                        {/* Mobile tab header (like HomePage) */}
+                        <Box
+                            sx={{
+                                display: { xs: "flex", sm: "none" },
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                px: 2,
+                                py: 1,
+                                borderBottom: "1px solid #e2e8f0",
+                                bgcolor: "background.paper",
+                            }}
+                        >
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                {GROUP_TAB_LABELS[tab] || "Overview"}
+                            </Typography>
+                            <IconButton
+                                size="small"
+                                onClick={() => setMobileTabsOpen(true)}
+                                aria-label="Open group sections"
+                            >
+                                <MenuRoundedIcon />
+                            </IconButton>
+                        </Box>
 
                         {/* Content */}
                         {loading ? (
@@ -4216,6 +4339,82 @@ export default function GroupManagePage() {
 
                             </Box>
                         )}
+
+                        {/* Mobile tabs drawer */}
+                        <Drawer
+                            anchor="right"
+                            open={mobileTabsOpen}
+                            onClose={() => setMobileTabsOpen(false)}
+                            sx={{
+                                display: { xs: "block", sm: "none" },
+                                "& .MuiBackdrop-root": {
+                                    backgroundColor: "rgba(15, 23, 42, 0.45)",
+                                },
+                            }}
+                            PaperProps={{
+                                sx: {
+                                    width: { xs: "88vw", sm: 320 },
+                                    maxWidth: "100vw",
+                                    borderTopLeftRadius: 24,
+                                    borderBottomLeftRadius: 24,
+                                    borderTopRightRadius: 0,
+                                    borderBottomRightRadius: 0,
+                                    pb: 2,
+                                },
+                            }}
+                        >
+                            <Box sx={{ p: 2 }}>
+                                <Typography
+                                    variant="subtitle1"
+                                    sx={{
+                                        mb: 2,
+                                        fontWeight: 700,
+                                        fontSize: 16,
+                                        textTransform: "none",
+                                    }}
+                                >
+                                    Go to section
+                                </Typography>
+
+                                <Stack spacing={1}>
+                                    {GROUP_TAB_LABELS.map((label, index) => {
+                                        // Respect your existing visibility rules
+                                        if (index === 2 && !showSubgroupsTab) return null;
+                                        if (index === 3 && !canSeeSettingsTab) return null;
+                                        if (index === NOTIF_TAB_INDEX && !canSeeNotificationsTab) return null;
+
+                                        return (
+                                            <Button
+                                                key={label}
+                                                fullWidth
+                                                variant="text"
+                                                sx={{
+                                                    justifyContent: "flex-start",
+                                                    textTransform: "none",
+                                                    borderRadius: 999,
+                                                    px: 1.5,
+                                                    py: 0.75,
+                                                    fontSize: 14,
+                                                    fontWeight: index === tab ? 700 : 500,
+                                                    backgroundColor:
+                                                        index === tab ? "#E6F7F6" : "transparent",
+                                                    "&:hover": {
+                                                        backgroundColor:
+                                                            index === tab ? "#E6F7F6" : "#F3F4F6",
+                                                    },
+                                                }}
+                                                onClick={() => {
+                                                    setTab(index);
+                                                    setMobileTabsOpen(false);
+                                                }}
+                                            >
+                                                {label}
+                                            </Button>
+                                        );
+                                    })}
+                                </Stack>
+                            </Box>
+                        </Drawer>
 
                         {/* Edit dialog */}
                         <AddMembersDialog

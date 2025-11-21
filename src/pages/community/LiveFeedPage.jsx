@@ -1751,6 +1751,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         borderRadius: 3,
         // 🔹 Make each post card itself fixed-width on desktop
         maxWidth: { xs: "100%", md: 720 },
+        minWidth: { xs: "100%", md: 720 },
         mx: { xs: 0, md: "auto" },
       }}
     >
