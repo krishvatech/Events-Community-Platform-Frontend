@@ -937,155 +937,213 @@ export default function AdminSettings() {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
       {isOwner ? (
-        // OWNER VIEW – keep existing UI
-        <Container maxWidth="md" sx={{ py: 4 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-            Admin Settings
-          </Typography>
+        <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 } }}>
+          <Stack spacing={3}>
+            {/* Page heading */}
+            <Box>
+              <Typography
+                variant="h5"
+                sx={{ fontWeight: 800, mb: 0.5, letterSpacing: 0.2 }}
+              >
+                Admin Settings
+              </Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Update how you appear as an admin across the community.
+              </Typography>
+            </Box>
 
-          <Card variant="outlined">
-            <CardHeader
-              title="Admin profile"
-              subheader="Update how you appear as an admin across the community."
-              action={
-                <Button
-                  size="small"
-                  startIcon={<RefreshRoundedIcon />}
-                  onClick={load}
-                  disabled={loading || saving}
+            {/* Profile card */}
+            <Card
+              variant="outlined"
+              sx={{
+                borderRadius: 3,
+                borderColor: "divider",
+                boxShadow: {
+                  xs: "none",
+                  md: "0 18px 45px rgba(15,23,42,0.08)",
+                },
+              }}
+            >
+              <CardContent
+                sx={{
+                  p: { xs: 2.5, sm: 3 },
+                }}
+              >
+                <Grid
+                  container
+                  spacing={{ xs: 3, md: 4 }}
+                  alignItems="flex-start"
                 >
-                  Refresh
-                </Button>
-              }
-            />
-            <CardContent>
-              <Grid container spacing={3}>
-                {/* Avatar column */}
-                <Grid item xs={12} sm={4} md={3}>
-                  <Stack spacing={2} alignItems="center">
-                    <Avatar
-                      src={avatarUrl || undefined}
+                  {/* Avatar + upload */}
+                  <Grid item xs={12} md={4}>
+                    <Stack
+                      spacing={2}
+                      alignItems="center"
                       sx={{
-                        width: 96,
-                        height: 96,
-                        fontSize: 32,
-                        bgcolor: "primary.main",
+                        width: "100%",
                       }}
                     >
-                      {(profile.full_name || "A")
-                        .charAt(0)
-                        .toUpperCase()}
-                    </Avatar>
+                      <Box
+                        sx={{
+                          position: "relative",
+                          width: 112,
+                          height: 112,
+                          borderRadius: "50%",
+                          border: "3px solid",
+                          borderColor: "primary.light",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: "grey.50",
+                        }}
+                      >
+                        <Avatar
+                          src={avatarUrl || undefined}
+                          sx={{
+                            width: 104,
+                            height: 104,
+                            fontSize: 34,
+                            bgcolor: "primary.main",
+                          }}
+                        >
+                          {(profile.full_name || "A").charAt(0).toUpperCase()}
+                        </Avatar>
+                      </Box>
 
-                    <input
-                      ref={fileRef}
-                      hidden
-                      type="file"
-                      accept="image/*"
-                      onChange={onFileChange}
-                    />
-
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<UploadRoundedIcon />}
-                      onClick={onPickFile}
-                      disabled={loading || saving}
-                    >
-                      Change photo
-                    </Button>
-                  </Stack>
-                </Grid>
-
-                {/* Text fields */}
-                <Grid item xs={12} sm={8} md={9}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Full name"
-                        fullWidth
-                        value={profile.full_name}
-                        onChange={(e) =>
-                          setProfile((p) => ({
-                            ...p,
-                            full_name: e.target.value,
-                          }))
-                        }
+                      {/* hidden file input */}
+                      <input
+                        ref={fileRef}
+                        hidden
+                        type="file"
+                        accept="image/*"
+                        onChange={onFileChange}
                       />
-                    </Grid>
 
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Headline"
-                        placeholder="e.g., Community manager at ABC"
+                      <Button
+                        size="small"
+                        variant="outlined"
                         fullWidth
-                        value={profile.headline}
-                        onChange={(e) =>
-                          setProfile((p) => ({
-                            ...p,
-                            headline: e.target.value,
-                          }))
-                        }
-                      />
-                    </Grid>
+                        startIcon={<UploadRoundedIcon />}
+                        onClick={onPickFile}
+                        disabled={loading || saving}
+                        sx={{
+                          borderRadius: 999,
+                          textTransform: "none",
+                        }}
+                      >
+                        Change photo
+                      </Button>
 
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Location"
-                        placeholder="City, Country"
-                        fullWidth
-                        value={profile.location}
-                        onChange={(e) =>
-                          setProfile((p) => ({
-                            ...p,
-                            location: e.target.value,
-                          }))
-                        }
-                      />
-                    </Grid>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "text.secondary", textAlign: "center" }}
+                      >
+                        Recommended: square image, at least 400×400px.
+                      </Typography>
+                    </Stack>
+                  </Grid>
 
-                    <Grid item xs={12}>
-                      <TextField
-                        label="Bio"
-                        placeholder="Tell people a bit about yourself…"
-                        fullWidth
-                        multiline
-                        minRows={4}
-                        value={profile.bio}
-                        onChange={(e) =>
-                          setProfile((p) => ({
-                            ...p,
-                            bio: e.target.value,
-                          }))
-                        }
-                      />
+                  {/* Profile fields */}
+                  <Grid item xs={12} md={8}>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12}>
+                        <TextField
+                          label="Full name"
+                          fullWidth
+                          size="small"
+                          value={profile.full_name}
+                          onChange={(e) =>
+                            setProfile((p) => ({
+                              ...p,
+                              full_name: e.target.value,
+                            }))
+                          }
+                        />
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <TextField
+                          label="Headline"
+                          placeholder="e.g., Community manager at ABC"
+                          fullWidth
+                          size="small"
+                          value={profile.headline}
+                          onChange={(e) =>
+                            setProfile((p) => ({
+                              ...p,
+                              headline: e.target.value,
+                            }))
+                          }
+                        />
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <TextField
+                          label="Location"
+                          placeholder="City, Country"
+                          fullWidth
+                          size="small"
+                          value={profile.location}
+                          onChange={(e) =>
+                            setProfile((p) => ({
+                              ...p,
+                              location: e.target.value,
+                            }))
+                          }
+                        />
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <TextField
+                          label="Bio"
+                          placeholder="Tell people a bit about yourself…"
+                          fullWidth
+                          multiline
+                          minRows={4}
+                          size="small"
+                          value={profile.bio}
+                          onChange={(e) =>
+                            setProfile((p) => ({
+                              ...p,
+                              bio: e.target.value,
+                            }))
+                          }
+                        />
+                      </Grid>
                     </Grid>
                   </Grid>
                 </Grid>
-              </Grid>
 
-              <Divider sx={{ my: 3 }} />
+                <Divider sx={{ my: 3 }} />
 
-              <Stack direction="row" justifyContent="flex-end" spacing={2}>
-                <Button
-                  variant="text"
-                  startIcon={<RefreshRoundedIcon />}
-                  onClick={load}
-                  disabled={loading || saving}
+                {/* Actions */}
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  justifyContent="flex-end"
+                  spacing={1.5}
                 >
-                  Reset
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<SaveRoundedIcon />}
-                  onClick={onSave}
-                  disabled={saving || loading}
-                >
-                  Save changes
-                </Button>
-              </Stack>
-            </CardContent>
-          </Card>
+                  <Button
+                    variant="text"
+                    startIcon={<RefreshRoundedIcon />}
+                    onClick={load}
+                    disabled={loading || saving}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<SaveRoundedIcon />}
+                    onClick={onSave}
+                    disabled={saving || loading}
+                    sx={{ textTransform: "none", minWidth: 140 }}
+                  >
+                    Save changes
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Stack>
         </Container>
       ) : (
         // STAFF VIEW – ProfilePage-style cards + edit dialogs
