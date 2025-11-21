@@ -3469,8 +3469,8 @@ export default function GroupManagePage() {
                                                 color="error"
                                                 variant="dot"
                                                 invisible={
-                                                    tab !== NOTIF_TAB_INDEX ||
-                                                    unreadJoinRequestsCount === 0
+                                                    tab !== NOTIF_TAB_INDEX
+                                                   
                                                 }
                                             >
                                                 Notifications
@@ -4456,7 +4456,6 @@ export default function GroupManagePage() {
                             ownerId={ownerId}                              // 👈 new prop
                             onRequested={(n) => {
                                 setRequestAddOpen(false);
-                                alert(`Request sent to admins to add ${n} member(s).`);
                             }}
                         />
 
