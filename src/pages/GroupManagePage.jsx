@@ -4,7 +4,7 @@ import {
     Alert, Avatar, AvatarGroup, Box, Button, Chip, Container, Dialog, DialogActions, DialogContent,
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
     TextField, Typography, Switch, FormControlLabel, CircularProgress,
-    List, ListItem, ListItemAvatar, ListItemText, ButtonGroup,
+    List, ListItem, ListItemAvatar, ListItemText, ButtonGroup, Badge,
     IconButton, Menu, ListItemIcon, Popper, Drawer
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
@@ -2829,11 +2829,23 @@ export default function GroupManagePage() {
     const canEditGroup = isOwnerRole || isAdminRole;
     const canReviewRequests = isOwnerRole || isAdminRole;
 
-    // ✅ Strong member management (only owner + admin can directly add/remove/change roles)
+    // ✅ Strong member management (only owner + admin can remove/change roles)
     const canHardManageMembers = isOwnerRole || isAdminRole;
 
-    // ✅ Moderators can only "request" member changes (front-end only for now)
-    const canRequestMemberChanges = isModeratorRole;
+    // visibility helpers
+    const isPublicGroup = group?.visibility === "public";
+    const isPrivateGroup = group?.visibility === "private";
+
+    // ✅ Who can directly ADD members?
+    // - Owner/Admin: always
+    // - Moderator: only in PUBLIC groups
+    const canAddMembersDirectly =
+        isOwnerRole || isAdminRole || (isModeratorRole && isPublicGroup);
+
+    // ✅ Who can only REQUEST member changes (add)?
+    // - Moderator in PRIVATE (or non-public) groups
+    const canRequestMemberChanges =
+        isModeratorRole && !canAddMembersDirectly;
 
     // ✅ Posts: owner + admin + moderator can create/manage/delete posts
     const canModerate = isOwnerRole || isAdminRole || isModeratorRole;
@@ -2841,6 +2853,7 @@ export default function GroupManagePage() {
 
     // ✅ Sub-group creation is restricted to Owner + Admin only
     const canCreateSubgroups = isOwnerRole;
+
 
     const canSeeSettingsTab = isOwnerRole || isAdminRole || isModeratorRole;
     const canSeeNotificationsTab = canModerate && showNotificationsTab;
@@ -3532,36 +3545,36 @@ export default function GroupManagePage() {
                                         <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                             <Typography variant="h6" className="font-semibold">Members</Typography>
 
-                                            {group?.visibility === "private" && (
-                                                <>
-                                                    {canHardManageMembers && (
-                                                        // Owner + Admin → real "Add members" (opens dialog)
-                                                        <Button
-                                                            variant="contained"
-                                                            className="rounded-xl"
-                                                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                                            onClick={() => setAddOpen(true)}
-                                                        >
-                                                            Add members
-                                                        </Button>
-                                                    )}
 
-                                                    {!canHardManageMembers && canRequestMemberChanges && (
-                                                        // Moderator → can only *request* adding members (no real add)
-                                                        <Button
-                                                            variant="outlined"
-                                                            className="rounded-xl"
-                                                            sx={{ textTransform: "none", borderColor: "#10b8a6", color: "#10b8a6" }}
-                                                            onClick={() => {
-                                                                fetchRequests();
-                                                                setRequestAddOpen(true);
-                                                            }}
-                                                        >
-                                                            Request to add members
-                                                        </Button>
-                                                    )}
-                                                </>
-                                            )}
+                                            <>
+                                                {canAddMembersDirectly && (
+                                                    // Owner + Admin → real "Add members" (opens dialog)
+                                                    <Button
+                                                        variant="contained"
+                                                        className="rounded-xl"
+                                                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                        onClick={() => setAddOpen(true)}
+                                                    >
+                                                        Add members
+                                                    </Button>
+                                                )}
+
+                                                {canRequestMemberChanges && !canAddMembersDirectly && (
+                                                    // Moderator → can only *request* adding members (no real add)
+                                                    <Button
+                                                        variant="outlined"
+                                                        className="rounded-xl"
+                                                        sx={{ textTransform: "none", borderColor: "#10b8a6", color: "#10b8a6" }}
+                                                        onClick={() => {
+                                                            fetchRequests();
+                                                            setRequestAddOpen(true);
+                                                        }}
+                                                    >
+                                                        Request to add members
+                                                    </Button>
+                                                )}
+                                            </>
+
                                         </Stack>
 
                                         {memLoading ? (

@@ -9,6 +9,7 @@ import {
   Container,
   Divider,
   Grid,
+  CircularProgress,
   LinearProgress,
   Paper,
   Snackbar,
@@ -26,6 +27,7 @@ import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import VideoLibraryRoundedIcon from "@mui/icons-material/VideoLibraryRounded";
 import LiveTvRoundedIcon from "@mui/icons-material/LiveTvRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
+import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -105,11 +107,18 @@ export default function EventManagePage() {
   const [event, setEvent] = useState(initialEvent);
   const [loading, setLoading] = useState(!initialEvent);
   const [err, setErr] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
 
+  // NEW: event purchase data
+  const [registrations, setRegistrations] = useState([]);
+  const [registrationsLoading, setRegistrationsLoading] = useState(false);
+  const [registrationsError, setRegistrationsError] = useState("");
+  const isOwner = isOwnerUser();
+
+  // existing useEffect that loads event
   useEffect(() => {
     if (!eventId) return;
 
-    // If we already have full event with same id, skip fetch
     if (initialEvent && String(initialEvent.id) === String(eventId)) return;
 
     const token = getToken();
@@ -136,6 +145,41 @@ export default function EventManagePage() {
 
     load();
   }, [eventId]);
+
+  // NEW: load registrations (purchases) for owner
+  useEffect(() => {
+    if (!eventId || !isOwner) return;
+
+    const token = getToken();
+    if (!token) return;
+
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+
+    const loadRegs = async () => {
+      setRegistrationsLoading(true);
+      try {
+        const res = await fetch(
+          `${API_ROOT}/events/${eventId}/registrations/`,
+          { headers }
+        );
+        const json = await res.json().catch(() => []);
+        if (!res.ok) {
+          throw new Error(json?.detail || `HTTP ${res.status}`);
+        }
+        setRegistrations(Array.isArray(json) ? json : []);
+        setRegistrationsError("");
+      } catch (e) {
+        setRegistrationsError(e?.message || "Unable to load purchasers");
+      } finally {
+        setRegistrationsLoading(false);
+      }
+    };
+
+    loadRegs();
+  }, [eventId, isOwner]);
 
   const status = useMemo(() => computeStatus(event || {}), [event]);
   const chip = statusChip(status);
@@ -519,6 +563,123 @@ export default function EventManagePage() {
                   </Box>
                 </Paper>
 
+                {/* NEW: Purchasers – only visible to owner */}
+                {isOwner && (
+                  <Paper
+                    elevation={0}
+                    className="rounded-2xl border border-slate-200"
+                  >
+                    <Box className="p-4">
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        sx={{ mb: 1 }}
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          className="font-semibold text-slate-800"
+                        >
+                          Members who purchased
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={registrations.length}
+                          className="bg-slate-100 text-slate-700"
+                        />
+                      </Stack>
+
+                      {registrationsLoading && (
+                        <Box className="flex items-center justify-center py-4">
+                          <CircularProgress size={20} />
+                        </Box>
+                      )}
+
+                      {!registrationsLoading && registrationsError && (
+                        <Typography
+                          variant="body2"
+                          color="error"
+                          className="text-red-500"
+                        >
+                          {registrationsError}
+                        </Typography>
+                      )}
+
+                      {!registrationsLoading &&
+                        !registrationsError &&
+                        registrations.length === 0 && (
+                          <Typography
+                            variant="body2"
+                            className="text-slate-500"
+                          >
+                            No purchases yet.
+                          </Typography>
+                        )}
+
+                      {!registrationsLoading &&
+                        !registrationsError &&
+                        registrations.length > 0 && (
+                          <Stack spacing={1.25} sx={{ mt: 0.5 }}>
+                            {registrations.map((r) => {
+                              const name =
+                                r.user_name || r.user_email || "Unnamed member";
+                              const email = r.user_email;
+                              const initial =
+                                (name && name[0] && name[0].toUpperCase()) || "U";
+                              const registeredAt = r.registered_at
+                                ? new Date(r.registered_at).toLocaleString()
+                                : null;
+
+                              return (
+                                <Stack
+                                  key={r.id}
+                                  direction="row"
+                                  spacing={1.5}
+                                  alignItems="center"
+                                >
+                                  <Avatar
+                                    sx={{
+                                      width: 32,
+                                      height: 32,
+                                      bgcolor: "#0ea5e9",
+                                      fontSize: 14,
+                                    }}
+                                  >
+                                    {initial}
+                                  </Avatar>
+                                  <Box>
+                                    <Typography
+                                      variant="body2"
+                                      className="font-medium text-slate-800"
+                                    >
+                                      {name}
+                                    </Typography>
+                                    {email && (
+                                      <Typography
+                                        variant="caption"
+                                        className="text-slate-500"
+                                      >
+                                        {email}
+                                      </Typography>
+                                    )}
+                                    {registeredAt && (
+                                      <Typography
+                                        variant="caption"
+                                        className="text-slate-400 block"
+                                      >
+                                        Purchased: {registeredAt}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </Stack>
+                              );
+                            })}
+                          </Stack>
+                        )}
+                    </Box>
+                  </Paper>
+                )}
+
                 {/* Resources */}
                 <Paper
                   elevation={0}
@@ -562,10 +723,10 @@ export default function EventManagePage() {
                             r.type === "file"
                               ? "File"
                               : r.type === "link"
-                              ? "Link"
-                              : r.type === "video"
-                              ? "Video"
-                              : r.type || "Resource";
+                                ? "Link"
+                                : r.type === "video"
+                                  ? "Video"
+                                  : r.type || "Resource";
 
                           const icon =
                             r.type === "file" ? (
