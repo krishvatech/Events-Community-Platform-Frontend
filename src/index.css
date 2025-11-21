@@ -43,3 +43,14 @@ button[aria-label="Enter full screen"],
 button[aria-label="Exit full screen"] {
   display: none !important;
 }
+
+/* When Q&A is open, make the Q&A controlbar button look "selected" */
+body.qna-open dyte-controlbar-button[label="Q&A"] {
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px #2160fd; /* blue outline similar to Chat */
+}
+
+/* (optional) make sure label/icon stay blue while active */
+body.qna-open dyte-controlbar-button[label="Q&A"] {
+  color: #2160fd;
+}
