@@ -16,6 +16,7 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
+
 const BORDER = "#e2e8f0";
 const JOIN_BTN_SX = {
   textTransform: "none",
@@ -69,16 +70,18 @@ function GroupGridCard({ g, onJoin, onOpen }) {
     <Card
       variant="outlined"
       sx={{
-        width: 282,
+        width: "100%",          // fill the Grid column
         borderRadius: 3,
         overflow: "hidden",
         borderColor: BORDER,
         height: 280,
         display: "flex",
         flexDirection: "column",
+        // ❌ remove maxWidth and mx
+        // maxWidth: { xs: "100%", sm: 320, lg: 360 },
+        // mx: "auto",
       }}
     >
-
       <Box
         onClick={() => onOpen?.(g)}
         sx={{
@@ -258,7 +261,6 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
   const headerTitle = params.get("topic") || "Sustainable Living";
 
   const [q, setQ] = React.useState("");
-  const [typeTab, setTypeTab] = React.useState("groups");
   const [currentPage, setCurrentPage] = React.useState(1);
 
   const [groups, setGroups] = React.useState([]);
@@ -388,7 +390,15 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
 
   return (
     <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
-      <Box sx={{ display: "flex", gap: 3, px: { xs: 2, sm: 2, md: 3 }, maxWidth: "1100px", mx: "auto" }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 3,
+          px: { xs: 1.5, sm: 2, md: 2.5, lg: 3 },   // reduced left/right padding
+          maxWidth: { xs: "100%", lg: "1200px" },
+          mx: "auto",
+        }}
+      >
         {/* LEFT: Main content */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <TopicHeader title={headerTitle} previews={previews} extraCount={extraCount} />
@@ -419,39 +429,6 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
                 }}
               />
             </Box>
-
-            <Button
-              variant="contained"
-              onClick={clearAll}
-              sx={{
-                whiteSpace: "nowrap",
-                alignSelf: { xs: "flex-end", md: "flex-end" },
-                height: 'fit-content',
-                mt: { xs: 0, md: 2.5 }
-              }}
-            >
-              Clear all Filters
-            </Button>
-          </Stack>
-
-          {/* Posts / Groups toggle */}
-          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 2 }}>
-            <Button
-              size="small"
-              variant={typeTab === "posts" ? "contained" : "outlined"}
-              onClick={() => setTypeTab("posts")}
-              sx={{ textTransform: "none" }}
-            >
-              Posts
-            </Button>
-            <Button
-              size="small"
-              variant={typeTab === "groups" ? "contained" : "outlined"}
-              onClick={() => setTypeTab("groups")}
-              sx={{ textTransform: "none" }}
-            >
-              Groups
-            </Button>
           </Stack>
 
           {/* Loading / error */}
@@ -469,7 +446,7 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
           {/* 3-column grid */}
           <Grid container spacing={2}>
             {paginatedGroups.map((g) => (
-              <Grid key={g.id} item xs={12} sm={6} md={4}>
+              <Grid key={g.id} item xs={12} sm={4} md={4}>
                 <GroupGridCard g={g} onJoin={handleJoin} onOpen={openQuick} />
               </Grid>
             ))}
@@ -510,10 +487,13 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
         {/* RIGHT: Sidebar - sticky */}
         <Box
           sx={{
-            width: 150,           // ← match md=3 column (~25% of 1100px)
-            display: { xs: "none", md: "block" },
+            width: 150,
+            display: "none",                       // hidden by default
+            "@media (min-width:1440px)": {
+              display: "block",                    // show only on 1440px+
+            },
             position: "sticky",
-            top: 88,              // ← same sticky offset as Notifications
+            top: 88,
             height: "fit-content",
             flexShrink: 0,
           }}
