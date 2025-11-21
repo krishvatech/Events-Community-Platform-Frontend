@@ -26,6 +26,7 @@ import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 
+
 // ---- API helpers (reuse same pattern as AdminGroups.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -2746,6 +2747,10 @@ export default function GroupManagePage() {
     const [roleErrorOpen, setRoleErrorOpen] = React.useState(false);
     const [roleErrorMsg, setRoleErrorMsg] = React.useState("");
 
+    const [requestInfoOpen, setRequestInfoOpen] = React.useState(false);
+    const [requestInfoMessage, setRequestInfoMessage] = React.useState("");
+
+
     // Posts tab state
     const [posts, setPosts] = React.useState([]);
     const [postsLoading, setPostsLoading] = React.useState(true);
@@ -3292,7 +3297,8 @@ export default function GroupManagePage() {
             }
         }
 
-        alert(msg);
+        setRequestInfoMessage(msg || "Request sent to group admins.");
+        setRequestInfoOpen(true);
         closeMemberMenu();
     };
 
@@ -3469,8 +3475,9 @@ export default function GroupManagePage() {
                                                 color="error"
                                                 variant="dot"
                                                 invisible={
-                                                    tab !== NOTIF_TAB_INDEX
-                                                   
+                                                    // Hide dot when: not on Notifications tab OR nothing to show
+                                                    tab !== NOTIF_TAB_INDEX ||
+                                                    (reqs.length + promotionReqs.length === 0)
                                                 }
                                             >
                                                 Notifications
@@ -4248,8 +4255,6 @@ export default function GroupManagePage() {
                                                                         );
                                                                     })}
                                                                 </List>
-                                                            ) : notifTab === 0 ? (
-                                                                <Typography className="text-slate-500">No notifications yet.</Typography>
                                                             ) : null}
                                                         </>
                                                     )}
@@ -4316,8 +4321,6 @@ export default function GroupManagePage() {
                                                                         );
                                                                     })}
                                                                 </List>
-                                                            ) : notifTab === 0 ? (
-                                                                <Typography className="text-slate-500">No notifications yet.</Typography>
                                                             ) : null}
                                                         </>
                                                     )}
@@ -4484,6 +4487,31 @@ export default function GroupManagePage() {
                                 </Button>
                             </DialogActions>
                         </Dialog>
+                        {/* Promotion request — info modal */}
+                        <Dialog
+                            open={requestInfoOpen}
+                            onClose={() => setRequestInfoOpen(false)}
+                            fullWidth
+                            maxWidth="xs"
+                            PaperProps={{ sx: { borderRadius: 3 } }}
+                        >
+                            <DialogTitle sx={{ fontWeight: 800 }}>Request sent</DialogTitle>
+                            <DialogContent>
+                                <Alert severity="success" sx={{ my: 1 }}>
+                                    {requestInfoMessage || "Your request has been sent to the group admins."}
+                                </Alert>
+                            </DialogContent>
+                            <DialogActions>
+                                <Button
+                                    onClick={() => setRequestInfoOpen(false)}
+                                    variant="contained"
+                                    sx={{ textTransform: "none" }}
+                                >
+                                    OK
+                                </Button>
+                            </DialogActions>
+                        </Dialog>
+
                         <Dialog
                             open={chatConfirmOpen}
                             onClose={() => setChatConfirmOpen(false)}
