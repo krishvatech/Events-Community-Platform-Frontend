@@ -36,6 +36,7 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/ap
   ""
 );
 const getToken = () =>
+  localStorage.getItem("access") ||
   localStorage.getItem("access_token") ||
   localStorage.getItem("jwt") ||
   localStorage.getItem("token") ||
@@ -98,6 +99,36 @@ const formatHHMM = (iso) =>
       minute: "2-digit",
     })
     : "";
+
+const formatLastSeenLabel = (iso) => {
+  if (!iso) return "";
+  const dt = new Date(iso);
+  const now = new Date();
+
+  const timeStr = dt.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const todayKey = now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayKey = yesterday.toDateString();
+  const dateKey = dt.toDateString();
+
+  if (dateKey === todayKey) {
+    return `Last seen today at ${timeStr}`;
+  }
+  if (dateKey === yesterdayKey) {
+    return `Last seen yesterday at ${timeStr}`;
+  }
+
+  const dateStr = dt.toLocaleDateString([], {
+    day: "2-digit",
+    month: "short",
+  });
+  return `Last seen ${dateStr} at ${timeStr}`;
+};
 
 const getLastPreviewText = (t) => {
   const lm = getLastMessageObj(t);
@@ -456,7 +487,11 @@ export default function AdminMessagesPage() {
 
 
   React.useEffect(() => {
-    fetchUsers();
+    fetchUsers(); // first load
+
+    // 🔁 refresh staff list every 15s to update online status
+    const iv = setInterval(fetchUsers, 15000);
+    return () => clearInterval(iv);
   }, [fetchUsers]);
 
   // initial + background polling for conversations
@@ -513,21 +548,36 @@ export default function AdminMessagesPage() {
     (activeUser ? displayName(activeUser) : "") ||
     (activeThread ? threadTitle(activeThread) : "");
 
-  const headerSubtitle = isGroupChat ? "Group chat" : "Staff chat";
+  // 🔎 pull presence info from the staff object
+  const presenceProfile =
+    (activeUser && activeUser.profile) ||
+    (activeTarget && activeTarget.profile) ||
+    {};
+
+  const activeIsOnline = Boolean(presenceProfile.is_online);
+  const activeLastSeenISO = presenceProfile.last_activity_at || null;
+
+  const headerSubtitle = isGroupChat
+    ? "Group chat"
+    : activeIsOnline
+    ? "Online"
+    : activeLastSeenISO
+    ? formatLastSeenLabel(activeLastSeenISO)
+    : "Staff chat";
 
   const headerAvatarSrc = isGroupChat
     ? activeTarget?.avatar ||
-    (activeThread ? threadAvatar(activeThread) : "")
+      (activeThread ? threadAvatar(activeThread) : "")
     : activeTarget?.avatar ||
-    activeUser?.avatar_url ||
-    activeUser?.profile_image ||
-    activeUser?.avatar ||
-    activeUser?.image ||
-    activeUser?.image_url ||
-    (activeThread ? threadAvatar(activeThread) : "");
+      activeUser?.avatar_url ||
+      activeUser?.profile_image ||
+      activeUser?.avatar ||
+      activeUser?.image ||
+      activeUser?.image_url ||
+      (activeThread ? threadAvatar(activeThread) : "");
 
 
-  const showOnlineDot = Boolean(!isGroupChat && conversationId);
+  const showOnlineDot = Boolean(!isGroupChat && conversationId && activeIsOnline);
 
   // mark-all-read for a conversation
   const markConversationAllRead = React.useCallback(async (cid) => {
@@ -563,6 +613,7 @@ export default function AdminMessagesPage() {
       id: user.id,
       name: displayName(user),
       avatar: user.avatar_url || user.profile_image || "",
+      profile: user.profile || null,
     });
     setConversationId(null);
     setMessages([]);
@@ -673,6 +724,7 @@ export default function AdminMessagesPage() {
             id: match.id,
             name: displayName(match),
             avatar: match.avatar_url || match.profile_image || "",
+            profile: match.profile || null, 
           });
         } else {
           setSelectedUserId(null);
@@ -681,6 +733,7 @@ export default function AdminMessagesPage() {
             id: null,
             name: title,
             avatar: threadAvatar(thread),
+            profile: null,
           });
         }
       }
@@ -918,18 +971,26 @@ export default function AdminMessagesPage() {
                     const active = conversationId === th.id;
                     const title = threadTitle(th);
 
-                    // 👇 pick avatar like chat header
-                    let avatarSrc = threadAvatar(th); // default: context / group cover
-                    if (!th.group && th.chat_type !== "group") {
-                      // DM: try to find this staff in users list and use their profile image
-                      const match =
+                    const isGroup = Boolean(th.group) || th.chat_type === "group";
+
+                    // try to match this thread to a staff user
+                    let matchedUser = null;
+                    if (!isGroup) {
+                      matchedUser =
                         users.find(
                           (u) => displayName(u).toLowerCase() === title.toLowerCase()
                         ) || null;
-                      if (match) {
-                        avatarSrc = match.avatar_url || match.profile_image || avatarSrc;
-                      }
                     }
+
+                    // avatar comes from user if we have it
+                    let avatarSrc = threadAvatar(th);
+                    if (matchedUser) {
+                      avatarSrc = matchedUser.avatar_url || matchedUser.profile_image || avatarSrc;
+                    }
+
+                    // 🔴 presence for the list item
+                    const matchProfile = matchedUser?.profile || {};
+                    const isOnline = Boolean(matchProfile.is_online);
 
                     const time = formatHHMM(getLastTimeISO(th));
                     const preview = getLastPreviewText(th) || "Say hi 👋";
@@ -969,7 +1030,7 @@ export default function AdminMessagesPage() {
                               {(title || "C").slice(0, 1).toUpperCase()}
                             </Avatar>
                             {/* green dot – top-right corner for DMs */}
-                            {!th.group && th.chat_type !== "group" && (
+                            {!isGroup && isOnline && (
                               <Box
                                 sx={{
                                   position: "absolute",
