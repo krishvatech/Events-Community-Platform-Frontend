@@ -64,13 +64,13 @@ function GroupGridCard({ g, onJoin, onOpen }) {
   const joined =
     (g.membership_status || "").toLowerCase() === "joined" || !!g.is_member;
 
-  const ctaText = joined ? "Joined" : pending ? "Request pending" : (isApproval ? "Request to join" : "Join");
+  const ctaText = joined ? "Joined" : pending ? "Request pending" : (isApproval ? "Request" : "Join");
 
   return (
     <Card
       variant="outlined"
       sx={{
-        width: "100%",          // fill the Grid column
+        width: { xs: "180%", sm: "95%", md: "100%" },          // fill the Grid column
         borderRadius: 3,
         overflow: "hidden",
         borderColor: BORDER,
@@ -117,7 +117,7 @@ function GroupGridCard({ g, onJoin, onOpen }) {
         </Typography>
       </CardContent>
 
-      <CardActions sx={{ pt: 0, pb: 2, px: 2 }}>
+      <CardActions sx={{ pt: 0, pb: 1, px: 1 }}>
         <Button
           size="small"
           color="primary"
