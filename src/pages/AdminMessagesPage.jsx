@@ -141,6 +141,14 @@ const getLastPreviewText = (t) => {
   );
 };
 
+const shortPreview = (text, max = 25) => {
+  if (!text) return "";
+  const cleaned = String(text).trim();
+  if (cleaned.length <= max) return cleaned;
+  return cleaned.slice(0, max) + "…";   // add ...
+};
+
+
 const threadTitle = (t) =>
   t?.group?.name ||
   t?.display_title ||
@@ -563,20 +571,20 @@ export default function AdminMessagesPage() {
   const headerSubtitle = isGroupChat
     ? "Group chat"
     : activeIsOnline
-    ? "Online"
-    : activeLastSeenISO
-    ? formatLastSeenLabel(activeLastSeenISO)
-    : "Staff chat";
+      ? "Online"
+      : activeLastSeenISO
+        ? formatLastSeenLabel(activeLastSeenISO)
+        : "Staff chat";
   const headerAvatarSrc = isGroupChat
     ? activeTarget?.avatar ||
-      (activeThread ? threadAvatar(activeThread) : "")
+    (activeThread ? threadAvatar(activeThread) : "")
     : activeTarget?.avatar ||
-      activeUser?.avatar_url ||
-      activeUser?.profile_image ||
-      activeUser?.avatar ||
-      activeUser?.image ||
-      activeUser?.image_url ||
-      (activeThread ? threadAvatar(activeThread) : "");
+    activeUser?.avatar_url ||
+    activeUser?.profile_image ||
+    activeUser?.avatar ||
+    activeUser?.image ||
+    activeUser?.image_url ||
+    (activeThread ? threadAvatar(activeThread) : "");
 
 
   const showOnlineDot = Boolean(!isGroupChat && conversationId && activeIsOnline);
@@ -726,7 +734,7 @@ export default function AdminMessagesPage() {
             id: match.id,
             name: displayName(match),
             avatar: match.avatar_url || match.profile_image || "",
-            profile: match.profile || null, 
+            profile: match.profile || null,
           });
         } else {
           setSelectedUserId(null);
@@ -995,7 +1003,7 @@ export default function AdminMessagesPage() {
                     const isOnline = !!matchProfile.is_online;
 
                     const time = formatHHMM(getLastTimeISO(th));
-                    const preview = getLastPreviewText(th) || "Say hi 👋";
+                    const preview = shortPreview(getLastPreviewText(th) || "Say hi 👋");
                     const unread = th.unread_count || 0;
 
                     return (
@@ -1452,7 +1460,11 @@ export default function AdminMessagesPage() {
                             >
                               <Typography
                                 variant="body2"
-                                sx={{ whiteSpace: "pre-wrap" }}
+                                sx={{
+                                  whiteSpace: "pre-wrap",
+                                  wordBreak: "break-word",   // break long words
+                                  overflowWrap: "anywhere",  // extra safety for very long strings
+                                }}
                               >
                                 {body}
                               </Typography>
