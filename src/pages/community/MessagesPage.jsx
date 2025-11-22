@@ -374,6 +374,14 @@ const getLastPreviewText = (t) => {
   return words.slice(0, 3).join(" ") + "…";
 };
 
+const shortPreview = (text, max = 28) => {
+  if (!text) return "";
+  const cleaned = String(text).trim();
+  if (cleaned.length <= max) return cleaned;
+  return cleaned.slice(0, max) + "…";
+};
+
+
 
 const isDmThread = (thread) => {
   if (!thread) return false;
@@ -483,7 +491,7 @@ function ConversationRow({ thread, active, onClick, online }) {
   const unread = thread.unread_count || 0;
   const timeISO = thread._last_ts || getLastTimeISO(thread);
   const time = formatHHMM(timeISO);
-  const last = getLastPreviewText(thread);
+  const last = shortPreview(getLastPreviewText(thread) || "");
   const title =
     thread?.group?.name ||
     thread.display_title ||
@@ -606,7 +614,14 @@ function Bubble({ m, showSender }) {
         )}
 
         {m.body && (
-          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+          <Typography
+            variant="body2"
+            sx={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              overflowWrap: "anywhere",
+            }}
+          >
             {m.body}
           </Typography>
         )}
