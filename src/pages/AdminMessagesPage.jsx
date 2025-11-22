@@ -130,6 +130,7 @@ const formatLastSeenLabel = (iso) => {
   return `Last seen ${dateStr} at ${timeStr}`;
 };
 
+
 const getLastPreviewText = (t) => {
   const lm = getLastMessageObj(t);
   return (
@@ -490,7 +491,7 @@ export default function AdminMessagesPage() {
     fetchUsers(); // first load
 
     // 🔁 refresh staff list every 15s to update online status
-    const iv = setInterval(fetchUsers, 15000);
+    const iv = setInterval(fetchUsers, 5000);
     return () => clearInterval(iv);
   }, [fetchUsers]);
 
@@ -554,8 +555,10 @@ export default function AdminMessagesPage() {
     (activeTarget && activeTarget.profile) ||
     {};
 
-  const activeIsOnline = Boolean(presenceProfile.is_online);
   const activeLastSeenISO = presenceProfile.last_activity_at || null;
+
+  // ✅ use backend flag only
+  const activeIsOnline = !!presenceProfile.is_online;
 
   const headerSubtitle = isGroupChat
     ? "Group chat"
@@ -564,7 +567,6 @@ export default function AdminMessagesPage() {
     : activeLastSeenISO
     ? formatLastSeenLabel(activeLastSeenISO)
     : "Staff chat";
-
   const headerAvatarSrc = isGroupChat
     ? activeTarget?.avatar ||
       (activeThread ? threadAvatar(activeThread) : "")
@@ -990,7 +992,7 @@ export default function AdminMessagesPage() {
 
                     // 🔴 presence for the list item
                     const matchProfile = matchedUser?.profile || {};
-                    const isOnline = Boolean(matchProfile.is_online);
+                    const isOnline = !!matchProfile.is_online;
 
                     const time = formatHHMM(getLastTimeISO(th));
                     const preview = getLastPreviewText(th) || "Say hi 👋";

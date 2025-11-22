@@ -320,6 +320,38 @@ const getLastTimeISO = (t) => {
 const formatHHMM = (iso) =>
   iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
 
+const formatLastSeen = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const now = new Date();
+
+  const sameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+
+  const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (sameDay(d, now)) {
+    return `last seen today at ${timeStr}`;
+  }
+  if (sameDay(d, yesterday)) {
+    return `last seen yesterday at ${timeStr}`;
+  }
+
+  const dateStr = d.toLocaleDateString([], {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  return `last seen on ${dateStr} at ${timeStr}`;
+};
+
 const getLastPreviewText = (t) => {
   const lm = getLastMessageObj(t);
   return (
@@ -331,14 +363,16 @@ const getLastPreviewText = (t) => {
 };
 
 
-function ConversationRow({ thread, active, onClick }) {
+function ConversationRow({ thread, active, onClick, online }) {
   const unread = thread.unread_count || 0;
   const timeISO = thread._last_ts || getLastTimeISO(thread);
   const time = formatHHMM(timeISO);
   const last = getLastPreviewText(thread);
-  const title = (thread?.group?.name)
-    || thread.display_title
-    || (thread.chat_type === "dm" ? "Direct Message" : "Conversation");
+  const title =
+    thread?.group?.name ||
+    thread.display_title ||
+    (thread.chat_type === "dm" ? "Direct Message" : "Conversation");
+
   return (
     <ListItem
       disableGutters
@@ -354,22 +388,39 @@ function ConversationRow({ thread, active, onClick }) {
       }}
     >
       <ListItemAvatar sx={{ minWidth: 48 }}>
-        <Badge variant={unread > 0 ? "dot" : "standard"} color="primary" overlap="circular">
+        <Box sx={{ position: "relative", display: "inline-flex" }}>
           <Avatar
             src={
-              thread?.context_logo
-              || thread?.context_cover
-              || thread?.group_cover
-              || thread?.event_cover
-              || ""
+              thread?.context_logo ||
+              thread?.context_cover ||
+              thread?.group_cover ||
+              thread?.event_cover ||
+              ""
             }
           >
             {(title || "C").slice(0, 1)}
           </Avatar>
-        </Badge>
+
+          {/* 🟢 online dot like 3rd screenshot */}
+          {online && (
+            <Box
+              sx={{
+                position: "absolute",
+                left: 2,
+                top: 2,
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                bgcolor: "success.main",
+                border: "2px solid #fff",
+              }}
+            />
+          )}
+        </Box>
       </ListItemAvatar>
 
       <ListItemText
+        disableTypography
         primary={
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
@@ -386,7 +437,12 @@ function ConversationRow({ thread, active, onClick }) {
               {last}
             </Typography>
             {unread > 0 && (
-              <Chip size="small" label={String(unread)} color="primary" sx={{ height: 18, minHeight: 18 }} />
+              <Chip
+                size="small"
+                label={String(unread)}
+                color="primary"
+                sx={{ height: 18, minHeight: 18 }}
+              />
             )}
           </Stack>
         }
@@ -394,7 +450,6 @@ function ConversationRow({ thread, active, onClick }) {
     </ListItem>
   );
 }
-
 function Bubble({ m, showSender }) {
   const mine = Boolean(m.mine);
   const shareAttachment = (m.attachments || []).find(
@@ -892,6 +947,7 @@ export default function MessagesPage() {
 
   const [me, setMe] = React.useState(null);
   const [topMembers, setTopMembers] = React.useState([]);
+  const [rosterMap, setRosterMap] = React.useState({});
 
   // 🔹 Whether the current user is allowed to send messages to the ACTIVE group
   // (for WhatsApp-style "Only admins can send messages" mode)
@@ -948,6 +1004,26 @@ export default function MessagesPage() {
     setTimeout(() => { markCooldown.current = false; }, 800);
   }, [markAllReadNow]);
 
+  const loadRoster = React.useCallback(async () => {
+    try {
+      const res = await apiFetch(`${API_ROOT}/users/roster/`);
+      if (!res.ok) {
+        console.warn("roster load failed", res.status);
+        return;
+      }
+      const data = await res.json();
+      const map = {};
+
+      (Array.isArray(data) ? data : []).forEach((u) => {
+        if (!u || !u.id) return;
+        map[String(u.id)] = u;
+      });
+
+      setRosterMap(map);
+    } catch (e) {
+      console.error("roster load failed", e);
+    }
+  }, []);
 
   const loadConversations = React.useCallback(async () => {
     try {
@@ -1081,6 +1157,11 @@ export default function MessagesPage() {
   // 🔹 Check if current user can send messages to the ACTIVE group
   // Uses: GET /api/groups/{id}/can-send/ → { ok, reason, message_mode }
 
+  React.useEffect(() => {
+    loadRoster();
+    const iv = setInterval(loadRoster, 60000); // refresh every 60s
+    return () => clearInterval(iv);
+  }, [loadRoster]);
 
   React.useEffect(() => {
     const { id: groupId, slug: groupSlug } = resolveActiveGroup();
@@ -1508,6 +1589,42 @@ export default function MessagesPage() {
     || active?.event_cover
     || "";
 
+  // Presence line for DM chats: "online" or "last seen ..."
+  const dmPresence = React.useMemo(() => {
+    if (!active || active.chat_type !== "dm") return null;
+    if (!topMembers || topMembers.length === 0) return null;
+
+    // pick the "other" member (not me)
+    let other =
+      topMembers.find((m) => m.is_you === false && m.id) || null;
+
+    if (!other && me) {
+      other = topMembers.find(
+        (m) => m.id && String(m.id) !== String(me.id)
+      ) || null;
+    }
+
+    if (!other) {
+      other = topMembers.find((m) => m.id) || null;
+    }
+    if (!other || !other.id) return null;
+
+    const entry = rosterMap[String(other.id)];
+    const prof = entry?.profile;
+    if (!prof) return null;
+
+    if (prof.is_online) {
+      return { label: "online", isOnline: true };
+    }
+
+    if (!prof.last_activity_at) return null;
+
+    return {
+      label: formatLastSeen(prof.last_activity_at),
+      isOnline: false,
+    };
+  }, [active, topMembers, rosterMap, me]);
+
   // 🔹 Reusable "details" content (Members + Attachments)
   const renderDetailsContent = () => (
     <Stack spacing={1.25}>
@@ -1674,19 +1791,40 @@ export default function MessagesPage() {
               All Message
             </Typography>
             <List dense sx={{ flex: 1, overflowY: "auto" }}>
-              {filtered.map((t) => (
-                <ConversationRow
-                  key={t.id}
-                  thread={t}
-                  active={t.id === activeId}
-                  onClick={() => {
-                    setActiveId(t.id);
-                    if (isMobileOrTablet) {
-                      setMobileView("chat");   // 🔹 switch to chat on mobile/tablet
-                    }
-                  }}
-                />
-              ))}
+              {filtered.map((t) => {
+                const isActive = t.id === activeId;
+
+                // 🟢 show green dot for any DM whose participant is online in rosterMap
+                let showOnline = false;
+                if (t.chat_type === "dm") {
+                  // Find the "other" participant in this DM
+                  const members = topMembers.length ? topMembers : Object.values(rosterMap);
+                  const other =
+                    members.find((m) => !m.is_you && m.id) ||
+                    members.find((m) => me && String(m.id) !== String(me.id));
+
+                  if (other) {
+                    const entry = rosterMap[String(other.id)];
+                    const prof = entry?.profile;
+                    if (prof?.is_online) showOnline = true;
+                  }
+                }
+
+                return (
+                  <ConversationRow
+                    key={t.id}
+                    thread={t}
+                    active={isActive}
+                    online={showOnline}
+                    onClick={() => {
+                      setActiveId(t.id);
+                      if (isMobileOrTablet) {
+                        setMobileView("chat");
+                      }
+                    }}
+                  />
+                );
+              })}
             </List>
 
             <Button fullWidth variant="outlined" sx={{ mt: 1 }} onClick={() => setNewOpen(true)}>
@@ -1745,6 +1883,7 @@ export default function MessagesPage() {
                       <ArrowBackRoundedIcon fontSize="small" />
                     </IconButton>
                   )}
+
                   <Avatar
                     src={topLogo}
                     sx={{ width: 40, height: 40, cursor: hasActiveGroup ? "pointer" : "default" }}
@@ -1752,17 +1891,43 @@ export default function MessagesPage() {
                   >
                     {(topTitle || "C").slice(0, 1)}
                   </Avatar>
-                  <Typography
-                    variant="subtitle1"
-                    sx={{
-                      fontWeight: 800,
-                      cursor: hasActiveGroup ? "pointer" : "default",
-                      "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
-                    }}
-                    onClick={hasActiveGroup ? openActiveGroup : undefined}
-                  >
-                    {topTitle}
-                  </Typography>
+
+                  {/* Title + presence (online / last seen) */}
+                  <Stack spacing={0.25}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 800,
+                        cursor: hasActiveGroup ? "pointer" : "default",
+                        "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
+                      }}
+                      onClick={hasActiveGroup ? openActiveGroup : undefined}
+                    >
+                      {topTitle}
+                    </Typography>
+
+                    {/* WhatsApp-style status: only for DM (dmPresence is computed above) */}
+                    {dmPresence && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      >
+                        {dmPresence.isOnline && (
+                          <Box
+                            component="span"
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              bgcolor: "success.main",
+                            }}
+                          />
+                        )}
+                        {dmPresence.label}
+                      </Typography>
+                    )}
+                  </Stack>
                 </Stack>
 
                 {/* Right actions */}
@@ -1779,6 +1944,7 @@ export default function MessagesPage() {
                 </Stack>
               </Stack>
             </Paper>
+
 
             {/* Chat thread */}
             <Paper
