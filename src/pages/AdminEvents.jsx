@@ -466,16 +466,36 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
               <Box
                 className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                sx={{ width: "100%", maxWidth: 340, aspectRatio: "16 / 9", mx: { xs: 0, md: "auto" }, mb: 1.5, overflow: "hidden" }}
+                sx={{
+                  width: "100%",
+                  maxWidth: 340,
+                  position: "relative",
+                  paddingTop: "56.25%",      // 16:9 box, fixed height
+                  mx: { xs: 0, md: "auto" },
+                  mb: 1.5,
+                  overflow: "hidden",
+                }}
               >
                 {localImagePreview ? (
-                  <img src={localImagePreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img
+                    src={localImagePreview}
+                    alt="preview"
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                  />
                 ) : (
-                  <Stack alignItems="center" spacing={1}>
+                  <Stack alignItems="center" spacing={1} sx={{ position: "absolute", inset: 0 }}>
                     <ImageRoundedIcon />
                     <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
                   </Stack>
                 )}
+
                 <input
                   id="ev-image-file"
                   type="file"
@@ -486,14 +506,20 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     if (!f) return;
                     setImageFile(f);
                     const r = new FileReader();
-                    r.onload = (ev) => setLocalImagePreview(String(ev.target?.result || ""));
+                    r.onload = (ev) =>
+                      setLocalImagePreview(String(ev.target?.result || ""));
                     r.readAsDataURL(f);
                   }}
                 />
               </Box>
 
               <label htmlFor="ev-image-file">
-                <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                <Button
+                  component="span"
+                  size="small"
+                  variant="outlined"
+                  startIcon={<InsertPhotoRoundedIcon />}
+                >
                   Upload
                 </Button>
               </label>
@@ -506,7 +532,12 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           <Typography variant="h6" className="font-semibold mb-3">Schedule</Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={3}>
-              <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} fullWidth
+              <TextField label="Start Date" type="date" value={startDate} onChange={(e) => {
+                const v = e.target.value;
+                setStartDate(v);
+                setEndDate(v);      // 🔴 auto-set End Date same as Start Date
+              }}
+                fullWidth
                 InputLabelProps={{ shrink: true }}
                 InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
                 // 🔻 show error if needed
@@ -1825,7 +1856,7 @@ export default function DashbAdminEventsoard() {
         >
 
           {/* Right: Content */}
-          <Grid size={{ xs: 12, md: 9 }}>
+          <Grid size={{ xs: 12, md: 12 }}>
             {active === "events" ? (
               <EventsPage />
             ) : active === "posts" ? (
