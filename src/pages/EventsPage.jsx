@@ -571,12 +571,63 @@ export default function EventsPage() {
 
 
   useEffect(() => {
-    fetch(`${EVENTS_URL}locations/`, { headers: authHeaders() })
-      .then(r => r.json())
-      .then(d => setLocations(d?.results || []))
-      .catch(() => setLocations([]));
-  }, []);
+    const ctrl = new AbortController();
 
+    (async () => {
+      try {
+        const res = await fetch(`${EVENTS_URL}locations/`, {
+          headers: authHeaders(),
+          signal: ctrl.signal,
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const payload = await res.json();
+
+        // Handle common shapes:
+        // - { results: [...] }
+        // - { locations: [...] }
+        // - [ ... ]
+        let arr =
+          Array.isArray(payload?.results)
+            ? payload.results
+            : Array.isArray(payload?.locations)
+              ? payload.locations
+              : Array.isArray(payload)
+                ? payload
+                : [];
+
+        // Convert objects → strings if necessary
+        const values = arr
+          .map((loc) =>
+            typeof loc === "string"
+              ? loc
+              : (loc?.name || loc?.city || loc?.label || "")
+          )
+          .filter(Boolean);
+
+        // ✅ Case-insensitive dedupe:
+        // "india", "India", "INDIA" → single entry
+        const canonicalMap = new Map(); // key = lowercased, value = first original
+        values.forEach((v) => {
+          const key = v.trim().toLowerCase();
+          if (!canonicalMap.has(key)) {
+            canonicalMap.set(key, v.trim());
+          }
+        });
+
+        const distinct = Array.from(canonicalMap.values());
+        setLocations(distinct);
+      } catch (err) {
+        console.error("Failed to load locations:", err);
+        setLocations([]);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, []);
   // Get my registrations (only if logged-in)
   // /api/event-registrations/mine/?limit=1000 returns [{ id, event: { id, ... }, ... }, ...]
   useEffect(() => {
