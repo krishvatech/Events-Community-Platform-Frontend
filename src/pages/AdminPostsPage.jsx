@@ -241,19 +241,41 @@ function PostCard({ item }) {
 
         {kind === "image" && (
           <Box>
-            {item.image_preview ? (
-              <img
-                src={item.image_preview}
-                alt="preview"
-                style={{ width: "100%", borderRadius: 12, marginBottom: 8 }}
-              />
-            ) : item.image_url || item.image ? (
-              <img
-                src={item.image_url || item.image}
-                alt="post"
-                style={{ width: "100%", borderRadius: 12, marginBottom: 8 }}
-              />
-            ) : null}
+            <Box
+              sx={{
+                width: "100%",
+                borderRadius: 2,
+                overflow: "hidden",
+                mb: 1,
+              }}
+            >
+              {item.image_preview ? (
+                <Box
+                  component="img"
+                  src={item.image_preview}
+                  alt="preview"
+                  sx={{
+                    width: "100%",
+                    height: { xs: 200, sm: 220, md: 260, lg: 300 }, // 🔹 fixed size by device
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              ) : item.image_url || item.image ? (
+                <Box
+                  component="img"
+                  src={item.image_url || item.image}
+                  alt="post"
+                  sx={{
+                    width: "100%",
+                    height: { xs: 200, sm: 220, md: 260, lg: 300 }, // 🔹 same heights
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              ) : null}
+            </Box>
+
             {item.caption && (
               <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
                 {item.caption}
