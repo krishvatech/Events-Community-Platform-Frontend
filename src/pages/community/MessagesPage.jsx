@@ -56,7 +56,8 @@ const TIME_H = 16;   // px reserved at the bottom for time
 
 const bubbleSx = (mine) => (theme) => ({
   position: "relative",
-  maxWidth: "calc(78% - 8px)",
+  // maxWidth: "calc(78% - 8px)",
+  maxWidth: "340px",
   padding: theme.spacing(0.75, 1.25),
   paddingRight: `calc(${theme.spacing(1.25)} + ${TIME_W}px)`,
   paddingBottom: `calc(${theme.spacing(0.75)} + ${TIME_H}px)`,
@@ -354,13 +355,25 @@ const formatLastSeen = (iso) => {
 
 const getLastPreviewText = (t) => {
   const lm = getLastMessageObj(t);
-  return (
+
+  const fullText =
     t?.last_message_text ||
     t?.last_text ||
     (lm?.body || lm?.text || lm?.message || "") ||
-    ""
-  );
+    "";
+
+  const trimmed = (fullText || "").trim();
+  if (!trimmed) return "";
+
+  const words = trimmed.split(/\s+/);
+
+  // 👇 Only first 3 words in the preview
+  if (words.length <= 3) {
+    return trimmed;
+  }
+  return words.slice(0, 3).join(" ") + "…";
 };
+
 
 const isDmThread = (thread) => {
   if (!thread) return false;
@@ -377,11 +390,11 @@ const isDmThread = (thread) => {
   // fall-back: anything that is NOT a group/event chat
   const isGroupOrEvent = Boolean(
     thread.is_group ||
-      thread.is_event_group ||
-      thread.group ||
-      thread.context_group ||
-      thread.event ||
-      thread.event_id
+    thread.is_event_group ||
+    thread.group ||
+    thread.context_group ||
+    thread.event ||
+    thread.event_id
   );
 
   return !isGroupOrEvent;
@@ -425,8 +438,8 @@ const getDmPartnerId = (thread, me, rosterMap) => {
   const participants = Array.isArray(thread.participants)
     ? thread.participants
     : Array.isArray(thread.members)
-    ? thread.members
-    : null;
+      ? thread.members
+      : null;
 
   const myId = me?.id ? String(me.id) : null;
   if (participants && myId) {
@@ -1692,8 +1705,8 @@ export default function MessagesPage() {
   }, [activeId, markAllReadDebounced]);
 
   const topTitle = (active?.group?.name)
-  || active?.display_title
-  || (active && isDmThread(active) ? "Direct Message" : "Conversation");
+    || active?.display_title
+    || (active && isDmThread(active) ? "Direct Message" : "Conversation");
 
   const topLogo =
     active?.context_logo
@@ -1785,7 +1798,7 @@ export default function MessagesPage() {
                   sx={{ width: 28, height: 28, cursor: "pointer" }}
                   onClick={() => openUserProfile(p.id)}
                 />
-                                <Typography
+                <Typography
                   variant="body2"
                   sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
                   onClick={() => openUserProfile(p.id)}
