@@ -226,6 +226,44 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const iso = (d, t) => (d && t ? dayjs(`${d}T${t}:00`).toISOString() : null);
 
+  // 🔹 NEW: reset all fields back to defaults after successful create
+  const resetForm = () => {
+    const todayStr = dayjs().format("YYYY-MM-DD");
+
+    setTitle("");
+    setSlug("");
+    setDescription("");
+    setLocation("");
+    setCategory("Workshop");
+    setFormat("virtual");
+    setPrice(0);
+
+    setStartDate(todayStr);
+    setEndDate(todayStr);
+    setStartTime("10:00");
+    setEndTime("12:00");
+    setTimezone("Asia/Kolkata");
+
+    setImageFile(null);
+    setLocalImagePreview("");
+
+    setResourceType("file");
+    setResFiles([]);
+    setResLinks([""]);
+    setResVideos([""]);
+
+    setResTitle("");
+    setResDesc("");
+    setTagInput("");
+    setResTags([]);
+
+    setResourcesPublishNow(true);
+    setResPublishDate(todayStr);
+    setResPublishTime("10:00");
+
+    setErrors({});
+  };
+
   const validate = () => {
     const e = {};
     if (!title.trim()) e.title = "Required";
@@ -300,12 +338,19 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       if (!res.ok) {
         const msg =
           json?.detail ||
-          Object.entries(json).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ") ||
+          Object.entries(json)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+            .join(" | ") ||
           `HTTP ${res.status}`;
         throw new Error(msg);
       }
+
       onCreated?.(json);
       setToast({ open: true, type: "success", msg: "Event created. Resources attached." });
+
+      // 🔹 CLEAR FORM FOR NEXT TIME
+      resetForm();
+
       onClose?.();
     } catch (e) {
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
