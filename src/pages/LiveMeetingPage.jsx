@@ -233,6 +233,8 @@ function DyteMeetingWrapper({
     })();
   }, [authToken, initMeeting]);
 
+
+
   // 🟦 HOST DETECTION (same logic as before)
   useEffect(() => {
     if (!meeting || !initDone) return;
@@ -650,6 +652,23 @@ export default function LiveMeetingPage() {
   const [showQnA, setShowQnA] = useState(false);
   const [sidebarTab, setSidebarTab] = useState("chat"); // "chat" | "polls" | "plugins" | "qna"
   const [sidebarMeeting, setSidebarMeeting] = useState(null);
+
+  // Highlight Q&A button when our custom Q&A drawer is open
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const dyteRoot =
+      document.querySelector("dyte-meeting") ||
+      document.querySelector("[data-dyte-ui='meeting']");
+
+    if (!dyteRoot) return;
+
+    if (showQnA) {
+      dyteRoot.classList.add("qna-open");
+    } else {
+      dyteRoot.classList.remove("qna-open");
+    }
+  }, [showQnA]);
   // 👇 For fullscreen
   const pageRef = useRef(null);
 
@@ -915,10 +934,20 @@ export default function LiveMeetingPage() {
     >
        <GlobalStyles
         styles={{
+          // still hide Dyte’s built-in sidebar toggles if you want
           "dyte-chat-toggle, dyte-polls-toggle, dyte-participants-toggle, dyte-plugins-toggle":
             {
               display: "none !important",
             },
+
+          // 🔵 When our custom Q&A drawer is open, visually
+          // highlight the Q&A controlbar button like Chat does
+          "dyte-meeting.qna-open dyte-controlbar-button[label='Q&A'], \
+dyte-meeting.qna-open dyte-controlbar-button[aria-label='Q&A']": {
+            backgroundColor: "rgba(59, 130, 246, 0.16)", // light blue fill
+            boxShadow: "0 0 0 1px #3b82f6 inset",        // blue border
+            borderRadius: "999px",
+          },
         }}
       />
       {/* 🔝 Header overlay ABOVE Dyte */}
@@ -961,7 +990,16 @@ export default function LiveMeetingPage() {
       </Box>
 
       {/* Meeting fills the background */}
-      <Box sx={{ flex: 1, minHeight: 0 }}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          pr: showQnA
+            ? { xs: 0, sm: "360px", md: "400px" } // same width as Q&A panel
+            : 0,
+          transition: "padding-right 200ms ease",
+        }}
+      >
         <DyteMeetingWrapper
           authToken={authToken}
           eventId={eventId}
@@ -972,6 +1010,7 @@ export default function LiveMeetingPage() {
         />
       </Box>
 
+      {/* Custom Q&A drawer (width matches the reserved padding above) */}
       <LiveQnAPanel
         open={showQnA}
         onClose={() => setShowQnA(false)}
