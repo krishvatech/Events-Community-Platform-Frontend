@@ -394,7 +394,7 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
         sx={{
           display: "flex",
           gap: 3,
-          px: { xs: 1.5, sm: 2, md: 2.5, lg: 3 },   // reduced left/right padding
+          px: { xs: 0, sm: 2, md: 2.5, lg: 3 },   // reduced left/right padding
           maxWidth: { xs: "100%", lg: "1200px" },
           mx: "auto",
         }}
@@ -444,7 +444,11 @@ export default function GroupsPage({ onJoinGroup = async (_g) => { }, user }) {
           )}
 
           {/* 3-column grid */}
-          <Grid container spacing={2}>
+          <Grid
+            container
+            rowSpacing={2}
+            columnSpacing={{ xs: 0, sm: 2 }}   // ⬅️ no left/right gap on mobile
+          >
             {paginatedGroups.map((g) => (
               <Grid key={g.id} item xs={12} sm={4} md={4}>
                 <GroupGridCard g={g} onJoin={handleJoin} onOpen={openQuick} />

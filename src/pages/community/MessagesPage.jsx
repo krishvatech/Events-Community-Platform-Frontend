@@ -1614,9 +1614,10 @@ export default function MessagesPage() {
 
       <Grid
         container
-        spacing={2}
+        rowSpacing={2}
+        columnSpacing={{ xs: 0, md: 2 }}   // 🔹 no side gap on mobile/tablet
         sx={{
-          width: "100%",   // 🔹 make inner grid use full width of page
+          width: "100%",
         }}
       >
         {/* LEFT: Conversation list */}
@@ -1640,9 +1641,13 @@ export default function MessagesPage() {
               height: PANEL_H,
               display: "flex",
               flexDirection: "column",
-              // 🔹 full width on mobile / tablet (320, 375, 420, 768)
-              width: 1,          // = 100% of Grid item, all breakpoints
-              maxWidth: "none",  // 🔹 remove 360px cap so tablet also fills
+
+              // 🔹 137% width on mobile (xs), normal 100% on tablet & up
+              width: { xs: "137%", sm: "250%", md: "100%" },
+              maxWidth: "none",
+
+              // optional: recentre the block so it doesn’t look shifted
+              ml: { xs: "-1.0%", sm: 0 }, // half of extra 37% = 18.5%
             }}
           >
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
@@ -1709,7 +1714,7 @@ export default function MessagesPage() {
               flexDirection: "column",
               minHeight: 0,
               // 🔹 full width on mobile / tablet
-              width: 1,          // 100% of Grid item
+              width: { xs: "105%", sm: "185%", md: "100%" },
               maxWidth: "none",  // no cap on tablet/mobile
             }}
           >
