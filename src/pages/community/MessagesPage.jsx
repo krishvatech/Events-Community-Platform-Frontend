@@ -362,6 +362,109 @@ const getLastPreviewText = (t) => {
   );
 };
 
+const isDmThread = (thread) => {
+  if (!thread) return false;
+
+  // explicit chat_type flags
+  if (
+    thread.chat_type === "dm" ||
+    thread.chat_type === "direct" ||
+    thread.chat_type === "private"
+  ) {
+    return true;
+  }
+
+  // fall-back: anything that is NOT a group/event chat
+  const isGroupOrEvent = Boolean(
+    thread.is_group ||
+      thread.is_event_group ||
+      thread.group ||
+      thread.context_group ||
+      thread.event ||
+      thread.event_id
+  );
+
+  return !isGroupOrEvent;
+};
+
+// Figure out the "other" user in a DM conversation
+// Figure out the "other" user in a DM conversation
+const getDmPartnerId = (thread, me, rosterMap) => {
+  if (!isDmThread(thread)) return null;
+
+  // 1) Explicit ID fields from backend (add/change as per your serializer)
+  const explicitId =
+    thread.dm_partner_id ??
+    thread.other_user_id ??
+    thread.friend_id ??
+    thread.recipient_id ??
+    null;
+  if (explicitId) return explicitId;
+
+  // 2) Explicit object fields from backend
+  const explicitObj =
+    thread.dm_partner ||
+    thread.other_user ||
+    thread.friend ||
+    thread.partner ||
+    null;
+
+  if (explicitObj) {
+    if (typeof explicitObj === "object") {
+      return (
+        explicitObj.id ??
+        explicitObj.user_id ??
+        explicitObj.user?.id ??
+        null
+      );
+    }
+    return explicitObj;
+  }
+
+  // 3) Fallback: participants/members array → pick "not me"
+  const participants = Array.isArray(thread.participants)
+    ? thread.participants
+    : Array.isArray(thread.members)
+    ? thread.members
+    : null;
+
+  const myId = me?.id ? String(me.id) : null;
+  if (participants && myId) {
+    const other = participants.find((p) => {
+      const id = p.id ?? p.user_id ?? p.user?.id;
+      if (!id) return false;
+      return String(id) !== myId;
+    });
+
+    if (other) {
+      return other.id ?? other.user_id ?? other.user?.id ?? null;
+    }
+  }
+
+  // 4) Name-based fallback using rosterMap
+  if (rosterMap && thread.display_title) {
+    const title = String(thread.display_title).trim().toLowerCase();
+
+    for (const key of Object.keys(rosterMap)) {
+      const entry = rosterMap[key];
+      const user = entry?.user || {};
+      const profile = entry?.profile || {};
+
+      const fullName = String(
+        user.full_name || user.name || profile.full_name || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      const username = String(user.username || "").trim().toLowerCase();
+
+      if (fullName && fullName === title) return key;
+      if (username && username === title) return key;
+    }
+  }
+
+  return null;
+};
 
 function ConversationRow({ thread, active, onClick, online }) {
   const unread = thread.unread_count || 0;
@@ -371,7 +474,7 @@ function ConversationRow({ thread, active, onClick, online }) {
   const title =
     thread?.group?.name ||
     thread.display_title ||
-    (thread.chat_type === "dm" ? "Direct Message" : "Conversation");
+    (isDmThread(thread) ? "Direct Message" : "Conversation");
 
   return (
     <ListItem
@@ -1015,8 +1118,18 @@ export default function MessagesPage() {
       const map = {};
 
       (Array.isArray(data) ? data : []).forEach((u) => {
-        if (!u || !u.id) return;
-        map[String(u.id)] = u;
+        if (!u) return;
+
+        // user id can come as id / user_id / user.id
+        const id =
+          u.id ??
+          u.user_id ??
+          (typeof u.user === "object" ? u.user.id : null);
+
+        if (!id) return;
+
+        // store with the real user id
+        map[String(id)] = { ...u, id };
       });
 
       setRosterMap(map);
@@ -1579,8 +1692,8 @@ export default function MessagesPage() {
   }, [activeId, markAllReadDebounced]);
 
   const topTitle = (active?.group?.name)
-    || active?.display_title
-    || (active?.chat_type === "dm" ? "Direct Message" : "Conversation");
+  || active?.display_title
+  || (active && isDmThread(active) ? "Direct Message" : "Conversation");
 
   const topLogo =
     active?.context_logo
@@ -1591,7 +1704,7 @@ export default function MessagesPage() {
 
   // Presence line for DM chats: "online" or "last seen ..."
   const dmPresence = React.useMemo(() => {
-    if (!active || active.chat_type !== "dm") return null;
+    if (!active || !isDmThread(active)) return null;
     if (!topMembers || topMembers.length === 0) return null;
 
     // pick the "other" member (not me)
@@ -1672,7 +1785,7 @@ export default function MessagesPage() {
                   sx={{ width: 28, height: 28, cursor: "pointer" }}
                   onClick={() => openUserProfile(p.id)}
                 />
-                +                <Typography
+                                <Typography
                   variant="body2"
                   sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
                   onClick={() => openUserProfile(p.id)}
@@ -1793,20 +1906,17 @@ export default function MessagesPage() {
             <List dense sx={{ flex: 1, overflowY: "auto" }}>
               {filtered.map((t) => {
                 const isActive = t.id === activeId;
-
-                // 🟢 show green dot for any DM whose participant is online in rosterMap
                 let showOnline = false;
-                if (t.chat_type === "dm") {
-                  // Find the "other" participant in this DM
-                  const members = topMembers.length ? topMembers : Object.values(rosterMap);
-                  const other =
-                    members.find((m) => !m.is_you && m.id) ||
-                    members.find((m) => me && String(m.id) !== String(me.id));
 
-                  if (other) {
-                    const entry = rosterMap[String(other.id)];
+                if (isDmThread(t)) {
+                  // ✅ Always decide from rosterMap (no need to open chat first)
+                  const partnerId = getDmPartnerId(t, me, rosterMap);
+                  if (partnerId) {
+                    const entry = rosterMap[String(partnerId)];
                     const prof = entry?.profile;
-                    if (prof?.is_online) showOnline = true;
+                    if (prof?.is_online) {
+                      showOnline = true;
+                    }
                   }
                 }
 
@@ -1825,6 +1935,7 @@ export default function MessagesPage() {
                   />
                 );
               })}
+
             </List>
 
             <Button fullWidth variant="outlined" sx={{ mt: 1 }} onClick={() => setNewOpen(true)}>
@@ -1981,7 +2092,7 @@ export default function MessagesPage() {
                         <Bubble
                           key={m.id}
                           m={m}
-                          showSender={active?.chat_type !== "dm" && firstOfBlock}
+                          showSender={active && !isDmThread(active) && firstOfBlock}
                         />
                       );
                     })}
