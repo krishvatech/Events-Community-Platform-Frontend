@@ -327,7 +327,7 @@ export default function MembersPage() {
 
   const getCenterForISO2 = useCountryCentroids(geoUrl);
 
-  
+
   // state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -628,7 +628,7 @@ export default function MembersPage() {
         >
           <Box
             sx={{
-              width: "100%",   // take full width of the grid item
+              width: { xs: "120%", sm: "157%", md: "100%" },  // take full width of the grid item
               mx: 0,           // follow container padding exactly (same as drawer)
             }}
           >
