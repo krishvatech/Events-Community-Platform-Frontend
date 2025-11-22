@@ -1941,6 +1941,7 @@ export default function HomePage() {
           post={posts.find((p) => p.id === editPostId)}
           communityId={myCommunityId}
           onClose={() => setEditOpen(false)}
+          reloadPosts={fetchMyPosts} 
           onSaved={(updated) => {
             if (!updated) { setEditOpen(false); return; }
             setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
@@ -2495,7 +2496,7 @@ function getPollOptionLabel(opt, idx) {
 }
 
 // Function For Edit Post Dialog & Delete Confirm Dialog
-function PostEditDialog({ open, post, communityId, onClose, onSaved }) {
+function PostEditDialog({ open, post, communityId, onClose, onSaved ,reloadPosts}) {
   const [saving, setSaving] = React.useState(false);
 
   // core states (same idea as AdminPostsPage)
@@ -2868,7 +2869,14 @@ function PostEditDialog({ open, post, communityId, onClose, onSaved }) {
           }
         : mergedBase;
 
+    // update local list immediately
     onSaved?.(merged);
+
+    // 🔁 also refresh from server so feed stays in sync
+    if (typeof reloadPosts === "function") {
+      reloadPosts();
+    }
+
     onClose?.();
   } catch (err) {
     console.error("Failed to update post", err);
