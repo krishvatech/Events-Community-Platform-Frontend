@@ -34,6 +34,7 @@ import {
   FormControlLabel,
   MenuItem,
   Drawer,
+  LinearProgress
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
@@ -618,51 +619,91 @@ function PostCard({ post, avatarUrl, actorName }) {
           </Grid>
         )}
 
-        {post.type === "poll" && Array.isArray(post.options) && post.options.length > 0 && (
-        <List dense sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-          {post.options.map((opt, idx) => {
-            const optionId =
-              typeof opt === "object"
-                ? (opt.id ?? opt.option_id ?? null)
-                : null;
-
-            const optionLabel =
-              typeof opt === "string"
-                ? opt
-                : (opt?.text ?? opt?.label ?? `Option ${idx + 1}`);
-
-            const votes = typeof opt === "object" && typeof opt?.vote_count === "number"
-              ? opt.vote_count
+        {post.type === "poll" && Array.isArray(post.options) && post.options.length > 0 && (() => {
+        // normalise options and compute totals
+        const normalized = post.options.map((opt, idx) => {
+          const optionId =
+            typeof opt === "object"
+              ? (opt.id ?? opt.option_id ?? null)
               : null;
 
-            return (
-              <ListItem key={idx} disableGutters sx={{ px: 1 }}>
-                <ListItemAvatar>
-                  <Avatar sx={{ width: 28, height: 28 }}>{idx + 1}</Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={optionLabel}
-                  secondary={
-                    votes != null ? (
-                      <Button
-                        size="small"
-                        sx={{ pl: 0 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!optionId) return;
-                          window.__openPollVotes?.(post.id, optionId, optionLabel)?.();
-                        }}
-                      >
-                        {votes} {votes === 1 ? "vote" : "votes"}
-                      </Button>
-                    ) : null
-                  }
-                />
-              </ListItem>
-            );
-          })}
-        </List>
-      )}
+          const label =
+            typeof opt === "string"
+              ? opt
+              : (opt?.text ?? opt?.label ?? `Option ${idx + 1}`);
+
+          const votes =
+            typeof opt === "object" && typeof opt?.vote_count === "number"
+              ? opt.vote_count
+              : 0;
+
+          return { idx, optionId, label, votes };
+        });
+
+        const totalVotes = normalized.reduce((sum, o) => sum + o.votes, 0);
+
+        return (
+          <Box sx={{ mt: 2 }}>
+            {normalized.map(({ idx, optionId, label, votes }) => {
+              const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+
+              return (
+                <Box
+                  key={idx}
+                  sx={{
+                    mb: 1.5,
+                    cursor: optionId ? "pointer" : "default",
+                  }}
+                  onClick={() => {
+                    if (!optionId) return;
+                    window.__votePollOption?.(post.id, optionId);
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    sx={{ mb: 0.5 }}
+                  >
+                    <Typography variant="body2">{label}</Typography>
+                    <Typography variant="body2" fontWeight={600}>
+                      {pct}%
+                    </Typography>
+                  </Stack>
+
+                  <LinearProgress
+                    variant="determinate"
+                    value={pct}
+                    sx={{
+                      height: 10,
+                      borderRadius: 5,
+                      "& .MuiLinearProgress-bar": {
+                        borderRadius: 5,
+                      },
+                    }}
+                  />
+
+                  <Button
+                    size="small"
+                    sx={{ mt: 0.5, pl: 0 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!optionId) return;
+                      window.__openPollVotes?.(post.id, optionId, label)?.();
+                    }}
+                  >
+                    {votes} {votes === 1 ? "vote" : "votes"}
+                  </Button>
+                </Box>
+              );
+            })}
+
+            <Typography variant="caption" color="text.secondary">
+              Total: {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
+            </Typography>
+          </Box>
+        );
+      })()}
 
       </CardContent>
       <CardActions sx={{ px: 1, py: 0.5, display: 'block' }}>
@@ -1301,6 +1342,71 @@ export default function HomePage() {
     }
   }, []);
 
+  // ---- Global poll vote handler (uses setPosts + fetchMyPosts) ----
+  React.useEffect(() => {
+    window.__votePollOption = async (postId, optionId) => {
+      if (!optionId) return;
+
+      // Optimistic UI: increment vote_count for that option
+      setPosts(prev =>
+        prev.map(p => {
+          if (p.id !== postId || p.type !== "poll") return p;
+          const options = (p.options || []).map(opt => {
+            if (typeof opt !== "object") return opt;
+            const oid = opt.id ?? opt.option_id;
+            if (oid !== optionId) return opt;
+            return {
+              ...opt,
+              vote_count: Number(opt.vote_count || 0) + 1,
+            };
+          });
+          return { ...p, options };
+        })
+      );
+
+      try {
+        const res = await fetch(
+          `${API_ROOT}/activity/feed/${postId}/poll/vote/`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...authHeader(),
+            },
+            body: JSON.stringify({ option_ids: [optionId] }),
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error("Vote failed");
+        }
+
+        // If API returns updated options, merge them in
+        const data = await res.json().catch(() => null);
+        if (data && Array.isArray(data.options)) {
+          setPosts(prev =>
+            prev.map(p =>
+              p.id === postId && p.type === "poll"
+                ? { ...p, options: data.options }
+                : p
+            )
+          );
+        }
+      } catch (err) {
+        console.error(err);
+        // On error, reload posts so counts are correct again
+        fetchMyPosts();
+      }
+    };
+
+    return () => {
+      try {
+        delete window.__votePollOption;
+      } catch {}
+    };
+  }, [fetchMyPosts]);
+
+
   React.useEffect(() => {
     if (Array.isArray(posts) && posts.length) {
       hydrateShareCounts(posts);
@@ -1829,17 +1935,19 @@ export default function HomePage() {
         }}
         setSaving={setAvatarSaving}
       />
-      <PostEditDialog
-        open={editOpen}
-        post={posts.find((p) => p.id === editPostId)}
-        communityId={myCommunityId}
-        onClose={() => setEditOpen(false)}
-        onSaved={(updated) => {
-          if (!updated) { setEditOpen(false); return; }
-          setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-          setEditOpen(false);
-        }}
-      />
+      {editOpen && editPostId && (
+        <PostEditDialog
+          open={editOpen}
+          post={posts.find((p) => p.id === editPostId)}
+          communityId={myCommunityId}
+          onClose={() => setEditOpen(false)}
+          onSaved={(updated) => {
+            if (!updated) { setEditOpen(false); return; }
+            setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+            setEditOpen(false);
+          }}
+        />
+      )}
       <PostDeleteConfirm
         open={deleteOpen}
         postId={deletePostId}
@@ -2380,151 +2488,613 @@ function SharesDialog({ open, postId, onClose }) {
   );
 }
 
+function getPollOptionLabel(opt, idx) {
+  if (typeof opt === "string") return opt;
+  if (!opt || typeof opt !== "object") return `Option ${idx + 1}`;
+  return opt.text || opt.label || opt.value || `Option ${idx + 1}`;
+}
 
 // Function For Edit Post Dialog & Delete Confirm Dialog
 function PostEditDialog({ open, post, communityId, onClose, onSaved }) {
   const [saving, setSaving] = React.useState(false);
+
+  // core states (same idea as AdminPostsPage)
   const [type, setType] = React.useState(post?.type || "text");
   const [content, setContent] = React.useState(post?.content || "");
   const [link, setLink] = React.useState(post?.link || "");
-  const [optionsText, setOptionsText] = React.useState(Array.isArray(post?.options) ? post.options.join("\n") : "");
 
+  // poll options – editable like AdminPostsPage
+  const [pollOptions, setPollOptions] = React.useState(["", ""]);
+
+  // image edit support (preview + replace)
+  const [imageFile, setImageFile] = React.useState(null);
+  const [imagePreview, setImagePreview] = React.useState("");
+
+  // initialize from post
   React.useEffect(() => {
-    setType(post?.type || "text");
-    setContent(post?.content || "");
-    setLink(post?.link || "");
-    setOptionsText(Array.isArray(post?.options) ? post.options.join("\n") : "");
-  }, [post]);
+    if (!post) return;
+
+    const t = post.type || "text";
+    setType(t);
+
+    // base content
+    const baseContent =
+      post.content ||
+      post.caption ||
+      post.text ||
+      post.description ||
+      post.question ||
+      "";
+
+    setContent(baseContent);
+    setLink(post.link || post.url || "");
+
+    // poll options (mirror AdminPostsPage behaviour)
+    if (t === "poll") {
+      const rawOpts = (post.options || post.poll_options || []).map(
+        (opt, idx) => getPollOptionLabel(opt, idx)
+      );
+      if (rawOpts.length >= 2) {
+        setPollOptions(rawOpts);
+      } else {
+        setPollOptions(["", ""]);
+      }
+    } else {
+      setPollOptions(["", ""]);
+    }
+
+    // image preview (mirror AdminPostsPage existing-image behaviour)
+    setImageFile(null);
+    if (t === "image") {
+      const existingImage =
+        (Array.isArray(post.images) && post.images[0]) ||
+        post.image_url ||
+        post.image ||
+        post.image_preview ||
+        "";
+      setImagePreview(existingImage || "");
+    } else {
+      setImagePreview("");
+    }
+  }, [post?.id]);
 
   if (!post) return null;
 
-  // Build both JSON and FormData shapes; try multiple endpoints until one works
-  async function updatePostApi() {
-    // Build the values we KNOW (from the dialog)
-    const localUi = (() => {
-      if (type === "text") return { type: "text", content };
-      if (type === "link") return { type: "link", content, link };
-      if (type === "image") return { type: "image", content };
-      if (type === "poll") {
-        const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
-        return { type: "poll", content, options: opts };
-      }
-      return { type: "text", content };
-    })();
-
-    // JSON + FormData variants (same as before)
-    const jsonPayload = (() => {
-      if (type === "text") return { type: "text", content };
-      if (type === "link") return { type: "link", url: link, description: content };
-      if (type === "image") return { type: "image", caption: content };
-      if (type === "poll") {
-        const opts = optionsText.split("\n").map(s => s.trim()).filter(Boolean);
-        return { type: "poll", question: content, options: opts.length ? opts : undefined };
-      }
-      return { type: "text", content };
-    })();
-
-    const formPayload = (() => {
-      const fd = new FormData();
-      fd.append("type", type);
-      if (type === "text") fd.append("content", content || "");
-      if (type === "link") { fd.append("url", link || ""); if (content) fd.append("description", content); }
-      if (type === "image") { if (content) fd.append("caption", content); }
-      if (type === "poll") {
-        fd.append("question", content || "");
-        optionsText.split("\n").map(s => s.trim()).filter(Boolean).forEach((o) => fd.append("options", o));
-      }
-      return fd;
-    })();
-
-    const cId = communityId;
-    const id = post.id;
-
-    const candidates = [
-      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PATCH", body: jsonPayload, json: true },
-      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "PUT", body: jsonPayload, json: true },
-      { url: `${API_ROOT}/posts/${id}/`, method: "PATCH", body: jsonPayload, json: true },
-      { url: `${API_ROOT}/posts/${id}/edit/`, method: "POST", body: jsonPayload, json: true },
-      { url: `${API_ROOT}/communities/${cId}/posts/${id}/edit/`, method: "POST", body: formPayload, json: false },
-    ];
-
-    let serverUi = {};
-    for (const c of candidates) {
-      try {
-        const r = await fetch(c.url, {
-          method: c.method,
-          headers: c.json ? { "Content-Type": "application/json", ...authHeader() } : { ...authHeader() },
-          body: c.json ? JSON.stringify(c.body) : c.body,
-        });
-        if (!r.ok) continue;
-        // Many of your endpoints return either empty JSON or a minimal shape.
-        const resp = await r.json().catch(() => ({}));
-        serverUi = mapCreateResponseToUiPost(resp) || {};
-        break;
-      } catch { /* try next */ }
+  // image picker (like AdminPostsPage)
+  const onPickImage = React.useCallback((file) => {
+    if (!file) {
+      setImageFile(null);
+      return;
     }
+    setImageFile(file);
 
-    // Merge priority: existing post → server response → local dialog values
-    // (Local values win if server is empty/minimal)
-    const merged = {
-      ...post,
-      ...serverUi,
-      ...localUi,
-      id: post.id, // keep same id
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result =
+        typeof e.target?.result === "string" ? e.target.result : "";
+      setImagePreview(result || "");
     };
-    // Ensure we don't lose arrays/fields when server returns nothing:
-    if (merged.type === "poll" && !Array.isArray(merged.options)) merged.options = localUi.options || post.options || [];
-    if (merged.type === "image" && !merged.images) merged.images = post.images || [];
+    reader.readAsDataURL(file);
+  }, []);
 
-    return merged;
+  // validation logic similar to AdminPostsPage Edit dialog
+  const canSave = React.useMemo(() => {
+    if (type === "text") {
+      return !!(content || "").trim();
+    }
+    if (type === "link") {
+      return !!(link || "").trim();
+    }
+    if (type === "poll") {
+      const trimmedQuestion = (content || "").trim();
+      const trimmedOptions = pollOptions
+        .map((o) => o.trim())
+        .filter(Boolean);
+      return trimmedQuestion.length > 0 && trimmedOptions.length >= 2;
+    }
+    // image or other custom types – allow save
+    return true;
+  }, [type, content, link, pollOptions]);
+
+  // ---- API helper: mirrors your Admin + Home logic ----
+  async function updatePostApi() {
+  const tokenHeaders = authHeader();
+  if (!post) throw new Error("No post");
+
+  const id = post.id;
+  const urlBase = API_ROOT;
+
+  // ---- Local UI fallback (so dialog doesn't crash if API fails) ----
+  const localUi = () => {
+    if (type === "text") {
+      return { type: "text", content };
+    }
+    if (type === "link") {
+      return { type: "link", content, link };
+    }
+    if (type === "image") {
+      const images = imagePreview
+        ? [imagePreview]
+        : Array.isArray(post.images)
+        ? post.images
+        : post.image
+        ? [post.image]
+        : [];
+      return { type: "image", content, images };
+    }
+    if (type === "poll") {
+      const trimmedOptions = pollOptions
+        .map((opt) => opt.trim())
+        .filter(Boolean);
+      return {
+        type: "poll",
+        content,
+        options: trimmedOptions,
+      };
+    }
+    return { type: type || post.type, content };
+  };
+
+  // ---- JSON payload for community posts (text / link / image generic) ----
+  const jsonPayload = () => {
+    if (type === "text") {
+      return { type: "text", content };
+    }
+    if (type === "link") {
+      return {
+        type: "link",
+        url: link || "",
+        description: content || "",
+      };
+    }
+    if (type === "image") {
+      // community posts edit: treat caption as content-ish field
+      return {
+        type: "image",
+        caption: content || "",
+      };
+    }
+    if (type === "poll") {
+      const trimmedOptions = pollOptions
+        .map((opt) => opt.trim())
+        .filter(Boolean);
+      return {
+        type: "poll",
+        question: content || "",
+        options: trimmedOptions,
+      };
+    }
+    return { type: type || post.type, content };
+  };
+
+  // ---- FormData payload (needed for image file uploads) ----
+  const formPayload = () => {
+    const fd = new FormData();
+    if (type === "text") {
+      fd.append("type", "text");
+      fd.append("content", content || "");
+    } else if (type === "link") {
+      fd.append("type", "link");
+      fd.append("url", link || "");
+      fd.append("description", content || "");
+    } else if (type === "image") {
+      fd.append("type", "image");
+      if (content) fd.append("caption", content);
+      if (imageFile) fd.append("image", imageFile);
+    } else if (type === "poll") {
+      fd.append("type", "poll");
+      fd.append("question", content || "");
+      pollOptions.forEach((opt, idx) => {
+        const trimmed = opt.trim();
+        if (trimmed) {
+          fd.append(`options[${idx}]`, trimmed);
+        }
+      });
+    } else {
+      fd.append("type", type || post.type);
+      fd.append("content", content || "");
+    }
+    return fd;
+  };
+
+  // ---- Special payload just for activity_feed poll update ----
+  const pollJsonPayload = () => {
+    const trimmedOptions = pollOptions
+      .map((opt) => opt.trim())
+      .filter(Boolean);
+    return {
+      question: content || "",
+      options: trimmedOptions,
+    };
+  };
+
+  // ---- Endpoint candidates (ordered by priority) ----
+  const candidates = [];
+
+  // 1) If this is a POLL → hit activity_feed poll update first
+  if (type === "poll") {
+    candidates.push({
+      // /api/activity/feed/<feed_item_id>/poll/
+      url: `${urlBase}/activity/feed/${id}/poll/`,
+      method: "PATCH",
+      json: true,
+      bodyBuilder: pollJsonPayload,
+    });
   }
 
-  const onSave = async () => {
-    setSaving(true);
-    try {
-      const updated = await updatePostApi();
-      onSaved?.(updated);
-    } catch (e) {
-      alert(e.message || "Could not update post");
-    } finally {
-      setSaving(false);
+  // 2) If this is an IMAGE → prefer multipart PATCH so caption + file update correctly
+  if (type === "image") {
+    candidates.push(
+      {
+        url: `${urlBase}/communities/${communityId}/posts/${id}/edit/`,
+        method: "PATCH",
+        json: false,
+        bodyBuilder: formPayload,
+      },
+      {
+        url: `${urlBase}/communities/${communityId}/posts/${id}/`,
+        method: "PATCH",
+        json: false,
+        bodyBuilder: formPayload,
+      }
+    );
+  }
+
+  // 3) Generic community JSON endpoints (good for text/link + fallback for image/poll)
+  candidates.push(
+    {
+      url: `${urlBase}/communities/${communityId}/posts/${id}/edit/`,
+      method: "PATCH",
+      json: true,
+      bodyBuilder: jsonPayload,
+    },
+    {
+      url: `${urlBase}/communities/${communityId}/posts/${id}/`,
+      method: "PATCH",
+      json: true,
+      bodyBuilder: jsonPayload,
+    },
+    {
+      url: `${urlBase}/communities/${communityId}/posts/${id}/edit/`,
+      method: "PUT",
+      json: true,
+      bodyBuilder: jsonPayload,
+    },
+    {
+      url: `${urlBase}/communities/${communityId}/posts/${id}/`,
+      method: "PUT",
+      json: true,
+      bodyBuilder: jsonPayload,
     }
+  );
+
+  // 4) Final fallback: multipart PATCH (for any type that wants it)
+  candidates.push({
+    url: `${urlBase}/communities/${communityId}/posts/${id}/edit/`,
+    method: "PATCH",
+    json: false,
+    bodyBuilder: formPayload,
+  });
+
+  let lastError = null;
+
+  for (const c of candidates) {
+    try {
+      const body = c.bodyBuilder();
+      const headers = c.json
+        ? { ...tokenHeaders, "Content-Type": "application/json" }
+        : tokenHeaders;
+
+      const resp = await fetch(c.url, {
+        method: c.method,
+        headers,
+        body: c.json ? JSON.stringify(body) : body,
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${text}`);
+      }
+
+      const data = await resp.json().catch(() => null);
+
+      // If activity_feed poll update responded directly with {question, options,...}
+      if (type === "poll" && data && data.question && Array.isArray(data.options)) {
+        return {
+          ...post,
+          type: "poll",
+          content: data.question,
+          options: data.options,
+        };
+      }
+
+      // Normal case: use same mapper as create
+      if (data) {
+        return mapCreateResponseToUiPost(data);
+      }
+
+      // Safety fallback if server returned 204 with no JSON
+      return { ...post, ...localUi() };
+    } catch (err) {
+      console.warn(
+        "[HomePage] edit-post candidate failed",
+        c.method,
+        c.url,
+        err
+      );
+      lastError = err;
+    }
+  }
+
+  // If everything fails, at least update UI locally so dialog closes gracefully
+  if (lastError) {
+    console.error("[HomePage] all edit-post endpoints failed", lastError);
+    return { ...post, ...localUi() };
+  }
+
+  return { ...post, ...localUi() };
+}
+
+
+  const onSave = async () => {
+  if (!canSave || !post) return;
+  setSaving(true);
+  try {
+    const updated = await updatePostApi();
+
+    // 1) Merge API result into existing post, keep same feed-item id
+    const mergedBase = updated
+      ? {
+          ...post,      // keep actor_name, metrics, etc.
+          ...updated,   // apply new content/link/caption/options
+          id: post.id,  // force id to stay same as current feed item
+        }
+      : post;
+
+    // 2) Special handling for IMAGE posts:
+    //    if API didn't send images, keep the old ones so UI doesn't go blank.
+    const merged =
+      (mergedBase.type || post.type) === "image"
+        ? {
+            ...mergedBase,
+            images:
+              (updated &&
+                Array.isArray(updated.images) &&
+                updated.images.length > 0)
+                ? updated.images
+                : (Array.isArray(post.images) && post.images.length > 0
+                    ? post.images
+                    : mergedBase.images || []),
+          }
+        : mergedBase;
+
+    onSaved?.(merged);
+    onClose?.();
+  } catch (err) {
+    console.error("Failed to update post", err);
+    alert("Could not update the post. Please try again.");
+  } finally {
+    setSaving(false);
+  }
+};
+
+  const handleOptionChange = (index, value) => {
+    setPollOptions((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const addPollOption = () => {
+    setPollOptions((prev) => [...prev, ""]);
+  };
+
+  const removePollOption = (index) => {
+    setPollOptions((prev) => {
+      if (prev.length <= 2) return prev; // keep at least 2 options
+      const next = [...prev];
+      next.splice(index, 1);
+      return next;
+    });
   };
 
   return (
-    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Edit post</DialogTitle>
-      <DialogContent sx={{ pt: 2 }}>
-        {/* Type is shown read-only to keep the UI minimal */}
-        <Typography variant="caption" color="text.secondary">Type: {type}</Typography>
+    <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Edit Post</DialogTitle>
+      <DialogContent dividers>
+        <Typography
+          variant="caption"
+          sx={{ display: "block", mb: 1, color: "text.secondary" }}
+        >
+          Type: {type}
+        </Typography>
+
+        {/* TEXT */}
         {type === "text" && (
-          <TextField fullWidth multiline minRows={4} sx={{ mt: 1 }}
-            value={content} onChange={(e) => setContent(e.target.value)} placeholder="Say something…" />
+          <TextField
+            fullWidth
+            multiline
+            minRows={4}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            label="Text"
+            placeholder="Update your text…"
+            sx={{ mt: 1 }}
+          />
         )}
-        {type === "link" && (
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField fullWidth value={link} onChange={(e) => setLink(e.target.value)} label="Link URL" />
-            <TextField fullWidth multiline minRows={3} value={content} onChange={(e) => setContent(e.target.value)} label="Description" />
+
+        {/* IMAGE (mirror AdminPostsPage: preview + replace + caption) */}
+        {type === "image" && (
+          <Stack spacing={1.5} sx={{ mt: 1 }}>
+            <Box
+              sx={{
+                width: "100%",
+                borderRadius: 2,
+                border: "1px dashed rgba(145, 158, 171, 0.5)",
+                overflow: "hidden",
+                bgcolor: "background.default",
+              }}
+            >
+              {imagePreview ? (
+                <Box
+                  component="img"
+                  src={imagePreview}
+                  alt="Post"
+                  sx={{
+                    display: "block",
+                    width: "100%",
+                    maxHeight: 260,
+                    objectFit: "cover",
+                  }}
+                />
+              ) : (
+                <Box
+                  sx={{
+                    p: 3,
+                    textAlign: "center",
+                    color: "text.secondary",
+                    fontSize: 13,
+                  }}
+                >
+                  No image preview available
+                </Box>
+              )}
+            </Box>
+
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              alignItems="flex-start"
+            >
+              <Button
+                component="label"
+                variant="outlined"
+                size="small"
+                startIcon={<ImageRoundedIcon fontSize="small" />}
+                sx={{ whiteSpace: "nowrap" }}
+              >
+                Replace image
+                <input
+                  hidden
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    onPickImage(e.target.files?.[0] || null)
+                  }
+                />
+              </Button>
+
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                label="Caption"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+              />
+            </Stack>
           </Stack>
         )}
-        {type === "image" && (
-          <TextField fullWidth multiline minRows={3} sx={{ mt: 1 }}
-            value={content} onChange={(e) => setContent(e.target.value)} label="Caption" />
+
+        {/* LINK (styled like AdminPostsPage) */}
+        {type === "link" && (
+          <Stack spacing={1.5} sx={{ mt: 1 }}>
+            <TextField
+              fullWidth
+              label="Link URL"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://example.com"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LinkRoundedIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            <TextField
+              fullWidth
+              label="Description"
+              multiline
+              minRows={3}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Say something about this link…"
+            />
+          </Stack>
         )}
+
+        {/* POLL (same feel as AdminPostsPage) */}
         {type === "poll" && (
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} label="Question" />
-            <TextField fullWidth multiline minRows={3} value={optionsText} onChange={(e) => setOptionsText(e.target.value)} label="Options (one per line)" />
+          <Stack spacing={1.5} sx={{ mt: 1 }}>
+            <TextField
+              fullWidth
+              label="Question"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="What do you want people to vote on?"
+            />
+
+            <Stack spacing={1}>
+              {pollOptions.map((option, index) => (
+                <Stack
+                  key={index}
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                >
+                  <TextField
+                    fullWidth
+                    label={`Option ${index + 1}`}
+                    value={option}
+                    onChange={(e) =>
+                      handleOptionChange(index, e.target.value)
+                    }
+                  />
+                  <IconButton
+                    size="small"
+                    color="error"
+                    disabled={pollOptions.length <= 2}
+                    onClick={() => removePollOption(index)}
+                  >
+                    <RemoveRoundedIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              ))}
+
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AddRoundedIcon fontSize="small" />}
+                onClick={addPollOption}
+                sx={{ alignSelf: "flex-start", mt: 0.5 }}
+              >
+                Add option
+              </Button>
+            </Stack>
           </Stack>
         )}
       </DialogContent>
+
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        <Button onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={onSave}
+          disabled={saving || !canSave}
+        >
+          {saving ? "Saving…" : "Save"}
+        </Button>
       </DialogActions>
     </Dialog>
   );
 }
+
 
 function PostDeleteConfirm({ open, postId, communityId, onClose, onDeleted }) {
   const [busy, setBusy] = React.useState(false);
