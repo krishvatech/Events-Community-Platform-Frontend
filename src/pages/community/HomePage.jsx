@@ -619,18 +619,51 @@ function PostCard({ post, avatarUrl, actorName }) {
         )}
 
         {post.type === "poll" && Array.isArray(post.options) && post.options.length > 0 && (
-          <List dense sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-            {post.options.map((opt, idx) => (
+        <List dense sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+          {post.options.map((opt, idx) => {
+            const optionId =
+              typeof opt === "object"
+                ? (opt.id ?? opt.option_id ?? null)
+                : null;
+
+            const optionLabel =
+              typeof opt === "string"
+                ? opt
+                : (opt?.text ?? opt?.label ?? `Option ${idx + 1}`);
+
+            const votes = typeof opt === "object" && typeof opt?.vote_count === "number"
+              ? opt.vote_count
+              : null;
+
+            return (
               <ListItem key={idx} disableGutters sx={{ px: 1 }}>
-                <ListItemAvatar><Avatar sx={{ width: 28, height: 28 }}>{idx + 1}</Avatar></ListItemAvatar>
+                <ListItemAvatar>
+                  <Avatar sx={{ width: 28, height: 28 }}>{idx + 1}</Avatar>
+                </ListItemAvatar>
                 <ListItemText
-                  primary={typeof opt === "string" ? opt : (opt?.text ?? opt?.label ?? `Option ${idx + 1}`)}
-                  secondary={typeof opt === "object" && typeof opt?.vote_count === "number" ? `${opt.vote_count} votes` : null}
+                  primary={optionLabel}
+                  secondary={
+                    votes != null ? (
+                      <Button
+                        size="small"
+                        sx={{ pl: 0 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!optionId) return;
+                          window.__openPollVotes?.(post.id, optionId, optionLabel)?.();
+                        }}
+                      >
+                        {votes} {votes === 1 ? "vote" : "votes"}
+                      </Button>
+                    ) : null
+                  }
                 />
               </ListItem>
-            ))}
-          </List>
-        )}
+            );
+          })}
+        </List>
+      )}
+
       </CardContent>
       <CardActions sx={{ px: 1, py: 0.5, display: 'block' }}>
         {/* Meta strip: avatars + "Name and N others"  |  shares on the right */}
@@ -1121,8 +1154,20 @@ export default function HomePage() {
   const [avatarSaving, setAvatarSaving] = React.useState(false);
   const [sharesOpen, setSharesOpen] = React.useState(false);
   const [sharesPostId, setSharesPostId] = React.useState(null);
+  const [pollVotesOpen, setPollVotesOpen] = React.useState(false);
+  const [pollVotesTarget, setPollVotesTarget] = React.useState(null);
 
-
+  React.useEffect(() => {
+    window.__openPollVotes = (postId, optionId, optionLabel) => () => {
+      setPollVotesTarget({ postId, optionId, optionLabel });
+      setPollVotesOpen(true);
+    };
+    return () => {
+      try {
+        delete window.__openPollVotes;
+      } catch {}
+    };
+  }, []);
   // ---- Expose global functions to open comments/likes dialogs ----
   React.useEffect(() => {
     window.__openComments = (postId) => () => openCommentsFor(postId);
@@ -1759,6 +1804,11 @@ export default function HomePage() {
         postId={sharesPostId}
         onClose={() => setSharesOpen(false)}
       />
+      <PollVotesDialog
+        open={pollVotesOpen}
+        target={pollVotesTarget}
+        onClose={() => setPollVotesOpen(false)}
+      />
 
       <AvatarUploadDialog
         open={avatarDialogOpen}
@@ -1802,6 +1852,179 @@ export default function HomePage() {
         }}
       />
     </Box>
+  );
+}
+
+function PollVotesDialog({ open, target, onClose }) {
+  const [loading, setLoading] = React.useState(false);
+  const [voters, setVoters] = React.useState([]);
+
+  const postId = target?.postId;
+  const optionId = target?.optionId;
+  const optionLabel = target?.optionLabel || "";
+
+  function normalizeUser(u) {
+    if (!u) return { id: null, name: "User", avatar: "" };
+
+    const id =
+      u.id ??
+      u.user_id ??
+      u.owner_id ??
+      null;
+
+    const first =
+      u.first_name ??
+      u.firstName ??
+      u.user_first_name ??
+      u.user__first_name ??
+      "";
+
+    const last =
+      u.last_name ??
+      u.lastName ??
+      u.user_last_name ??
+      u.user__last_name ??
+      "";
+
+    const name =
+      u.name ||
+      `${first} ${last}`.trim() ||
+      u.username ||
+      (id ? `User #${id}` : "User");
+
+    const profile =
+      u.profile ||
+      u.userprofile ||
+      u.user_profile ||
+      {};
+
+    const avatarRaw =
+      profile.user_image_url ||
+      profile.user_image ||
+      u.user_image ||
+      u.user_image_url ||
+      u.avatar ||
+      u.profile_image ||
+      u.photo ||
+      u.image_url ||
+      u.avatar_url ||
+      "";
+
+    return {
+      id,
+      name,
+      avatar: toAbsolute(avatarRaw),
+      headline:
+        u.headline ||
+        u.job_title ||
+        u.title ||
+        u.bio ||
+        u.about ||
+        "",
+    };
+  }
+
+  function normalizeVoteRow(row) {
+    // try to find the user on the row
+    const nested =
+      row?.user ||
+      row?.voter ||
+      row?.owner ||
+      row?.actor ||
+      null;
+
+    if (nested && typeof nested === "object") return normalizeUser(nested);
+
+    // flattened fall-back
+    return normalizeUser({
+      id: row?.user_id ?? row?.voter_id,
+      first_name: row?.user_first_name,
+      last_name: row?.user_last_name,
+      username: row?.user_username,
+      user_image: row?.user_image ?? row?.user_image_url,
+    });
+  }
+
+  async function fetchVoters(feedItemId, optionId) {
+    // feedItemId is not needed anymore, we look up by optionId directly
+    const url = `${API_ROOT}/activity/feed/polls/options/${optionId}/votes/`;
+
+    try {
+      const r = await fetch(url, {
+        headers: { ...authHeader(), accept: "application/json" },
+      });
+      if (!r.ok) {
+        console.error("Failed to load poll voters:", r.status, await r.text());
+        return [];
+      }
+      const data = await r.json();
+
+      const rows = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+        ? data
+        : [];
+
+      return rows.map(normalizeVoteRow); // same normalizeVoteRow you already have
+    } catch (err) {
+      console.error("Error loading poll voters:", err);
+      return [];
+    }
+  }
+
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!open || !postId || !optionId) return;
+      setLoading(true);
+      const list = await fetchVoters(postId, optionId);
+      if (!cancelled) setVoters(list);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, postId, optionId]);
+
+  return (
+    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>
+        {`Votes By`}
+      </DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Typography variant="body2" color="text.secondary">
+            Loading…
+          </Typography>
+        ) : voters.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No votes yet.
+          </Typography>
+        ) : (
+          <List dense>
+            {voters.map((u) => (
+              <ListItem key={u.id || u.name} disableGutters>
+                <ListItemAvatar>
+                  <Avatar src={u.avatar}>
+                    {(u.name || "U").slice(0, 1).toUpperCase()}
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={u.name}
+                  secondary={u.headline || null}
+                  primaryTypographyProps={{ variant: "body2", fontWeight: 600 }}
+                  secondaryTypographyProps={{ variant: "caption" }}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
