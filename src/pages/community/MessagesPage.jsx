@@ -30,6 +30,8 @@ import {
   CircularProgress,
   useTheme,
   useMediaQuery,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import SearchIcon from "@mui/icons-material/Search";
@@ -574,7 +576,7 @@ function ConversationRow({ thread, active, onClick, online }) {
     </ListItem>
   );
 }
-function Bubble({ m, showSender }) {
+function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned }) {
   const mine = Boolean(m.mine);
   const shareAttachment = (m.attachments || []).find(
     (a) => a && a.type === "share"
@@ -596,7 +598,20 @@ function Bubble({ m, showSender }) {
         </Avatar>
       )}
 
-      <Box sx={bubbleSx(mine)}>
+      <Box
+        sx={bubbleSx(mine)}
+        onClick={(e) => {
+          if (onBubbleClick) onBubbleClick(e, m);
+        }}
+        onContextMenu={(e) => {
+          if (onBubbleContextMenu) {
+            e.preventDefault();
+            onBubbleContextMenu(e, m);
+          }
+        }}
+      >
+        
+
         {showSender && (
           <Typography
             variant="caption"
@@ -1014,6 +1029,91 @@ export default function MessagesPage() {
 
   // CENTER: chat
   const [messages, setMessages] = React.useState([]); // API: /conversations/:id/messages/
+  const [pinned, setPinned] = React.useState([]);
+  const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
+  const [menuMessage, setMenuMessage] = React.useState(null);
+  const messageMenuOpen = Boolean(menuAnchorEl);
+  const [pinsExpanded, setPinsExpanded] = React.useState(false);
+
+  const isMessagePinned = React.useCallback(
+    (mid) => {
+      if (!mid) return false;
+      return pinned.some((p) => {
+        const id =
+          p?.message_id ??
+          p?.messageId ??
+          p?.message_pk ??
+          p?.msg_id ??
+          (p?.message && (p.message.id || p.message.pk));
+        return id && String(id) === String(mid);
+      });
+    },
+    [pinned]
+  );
+
+  const pinnedMessages = React.useMemo(() => {
+    if (!Array.isArray(pinned) || pinned.length === 0) return [];
+
+    const byId = new Map(messages.map((m) => [String(m.id), m]));
+    const out = [];
+
+    for (const p of pinned) {
+      const mid =
+        p?.message_id ??
+        p?.messageId ??
+        p?.message_pk ??
+        p?.msg_id ??
+        (p?.message && (p.message.id || p.message.pk));
+
+      if (!mid) continue;
+      const key = String(mid);
+
+      // Try to find the normalized message from `messages`
+      const existing = byId.get(key);
+      if (existing) {
+        out.push(existing);
+        continue;
+      }
+
+      // Fallback: if backend returned a nested `message` object
+      if (p.message) {
+        const m = p.message;
+        const createdIso =
+          m.created_at ?? m.created ?? m.timestamp ?? m.sent_at ?? m.createdOn;
+
+        out.push({
+          id: key,
+          body: m.body ?? m.text ?? m.message ?? "",
+          sender_id:
+            m.sender_id ??
+            m.user_id ??
+            (typeof m.sender === "object" ? m.sender?.id : m.sender) ??
+            (typeof m.user === "object" ? m.user?.id : m.user),
+          sender_name:
+            m.sender_name ?? m.sender_display ?? m.senderUsername ?? "",
+          sender_display:
+            m.sender_display ?? m.sender_name ?? m.senderUsername ?? "",
+          sender_avatar:
+            m.sender_avatar ??
+            (typeof m.sender === "object" ? m.sender?.avatar : undefined) ??
+            "",
+          attachments: Array.isArray(m.attachments) ? m.attachments : [],
+          mine: false,
+          read_by_me: true,
+          created_at: createdIso,
+          _time: createdIso
+            ? new Date(createdIso).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "",
+        });
+      }
+    }
+
+    return out;
+  }, [pinned, messages]);
+
 
   const sections = React.useMemo(() => {
     const out = [];
@@ -1295,6 +1395,48 @@ export default function MessagesPage() {
       ? (activeMessageMode === "admins_only" && !canSendToActiveGroup) // members blocked, admins allowed
       : !canSendToActiveGroup
   );
+
+  React.useEffect(() => {
+  // No conversation → clear pins
+  if (!activeId) {
+    setPinned([]);
+    return;
+  }
+
+  let cancelled = false;
+
+  (async () => {
+    try {
+      const res = await apiFetch(
+        `${MESSAGING}/conversations/${activeId}/pinned-messages/`
+      );
+
+      if (!res.ok) {
+        if (!cancelled) setPinned([]);
+        return;
+      }
+
+      const json = await res.json();
+      const arr = Array.isArray(json?.results)
+        ? json.results
+        : Array.isArray(json)
+        ? json
+        : [];
+
+      if (!cancelled) {
+        setPinned(arr);
+      }
+    } catch (err) {
+      console.error("Failed to fetch pinned messages", err);
+      if (!cancelled) setPinned([]);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [activeId]);
+
   // 🔹 Check if current user can send messages to the ACTIVE group
   // Uses: GET /api/groups/{id}/can-send/ → { ok, reason, message_mode }
 
@@ -1346,6 +1488,9 @@ export default function MessagesPage() {
 
     return () => { cancelled = true; };
   }, [activeId, resolveActiveGroup]);
+
+  
+
 
 
 
@@ -1612,8 +1757,6 @@ export default function MessagesPage() {
     if (!t) return threads;
     return threads.filter((th) => (th.display_title || "").toLowerCase().includes(t));
   }, [q, threads]);
-  const pinned = [];
-  const rest = filtered;
 
   const handleSend = async () => {
     const text = draft.trim();
@@ -1855,6 +1998,136 @@ export default function MessagesPage() {
       </Accordion>
     </Stack>
   );
+
+    const handleOpenMessageMenu = (event, message) => {
+    if (!message) return;
+
+    if (event && event.preventDefault) {
+      event.preventDefault();
+    }
+
+    setMenuAnchorEl(event.currentTarget);
+    setMenuMessage(message);
+  };
+
+  const handleCloseMessageMenu = () => {
+    setMenuAnchorEl(null);
+    setMenuMessage(null);
+  };
+
+
+  const handlePinOrUnpin = async () => {
+    if (!menuMessage || !activeId) {
+      handleCloseMessageMenu();
+      return;
+    }
+
+    const currentlyPinned = isMessagePinned(menuMessage.id);
+
+    const url = currentlyPinned
+      ? `${MESSAGING}/conversations/${activeId}/unpin-message/`
+      : `${MESSAGING}/conversations/${activeId}/pin-message/`;
+
+    // 1. Check if this is a group chat
+    const { id: groupId } = resolveActiveGroup();
+    const isGroupChat = Boolean(groupId);
+
+    // 2. Determine Scope
+    // Default to 'global' for DMs. For groups, check role.
+    let pinScope = 'global';
+
+    if (isGroupChat) {
+      // Find my member object from the topMembers list to check role
+      const meMember = topMembers.find((m) => m.is_you);
+      const myRole = meMember?.role; // e.g., "Host", "Admin", "Moderator", "Member"
+      
+      // Allow global pins only for these roles
+      const canGlobalPin = ["Host", "Owner", "Admin", "Moderator"].includes(myRole);
+      
+      pinScope = canGlobalPin ? 'global' : 'private';
+    }
+
+    try {
+      const res = await apiFetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          message_id: menuMessage.id,
+          scope: pinScope // 👈 Sending the scope to backend
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("Pin/unpin failed", res.status);
+      } else {
+        // Reload pinned list
+        try {
+          const r = await apiFetch(
+            `${MESSAGING}/conversations/${activeId}/pinned-messages/`
+          );
+          if (r.ok) {
+            const json = await r.json();
+            const arr = Array.isArray(json?.results)
+              ? json.results
+              : Array.isArray(json)
+              ? json
+              : [];
+            setPinned(arr);
+          }
+        } catch (e) {
+          console.error("Failed to refresh pinned after toggle", e);
+        }
+      }
+    } catch (err) {
+      console.error("Pin/unpin error", err);
+    } finally {
+      handleCloseMessageMenu();
+    }
+  };
+  const handleDeleteMessage = async () => {
+  if (!menuMessage || !activeId) {
+    handleCloseMessageMenu();
+    return;
+  }
+
+  try {
+    const res = await apiFetch(
+      `${MESSAGING}/conversations/${activeId}/${menuMessage.id}/`,
+      { method: "DELETE" }
+    );
+
+    if (!res.ok && res.status !== 204) {
+      console.error("Delete message failed", res.status);
+    } else {
+      // Remove from local messages
+      setMessages((curr) => curr.filter((m) => m.id !== menuMessage.id));
+
+      // Also refresh pinned (in case this message was pinned)
+      try {
+        const r = await apiFetch(
+          `${MESSAGING}/conversations/${activeId}/pinned-messages/`
+        );
+        if (r.ok) {
+          const json = await r.json();
+          const arr = Array.isArray(json?.results)
+            ? json.results
+            : Array.isArray(json)
+            ? json
+            : [];
+          setPinned(arr);
+        }
+      } catch (e) {
+        console.error("Failed to refresh pinned after delete", e);
+      }
+    }
+  } catch (err) {
+    console.error("Delete message error", err);
+  } finally {
+    handleCloseMessageMenu();
+  }
+};
+
+
 
   return (
     <>
@@ -2108,6 +2381,124 @@ export default function MessagesPage() {
                   "&::-webkit-scrollbar": { display: "none" },
                 }}
               >
+                {pinnedMessages.length > 0 && (
+                  <Box
+                    sx={{
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 2, 
+                      mb: 1,
+                      px: 1,
+                      py: 0.75,
+                      borderRadius: 2,
+                      bgcolor: "#f8fafc",
+                      border: `1px solid ${BORDER}`,
+                      boxShadow: pinnedMessages.length > 1 ? "0 2px 4px rgba(0,0,0,0.03)" : "none",
+                    }}
+                  >
+                    {/* Header Row: Always visible */}
+                    <Stack 
+                      direction="row" 
+                      alignItems="center" 
+                      justifyContent="space-between"
+                      onClick={() => {
+                        if (pinnedMessages.length > 1) setPinsExpanded(!pinsExpanded);
+                      }}
+                      sx={{ 
+                        cursor: pinnedMessages.length > 1 ? "pointer" : "default",
+                        userSelect: "none"
+                      }}
+                    >
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ overflow: "hidden", flex: 1 }}>
+                        <Typography variant="caption" sx={{ fontSize: 13 }}>📌</Typography>
+                        <Typography
+                            variant="body2"
+                            sx={{
+                              fontSize: 13,
+                              fontWeight: pinsExpanded ? 700 : 500,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              color: "text.primary"
+                            }}
+                        >
+                          {pinsExpanded 
+                            ? "Pinned messages" 
+                            : pinnedMessages[pinnedMessages.length - 1].body}
+                        </Typography>
+                      </Stack>
+
+                      {pinnedMessages.length > 1 && (
+                        <Stack direction="row" alignItems="center" spacing={1} sx={{ pl: 1 }}>
+                          {!pinsExpanded && (
+                            <Chip 
+                              label={`+${pinnedMessages.length - 1}`} 
+                              size="small" 
+                              sx={{ 
+                                height: 20, 
+                                fontSize: 10, 
+                                fontWeight: 700, 
+                                bgcolor: "primary.main", 
+                                color: "#fff" 
+                              }} 
+                            />
+                          )}
+                          <ExpandMoreIcon 
+                            fontSize="small" 
+                            sx={{ 
+                              transform: pinsExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                              transition: "transform 0.2s"
+                            }} 
+                          />
+                        </Stack>
+                      )}
+                    </Stack>
+
+                    {/* Expanded List */}
+                    {pinsExpanded && (
+                      <Stack spacing={0.5} sx={{ mt: 1 }}>
+                        {pinnedMessages.map((m) => (
+                          <Stack
+                            key={`pinned-${m.id}`}
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            sx={{
+                              cursor: "pointer",
+                              borderRadius: 1,
+                              p: 0.5,
+                              "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation(); 
+                              const el = document.querySelector(`[data-mid="${m.id}"]`);
+                              if (el) {
+                                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                              }
+                            }}
+                          >
+                            <Box sx={{ width: 24, display: 'flex', justifyContent: 'center' }}>
+                                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'text.secondary' }} />
+                            </Box>
+                            
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontSize: 13,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                flex: 1
+                              }}
+                            >
+                              {m.body}
+                            </Typography>
+                          </Stack>
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
+                )}
                 {sections.map((sec) => (
                   <React.Fragment key={sec.label}>
                     <Stack alignItems="center" sx={{ my: 0.8 }}>
@@ -2121,9 +2512,13 @@ export default function MessagesPage() {
                           key={m.id}
                           m={m}
                           showSender={active && !isDmThread(active) && firstOfBlock}
+                          isPinned={isMessagePinned(m.id)}
+                          onBubbleClick={handleOpenMessageMenu}
+                          onBubbleContextMenu={handleOpenMessageMenu}
                         />
                       );
                     })}
+
                   </React.Fragment>
                 ))}
               </Box>
@@ -2236,6 +2631,23 @@ export default function MessagesPage() {
           {renderDetailsContent()}
         </DialogContent>
       </Dialog>
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={messageMenuOpen && !!menuMessage}
+        onClose={handleCloseMessageMenu}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        {menuMessage && (
+          <MenuItem onClick={handlePinOrUnpin}>
+            {isMessagePinned(menuMessage.id) ? "Unpin" : "Pin"}
+          </MenuItem>
+        )}
+
+        {menuMessage && (
+          <MenuItem onClick={handleDeleteMessage}>Delete</MenuItem>
+        )}
+      </Menu>
     </>
   );
 }
