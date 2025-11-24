@@ -1640,10 +1640,17 @@ export default function MessagesPage() {
       }
 
 
-      // scroll to bottom (keep your code)
+      // scroll to bottom ONLY if user is already near the bottom
       requestAnimationFrame(() => {
         const el = document.getElementById("chat-scroll");
-        if (el) el.scrollTop = el.scrollHeight;
+        if (!el) return;
+
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        const isNearBottom = distanceFromBottom < 80; // tweak threshold if needed
+
+        if (isNearBottom) {
+          el.scrollTop = el.scrollHeight;
+        }
       });
 
       // mark inbound bubbles as read once ~60% visible
@@ -1668,12 +1675,18 @@ export default function MessagesPage() {
         container.querySelectorAll("[data-mid]").forEach((n) => io.observe(n));
       });
 
-      // scroll to bottom
+      // scroll to bottom ONLY if user is already near the bottom
       requestAnimationFrame(() => {
         const el = document.getElementById("chat-scroll");
-        if (el) el.scrollTop = el.scrollHeight;
-      });
+        if (!el) return;
 
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        const isNearBottom = distanceFromBottom < 80;
+
+        if (isNearBottom) {
+          el.scrollTop = el.scrollHeight;
+        }
+      });
       // Important: immediately mark-all-read for visible conversation
       markAllReadDebounced();
     } catch (e) {
