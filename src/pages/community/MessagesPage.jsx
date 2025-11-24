@@ -2091,29 +2091,27 @@ export default function MessagesPage() {
   }
 
   try {
+    // 🔴 OLD (Caused 404): `${MESSAGING}/conversations/${activeId}/${menuMessage.id}/`
+    // 🟢 NEW (Correct): Added "/messages/"
     const res = await apiFetch(
-      `${MESSAGING}/conversations/${activeId}/${menuMessage.id}/`,
+      `${MESSAGING}/conversations/${activeId}/messages/${menuMessage.id}/`,
       { method: "DELETE" }
     );
 
     if (!res.ok && res.status !== 204) {
       console.error("Delete message failed", res.status);
     } else {
-      // Remove from local messages
+      // Remove from UI immediately
       setMessages((curr) => curr.filter((m) => m.id !== menuMessage.id));
 
-      // Also refresh pinned (in case this message was pinned)
+      // Refresh pinned messages in case the deleted one was pinned
       try {
         const r = await apiFetch(
           `${MESSAGING}/conversations/${activeId}/pinned-messages/`
         );
         if (r.ok) {
           const json = await r.json();
-          const arr = Array.isArray(json?.results)
-            ? json.results
-            : Array.isArray(json)
-            ? json
-            : [];
+          const arr = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
           setPinned(arr);
         }
       } catch (e) {
@@ -2644,7 +2642,7 @@ export default function MessagesPage() {
           </MenuItem>
         )}
 
-        {menuMessage && (
+        {menuMessage && menuMessage.mine && (
           <MenuItem onClick={handleDeleteMessage}>Delete</MenuItem>
         )}
       </Menu>
