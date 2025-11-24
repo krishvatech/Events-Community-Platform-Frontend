@@ -54,6 +54,9 @@ import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
+import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRounded";
 import { useNavigate } from "react-router-dom";
 
 
@@ -192,6 +195,8 @@ const ENDPOINTS = {
 
   // Messages
   messageRead: (mid) => `${MESSAGING}/messages/${mid}/read/`,
+  downloadAttachment: (cid, mid, index) =>
+    `${MESSAGING}/conversations/${cid}/messages/${mid}/download-attachment/?index=${index}`,
 };
 
 const emitUnreadMessages = (count) => {
@@ -272,6 +277,37 @@ async function markMessageRead(messageId) {
     if (!res.ok) throw new Error("mark read failed");
   } catch (e) {
     console.warn("markMessageRead:", e?.message || e);
+  }
+}
+
+async function downloadAttachmentFromApi(conversationId, messageId, index, filename) {
+  if (!conversationId || !messageId) return;
+
+  try {
+    const res = await apiFetch(
+      ENDPOINTS.downloadAttachment(conversationId, messageId, index),
+      {
+        // For binary file, accept anything
+        headers: { Accept: "*/*" },
+      }
+    );
+
+    if (!res.ok) {
+      console.error("Attachment download failed", res.status);
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename || "download";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error("Download error", e);
   }
 }
 
@@ -578,18 +614,55 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
     </ListItem>
   );
 }
-function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned }) {
+function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, conversationId }) {
   const mine = Boolean(m.mine);
-  const shareAttachment = (m.attachments || []).find(
-    (a) => a && a.type === "share"
-  );
+  
+  const attachments = m.attachments || [];
+  const shareAttachment = attachments.find((a) => a && a.type === "share");
+  const standardAttachments = attachments.filter((a) => a && a.type !== "share");
+  
+  // Check if we need to hide the main timestamp (because we overlay it on the image)
+  const hasFullWidthAttachmentNoText =
+    standardAttachments.some((a) => {
+      const url = a.url || "";
+      const type = (a.type || "").toLowerCase();
+      const isImage = type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+      const isVideo = type.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(url);
+      const isPdf   = type === "application/pdf" || url.toLowerCase().endsWith(".pdf");
+      return isImage || isVideo || isPdf;
+    }) && !m.body;
+
+  const hasOnlyPdfAttachmentNoText =
+    standardAttachments.length === 1 &&
+    !m.body &&
+    (() => {
+      const a = standardAttachments[0];
+      if (!a) return false;
+      const url = a.url || "";
+      const type = (a.type || "").toLowerCase();
+      const isPdf =
+        type === "application/pdf" || url.toLowerCase().endsWith(".pdf");
+      return isPdf;
+    })();
+
+
+  const formatSize = (bytes) => {
+    if (!bytes) return "";
+    const k = bytes / 1024;
+    return k < 1024 ? `${k.toFixed(1)} KB` : `${(k / 1024).toFixed(1)} MB`;
+  };
+
+  const handleDownloadClick = (idx, filename) => {
+    if (!conversationId) return;
+    downloadAttachmentFromApi(conversationId, m.id, idx, filename);
+  };
 
   return (
     <Stack
       direction="row"
       justifyContent={mine ? "flex-end" : "flex-start"}
       alignItems="flex-end"
-      sx={{ my: 0.75, width: "100%" }}   // <-- ensure the row spans full width
+      sx={{ my: 0.75, width: "100%" }}
       data-mid={m.id}
       data-mine={mine ? "1" : "0"}
       data-readbyme={m.read_by_me ? "1" : "0"}
@@ -601,7 +674,21 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned })
       )}
 
       <Box
-        sx={bubbleSx(mine)}
+        sx={[
+          bubbleSx(mine),
+          hasFullWidthAttachmentNoText && {
+            p: 0,
+            paddingRight: 0,
+            paddingBottom: 0, // no extra space for time
+          },
+          hasOnlyPdfAttachmentNoText && {
+            // hide outer grey bubble for “PDF only” messages
+            bgcolor: "transparent",
+            border: "none",
+            boxShadow: "none",
+            "&:after": { display: "none" },
+          },
+        ]}
         onClick={(e) => {
           if (onBubbleClick) onBubbleClick(e, m);
         }}
@@ -612,8 +699,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned })
           }
         }}
       >
-        
-
+        {/* Sender Name */}
         {showSender && (
           <Typography
             variant="caption"
@@ -622,14 +708,175 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned })
               lineHeight: 1.2,
               fontWeight: 700,
               display: "block",
-              mb: 0.25,
+              mb: 0.5,
               opacity: 0.9,
+              color: mine ? "inherit" : "primary.main"
             }}
           >
             {mine ? "You" : (m.sender_display || m.sender_name)}
           </Typography>
         )}
 
+        {/* 🔹 ATTACHMENTS */}
+        {standardAttachments.length > 0 && (
+          <Stack spacing={0.5} sx={{ mb: m.body ? 0.5 : -0.5 }}>
+            {standardAttachments.map((att, index) => {
+              const realIndex = m.attachments.indexOf(att);
+              const url = att.url || "";
+              const type = (att.type || "").toLowerCase();
+              const name = att.name || "Unknown File";
+              const fullWidthSx = !m.body
+                ? {
+                    // pure attachment message → fill entire bubble
+                    width: "100%",
+                    maxWidth: "100%",
+                    borderRadius: "inherit",
+                    overflow: "hidden",
+                  }
+                : {
+                    // attachment + text → stay inside normal padding
+                    width: "100%",
+                    maxWidth: "100%",
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    mt: 0.5,
+                  };
+              
+              const isImage = type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+              const isVideo = type.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(url);
+              const isPdf = type === "application/pdf" || url.toLowerCase().endsWith(".pdf");
+
+              // 🟢 1. IMAGE DISPLAY (Flush with edges + Time Overlay)
+              if (isImage) {
+                return (
+                  <Box
+                    key={index}
+                    onClick={() => window.open(url, "_blank")}
+                    sx={{
+                      ...fullWidthSx,
+                      height: 250,
+                      cursor: "pointer",
+                      display: "flex",
+                      position: "relative",
+                      bgcolor: "rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    <img 
+                      src={url} 
+                      alt={name} 
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                    />
+
+                    {/* 🔹 WhatsApp Style Time Overlay (Only if no text) */}
+                    {!m.body && (
+                       <Box
+                         sx={{
+                           position: "absolute",
+                           bottom: 0,
+                           left: 0,
+                           width: "100%",
+                           height: 40,
+                           background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)",
+                           display: "flex",
+                           alignItems: "flex-end",
+                           justifyContent: "flex-end",
+                           p: 1
+                         }}
+                       >
+                         <Typography variant="caption" sx={{ color: "white", fontSize: 11, fontWeight: 500 }}>
+                           {m._time}
+                         </Typography>
+                       </Box>
+                    )}
+                  </Box>
+                );
+              }
+
+              // 🟢 2. VIDEO DISPLAY
+             if (isVideo) {
+                return (
+                  <Box
+                    key={index}
+                    sx={{
+                      ...fullWidthSx,
+                      height: 260,
+                      bgcolor: "rgba(0,0,0,0.05)",
+                      display: "flex",
+                    }}
+                  >
+                    <video
+                      src={url}
+                      controls
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  </Box>
+                );
+              }
+
+              // 🟢 3. PDF
+              if (isPdf) {
+                return (
+                  <Box 
+                    key={index}
+                    onClick={() => handleDownloadClick(index, name)}
+                    sx={{
+                      width: 240, 
+                      maxWidth: "100%",
+                      borderRadius: 2,
+                      overflow: "hidden",
+                      bgcolor: mine ? "rgba(0,0,0,0.05)" : "#f0f2f5",
+                      cursor: "pointer",
+                      mb: 0.5,
+                      border: "1px solid rgba(0,0,0,0.08)"
+                    }}
+                  >
+                    <Box sx={{ height: 120, bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+                      <PictureAsPdfRoundedIcon sx={{ fontSize: 50, color: "#e0e0e0" }} />
+                    </Box>
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5 }}>
+                      <PictureAsPdfRoundedIcon sx={{ color: "#d32f2f", fontSize: 28 }} />
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
+                        <Typography variant="caption" color="text.secondary">{formatSize(att.size)} • PDF</Typography>
+                      </Box>
+                      <FileDownloadOutlinedIcon
+                        fontSize="small"
+                        sx={{ color: "text.secondary" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadClick(index, name);
+                        }}
+                      />
+                    </Stack>
+                  </Box>
+                );
+              }
+
+              // 🟢 4. GENERIC FILE
+              return (
+                <Stack 
+                  key={index}
+                  direction="row" 
+                  alignItems="center" 
+                  spacing={1.5}
+                  onClick={() => window.open(url, "_blank")}
+                  sx={{ 
+                    p: 1.5, borderRadius: 2, bgcolor: "rgba(0,0,0,0.06)", cursor: "pointer", mb: 0.5
+                  }}
+                >
+                  <InsertDriveFileRoundedIcon sx={{ color: "#54656f", fontSize: 28 }} />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.7 }}>{formatSize(att.size)} • {type.split('/').pop().toUpperCase()}</Typography>
+                  </Box>
+                  <FileDownloadOutlinedIcon sx={{ opacity: 0.6 }} />
+                </Stack>
+              );
+            })}
+          </Stack>
+        )}
+
+        {/* Text Body */}
         {m.body && (
           <Typography
             variant="body2"
@@ -637,31 +884,36 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned })
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
               overflowWrap: "anywhere",
+              mt: standardAttachments.length > 0 ? 0.5 : 0
             }}
           >
             {m.body}
           </Typography>
         )}
 
-        {/* 🔹 LinkedIn-style shared post preview (ONLY for shared messages) */}
+        {/* Shared Post Preview */}
         {shareAttachment && (
           <SharePreview attachment={shareAttachment} mine={mine} />
         )}
 
-        <Typography
-          className="bubble-time"
-          variant="caption"
-          sx={{
-            position: "absolute",
-            right: 8,
-            bottom: 4,
-            fontSize: 11,
-            lineHeight: 1,
-            opacity: 0.75,
-          }}
-        >
-          {m._time}
-        </Typography>
+        {/* 🔹 Main Timestamp (Hide if we already showed it inside the image) */}
+        {!hasFullWidthAttachmentNoText && (
+          <Typography
+            className="bubble-time"
+            variant="caption"
+            sx={{
+              float: "right",
+              ml: 1,
+              mt: 0.5,
+              fontSize: 10,
+              opacity: 0.75,
+              display: "inline-block",
+              verticalAlign: "bottom"
+            }}
+          >
+            {m._time}
+          </Typography>
+        )}
       </Box>
     </Stack>
   );
@@ -1009,6 +1261,57 @@ function NewChatDialog({ open, onClose, onOpened }) {
   );
 }
 
+// 🔹 Helper to resize images
+const resizeImage = (file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) => {
+  return new Promise((resolve) => {
+    // If not an image, return original file
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        // Calculate new dimensions maintaining aspect ratio
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert back to file
+        ctx.canvas.toBlob((blob) => {
+          const newFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+          resolve(newFile);
+        }, 'image/jpeg', quality);
+      };
+    };
+    reader.onerror = () => resolve(file);
+  });
+};
+
 /** ---------- PAGE ---------- */
 export default function MessagesPage() {
   const navigate = useNavigate();
@@ -1073,12 +1376,18 @@ export default function MessagesPage() {
   };
 
   // 🔹 Handle actual file selection (Placeholder logic)
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
     const files = event.target.files;
     if (files && files.length > 0) {
-      // Append new files to existing ones (or replace, depending on preference. Here we append)
-      setDraftAttachments(prev => [...prev, ...Array.from(files)]);
-      setActivePreviewIndex(0); // Reset to first image
+      const fileArray = Array.from(files);
+      
+      // Resize all selected images before adding to state
+      const processedFiles = await Promise.all(
+        fileArray.map(f => resizeImage(f)) 
+      );
+
+      setDraftAttachments(prev => [...prev, ...processedFiles]);
+      setActivePreviewIndex(0); 
     }
     event.target.value = ""; 
   };
@@ -1573,19 +1882,41 @@ const handleTogglePinConversation = async () => {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    
+    // Resize Logic
+    const MAX_WIDTH = 1280;
+    const MAX_HEIGHT = 1280;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
+
+    // Calculate aspect ratio
+    if (width > height) {
+      if (width > MAX_WIDTH) {
+        height = Math.round((height * MAX_WIDTH) / width);
+        width = MAX_WIDTH;
+      }
+    } else {
+      if (height > MAX_HEIGHT) {
+        width = Math.round((width * MAX_HEIGHT) / height);
+        height = MAX_HEIGHT;
+      }
+    }
+
+    // Set canvas to new small size
+    canvas.width = width;
+    canvas.height = height;
     
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Draw image scaled down
+    ctx.drawImage(video, 0, 0, width, height);
 
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
       
-      setDraftAttachments([file]); // Store photo in state
-      setCameraOpen(false);        // Close camera modal
-    }, "image/jpeg");
+      setDraftAttachments([file]); 
+      setCameraOpen(false);        
+    }, "image/jpeg", 0.8); // 0.8 quality (80%)
   };
 
   // 🔹 NEW: Clear attachments
@@ -1981,10 +2312,20 @@ const handleTogglePinConversation = async () => {
     try {
       // Note: You need to implement actual file upload logic here (e.g. using FormData)
       // For now, this sends the text and an empty attachment array to the backend
+      const formData = new FormData();
+      formData.append("body", text);
+      
+      // Append each file. Key must be 'attachments' to match Django logic
+      draftAttachments.forEach((file) => {
+        formData.append("attachments", file);
+      });
+
+      // 4. API Call 
+      // IMPORTANT: Remove 'Content-Type' header so browser sets multipart boundary
       const res = await apiFetch(ENDPOINTS.conversationMessages(activeId), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: text, attachments: [] }), 
+        headers: {}, 
+        body: formData, 
       });
 
       const saved = await res.json();
@@ -2004,15 +2345,28 @@ const handleTogglePinConversation = async () => {
         )
       );
 
+      const hasAttachments = filesToSend.length > 0;
+      const previewText = saved.body 
+        ? saved.body 
+        : (hasAttachments 
+            ? (filesToSend[0].type?.startsWith("image/") ? "📷 Photo" : "📎 Sent an attachment") 
+            : "Sent a message");
+
       setThreads((cur) =>
         cur
           .map((t) =>
             t.id === activeId
               ? {
                 ...t,
-                last_message: saved.body || (filesToSend.length ? "Sent an attachment" : ""),
+                // 🔹 UPDATE ALL FIELDS so the UI doesn't use old cached text
+                last_message: previewText,
+                last_message_text: previewText, 
+                last_text: previewText,
+
+                // Update timestamps
                 last_message_created_at: saved.created_at || new Date().toISOString(),
                 _last_ts: saved.created_at || new Date().toISOString(),
+                updated_at: saved.created_at || new Date().toISOString(), // Move to top
                 unread_count: 0,
               }
               : t
@@ -2888,9 +3242,11 @@ const handleTogglePinConversation = async () => {
                           m={m}
                           showSender={active && !isDmThread(active) && firstOfBlock}
                           isPinned={isMessagePinned(m.id)}
+                          conversationId={activeId}
                           onBubbleClick={handleOpenMessageMenu}
                           onBubbleContextMenu={handleOpenMessageMenu}
                         />
+
                       );
                     })}
 
