@@ -48,6 +48,8 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import VideoFileOutlinedIcon from "@mui/icons-material/VideoFileOutlined";
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
+import PushPinIcon from "@mui/icons-material/PushPin";
+import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import { useNavigate } from "react-router-dom";
 
 
@@ -489,7 +491,7 @@ const getDmPartnerId = (thread, me, rosterMap) => {
   return null;
 };
 
-function ConversationRow({ thread, active, onClick, online }) {
+function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
   const unread = thread.unread_count || 0;
   const timeISO = thread._last_ts || getLastTimeISO(thread);
   const time = formatHHMM(timeISO);
@@ -503,11 +505,13 @@ function ConversationRow({ thread, active, onClick, online }) {
     <ListItem
       disableGutters
       onClick={onClick}
+      onContextMenu={onContextMenu} // <--- Handle Right Click
       sx={{
         px: 1,
         py: 1,
         borderRadius: 2,
         cursor: "pointer",
+        bgcolor: thread.is_pinned ? "#f8fafc" : "transparent", // Slight background for pinned
         ...(active
           ? { bgcolor: "#f6fffe", border: `1px solid ${BORDER}` }
           : { "&:hover": { bgcolor: "#fafafa" } }),
@@ -526,19 +530,11 @@ function ConversationRow({ thread, active, onClick, online }) {
           >
             {(title || "C").slice(0, 1)}
           </Avatar>
-
-          {/* 🟢 online dot like 3rd screenshot */}
           {online && (
             <Box
               sx={{
-                position: "absolute",
-                left: 2,
-                top: 2,
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                bgcolor: "success.main",
-                border: "2px solid #fff",
+                position: "absolute", left: 2, top: 2, width: 10, height: 10,
+                borderRadius: "50%", bgcolor: "success.main", border: "2px solid #fff",
               }}
             />
           )}
@@ -552,9 +548,13 @@ function ConversationRow({ thread, active, onClick, online }) {
             <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
               {title}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={CAPTION_SX}>
-              {time}
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+               {/* Show Pin Icon if pinned */}
+               {thread.is_pinned && <PushPinIcon sx={{ fontSize: 14, color: "text.secondary", transform: "rotate(45deg)" }} />}
+               <Typography variant="caption" color="text.secondary" sx={CAPTION_SX}>
+                {time}
+              </Typography>
+            </Stack>
           </Stack>
         }
         secondary={
@@ -564,9 +564,7 @@ function ConversationRow({ thread, active, onClick, online }) {
             </Typography>
             {unread > 0 && (
               <Chip
-                size="small"
-                label={String(unread)}
-                color="primary"
+                size="small" label={String(unread)} color="primary"
                 sx={{ height: 18, minHeight: 18 }}
               />
             )}
@@ -1034,6 +1032,56 @@ export default function MessagesPage() {
   const [menuMessage, setMenuMessage] = React.useState(null);
   const messageMenuOpen = Boolean(menuAnchorEl);
   const [pinsExpanded, setPinsExpanded] = React.useState(false);
+  const [convMenuAnchor, setConvMenuAnchor] = React.useState(null);
+  const [convMenuTarget, setConvMenuTarget] = React.useState(null);
+
+  // 1. Handle opening the context menu
+const handleConvContextMenu = (e, thread) => {
+  e.preventDefault();
+  setConvMenuTarget(thread);
+  setConvMenuAnchor(e.currentTarget); // Or e.clientX/Y for precise position
+};
+
+const handleCloseConvMenu = () => {
+  setConvMenuAnchor(null);
+  setConvMenuTarget(null);
+};
+
+// 2. Handle the Pin API Call
+const handleTogglePinConversation = async () => {
+  if (!convMenuTarget) return;
+  const targetId = convMenuTarget.id;
+  handleCloseConvMenu();
+
+  try {
+    const res = await apiFetch(`${MESSAGING}/conversations/${targetId}/toggle-pin/`, {
+      method: "POST"
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      const isNowPinned = data.is_pinned;
+
+      // Update local state immediately without full reload
+      setThreads(prev => {
+        const updated = prev.map(t => 
+          t.id === targetId ? { ...t, is_pinned: isNowPinned } : t
+        );
+        
+        // RE-SORT: Pinned first, then Newest Timestamp
+        return updated.sort((a, b) => {
+          const pinA = Boolean(a.is_pinned);
+          const pinB = Boolean(b.is_pinned);
+          if (pinA !== pinB) return pinA ? -1 : 1;
+
+          return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
+        });
+      });
+    }
+  } catch (e) {
+    console.error("Failed to toggle pin", e);
+  }
+};
 
   const isMessagePinned = React.useCallback(
     (mid) => {
@@ -1325,11 +1373,15 @@ export default function MessagesPage() {
                 _last_ts: best || serverTs || t.updated_at || t.created_at,
               };
             })
-            .sort(
-              (a, b) =>
-                new Date(b._last_ts || 0).getTime() -
-                new Date(a._last_ts || 0).getTime()
-            );
+            .sort((a, b) => {
+              // 1. Priority: Pinned status (True comes first)
+              const pinA = Boolean(a.is_pinned);
+              const pinB = Boolean(b.is_pinned);
+              if (pinA !== pinB) return pinA ? -1 : 1;
+
+              // 2. Priority: Time (Newest first)
+              return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
+            });
 
           if (!activeId && normalized.length) setActiveId(normalized[0].id);
           return normalized;
@@ -1632,10 +1684,16 @@ export default function MessagesPage() {
                 last_message_created_at: better || t.last_message_created_at,
               };
             })
-            .sort(
-              (a, b) =>
-                new Date(b._last_ts || 0).getTime() - new Date(a._last_ts || 0).getTime()
-            )
+            .sort((a, b) => {
+              const pinA = Boolean(a.is_pinned);
+              const pinB = Boolean(b.is_pinned);
+              
+              // 1. Pinned items go to top
+              if (pinA !== pinB) return pinA ? -1 : 1;
+
+              // 2. Then sort by time
+              return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
+            })
         );
       }
 
@@ -1839,7 +1897,13 @@ export default function MessagesPage() {
               }
               : t
           )
-          .sort((a, b) => new Date(b._last_ts || 0) - new Date(a._last_ts || 0))
+          .sort((a, b) => {
+             const pinA = Boolean(a.is_pinned);
+             const pinB = Boolean(b.is_pinned);
+             if (pinA !== pinB) return pinA ? -1 : 1;
+
+             return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
+          })
       );
 
     } catch (e) {
@@ -2244,6 +2308,7 @@ export default function MessagesPage() {
                         setMobileView("chat");
                       }
                     }}
+                    onContextMenu={(e) => handleConvContextMenu(e, t)}
                   />
                 );
               })}
@@ -2658,6 +2723,17 @@ export default function MessagesPage() {
         {menuMessage && menuMessage.mine && (
           <MenuItem onClick={handleDeleteMessage}>Delete</MenuItem>
         )}
+      </Menu>
+      <Menu
+        anchorEl={convMenuAnchor}
+        open={Boolean(convMenuAnchor)}
+        onClose={handleCloseConvMenu}
+        anchorOrigin={{ vertical: "center", horizontal: "center" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+      >
+        <MenuItem onClick={handleTogglePinConversation}>
+          {convMenuTarget?.is_pinned ? "Unpin Chat" : "Pin Chat"}
+        </MenuItem>
       </Menu>
     </>
   );
