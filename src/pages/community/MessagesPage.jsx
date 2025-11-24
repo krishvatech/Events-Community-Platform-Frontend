@@ -12,6 +12,7 @@ import {
   InputAdornment,
   List,
   ListItem,
+  ListItemIcon,
   ListItemAvatar,
   ListItemText,
   Paper,
@@ -50,6 +51,9 @@ import VideoFileOutlinedIcon from "@mui/icons-material/VideoFileOutlined";
 import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
 import { useNavigate } from "react-router-dom";
 
 
@@ -1025,6 +1029,11 @@ export default function MessagesPage() {
   const [activeId, setActiveId] = React.useState(null);
   const [newOpen, setNewOpen] = React.useState(false);
 
+  const [cameraOpen, setCameraOpen] = React.useState(false);
+  const [cameraStream, setCameraStream] = React.useState(null);
+  const videoRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+
   // CENTER: chat
   const [messages, setMessages] = React.useState([]); // API: /conversations/:id/messages/
   const [pinned, setPinned] = React.useState([]);
@@ -1034,6 +1043,45 @@ export default function MessagesPage() {
   const [pinsExpanded, setPinsExpanded] = React.useState(false);
   const [convMenuAnchor, setConvMenuAnchor] = React.useState(null);
   const [convMenuTarget, setConvMenuTarget] = React.useState(null);
+  // 🔹 Attachment Menu State
+  const [attachMenuAnchor, setAttachMenuAnchor] = React.useState(null);
+  const isAttachMenuOpen = Boolean(attachMenuAnchor);
+  
+  // 🔹 Hidden Input Refs
+  const fileInputRef = React.useRef(null);
+  const cameraInputRef = React.useRef(null);
+
+  // 🔹 Handlers
+  const handleAttachClick = (event) => {
+    setAttachMenuAnchor(event.currentTarget);
+  };
+
+  const handleAttachClose = () => {
+    setAttachMenuAnchor(null);
+  };
+
+  const handleTriggerFileUpload = () => {
+    handleAttachClose();
+    if (fileInputRef.current) fileInputRef.current.click();
+  };
+
+  const handleTriggerCamera = () => {
+    handleAttachClose();
+    // On mobile, you might still want the native input (optional), 
+    // but for consistency let's use the modal or check strictly for desktop.
+    setCameraOpen(true); 
+  };
+
+  // 🔹 Handle actual file selection (Placeholder logic)
+  const handleFileChange = (event) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      // Append new files to existing ones (or replace, depending on preference. Here we append)
+      setDraftAttachments(prev => [...prev, ...Array.from(files)]);
+      setActivePreviewIndex(0); // Reset to first image
+    }
+    event.target.value = ""; 
+  };
 
   // 1. Handle opening the context menu
 const handleConvContextMenu = (e, thread) => {
@@ -1197,6 +1245,9 @@ const handleTogglePinConversation = async () => {
   }, [messages]);
 
   const [draft, setDraft] = React.useState("");
+  const [draftAttachments, setDraftAttachments] = React.useState([]);
+
+  const [activePreviewIndex, setActivePreviewIndex] = React.useState(0);
 
   // attachments summary
   const attachmentSummary = React.useMemo(() => {
@@ -1491,6 +1542,62 @@ const handleTogglePinConversation = async () => {
 
   // 🔹 Check if current user can send messages to the ACTIVE group
   // Uses: GET /api/groups/{id}/can-send/ → { ok, reason, message_mode }
+
+  // Start Camera when modal opens
+  React.useEffect(() => {
+    if (cameraOpen) {
+      (async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setCameraStream(stream);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (err) {
+          console.error("Camera access denied:", err);
+          alert("Could not access camera. Please allow permissions.");
+          setCameraOpen(false);
+        }
+      })();
+    } else {
+      // Stop Camera when modal closes
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+        setCameraStream(null);
+      }
+    }
+  }, [cameraOpen]);
+
+  const handleCapturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+      
+      setDraftAttachments([file]); // Store photo in state
+      setCameraOpen(false);        // Close camera modal
+    }, "image/jpeg");
+  };
+
+  // 🔹 NEW: Clear attachments
+  const handleClearAttachments = () => {
+    setDraftAttachments([]);
+    setDraft(""); 
+    setActivePreviewIndex(0); // Reset
+  };
+
+  const handleCloseCamera = () => {
+    setCameraOpen(false);
+  };
 
   React.useEffect(() => {
     loadRoster();
@@ -1831,15 +1938,14 @@ const handleTogglePinConversation = async () => {
 
   const handleSend = async () => {
     const text = draft.trim();
-    if (!text || !activeId) return;
+    
+    // 1. Check if there is text OR an attachment
+    if ((!text && draftAttachments.length === 0) || !activeId) return;
 
-    // WhatsApp-style: if this is a group AND backend says "admins only",
-    // non-admin members should NOT be able to send messages.
     if (groupReadOnly) {
       console.warn("Sending disabled: only admins can send messages in this group.");
       return;
     }
-
 
     const now = new Date();
     const nowStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -1853,20 +1959,34 @@ const handleTogglePinConversation = async () => {
       sender_display: "You",
       created_at: now.toISOString(),
       _time: nowStr,
+      // 2. Add attachments to local message for immediate display
+      attachments: draftAttachments.map(file => ({
+        url: URL.createObjectURL(file),
+        type: file.type
+      }))
     };
+
     setMessages((cur) => [...cur, localMsg]);
+    
+    // 3. Clear inputs immediately (this closes the Preview Overlay)
+    const filesToSend = [...draftAttachments]; 
     setDraft("");
+    setDraftAttachments([]); 
+
     requestAnimationFrame(() => {
       const el = document.getElementById("chat-scroll");
       if (el) el.scrollTop = el.scrollHeight;
     });
 
     try {
+      // Note: You need to implement actual file upload logic here (e.g. using FormData)
+      // For now, this sends the text and an empty attachment array to the backend
       const res = await apiFetch(ENDPOINTS.conversationMessages(activeId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: text, attachments: [] }),
+        body: JSON.stringify({ body: text, attachments: [] }), 
       });
+
       const saved = await res.json();
       if (!res.ok) throw new Error(saved?.detail || "Send failed");
 
@@ -1890,9 +2010,9 @@ const handleTogglePinConversation = async () => {
             t.id === activeId
               ? {
                 ...t,
-                last_message: saved.body,
+                last_message: saved.body || (filesToSend.length ? "Sent an attachment" : ""),
                 last_message_created_at: saved.created_at || new Date().toISOString(),
-                _last_ts: saved.created_at || new Date().toISOString(),   // ✅ drive UI time
+                _last_ts: saved.created_at || new Date().toISOString(),
                 unread_count: 0,
               }
               : t
@@ -1901,7 +2021,6 @@ const handleTogglePinConversation = async () => {
              const pinA = Boolean(a.is_pinned);
              const pinB = Boolean(b.is_pinned);
              if (pinA !== pinB) return pinA ? -1 : 1;
-
              return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
           })
       );
@@ -2444,8 +2563,188 @@ const handleTogglePinConversation = async () => {
                 minHeight: 0,
                 display: "flex",
                 flexDirection: "column",
+                position: "relative",
               }}
             >
+              {/* 🔹 ATTACHMENT PREVIEW OVERLAY (Multi-File Carousel) */}
+              {draftAttachments.length > 0 && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 20,
+                    bgcolor: "#e9edef",
+                    display: "flex",
+                    flexDirection: "column",
+                    borderRadius: 3,
+                    overflow: "hidden"
+                  }}
+                >
+                  {/* Header */}
+                  <Stack direction="row" alignItems="center" sx={{ p: 2, zIndex: 2 }}>
+                    <IconButton onClick={handleClearAttachments}>
+                      <CloseRoundedIcon sx={{ fontSize: 30 }} />
+                    </IconButton>
+                    <Typography variant="h6" sx={{ ml: 2 }}>
+                      Preview {draftAttachments.length > 1 && `(${activePreviewIndex + 1} of ${draftAttachments.length})`}
+                    </Typography>
+                  </Stack>
+
+                  {/* Center: Carousel Stage */}
+                  <Box
+                    sx={{
+                      flex: 1,
+                      position: "relative",
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      bgcolor: "#d1d7db",
+                      overflow: "hidden"
+                    }}
+                  >
+                    {/* LEFT ARROW (Show only if not first) */}
+                    {draftAttachments.length > 1 && (
+                      <IconButton
+                        onClick={() => setActivePreviewIndex((prev) => (prev > 0 ? prev - 1 : prev))}
+                        disabled={activePreviewIndex === 0}
+                        sx={{
+                          position: "absolute",
+                          left: 10,
+                          bgcolor: "rgba(255,255,255,0.6)",
+                          "&:hover": { bgcolor: "white" },
+                          zIndex: 10,
+                          display: activePreviewIndex === 0 ? "none" : "flex"
+                        }}
+                      >
+                        <ArrowBackRoundedIcon />
+                      </IconButton>
+                    )}
+
+                    {/* THE ACTIVE FILE */}
+                    <Box sx={{ p: 4, width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                      {draftAttachments[activePreviewIndex].type.startsWith("image/") ? (
+                        <img
+                          src={URL.createObjectURL(draftAttachments[activePreviewIndex])}
+                          alt="Preview"
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: "100%",
+                            objectFit: "contain",
+                            boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                            borderRadius: 8
+                          }}
+                        />
+                      ) : (
+                        <Stack alignItems="center" spacing={2} sx={{ p: 4, bgcolor: "white", borderRadius: 4 }}>
+                          <DescriptionOutlinedIcon sx={{ fontSize: 60, color: "#54656f" }} />
+                          <Typography variant="h6">{draftAttachments[activePreviewIndex].name}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {(draftAttachments[activePreviewIndex].size / 1024).toFixed(1)} KB
+                          </Typography>
+                        </Stack>
+                      )}
+                    </Box>
+
+                    {/* RIGHT ARROW (Show only if not last) */}
+                    {draftAttachments.length > 1 && (
+                      <IconButton
+                        onClick={() => setActivePreviewIndex((prev) => (prev < draftAttachments.length - 1 ? prev + 1 : prev))}
+                        disabled={activePreviewIndex === draftAttachments.length - 1}
+                        sx={{
+                          position: "absolute",
+                          right: 10,
+                          bgcolor: "rgba(255,255,255,0.6)",
+                          "&:hover": { bgcolor: "white" },
+                          zIndex: 10,
+                          display: activePreviewIndex === draftAttachments.length - 1 ? "none" : "flex"
+                        }}
+                      >
+                        {/* We reuse ArrowBack but rotate it 180deg for Right Arrow */}
+                        <ArrowBackRoundedIcon sx={{ transform: "rotate(180deg)" }} />
+                      </IconButton>
+                    )}
+                  </Box>
+
+                  {/* Thumbnail Strip (Only if > 1 file) */}
+                  {draftAttachments.length > 1 && (
+                    <Stack 
+                      direction="row" 
+                      spacing={1} 
+                      sx={{ 
+                        p: 1, 
+                        bgcolor: "rgba(255,255,255,0.5)", 
+                        justifyContent: "center",
+                        overflowX: "auto"
+                      }}
+                    >
+                      {draftAttachments.map((file, idx) => (
+                        <Box
+                          key={idx}
+                          onClick={() => setActivePreviewIndex(idx)}
+                          sx={{
+                            width: 50,
+                            height: 50,
+                            borderRadius: 1,
+                            overflow: "hidden",
+                            border: activePreviewIndex === idx ? "2px solid #00a884" : "2px solid transparent",
+                            cursor: "pointer",
+                            flexShrink: 0
+                          }}
+                        >
+                          {file.type.startsWith("image/") ? (
+                            <img 
+                              src={URL.createObjectURL(file)} 
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                            />
+                          ) : (
+                            <Box sx={{ width: "100%", height: "100%", bgcolor: "white", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                              <DescriptionOutlinedIcon fontSize="small" />
+                            </Box>
+                          )}
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
+
+                  {/* Footer: Caption & Send */}
+                  <Stack 
+                    direction="row" 
+                    spacing={1} 
+                    alignItems="center" 
+                    sx={{ p: 2, bgcolor: "#f0f2f5" }}
+                  >
+                    <TextField
+                      size="small"
+                      placeholder="Add a caption..."
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      fullWidth
+                      autoFocus
+                      sx={{ bgcolor: "white", borderRadius: 1 }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                    />
+                    <IconButton 
+                      onClick={handleSend}
+                      sx={{ 
+                        bgcolor: "#00a884", 
+                        color: "white", 
+                        width: 45, height: 45, 
+                        "&:hover": { bgcolor: "#008f6f" } 
+                      }}
+                    >
+                      <SendIcon sx={{ fontSize: 20, ml: 0.5 }} />
+                    </IconButton>
+                  </Stack>
+                </Box>
+              )}
               <Box
                 id="chat-scroll"
                 sx={{
@@ -2618,12 +2917,70 @@ const handleTogglePinConversation = async () => {
                   Only admins can send messages in this group.
                 </Box>
               ) : (
-                <Stack direction="row" spacing={1}>
-                  <Tooltip title="Attach file">
-                    <IconButton size="small">
-                      <AttachFileOutlinedIcon fontSize="small" />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {/* 🔹 1. Hidden Inputs for File and Camera */}
+                  <input
+                    type="file"
+                    multiple
+                    ref={fileInputRef}
+                    style={{ display: "none" }}
+                    onChange={handleFileChange}
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment" // This triggers the camera on mobile
+                    ref={cameraInputRef}
+                    style={{ display: "none" }}
+                    onChange={handleFileChange}
+                  />
+
+                  {/* 🔹 2. The Plus (+) Button */}
+                  <Tooltip title="Attach">
+                    <IconButton 
+                      onClick={handleAttachClick}
+                      size="small"
+                      sx={{ 
+                        bgcolor: isAttachMenuOpen ? "rgba(0,0,0,0.08)" : "transparent",
+                        transition: "transform 0.2s",
+                        transform: isAttachMenuOpen ? "rotate(45deg)" : "rotate(0deg)" 
+                      }}
+                    >
+                      <AddRoundedIcon fontSize="medium" />
                     </IconButton>
                   </Tooltip>
+
+                  {/* 🔹 3. The Attachment Menu */}
+                  <Menu
+                    anchorEl={attachMenuAnchor}
+                    open={isAttachMenuOpen}
+                    onClose={handleAttachClose}
+                    anchorOrigin={{ vertical: "top", horizontal: "left" }}
+                    transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+                    sx={{ 
+                      "& .MuiPaper-root": { 
+                        borderRadius: 3, 
+                        mb: 1, 
+                        boxShadow: "0px 4px 20px rgba(0,0,0,0.15)" 
+                      } 
+                    }}
+                  >
+                    <MenuItem onClick={handleTriggerFileUpload} sx={{ py: 1.5, pr: 3 }}>
+                      <ListItemIcon>
+                        <UploadFileRoundedIcon fontSize="small" sx={{ color: "#7F66FF" }} />
+                      </ListItemIcon>
+                      <Typography variant="body2" fontWeight={600}>File Upload</Typography>
+                    </MenuItem>
+
+                    <MenuItem onClick={handleTriggerCamera} sx={{ py: 1.5, pr: 3 }}>
+                      <ListItemIcon>
+                        <CameraAltRoundedIcon fontSize="small" sx={{ color: "#D93025" }} />
+                      </ListItemIcon>
+                      <Typography variant="body2" fontWeight={600}>Camera</Typography>
+                    </MenuItem>
+                  </Menu>
+
+                  {/* Existing TextField */}
                   <TextField
                     size="small"
                     placeholder="Type a message"
@@ -2735,6 +3092,41 @@ const handleTogglePinConversation = async () => {
           {convMenuTarget?.is_pinned ? "Unpin Chat" : "Pin Chat"}
         </MenuItem>
       </Menu>
+
+      {/* 🔹 Camera Modal */}
+      <Dialog open={cameraOpen} onClose={handleCloseCamera} maxWidth="md">
+        <DialogContent sx={{ p: 0, bgcolor: "black", display: "flex", justifyContent: "center" }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            style={{ width: "100%", maxHeight: "60vh", objectFit: "contain" }}
+          />
+          {/* Hidden canvas for capture logic */}
+          <canvas ref={canvasRef} style={{ display: "none" }} />
+        </DialogContent>
+        <Stack 
+          direction="row" 
+          justifyContent="center" 
+          spacing={2} 
+          sx={{ p: 2, bgcolor: "#000" }}
+        >
+          <IconButton onClick={handleCloseCamera} sx={{ color: "white" }}>
+            <CloseRoundedIcon />
+          </IconButton>
+          <IconButton 
+            onClick={handleCapturePhoto}
+            sx={{ 
+              width: 60, 
+              height: 60, 
+              border: "4px solid white", 
+              color: "white" 
+            }}
+          >
+            <CameraAltRoundedIcon fontSize="large" />
+          </IconButton>
+        </Stack>
+      </Dialog>
     </>
   );
 }
