@@ -339,8 +339,10 @@ function RichPostCard({
 
 
   const [expanded, setExpanded] = React.useState(false);
-  const [shareOpen, setShareOpen] = React.useState(false);
+  const [shareOpen, setShareOpen] = React.useState(false);         // send-to-friends popup
+  const [shareListOpen, setShareListOpen] = React.useState(false); // who-received popup
   const [commentsOpen, setCommentsOpen] = React.useState(false);
+
 
   const likeLabel =
     likeCount === 0
@@ -459,7 +461,9 @@ function RichPostCard({
           </Stack>
 
           {/* Right: share count, like HomePage "My posts" section */}
-          <Button size="small" disabled={!shareCount}>
+          <Button size="small" disabled={!shareCount} onClick={() => {
+            if (shareCount) setShareListOpen(true);
+          }}>
             {shareCount.toLocaleString()} SHARES
           </Button>
         </Stack>
@@ -542,7 +546,7 @@ function RichPostCard({
         postId={post.id}
       />
       {/* Comments dialog for this post */}
-            <ProfileShareDialog
+      <ProfileShareDialog
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         postId={post.id}
@@ -559,6 +563,11 @@ function RichPostCard({
           //   setCommentCount(counts.comments ?? 0);
           // });
         }}
+      />
+      <ProfileShareRecipientsDialog
+        open={shareListOpen}
+        onClose={() => setShareListOpen(false)}
+        postId={post.id}
       />
     </Card>
   );
@@ -995,6 +1004,140 @@ function ProfileShareDialog({ open, onClose, postId, authorId, groupId, onShared
     </Dialog>
   );
 }
+
+
+function ProfileShareRecipientsDialog({ open, onClose, postId }) {
+  const [loading, setLoading] = React.useState(false);
+  const [items, setItems] = React.useState([]);
+
+  // Normalize share row → { id, name, avatar }  // 👈 now: WHO SHARED the post
+  function normalizeRecipient(row = {}) {
+    // Sharer / actor of the share
+    const u =
+      row.actor ||          // preferred: who performed the share
+      row.user ||           // fallback
+      row.profile ||
+      row.owner ||
+      row.from_user ||      // extra safeguard if backend uses from_user
+      {};
+
+    const id =
+      u.id ??
+      row.actor_id ??
+      row.user_id ??
+      row.owner_id ??
+      row.from_user_id ??
+      row.id;
+
+    const name =
+      u.full_name ||
+      u.name ||
+      u.username ||
+      [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+      (id ? `User #${id}` : "User");
+
+    const avatar =
+      u.avatar_url ||
+      u.user_image_url ||
+      u.avatar ||
+      u.photo ||
+      u.image ||
+      "";
+
+    return id ? { id, name, avatar } : null;
+  }
+
+
+  React.useEffect(() => {
+    if (!open || !postId) return;
+
+    setLoading(true);
+    (async () => {
+      try {
+        // 🔹 Adjust the URL/param if your backend uses a different shape
+        const res = await fetch(
+          `${API_BASE}/engagements/shares/?target_id=${postId}`,
+          {
+            headers: { Accept: "application/json", ...tokenHeader() },
+            credentials: "include",
+          }
+        );
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json().catch(() => ({}));
+
+        const arr = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+            ? data
+            : data?.data || [];
+
+        const norm = arr.map(normalizeRecipient).filter(Boolean);
+
+        // Deduplicate by user id: if A shared to many friends, show A only once
+        const seen = new Set();
+        const unique = [];
+        for (const u of norm) {
+          if (!seen.has(u.id)) {
+            seen.add(u.id);
+            unique.push(u);
+          }
+        }
+
+        setItems(unique);
+
+      } catch (e) {
+        console.error("Failed to load share recipients:", e);
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [open, postId]);
+
+  return (
+    <Dialog open={!!open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Shared by</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}>
+            <CircularProgress size={22} />
+          </Stack>
+        ) : items.length === 0 ? (
+          <Typography color="text.secondary">
+            This post hasn&apos;t been shared to anyone yet.
+          </Typography>
+        ) : (
+          <List dense>
+            {items.map((u) => (
+              <ListItem key={u.id}>
+                <ListItemAvatar>
+                  <Avatar src={u.avatar}>
+                    {(u.name || "U").slice(0, 1).toUpperCase()}
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {u.name}
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} sx={{ textTransform: "none" }}>
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 
 
 export default function RichProfile() {
