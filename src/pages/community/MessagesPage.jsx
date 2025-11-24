@@ -1336,6 +1336,10 @@ export default function MessagesPage() {
   const [cameraStream, setCameraStream] = React.useState(null);
   const videoRef = React.useRef(null);
   const canvasRef = React.useRef(null);
+  const isFirstLoadRef = React.useRef(true);
+  React.useEffect(() => {
+    isFirstLoadRef.current = true;
+  }, [activeId]);
 
   // CENTER: chat
   const [messages, setMessages] = React.useState([]); // API: /conversations/:id/messages/
@@ -2136,20 +2140,22 @@ const handleTogglePinConversation = async () => {
       }
 
 
-      // scroll to bottom ONLY if user is already near the bottom
+      // 1. Scroll Logic (Updated to handle First Load)
       requestAnimationFrame(() => {
         const el = document.getElementById("chat-scroll");
         if (!el) return;
 
         const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-        const isNearBottom = distanceFromBottom < 80; // tweak threshold if needed
+        const isNearBottom = distanceFromBottom < 80;
 
-        if (isNearBottom) {
+        // 🟢 FIX: Scroll if it's the first load OR if user is already near bottom
+        if (isFirstLoadRef.current || isNearBottom) {
           el.scrollTop = el.scrollHeight;
+          isFirstLoadRef.current = false; // Mark first load as complete
         }
       });
 
-      // mark inbound bubbles as read once ~60% visible
+      // 2. Mark inbound bubbles as read once ~60% visible
       requestAnimationFrame(() => {
         const container = document.getElementById("chat-scroll");
         if (!container) return;
@@ -2162,7 +2168,8 @@ const handleTogglePinConversation = async () => {
             const mine = el.getAttribute("data-mine") === "1";
             const byme = el.getAttribute("data-readbyme") === "1";
             if (!mid || mine || byme) return;
-            markMessageRead(mid);               // fire-and-forget
+            
+            markMessageRead(mid); // fire-and-forget
             el.setAttribute("data-readbyme", "1");
             io.unobserve(el);
           });
@@ -2171,18 +2178,8 @@ const handleTogglePinConversation = async () => {
         container.querySelectorAll("[data-mid]").forEach((n) => io.observe(n));
       });
 
-      // scroll to bottom ONLY if user is already near the bottom
-      requestAnimationFrame(() => {
-        const el = document.getElementById("chat-scroll");
-        if (!el) return;
+      // (Deleted duplicate scroll block here)
 
-        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-        const isNearBottom = distanceFromBottom < 80;
-
-        if (isNearBottom) {
-          el.scrollTop = el.scrollHeight;
-        }
-      });
       // Important: immediately mark-all-read for visible conversation
       markAllReadDebounced();
     } catch (e) {
