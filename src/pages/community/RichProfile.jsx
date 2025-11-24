@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Avatar,
+  AvatarGroup,
   Box,
   Button,
   Card,
@@ -28,12 +29,22 @@ import {
   Chip,
   Tabs,
   Tab,
+  CircularProgress,   // 👈 NEW
+  Checkbox,           // 👈 NEW
+  ListItemButton,     // 👈 NEW
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import CommunitySidebar from "../../components/CommunitySideBar.jsx";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import IosShareIcon from "@mui/icons-material/IosShare";
+import SearchIcon from "@mui/icons-material/Search";
+
+
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -45,6 +56,65 @@ const tokenHeader = () => {
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
+
+// --- Engagement helpers for Rich Profile posts ---
+
+function engageTargetOfProfilePost(post) {
+  if (!post) return { type: null, id: null };
+  return { type: null, id: Number(post.id) || null }; // treat as feed item
+}
+
+async function fetchEngagementCountsForProfilePost(post) {
+  const target = engageTargetOfProfilePost(post);
+  if (!target.id) {
+    return { likes: 0, comments: 0, shares: 0, user_has_liked: false };
+  }
+  const tt = target.type
+    ? `&target_type=${encodeURIComponent(target.type)}`
+    : "";
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/engagements/metrics/?ids=${target.id}${tt}`,
+      {
+        headers: { Accept: "application/json", ...tokenHeader() },
+        credentials: "include",
+      }
+    );
+    if (!res.ok) throw new Error("metrics failed");
+    const data = await res.json().catch(() => ({}));
+    return (
+      data[String(target.id)] || {
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        user_has_liked: false,
+      }
+    );
+  } catch {
+    return { likes: 0, comments: 0, shares: 0, user_has_liked: false };
+  }
+}
+
+async function toggleProfilePostLike(post) {
+  const target = engageTargetOfProfilePost(post);
+  if (!target.id) return;
+
+  const body = target.type
+    ? { target_type: target.type, target_id: target.id, reaction: "like" }
+    : { target_id: target.id, reaction: "like" };
+
+  await fetch(`${API_BASE}/engagements/reactions/toggle/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...tokenHeader(),
+    },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+}
+
 
 const pickAvatarUrl = (u) => {
   if (!u) return "";
@@ -135,9 +205,178 @@ function timeAgo(date) {
 
 // Post card component used in the Posts tab. Shows the post content and a
 // bottom row with mutual connections and a friend button (if not friends).
-function RichPostCard({ post, fullName, avatarUrl, mutualCount, friendStatus, friendSubmitting, handleAddFriend }) {
+function RichPostCard({
+  post,
+  fullName,
+  avatarUrl,
+  mutualCount,
+  onOpenConnections,
+  friendStatus,
+  friendSubmitting,
+  handleAddFriend,
+  authorId,
+}) {
+  // initial like status from backend (if available)
+  const [liked, setLiked] = React.useState(
+    !!(post?.liked_by_me ?? post?.user_has_liked)
+  );
+
+  // counters based on metrics (and will be refreshed from /engagements/metrics/)
+  const [likeCount, setLikeCount] = React.useState(
+    Number(
+      post?.like_count ??
+      post?.metrics?.likes ??
+      0
+    )
+  );
+  const [shareCount, setShareCount] = React.useState(
+    Number(
+      post?.share_count ??
+      post?.metrics?.shares ??
+      0
+    )
+  );
+  const [commentCount, setCommentCount] = React.useState(
+    Number(
+      post?.comment_count ??
+      post?.metrics?.comments ??
+      0
+    )
+  );
+
+  const [likers, setLikers] = React.useState([]);
+  // Load latest engagement counts (likes/comments/shares) for this post
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      const counts = await fetchEngagementCountsForProfilePost(post);
+      if (!alive) return;
+      setLikeCount(counts.likes ?? 0);
+      setShareCount(counts.shares ?? 0);
+      setCommentCount(counts.comments ?? 0);
+      setLiked(!!counts.user_has_liked);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [post?.id]);
+
+  // Load top likers to show avatars in the bubble
+  const loadTopLikers = React.useCallback(async () => {
+    const target = engageTargetOfProfilePost(post);
+    if (!target.id) return;
+
+    const urls = [
+      // generic likes list
+      target.type
+        ? `${API_BASE}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(
+          target.type
+        )}&target_id=${target.id}&page_size=5`
+        : `${API_BASE}/engagements/reactions/?reaction=like&target_id=${target.id}&page_size=5`,
+      // specialised "who liked" endpoint – will silently fail if not present
+      `${API_BASE}/engagements/reactions/who-liked/?feed_item=${target.id}&page_size=5`,
+    ];
+
+    const normalizeUsers = (payload) => {
+      const arr = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.results)
+          ? payload.results
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : [];
+      return arr
+        .map((row) => {
+          const u =
+            row.user ||
+            row.actor ||
+            row.profile ||
+            row.author ||
+            row.owner ||
+            row;
+          const id = u?.id ?? row.user_id ?? row.id;
+          const name =
+            u?.full_name ||
+            u?.name ||
+            u?.username ||
+            [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
+            (id ? `User #${id}` : "User");
+          const avatar =
+            u?.avatar_url ||
+            u?.user_image_url ||
+            u?.avatar ||
+            u?.photo ||
+            u?.image ||
+            "";
+          return id ? { id, name, avatar } : null;
+        })
+        .filter(Boolean);
+    };
+
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          headers: { Accept: "application/json", ...tokenHeader() },
+          credentials: "include",
+        });
+        if (!res.ok) continue;
+        const data = await res.json().catch(() => ({}));
+        const list = normalizeUsers(data);
+        if (list.length) {
+          setLikers(list);
+          return;
+        }
+      } catch {
+        // try next url
+      }
+    }
+    setLikers([]);
+  }, [post?.id]);
+
+  React.useEffect(() => {
+    loadTopLikers();
+  }, [loadTopLikers]);
+
+
+  const [expanded, setExpanded] = React.useState(false);
+  const [shareOpen, setShareOpen] = React.useState(false);
+  const [commentsOpen, setCommentsOpen] = React.useState(false);
+
+  const likeLabel =
+    likeCount === 0
+      ? "No likes yet"
+      : likeCount === 1
+        ? "1 like"
+        : `${likeCount} likes`;
+
+
+  const handleLikeClick = async () => {
+    const willUnlike = liked;
+
+    // optimistic UI
+    setLiked(!willUnlike);
+    setLikeCount((c) => Math.max(0, c + (willUnlike ? -1 : +1)));
+
+    try {
+      await toggleProfilePostLike(post);
+      const counts = await fetchEngagementCountsForProfilePost(post);
+      setLikeCount(counts.likes ?? 0);
+      setShareCount(counts.shares ?? 0);
+      setCommentCount(counts.comments ?? 0);
+      setLiked(!!counts.user_has_liked);
+    } catch (e) {
+      // rollback via re-fetch
+      const counts = await fetchEngagementCountsForProfilePost(post);
+      setLikeCount(counts.likes ?? 0);
+      setShareCount(counts.shares ?? 0);
+      setCommentCount(counts.comments ?? 0);
+      setLiked(!!counts.user_has_liked);
+    }
+  };
+
   return (
     <Card variant="outlined" sx={{ borderRadius: 2 }}>
+
       <CardHeader
         avatar={
           <Avatar sx={{ width: 40, height: 40 }} src={avatarUrl}>
@@ -188,45 +427,139 @@ function RichPostCard({ post, fullName, avatarUrl, mutualCount, friendStatus, fr
           </List>
         )}
       </CardContent>
-      <Box
+      {/* Meta strip: likes bubble + shares count (same style as HomePage) */}
+      <Box sx={{ px: 1.25, pt: 0.75, pb: 0.5 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          {/* Left: liker avatars + text */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            {/* If later you have real liker list, you can map it here.
+               For now we just show the avatars of the profile owner */}
+            <AvatarGroup
+              max={3}
+              sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}
+            >
+              {(likers || []).slice(0, 3).map((u) => (
+                <Avatar key={u.id || u.name} src={u.avatar}>
+                  {(u.name || "U").slice(0, 1)}
+                </Avatar>
+              ))}
+            </AvatarGroup>
+
+            <Typography variant="body2">
+              {likers?.[0]?.name
+                ? Math.max(0, (likeCount || 0) - 1) > 0
+                  ? `${likers[0].name} and ${Math.max(
+                    0,
+                    (likeCount || 0) - 1
+                  ).toLocaleString()} others`
+                  : likers[0].name
+                : `${(likeCount || 0).toLocaleString()} ${Number(likeCount || 0) === 1 ? "like" : "likes"
+                }`}
+            </Typography>
+          </Stack>
+
+          {/* Right: share count, like HomePage "My posts" section */}
+          <Button size="small" disabled={!shareCount}>
+            {shareCount.toLocaleString()} SHARES
+          </Button>
+        </Stack>
+      </Box>
+
+      <Divider sx={{ my: 1 }} />
+
+      {/* Action row: Like / Comment / Share */}
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent={{ xs: "space-between", sm: "space-around" }}
+        spacing={{ xs: 0.5, sm: 1.5 }}
         sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          px: 2,
-          pb: 2,
+          px: { xs: 0.5, sm: 0.75 },
+          pb: 0.5,
+          flexWrap: "nowrap",
         }}
       >
-        {mutualCount > 0 && (
-          <Chip label={`${mutualCount} mutual`} size="small" />
-        )}
-        {friendStatus !== "self" && (
-          friendStatus === "none" ? (
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<PersonAddAlt1RoundedIcon />}
-              disabled={friendSubmitting}
-              onClick={handleAddFriend}
-              sx={{ textTransform: "none", borderRadius: 2 }}
-            >
-              {friendSubmitting ? "Sending…" : "Add Friend"}
-            </Button>
-          ) : friendStatus === "pending_outgoing" ? (
-            <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-              Request sent
-            </Button>
-          ) : friendStatus === "pending_incoming" ? (
-            <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-              Pending your approval
-            </Button>
-          ) : friendStatus === "friends" ? (
-            <Button variant="contained" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-              Your Friend
-            </Button>
-          ) : null
-        )}
-      </Box>
+        {/* LIKE */}
+        <Button
+          size="small"
+          startIcon={liked ? <FavoriteRoundedIcon /> : <FavoriteBorderIcon />}
+          onClick={handleLikeClick}
+          sx={{
+            flex: { xs: 1, sm: "0 0 auto" },
+            minWidth: 0,
+            px: { xs: 0.25, sm: 1 },
+            fontSize: { xs: 11, sm: 12 },
+            color: liked ? "error.main" : "text.secondary",
+            "& .MuiButton-startIcon": {
+              mr: { xs: 0.25, sm: 0.5 },
+            },
+          }}
+        >
+          LIKE
+        </Button>
+
+        {/* COMMENT */}
+        <Button
+          size="small"
+          startIcon={<ChatBubbleOutlineIcon />}
+          onClick={() => setCommentsOpen(true)}
+          sx={{
+            flex: { xs: 1, sm: "0 0 auto" },
+            minWidth: 0,
+            px: { xs: 0.25, sm: 1 },
+            fontSize: { xs: 11, sm: 12 },
+            "& .MuiButton-startIcon": {
+              mr: { xs: 0.25, sm: 0.5 },
+            },
+          }}
+        >
+          COMMENT
+        </Button>
+
+        {/* SHARE */}
+        <Button
+          size="small"
+          startIcon={<IosShareIcon />}
+          onClick={() => setShareOpen(true)}
+          sx={{
+            flex: { xs: 1, sm: "0 0 auto" },
+            minWidth: 0,
+            px: { xs: 0.25, sm: 1 },
+            fontSize: { xs: 11, sm: 12 },
+            "& .MuiButton-startIcon": {
+              mr: { xs: 0.25, sm: 0.5 },
+            },
+          }}
+        >
+          SHARE
+        </Button>
+      </Stack>
+
+      {/* Comments dialog for this post */}
+      <ProfileCommentsDialog
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        postId={post.id}
+      />
+      {/* Comments dialog for this post */}
+            <ProfileShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        postId={post.id}
+        authorId={authorId}
+        groupId={post.group_id || null}
+        onShared={() => {
+          // local bump so user sees it immediately
+          setShareCount((c) => c + 1);
+
+          // optional: refresh from backend for absolute truth
+          // fetchEngagementCountsForProfilePost(post).then((counts) => {
+          //   setShareCount(counts.shares ?? 0);
+          //   setLikeCount(counts.likes ?? 0);
+          //   setCommentCount(counts.comments ?? 0);
+          // });
+        }}
+      />
     </Card>
   );
 }
@@ -241,6 +574,428 @@ function pickBestExperience(exps = []) {
     return new Date(bEnd) - new Date(aEnd);
   })[0];
 }
+
+function ProfileCommentsDialog({ open, onClose, postId }) {
+  const [loading, setLoading] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [comments, setComments] = React.useState([]);
+  const [body, setBody] = React.useState("");
+
+  // Normalize comment shape → { id, text, authorName, authorAvatar }
+  function normalizeComment(row = {}) {
+    const author =
+      row.author ||
+      row.user ||
+      row.profile ||
+      row.created_by ||
+      row.owner ||
+      {};
+
+    const name =
+      author.name ||
+      author.full_name ||
+      (author.first_name || author.last_name
+        ? `${author.first_name || ""} ${author.last_name || ""}`.trim()
+        : author.username) ||
+      "User";
+
+    const avatar =
+      author.avatar ||
+      author.avatar_url ||
+      author.user_image ||
+      author.user_image_url ||
+      author.image ||
+      author.photo ||
+      "";
+
+    const text =
+      row.text ||
+      row.body ||
+      row.comment ||
+      row.content ||
+      "";
+
+    return {
+      id: row.id ?? row.pk,
+      text,
+      authorName: name,
+      authorAvatar: avatar,
+    };
+  }
+
+  const fetchComments = React.useCallback(async () => {
+    if (!open || !postId) return;
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("target_id", String(postId));
+      params.set("page_size", "200");
+
+      const res = await fetch(
+        `${API_BASE}/engagements/comments/?${params.toString()}`,
+        {
+          headers: { Accept: "application/json", ...tokenHeader() },
+          credentials: "include",
+        }
+      );
+
+      let list = [];
+      if (res.ok) {
+        const j = await res.json().catch(() => null);
+        const raw = Array.isArray(j?.results)
+          ? j.results
+          : Array.isArray(j)
+            ? j
+            : [];
+        list = raw.map(normalizeComment);
+      }
+      setComments(list);
+    } catch (e) {
+      console.error("Failed to load comments:", e);
+      setComments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [open, postId]);
+
+  React.useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
+
+  async function handleSubmit(e) {
+    e?.preventDefault?.();
+    const text = (body || "").trim();
+    if (!text || !postId) return;
+
+    setSubmitting(true);
+    try {
+      const payload = { text, target_id: Number(postId) };
+
+      const res = await fetch(`${API_BASE}/engagements/comments/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...tokenHeader(),
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setBody("");
+        await fetchComments();   // reload with new comment
+      } else {
+        console.error("Comment POST failed:", res.status);
+      }
+    } catch (e) {
+      console.error("Failed to post comment:", e);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Comments</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}>
+            <CircularProgress size={22} />
+          </Stack>
+        ) : comments.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No comments yet. Be the first to comment.
+          </Typography>
+        ) : (
+          <List dense sx={{ mb: 2 }}>
+            {comments.map((c) => (
+              <ListItem key={c.id} alignItems="flex-start">
+                <ListItemAvatar>
+                  <Avatar src={c.authorAvatar}>
+                    {(c.authorName || "U").slice(0, 1)}
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={
+                    <Typography
+                      variant="body2"
+                      sx={{ whiteSpace: "pre-wrap" }}
+                    >
+                      {c.text}
+                    </Typography>
+                  }
+                  secondary={
+                    <Typography variant="caption" color="text.secondary">
+                      {c.authorName}
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+
+        <Box component="form" onSubmit={handleSubmit}>
+          <TextField
+            fullWidth
+            multiline
+            minRows={2}
+            placeholder="Write a comment…"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            disabled={submitting}
+          />
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={submitting}>
+          Close
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={submitting || !body.trim()}
+        >
+          {submitting ? "Posting…" : "Post"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+function ProfileShareDialog({ open, onClose, postId, authorId, groupId, onShared }) {
+  const [loading, setLoading] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [friends, setFriends] = React.useState([]);
+  const [query, setQuery] = React.useState("");
+  const [selected, setSelected] = React.useState(new Set());
+
+  // Normalize any friends API shape -> { id, name, avatar }
+  function normalizeFriends(list) {
+    return (list || [])
+      .map((f) => {
+        const u = f.user || f.friend || f.to_user || f.peer || f.profile || f;
+        const id = u?.id ?? f.user_id ?? f.friend_id ?? f.peer_id ?? f.id;
+        const name =
+          u?.name ||
+          u?.full_name ||
+          (u?.first_name || u?.last_name
+            ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim()
+            : null) ||
+          u?.username ||
+          `User #${id}`;
+
+        const avatar =
+          u?.avatar ||
+          u?.avatar_url ||
+          u?.user_image ||
+          u?.user_image_url ||
+          u?.image ||
+          u?.photo ||
+          f?.avatar ||
+          f?.avatar_url ||
+          f?.user_image ||
+          f?.user_image_url ||
+          f?.image ||
+          f?.photo ||
+          "";
+
+        return { id, name, avatar };
+      })
+      .filter((x) => x.id);
+  }
+
+  const fetchFriends = React.useCallback(async () => {
+    if (!open) return;
+    setLoading(true);
+
+    const headers = { Accept: "application/json", ...tokenHeader() };
+
+    // 0) GROUP POST: same-group only
+    if (groupId) {
+      const groupPaths = [
+        `groups/${groupId}/members/`,
+        `groups/${groupId}/memberships/`,
+        `group-memberships/?group=${groupId}`,
+        `group-members/?group=${groupId}`,
+      ];
+
+      for (const path of groupPaths) {
+        try {
+          const res = await fetch(
+            `${API_BASE}/${String(path).replace(/^\/+/, "")}`,
+            { headers, credentials: "include" }
+          );
+          if (!res.ok) continue;
+
+          const j = await res.json().catch(() => null);
+          const arr = Array.isArray(j?.results)
+            ? j.results
+            : Array.isArray(j)
+              ? j
+              : j?.members || j?.data || [];
+
+          const norm = normalizeFriends(arr);
+          setFriends(norm);
+          setLoading(false);
+          return; // ✅ same-group list ready
+        } catch (e) {
+          // try next path
+        }
+      }
+    }
+
+    // 1) Normal profile post: mutual friends ONLY
+    if (authorId) {
+      try {
+        const res = await fetch(
+          `${API_BASE}/friends/mutual/?user_id=${authorId}`,
+          { headers, credentials: "include" }
+        );
+        if (res.ok) {
+          const j = await res.json().catch(() => null);
+          const arr = Array.isArray(j?.results)
+            ? j.results
+            : Array.isArray(j)
+              ? j
+              : j?.data || [];
+          const norm = normalizeFriends(arr);
+          setFriends(norm);
+          setLoading(false);
+          return; // ✅ mutuals only; no fallback
+        }
+      } catch (e) {
+        // fall through to empty
+      }
+    }
+
+    // 2) If nothing matched, show empty
+    setFriends([]);
+    setLoading(false);
+  }, [open, authorId, groupId]);
+
+  React.useEffect(() => {
+    fetchFriends();
+  }, [fetchFriends]);
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return friends;
+    return friends.filter((f) => (f.name || "").toLowerCase().includes(q));
+  }, [friends, query]);
+
+  function toggle(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function shareNow() {
+    if (!selected.size || !postId) return;
+    setSending(true);
+    try {
+      const payload = {
+        target_id: postId,           // 👈 feed item id
+        to_users: [...selected],     // 👈 selected mutual/same-group users
+      };
+
+      const res = await fetch(`${API_BASE}/engagements/shares/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...tokenHeader(),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      onShared?.();
+
+      setSending(false);
+      onClose?.();
+      setSelected(new Set());
+      setQuery("");
+    } catch (e) {
+      console.error("ProfileShareDialog shareNow error:", e);
+      setSending(false);
+      alert("Could not share this post. Please check your share endpoint.");
+    }
+  }
+
+  return (
+    <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Share post</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}>
+            <CircularProgress size={22} />
+          </Stack>
+        ) : friends.length === 0 ? (
+          <Typography color="text.secondary">No friends found.</Typography>
+        ) : (
+          <>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Search friends…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 1.5 }}
+            />
+            <Divider sx={{ mb: 1 }} />
+            <List dense disablePadding>
+              {filtered.map((f) => (
+                <ListItem
+                  key={f.id}
+                  disablePadding
+                  secondaryAction={
+                    <Checkbox
+                      edge="end"
+                      onChange={() => toggle(f.id)}
+                      checked={selected.has(f.id)}
+                    />
+                  }
+                >
+                  <ListItemButton onClick={() => toggle(f.id)}>
+                    <ListItemAvatar>
+                      <Avatar src={f.avatar}>{(f.name || "U").slice(0, 1)}</Avatar>
+                    </ListItemAvatar>
+                    <ListItemText primary={f.name} />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={sending}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={shareNow}
+          disabled={!selected.size || sending}
+        >
+          {sending ? "Sharing…" : "Share"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 
 export default function RichProfile() {
   // IMPORTANT: use :userId from /community/rich-profile/:userId
@@ -362,7 +1117,61 @@ export default function RichProfile() {
       (m.type || src?.type || (images.length ? "image" : pollOptions.length ? "poll" : link ? "link" : "text"))
         ?.toLowerCase();
 
-    return { id, type, content: text, link, images, options: pollOptions, created_at: created };
+
+    // Try to capture group id if present (for "same group" share)
+    const group_id =
+      row.group_id ??
+      m.group_id ??
+      src?.group_id ??
+      (typeof row.group === "object" ? row.group.id : row.group) ??
+      (typeof m.group === "object" ? m.group.id : m.group) ??
+      (typeof src?.group === "object" ? src.group.id : src.group) ??
+      null;
+    const engagement =
+      m.metrics || row.metrics || row.engagement || row.engagements || {};
+
+    const like_count =
+      engagement.likes ??
+      engagement.like_count ??
+      row.like_count ??
+      src?.like_count ??
+      0;
+    const comment_count =
+      engagement.comments ??
+      engagement.comment_count ??
+      row.comment_count ??
+      src?.comment_count ??
+      0;
+    const share_count =
+      engagement.shares ??
+      engagement.share_count ??
+      row.share_count ??
+      src?.share_count ??
+      0;
+
+    const liked_by_me =
+      !!(
+        engagement.user_has_liked ??
+        engagement.liked_by_me ??
+        row.user_has_liked ??
+        row.liked_by_me
+      );
+
+    return {
+      id,
+      type,
+      content: text,
+      link,
+      images,
+      options: pollOptions,
+      created_at: created,
+      group_id,
+      metrics: engagement,
+      like_count,
+      comment_count,
+      share_count,
+      liked_by_me,
+    };
   }
 
   async function fetchFeedItemById(feedId, headers) {
@@ -897,6 +1706,7 @@ export default function RichProfile() {
                               friendStatus={friendStatus}
                               friendSubmitting={friendSubmitting}
                               handleAddFriend={sendFriendRequest}
+                              authorId={userId}
                             />
                           ))}
                         </Stack>
