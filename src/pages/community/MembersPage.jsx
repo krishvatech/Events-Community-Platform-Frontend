@@ -482,19 +482,74 @@ export default function MembersPage() {
 
 
 
-  // text filter
+  // single search box: name + email + role + tags + location + company + title
   const filtered = useMemo(() => {
     const s = (q || "").toLowerCase().trim();
+
+    // if nothing typed, show all
+    if (!s) return users;
+
     return users.filter((u) => {
+      // basic identity
       const fn = (u.first_name || "").toLowerCase();
       const ln = (u.last_name || "").toLowerCase();
       const em = (u.email || "").toLowerCase();
       const full = (u.profile?.full_name || "").toLowerCase();
+
+      // company / job / role
       const company = (u.company_from_experience || "").toLowerCase();
-      const title = (u.position_from_experience || u.profile?.job_title || u.job_title || "").toLowerCase();
-      return fn.includes(s) || ln.includes(s) || em.includes(s) || full.includes(s) || company.includes(s) || title.includes(s);
+      const title = (
+        u.position_from_experience ||
+        u.profile?.job_title ||
+        u.job_title ||
+        ""
+      ).toLowerCase();
+      const role = (u.profile?.role || u.role || "").toLowerCase();
+
+      // tags / skills (array or CSV string)
+      let skills = [];
+      const rawSkills =
+        (u.profile && u.profile.skills) ||
+        u.skills ||
+        [];
+      if (Array.isArray(rawSkills)) {
+        skills = rawSkills.map((x) => String(x).toLowerCase());
+      } else if (typeof rawSkills === "string") {
+        skills = rawSkills
+          .split(/,|;|\n/)
+          .map((x) => x.trim().toLowerCase())
+          .filter(Boolean);
+      }
+
+      // location: country + city
+      const countryName = (displayCountry(u) || "").toLowerCase();
+      const city = (
+        u.profile?.location_city ||
+        u.profile?.city ||
+        u.city ||
+        u.profile?.location ||
+        ""
+      ).toLowerCase();
+
+      // build one big list of searchable fields
+      const haystack = [
+        fn,
+        ln,
+        full,
+        em,
+        company,
+        title,
+        role,
+        countryName,
+        city,
+        ...skills,
+      ];
+
+      // match if ANY field contains the search text
+      return haystack.some((v) => v && v.includes(s));
     });
   }, [users, q]);
+
 
   // preload friend statuses (for map dot colors and cards)
   useEffect(() => {
@@ -654,7 +709,7 @@ export default function MembersPage() {
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     size="small"
-                    placeholder="Search members"
+                    placeholder="Search by name, role, tags, location"
                     sx={{
                       width: {
                         xs: "100%", // 320 / 375 / 425
