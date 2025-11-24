@@ -1949,6 +1949,8 @@ export default function LiveFeedPage({
   // SCOPE: all | mine
   const [scope, setScope] = React.useState("all");
 
+  const [sortMode, setSortMode] = React.useState("recent");
+
   // Search
   const [query, setQuery] = React.useState("");
   const dq = useDebounced(query, 400);
@@ -2319,12 +2321,11 @@ export default function LiveFeedPage({
     await loadFeed(nextUrl, true);
   };
 
-  // If scope is 'mine' and backend didn’t support ?mine=true, fallback to client filter.
   const displayPosts = React.useMemo(() => {
-    // scope filter first
+    // 1) scope filter first
     let arr = scope === "mine" ? posts.filter((p) => !!p.group_id) : posts;
 
-    // client-side search fallback (works even if API ignores q/search)
+    // 2) client-side search fallback (works even if API ignores q/search)
     const needle = (dq || "").trim().toLowerCase();
     if (needle) {
       const toText = (v) => (v ? String(v).toLowerCase() : "");
@@ -2337,12 +2338,36 @@ export default function LiveFeedPage({
           p.url_desc,
           p.event?.title,
           p.event?.where,
-        ].map(toText).join(" ");
+        ]
+          .map(toText)
+          .join(" ");
         return haystack.includes(needle);
       });
     }
-    return arr;
-  }, [posts, scope, dq]);
+
+    // 3) sort by mode
+    const sorted = [...arr];
+
+    if (sortMode === "popular") {
+      // 👍 Most popular = highest likes first (then newest)
+      sorted.sort((a, b) => {
+        const la = a.metrics?.likes ?? a.like_count ?? 0;
+        const lb = b.metrics?.likes ?? b.like_count ?? 0;
+        if (lb !== la) return lb - la; // more likes → higher
+        // tie-breaker: newer first
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
+    } else {
+      // 🕒 Most recent (default)
+      sorted.sort(
+        (a, b) =>
+          new Date(b.created_at || 0) - new Date(a.created_at || 0)
+      );
+    }
+
+    return sorted;
+  }, [posts, scope, dq, sortMode]);
+
 
   React.useEffect(() => {
     if (!displayPosts.length) return;
@@ -2403,10 +2428,25 @@ export default function LiveFeedPage({
           }}
         >
           {/* Scope toggle */}
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 2 }} alignItems="center">
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ mb: 2 }}
+            alignItems="center"
+          >
             <Stack direction="row" spacing={1}>
-              <Chip label="All" color={scope === "all" ? "primary" : "default"} variant={scope === "all" ? "filled" : "outlined"} onClick={() => setScope("all")} />
-              <Chip label="My Groups" color={scope === "mine" ? "primary" : "default"} variant={scope === "mine" ? "filled" : "outlined"} onClick={() => setScope("mine")} />
+              <Chip
+                label="All"
+                color={scope === "all" ? "primary" : "default"}
+                variant={scope === "all" ? "filled" : "outlined"}
+                onClick={() => setScope("all")}
+              />
+              <Chip
+                label="My Groups"
+                color={scope === "mine" ? "primary" : "default"}
+                variant={scope === "mine" ? "filled" : "outlined"}
+                onClick={() => setScope("mine")}
+              />
             </Stack>
 
             <Box sx={{ flex: 1, width: "100%" }}>
@@ -2415,15 +2455,45 @@ export default function LiveFeedPage({
                 size="small"
                 placeholder="Search posts, events, resources…"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}     // debounced by dq
+                onChange={(e) => setQuery(e.target.value)} // debounced by dq
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") loadFeed(buildFeedPath(scope, query), false); // optional: immediate refresh
+                  if (e.key === "Enter")
+                    loadFeed(buildFeedPath(scope, query), false); // optional: immediate refresh
                 }}
-                InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>) }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
                 type="search"
               />
             </Box>
+
+            {/* 🔽 NEW: sort chips */}
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ mt: { xs: 1, sm: 0 } }}
+            >
+              <Chip
+                label="Most recent"
+                size="small"
+                color={sortMode === "recent" ? "primary" : "default"}
+                variant={sortMode === "recent" ? "filled" : "outlined"}
+                onClick={() => setSortMode("recent")}
+              />
+              <Chip
+                label="Most popular"
+                size="small"
+                color={sortMode === "popular" ? "primary" : "default"}
+                variant={sortMode === "popular" ? "filled" : "outlined"}
+                onClick={() => setSortMode("popular")}
+              />
+            </Stack>
           </Stack>
+
 
           {/* (Composer kept commented; leave as-is to avoid changing other UI) */}
 
