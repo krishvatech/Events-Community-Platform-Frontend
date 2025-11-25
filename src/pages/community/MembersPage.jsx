@@ -467,7 +467,11 @@ export default function MembersPage() {
         }
 
         if (!alive) return;
-        setUsers((list || []).filter((u) => u.id !== me?.id));
+        setUsers(
+          (list || []).filter(
+            (u) => u.id !== me?.id && !u.is_superuser
+          )
+        );
       } catch (e) {
         if (isAbort(e)) return;
         console.error(e);
