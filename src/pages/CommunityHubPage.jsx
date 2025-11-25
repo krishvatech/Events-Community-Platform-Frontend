@@ -11,6 +11,7 @@ import NotificationsPage from "./community/NotificationsPage.jsx";
 import GroupsPage from "./community/GroupsPage.jsx";
 import MembersPage from "./community/MembersPage.jsx";
 import MessagesPage from "./community/MessagesPage.jsx";
+import MyPostsPage from "./community/MyPostsPage";
 
 // Keep a light topics list for the sidebar (safe mock; replace from API anytime)
 const TOPICS = [
@@ -206,6 +207,8 @@ export default function CommunityHubPage() {
         >
           {view === "home" ? (
             <HomePage />
+          ) : view === "myposts" ? (   // <--- Added this block
+            <MyPostsPage />
           ) : view === "live" ? (
             <LiveFeedPage />
           ) : view === "notify" ? (

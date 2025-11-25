@@ -19,6 +19,8 @@ import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import Diversity3RoundedIcon from "@mui/icons-material/Diversity3Rounded";
 import LiveTvRoundedIcon from "@mui/icons-material/LiveTvRounded";
+// 👇 Added Icon for My Posts
+import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 
 const BORDER = "#e2e8f0";
 const HOVER_BG = "#e6f7f6";
@@ -164,8 +166,10 @@ export default function CommunitySideBar({
   // HARMONIZED + REORDERED ITEMS
   const items = [
     { key: "home", label: "Home", Icon: HomeRoundedIcon },
-    { key: "members", label: "Members", Icon: Diversity3RoundedIcon }, // directly under Home
-    { key: "feed", label: "Groups", Icon: GroupsRoundedIcon }, // below Members
+    // 👇 Added My Posts here
+    { key: "myposts", label: "My Posts", Icon: ArticleRoundedIcon },
+    { key: "members", label: "Members", Icon: Diversity3RoundedIcon },
+    { key: "feed", label: "Groups", Icon: GroupsRoundedIcon }, 
     { key: "live", label: "Live Feed", Icon: LiveTvRoundedIcon },
     { key: "notify", label: "Notification", Icon: NotificationsRoundedIcon },
     { key: "messages", label: "Messages", Icon: ChatBubbleRoundedIcon },
@@ -196,6 +200,8 @@ export default function CommunitySideBar({
           const norm = (v) => String(v || "").toLowerCase();
           const aliases = {
             home: ["home"],
+            // 👇 Added aliases for My Posts
+            myposts: ["myposts", "posts", "my-posts"],
             live: ["live", "live-feed"],
             notify: ["notify", "notification", "notifications"],
             messages: ["messages", "message", "chat"],

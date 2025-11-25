@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useNavigate } from "react-router-dom";
 import {
   Avatar,
-  Badge,
   Box,
   Grid,
   InputAdornment,
@@ -21,6 +20,8 @@ import {
   Chip,
   Card,
   useMediaQuery,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
@@ -47,7 +48,7 @@ import {
 const BORDER = "#e2e8f0";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
-const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"; // sharper borders
+const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"; 
 
 const tokenHeader = () => {
   const t =
@@ -56,19 +57,6 @@ const tokenHeader = () => {
     localStorage.getItem("access") ||
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};
-};
-
-const getAvatarUrl = (u) => {
-  const p = u?.profile || {};
-  return (
-    u?.avatar_url ||      // from /users/roster/ (server serializer)
-    u?.avatar ||          // alternative
-    p.user_image ||       // your DB field on profile if present
-    p.image_url ||
-    p.photo ||
-    p.avatar ||
-    ""
-  );
 };
 
 const normalizeFriendStatus = (s) => {
@@ -83,21 +71,11 @@ const isAbort = (e) =>
   e?.name === "AbortError" ||
   /aborted|aborterror|signal is aborted/i.test(e?.message || "");
 
-const norm = (s) =>
-  (s || "")
-    .toString()
-    .toLowerCase()
-    .replace(/[\u2019'".,]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const MIN_ZOOM = 1;      // keep world fitting the box; below this panning feels "stuck"
+const MIN_ZOOM = 1;      
 const MAX_ZOOM = 8;
-const ZOOM_STEP = 1.35;  // how fast +/- changes
-
+const ZOOM_STEP = 1.35; 
 
 function resolveCountryCode(user) {
-  // First prefer explicit ISO2 if you store it
   const code =
     user?.profile?.country_code ||
     user?.country_code ||
@@ -107,19 +85,17 @@ function resolveCountryCode(user) {
 
   if (code) return String(code).toUpperCase();
 
-  // Fallback: convert a country NAME (e.g., "India") to ISO2 (e.g., "IN")
   const name =
     user?.profile?.country ||
     user?.country ||
     user?.location_country ||
     user?.profile?.location_country ||
-    user?.profile?.location ||   // <— important if you saved into `location`
+    user?.profile?.location ||   
     "";
 
   const iso2 = name ? isoCountries.getAlpha2Code(String(name), "en") : "";
   return iso2 ? String(iso2).toUpperCase() : "";
 }
-
 
 function displayCountry(user) {
   return (
@@ -138,7 +114,6 @@ function flagEmojiFromISO2(code) {
   try { return String.fromCodePoint(...pts); } catch { return ""; }
 }
 
-// normalize names so "Côte d’Ivoire" etc. match reliably
 const normName = (s) =>
   (s || "")
     .normalize("NFD")
@@ -148,12 +123,9 @@ const normName = (s) =>
     .replace(/\s+/g, " ")
     .trim();
 
-// name -> [lon, lat]
-
 function useCountryCentroids(geoUrl) {
   const [centroidsByName, setCentroidsByName] = useState({});
 
-  // load topojson and compute centroids once
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -164,7 +136,7 @@ function useCountryCentroids(geoUrl) {
         for (const f of gj.features) {
           const name = f?.properties?.name;
           if (!name) continue;
-          map[normName(name)] = geoCentroid(f); // [lon, lat]
+          map[normName(name)] = geoCentroid(f); 
         }
         if (alive) setCentroidsByName(map);
       } catch (e) {
@@ -174,7 +146,6 @@ function useCountryCentroids(geoUrl) {
     return () => { alive = false; };
   }, [geoUrl]);
 
-  // iso2 -> [lon, lat]
   const getCenterForISO2 = useCallback((iso2) => {
     if (!iso2) return null;
     const name = isoCountries.getName(String(iso2).toUpperCase(), "en");
@@ -188,8 +159,6 @@ function useCountryCentroids(geoUrl) {
   return getCenterForISO2;
 }
 
-
-// pastel country fills
 const PALETTE = [
   "#e3f2fd", "#e8f5e9", "#fff3e0", "#f3e5f5", "#ede7f6",
   "#fffde7", "#e0f2f1", "#fce4ec", "#e8eaf6", "#f1f8e9",
@@ -203,18 +172,13 @@ const countryColor = (name) => {
 /* -------------------------- Member card (left) -------------------------- */
 function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
   const isMobile = useMediaQuery("(max-width:600px)");
-  // email for the second line
   const email = u?.email || "";
-
-  // username taken from email before "@"
   const usernameFromEmail = email ? email.split("@")[0] : "";
-
-  // what to show in bold (top line)
   const name =
     u?.profile?.full_name ||
     `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
-    usernameFromEmail ||     // 👈 use "username" if no name
-    email;                   // final fallback
+    usernameFromEmail ||     
+    email;                   
 
   const company = u?.company_from_experience ?? "—";
   const title =
@@ -248,7 +212,6 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
           sx={{ width: 44, height: 44, cursor: "pointer", bgcolor: "#e2e8f0", color: "#334155", fontWeight: 700 }}
           onClick={() => onOpenProfile?.(u)}
         >
-          {/* fallback initial only when no image */}
           {!(u?.avatar_url) ? (name || "?").slice(0, 1).toUpperCase() : null}
         </Avatar>
 
@@ -279,7 +242,6 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
           </Typography>
         </Box>
 
-        {/* actions on the right */}
         <Stack direction="row" spacing={1} alignItems="center" flexShrink={0}>
           {status === "friends" ? (
             <Tooltip title="Open profile">
@@ -322,28 +284,28 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
 /* ------------------------------ page component ------------------------------ */
 export default function MembersPage() {
   const navigate = useNavigate();
-  const isCompact = useMediaQuery("(max-width:1024px)"); // mobile + tablet + 1024
+  // Changed logic: Trigger side-by-side mode earlier (at 900px, which is 'md')
+  const isCompact = useMediaQuery("(max-width:900px)"); 
   const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
-
   const getCenterForISO2 = useCountryCentroids(geoUrl);
-
 
   // state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
   const [q, setQ] = useState("");
+  
+  const [tabValue, setTabValue] = useState(0); 
 
   // map controls
   const [showMap, setShowMap] = useState(true);
-  const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 }); // pan/zoom state
+  const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 });
 
   const hasSideMap = !isCompact && showMap;
 
   // Tooltip state
-  const [tip, setTip] = React.useState(null); // { x, y, node }
+  const [tip, setTip] = React.useState(null); 
 
-  // Show / move / hide tooltip
   const showTip = (evt, node) => {
     const rect = mapBoxRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -364,15 +326,15 @@ export default function MembersPage() {
   };
   const hideTip = () => setTip(null);
 
-  // pagination
   const [page, setPage] = useState(1);
   const ROWS_PER_PAGE = 5;
 
-  // friend + unread
   const [friendStatusByUser, setFriendStatusByUser] = useState({});
 
   const mapBoxRef = useRef(null);
   const [mapSize, setMapSize] = useState({ w: 800, h: 400 });
+  
+  // Resize observer to ensure map fits container fluidly
   useEffect(() => {
     const el = mapBoxRef.current;
     if (!el) return;
@@ -384,7 +346,6 @@ export default function MembersPage() {
     return () => ro.disconnect();
   }, []);
 
-  // Who to show as a person's name
   const userDisplayName = (u) =>
     u?.profile?.full_name ||
     `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
@@ -416,22 +377,18 @@ export default function MembersPage() {
           ...tokenHeader(),
         },
         credentials: "include",
-        body: JSON.stringify({ to_user: Number(id) }), // ← key changed
+        body: JSON.stringify({ to_user: Number(id) }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok && r.status !== 200 && r.status !== 201) {
         throw new Error(d?.detail || "Failed to send request");
       }
-
-      // normalize possible variants from API
       const status = normalizeFriendStatus(d?.status || "pending_outgoing");
-
       setFriendStatusByUser((m) => ({ ...m, [id]: status }));
     } catch (e) {
       alert(e?.message || "Failed to send request");
     }
   }
-
 
   // data load
   useEffect(() => {
@@ -484,23 +441,23 @@ export default function MembersPage() {
     return () => { alive = false; ctrl.abort(); };
   }, [me?.id]);
 
-
-
-  // single search box: name + email + role + tags + location + company + title
   const filtered = useMemo(() => {
+    let sourceList = users;
+    if (tabValue === 1) {
+        sourceList = users.filter((u) => {
+            const status = (friendStatusByUser[u.id] || "").toLowerCase();
+            return status === "friends";
+        });
+    }
+
     const s = (q || "").toLowerCase().trim();
+    if (!s) return sourceList;
 
-    // if nothing typed, show all
-    if (!s) return users;
-
-    return users.filter((u) => {
-      // basic identity
+    return sourceList.filter((u) => {
       const fn = (u.first_name || "").toLowerCase();
       const ln = (u.last_name || "").toLowerCase();
       const em = (u.email || "").toLowerCase();
       const full = (u.profile?.full_name || "").toLowerCase();
-
-      // company / job / role
       const company = (u.company_from_experience || "").toLowerCase();
       const title = (
         u.position_from_experience ||
@@ -509,8 +466,6 @@ export default function MembersPage() {
         ""
       ).toLowerCase();
       const role = (u.profile?.role || u.role || "").toLowerCase();
-
-      // tags / skills (array or CSV string)
       let skills = [];
       const rawSkills =
         (u.profile && u.profile.skills) ||
@@ -524,8 +479,6 @@ export default function MembersPage() {
           .map((x) => x.trim().toLowerCase())
           .filter(Boolean);
       }
-
-      // location: country + city
       const countryName = (displayCountry(u) || "").toLowerCase();
       const city = (
         u.profile?.location_city ||
@@ -535,7 +488,6 @@ export default function MembersPage() {
         ""
       ).toLowerCase();
 
-      // build one big list of searchable fields
       const haystack = [
         fn,
         ln,
@@ -549,13 +501,11 @@ export default function MembersPage() {
         ...skills,
       ];
 
-      // match if ANY field contains the search text
       return haystack.some((v) => v && v.includes(s));
     });
-  }, [users, q]);
+  }, [users, q, tabValue, friendStatusByUser]);
 
 
-  // preload friend statuses (for map dot colors and cards)
   useEffect(() => {
     let alive = true;
     const ids = filtered
@@ -575,9 +525,8 @@ export default function MembersPage() {
       } catch { }
     })();
     return () => { alive = false; };
-  }, [filtered.map((u) => u.id).join("|")]); // eslint-disable-line
+  }, [filtered.map((u) => u.id).join("|")]); 
 
-  // markers from filtered list
   const liveMarkers = useMemo(() => {
     const byCountry = {};
     for (const u of filtered) {
@@ -630,17 +579,18 @@ export default function MembersPage() {
     return Object.values(map).map((e) => ({ ...e, total: e.users.length }));
   }, [filtered, friendStatusByUser]);
 
-  // Use preview when switch is ON, otherwise live markers;
-  // if live is empty, auto-fallback to preview so the map isn’t blank.
   const markers = liveMarkers;
 
-  // pagination
-  useEffect(() => setPage(1), [q]);
+  useEffect(() => setPage(1), [q, tabValue]);
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
   const pageCount = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
   const startIdx = (page - 1) * ROWS_PER_PAGE;
   const current = filtered.slice(startIdx, startIdx + ROWS_PER_PAGE);
 
-  // ensure page rows have friend status (for action buttons)
   useEffect(() => {
     let alive = true;
     const idsToLoad = current.map((u) => u.id).filter((id) => friendStatusByUser[id] === undefined);
@@ -657,7 +607,7 @@ export default function MembersPage() {
       } catch { }
     })();
     return () => { alive = false; };
-  }, [current.map((u) => u.id).join(",")]); // eslint-line-disable
+  }, [current.map((u) => u.id).join(",")]); 
 
   const handleOpenProfile = (m) => {
     const id = m?.id;
@@ -666,7 +616,6 @@ export default function MembersPage() {
   };
 
 
-  // map controls
   const zoomIn = () =>
     setMapPos((p) => ({ ...p, zoom: Math.min(MAX_ZOOM, +(p.zoom * ZOOM_STEP).toFixed(3)) }));
   const zoomOut = () =>
@@ -677,71 +626,97 @@ export default function MembersPage() {
   return (
     <>
       <Grid container spacing={hasSideMap ? 2 : 0}>
-        {/* Left: Member list (card style) */}
+        {/* Left: Member list */}
         <Grid
           item
           xs={12}
           md={hasSideMap ? 6 : 12}
           lg={hasSideMap ? 5 : 12}
           xl={hasSideMap ? 4 : 12}
+          sx={{ minWidth: 0 }} /* Prevent Grid blowout */
         >
           <Box
             sx={{
-              width: { xs: "120%", sm: "157%", md: "100%" },  // take full width of the grid item
-              mx: 0,           // follow container padding exactly (same as drawer)
+              width: "100%",  // Fixed: Removed unstable % widths (120/157%)
+              mx: 0, 
             }}
           >
-            {/* 👇 your updated Paper with search + map button is here */}
+            {/* Header Paper */}
             <Paper sx={{ p: 1.5, mb: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1}
-                alignItems={{ xs: "stretch", sm: "center" }}
-                justifyContent="space-between"
-              >
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Members ({filtered.length})
-                </Typography>
-
+              <Stack spacing={1}>
+                {/* Top Row: Title + Search */}
                 <Stack
-                  direction="row"
+                  direction={{ xs: "column", sm: "row" }}
                   spacing={1}
-                  alignItems="center"
-                  sx={{ width: { xs: "100%", sm: "100%", md: "auto" } }}
+                  alignItems={{ xs: "stretch", sm: "center" }}
+                  justifyContent="space-between"
                 >
-                  <TextField
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    size="small"
-                    placeholder="Search by name, role, tags, location"
-                    sx={{
-                      width: {
-                        xs: "100%", // 320 / 375 / 425
-                        sm: "100%", // 768 tablet etc.
-                        md: 320,    // desktop – fixed width search bar
-                      },
-                    }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon fontSize="small" />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {tabValue === 0 ? "All Members" : "My Friends"} ({filtered.length})
+                  </Typography>
 
-                  {isCompact && (
-                    <Tooltip title="View map">
-                      <IconButton
-                        size="small"
-                        onClick={() => setMapOverlayOpen(true)}
-                        sx={{ flexShrink: 0 }}
-                      >
-                        <MapRoundedIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{ width: { xs: "100%", sm: "100%", md: "auto" } }}
+                  >
+                    <TextField
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      size="small"
+                      placeholder="Search..."
+                      sx={{
+                        width: {
+                          xs: "100%", 
+                          sm: "100%", 
+                          md: 320,    
+                        },
+                      }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+
+                    {isCompact && (
+                      <Tooltip title="View map">
+                        <IconButton
+                          size="small"
+                          onClick={() => setMapOverlayOpen(true)}
+                          sx={{ flexShrink: 0 }}
+                        >
+                          <MapRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Stack>
                 </Stack>
+                
+                {/* Bottom Row: Tabs */}
+                <Tabs 
+                  value={tabValue} 
+                  onChange={handleTabChange}
+                  textColor="primary"
+                  indicatorColor="primary"
+                  variant="standard"
+                  sx={{ 
+                    minHeight: 40,
+                    borderBottom: `1px solid ${BORDER}`,
+                    "& .MuiTab-root": {
+                        textTransform: "none",
+                        fontWeight: 600,
+                        minHeight: 40,
+                        px: 2
+                    }
+                  }}
+                >
+                  <Tab label="All Members" />
+                  <Tab label="My Friends" />
+                </Tabs>
               </Stack>
             </Paper>
 
@@ -755,7 +730,6 @@ export default function MembersPage() {
 
             {!loading && !error && (
               <>
-                {/* Member cards */}
                 <Stack
                   spacing={1.25}
                   alignItems="stretch"
@@ -786,12 +760,15 @@ export default function MembersPage() {
                         border: `1px solid ${BORDER}`,
                       }}
                     >
-                      <Typography>No members match your search.</Typography>
+                      <Typography>
+                        {tabValue === 1 && Object.keys(friendStatusByUser).length === 0
+                          ? "No friends found."
+                          : "No members match your search."}
+                      </Typography>
                     </Paper>
                   )}
                 </Stack>
 
-                {/* Pagination at bottom */}
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
                   alignItems={{ xs: "flex-start", sm: "center" }}
@@ -821,9 +798,9 @@ export default function MembersPage() {
           </Box>
         </Grid>
 
-        {/* Right: map panel only on desktop / large */}
+        {/* Right: map panel */}
         {hasSideMap && (
-          <Grid item xs={12} md={6} lg={7} xl={8}>
+          <Grid item xs={12} md={6} lg={7} xl={8} sx={{ minWidth: 0 }}>
             <Paper
               sx={{
                 p: 1.5,
@@ -832,7 +809,7 @@ export default function MembersPage() {
                 position: { md: "sticky" },
                 top: 88,
                 height: { xs: 520, md: "calc(100vh - 140px)" },
-                width: 605,
+                width: 600, // Fixed: Changed from 605 to 100% to fit grid
                 display: "flex",
                 flexDirection: "column",
                 gap: 1,
@@ -845,7 +822,7 @@ export default function MembersPage() {
                 spacing={1}
               >
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Where members are from
+                  Where {tabValue === 1 ? "friends" : "members"} are from
                 </Typography>
                 <Stack direction="row" alignItems="center" spacing={2}>
                   <FormControlLabel
@@ -1052,7 +1029,7 @@ export default function MembersPage() {
         )}
       </Grid>
 
-      {/* 🔹 Full-screen map overlay for mobile / tablet / 1024 */}
+      {/* 🔹 Full-screen map overlay for mobile / tablet / 900px */}
       {isCompact && mapOverlayOpen && (
         <Box
           sx={{
@@ -1100,7 +1077,7 @@ export default function MembersPage() {
               spacing={1}
             >
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Where members are from
+                Where {tabValue === 1 ? "friends" : "members"} are from
               </Typography>
               <Stack direction="row" alignItems="center" spacing={2}>
                 <FormControlLabel
@@ -1307,4 +1284,3 @@ export default function MembersPage() {
     </>
   );
 }
-
