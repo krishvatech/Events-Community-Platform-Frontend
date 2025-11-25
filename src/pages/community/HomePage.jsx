@@ -3750,10 +3750,16 @@ const FIELD_OF_STUDY_OPTIONS = [
 function AboutTab({ profile, groups, onUpdate }) {
   // ----- dialogs & forms -----
   const [aboutOpen, setAboutOpen] = React.useState(false);
+  // "description" when opened from About, "skills" when opened from Skills
+  const [aboutMode, setAboutMode] = React.useState("description");
+
   const [aboutForm, setAboutForm] = React.useState({
     bio: profile.bio || "",
-    skillsText: (profile.skills || []).join(", "),
+    skillsText: Array.isArray(profile.skills)
+      ? JSON.stringify(profile.skills)
+      : profile.skills || "",
   });
+
 
   const [eduOpen, setEduOpen] = React.useState(false);
   const [editEduId, setEditEduId] = React.useState(null);
@@ -3841,8 +3847,18 @@ function AboutTab({ profile, groups, onUpdate }) {
     }));
   }, [onUpdate]);
 
-  // ----- About (summary + skills) -----
-  const openEditAbout = () => setAboutOpen(true);
+  // mode = "description" | "skills"
+  const openEditAbout = (mode = "description") => {
+    setAboutMode(mode);
+    setAboutForm({
+      bio: profile.bio || "",
+      // show as simple CSV in the textbox, like LinkedIn screenshot
+      skillsText: (profile.skills || []).join(", "),
+    });
+    setAboutOpen(true);
+  };
+
+
   const saveAbout = async () => {
     try {
       const payload = {
@@ -4167,19 +4183,65 @@ function AboutTab({ profile, groups, onUpdate }) {
         <Grid item xs={12} md={6} sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 } }}>
           <SectionCard
             title="About"
-            action={<Tooltip title="Edit about"><IconButton size="small" onClick={openEditAbout}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+            action={
+              <Tooltip title="Edit about">
+                <IconButton size="small" onClick={() => openEditAbout("description")}>
+                  <EditRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            }
             sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
           >
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Summary:</Typography>
-            {profile.bio ? <Typography variant="body2">{profile.bio}</Typography>
-              : <Typography variant="body2" color="text.secondary">—</Typography>}
+            <Typography
+              variant="subtitle2"
+              color="text.secondary"
+              sx={{ mb: 0.5 }}
+            >
+              Description
+            </Typography>
 
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Skills:</Typography>
-            {profile.skills && profile.skills.length
-              ? <SkillsChips skills={profile.skills} />
-              : <Typography variant="body2" color="text.secondary">—</Typography>}
+            {profile.bio ? (
+              <Typography variant="body2">{profile.bio}</Typography>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                List your major duties and successes, highlighting specific projects.
+              </Typography>
+            )}
+
+            {/* small caption like LinkedIn "0/2000" */}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 0.75, ml: "auto" }}
+            >
+              {(profile.bio || "").length}/2000
+            </Typography>
           </SectionCard>
-
+          <SectionCard
+            title="Skills"
+            action={
+              <Tooltip title="Edit skills">
+                <IconButton size="small" onClick={() => openEditAbout("skills")}>
+                  <EditRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            }
+            sx={{ mt: 2, display: "flex", flexDirection: "column" }}
+          >
+            <Typography
+              variant="subtitle2"
+              color="text.secondary"
+              sx={{ mb: 0.5 }}
+            >
+              Skills
+            </Typography>
+            {/* existing skills preview, if any */}
+            {profile.skills && profile.skills.length ? (
+              <Box sx={{ mb: 1 }}>
+                <SkillsChips skills={profile.skills} />
+              </Box>
+            ) : null}
+          </SectionCard>
           <SectionCard
             title="Experience"
             action={<Tooltip title="Add experience"><IconButton size="small" onClick={() => openAddExperience()}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}
@@ -4345,19 +4407,116 @@ function AboutTab({ profile, groups, onUpdate }) {
       {/* --- Dialogs --- */}
 
       {/* Edit About */}
-      <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Edit About</DialogTitle>
+      <Dialog
+        open={aboutOpen}
+        onClose={() => setAboutOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        {/* Title changes based on mode */}
+        <DialogTitle>
+          {aboutMode === "skills" ? "Edit skills" : "Edit description"}
+        </DialogTitle>
+
         <DialogContent>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>Update your summary and skills</Typography>
-          <TextField label="Summary" value={aboutForm.bio} onChange={(e) => setAboutForm((f) => ({ ...f, bio: e.target.value }))} fullWidth multiline minRows={4} sx={{ mb: 2 }} />
-          <TextField label="Skills (CSV or JSON array)" value={aboutForm.skillsText} onChange={(e) => setAboutForm((f) => ({ ...f, skillsText: e.target.value }))} fullWidth helperText="Saved as a list of strings" />
-          <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
-            {parseSkills(aboutForm.skillsText).length ? parseSkills(aboutForm.skillsText).map((s, i) => <Chip key={i} label={s} size="small" />) : <Typography variant="caption" color="text.secondary">No skills parsed yet</Typography>}
-          </Box>
+          {/* DESCRIPTION MODE */}
+          {aboutMode === "description" && (
+            <Box sx={{ mb: 3 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{ mb: 0.5 }}
+              >
+                Description
+              </Typography>
+
+              <TextField
+                placeholder="List your major duties and successes, highlighting specific projects"
+                value={aboutForm.bio}
+                onChange={(e) =>
+                  setAboutForm((f) => ({ ...f, bio: e.target.value }))
+                }
+                fullWidth
+                multiline
+                minRows={4}
+              />
+
+              {/* helper text + character counter */}
+              <Box
+                sx={{
+                  mt: 0.5,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Review and edit the draft before saving so it reflects you.
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {(aboutForm.bio?.length || 0)}/2000
+                </Typography>
+              </Box>
+
+              {/* static LinkedIn-style button */}
+              <Box sx={{ mt: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                // purely visual, no handler for now
+                >
+                  Rewrite with AI
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+          {/* SKILLS MODE */}
+          {aboutMode === "skills" && (
+            <Box>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{ mb: 0.5 }}
+              >
+                Skills
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1 }}
+              >
+                We recommend adding your top 5 used in this role. They’ll also appear
+                in your Skills section.
+              </Typography>
+
+              <TextField
+                label="Skills (CSV or JSON array)"
+                value={aboutForm.skillsText}
+                onChange={(e) =>
+                  setAboutForm((f) => ({ ...f, skillsText: e.target.value }))
+                }
+                fullWidth
+                helperText="Saved as a list of strings"
+              />
+
+              {/* live preview of parsed skills */}
+              <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
+                {parseSkills(aboutForm.skillsText).length
+                  ? parseSkills(aboutForm.skillsText).map((skill, idx) => (
+                    <Chip key={idx} size="small" label={skill} />
+                  ))
+                  : null}
+              </Box>
+            </Box>
+          )}
         </DialogContent>
+
         <DialogActions>
           <Button onClick={() => setAboutOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveAbout}>Save</Button>
+          <Button variant="contained" onClick={saveAbout}>
+            Save
+          </Button>
         </DialogActions>
       </Dialog>
 
