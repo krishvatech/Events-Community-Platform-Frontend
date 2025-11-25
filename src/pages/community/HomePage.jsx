@@ -863,252 +863,6 @@ function PostCard({ post, avatarUrl, actorName }) {
   );
 }
 
-function MyPostsList({ posts, avatarUrl, actorName }) {
-  if (!posts || posts.length === 0) {
-    return (
-      <Card variant="outlined" sx={{ borderRadius: 3 }}>
-        <CardContent><Typography>No posts yet.</Typography></CardContent>
-      </Card>
-    );
-  }
-  return (
-    <Stack spacing={2}>
-      {posts.map((p) => (
-        <PostCard key={p.id} post={p} avatarUrl={avatarUrl} actorName={actorName} />
-      ))}
-    </Stack>
-  );
-}
-
-function MyGroups({ groups }) {
-  const [query, setQuery] = React.useState("");
-  const [page, setPage] = React.useState(1);
-  const perPage = 5;
-  const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return groups;
-    return groups.filter((g) =>
-      (g.name || "").toLowerCase().includes(q) ||
-      (g.description || "").toLowerCase().includes(q)
-    );
-  }, [groups, query]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-  const startIdx = (page - 1) * perPage;
-  const endIdx = Math.min(startIdx + perPage, filtered.length);
-  const pageItems = filtered.slice(startIdx, endIdx);
-  React.useEffect(() => { setPage(1); }, [query, groups.length]);
-  return (
-    <Card variant="outlined" sx={{ borderRadius: 3 }}>
-      <CardHeader title="Joined Groups" sx={{ pb: 0 }} />
-      <CardContent sx={{ pt: 1, pb: 0 }}>
-        <TextField
-          fullWidth
-          placeholder="Search groups"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }}
-        />
-      </CardContent>
-      <List disablePadding>
-        {pageItems.length === 0 && (<ListItem><ListItemText primary="No groups match your search." /></ListItem>)}
-        {pageItems.map((g, idx) => (
-          <React.Fragment key={g.id}>
-            <ListItem alignItems="flex-start" secondaryAction={<Chip label={`${g.member_count ?? 0} members`} size="small" />}>
-              <ListItemAvatar>
-                <Avatar
-                  src={g.cover_image || undefined}
-                  alt={g.name || "Group"}
-                  imgProps={{ referrerPolicy: "no-referrer" }}
-                >
-                  {(g.name || "").slice(0, 1).toUpperCase()}
-                </Avatar>
-              </ListItemAvatar>
-              <ListItemText
-                primary={
-                  <Typography
-                    fontWeight={600}
-                    component={RouterLink}
-                    to={`/community/groups/${g.id}`}
-                    style={{ textDecoration: "none", color: "inherit" }}
-                  >
-                    {g.name}
-                  </Typography>
-                }
-                secondary={g.description && (
-                  <Typography variant="body2" color="text.secondary" sx={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                    {g.description}
-                  </Typography>
-                )}
-              />
-            </ListItem>
-            {idx < pageItems.length - 1 && <Divider component="li" />}
-          </React.Fragment>
-        ))}
-      </List>
-      <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between" sx={{ p: 2, pt: 1 }}>
-        <Typography variant="body2" color="text.secondary">Showing {filtered.length === 0 ? 0 : startIdx + 1}–{endIdx} of {filtered.length}</Typography>
-        <Pagination count={totalPages} page={page} onChange={(_, p) => setPage(p)} color="primary" size="medium" siblingCount={0} boundaryCount={1} />
-      </Stack>
-    </Card>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Friends list (new)
-// -----------------------------------------------------------------------------
-// Put this small helper once (top of file or near other utils)
-const toAbsolute = (u) =>
-  !u
-    ? ""
-    : /^https?:\/\//i.test(u)
-      ? u
-      : `${(import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN)}${u.startsWith("/") ? "" : "/"}${u}`;
-
-
-function normalizeFriend(row) {
-  // accept common payload shapes
-  const u = row?.friend || row?.user || row || {};
-  const profile = u.profile || u.userprofile || u.user_profile || row?.profile || {};
-
-  const id = u.id ?? row.id;
-  const first = u.first_name || u.firstName || "";
-  const last = u.last_name || u.lastName || "";
-
-  // Match the same priority you already use elsewhere (profile → flat → legacy)
-  const avatarRaw =
-    profile.user_image_url ||
-    profile.user_image ||
-    u.user_image_url ||
-    u.user_image ||
-    row.user_image ||                 // sometimes it lives on the row itself
-    u.image_url ||
-    u.photo_url ||
-    u.avatar_url ||
-    u.profile_image ||
-    u.avatar ||
-    "";
-
-  return {
-    id,
-    name: `${first} ${last}`.trim() || u.username || "Friend",
-    avatar: toAbsolute(avatarRaw),
-    headline: u.job_title || u.title || u.bio || "",
-    mutual_count: row?.mutual_count ?? row?.mutuals ?? 0,
-  };
-}
-
-
-function MyFriends({ friends }) {
-  const [query, setQuery] = React.useState("");
-  const [page, setPage] = React.useState(1);
-  const perPage = 8;
-
-  const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return friends;
-    return friends.filter((f) =>
-      f.name.toLowerCase().includes(q) || (f.headline || "").toLowerCase().includes(q)
-    );
-  }, [friends, query]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-  const startIdx = (page - 1) * perPage;
-  const endIdx = Math.min(startIdx + perPage, filtered.length);
-  const pageItems = filtered.slice(startIdx, endIdx);
-
-  React.useEffect(() => { setPage(1); }, [query, friends.length]);
-
-  return (
-    <Card variant="outlined" sx={{ borderRadius: 3 }}>
-      <CardHeader title="My Friends" sx={{ pb: 0 }} />
-      <CardContent sx={{ pt: 1 }}>
-        <TextField
-          fullWidth
-          placeholder="Search friends"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }}
-          sx={{ mb: 2 }}
-        />
-
-        {pageItems.length === 0 ? (
-          <Typography color="text.secondary">No friends found.</Typography>
-        ) : (
-          <List disablePadding>
-            {pageItems.map((f, idx) => (
-              <React.Fragment key={f.id}>
-                <ListItem
-                  alignItems="flex-start"
-                  secondaryAction={
-                    f.mutual_count ? <Chip size="small" label={`${f.mutual_count} mutual`} /> : null
-                  }
-                  sx={{
-                    px: 1,
-                    py: 1,
-                    "& .MuiListItemSecondaryAction-root": { right: { xs: 8, sm: 12 } },
-                  }}
-                >
-                  <ListItemAvatar>
-                    <Avatar
-                      src={f.avatar}
-                      imgProps={{ referrerPolicy: "no-referrer" }}
-                      component={RouterLink}
-                      to={`/community/rich-profile/${f.id}`}
-                      sx={{ cursor: "pointer" }}
-                    >
-                      {(f.name?.[0] || "").toUpperCase()}
-                    </Avatar>
-                  </ListItemAvatar>
-
-                  <ListItemText
-                    primary={
-                      <Typography
-                        fontWeight={600}
-                        component={RouterLink}
-                        to={`/community/rich-profile/${f.id}`}
-                        style={{ textDecoration: "none", color: "inherit" }}
-                      >
-                        {f.name}
-                      </Typography>
-                    }
-                    secondary={
-                      <Typography variant="body2" color="text.secondary">
-                        {f.headline || "—"}
-                      </Typography>
-                    }
-                  />
-                </ListItem>
-                {idx < pageItems.length - 1 && <Divider component="li" />}
-              </React.Fragment>
-            ))}
-          </List>
-        )}
-      </CardContent>
-
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ p: 2, pt: 0 }}
-      >
-        <Typography variant="body2" color="text.secondary">
-          Showing {filtered.length === 0 ? 0 : startIdx + 1}–{endIdx} of {filtered.length}
-        </Typography>
-        <Pagination
-          count={totalPages}
-          page={page}
-          onChange={(_, p) => setPage(p)}
-          color="primary"
-          size="medium"
-          siblingCount={0}
-          boundaryCount={1}
-        />
-      </Stack>
-    </Card>
-  );
-}
-
-
 
 // -----------------------------------------------------------------------------
 // API mappers
@@ -1180,8 +934,7 @@ function mapCreateResponseToUiPost(resp) {
 // -----------------------------------------------------------------------------
 // Main page
 // -----------------------------------------------------------------------------
-
-const TAB_LABELS = ["My Posts", "My Groups", "My Friends", "About"];
+const TAB_LABELS = ["About"];
 export default function HomePage() {
   const PAGE_MAX_W = 1120;
   const [myCommunityId, setMyCommunityId] = React.useState(null);
@@ -1774,7 +1527,7 @@ export default function HomePage() {
             }}
           >
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              {TAB_LABELS[tabIndex] || "My Posts"}
+              {TAB_LABELS[tabIndex] || "About"}
             </Typography>
             <IconButton
               size="small"
@@ -1787,33 +1540,13 @@ export default function HomePage() {
 
           <Divider />
           <CardContent>
-            {tabIndex === 0 && (
-              <Stack spacing={2}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h6">My Posts</Typography>
-                  <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setDialogOpen(true)}>
-                    Create Post
-                  </Button>
-                </Stack>
-                <ScrollThreeVisible>
-                  <MyPostsList
-                    posts={posts}
-                    avatarUrl={profile.avatar}
-                    actorName={fullName}
-                  />
-                </ScrollThreeVisible>
-              </Stack>
-            )}
-            {tabIndex === 1 && <MyGroups groups={groups} />}
-            {tabIndex === 2 && <MyFriends friends={friends} />}     {/* ← NEW */}
-            {tabIndex === 3 && (
-              <AboutTab
-                profile={profile}
-                groups={groups}
-                onUpdate={handleUpdateProfile}
-              />
-            )}
+            <AboutTab
+              profile={profile}
+              groups={groups}
+              onUpdate={handleUpdateProfile}
+            />
           </CardContent>
+
         </Card>
 
         {/* Mobile drawer for tabs – right side, like community sidebar */}
