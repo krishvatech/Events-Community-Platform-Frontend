@@ -416,18 +416,122 @@ function RichPostCard({
             ))}
           </Stack>
         )}
-        {post.type === "poll" && Array.isArray(post.options) && post.options.length > 0 && (
-          <List dense sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-            {post.options.map((opt, idx) => (
-              <ListItem key={idx} disableGutters sx={{ px: 1 }}>
-                <ListItemAvatar>
-                  <Avatar sx={{ width: 28, height: 28 }}>{idx + 1}</Avatar>
-                </ListItemAvatar>
-                <ListItemText primary={opt} />
-              </ListItem>
-            ))}
-          </List>
-        )}
+        {post.type === "poll" &&
+          Array.isArray(post.options) &&
+          post.options.length > 0 &&
+          (() => {
+            // Normalise options and compute totals (same logic style as HomePage)
+            const normalized = post.options.map((opt, idx) => {
+              const optionId =
+                typeof opt === "object"
+                  ? opt.id ?? opt.option_id ?? null
+                  : null;
+
+              const label =
+                typeof opt === "string"
+                  ? opt
+                  : opt?.text ??
+                  opt?.label ??
+                  opt?.option ??
+                  opt?.value ??
+                  `Option ${idx + 1}`;
+
+              const votes =
+                typeof opt === "object"
+                  ? (typeof opt.vote_count === "number"
+                    ? opt.vote_count
+                    : typeof opt.votes === "number"
+                      ? opt.votes
+                      : 0)
+                  : 0;
+
+              return { idx, optionId, label, votes };
+            });
+
+            const totalVotes = normalized.reduce(
+              (sum, o) => sum + (o.votes || 0),
+              0
+            );
+
+            return (
+              <Box sx={{ mt: 2 }}>
+                {normalized.map(({ idx, optionId, label, votes }) => {
+                  const pct =
+                    totalVotes > 0
+                      ? Math.round((votes / totalVotes) * 100)
+                      : 0;
+
+                  return (
+                    <Box
+                      key={optionId ?? idx}
+                      sx={{
+                        mb: 1.5,
+                        cursor: optionId ? "pointer" : "default",
+                      }}
+                      onClick={() => {
+                        if (!optionId) return;
+                        if (
+                          typeof window !== "undefined" &&
+                          window.__votePollOption
+                        ) {
+                          window.__votePollOption(post.id, optionId);
+                        }
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        sx={{ mb: 0.5 }}
+                      >
+                        <Typography variant="body2">{label}</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {pct}%
+                        </Typography>
+                      </Stack>
+
+                      <LinearProgress
+                        variant="determinate"
+                        value={pct}
+                        sx={{
+                          height: 10,
+                          borderRadius: 5,
+                          "& .MuiLinearProgress-bar": {
+                            borderRadius: 5,
+                          },
+                        }}
+                      />
+
+                      <Button
+                        size="small"
+                        sx={{ mt: 0.5, pl: 0 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!optionId) return;
+                          if (
+                            typeof window !== "undefined" &&
+                            window.__openPollVotes
+                          ) {
+                            window.__openPollVotes(
+                              post.id,
+                              optionId,
+                              label
+                            )?.();
+                          }
+                        }}
+                      >
+                        {votes} {votes === 1 ? "vote" : "votes"}
+                      </Button>
+                    </Box>
+                  );
+                })}
+
+                <Typography variant="caption" color="text.secondary">
+                  Total: {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
+                </Typography>
+              </Box>
+            );
+          })()}
       </CardContent>
       {/* Meta strip: likes bubble + shares count (same style as HomePage) */}
       <Box sx={{ px: 1.25, pt: 0.75, pb: 0.5 }}>
@@ -584,55 +688,19 @@ function pickBestExperience(exps = []) {
   })[0];
 }
 
+
 function ProfileCommentsDialog({ open, onClose, postId }) {
   const [loading, setLoading] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [comments, setComments] = React.useState([]);
-  const [body, setBody] = React.useState("");
+  const [items, setItems] = React.useState([]);       // raw comments from API
+  const [text, setText] = React.useState("");        // composer text
+  const [replyTo, setReplyTo] = React.useState(null); // which comment we’re replying to
+  const [deleteTarget, setDeleteTarget] = React.useState(null);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
 
-  // Normalize comment shape → { id, text, authorName, authorAvatar }
-  function normalizeComment(row = {}) {
-    const author =
-      row.author ||
-      row.user ||
-      row.profile ||
-      row.created_by ||
-      row.owner ||
-      {};
 
-    const name =
-      author.name ||
-      author.full_name ||
-      (author.first_name || author.last_name
-        ? `${author.first_name || ""} ${author.last_name || ""}`.trim()
-        : author.username) ||
-      "User";
-
-    const avatar =
-      author.avatar ||
-      author.avatar_url ||
-      author.user_image ||
-      author.user_image_url ||
-      author.image ||
-      author.photo ||
-      "";
-
-    const text =
-      row.text ||
-      row.body ||
-      row.comment ||
-      row.content ||
-      "";
-
-    return {
-      id: row.id ?? row.pk,
-      text,
-      authorName: name,
-      authorAvatar: avatar,
-    };
-  }
-
-  const fetchComments = React.useCallback(async () => {
+  // -------- Load comments (root + replies) --------
+  const load = React.useCallback(async () => {
     if (!open || !postId) return;
     setLoading(true);
     try {
@@ -648,7 +716,6 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
         }
       );
 
-      let list = [];
       if (res.ok) {
         const j = await res.json().catch(() => null);
         const raw = Array.isArray(j?.results)
@@ -656,29 +723,93 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
           : Array.isArray(j)
             ? j
             : [];
-        list = raw.map(normalizeComment);
+        setItems(raw);
+      } else {
+        setItems([]);
       }
-      setComments(list);
     } catch (e) {
       console.error("Failed to load comments:", e);
-      setComments([]);
+      setItems([]);
     } finally {
       setLoading(false);
     }
   }, [open, postId]);
 
   React.useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+    load();
+  }, [load]);
 
-  async function handleSubmit(e) {
-    e?.preventDefault?.();
-    const text = (body || "").trim();
-    if (!text || !postId) return;
+  // -------- Build tree (roots + children) & add authorName / avatar --------
+  const roots = React.useMemo(() => {
+    const map = new Map();
+
+    (items || []).forEach((row) => {
+      const author =
+        row.author ||
+        row.user ||
+        row.profile ||
+        row.created_by ||
+        row.owner ||
+        {};
+
+      const name =
+        author.name ||
+        author.full_name ||
+        (author.first_name || author.last_name
+          ? `${author.first_name || ""} ${author.last_name || ""}`.trim()
+          : author.username) ||
+        "User";
+
+      const avatar =
+        author.avatar ||
+        author.avatar_url ||
+        author.user_image ||
+        author.user_image_url ||
+        author.image ||
+        author.photo ||
+        "";
+
+      map.set(row.id, {
+        ...row,
+        authorName: name,
+        authorAvatar: avatar,
+        children: [],
+      });
+    });
+
+    map.forEach((c) => {
+      if (c.parent_id && map.get(c.parent_id)) {
+        map.get(c.parent_id).children.push(c);
+      }
+    });
+
+    const all = Array.from(map.values());
+    const rootNodes = all.filter((c) => !c.parent_id);
+
+    // newest first
+    rootNodes.sort(
+      (a, b) =>
+        new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    );
+
+    return rootNodes;
+  }, [items]);
+
+  // -------- Create / reply comment (POST) --------
+  async function createComment(body, parentId = null) {
+    const trimmed = (body || "").trim();
+    if (!trimmed || !postId) return;
 
     setSubmitting(true);
     try {
-      const payload = { text, target_id: Number(postId) };
+      const topLevelPayload = {
+        text: trimmed,
+        target_id: Number(postId),
+      };
+
+      const payload = parentId
+        ? { text: trimmed, parent: parentId } // reply – backend uses parent to inherit target
+        : topLevelPayload;
 
       const res = await fetch(`${API_BASE}/engagements/comments/`, {
         method: "POST",
@@ -691,8 +822,9 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
       });
 
       if (res.ok) {
-        setBody("");
-        await fetchComments();   // reload with new comment
+        setText("");
+        setReplyTo(null);
+        await load();
       } else {
         console.error("Comment POST failed:", res.status);
       }
@@ -703,72 +835,223 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
     }
   }
 
-  return (
-    <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Comments</DialogTitle>
-      <DialogContent dividers>
-        {loading ? (
-          <Stack alignItems="center" py={3}>
-            <CircularProgress size={22} />
-          </Stack>
-        ) : comments.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            No comments yet. Be the first to comment.
-          </Typography>
-        ) : (
-          <List dense sx={{ mb: 2 }}>
-            {comments.map((c) => (
-              <ListItem key={c.id} alignItems="flex-start">
-                <ListItemAvatar>
-                  <Avatar src={c.authorAvatar}>
-                    {(c.authorName || "U").slice(0, 1)}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={
-                    <Typography
-                      variant="body2"
-                      sx={{ whiteSpace: "pre-wrap" }}
-                    >
-                      {c.text}
-                    </Typography>
-                  }
-                  secondary={
-                    <Typography variant="caption" color="text.secondary">
-                      {c.authorName}
-                    </Typography>
-                  }
-                />
-              </ListItem>
-            ))}
-          </List>
-        )}
+  // -------- Delete comment (and its replies) --------
+  function handleDelete(c) {
+    // just open the modern dialog
+    setDeleteTarget(c);
+  }
 
-        <Box component="form" onSubmit={handleSubmit}>
-          <TextField
-            fullWidth
-            multiline
-            minRows={2}
-            placeholder="Write a comment…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            disabled={submitting}
-          />
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={submitting}>
-          Close
-        </Button>
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={submitting || !body.trim()}
-        >
-          {submitting ? "Posting…" : "Post"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/engagements/comments/${deleteTarget.id}/`,
+        {
+          method: "DELETE",
+          headers: { ...tokenHeader(), Accept: "application/json" },
+          credentials: "include",
+        }
+      );
+
+      if (res.ok || res.status === 204) {
+        setDeleteTarget(null);
+        await load();   // reload comments
+      } else {
+        console.error("Delete failed", res.status);
+        alert("Could not delete comment. Please try again.");
+      }
+    } catch (e) {
+      console.error("Failed to delete comment", e);
+      alert("Could not delete comment. Please try again.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+
+  // -------- Single comment item (with nested replies) --------
+  function CommentItem({ c, depth = 0 }) {
+    return (
+      <Box sx={{ pl: depth ? 5 : 0, mt: depth ? 0.75 : 1 }}>
+        <Stack direction="row" spacing={1} alignItems="flex-start">
+          <Avatar sx={{ width: 32, height: 32 }} src={c.authorAvatar}>
+            {(c.authorName || "U").slice(0, 1)}
+          </Avatar>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle2">
+              {c.authorName}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ whiteSpace: "pre-wrap" }}
+            >
+              {c.text || c.body || ""}
+            </Typography>
+
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ mt: 0.5 }}
+            >
+              <Button
+                size="small"
+                onClick={() => setReplyTo(c)}
+              >
+                Reply
+              </Button>
+
+              <Button
+                size="small"
+                color="error"
+                onClick={() => handleDelete(c)}
+              >
+                Delete
+              </Button>
+            </Stack>
+
+            {c.children && c.children.length > 0 && (
+              <Box sx={{ mt: 0.5 }}>
+                {c.children.map((child) => (
+                  <CommentItem
+                    key={child.id}
+                    c={child}
+                    depth={depth + 1}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+        </Stack>
+      </Box>
+    );
+  }
+
+  return (
+    <>
+      <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Comments</DialogTitle>
+
+        <DialogContent dividers>
+          {loading ? (
+            <Stack alignItems="center" py={3}>
+              <CircularProgress size={22} />
+            </Stack>
+          ) : roots.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No comments yet. Be the first to comment.
+            </Typography>
+          ) : (
+            <Box sx={{ mb: 2 }}>
+              {roots.map((c) => (
+                <CommentItem key={c.id} c={c} />
+              ))}
+            </Box>
+          )}
+
+          {replyTo && (
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ mb: 1 }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Replying to {replyTo.authorName || "comment"}
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => setReplyTo(null)}
+              >
+                Cancel
+              </Button>
+            </Stack>
+          )}
+
+          <Box
+            component="form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              createComment(text, replyTo?.id || null);
+            }}
+          >
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              placeholder={
+                replyTo ? "Write a reply…" : "Write a comment…"
+              }
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              disabled={submitting}
+            />
+          </Box>
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={onClose} disabled={submitting}>
+            Close
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => createComment(text, replyTo?.id || null)}
+            disabled={submitting || !text.trim()}
+          >
+            {submitting ? "Posting…" : "Post"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modern delete confirm dialog */}
+      <Dialog
+        open={!!deleteTarget}
+        onClose={deleteBusy ? undefined : () => setDeleteTarget(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete comment?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Are you sure you want to delete this comment? This action
+            cannot be undone.
+          </Typography>
+
+          {deleteTarget && (
+            <Box
+              mt={2}
+              p={1.5}
+              sx={{ bgcolor: "grey.100", borderRadius: 1 }}
+            >
+              <Typography
+                variant="body2"
+                sx={{ whiteSpace: "pre-wrap" }}
+              >
+                {deleteTarget.text || deleteTarget.body || ""}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteTarget(null)}
+            disabled={deleteBusy}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmDelete}
+            disabled={deleteBusy}
+          >
+            {deleteBusy ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
 
@@ -1165,6 +1448,97 @@ export default function RichProfile() {
   // Per-row friendship status inside Connections dialog
   const [connFriendStatus, setConnFriendStatus] = useState({}); // { [userId]: "friends" | "pending_outgoing" | "pending_incoming" | "none" }
   const [connSubmitting, setConnSubmitting] = useState({});     // { [userId]: boolean }
+
+  React.useEffect(() => {
+    // 🔹 Global helper used by the poll UI in RichProfile
+    window.__votePollOption = async (postId, optionId) => {
+      if (!postId || !optionId) return;
+
+      try {
+        const res = await fetch(
+          `${API_BASE}/activity/feed/${postId}/poll/vote/`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...tokenHeader(),      // 🔹 same auth as other API calls in this file
+            },
+            body: JSON.stringify({ option_ids: [optionId] }), // ✅ IMPORTANT
+          }
+        );
+
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          console.error("Poll vote failed:", res.status, txt);
+          alert("Could not register your vote.");
+          return;
+        }
+
+        // (Optional) If backend returns updated options, you can merge them into local state here.
+        // const data = await res.json().catch(() => null);
+        // if (data && Array.isArray(data.options)) {
+        //   setPosts(prev =>
+        //     prev.map((p) =>
+        //       p.id === postId && p.type === "poll"
+        //         ? { ...p, options: data.options }
+        //         : p
+        //     )
+        //   );
+        // }
+      } catch (err) {
+        console.error("Error voting on poll:", err);
+        alert("Could not register your vote.");
+      }
+    };
+
+    // If you already have __openPollVotes here, keep it below:
+    // window.__openPollVotes = (postId, optionId, label) => { ... };
+
+    return () => {
+      try {
+        delete window.__votePollOption;
+        delete window.__openPollVotes;
+      } catch { }
+    };
+  }, []);
+
+
+  useEffect(() => {
+    // allow voting on polls from RichProfile page
+    window.__votePollOption = async (postId, optionId) => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/activity/feed/${postId}/poll/vote/`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...tokenHeader(),
+            },
+            credentials: "include",
+            body: JSON.stringify({ option_ids: [optionId] }),
+          }
+        );
+
+        if (!res.ok) {
+          console.error("Poll vote failed:", res.status);
+        }
+      } catch (err) {
+        console.error("Poll vote error:", err);
+      }
+    };
+
+    // optional stub: you can later show a dialog with who voted
+    window.__openPollVotes = (postId, optionId, label) => {
+      console.log("openPollVotes (RichProfile) →", { postId, optionId, label });
+      // later you can implement a dialog here if you want
+    };
+
+    return () => {
+      delete window.__votePollOption;
+      delete window.__openPollVotes;
+    };
+  }, []);
 
   async function fetchFriendStatus(targetId) {
     try {

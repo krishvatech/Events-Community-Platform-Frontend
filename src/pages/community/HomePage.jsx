@@ -108,6 +108,7 @@ function mapExperience(item) {
     compensation_type: item.compensation_type || "",
     work_arrangement: item.work_arrangement || "",
     location: item.location || "",
+    exit_reason: item.exit_reason || "",
   };
 }
 
@@ -1928,7 +1929,6 @@ export default function HomePage() {
         target={pollVotesTarget}
         onClose={() => setPollVotesOpen(false)}
       />
-
       <AvatarUploadDialog
         open={avatarDialogOpen}
         file={avatarFile}
@@ -3935,6 +3935,7 @@ async function createExperienceApi(payload) {
       career_stage: payload.career_stage || "",
       compensation_type: payload.compensation_type || "",
       work_arrangement: payload.work_arrangement || "",
+      exit_reason: payload.exit_reason || "",
     }),
   });
   const j = await r.json().catch(() => ({}));
@@ -3960,6 +3961,7 @@ async function updateExperienceApi(id, payload) {
       career_stage: payload.career_stage || "",
       compensation_type: payload.compensation_type || "",
       work_arrangement: payload.work_arrangement || "",
+      exit_reason: payload.exit_reason || "",
     }),
   });
   const j = await r.json().catch(() => ({}));
@@ -3976,6 +3978,41 @@ async function deleteExperienceApi(id) {
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete experience");
 }
 
+// ---- Education dropdown options ----
+const SCHOOL_OPTIONS = [
+  "Harvard University",
+  "Stanford University",
+  "Indian Institute of Technology Bombay",
+  "Indian Institute of Management Ahmedabad",
+  "University of Oxford",
+  "University of Cambridge",
+  "Massachusetts Institute of Technology (MIT)",
+  "National University of Singapore",
+  "University of Mumbai",
+  "University of Delhi",
+  // add more as needed...
+];
+
+const FIELD_OF_STUDY_OPTIONS = [
+  "Computer Science",
+  "Information Technology",
+  "Electronics & Communication Engineering",
+  "Mechanical Engineering",
+  "Civil Engineering",
+  "Business Administration",
+  "Finance",
+  "Marketing",
+  "Economics",
+  "Psychology",
+  "Law",
+  "Medicine",
+  "Pharmacy",
+  "Design",
+  "Data Science",
+  // add more as needed...
+];
+
+
 
 function AboutTab({ profile, groups, onUpdate }) {
   // ----- dialogs & forms -----
@@ -3991,18 +4028,47 @@ function AboutTab({ profile, groups, onUpdate }) {
     school: "", degree: "", field: "", start: "", end: "", grade: "",
   });
 
+  const [eduErrors, setEduErrors] = React.useState({
+    start: "",
+    end: "",
+  });
+
+  const [eduDeleteId, setEduDeleteId] = React.useState(null);
+  const [eduDeleteBusy, setEduDeleteBusy] = React.useState(false);
+  // Experience delete confirmation
+  const [expDeleteId, setExpDeleteId] = React.useState(null);
+  const [expDeleteBusy, setExpDeleteBusy] = React.useState(false);
+
   const [expOpen, setExpOpen] = React.useState(false);
   const [editExpId, setEditExpId] = React.useState(null);
 
   const [expForm, setExpForm] = React.useState({
     org: "", position: "", location: "", start: "", end: "", current: false,
-    employment_type: "full_time",       // compulsory (default)
-    work_schedule: "",                   // optional: "", "full_time", "part_time"
-    relationship_to_org: "",            // optional: "", "employee", "independent", "third_party"
-    career_stage: "",                   // optional: "", "internship","apprenticeship","trainee","entry","mid","senior"
-    compensation_type: "",              // optional: "", "paid","stipend","volunteer"
-    work_arrangement: "",               // optional: "", "onsite","hybrid","remote"
+    employment_type: "full_time",
+    work_schedule: "",
+    relationship_to_org: "",
+    career_stage: "",
+    compensation_type: "",
+    work_arrangement: "",
+    exit_reason: "",
   });
+
+  // helper: show "Why did you leave this job?" only if
+  // end date exists, not current, and end date is before today
+  const shouldShowExitReason = () => {
+    if (!expForm.end || expForm.current) return false;
+
+    const endDate = new Date(expForm.end);
+    const today = new Date();
+
+    // ignore time of day for comparison
+    endDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    return endDate < today;
+  };
+
+
   const [syncProfileLocation, setSyncProfileLocation] = React.useState(false);
 
   // NEW: Edit Contact dialog (first, last, email, location, linkedin, job title)
@@ -4069,7 +4135,20 @@ function AboutTab({ profile, groups, onUpdate }) {
   };
 
   // ----- Education -----
-  const openAddEducation = () => { setEditEduId(null); setEduForm({ school: "", degree: "", field: "", start: "", end: "", grade: "" }); setEduOpen(true); };
+  const openAddEducation = () => {
+    setEditEduId(null);
+    setEduForm({
+      school: "",
+      degree: "",
+      field: "",
+      start: "",
+      end: "",
+      grade: "",
+    });
+    setEduErrors({ start: "", end: "" });
+    setEduOpen(true);
+  };
+
   const openEditEducation = (id) => {
     const e = (profile.education || []).find((x) => x.id === id);
     if (!e) return;
@@ -4078,25 +4157,147 @@ function AboutTab({ profile, groups, onUpdate }) {
       school: e.school || "",
       degree: e.degree || "",
       field: e.field || e.field_of_study || "",
-      start: e.start || e.start_date || "",
-      end: e.end || e.end_date || "",
+      start: (e.start || e.start_date || "").slice(0, 4) || "",
+      end: (e.end || e.end_date || "").slice(0, 4) || "",
       grade: e.grade || "",
     });
+    setEduErrors({ start: "", end: "" });
     setEduOpen(true);
   };
+
+
   const saveEducation = async () => {
+    // clear previous errors
+    setEduErrors({ start: "", end: "" });
+
+    const toIntYear = (value) => {
+      if (value === null || value === undefined) return null;
+      const trimmed = String(value).trim();
+      if (!trimmed) return null;
+      const n = parseInt(trimmed, 10);
+      return Number.isNaN(n) ? null : n;
+    };
+
+    const currentYear = new Date().getFullYear();
+    const startYearNum = toIntYear(eduForm.start);
+    const endYearNum = toIntYear(eduForm.end);
+
+    let hasError = false;
+
+    // ✅ Start year cannot be in the future
+    if (startYearNum && startYearNum > currentYear) {
+      setEduErrors((prev) => ({
+        ...prev,
+        start: "Start year cannot be in the future.",
+      }));
+      hasError = true;
+    }
+
+    // ✅ End year cannot be less than start year
+    if (startYearNum && endYearNum && endYearNum < startYearNum) {
+      setEduErrors((prev) => ({
+        ...prev,
+        end: "End year cannot be less than start year.",
+      }));
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    const normalizeYear = (year) => {
+      if (!year) return null;
+      const trimmed = String(year).trim();
+      if (!trimmed) return null;
+      // store as YYYY-01-01 (only year is meaningful)
+      return `${trimmed}-01-01`;
+    };
+
+    const payload = {
+      ...eduForm,
+      start: normalizeYear(eduForm.start),
+      end: normalizeYear(eduForm.end),
+    };
+
     try {
-      if (editEduId) await updateEducationApi(editEduId, eduForm);
-      else await createEducationApi(eduForm);
-      setEduOpen(false); setEditEduId(null);
+      if (editEduId) await updateEducationApi(editEduId, payload);
+      else await createEducationApi(payload);
+
+      setEduOpen(false);
+      setEditEduId(null);
       await reloadExtras();
-    } catch (e) { alert(e.message || "Save failed"); }
+    } catch (e) {
+      alert(e.message || "Save failed");
+    }
   };
-  const deleteEducation = async (id) => {
-    if (!window.confirm("Delete this education?")) return;
-    try { await deleteEducationApi(id); setEduOpen(false); setEditEduId(null); await reloadExtras(); }
-    catch (e) { alert(e.message || "Delete failed"); }
+
+
+  const deleteEducation = (id) => {
+    setEduDeleteId(id);
   };
+
+  const handleConfirmDeleteEducation = async () => {
+    if (!eduDeleteId) return;
+    try {
+      setEduDeleteBusy(true);
+      await deleteEducationApi(eduDeleteId);
+      setEduOpen(false);
+      setEditEduId(null);
+      setEduDeleteId(null);
+      setEduDeleteBusy(false);
+      await reloadExtras();
+    } catch (e) {
+      setEduDeleteBusy(false);
+      setEduDeleteId(null);
+      alert(e.message || "Delete failed");
+    }
+  };
+
+  const handleCancelDeleteEducation = () => {
+    if (eduDeleteBusy) return;
+    setEduDeleteId(null);
+  };
+
+  const deleteExperience = (id) => {
+    // open the modern confirmation dialog for this experience
+    setExpDeleteId(id);
+  };
+
+  // -------- Experience delete confirmation handlers --------
+  const handleCancelDeleteExperience = () => {
+    if (expDeleteBusy) return;      // avoid double clicks while deleting
+    setExpDeleteId(null);           // just close the dialog
+  };
+
+  const handleConfirmDeleteExperience = async () => {
+    if (!expDeleteId) return;
+
+    try {
+      setExpDeleteBusy(true);
+
+      const res = await fetch(
+        `${API_ROOT}/auth/me/experiences/${expDeleteId}/`,
+        {
+          method: "DELETE",
+          headers: { ...authHeader() },
+        }
+      );
+
+      if (!res.ok && res.status !== 204) {
+        throw new Error("Failed to delete experience");
+      }
+
+      // Refresh list after successful delete
+      if (typeof reloadExtras === "function") {
+        await reloadExtras();
+      }
+    } catch (err) {
+      console.error("Delete experience failed", err);
+    } finally {
+      setExpDeleteBusy(false);
+      setExpDeleteId(null); // close dialog in all cases
+    }
+  };
+
 
   // ----- Experience (NO location field) -----
   const openAddExperience = () => {
@@ -4190,11 +4391,7 @@ function AboutTab({ profile, groups, onUpdate }) {
       await reloadExtras();
     } catch (e) { alert(e.message || "Save failed"); }
   };
-  const deleteExperience = async (id) => {
-    if (!window.confirm("Delete this experience?")) return;
-    try { await deleteExperienceApi(id); setExpOpen(false); setEditExpId(null); await reloadExtras(); }
-    catch (e) { alert(e.message || "Delete failed"); }
-  };
+
 
   // ----- Contact (edit dialog) -----
   const saveContact = async () => {
@@ -4259,7 +4456,27 @@ function AboutTab({ profile, groups, onUpdate }) {
               <List dense disablePadding>
                 {profile.experience.map((exp) => (
                   <ListItem key={exp.id} disableGutters sx={{ py: 0.75 }}
-                    secondaryAction={<Tooltip title="Edit"><IconButton size="small" onClick={() => openEditExperience(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                    secondaryAction={
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            size="small"
+                            onClick={() => deleteExperience(exp.id)}
+                          >
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit">
+                          <IconButton
+                            size="small"
+                            onClick={() => openEditExperience(exp.id)}
+                          >
+                            <EditRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    }
+                  >
                     <ListItemText
                       primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{exp.position} — {exp.org}</Typography>}
                       secondary={<Typography variant="caption" color="text.secondary">{dateRange(exp.start, exp.end, exp.current)}</Typography>}
@@ -4272,22 +4489,64 @@ function AboutTab({ profile, groups, onUpdate }) {
 
           <SectionCard
             title="Education"
-            action={<Tooltip title="Add education"><IconButton size="small" onClick={() => openAddEducation()}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+            action={
+              <Tooltip title="Add education">
+                <IconButton size="small" onClick={() => openAddEducation()}>
+                  <AddRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            }
             sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
           >
             {profile.education && profile.education.length ? (
               <List dense disablePadding>
                 {profile.education.map((edu) => (
-                  <ListItem key={edu.id} disableGutters sx={{ py: 0.75 }}
-                    secondaryAction={<Tooltip title="Edit"><IconButton size="small" onClick={() => openEditEducation(edu.id)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                  <ListItem
+                    key={edu.id}
+                    disableGutters
+                    sx={{ py: 0.75 }}
+                    secondaryAction={
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" onClick={() => deleteEducation(edu.id)}>
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => openEditEducation(edu.id)}>
+                            <EditRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    }
+                  >
                     <ListItemText
-                      primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{edu.degree} — {edu.school}</Typography>}
-                      secondary={<Typography variant="caption" color="text.secondary">{dateRange(edu.start, edu.end, false)}{edu.field ? ` · ${edu.field}` : ""}{edu.grade ? ` · ${edu.grade}` : ""}</Typography>}
+                      primary={
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {edu.degree} — {edu.school}
+                        </Typography>
+                      }
+                      secondary={
+                        <Typography variant="caption" color="text.secondary">
+                          {[
+                            (edu.start || edu.start_date || "").slice(0, 4),
+                            (edu.end || edu.end_date || "").slice(0, 4),
+                          ]
+                            .filter(Boolean)
+                            .join(" - ")}
+                          {edu.field ? ` · ${edu.field}` : ""}
+                          {edu.grade ? ` · ${edu.grade}` : ""}
+                        </Typography>
+                      }
                     />
                   </ListItem>
                 ))}
               </List>
-            ) : <Typography variant="body2" color="text.secondary">No education yet</Typography>}
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No education yet
+              </Typography>
+            )}
           </SectionCard>
         </Grid>
 
@@ -4374,9 +4633,51 @@ function AboutTab({ profile, groups, onUpdate }) {
         <DialogTitle>{editEduId ? "Edit education" : "Add education"}</DialogTitle>
         <DialogContent>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>*Required fields are marked with an asterisk</Typography>
-          <TextField label="School *" value={eduForm.school} onChange={(e) => setEduForm((f) => ({ ...f, school: e.target.value }))} fullWidth sx={{ mb: 2 }} />
+          <Autocomplete
+            freeSolo
+            options={SCHOOL_OPTIONS}
+            value={eduForm.school}
+            onChange={(_, newValue) => {
+              setEduForm((f) => ({ ...f, school: newValue || "" }));
+            }}
+            onInputChange={(event, newInput) => {
+              // when user types manually
+              if (event && event.type === "change") {
+                setEduForm((f) => ({ ...f, school: newInput }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="School *"
+                fullWidth
+                sx={{ mb: 2 }}
+              />
+            )}
+          />
           <TextField label="Degree *" value={eduForm.degree} onChange={(e) => setEduForm((f) => ({ ...f, degree: e.target.value }))} fullWidth sx={{ mb: 2 }} />
-          <TextField label="Field of Study *" value={eduForm.field} onChange={(e) => setEduForm((f) => ({ ...f, field: e.target.value }))} fullWidth sx={{ mb: 2 }} />
+          <Autocomplete
+            freeSolo
+            options={[...FIELD_OF_STUDY_OPTIONS, "Other"]}
+            value={eduForm.field}
+            onChange={(_, newValue) => {
+              setEduForm((f) => ({ ...f, field: newValue || "" }));
+            }}
+            onInputChange={(event, newInput) => {
+              if (event && event.type === "change") {
+                setEduForm((f) => ({ ...f, field: newInput }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Field of Study *"
+                fullWidth
+                sx={{ mb: 2 }}
+                helperText="Pick from list or type your own (Other)."
+              />
+            )}
+          />
           {/* 👇 Date row – 50% + 50% on sm+, full width stacked on mobile */}
           <Box
             sx={{
@@ -4387,30 +4688,34 @@ function AboutTab({ profile, groups, onUpdate }) {
             }}
           >
             <TextField
-              label="Start Date"
-              type="date"
+              label="Start Year"
+              type="number"
               value={eduForm.start}
               onChange={(e) =>
                 setEduForm((f) => ({ ...f, start: e.target.value }))
               }
               fullWidth
-              InputLabelProps={{ shrink: true }}
               sx={{ flex: 1 }}
+              inputProps={{ min: 1900, max: new Date().getFullYear() }}
+              error={!!eduErrors.start}
+              helperText={eduErrors.start || ""}
             />
 
             <TextField
-              label="End Date"
-              type="date"
+              label="End Year"
+              type="number"
               value={eduForm.end}
               onChange={(e) =>
                 setEduForm((f) => ({ ...f, end: e.target.value }))
               }
               fullWidth
-              InputLabelProps={{ shrink: true }}
               sx={{ flex: 1 }}
+              inputProps={{ min: 1900, max: new Date().getFullYear() + 10 }}
+              error={!!eduErrors.end}
+              helperText={eduErrors.end || ""}
             />
           </Box>
-          <TextField label="Grade *" value={eduForm.grade} onChange={(e) => setEduForm((f) => ({ ...f, grade: e.target.value }))} fullWidth />
+          <TextField label="Grade (optional)" value={eduForm.grade} onChange={(e) => setEduForm((f) => ({ ...f, grade: e.target.value }))} fullWidth />
         </DialogContent>
         <DialogActions>
           {editEduId && (<Button color="error" onClick={() => deleteEducation(editEduId)}>Delete</Button>)}
@@ -4418,6 +4723,66 @@ function AboutTab({ profile, groups, onUpdate }) {
           <Button variant="contained" onClick={saveEducation}>{editEduId ? "Save changes" : "Save"}</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Delete Education confirmation */}
+      <Dialog
+        open={!!eduDeleteId}
+        onClose={handleCancelDeleteEducation}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete education?</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2">
+            This will remove this education from your profile. You can&apos;t undo this action.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDeleteEducation} disabled={eduDeleteBusy}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDeleteEducation}
+            color="error"
+            variant="contained"
+            disabled={eduDeleteBusy}
+          >
+            {eduDeleteBusy ? "Deleting." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Experience delete confirmation */}
+      <Dialog
+        open={!!expDeleteId}
+        onClose={handleCancelDeleteExperience}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete experience</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this experience entry?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleCancelDeleteExperience}
+            disabled={expDeleteBusy}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDeleteExperience}
+            color="error"
+            variant="contained"
+            disabled={expDeleteBusy}
+          >
+            {expDeleteBusy ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
 
       {/* Add/Edit Experience (NO Location field) */}
       <Dialog open={expOpen} onClose={() => { setExpOpen(false); setEditExpId(null); }} fullWidth maxWidth="sm">
@@ -4461,7 +4826,7 @@ function AboutTab({ profile, groups, onUpdate }) {
             fullWidth
             sx={{ mb: 2 }}
           >
-            <MenuItem value="">—</MenuItem>
+
             <MenuItem value="employee">Employee (on payroll)</MenuItem>
             <MenuItem value="independent">
               Independent (self-employed / contractor / freelance)
@@ -4496,9 +4861,8 @@ function AboutTab({ profile, groups, onUpdate }) {
             <MenuItem value="part_time">Part-time</MenuItem>
           </TextField>
 
-          {/* Career stage + Compensation type (half-half) */}
+          {/* Career stage (optional) */}
           <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
-            {/* Career stage (optional) */}
             <TextField
               select
               value={expForm.career_stage}
@@ -4506,7 +4870,7 @@ function AboutTab({ profile, groups, onUpdate }) {
                 setExpForm((f) => ({ ...f, career_stage: e.target.value }))
               }
               fullWidth
-              sx={{ flex: 1 }}   // 👈 makes it use 50% of row
+              sx={{ flex: 1 }}
               SelectProps={{
                 displayEmpty: true,
                 renderValue: (v) =>
@@ -4526,7 +4890,7 @@ function AboutTab({ profile, groups, onUpdate }) {
                     ),
               }}
             >
-              <MenuItem value="">—</MenuItem>
+
               <MenuItem value="internship">Internship</MenuItem>
               <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
               <MenuItem value="trainee">Trainee / Entry program</MenuItem>
@@ -4534,38 +4898,8 @@ function AboutTab({ profile, groups, onUpdate }) {
               <MenuItem value="mid">Mid level</MenuItem>
               <MenuItem value="senior">Senior level</MenuItem>
             </TextField>
-
-            {/* Compensation type (optional) */}
-            <TextField
-              select
-              value={expForm.compensation_type}
-              onChange={(e) =>
-                setExpForm((f) => ({ ...f, compensation_type: e.target.value }))
-              }
-              fullWidth
-              sx={{ flex: 1 }}   // 👈 also 50% of row
-              SelectProps={{
-                displayEmpty: true,
-                renderValue: (v) =>
-                  v
-                    ? ({
-                      paid: "Paid",
-                      stipend: "Stipend",
-                      volunteer: "Volunteer / Unpaid",
-                    }[v] || v)
-                    : (
-                      <span style={{ color: "rgba(0,0,0,0.6)" }}>
-                        Compensation type
-                      </span>
-                    ),
-              }}
-            >
-              <MenuItem value="">—</MenuItem>
-              <MenuItem value="paid">Paid</MenuItem>
-              <MenuItem value="stipend">Stipend</MenuItem>
-              <MenuItem value="volunteer">Volunteer / Unpaid</MenuItem>
-            </TextField>
           </Box>
+
 
           {/* Work arrangement (optional) */}
           <TextField
@@ -4576,7 +4910,7 @@ function AboutTab({ profile, groups, onUpdate }) {
             fullWidth
             sx={{ mb: 2 }}
           >
-            <MenuItem value="">—</MenuItem>
+
             <MenuItem value="onsite">On-site</MenuItem>
             <MenuItem value="hybrid">Hybrid</MenuItem>
             <MenuItem value="remote">Remote</MenuItem>
@@ -4633,6 +4967,21 @@ function AboutTab({ profile, groups, onUpdate }) {
             }
             label="I currently work here"
           />
+
+          {shouldShowExitReason() && (
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              maxRows={4}
+              label="Why did you leave this job?"
+              value={expForm.exit_reason}
+              onChange={(e) =>
+                setExpForm((prev) => ({ ...prev, exit_reason: e.target.value }))
+              }
+              sx={{ mt: 2 }}
+            />
+          )}
 
           {expForm.current && (
             <FormControlLabel
