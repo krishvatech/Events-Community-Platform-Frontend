@@ -818,7 +818,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                 return (
                   <Box 
                     key={index}
-                    onClick={() => handleDownloadClick(index, name)}
+                    onClick={() => handleDownloadClick(realIndex, name)}
                     sx={{
                       width: 240, 
                       maxWidth: "100%",
@@ -844,7 +844,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                         sx={{ color: "text.secondary" }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDownloadClick(index, name);
+                          handleDownloadClick(realIndex, name);
                         }}
                       />
                     </Stack>

@@ -23,12 +23,22 @@ import {
   DialogContent,
   Tabs,
   Tab,
+  Menu,
+  MenuItem,
+  Tooltip,
+  ListItemIcon,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import MoreVertOutlinedIcon from "@mui/icons-material/MoreVertOutlined";
+import PushPinIcon from "@mui/icons-material/PushPin";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 // ---- API helpers ----
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(
@@ -55,6 +65,64 @@ const ENDPOINTS = {
   ensureGroup: () => `${MESSAGING_BASE}/conversations/ensure-group/`,
   convMarkAllRead: (cid) => `${MESSAGING_BASE}/conversations/${cid}/mark-all-read/`,
   messageRead: (mid) => `${MESSAGING_BASE}/messages/${mid}/read/`,
+  toggleConversationPin: (cid) => `${MESSAGING_BASE}/conversations/${cid}/toggle-pin/`,
+  pinnedMessages: (cid) => `${MESSAGING_BASE}/conversations/${cid}/pinned-messages/`,
+  pinMessage: (cid) => `${MESSAGING_BASE}/conversations/${cid}/pin-message/`,
+  unpinMessage: (cid) => `${MESSAGING_BASE}/conversations/${cid}/unpin-message/`,
+};
+
+
+const resizeImage = (file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) => {
+  return new Promise((resolve) => {
+    // Not an image → return as-is
+    if (!file.type.startsWith("image/")) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        // keep aspect ratio but clamp to maxWidth / maxHeight
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            const newFile = new File([blob], file.name, {
+              type: "image/jpeg",
+              lastModified: Date.now(),
+            });
+            resolve(newFile);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+    };
+    reader.onerror = () => resolve(file);
+  });
 };
 
 const emitUnreadMessages = (count) => {
@@ -169,6 +237,37 @@ const normalizeMessages = (data) => {
   if (Array.isArray(data)) return [...data].sort(byTimeAsc);
   const rows = Array.isArray(data?.results) ? data.results : [];
   return [...rows].sort(byTimeAsc);
+};
+
+const getMessageAttachments = (msg) => {
+  const arr = Array.isArray(msg?.attachments) ? msg.attachments : [];
+  return arr;
+};
+
+const getAttachmentUrl = (att) =>
+  att.url ||
+  att.file ||
+  att.file_url ||
+  att.image ||
+  att.image_url ||
+  att.download_url ||
+  "";
+
+const getAttachmentName = (att) =>
+  att.name ||
+  att.filename ||
+  att.file_name ||
+  att.original_name ||
+  "Attachment";
+
+const isImageAttachment = (att) => {
+  const contentType = att.content_type || att.mime_type || "";
+  const name = getAttachmentName(att);
+  const lowerName = String(name).toLowerCase();
+
+  if (contentType.startsWith("image/")) return true;
+  if (lowerName.match(/\.(png|jpe?g|gif|webp|bmp|heic|heif)$/)) return true;
+  return false;
 };
 
 function displayName(user) {
@@ -373,8 +472,17 @@ export default function AdminMessagesPage() {
 
   const [messages, setMessages] = React.useState([]);
   const [loadingMessages, setLoadingMessages] = React.useState(false);
+  const [pinned, setPinned] = React.useState([]);
+  const [pinsExpanded, setPinsExpanded] = React.useState(false);
+
+  const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
+  const [menuMessage, setMenuMessage] = React.useState(null);
+  const messageMenuOpen = Boolean(menuAnchorEl);
   const [sending, setSending] = React.useState(false);
   const [text, setText] = React.useState("");
+  const [draftAttachments, setDraftAttachments] = React.useState([]);
+  const [activePreviewIndex, setActivePreviewIndex] = React.useState(0);
+  const [previewUrls, setPreviewUrls] = React.useState([]);
   const [error, setError] = React.useState("");
   const [detailsOpen, setDetailsOpen] = React.useState(false);
   const [newChatOpen, setNewChatOpen] = React.useState(false);
@@ -383,6 +491,38 @@ export default function AdminMessagesPage() {
   const [activeTarget, setActiveTarget] = React.useState(null);
 
   const chatScrollRef = React.useRef(null);
+  const [isUserAtBottom, setIsUserAtBottom] = React.useState(true);
+
+  // Conversation context menu (pin / unpin)
+  const [convMenuAnchor, setConvMenuAnchor] = React.useState(null);
+  const [convMenuTarget, setConvMenuTarget] = React.useState(null);
+
+  // Attachment menu + hidden inputs
+  const [attachMenuAnchor, setAttachMenuAnchor] = React.useState(null);
+  const isAttachMenuOpen = Boolean(attachMenuAnchor);
+  const fileInputRef = React.useRef(null);
+  const cameraInputRef = React.useRef(null);
+
+  // Camera modal
+  const [cameraOpen, setCameraOpen] = React.useState(false);
+  const videoRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+
+  // Build local blob URLs for draft attachment preview
+  React.useEffect(() => {
+    if (!draftAttachments || draftAttachments.length === 0) {
+      setPreviewUrls([]);
+      return;
+    }
+
+    const urls = draftAttachments.map((file) => URL.createObjectURL(file));
+    setPreviewUrls(urls);
+
+    // cleanup old blob URLs when attachments change / unmount
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [draftAttachments]);
 
   const me = React.useMemo(() => {
     try {
@@ -466,12 +606,15 @@ export default function AdminMessagesPage() {
                 _last_ts: best || serverTs || t.updated_at || t.created_at,
               };
             })
-            .sort(
-              (a, b) =>
+            .sort((a, b) => {
+              const pinA = !!a.is_pinned;
+              const pinB = !!b.is_pinned;
+              if (pinA !== pinB) return pinA ? -1 : 1; // pinned first
+              return (
                 new Date(b._last_ts || 0).getTime() -
                 new Date(a._last_ts || 0).getTime()
-            );
-
+              );
+            });
           // broadcast unread count (based on sorted list)
           const totalUnread = normalized.reduce(
             (sum, th) => sum + (th?.unread_count || 0),
@@ -494,6 +637,35 @@ export default function AdminMessagesPage() {
     []
   );
 
+  // Start / stop camera when the modal opens/closes
+  React.useEffect(() => {
+    if (!cameraOpen) return;
+
+    let stream;
+
+    const startCamera = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error("Failed to open camera", err);
+        setCameraOpen(false);
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    };
+  }, [cameraOpen]);
 
   React.useEffect(() => {
     fetchUsers(); // first load
@@ -701,6 +873,7 @@ export default function AdminMessagesPage() {
       setConversationId(thread.id);
       setMessages([]);
       setError("");
+      setIsUserAtBottom(true);
 
       const isGroup =
         thread.chat_type === "group" ||
@@ -751,6 +924,57 @@ export default function AdminMessagesPage() {
     [users]
   );
 
+  // open context menu on right-click of conversation row
+  const handleConvContextMenu = (event, thread) => {
+    event.preventDefault();
+    setConvMenuTarget(thread);
+    setConvMenuAnchor(event.currentTarget);
+  };
+
+  const handleCloseConvMenu = () => {
+    setConvMenuAnchor(null);
+    setConvMenuTarget(null);
+  };
+
+  const handleTogglePinConversation = async () => {
+    if (!convMenuTarget) return;
+    const targetId = convMenuTarget.id;
+    handleCloseConvMenu();
+
+    try {
+      const res = await fetch(ENDPOINTS.toggleConversationPin(targetId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+
+      if (!res.ok) {
+        console.error("Failed to toggle pin", res.status);
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      const isNowPinned = !!data.is_pinned;
+
+      setThreads((prev) => {
+        const updated = prev.map((t) =>
+          t.id === targetId ? { ...t, is_pinned: isNowPinned } : t
+        );
+
+        // same sort logic as above: pinned first, then latest
+        return updated.sort((a, b) => {
+          const pinA = !!a.is_pinned;
+          const pinB = !!b.is_pinned;
+          if (pinA !== pinB) return pinA ? -1 : 1;
+          return (
+            new Date(b._last_ts || 0).getTime() -
+            new Date(a._last_ts || 0).getTime()
+          );
+        });
+      });
+    } catch (err) {
+      console.error("toggle pin failed", err);
+    }
+  };
   // poll messages for active conversation
   React.useEffect(() => {
     if (!conversationId) return;
@@ -790,30 +1014,344 @@ export default function AdminMessagesPage() {
     };
   }, [conversationId, markConversationAllRead]);
 
-  // 🔁 auto-scroll chat to latest message whenever messages change
+  React.useEffect(() => {
+    if (!conversationId) {
+      setPinned([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(ENDPOINTS.pinnedMessages(conversationId), {
+          headers: { Accept: "application/json", ...authHeader() },
+        });
+
+        if (!res.ok) {
+          if (!cancelled) setPinned([]);
+          return;
+        }
+
+        const json = await res.json();
+        const arr = Array.isArray(json?.results)
+          ? json.results
+          : Array.isArray(json)
+          ? json
+          : [];
+        if (!cancelled) setPinned(arr);
+      } catch (err) {
+        console.error("Failed to fetch pinned messages", err);
+        if (!cancelled) setPinned([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId]);
+
+  const isMessagePinned = React.useCallback(
+    (mid) => {
+      if (!mid) return false;
+      return pinned.some((p) => {
+        const id =
+          p?.message_id ??
+          p?.messageId ??
+          p?.message_pk ??
+          p?.msg_id ??
+          (p?.message && (p.message.id || p.message.pk));
+        return id && String(id) === String(mid);
+      });
+    },
+    [pinned]
+  );
+
+  const pinnedMessages = React.useMemo(() => {
+    if (!Array.isArray(pinned) || pinned.length === 0) return [];
+
+    const byId = new Map(messages.map((m) => [String(m.id), m]));
+    const out = [];
+
+    for (const p of pinned) {
+      const mid =
+        p?.message_id ??
+        p?.messageId ??
+        p?.message_pk ??
+        p?.msg_id ??
+        (p?.message && (p.message.id || p.message.pk));
+      if (!mid) continue;
+
+      const existing = byId.get(String(mid));
+      if (existing) {
+        out.push(existing);
+      }
+      // ❗ if message is not in messages[], we treat it as deleted → no pin shown
+    }
+
+    return out;
+  }, [pinned, messages]);
+
+    const isMyMessage = (msg) => {
+      if (!msg || !me) return false;
+      const senderId =
+        msg.sender_id ??
+        (typeof msg.sender === "object" ? msg.sender.id : msg.sender) ??
+        msg.user_id ??
+        (typeof msg.user === "object" ? msg.user.id : msg.user);
+
+      return String(senderId) === String(me.id);
+    };
+
+    const handleOpenMessageMenu = (event, message) => {
+    if (!message) return;
+    if (event && event.preventDefault) {
+      event.preventDefault();
+    }
+    setMenuAnchorEl(event.currentTarget);
+    setMenuMessage(message);
+  };
+
+  const handleCloseMessageMenu = () => {
+    setMenuAnchorEl(null);
+    setMenuMessage(null);
+  };
+
+  const handlePinOrUnpin = async () => {
+    if (!menuMessage || !conversationId) {
+      handleCloseMessageMenu();
+      return;
+    }
+
+    const currentlyPinned = isMessagePinned(menuMessage.id);
+
+    const url = currentlyPinned
+      ? ENDPOINTS.unpinMessage(conversationId)
+      : ENDPOINTS.pinMessage(conversationId);
+
+    // For admin page we can just use global scope
+    const pinScope = "global";
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({
+          message_id: menuMessage.id,
+          scope: pinScope,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("Pin/unpin failed", res.status);
+      } else {
+        // reload pinned list
+        try {
+          const r = await fetch(ENDPOINTS.pinnedMessages(conversationId), {
+            headers: { Accept: "application/json", ...authHeader() },
+          });
+          if (r.ok) {
+            const json = await r.json();
+            const arr = Array.isArray(json?.results)
+              ? json.results
+              : Array.isArray(json)
+              ? json
+              : [];
+            setPinned(arr);
+          }
+        } catch (e) {
+          console.error("Failed to refresh pinned after toggle", e);
+        }
+      }
+    } catch (err) {
+      console.error("Pin/unpin error", err);
+    } finally {
+      handleCloseMessageMenu();
+    }
+  };
+
+  const handleDeleteMessage = async () => {
+    if (!menuMessage || !conversationId) {
+      handleCloseMessageMenu();
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `${MESSAGING_BASE}/conversations/${conversationId}/messages/${menuMessage.id}/`,
+        {
+          method: "DELETE",
+          headers: { ...authHeader() },
+        }
+      );
+
+      if (!res.ok && res.status !== 204) {
+        console.error("Delete message failed", res.status);
+      } else {
+        // 1) Remove from main messages list
+        setMessages((curr) => curr.filter((m) => m.id !== menuMessage.id));
+
+        // 2) Also remove from pinned list if it was pinned
+        setPinned((prev) => {
+          if (!Array.isArray(prev)) return prev;
+
+          return prev.filter((p) => {
+            const mid =
+              p?.message_id ??
+              p?.messageId ??
+              p?.message_pk ??
+              p?.msg_id ??
+              (p?.message && (p.message.id || p.message.pk)) ??
+              p?.id;
+
+            if (!mid) return true;
+            return String(mid) !== String(menuMessage.id);
+          });
+        });
+      }
+    } catch (err) {
+      console.error("Delete message error", err);
+    } finally {
+      handleCloseMessageMenu();
+    }
+  };
+
+
+
+  const handleChatScroll = React.useCallback(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+
+    const threshold = 48; // px from bottom
+    const atBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+
+    setIsUserAtBottom(atBottom);
+  }, []);
+
+
   React.useEffect(() => {
     const el = chatScrollRef.current;
     if (!el) return;
+
+    // only stick to bottom if user is already near bottom
+    if (!isUserAtBottom) return;
+
     el.scrollTop = el.scrollHeight;
-  }, [messages, loadingMessages, conversationId]);
+  }, [messages, loadingMessages, conversationId, isUserAtBottom]);
+
+  const handleAttachClick = (event) => {
+    setAttachMenuAnchor(event.currentTarget);
+  };
+
+  const handleAttachClose = () => {
+    setAttachMenuAnchor(null);
+  };
+
+  const handleTriggerFileUpload = () => {
+    handleAttachClose();
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleTriggerCamera = () => {
+    handleAttachClose();
+    setCameraOpen(true);
+  };
+
+  const handleFileChange = async (event) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+
+      const processed = await Promise.all(
+        fileArray.map((f) => resizeImage(f))
+      );
+
+      setDraftAttachments((prev) => [...prev, ...processed]);
+      setActivePreviewIndex(0);
+    }
+    event.target.value = "";
+  };
+
+  const handleClearAttachments = () => {
+    setDraftAttachments([]);
+    setActivePreviewIndex(0);
+    setText(""); // clear caption as well
+  };
+
+  const handleCapturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+
+    let width = video.videoWidth || 1280;
+    let height = video.videoHeight || 720;
+
+    const maxWidth = 1280;
+    const maxHeight = 1280;
+
+    if (width > height) {
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+    } else {
+      if (height > maxHeight) {
+        width = Math.round((width * maxHeight) / height);
+        height = maxHeight;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(video, 0, 0, width, height);
+
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) return;
+        const file = new File([blob], `camera-${Date.now()}.jpg`, {
+          type: "image/jpeg",
+        });
+        const resized = await resizeImage(file);
+        setDraftAttachments((prev) => [...prev, resized]);
+        setActivePreviewIndex(0);
+        setCameraOpen(false);
+      },
+      "image/jpeg",
+      0.8
+    );
+  };
+
+  const handleCloseCamera = () => {
+    setCameraOpen(false);
+  };
 
   const handleSend = async () => {
     const body = text.trim();
-    if (!body || sending || !conversationId) return;
+    const hasAttachments = draftAttachments.length > 0;
+    if ((!body && !hasAttachments) || sending || !conversationId) return;
 
     const nowIso = new Date().toISOString();
 
     try {
       setSending(true);
+      setIsUserAtBottom(true);  // we want to follow our own new message
 
-      const res = await fetch(
-        ENDPOINTS.conversationMessages(conversationId),
-        {
+      const formData = new FormData();
+        formData.append("body", body);
+        draftAttachments.forEach((file) => {
+          formData.append("attachments", file);
+        });
+
+        const res = await fetch(ENDPOINTS.conversationMessages(conversationId), {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify({ body }),
-        }
-      );
+          headers: { ...authHeader() }, // let browser set multipart boundary
+          body: formData,
+        });
       const msg = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(msg?.detail || "Failed to send message");
 
@@ -824,6 +1362,8 @@ export default function AdminMessagesPage() {
       });
 
       setText("");
+      setDraftAttachments([]);
+      setActivePreviewIndex(0);
 
       // 🔝 immediately bump this conversation to the top on the left
       setThreads((prev) =>
@@ -832,7 +1372,16 @@ export default function AdminMessagesPage() {
             t.id === conversationId
               ? {
                 ...t,
-                last_message: msg.body || msg.text || msg.message || body,
+                last_message:
+                  msg.body ||
+                  msg.text ||
+                  msg.message ||
+                  body ||
+                  (Array.isArray(msg.attachments) && msg.attachments.length
+                    ? msg.attachments.length === 1
+                      ? msg.attachments[0].name || "Attachment"
+                      : `${msg.attachments.length} attachments`
+                    : ""),
                 last_message_created_at:
                   msg.created_at || msg.timestamp || nowIso,
                 _last_ts: msg.created_at || msg.timestamp || nowIso,
@@ -1011,6 +1560,7 @@ export default function AdminMessagesPage() {
                         key={th.id}
                         selected={active}
                         onClick={() => selectThread(th)}
+                        onContextMenu={(e) => handleConvContextMenu(e, th)}
                         sx={{
                           px: 1,
                           py: 1,
@@ -1071,14 +1621,22 @@ export default function AdminMessagesPage() {
                             >
                               {title}
                             </Typography>
-                            {time && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {time}
-                              </Typography>
-                            )}
+                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                              {th.is_pinned && (
+                                <PushPinIcon
+                                  sx={{
+                                    fontSize: 14,
+                                    color: "text.secondary",
+                                    transform: "rotate(45deg)",
+                                  }}
+                                />
+                              )}
+                              {time && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {time}
+                                </Typography>
+                              )}
+                            </Stack>
                           </Stack>
                           <Stack
                             direction="row"
@@ -1293,8 +1851,145 @@ export default function AdminMessagesPage() {
 
                 <Divider sx={{ mb: 1.5 }} />
 
+                {/* 📌 Pinned bar – fixed under header, does NOT scroll */}
+                {pinnedMessages.length > 0 && (
+                  <Box
+                    sx={{
+                      mb: 1.5,
+                      px: 1.25,
+                      py: 0.75,
+                      borderRadius: 2,
+                      bgcolor: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    {/* Header row */}
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      onClick={() => {
+                        if (pinnedMessages.length > 1)
+                          setPinsExpanded(!pinsExpanded);
+                      }}
+                      sx={{
+                        cursor: pinnedMessages.length > 1 ? "pointer" : "default",
+                        userSelect: "none",
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        sx={{ overflow: "hidden", flex: 1 }}
+                      >
+                        <Typography variant="caption" sx={{ fontSize: 13 }}>
+                          📌
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: pinsExpanded ? 700 : 500,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            color: "text.primary",
+                          }}
+                        >
+                          {pinsExpanded
+                            ? "Pinned messages"
+                            : pinnedMessages[pinnedMessages.length - 1].body}
+                        </Typography>
+                      </Stack>
+
+                      {pinnedMessages.length > 1 && (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Chip
+                            size="small"
+                            label={pinnedMessages.length}
+                            sx={{
+                              height: 20,
+                              fontSize: 10,
+                              fontWeight: 700,
+                            }}
+                          />
+                          <ExpandMoreIcon
+                            fontSize="small"
+                            sx={{
+                              transform: pinsExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                              transition: "transform 0.2s",
+                            }}
+                          />
+                        </Stack>
+                      )}
+                    </Stack>
+
+                    {/* Expanded pinned list */}
+                    {pinsExpanded && (
+                      <Stack spacing={0.5} sx={{ mt: 1 }}>
+                        {pinnedMessages.map((m) => (
+                          <Stack
+                            key={`pinned-${m.id}`}
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            sx={{
+                              cursor: "pointer",
+                              borderRadius: 1,
+                              p: 0.5,
+                              "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
+                            }}
+                            onClick={() => {
+                              const el = document.querySelector(
+                                `[data-mid="${m.id}"]`
+                              );
+                              if (el) {
+                                el.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "center",
+                                });
+                              }
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 24,
+                                display: "flex",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 4,
+                                  height: 4,
+                                  borderRadius: "50%",
+                                  bgcolor: "text.secondary",
+                                }}
+                              />
+                            </Box>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                fontSize: 13,
+                              }}
+                            >
+                              {m.body}
+                            </Typography>
+                          </Stack>
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
+                )}
+
+                {/* Scrollable messages area */}
                 <Box
                   ref={chatScrollRef}
+                  onScroll={handleChatScroll}
                   sx={{
                     flex: 1,
                     overflowY: "auto",
@@ -1329,6 +2024,7 @@ export default function AdminMessagesPage() {
                           ? new Date(m.created_at)
                           : null;
 
+                        
                         // ---- date chip (Nov 14, 2025) ----
                         const dateKey = created
                           ? created.toDateString()
@@ -1401,6 +2097,8 @@ export default function AdminMessagesPage() {
                           m.author_name ||
                           headerName;
 
+                        const attachments = getMessageAttachments(m);
+
                         // Avatar for *me*
                         const meAvatar =
                           me?.profile_image ||
@@ -1448,6 +2146,7 @@ export default function AdminMessagesPage() {
                             )}
 
                             <Box
+                              data-mid={m.id}
                               sx={{
                                 maxWidth: "75%",
                                 px: 1.5,
@@ -1457,18 +2156,82 @@ export default function AdminMessagesPage() {
                                 border: "1px solid #e2e8f0",
                                 boxShadow: "0 6px 16px rgba(15,23,42,0.06)",
                               }}
+                              onContextMenu={(e) => handleOpenMessageMenu(e, m)}
                             >
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  whiteSpace: "pre-wrap",
-                                  wordBreak: "break-word",   // break long words
-                                  overflowWrap: "anywhere",  // extra safety for very long strings
-                                }}
-                              >
-                                {body}
-                              </Typography>
+                              {/* 🔹 Attachments preview (same style as user messages page) */}
+                              {attachments.length > 0 && (
+                                <Stack spacing={0.75} sx={{ mb: body ? 0.75 : 0 }}>
+                                  {attachments.map((att, idx) => {
+                                    const url = getAttachmentUrl(att);
+                                    const name = getAttachmentName(att);
+                                    const imageLike = isImageAttachment(att);
 
+                                    if (!url) return null;
+
+                                    if (imageLike) {
+                                      // image-style preview
+                                      return (
+                                        <Box
+                                          key={att.id || `${m.id}-att-img-${idx}`}
+                                          sx={{
+                                            borderRadius: 1,
+                                            overflow: "hidden",
+                                            border: "1px solid rgba(148,163,184,0.4)",
+                                            cursor: "pointer",
+                                          }}
+                                          onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+                                        >
+                                          <Box
+                                            component="img"
+                                            src={url}
+                                            alt={name}
+                                            sx={{
+                                              display: "block",
+                                              maxWidth: 260,
+                                              maxHeight: 260,
+                                              objectFit: "cover",
+                                            }}
+                                          />
+                                        </Box>
+                                      );
+                                    }
+
+                                    // file-style preview (non-image)
+                                    return (
+                                      <Chip
+                                        key={att.id || `${m.id}-att-file-${idx}`}
+                                        variant="outlined"
+                                        size="small"
+                                        label={name}
+                                        onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+                                        sx={{
+                                          maxWidth: 260,
+                                          "& .MuiChip-label": {
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                          },
+                                        }}
+                                      />
+                                    );
+                                  })}
+                                </Stack>
+                              )}
+
+                              {/* 🔹 Text body (if any) */}
+                              {body && (
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    whiteSpace: "pre-wrap",
+                                    wordBreak: "break-word",
+                                    overflowWrap: "anywhere",
+                                  }}
+                                >
+                                  {body}
+                                </Typography>
+                              )}
+
+                              {/* 🔹 Time at bottom-right */}
                               {timeStr && (
                                 <Typography
                                   variant="caption"
@@ -1477,13 +2240,14 @@ export default function AdminMessagesPage() {
                                     display: "block",
                                     mt: 0.5,
                                     textAlign: "right",
-                                    fontSize: "0.65rem",   // ⬅ smaller time font
+                                    fontSize: "0.65rem",
                                   }}
                                 >
                                   {timeStr}
                                 </Typography>
                               )}
                             </Box>
+
 
                             {mine && (
                               <Avatar
@@ -1511,32 +2275,320 @@ export default function AdminMessagesPage() {
                   )}
                 </Box>
 
+                {/* Hidden inputs for File Upload & Camera (shared for both states) */}
+                <input
+                  type="file"
+                  multiple
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  onChange={handleFileChange}
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  ref={cameraInputRef}
+                  style={{ display: "none" }}
+                  onChange={handleFileChange}
+                />
+
                 <Divider sx={{ mt: 1.5, mb: 1 }} />
 
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <TextField
-                    placeholder="Type a message…"
-                    fullWidth
-                    size="small"
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
+                {draftAttachments.length > 0 ? (
+                  // 🔍 Media preview panel (like MessagesPage)
+                  (() => {
+                    const activeFile =
+                      draftAttachments[activePreviewIndex] || draftAttachments[0];
+                    const activeUrl =
+                      previewUrls[activePreviewIndex] || previewUrls[0] || null;
+                    const isImage =
+                      activeFile &&
+                      typeof activeFile.type === "string" &&
+                      activeFile.type.startsWith("image/");
+
+                    return (
+                      <Box
+                        sx={{
+                          borderRadius: 2,
+                          border: "1px solid #e2e8f0",
+                          bgcolor: "#f8fafc",
+                          px: { xs: 1.5, md: 2 },
+                          py: { xs: 1, md: 1.25 },
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 1,
+                          maxWidth: 480,          // ⬅ limit width
+                          alignSelf: "center",    // ⬅ center inside chat column
+                        }}
+                      >
+                        {/* Header: title + attach + close */}
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          justifyContent="space-between"
+                        >
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            Preview
+                          </Typography>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            {draftAttachments.length > 1 && (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {activePreviewIndex + 1} / {draftAttachments.length}
+                              </Typography>
+                            )}
+                            {/* Attach more files */}
+                            <Tooltip title="Attach more">
+                              <IconButton
+                                size="small"
+                                onClick={handleAttachClick}
+                                sx={{ mr: 0.5 }}
+                              >
+                                <AddRoundedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            {/* Close / clear all */}
+                            <IconButton size="small" onClick={handleClearAttachments}>
+                              <CloseRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Stack>
+                        </Stack>
+
+                        {/* Large preview */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                          }}
+                        >
+                          {activeUrl && isImage ? (
+                            <Box
+                              component="img"
+                              src={activeUrl}
+                              alt={activeFile?.name || "preview"}
+                              sx={{
+                                maxHeight: 240,          // ⬅ shorter
+                                maxWidth: "100%",
+                                borderRadius: 2,
+                                objectFit: "contain",
+                                bgcolor: "#e2e8f0",
+                              }}
+                            />
+                          ) : (
+                            <Paper
+                              elevation={0}
+                              sx={{
+                                borderRadius: 2,
+                                border: "1px dashed #94a3b8",
+                                bgcolor: "#e2e8f0",
+                                px: 4,
+                                py: 3,
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                textAlign: "center",
+                                maxWidth: 320,
+                              }}
+                            >
+                              <UploadFileRoundedIcon sx={{ mb: 1 }} />
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {activeFile?.name || "File"}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ mt: 0.5 }}
+                              >
+                                This file will be sent with your message.
+                              </Typography>
+                            </Paper>
+                          )}
+                        </Box>
+
+                        {/* Thumbnails for multiple files */}
+                        {draftAttachments.length > 1 && (
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            justifyContent="center"
+                            flexWrap="wrap"
+                          >
+                            {previewUrls.map((url, idx) => {
+                              const file = draftAttachments[idx];
+                              const img =
+                                file &&
+                                typeof file.type === "string" &&
+                                file.type.startsWith("image/");
+
+                              return (
+                                <Box
+                                  key={idx}
+                                  onClick={() => setActivePreviewIndex(idx)}
+                                  sx={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: 1.5,
+                                      overflow: "hidden",
+                                      border:
+                                        idx === activePreviewIndex
+                                          ? "2px solid #0ea5e9"
+                                          : "1px solid #e2e8f0",
+                                      cursor: "pointer",
+                                    }}
+                                >
+                                  {img ? (
+                                    <Box
+                                      component="img"
+                                      src={url}
+                                      alt={file?.name || "thumb"}
+                                      sx={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                      }}
+                                    />
+                                  ) : (
+                                    <Box
+                                      sx={{
+                                        width: "100%",
+                                        height: "100%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 10,
+                                        px: 0.5,
+                                        textAlign: "center",
+                                      }}
+                                    >
+                                      {file?.name}
+                                    </Box>
+                                  )}
+                                </Box>
+                              );
+                            })}
+                          </Stack>
+                        )}
+
+                        {/* Caption + Send button (WhatsApp style) */}
+                        <Box sx={{ position: "relative", mt: 0.5 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Add a caption…"
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSend();
+                              }
+                            }}
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                borderRadius: 999,
+                                pr: 7, // space for send button
+                              },
+                            }}
+                          />
+                          <IconButton
+                            onClick={handleSend}
+                            disabled={
+                              sending ||
+                              (!text.trim() && draftAttachments.length === 0) ||
+                              !conversationId
+                            }
+                            sx={{
+                              position: "absolute",
+                              right: 6,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              bgcolor: "primary.main",
+                              color: "#fff",
+                              "&:hover": { bgcolor: "primary.dark" },
+                              width: 34,
+                              height: 34,
+                            }}
+                          >
+                            <SendRoundedIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    );
+                  })()
+                ) : (
+                  // ✉️ Normal text-only composer
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                    <Tooltip title="Attach">
+                      <IconButton
+                        onClick={handleAttachClick}
+                        size="small"
+                        sx={{
+                          bgcolor: isAttachMenuOpen ? "rgba(0,0,0,0.06)" : "transparent",
+                          transition: "transform 0.2s",
+                          transform: isAttachMenuOpen ? "rotate(45deg)" : "rotate(0deg)",
+                        }}
+                      >
+                        <AddRoundedIcon fontSize="medium" />
+                      </IconButton>
+                    </Tooltip>
+
+                    <TextField
+                      placeholder="Type a message…"
+                      fullWidth
+                      size="small"
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="contained"
+                      startIcon={<SendRoundedIcon />}
+                      disabled={
+                        (!text.trim() && draftAttachments.length === 0) ||
+                        sending ||
+                        !conversationId
                       }
-                    }}
-                  />
-                  <Button
-                    variant="contained"
-                    startIcon={<SendRoundedIcon />}
-                    disabled={!text.trim() || sending || !conversationId}
-                    onClick={handleSend}
-                    sx={{ textTransform: "none", borderRadius: 2 }}
+                      onClick={handleSend}
+                      sx={{ textTransform: "none", borderRadius: 2 }}
+                    >
+                      Send
+                    </Button>
+                  </Box>
+                )}
+                {/* Attach menu: File Upload & Camera (same as MessagesPage) */}
+                  <Menu
+                    anchorEl={attachMenuAnchor}
+                    open={isAttachMenuOpen}
+                    onClose={handleAttachClose}
+                    anchorOrigin={{ vertical: "top", horizontal: "left" }}
+                    transformOrigin={{ vertical: "bottom", horizontal: "left" }}
                   >
-                    Send
-                  </Button>
-                </Box>
+                    <MenuItem onClick={handleTriggerFileUpload}>
+                      <ListItemIcon>
+                        <UploadFileRoundedIcon fontSize="small" />
+                      </ListItemIcon>
+                      <Typography variant="body2" fontWeight={600}>
+                        File Upload
+                      </Typography>
+                    </MenuItem>
+                    <MenuItem onClick={handleTriggerCamera}>
+                      <ListItemIcon>
+                        <CameraAltRoundedIcon fontSize="small" />
+                      </ListItemIcon>
+                      <Typography variant="body2" fontWeight={600}>
+                        Camera
+                      </Typography>
+                    </MenuItem>
+                  </Menu>
               </>
             ) : (
               <Box
@@ -1557,6 +2609,74 @@ export default function AdminMessagesPage() {
           </Box>
         </Box>
       </Paper>
+      {/* Conversation context menu: pin / unpin */}
+      <Menu
+        anchorEl={convMenuAnchor}
+        open={Boolean(convMenuAnchor)}
+        onClose={handleCloseConvMenu}
+      >
+        <MenuItem onClick={handleTogglePinConversation}>
+          {convMenuTarget?.is_pinned ? "Unpin chat" : "Pin chat"}
+        </MenuItem>
+      </Menu>
+      {/* Message context menu: pin / unpin / delete */}
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={messageMenuOpen && !!menuMessage}
+        onClose={handleCloseMessageMenu}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        {/* Everyone can see Pin / Unpin */}
+        {menuMessage && (
+          <MenuItem onClick={handlePinOrUnpin}>
+            {isMessagePinned(menuMessage.id) ? "Unpin message" : "Pin message"}
+          </MenuItem>
+        )}
+
+        {/* Only message owner can see Delete */}
+        {menuMessage && (menuMessage.mine || isMyMessage(menuMessage)) && (
+          <MenuItem onClick={handleDeleteMessage}>Delete</MenuItem>
+        )}
+      </Menu>
+
+      {/* Camera modal for capturing a photo */}
+      <Dialog open={cameraOpen} onClose={handleCloseCamera} maxWidth="md">
+        <DialogContent sx={{ p: 0, bgcolor: "black" }}>
+          <Box sx={{ display: "flex", justifyContent: "center" }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              style={{
+                width: "100%",
+                maxHeight: "60vh",
+                objectFit: "contain",
+              }}
+            />
+          </Box>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              py: 2,
+            }}
+          >
+            <IconButton
+              onClick={handleCapturePhoto}
+              sx={{
+                width: 60,
+                height: 60,
+                border: "4px solid white",
+                color: "white",
+              }}
+            >
+              <CameraAltRoundedIcon fontSize="large" />
+            </IconButton>
+          </Box>
+          <canvas ref={canvasRef} style={{ display: "none" }} />
+        </DialogContent>
+      </Dialog>
     </Container>
   );
 }
