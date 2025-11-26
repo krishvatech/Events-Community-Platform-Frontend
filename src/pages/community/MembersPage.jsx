@@ -208,10 +208,84 @@ function useCountryCentroids(geoUrl) {
   return getCenterForISO2;
 }
 
-const PALETTE = [
-  "#e3f2fd", "#e8f5e9", "#fff3e0", "#f3e5f5", "#ede7f6",
-  "#fffde7", "#e0f2f1", "#fce4ec", "#e8eaf6", "#f1f8e9",
-];
+const MAP_THEMES = {
+  pastel: {
+    landPalette: [
+      "#e3f2fd", "#e8f5e9", "#fff3e0", "#f3e5f5", "#ede7f6",
+      "#fffde7", "#e0f2f1", "#fce4ec", "#e8eaf6", "#f1f8e9",
+    ],
+    landStroke: "#ffffff",
+    memberDot: "#ef4444",
+    friendDot: "#10b981",
+    ocean: "#f8fafc",
+  },
+
+  dark: {
+    landPalette: [
+      "#1f2937", "#111827", "#0f172a", "#020617", "#111827",
+      "#1e293b", "#0b1120", "#020617", "#020617", "#111827",
+    ],
+    landStroke: "#020617",
+    memberDot: "#f97316",   // orange
+    friendDot: "#22c55e",   // green
+    ocean: "#020617",
+  },
+
+  minimal: {
+    landPalette: ["#e5e7eb"], // almost flat
+    landStroke: "#9ca3af",
+    memberDot: "#2563eb",
+    friendDot: "#22c55e",
+    ocean: "#ffffff",
+  },
+
+  // 🌍 Google-Earth style (day)
+  earth: {
+    landPalette: [
+      "#c8e6c9", // light green
+      "#a5d6a7",
+      "#81c784",
+      "#e6ce9a", // sand / desert
+      "#d7ccc8",
+      "#c5e1a5",
+      "#aed581",
+      "#ffecb3",
+      "#b2dfdb",
+      "#ffe0b2",
+    ],
+    landStroke: "#8fa8c3",          // soft bluish border
+    memberDot: "#e53935",           // strong red
+    friendDot: "#1e88e5",           // Google blue
+    ocean: "#b3d9ff",               // bright blue water
+  },
+
+  // 🌎 Google-Earth muted / terrain
+  earthMuted: {
+    landPalette: [
+      "#9ccc65",
+      "#8bc34a",
+      "#7cb342",
+      "#d4b483",
+      "#c8b68c",
+      "#a5d6a7",
+      "#c0ca33",
+      "#ffcc80",
+      "#80cbc4",
+      "#bcaaa4",
+    ],
+    landStroke: "#7c8c9a",
+    memberDot: "#f4511e",           // warmer red-orange
+    friendDot: "#29b6f6",           // lighter blue
+    ocean: "#90caf9",               // softer blue water
+  },
+};
+
+
+const CURRENT_MAP_THEME = MAP_THEMES.earth; // or "pastel" / "minimal"
+
+
+const PALETTE = CURRENT_MAP_THEME.landPalette;
+
 const countryColor = (name) => {
   let h = 0;
   for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -742,7 +816,11 @@ export default function MembersPage() {
   /* -------------------------------- UI -------------------------------- */
   return (
     <>
-      <Grid container spacing={hasSideMap ? 2 : 0}>
+      <Grid
+        container
+        spacing={hasSideMap ? 2 : 0}
+        alignItems={hasSideMap ? "stretch" : "flex-start"}
+      >
         {/* Left: Member list */}
         <Grid
           item
@@ -750,12 +828,15 @@ export default function MembersPage() {
           md={hasSideMap ? 6 : 12}
           lg={hasSideMap ? 5 : 12}
           xl={hasSideMap ? 4 : 12}
-          sx={{ minWidth: 0 }} /* Prevent Grid blowout */
+          sx={{ minWidth: 0, display: "flex" }} /* Prevent Grid blowout */
         >
           <Box
             sx={{
-              width: "100%",  // Fixed: Removed unstable % widths (120/157%)
+              width: "100%",
               mx: 0,
+              display: "flex",                           // ⬅️ make column
+              flexDirection: "column",
+              height: "100%",                            // ⬅️ stretch to grid height
             }}
           >
             {/* Header Paper */}
@@ -949,6 +1030,7 @@ export default function MembersPage() {
                   spacing={1.25}
                   alignItems="stretch"
                   sx={{
+                    flex: 1,
                     width: "100%",
                     "& > *": {
                       width: "100% !important",
@@ -1015,16 +1097,24 @@ export default function MembersPage() {
 
         {/* Right: map panel */}
         {hasSideMap && (
-          <Grid item xs={12} md={6} lg={7} xl={8} sx={{ minWidth: 0 }}>
+          <Grid
+            item
+            xs={12}
+            md={6}
+            lg={7}
+            xl={8}
+            sx={{ minWidth: 0, display: "flex" }}     // ⬅️ flex so Paper can stretch
+          >
             <Paper
               sx={{
                 p: 1.5,
                 border: `1px solid ${BORDER}`,
                 borderRadius: 3,
-                position: { md: "sticky" },
-                top: 88,
-                height: { xs: 520, md: "calc(100vh - 140px)" },
-                width: 500, // Fixed: Changed from 605 to 100% to fit grid
+                // ⬇️ REMOVE sticky + fixed viewport height
+                // position: { md: "sticky" },
+                // top: 88,
+                // height: { xs: 520, md: "calc(100vh - 140px)" },
+                width: "100%",                         // ⬅️ full width of grid cell
                 display: "flex",
                 flexDirection: "column",
                 gap: 1,
@@ -1067,7 +1157,7 @@ export default function MembersPage() {
                         width: 12,
                         height: 12,
                         borderRadius: "50%",
-                        bgcolor: "#ef4444",
+                        bgcolor: CURRENT_MAP_THEME.memberDot,
                         border: "1px solid #fff",
                       }}
                     />
@@ -1079,7 +1169,7 @@ export default function MembersPage() {
                         width: 12,
                         height: 12,
                         borderRadius: "50%",
-                        bgcolor: "#10b981",
+                        bgcolor: CURRENT_MAP_THEME.friendDot,
                         border: "1px solid #fff",
                       }}
                     />
@@ -1099,6 +1189,7 @@ export default function MembersPage() {
                   "& *:focus, & *:focus-visible": {
                     outline: "none !important",
                   },
+                  bgcolor: CURRENT_MAP_THEME.ocean,
                 }}
               >
                 {showMap ? (
@@ -1123,7 +1214,7 @@ export default function MembersPage() {
                               key={geo.rsmKey}
                               geography={geo}
                               fill={countryColor(geo.properties.name)}
-                              stroke="#ffffff"
+                              stroke={CURRENT_MAP_THEME.landStroke}
                               strokeWidth={0.3}
                             />
                           ))
@@ -1195,7 +1286,7 @@ export default function MembersPage() {
                         >
                           <circle
                             r={3.2}
-                            fill={m.isFriend ? "#10b981" : "#ef4444"}
+                            fill={m.isFriend ? CURRENT_MAP_THEME.friendDot : CURRENT_MAP_THEME.memberDot}
                             stroke="#ffffff"
                             strokeWidth={1}
                             style={{ pointerEvents: "all" }}
@@ -1321,7 +1412,7 @@ export default function MembersPage() {
                       width: 12,
                       height: 12,
                       borderRadius: "50%",
-                      bgcolor: "#ef4444",
+                      bgcolor: CURRENT_MAP_THEME.memberDot,
                       border: "1px solid #fff",
                     }}
                   />
@@ -1333,7 +1424,7 @@ export default function MembersPage() {
                       width: 12,
                       height: 12,
                       borderRadius: "50%",
-                      bgcolor: "#10b981",
+                      bgcolor: CURRENT_MAP_THEME.friendDot,
                       border: "1px solid #fff",
                     }}
                   />
@@ -1353,6 +1444,7 @@ export default function MembersPage() {
                 "& *:focus, & *:focus-visible": {
                   outline: "none !important",
                 },
+                bgcolor: CURRENT_MAP_THEME.ocean,
               }}
             >
               {showMap ? (
@@ -1449,7 +1541,7 @@ export default function MembersPage() {
                       >
                         <circle
                           r={3.2}
-                          fill={m.isFriend ? "#10b981" : "#ef4444"}
+                          fill={m.isFriend ? CURRENT_MAP_THEME.friendDot : CURRENT_MAP_THEME.memberDot}
                           stroke="#ffffff"
                           strokeWidth={1}
                           style={{ pointerEvents: "all" }}
