@@ -32,20 +32,22 @@ import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import MapRoundedIcon from "@mui/icons-material/MapRounded";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import { geoNaturalEarth1, geoCentroid } from "d3-geo";
+import { geoCentroid } from "d3-geo";
+
 import { feature as topoFeature } from "topojson-client";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 isoCountries.registerLocale(enLocale);
-
-// Colorful world map + markers with pan/zoom
 import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  Marker,
-  ZoomableGroup,
-} from "react-simple-maps";
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Tooltip as LeafletTooltip,
+  useMap,
+} from "react-leaflet";
+import L from "leaflet";
+
+
 
 /* --------------------- constants & helpers --------------------- */
 const BORDER = "#e2e8f0";
@@ -404,6 +406,153 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
   );
 }
 
+
+function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
+  const hasMarkers = markers && markers.length > 0;
+  function AutoZoom({ markers }) {
+    const map = useMap();
+
+    React.useEffect(() => {
+      if (!markers || markers.length === 0) return;
+
+      // If only one marker, zoom in strongly on it
+      if (markers.length === 1) {
+        const [lng, lat] = markers[0].coordinates;
+        map.flyTo([lat, lng], 6, { duration: 0.8 }); // zoom 6 = closer
+        return;
+      }
+
+      // If multiple markers, fit bounds but don't zoom too far out
+      const latLngs = markers.map((m) => {
+        const [lng, lat] = m.coordinates;
+        return [lat, lng];
+      });
+
+      const bounds = L.latLngBounds(latLngs);
+      map.fitBounds(bounds, {
+        padding: [40, 40],
+        maxZoom: 4, // more zoom than before, but not too tight
+      });
+    }, [markers, map]);
+
+    return null;
+  }
+
+
+  // Simple center: average of all marker positions, fallback to (20,0)
+  let center = [20, 0]; // [lat, lng]
+  if (hasMarkers) {
+    let sumLat = 0;
+    let sumLng = 0;
+    markers.forEach((m) => {
+      const [lng, lat] = m.coordinates; // our data is [lng, lat]
+      sumLat += lat;
+      sumLng += lng;
+    });
+    center = [sumLat / markers.length, sumLng / markers.length];
+  }
+
+  return (
+    <Box
+      sx={{
+        position: "relative",
+        flex: 1,
+        minHeight,
+        borderRadius: 3,
+        overflow: "hidden",
+      }}
+    >
+      {showMap && hasMarkers ? (
+        <MapContainer
+          center={center}
+          zoom={3}
+          minZoom={2}
+          maxZoom={7}
+          style={{ width: "100%", height: "100%" }}
+          scrollWheelZoom
+          worldCopyJump
+        >
+          {/* Auto-adjust view when search/filter changes */}
+          <AutoZoom markers={markers} />
+          <TileLayer
+            attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          />
+
+
+          {/* Country-level circles with counts (big soft markers) */}
+          {countryAgg.map((c) => {
+            const [lng, lat] = c.center;
+            return (
+              <CircleMarker
+                key={c.code}
+                center={[lat, lng]} // Leaflet uses [lat, lng]
+                radius={10}
+                pathOptions={{
+                  color: "transparent",
+                  fillOpacity: 0,
+                }}
+              >
+                <LeafletTooltip direction="top" offset={[0, -4]}>
+                  <Box sx={{ fontSize: 12 }}>
+                    <div style={{ fontWeight: 700 }}>{c.label}</div>
+                    <div>
+                      {c.total} people
+                      {c.friends ? ` • ${c.friends} friends` : ""}
+                    </div>
+                    <div style={{ marginTop: 4, opacity: 0.9 }}>
+                      {c.users.slice(0, 6).join(", ")}
+                      {c.total > 6 ? ` +${c.total - 6} more` : ""}
+                    </div>
+                  </Box>
+                </LeafletTooltip>
+              </CircleMarker>
+            );
+          })}
+
+          {/* Individual member dots */}
+          {markers.map((m, i) => {
+            const [lng, lat] = m.coordinates;
+            return (
+              <CircleMarker
+                key={i}
+                center={[lat, lng]}
+                radius={3}
+                pathOptions={{
+                  color: "#ffffff",
+                  weight: 1,
+                  fillColor: m.isFriend
+                    ? CURRENT_MAP_THEME.friendDot
+                    : CURRENT_MAP_THEME.memberDot,
+                  fillOpacity: 1,
+                }}
+              >
+                <LeafletTooltip direction="top" offset={[0, -4]}>
+                  <Box sx={{ fontSize: 12 }}>
+                    <div style={{ fontWeight: 600 }}>{m.userName}</div>
+                    <div style={{ opacity: 0.85 }}>
+                      {m.isFriend ? "Friend" : "Member"}
+                    </div>
+                  </Box>
+                </LeafletTooltip>
+              </CircleMarker>
+            );
+          })}
+        </MapContainer>
+      ) : (
+        <Stack
+          alignItems="center"
+          justifyContent="center"
+          sx={{ height: "100%", color: "text.secondary" }}
+        >
+          <Typography>Map hidden.</Typography>
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
+
 /* ------------------------------ page component ------------------------------ */
 export default function MembersPage() {
   const navigate = useNavigate();
@@ -429,50 +578,12 @@ export default function MembersPage() {
   const [showMap, setShowMap] = useState(true);
   const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 });
 
-  const hasSideMap = !isCompact && showMap;
-
-  // Tooltip state
-  const [tip, setTip] = React.useState(null);
-
-  const showTip = (evt, node) => {
-    const rect = mapBoxRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTip({
-      x: evt.clientX - rect.left + 10,
-      y: evt.clientY - rect.top + 10,
-      node,
-    });
-  };
-  const moveTip = (evt) => {
-    const rect = mapBoxRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTip((prev) =>
-      prev
-        ? { ...prev, x: evt.clientX - rect.left + 10, y: evt.clientY - rect.top + 10 }
-        : prev
-    );
-  };
-  const hideTip = () => setTip(null);
+  const hasSideMap = !isCompact;
 
   const [page, setPage] = useState(1);
   const ROWS_PER_PAGE = 5;
 
   const [friendStatusByUser, setFriendStatusByUser] = useState({});
-
-  const mapBoxRef = useRef(null);
-  const [mapSize, setMapSize] = useState({ w: 800, h: 400 });
-
-  // Resize observer to ensure map fits container fluidly
-  useEffect(() => {
-    const el = mapBoxRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setMapSize({ w: Math.max(100, width), h: Math.max(100, height) });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const userDisplayName = (u) =>
     u?.profile?.full_name ||
@@ -579,13 +690,23 @@ export default function MembersPage() {
   }, [users]);
 
   const countryOptions = useMemo(() => {
-    const set = new Set();
+    const map = new Map();
+
     users.forEach((u) => {
-      const c = getCountryFromUser(u);
-      if (c) set.add(c);
+      const raw = getCountryFromUser(u);
+      if (!raw) return;
+
+      const cleaned = raw.trim();
+      const key = cleaned.toLowerCase(); // use lower-case for dedupe
+
+      if (!map.has(key)) {
+        map.set(key, cleaned); // store the nicely formatted label once
+      }
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
   }, [users]);
+
 
   const titleOptions = useMemo(() => {
     const set = new Set();
@@ -825,10 +946,10 @@ export default function MembersPage() {
         <Grid
           item
           xs={12}
-          md={hasSideMap ? 6 : 12}
-          lg={hasSideMap ? 5 : 12}
-          xl={hasSideMap ? 4 : 12}
-          sx={{ minWidth: 0, display: "flex" }} /* Prevent Grid blowout */
+          md={hasSideMap ? 5 : 12}   // 5/12 at 1024px  → ~427px
+          lg={hasSideMap ? 7 : 12}   // 7/12 at 1440px → ~840px
+          xl={hasSideMap ? 7 : 12}
+          sx={{ minWidth: 0, display: "flex" }}
         >
           <Box
             sx={{
@@ -1100,10 +1221,10 @@ export default function MembersPage() {
           <Grid
             item
             xs={12}
-            md={6}
-            lg={7}
-            xl={8}
-            sx={{ minWidth: 0, display: "flex" }}     // ⬅️ flex so Paper can stretch
+            md={7}   // 7/12 of 1024px ≈ 597px  ≈ 600px
+            lg={5}   // 5/12 of 1440px = 600px
+            xl={5}
+            sx={{ minWidth: 0, display: "flex" }}
           >
             <Paper
               sx={{
@@ -1178,158 +1299,11 @@ export default function MembersPage() {
                 </Stack>
               </Stack>
 
-              <Box
-                ref={mapBoxRef}
-                sx={{
-                  position: "relative",
-                  flex: 1,
-                  minHeight: 580,
-                  userSelect: "none",
-                  "& svg": { display: "block" },
-                  "& *:focus, & *:focus-visible": {
-                    outline: "none !important",
-                  },
-                  bgcolor: CURRENT_MAP_THEME.ocean,
-                }}
-              >
-                {showMap ? (
-                  <ComposableMap
-                    projection={geoNaturalEarth1()}
-                    width={mapSize.w}
-                    height={mapSize.h}
-                    preserveAspectRatio="xMidYMid slice"
-                  >
-                    <ZoomableGroup
-                      center={mapPos.coordinates}
-                      zoom={mapPos.zoom}
-                      minZoom={MIN_ZOOM}
-                      maxZoom={MAX_ZOOM}
-                      onMoveStart={() => hideTip()}
-                      onMoveEnd={(pos) => setMapPos(pos)}
-                    >
-                      <Geographies geography={geoUrl}>
-                        {({ geographies }) =>
-                          geographies.map((geo) => (
-                            <Geography
-                              key={geo.rsmKey}
-                              geography={geo}
-                              fill={countryColor(geo.properties.name)}
-                              stroke={CURRENT_MAP_THEME.landStroke}
-                              strokeWidth={0.3}
-                            />
-                          ))
-                        }
-                      </Geographies>
-
-                      {countryAgg.map((c) => (
-                        <Marker
-                          key={`hover-${c.code}`}
-                          coordinates={c.center}
-                          onMouseEnter={(e) =>
-                            showTip(
-                              e,
-                              <div>
-                                <div style={{ fontWeight: 700 }}>
-                                  {c.label}
-                                </div>
-                                <div>
-                                  {c.total} people
-                                  {c.friends
-                                    ? ` • ${c.friends} friends`
-                                    : ""}
-                                </div>
-                                <div
-                                  style={{
-                                    marginTop: 4,
-                                    opacity: 0.9,
-                                  }}
-                                >
-                                  {c.users.slice(0, 6).join(", ")}
-                                  {c.total > 6
-                                    ? ` +${c.total - 6} more`
-                                    : ""}
-                                </div>
-                              </div>
-                            )
-                          }
-                          onMouseMove={moveTip}
-                          onMouseLeave={hideTip}
-                        >
-                          <circle
-                            r={14}
-                            fill="transparent"
-                            stroke="transparent"
-                            style={{ pointerEvents: "all" }}
-                          />
-                        </Marker>
-                      ))}
-
-                      {markers.map((m, i) => (
-                        <Marker
-                          key={i}
-                          coordinates={m.coordinates}
-                          onMouseEnter={(e) =>
-                            showTip(
-                              e,
-                              <div>
-                                <div style={{ fontWeight: 600 }}>
-                                  {m.userName}
-                                </div>
-                                <div style={{ opacity: 0.85 }}>
-                                  {m.isFriend ? "Friend" : "Member"}
-                                </div>
-                              </div>
-                            )
-                          }
-                          onMouseMove={moveTip}
-                          onMouseLeave={hideTip}
-                        >
-                          <circle
-                            r={3.2}
-                            fill={m.isFriend ? CURRENT_MAP_THEME.friendDot : CURRENT_MAP_THEME.memberDot}
-                            stroke="#ffffff"
-                            strokeWidth={1}
-                            style={{ pointerEvents: "all" }}
-                          />
-                        </Marker>
-                      ))}
-                    </ZoomableGroup>
-                  </ComposableMap>
-                ) : (
-                  <Stack
-                    alignItems="center"
-                    justifyContent="center"
-                    sx={{ height: "100%", color: "text.secondary" }}
-                  >
-                    <Typography>Map hidden.</Typography>
-                  </Stack>
-                )}
-
-                {tip?.node && (
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      left: tip.x,
-                      top: tip.y,
-                      pointerEvents: "none",
-                      backgroundColor: "rgba(0,0,0,0.92)",
-                      color: "#fff",
-                      px: 1.25,
-                      py: 0.75,
-                      borderRadius: 1,
-                      fontSize: 12,
-                      lineHeight: 1.35,
-                      boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
-                      maxWidth: 280,
-                      zIndex: 10,
-                      border: "none",
-                      outline: "none",
-                    }}
-                  >
-                    {tip.node}
-                  </Box>
-                )}
-              </Box>
+              <MembersLeafletMap
+                markers={markers}
+                countryAgg={countryAgg}
+                showMap={showMap}
+              />
             </Paper>
           </Grid>
         )}
@@ -1433,158 +1407,12 @@ export default function MembersPage() {
               </Stack>
             </Stack>
 
-            <Box
-              ref={mapBoxRef}
-              sx={{
-                position: "relative",
-                flex: 1,
-                minHeight: 360,
-                userSelect: "none",
-                "& svg": { display: "block" },
-                "& *:focus, & *:focus-visible": {
-                  outline: "none !important",
-                },
-                bgcolor: CURRENT_MAP_THEME.ocean,
-              }}
-            >
-              {showMap ? (
-                <ComposableMap
-                  projection={geoNaturalEarth1()}
-                  width={mapSize.w}
-                  height={mapSize.h}
-                  preserveAspectRatio="xMidYMid slice"
-                >
-                  <ZoomableGroup
-                    center={mapPos.coordinates}
-                    zoom={mapPos.zoom}
-                    minZoom={MIN_ZOOM}
-                    maxZoom={MAX_ZOOM}
-                    onMoveStart={() => hideTip()}
-                    onMoveEnd={(pos) => setMapPos(pos)}
-                  >
-                    <Geographies geography={geoUrl}>
-                      {({ geographies }) =>
-                        geographies.map((geo) => (
-                          <Geography
-                            key={geo.rsmKey}
-                            geography={geo}
-                            fill={countryColor(geo.properties.name)}
-                            stroke="#ffffff"
-                            strokeWidth={0.3}
-                          />
-                        ))
-                      }
-                    </Geographies>
-
-                    {countryAgg.map((c) => (
-                      <Marker
-                        key={`hover-mobile-${c.code}`}
-                        coordinates={c.center}
-                        onMouseEnter={(e) =>
-                          showTip(
-                            e,
-                            <div>
-                              <div style={{ fontWeight: 700 }}>
-                                {c.label}
-                              </div>
-                              <div>
-                                {c.total} people
-                                {c.friends
-                                  ? ` • ${c.friends} friends`
-                                  : ""}
-                              </div>
-                              <div
-                                style={{
-                                  marginTop: 4,
-                                  opacity: 0.9,
-                                }}
-                              >
-                                {c.users.slice(0, 6).join(", ")}
-                                {c.total > 6
-                                  ? ` +${c.total - 6} more`
-                                  : ""}
-                              </div>
-                            </div>
-                          )
-                        }
-                        onMouseMove={moveTip}
-                        onMouseLeave={hideTip}
-                      >
-                        <circle
-                          r={14}
-                          fill="transparent"
-                          stroke="transparent"
-                          style={{ pointerEvents: "all" }}
-                        />
-                      </Marker>
-                    ))}
-
-                    {markers.map((m, i) => (
-                      <Marker
-                        key={`mobile-${i}`}
-                        coordinates={m.coordinates}
-                        onMouseEnter={(e) =>
-                          showTip(
-                            e,
-                            <div>
-                              <div style={{ fontWeight: 600 }}>
-                                {m.userName}
-                              </div>
-                              <div style={{ opacity: 0.85 }}>
-                                {m.isFriend ? "Friend" : "Member"}
-                              </div>
-                            </div>
-                          )
-                        }
-                        onMouseMove={moveTip}
-                        onMouseLeave={hideTip}
-                      >
-                        <circle
-                          r={3.2}
-                          fill={m.isFriend ? CURRENT_MAP_THEME.friendDot : CURRENT_MAP_THEME.memberDot}
-                          stroke="#ffffff"
-                          strokeWidth={1}
-                          style={{ pointerEvents: "all" }}
-                        />
-                      </Marker>
-                    ))}
-                  </ZoomableGroup>
-                </ComposableMap>
-              ) : (
-                <Stack
-                  alignItems="center"
-                  justifyContent="center"
-                  sx={{ height: "100%", color: "text.secondary" }}
-                >
-                  <Typography>Map hidden.</Typography>
-                </Stack>
-              )}
-
-              {tip?.node && (
-                <Box
-                  sx={{
-                    position: "absolute",
-                    left: tip.x,
-                    top: tip.y,
-                    pointerEvents: "none",
-                    backgroundColor: "rgba(0,0,0,0.92)",
-                    color: "#fff",
-                    px: 1.25,
-                    py: 0.75,
-                    borderRadius: 1,
-                    fontSize: 12,
-                    lineHeight: 1.35,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
-                    maxWidth: 280,
-                    zIndex: 10,
-                    border: "none",
-                    outline: "none",
-                  }}
-                >
-                  {tip.node}
-                </Box>
-              )}
-            </Box>
+            <MembersLeafletMap
+              markers={markers}
+              countryAgg={countryAgg}
+              showMap={showMap}
+              minHeight={360}
+            />
           </Paper>
         </Box>
       )}

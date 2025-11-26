@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import './index.css';
 import './styles/brand.css';
+import "leaflet/dist/leaflet.css";
 
 // MUI providers
 import { ThemeProvider, StyledEngineProvider } from '@mui/material/styles';

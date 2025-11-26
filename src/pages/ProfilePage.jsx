@@ -147,11 +147,20 @@ export default function ProfilePage() {
   const [expList, setExpList] = useState([]);
 
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [aboutForm, setAboutForm] = useState({ bio: "", skillsText: "" });
+  // "description" when opened from About, "skills" when opened from Skills (same as HomePage)
+  const [aboutMode, setAboutMode] = useState("description");
 
-  const openAbout = () => {
+  const [aboutForm, setAboutForm] = useState({
+    bio: "",
+    skillsText: "",
+  });
+
+  // open from About or Skills card
+  const openEditAbout = (mode = "description") => {
+    setAboutMode(mode);
     setAboutForm({
       bio: form.bio || "",
+      // same style as HomePage: keep CSV / text from form
       skillsText: form.skillsText || "",
     });
     setAboutOpen(true);
@@ -686,51 +695,63 @@ export default function ProfilePage() {
                 >
                   {/* LEFT */}
                   <Grid item xs={12} lg={6}>
+                    {/* About (description only) */}
                     <SectionCard
                       title="About"
-                      action={<Button size="small" onClick={openAbout}>Edit</Button>}
-                    >
-                      <Label>Summary:</Label>
-                      {form.bio ? (
-                        <Typography variant="body2">{form.bio}</Typography>
-                      ) : (
-                        <PlaceholderLine />
-                      )}
-                      {/* Skills */}
-                      <Label sx={{ mt: 2 }}>Skills:</Label>
-                      {parseSkills(form.skillsText).length ? (
-                        <Box
-                          sx={{
-                            mt: 1,
-                            display: "grid",
-                            // max 6 per row; responsive so it isn't tiny on phones
-                            gridTemplateColumns: {
-                              xs: "repeat(4, minmax(0,1fr))",   // phones
-                              sm: "repeat(3, minmax(0,1fr))",   // small tablets
-                              md: "repeat(4, minmax(0,1fr))",   // desktops: max 6 per row
-                            },
-                            gap: 1, // space between chips
-                          }}
+                      action={
+                        <Button
+                          size="small"
+                          startIcon={<EditOutlinedIcon fontSize="small" />}
+                          onClick={() => openEditAbout("description")}
                         >
+                          Edit
+                        </Button>
+                      }
+                    >
+                      <Label>Summary</Label>
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>
+                        {form.bio?.trim()
+                          ? form.bio
+                          : "Add a short description about your role, focus areas, and what you're working on."}
+                      </Typography>
+                    </SectionCard>
+
+                    {/* Skills (separate card, like HomePage) */}
+                    <SectionCard
+                      sx={{ mt: 2 }}
+                      title="Skills"
+                      action={
+                        <Button
+                          size="small"
+                          startIcon={<EditOutlinedIcon fontSize="small" />}
+                          onClick={() => openEditAbout("skills")}
+                        >
+                          Edit
+                        </Button>
+                      }
+                    >
+                      {parseSkills(form.skillsText).length ? (
+                        <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
                           {parseSkills(form.skillsText).map((s, i) => (
-                            <Box key={i} sx={{ minWidth: 0, display: "flex", justifyContent: "flex-start" }}>
-                              <Chip
-                                size="small"
-                                label={s}
-                                sx={{
-                                  maxWidth: "100%",
-                                  "& .MuiChip-label": {
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  },
-                                }}
-                              />
-                            </Box>
+                            <Chip
+                              key={i}
+                              size="small"
+                              label={s}
+                              sx={{
+                                maxWidth: "100%",
+                                "& .MuiChip-label": {
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                },
+                              }}
+                            />
                           ))}
                         </Box>
                       ) : (
-                        <PlaceholderLine />
+                        <Typography variant="body2" color="text.secondary">
+                          Add your top skills so others can quickly see where you’re strongest.
+                        </Typography>
                       )}
                     </SectionCard>
 
@@ -1284,42 +1305,108 @@ export default function ProfilePage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit About</DialogTitle>
+      <Dialog
+        open={aboutOpen}
+        onClose={() => setAboutOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        fullScreen={isMobile}
+      >
+        {/* Title changes based on mode */}
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {aboutMode === "skills" ? "Edit skills" : "Edit description"}
+        </DialogTitle>
+
         <DialogContent dividers>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-            Update your summary and skills
-          </Typography>
+          {/* DESCRIPTION MODE */}
+          {aboutMode === "description" && (
+            <Box sx={{ mb: 3 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{ mb: 0.5 }}
+              >
+                Description
+              </Typography>
 
-          {/* Summary */}
-          <TextField
-            label="Summary"
-            value={aboutForm.bio}
-            onChange={(e) => setAboutForm(f => ({ ...f, bio: e.target.value }))}
-            fullWidth
-            multiline
-            minRows={4}
-            sx={{ mb: 2 }}
-            placeholder="Tell people a little about yourself…"
-          />
+              <TextField
+                placeholder="List your major duties and successes, highlighting specific projects"
+                value={aboutForm.bio}
+                onChange={(e) =>
+                  setAboutForm((f) => ({ ...f, bio: e.target.value }))
+                }
+                fullWidth
+                multiline
+                minRows={4}
+              />
 
-          {/* Skills (CSV or JSON array) */}
-          <TextField
-            label="Skills (CSV or JSON array)"
-            value={aboutForm.skillsText}
-            onChange={(e) => setAboutForm(f => ({ ...f, skillsText: e.target.value }))}
-            fullWidth
-            placeholder='e.g., M&A, Strategy  OR  ["M&A","Strategy"]'
-            helperText="Saved as a list of strings"
-          />
+              {/* helper text + character counter */}
+              <Box
+                sx={{
+                  mt: 0.5,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Review and edit the draft before saving so it reflects you.
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {(aboutForm.bio?.length || 0)}/2000
+                </Typography>
+              </Box>
 
-          {/* Live preview of parsed skills */}
-          <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            {parseSkills(aboutForm.skillsText).length
-              ? parseSkills(aboutForm.skillsText).map((s, i) => <Chip key={i} label={s} size="small" />)
-              : <Typography variant="caption" color="text.secondary">No skills parsed yet</Typography>}
-          </Box>
+              {/* static LinkedIn-style button */}
+              <Box sx={{ mt: 1 }}>
+                <Button variant="outlined" size="small">
+                  Rewrite with AI
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+          {/* SKILLS MODE */}
+          {aboutMode === "skills" && (
+            <Box>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{ mb: 0.5 }}
+              >
+                Skills
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1 }}
+              >
+                We recommend adding your top 5 used in this role. They’ll also appear
+                in your Skills section.
+              </Typography>
+
+              <TextField
+                label="Skills (CSV or JSON array)"
+                value={aboutForm.skillsText}
+                onChange={(e) =>
+                  setAboutForm((f) => ({ ...f, skillsText: e.target.value }))
+                }
+                fullWidth
+                helperText="Saved as a list of strings"
+              />
+
+              {/* live preview of parsed skills */}
+              <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
+                {parseSkills(aboutForm.skillsText).length
+                  ? parseSkills(aboutForm.skillsText).map((skill, idx) => (
+                    <Chip key={idx} size="small" label={skill} />
+                  ))
+                  : null}
+              </Box>
+            </Box>
+          )}
         </DialogContent>
+
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setAboutOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={saveAbout} disabled={saving}>
