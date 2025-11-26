@@ -288,6 +288,8 @@ function displayName(user) {
 function AdminNewChatDialog({
   open,
   staff,
+  existingGroupIds = [],
+  existingGroupNames = [],
   onClose,
   onStartStaffChat,
   onStartGroupChat,
@@ -297,7 +299,8 @@ function AdminNewChatDialog({
   const [groups, setGroups] = React.useState([]);
   const [loadingGroups, setLoadingGroups] = React.useState(false);
 
-  // Load "groups you joined" when dialog opens on Groups tab
+    // Load "groups you joined" when dialog opens on Groups tab
+  // 👉 only fetch once per open; filtering is done separately
   React.useEffect(() => {
     if (!open || tab !== 1) return;
     let cancelled = false;
@@ -316,8 +319,9 @@ function AdminNewChatDialog({
         const raw = Array.isArray(data?.results)
           ? data.results
           : Array.isArray(data)
-            ? data
-            : [];
+          ? data
+          : [];
+
         const mapped = raw
           .map((g) => ({
             id: g.id,
@@ -331,6 +335,7 @@ function AdminNewChatDialog({
               "",
           }))
           .filter((g) => g.id);
+
         if (!cancelled) setGroups(mapped);
       } catch (e) {
         console.error(e);
@@ -343,9 +348,30 @@ function AdminNewChatDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, tab]);
+  }, [open, tab]);        // 🔴 remove existingGroupIds from deps
 
-  const list = tab === 0 ? staff : groups;
+  // Groups that should appear in "New chat" → Groups tab
+  // hide groups that already have a conversation with messages
+  const groupList = React.useMemo(() => {
+    if (!Array.isArray(groups)) return [];
+
+    const idSet = new Set(existingGroupIds || []);
+    const nameSet = new Set(
+      (existingGroupNames || [])
+        .map((n) => (n || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    return groups.filter((g) => {
+      const id = g.id;
+      const name = (g.name || "").trim().toLowerCase();
+      if (id && idSet.has(id)) return false;
+      if (name && nameSet.has(name)) return false;
+      return true;
+    });
+  }, [groups, existingGroupIds, existingGroupNames]);
+
+  const list = tab === 0 ? staff : groupList;
   const filtered = React.useMemo(() => {
     const t = query.trim().toLowerCase();
     if (!t) return list;
@@ -698,6 +724,69 @@ export default function AdminMessagesPage() {
       }),
     [threads]
   );
+
+  
+
+  // Staff for "New chat" – hide staff who already have a DM with real messages
+  const staffForNewChat = React.useMemo(() => {
+    if (!users || users.length === 0) return [];
+
+    const dmTitles = new Set(
+      visibleThreads
+        .filter((t) => {
+          const isGroup =
+            t.chat_type === "group" || Boolean(t.group || t.context_group);
+          return !isGroup; // only direct messages
+        })
+        .map((t) => (threadTitle(t) || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    return users.filter((u) => {
+      const name = (displayName(u) || "").trim().toLowerCase();
+      if (!name) return false;
+      return !dmTitles.has(name);
+    });
+  }, [users, visibleThreads]);
+
+  // Group IDs that already have conversations with messages
+  const existingGroupIds = React.useMemo(() => {
+    const ids = new Set();
+    visibleThreads.forEach((t) => {
+      const isGroup =
+        t.chat_type === "group" || Boolean(t.group || t.context_group);
+      if (!isGroup) return;
+
+      const g = t.group || t.context_group || {};
+      const id =
+        g.id ||
+        t.group_id ||
+        t.context_group_id ||
+        t.context_id ||
+        null;
+
+      if (id) ids.add(id);
+    });
+    return Array.from(ids);
+  }, [visibleThreads]);
+
+  // Names of groups that already have a conversation with messages
+  const existingGroupNames = React.useMemo(() => {
+    const names = new Set();
+    visibleThreads.forEach((t) => {
+      const isGroup =
+        t.chat_type === "group" ||
+        Boolean(t.group || t.context_group) ||
+        (t.context_type &&
+          String(t.context_type).toLowerCase().includes("group"));
+      if (!isGroup) return;
+
+      const title = (threadTitle(t) || "").trim().toLowerCase();
+      if (title) names.add(title);
+    });
+    return Array.from(names);
+  }, [visibleThreads]);
+
 
   const filteredThreads = React.useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -1420,7 +1509,9 @@ export default function AdminMessagesPage() {
       {/* New chat dialog (staff + joined groups) */}
       <AdminNewChatDialog
         open={newChatOpen}
-        staff={users}
+        staff={staffForNewChat}
+        existingGroupIds={existingGroupIds}
+        existingGroupNames={existingGroupNames}
         onClose={() => setNewChatOpen(false)}
         onStartStaffChat={(u) => openConversation(u)}
         onStartGroupChat={(g) => openGroupConversation(g)}
