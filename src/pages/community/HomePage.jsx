@@ -91,7 +91,6 @@ function authHeader() {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-// ---------------- Profile wiring (read) ----------------
 function mapExperience(item) {
   return {
     id: item.id,
@@ -108,9 +107,12 @@ function mapExperience(item) {
     compensation_type: item.compensation_type || "",
     work_arrangement: item.work_arrangement || "",
     location: item.location || "",
+    description: item.description || "",   // 👈 ADD THIS
     exit_reason: item.exit_reason || "",
   };
 }
+
+
 
 function mapEducation(item) {
   return {
@@ -3745,6 +3747,93 @@ const FIELD_OF_STUDY_OPTIONS = [
   // add more as needed...
 ];
 
+const CITY_OPTIONS = [
+  "Abu Dhabi",
+  "Accra",
+  "Ahmedabad",
+  "Amsterdam",
+  "Athens",
+  "Auckland",
+  "Bangkok",
+  "Barcelona",
+  "Beijing",
+  "Bengaluru",
+  "Berlin",
+  "Bhopal",
+  "Bogotá",
+  "Brisbane",
+  "Brussels",
+  "Buenos Aires",
+  "Cairo",
+  "Cape Town",
+  "Chennai",
+  "Chicago",
+  "Copenhagen",
+  "Dallas",
+  "Delhi",
+  "Doha",
+  "Dubai",
+  "Dublin",
+  "Edinburgh",
+  "Frankfurt",
+  "Geneva",
+  "Hong Kong",
+  "Hyderabad",
+  "Indore",
+  "Istanbul",
+  "Jaipur",
+  "Jakarta",
+  "Johannesburg",
+  "Kolkata",
+  "Kuala Lumpur",
+  "Lisbon",
+  "London",
+  "Los Angeles",
+  "Lucknow",
+  "Madrid",
+  "Manila",
+  "Melbourne",
+  "Mexico City",
+  "Milan",
+  "Montreal",
+  "Moscow",
+  "Mumbai",
+  "Nagpur",
+  "Nashik",
+  "New York",
+  "Osaka",
+  "Ottawa",
+  "Paris",
+  "Patna",
+  "Perth",
+  "Prague",
+  "Pune",
+  "Rajkot",
+  "Rio de Janeiro",
+  "Rome",
+  "San Francisco",
+  "Santiago",
+  "São Paulo",
+  "Seattle",
+  "Seoul",
+  "Shanghai",
+  "Singapore",
+  "Stockholm",
+  "Surat",
+  "Sydney",
+  "Thane",
+  "Tokyo",
+  "Toronto",
+  "Vadodara",
+  "Vancouver",
+  "Vienna",
+  "Visakhapatnam",
+  "Warsaw",
+  "Washington",
+  "Wellington",
+  "Zurich",
+];
+
 
 
 function AboutTab({ profile, groups, onUpdate }) {
@@ -3780,17 +3869,27 @@ function AboutTab({ profile, groups, onUpdate }) {
 
   const [expOpen, setExpOpen] = React.useState(false);
   const [editExpId, setEditExpId] = React.useState(null);
+  const [savingExp, setSavingExp] = React.useState(false);
 
   const [expForm, setExpForm] = React.useState({
-    org: "", position: "", location: "", start: "", end: "", current: false,
+    org: "",
+    position: "",
+    city: "",            // 👈 NEW
+    location: "",
+    start: "",
+    end: "",
+    current: false,
     employment_type: "full_time",
     work_schedule: "",
     relationship_to_org: "",
     career_stage: "",
     compensation_type: "",
     work_arrangement: "",
+    description: "",     // 👈 keep as-is
     exit_reason: "",
   });
+
+
 
   // helper: show "Why did you leave this job?" only if
   // end date exists, not current, and end date is before today
@@ -3816,25 +3915,43 @@ function AboutTab({ profile, groups, onUpdate }) {
     first_name: profile.first_name || "",
     last_name: profile.last_name || "",
     email: profile.email || "",
+    city: "",
     location: profile.location || "",
     linkedin: profile.links?.linkedin || "",
     job_title: profile.job_title || "",
   });
 
+
   React.useEffect(() => {
+    // Split profile.location like "Mumbai, India" → city + country for Contact dialog
+    const fullLocation = profile.location || "";
+    let city = "";
+    let country = "";
+
+    if (fullLocation.includes(",")) {
+      const [cityPart, countryPart] = fullLocation.split(",").map((s) => s.trim());
+      city = cityPart || "";
+      country = countryPart || "";
+    } else {
+      country = fullLocation || "";
+    }
+
     setAboutForm({
       bio: profile.bio || "",
       skillsText: (profile.skills || []).join(", "),
     });
+
     setContactForm({
       first_name: profile.first_name || "",
       last_name: profile.last_name || "",
       email: profile.email || "",
-      location: profile.location || "",
+      city,              // 👈 pre-filled city
+      location: country, // 👈 only country goes into dropdown
       linkedin: profile.links?.linkedin || "",
       job_title: profile.job_title || "",
     });
   }, [profile]);
+
 
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
 
@@ -4048,29 +4165,52 @@ function AboutTab({ profile, groups, onUpdate }) {
   };
 
 
-  // ----- Experience (NO location field) -----
   const openAddExperience = () => {
     setEditExpId(null);
     setExpForm({
-      org: "", position: "", location: "", start: "", end: "", current: false,
+      org: "",
+      position: "",
+      city: "",          // 👈 NEW
+      location: "",
+      start: "",
+      end: "",
+      current: false,
       employment_type: "full_time",
       work_schedule: "",
       relationship_to_org: "",
       career_stage: "",
       compensation_type: "",
       work_arrangement: "",
+      description: "",   // 👈 ADD
+      exit_reason: "",
     });
     setSyncProfileLocation(false);
     setExpOpen(true);
   };
+
   const openEditExperience = (id) => {
     const x = (profile.experience || []).find((e) => e.id === id);
     if (!x) return;
+
+    // x.location might be "Mumbai, India" or just "India"
+    const fullLocation = x.location || "";
+    let city = "";
+    let country = "";
+
+    if (fullLocation.includes(",")) {
+      const [cityPart, countryPart] = fullLocation.split(",").map((s) => s.trim());
+      city = cityPart || "";
+      country = countryPart || "";
+    } else {
+      country = fullLocation || "";
+    }
+
     setEditExpId(id);
     setExpForm({
       org: x.org || x.community_name || "",
       position: x.position || "",
-      location: x.location || "",
+      city,
+      location: country, // only country label is used in the dropdown
       start: x.start || x.start_date || "",
       end: x.end || x.end_date || "",
       current: !!(x.current || x.currently_work_here),
@@ -4080,11 +4220,18 @@ function AboutTab({ profile, groups, onUpdate }) {
       career_stage: x.career_stage || "",
       compensation_type: x.compensation_type || "",
       work_arrangement: x.work_arrangement || "",
+      description: x.description || "",
+      exit_reason: x.exit_reason || "",
     });
+    setSyncProfileLocation(false);
     setExpOpen(true);
   };
 
   const saveExperience = async () => {
+    // prevent double submit
+    if (savingExp) return;
+    setSavingExp(true);
+
     try {
       const { start, end, current } = expForm;
 
@@ -4105,47 +4252,103 @@ function AboutTab({ profile, groups, onUpdate }) {
 
       // 3) End date cannot be before start date
       if (!current && start && end && end < start) {
-        alert("End date cannot be before start date.");
+        alert("End date cannot be earlier than start date.");
         return;
       }
-      if (editExpId) await updateExperienceApi(editExpId, expForm);
-      else await createExperienceApi(expForm);
-      // If user ticked "Make this location my profile’s work location"
-      if (syncProfileLocation && expForm.location) {
-        const payload = {
+
+      // 4) Basic required fields
+      if (!expForm.org.trim() || !expForm.position.trim()) {
+        alert("Please fill in both company name and position.");
+        return;
+      }
+
+      const city = (expForm.city || "").trim();
+      const country = (expForm.location || "").trim();
+      const formattedLocation = [city, country].filter(Boolean).join(", ");
+
+      const payload = {
+        org: expForm.org.trim(),
+        position: expForm.position.trim(),
+        location: formattedLocation,   // 👈 use "City, Country"
+        start: expForm.start || null,
+        end: expForm.current ? null : (expForm.end || null),
+        current: !!expForm.current,
+        description: expForm.description || "",
+        employment_type: expForm.employment_type || "full_time",
+        work_schedule: expForm.work_schedule || "",
+        relationship_to_org: expForm.relationship_to_org || "",
+        career_stage: expForm.career_stage || "",
+        compensation_type: expForm.compensation_type || "",
+        work_arrangement: expForm.work_arrangement || "",
+        exit_reason: expForm.exit_reason || "",
+      };
+
+      if (editExpId) {
+        await updateExperienceApi(editExpId, payload);
+      } else {
+        await createExperienceApi(payload);
+      }
+
+      // sync profile location when checked
+      if (expForm.current && syncProfileLocation && expForm.location) {
+        const payloadProfile = {
           first_name: profile.first_name || "",
           last_name: profile.last_name || "",
           email: profile.email || "",
           profile: {
+            // same full name you already show in the UI
             full_name: fullName,
             timezone: "",
+            // keep existing bio & other fields
             bio: profile.bio || "",
             headline: "",
             job_title: profile.job_title || "",
             company: "",
-            location: expForm.location,
+            // ✅ only this is changed to the new experience location
+            location: formattedLocation,
             skills: profile.skills || [],
             links: profile.links || {},
           },
         };
 
         try {
-          await saveProfileToMe(payload);
-          onUpdate?.({ ...profile, location: expForm.location });
+          await saveProfileToMe(payloadProfile);
+          // update local React state so contact dialog/location updates instantly
+          onUpdate?.({
+            ...profile,
+            location: formattedLocation,
+          });
         } catch (err) {
           console.error("Failed to sync profile location from experience", err);
         }
       }
-      setExpOpen(false); setEditExpId(null);
+
+
+      setExpOpen(false);
+      setEditExpId(null);
       await reloadExtras();
-    } catch (e) { alert(e.message || "Save failed"); }
+    } catch (e) {
+      console.error("Save experience failed", e);
+      alert(e.message || "Save failed");
+    } finally {
+      setSavingExp(false);
+    }
   };
 
 
   // ----- Contact (edit dialog) -----
   const saveContact = async () => {
     try {
-      const links = { ...(profile.links || {}), linkedin: (contactForm.linkedin || "").trim() };
+      const links = {
+        ...(profile.links || {}),
+        linkedin: (contactForm.linkedin || "").trim(),
+      };
+
+      // 👇 Build "City, Country" exactly like Experience
+      const city = (contactForm.city || "").trim();
+      const country = (contactForm.location || "").trim();
+      const formattedLocation = [city, country].filter(Boolean).join(", ");
+
       const payload = {
         first_name: (contactForm.first_name || "").trim(),
         last_name: (contactForm.last_name || "").trim(),
@@ -4157,12 +4360,14 @@ function AboutTab({ profile, groups, onUpdate }) {
           headline: "",
           job_title: (contactForm.job_title || "").trim(),
           company: "",
-          location: (contactForm.location || "").trim(),
+          location: formattedLocation, // ⭐ "City, Country"
           skills: profile.skills || [],
           links,
         },
       };
+
       await saveProfileToMe(payload);
+
       onUpdate?.({
         ...profile,
         first_name: payload.first_name,
@@ -4172,8 +4377,11 @@ function AboutTab({ profile, groups, onUpdate }) {
         location: payload.profile.location,
         links: payload.profile.links,
       });
+
       setContactOpen(false);
-    } catch (e) { alert(e.message || "Save failed"); }
+    } catch (e) {
+      alert(e.message || "Save failed");
+    }
   };
 
   return (
@@ -4242,15 +4450,26 @@ function AboutTab({ profile, groups, onUpdate }) {
               </Box>
             ) : null}
           </SectionCard>
+
           <SectionCard
             title="Experience"
-            action={<Tooltip title="Add experience"><IconButton size="small" onClick={() => openAddExperience()}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}
+            action={
+              <Tooltip title="Add experience">
+                <IconButton size="small" onClick={() => openAddExperience()}>
+                  <AddRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            }
             sx={{ minHeight: 200, display: "flex", flexDirection: "column" }}
           >
             {profile.experience && profile.experience.length ? (
               <List dense disablePadding>
                 {profile.experience.map((exp) => (
-                  <ListItem key={exp.id} disableGutters sx={{ py: 0.75 }}
+                  <ListItem
+                    key={exp.id}
+                    disableGutters
+                    alignItems="flex-start"
+                    sx={{ py: 0.75, pr: 7 }}
                     secondaryAction={
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <Tooltip title="Delete">
@@ -4273,14 +4492,52 @@ function AboutTab({ profile, groups, onUpdate }) {
                     }
                   >
                     <ListItemText
-                      primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{exp.position} — {exp.org}</Typography>}
-                      secondary={<Typography variant="caption" color="text.secondary">{dateRange(exp.start, exp.end, exp.current)}</Typography>}
+                      primary={
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {exp.position} — {exp.org}
+                        </Typography>
+                      }
+                      secondary={
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 0.25,
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            {dateRange(exp.start, exp.end, exp.current)}
+                            {exp.location ? ` · ${exp.location}` : ""}
+                          </Typography>
+
+                          {exp.description ? (
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{
+                                mt: 0.25,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 3,          // medium context view
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {exp.description}
+                            </Typography>
+                          ) : null}
+                        </Box>
+                      }
                     />
                   </ListItem>
                 ))}
               </List>
-            ) : <Typography variant="body2" color="text.secondary">No experience yet</Typography>}
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No experience yet
+              </Typography>
+            )}
           </SectionCard>
+
 
           <SectionCard
             title="Education"
@@ -4697,14 +4954,69 @@ function AboutTab({ profile, groups, onUpdate }) {
             sx={{ mb: 2 }}
           />
 
-          <TextField
-            label="Location *"
-            value={expForm.location}
-            onChange={(e) =>
-              setExpForm((f) => ({ ...f, location: e.target.value }))
-            }
+          <Autocomplete
             fullWidth
-            sx={{ mb: 2 }}
+            size="small"
+            options={CITY_OPTIONS}
+            value={
+              CITY_OPTIONS.find((c) => c === expForm.city) || null
+            }
+            onChange={(_, value) =>
+              setExpForm((prev) => ({
+                ...prev,
+                city: value || "",
+              }))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="City"
+                placeholder="Select city"
+                sx={{ mb: 2 }}
+              />
+            )}
+          />
+
+
+          {/* Country dropdown */}
+          <Autocomplete
+            size="small"
+            fullWidth
+            options={COUNTRY_OPTIONS}
+            autoHighlight
+            value={getSelectedCountry({ location: expForm.location })}
+            getOptionLabel={(opt) => opt?.label ?? ""}
+            isOptionEqualToValue={(o, v) => o.code === v.code}
+            onChange={(_, newVal) =>
+              setExpForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))
+            }
+            renderOption={(props, option) => (
+              <li {...props}>
+                <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                {option.label}
+              </li>
+            )}
+            ListboxProps={{
+              style: {
+                maxHeight: 36 * 7,
+                overflowY: "auto",
+                paddingTop: 0,
+                paddingBottom: 0,
+              },
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Country *"
+                placeholder="Select country"
+                fullWidth
+                inputProps={{
+                  ...params.inputProps,
+                  autoComplete: "new-password",
+                }}
+                sx={{ mb: 2 }}
+              />
+            )}
           />
 
           {/* Relationship to organization (required) */}
@@ -4886,11 +5198,72 @@ function AboutTab({ profile, groups, onUpdate }) {
               label="Make this location my profile’s work location"
             />
           )}
+          <Box sx={{ mt: 2 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 600, mb: 0.5 }}
+            >
+              Description
+            </Typography>
+            {/* Description (same style as About) */}
+            <Box sx={{ mt: 2 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{ mb: 0.5 }}
+              >
+                Description
+              </Typography>
+
+              <TextField
+                placeholder="List your major duties and successes, highlighting specific projects"
+                value={expForm.description || ""}
+                onChange={(e) =>
+                  setExpForm((f) => ({ ...f, description: e.target.value }))
+                }
+                fullWidth
+                multiline
+                minRows={4}
+              />
+
+              {/* helper text + character counter */}
+              <Box
+                sx={{
+                  mt: 0.5,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Review and edit the draft before saving so it reflects you.
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {(expForm.description?.length || 0)}/2000
+                </Typography>
+              </Box>
+
+              {/* static LinkedIn-style button */}
+              <Box sx={{ mt: 1 }}>
+                <Button variant="outlined" size="small">
+                  Rewrite with AI
+                </Button>
+              </Box>
+            </Box>
+
+          </Box>
+
         </DialogContent>
         <DialogActions>
           {editExpId && (<Button color="error" onClick={() => deleteExperience(editExpId)}>Delete</Button>)}
           <Button onClick={() => { setExpOpen(false); setEditExpId(null); }}>Cancel</Button>
-          <Button variant="contained" onClick={saveExperience}>{editExpId ? "Save changes" : "Save"}</Button>
+          <Button
+            variant="contained"
+            onClick={saveExperience}
+            disabled={savingExp}
+          >
+            {savingExp ? "Saving..." : (editExpId ? "Save changes" : "Save")}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -4903,8 +5276,47 @@ function AboutTab({ profile, groups, onUpdate }) {
               <TextField label="First name" value={contactForm.first_name} onChange={(e) => setContactForm({ ...contactForm, first_name: e.target.value })} fullWidth sx={{ flex: 1 }} />
               <TextField label="Last name" value={contactForm.last_name} onChange={(e) => setContactForm({ ...contactForm, last_name: e.target.value })} fullWidth sx={{ flex: 1 }} />
             </Box>
-            <TextField label="Job title" value={contactForm.job_title} onChange={(e) => setContactForm({ ...contactForm, job_title: e.target.value })} fullWidth />
-            <TextField label="Email" value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} fullWidth />
+            <TextField
+              label="Job title"
+              value={contactForm.job_title}
+              onChange={(e) =>
+                setContactForm({ ...contactForm, job_title: e.target.value })
+              }
+              fullWidth
+            />
+
+            <TextField
+              label="Email"
+              value={contactForm.email}
+              onChange={(e) =>
+                setContactForm({ ...contactForm, email: e.target.value })
+              }
+              fullWidth
+            />
+
+            {/* City autocomplete – same style as Experience */}
+            <Autocomplete
+              fullWidth
+              size="small"
+              options={CITY_OPTIONS}
+              value={CITY_OPTIONS.find((c) => c === contactForm.city) || null}
+              onChange={(_, value) =>
+                setContactForm((prev) => ({
+                  ...prev,
+                  city: value || "",
+                }))
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="City"
+                  placeholder="Select city"
+                  sx={{ mb: 2 }}
+                />
+              )}
+            />
+
+            {/* Country dropdown */}
             <Autocomplete
               size="small"
               fullWidth
@@ -4914,19 +5326,19 @@ function AboutTab({ profile, groups, onUpdate }) {
               getOptionLabel={(opt) => opt?.label ?? ""}
               isOptionEqualToValue={(o, v) => o.code === v.code}
               onChange={(_, newVal) =>
-                setContactForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))
+                setContactForm((f) => ({
+                  ...f,
+                  location: newVal ? newVal.label : "",
+                }))
               }
-
-              // ⬇️ show 7 items, then scroll
               ListboxProps={{
                 style: {
-                  maxHeight: 36 * 7,   // 36px per option for size="small"; use 48 * 7 for "medium"
+                  maxHeight: 36 * 7,
                   overflowY: "auto",
                   paddingTop: 0,
                   paddingBottom: 0,
                 },
               }}
-
               renderOption={(props, option) => (
                 <li {...props} key={option.code}>
                   <span style={{ marginRight: 8 }}>{option.emoji}</span>
@@ -4936,14 +5348,25 @@ function AboutTab({ profile, groups, onUpdate }) {
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Location"
+                  label="Country"
                   placeholder="Select country"
                   fullWidth
-                  inputProps={{ ...params.inputProps, autoComplete: "new-password" }}
+                  inputProps={{
+                    ...params.inputProps,
+                    autoComplete: "new-password",
+                  }}
                 />
               )}
             />
-            <TextField label="LinkedIn URL" value={contactForm.linkedin} onChange={(e) => setContactForm({ ...contactForm, linkedin: e.target.value })} fullWidth />
+
+            <TextField
+              label="LinkedIn URL"
+              value={contactForm.linkedin}
+              onChange={(e) =>
+                setContactForm({ ...contactForm, linkedin: e.target.value })
+              }
+              fullWidth
+            />
           </Stack>
         </DialogContent>
         <DialogActions>

@@ -18,7 +18,6 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import LinkedInIcon from "@mui/icons-material/LinkedIn";
 import EmailIcon from "@mui/icons-material/Email";
 import PlaceIcon from "@mui/icons-material/Place";
-import AccountHero from "../components/AccountHero.jsx";
 import AccountSidebar from "../components/AccountSidebar.jsx";
 
 // -------------------- API helpers (unchanged) --------------------
@@ -666,27 +665,8 @@ export default function ProfilePage() {
   // -------------------- Render --------------------
   return (
     <div className="min-h-screen bg-slate-50">
-      <AccountHero
-        actions={
-          <Box sx={{ display: "flex", gap: 1.25 }}>
-            <Button
-              variant="text"
-              className="rounded-xl px-4"
-              onClick={() => setMode("edit")}
-              sx={{
-                textTransform: "none",
-                color: "#10b8a6",
-                fontWeight: 700,
-                width: { xs: "100%", sm: "auto" },
-              }}
-            >
-              Edit My Profile
-            </Button>
-          </Box>
-        }
-      />
-      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
-        <div className="grid grid-cols-12 gap-4 md:gap-6">
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
+        <div className="grid grid-cols-12 gap-3 md:gap-4">
           <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar stickyTop={96} />
           </aside>

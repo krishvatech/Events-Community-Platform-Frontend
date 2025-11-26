@@ -479,9 +479,8 @@ export default function MyEventsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <AccountHero greeting={`Hi ${first},`} subtitle="Your purchased & registered events" />
-      <Container maxWidth="lg" className="py-6 sm:py-8">
-        <div className="grid grid-cols-12 gap-6">
+      <Container maxWidth="xl" className="py-6 sm:py-8">
+        <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar />
           </aside>

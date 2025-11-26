@@ -9,7 +9,6 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import AccountSidebar from "../components/AccountSidebar.jsx";
-import AccountHero from "../components/AccountHero.jsx";
 
 // Icons
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -262,23 +261,21 @@ export default function MyResourcesPage() {
 
   if (!currentUser) {
     return (
-      <>
-        <AccountHero user={currentUser} />
+      <div className="min-h-screen bg-slate-50">
         <Container maxWidth="lg" className="py-6 sm:py-8">
           <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
             <CircularProgress />
           </Box>
         </Container>
-      </>
+      </div>
     );
   }
 
-  return (
-    <>
-      <AccountHero user={currentUser} />
 
-      <Container maxWidth="lg" className="py-6 sm:py-8">
-        <div className="grid grid-cols-12 gap-6">
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <Container maxWidth="xl" className="py-6 sm:py-8">
+        <div className="grid grid-cols-12 gap-3 md:gap-4">
           <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar activeKey="resources" onNavigate={(k) => console.log(k)} />
           </aside>
@@ -511,6 +508,6 @@ export default function MyResourcesPage() {
           </main>
         </div>
       </Container>
-    </>
+    </div>
   );
 }

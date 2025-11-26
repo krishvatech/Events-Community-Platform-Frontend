@@ -45,7 +45,6 @@ import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import AccountHero from "../components/AccountHero.jsx";
 import { API_BASE, getToken } from "../utils/api.js";
 const navItems = [
   { key: "activity", label: "Activity", icon: <TimelineOutlinedIcon /> },
@@ -294,23 +293,8 @@ export default function MyCartPage() {
   };
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Shared Account hero */}
-      <AccountHero
-        actions={
-          <>
-            <Button component={Link} to="/events" variant="contained" className="rounded-xl px-4"
-              sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}>
-              Explore events
-            </Button>
-            <Button onClick={proceedCheckout} variant="outlined" className="rounded-xl px-4"
-              sx={{ textTransform: "none", borderColor: "rgba(255,255,255,0.35)", color: "white" }}>
-              Checkout
-            </Button>
-          </>
-        }
-      />
-      <Container maxWidth="lg" className="py-6 sm:py-8">
-        <div className="grid grid-cols-12 gap-6 items-start">
+      <Container maxWidth="xl" className="py-6 sm:py-8">
+        <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar />
           </aside>

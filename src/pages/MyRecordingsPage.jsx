@@ -13,7 +13,6 @@ import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineR
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import PlaceIcon from "@mui/icons-material/Place";
-import AccountHero from "../components/AccountHero.jsx";
 import AccountSidebar from "../components/AccountSidebar.jsx";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
@@ -144,9 +143,8 @@ export default function MyRecordingsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <AccountHero />
-      <Container maxWidth="lg" className="py-6 sm:py-8">
-        <div className="grid grid-cols-12 gap-6">
+      <Container maxWidth="xl" className="py-6 sm:py-8">
+        <div className="grid grid-cols-12 gap-3 md:gap-4">
           <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar activeKey="recordings" />
           </aside>

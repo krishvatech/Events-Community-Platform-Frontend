@@ -2,11 +2,17 @@
 import React, { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  Paper, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Button, Drawer, IconButton, Box, Divider
+  Paper,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Button,
+  Drawer,
+  Box,
 } from "@mui/material";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 // Icons
 import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
@@ -20,17 +26,68 @@ import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 
+// --- Harmonized styling (same vibe as CommunitySideBar) ---
+const BORDER = "#e2e8f0";
+const HOVER_BG = "#e6f7f6";
+const TEAL = "#14b8b1";
+const SLATE_700 = "#334155";
+
 const NAV_ITEMS = [
-  { key: "resources", label: "My Resources", icon: <TimelineOutlinedIcon />, to: "/account/resources" },
-  { key: "events", label: "My Events", icon: <SchoolOutlinedIcon />, to: "/account/events" },
-  { key: "profile", label: "Profile", icon: <PersonOutlineOutlinedIcon />, to: "/account/profile" },
-  { key: "elibrary", label: "My Recordings", icon: <MenuBookOutlinedIcon />, to: "/account/recordings" },
-  { key: "forums", label: "Forums", icon: <ForumOutlinedIcon /> },
-  { key: "orders", label: "Orders", icon: <ReceiptLongOutlinedIcon />, to: "/account/cart" },
-  { key: "memberships", label: "Memberships", icon: <WorkspacePremiumOutlinedIcon /> },
-  { key: "subscriptions", label: "Subscriptions", icon: <AutorenewOutlinedIcon /> },
-  { key: "friends", label: "Friends", icon: <PeopleAltOutlinedIcon /> },
-  { key: "settings", label: "Settings", icon: <SettingsOutlinedIcon /> },
+  {
+    key: "resources",
+    label: "My Resources",
+    icon: <TimelineOutlinedIcon fontSize="small" />,
+    to: "/account/resources",
+  },
+  {
+    key: "events",
+    label: "My Events",
+    icon: <SchoolOutlinedIcon fontSize="small" />,
+    to: "/account/events",
+  },
+  {
+    key: "profile",
+    label: "Profile",
+    icon: <PersonOutlineOutlinedIcon fontSize="small" />,
+    to: "/account/profile",
+  },
+  {
+    key: "elibrary",
+    label: "My Recordings",
+    icon: <MenuBookOutlinedIcon fontSize="small" />,
+    to: "/account/recordings",
+  },
+  {
+    key: "forums",
+    label: "Forums",
+    icon: <ForumOutlinedIcon fontSize="small" />,
+  },
+  {
+    key: "orders",
+    label: "Orders",
+    icon: <ReceiptLongOutlinedIcon fontSize="small" />,
+    to: "/account/cart",
+  },
+  {
+    key: "memberships",
+    label: "Memberships",
+    icon: <WorkspacePremiumOutlinedIcon fontSize="small" />,
+  },
+  {
+    key: "subscriptions",
+    label: "Subscriptions",
+    icon: <AutorenewOutlinedIcon fontSize="small" />,
+  },
+  {
+    key: "friends",
+    label: "Friends",
+    icon: <PeopleAltOutlinedIcon fontSize="small" />,
+  },
+  {
+    key: "settings",
+    label: "Settings",
+    icon: <SettingsOutlinedIcon fontSize="small" />,
+  },
 ];
 
 export default function AccountSidebar({ stickyTop = 96 }) {
@@ -50,18 +107,63 @@ export default function AccountSidebar({ stickyTop = 96 }) {
     <List disablePadding>
       {NAV_ITEMS.map((item) => {
         const active = activeKey === item.key;
-        const btnProps = item.to ? { component: Link, to: item.to } : { onClick: onItem || (() => { }) };
+
+        const handleClick = () => {
+          if (onItem) onItem();
+        };
+
+        const btnProps = item.to
+          ? {
+              component: Link,
+              to: item.to,
+              onClick: handleClick,
+            }
+          : {
+              onClick: handleClick,
+            };
+
         return (
-          <ListItem key={item.key} disablePadding>
+          <ListItem key={item.key} disablePadding sx={{ my: 0.25 }}>
             <ListItemButton
               {...btnProps}
-              className={`${active ? "bg-teal-50 text-teal-700" : "text-slate-700 hover:bg-slate-50"}`}
-              sx={{ py: 1.25 }}
+              sx={{
+                borderRadius: 2,
+                px: 1.5,
+                py: 1,
+                position: "relative",
+                m: "2px 0",
+                color: active ? TEAL : SLATE_700,
+                "&:hover": { bgcolor: HOVER_BG },
+                ...(active && {
+                  bgcolor: "rgba(20,184,177,0.08)",
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    left: 6,
+                    top: 6,
+                    bottom: 6,
+                    width: 3,
+                    borderRadius: 8,
+                    backgroundColor: TEAL,
+                  },
+                }),
+              }}
             >
-              <ListItemIcon sx={{ minWidth: 40, color: active ? "#0ea5a4" : "#64748b" }}>
+              <ListItemIcon
+                sx={{
+                  minWidth: 32,
+                  color: active ? TEAL : "#6b7280",
+                }}
+              >
                 {item.icon}
               </ListItemIcon>
-              <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: active ? 700 : 500 }} />
+              <ListItemText
+                primary={item.label}
+                primaryTypographyProps={{
+                  variant: "body2",
+                  fontWeight: active ? 700 : 500,
+                }}
+              />
             </ListItemButton>
           </ListItem>
         );
@@ -84,23 +186,31 @@ export default function AccountSidebar({ stickyTop = 96 }) {
         </Button>
       </div>
 
-      {/* Desktop sidebar (lg+) */}
+      {/* Desktop sidebar (lg+) - styled like CommunitySideBar */}
       <Paper
         elevation={0}
-        className="rounded-2xl border border-slate-200 sticky hidden lg:block"
-        sx={{ top: { lg: stickyTop }, position: { lg: "sticky" } }}
+        className="hidden lg:block"
+        sx={{
+          borderRadius: 3,
+          border: `1px solid ${BORDER}`,
+          position: { lg: "sticky" },
+          top: { lg: stickyTop },
+          p: 1.0,
+          maxHeight: { lg: "calc(100vh - 120px)" },
+          overflowY: { lg: "auto" },
+          width: { lg: 300 },           // ← narrower sidebar on desktop
+        }}
       >
         <ListUI />
       </Paper>
 
-      {/* Mobile drawer */}
-      <Drawer anchor="left" open={mobileOpen} onClose={() => setMobileOpen(false)}>
-        <Box sx={{ width: 300 }} role="presentation" onClick={() => setMobileOpen(false)}>
-          <Box className="flex items-center justify-between px-3 py-3">
-            <span className="font-semibold">Account</span>
-            <IconButton aria-label="Close"><CloseRoundedIcon /></IconButton>
-          </Box>
-          <Divider />
+      {/* Mobile drawer - header removed, only the list */}
+      <Drawer
+        anchor="left"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+      >
+        <Box sx={{ width: 260, p: 1 }}>  {/* ← match narrower width on mobile */}
           <ListUI onItem={() => setMobileOpen(false)} />
         </Box>
       </Drawer>
