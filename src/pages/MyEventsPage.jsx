@@ -110,6 +110,7 @@ function statusChip(status) {
 function EventCard({ ev, onJoinLive, isJoining }) {
   const status = computeStatus(ev);
   const chip = statusChip(status);
+  const [imgFailed, setImgFailed] = useState(false);
 
   return (
     <Paper
@@ -117,8 +118,8 @@ function EventCard({ ev, onJoinLive, isJoining }) {
       className="flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
       sx={{
         borderRadius: 2,
-        // SAME CARD HEIGHT across grid (adjust to taste)
-        height: { xs: 'auto', sm: 'auto', md: 360 },
+        // Let the card grow with content so buttons are always visible
+        height: "auto",
       }}
     >
       {/* SAME IMAGE SIZE for all cards: 16:9 area that always covers */}
@@ -126,36 +127,37 @@ function EventCard({ ev, onJoinLive, isJoining }) {
         sx={{
           position: "relative",
           width: "100%",
-          aspectRatio: "16 / 9",       // key line
-          // Fallback if some browsers ignore aspect-ratio:
+          aspectRatio: "16 / 9",
           "@supports not (aspect-ratio: 1 / 1)": { height: 200 },
         }}
       >
-        {ev.preview_image ? (
+        {ev.preview_image && !imgFailed ? (
           <Link to={`/events/${ev.slug || ev.id}`} state={{ event: ev }}>
             <img
               src={toAbs(ev.preview_image)}
               alt={ev.title}
               loading="lazy"
+              onError={() => setImgFailed(true)}   // 👈 fallback on broken URL
               style={{
                 position: "absolute",
                 inset: 0,
                 width: "100%",
                 height: "100%",
-                objectFit: "cover",     // key line
+                objectFit: "cover",
               }}
             />
           </Link>
         ) : (
-          <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "#E5E7EB",              // same grey placeholder
+            }}
+          />
         )}
-
-        {/* (optional) category/status pills on top of the image */}
-        {/* <Box sx={{ position: "absolute", inset: 8, display: "flex", gap: 1, justifyContent: "space-between" }}>
-          <Chip size="small" label={chip.label} className={`${chip.className} font-medium`} />
-          {ev.format && <Chip size="small" label={ev.format} variant="outlined" />}
-        </Box> */}
       </Box>
+
 
       {/* Content area with fixed rhythm so cards line up */}
       <Box sx={{ p: 1.75, display: "flex", flexDirection: "column", gap: 1 }}>
