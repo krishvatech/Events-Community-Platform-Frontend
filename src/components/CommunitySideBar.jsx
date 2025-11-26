@@ -167,12 +167,12 @@ export default function CommunitySideBar({
   const items = [
     { key: "home", label: "Home", Icon: HomeRoundedIcon },
     // 👇 Added My Posts here
-    { key: "myposts", label: "My Posts", Icon: ArticleRoundedIcon },
     { key: "members", label: "Members", Icon: Diversity3RoundedIcon },
     { key: "feed", label: "Groups", Icon: GroupsRoundedIcon }, 
     { key: "live", label: "Live Feed", Icon: LiveTvRoundedIcon },
     { key: "notify", label: "Notification", Icon: NotificationsRoundedIcon },
     { key: "messages", label: "Messages", Icon: ChatBubbleRoundedIcon },
+    { key: "myposts", label: "My Posts", Icon: ArticleRoundedIcon },
   ];
 
   return (

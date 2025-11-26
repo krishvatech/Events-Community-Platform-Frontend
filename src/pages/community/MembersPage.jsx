@@ -22,6 +22,9 @@ import {
   useMediaQuery,
   Tabs,
   Tab,
+  Checkbox,
+  MenuItem,
+  ListItemText,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
@@ -48,7 +51,7 @@ import {
 const BORDER = "#e2e8f0";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
-const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"; 
+const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
 
 const tokenHeader = () => {
   const t =
@@ -71,9 +74,27 @@ const isAbort = (e) =>
   e?.name === "AbortError" ||
   /aborted|aborterror|signal is aborted/i.test(e?.message || "");
 
-const MIN_ZOOM = 1;      
+const MIN_ZOOM = 1;
 const MAX_ZOOM = 8;
-const ZOOM_STEP = 1.35; 
+const ZOOM_STEP = 1.35;
+
+function extractCountryFromLocation(raw) {
+  if (!raw) return "";
+  const parts = String(raw)
+    .split(/,|\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (!parts.length) return "";
+
+  // usually last part = country | e.g. "Mumbai, Maharashtra, India" -> "India"
+  const last = parts[parts.length - 1]
+    .replace(/[-–].*$/, "") // strip " - something" if present
+    .trim();
+
+  return last;
+}
+
 
 function resolveCountryCode(user) {
   const code =
@@ -85,26 +106,54 @@ function resolveCountryCode(user) {
 
   if (code) return String(code).toUpperCase();
 
-  const name =
+  const rawName =
     user?.profile?.country ||
     user?.country ||
     user?.location_country ||
     user?.profile?.location_country ||
-    user?.profile?.location ||   
+    user?.profile?.location ||
+    user?.location ||
     "";
 
+  const name = extractCountryFromLocation(rawName) || rawName;
   const iso2 = name ? isoCountries.getAlpha2Code(String(name), "en") : "";
   return iso2 ? String(iso2).toUpperCase() : "";
 }
 
 function displayCountry(user) {
-  return (
+  // 1) direct country fields
+  const direct =
     user?.profile?.country ||
     user?.country ||
     user?.location_country ||
-    user?.profile?.location_country ||
+    user?.profile?.location_country;
+
+  if (direct) {
+    // if backend accidentally stored "City, Country" here, clean it
+    const cleaned = extractCountryFromLocation(direct);
+    return cleaned || direct;
+  }
+
+  // 2) fall back to full location ("Mumbai, India" -> "India")
+  const loc = user?.profile?.location || user?.location;
+  const fromLoc = extractCountryFromLocation(loc);
+  return fromLoc || "";
+}
+function getCompanyFromUser(u) {
+  return (u?.company_from_experience || "").trim();
+}
+
+function getJobTitleFromUser(u) {
+  return (
+    u?.position_from_experience ||
+    u?.profile?.job_title ||
+    u?.job_title ||
     ""
-  );
+  ).trim();
+}
+
+function getCountryFromUser(u) {
+  return (displayCountry(u) || "").trim();
 }
 
 function flagEmojiFromISO2(code) {
@@ -136,7 +185,7 @@ function useCountryCentroids(geoUrl) {
         for (const f of gj.features) {
           const name = f?.properties?.name;
           if (!name) continue;
-          map[normName(name)] = geoCentroid(f); 
+          map[normName(name)] = geoCentroid(f);
         }
         if (alive) setCentroidsByName(map);
       } catch (e) {
@@ -177,8 +226,8 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
   const name =
     u?.profile?.full_name ||
     `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
-    usernameFromEmail ||     
-    email;                   
+    usernameFromEmail ||
+    email;
 
   const company = u?.company_from_experience ?? "—";
   const title =
@@ -285,7 +334,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
 export default function MembersPage() {
   const navigate = useNavigate();
   // Changed logic: Trigger side-by-side mode earlier (at 900px, which is 'md')
-  const isCompact = useMediaQuery("(max-width:900px)"); 
+  const isCompact = useMediaQuery("(max-width:900px)");
   const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
   const getCenterForISO2 = useCountryCentroids(geoUrl);
 
@@ -294,8 +343,13 @@ export default function MembersPage() {
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
   const [q, setQ] = useState("");
-  
-  const [tabValue, setTabValue] = useState(0); 
+
+  const [selectedCompanies, setSelectedCompanies] = useState([]);
+  const [selectedCountries, setSelectedCountries] = useState([]);
+  const [selectedTitles, setSelectedTitles] = useState([]);
+
+
+  const [tabValue, setTabValue] = useState(0);
 
   // map controls
   const [showMap, setShowMap] = useState(true);
@@ -304,7 +358,7 @@ export default function MembersPage() {
   const hasSideMap = !isCompact && showMap;
 
   // Tooltip state
-  const [tip, setTip] = React.useState(null); 
+  const [tip, setTip] = React.useState(null);
 
   const showTip = (evt, node) => {
     const rect = mapBoxRef.current?.getBoundingClientRect();
@@ -333,7 +387,7 @@ export default function MembersPage() {
 
   const mapBoxRef = useRef(null);
   const [mapSize, setMapSize] = useState({ w: 800, h: 400 });
-  
+
   // Resize observer to ensure map fits container fluidly
   useEffect(() => {
     const el = mapBoxRef.current;
@@ -441,18 +495,70 @@ export default function MembersPage() {
     return () => { alive = false; ctrl.abort(); };
   }, [me?.id]);
 
+  const companyOptions = useMemo(() => {
+    const set = new Set();
+    users.forEach((u) => {
+      const c = getCompanyFromUser(u);
+      if (c) set.add(c);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [users]);
+
+  const countryOptions = useMemo(() => {
+    const set = new Set();
+    users.forEach((u) => {
+      const c = getCountryFromUser(u);
+      if (c) set.add(c);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [users]);
+
+  const titleOptions = useMemo(() => {
+    const set = new Set();
+    users.forEach((u) => {
+      const t = getJobTitleFromUser(u);
+      if (t) set.add(t);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [users]);
+
+
   const filtered = useMemo(() => {
     let sourceList = users;
+
+    // Tab filter (All Members / My Contacts)
     if (tabValue === 1) {
-        sourceList = users.filter((u) => {
-            const status = (friendStatusByUser[u.id] || "").toLowerCase();
-            return status === "friends";
-        });
+      sourceList = users.filter((u) => {
+        const status = (friendStatusByUser[u.id] || "").toLowerCase();
+        return status === "friends";
+      });
+    }
+
+    // ✅ Company filter
+    if (selectedCompanies.length) {
+      sourceList = sourceList.filter((u) =>
+        selectedCompanies.includes(getCompanyFromUser(u))
+      );
+    }
+
+    // ✅ Country filter
+    if (selectedCountries.length) {
+      sourceList = sourceList.filter((u) =>
+        selectedCountries.includes(getCountryFromUser(u))
+      );
+    }
+
+    // ✅ Job title filter
+    if (selectedTitles.length) {
+      sourceList = sourceList.filter((u) =>
+        selectedTitles.includes(getJobTitleFromUser(u))
+      );
     }
 
     const s = (q || "").toLowerCase().trim();
     if (!s) return sourceList;
 
+    // Text search (name, email, company, title, skills, city, country)
     return sourceList.filter((u) => {
       const fn = (u.first_name || "").toLowerCase();
       const ln = (u.last_name || "").toLowerCase();
@@ -503,7 +609,15 @@ export default function MembersPage() {
 
       return haystack.some((v) => v && v.includes(s));
     });
-  }, [users, q, tabValue, friendStatusByUser]);
+  }, [
+    users,
+    q,
+    tabValue,
+    friendStatusByUser,
+    selectedCompanies,
+    selectedCountries,
+    selectedTitles,
+  ]);
 
 
   useEffect(() => {
@@ -525,7 +639,7 @@ export default function MembersPage() {
       } catch { }
     })();
     return () => { alive = false; };
-  }, [filtered.map((u) => u.id).join("|")]); 
+  }, [filtered.map((u) => u.id).join("|")]);
 
   const liveMarkers = useMemo(() => {
     const byCountry = {};
@@ -581,7 +695,10 @@ export default function MembersPage() {
 
   const markers = liveMarkers;
 
-  useEffect(() => setPage(1), [q, tabValue]);
+  useEffect(() => {
+    setPage(1);
+  }, [q, tabValue, selectedCompanies, selectedCountries, selectedTitles]);
+
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -607,7 +724,7 @@ export default function MembersPage() {
       } catch { }
     })();
     return () => { alive = false; };
-  }, [current.map((u) => u.id).join(",")]); 
+  }, [current.map((u) => u.id).join(",")]);
 
   const handleOpenProfile = (m) => {
     const id = m?.id;
@@ -638,84 +755,182 @@ export default function MembersPage() {
           <Box
             sx={{
               width: "100%",  // Fixed: Removed unstable % widths (120/157%)
-              mx: 0, 
+              mx: 0,
             }}
           >
             {/* Header Paper */}
             <Paper sx={{ p: 1.5, mb: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-              <Stack spacing={1}>
-                {/* Top Row: Title + Search */}
+              <Stack spacing={1.25}>
+                {/* Title row */}
                 <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1}
-                  alignItems={{ xs: "stretch", sm: "center" }}
+                  direction="row"
+                  alignItems="center"
                   justifyContent="space-between"
                 >
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    {tabValue === 0 ? "All Members" : "My Friends"} ({filtered.length})
+                    {tabValue === 0 ? "All Members" : "My Contacts"} ({filtered.length})
                   </Typography>
 
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    sx={{ width: { xs: "100%", sm: "100%", md: "auto" } }}
-                  >
-                    <TextField
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      size="small"
-                      placeholder="Search..."
-                      sx={{
-                        width: {
-                          xs: "100%", 
-                          sm: "100%", 
-                          md: 320,    
-                        },
-                      }}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon fontSize="small" />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-
-                    {isCompact && (
-                      <Tooltip title="View map">
-                        <IconButton
-                          size="small"
-                          onClick={() => setMapOverlayOpen(true)}
-                          sx={{ flexShrink: 0 }}
-                        >
-                          <MapRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Stack>
+                  {isCompact && (
+                    <Tooltip title="View map">
+                      <IconButton
+                        size="small"
+                        onClick={() => setMapOverlayOpen(true)}
+                        sx={{ flexShrink: 0 }}
+                      >
+                        <MapRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Stack>
-                
-                {/* Bottom Row: Tabs */}
-                <Tabs 
-                  value={tabValue} 
+
+                {/* Search bar - full width */}
+                <TextField
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  size="small"
+                  placeholder="Search by name, company, country..."
+                  fullWidth
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                {/* Filters row: company / country / job title */}
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  sx={{
+                    width: "100%",
+                    flexWrap: "wrap",
+                    "& > *": {
+                      minWidth: { xs: "100%", sm: 180 },
+                      maxWidth: { xs: "100%", sm: 260 },
+                    },
+                  }}
+                >
+                  {/* Company filter */}
+                  <TextField
+                    size="small"
+                    select
+                    label="Company"
+                    value={selectedCompanies}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedCompanies(
+                        typeof value === "string" ? value.split(",") : value
+                      );
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                    SelectProps={{
+                      multiple: true,
+                      displayEmpty: true,
+                      renderValue: (selected) => {
+                        if (!selected || selected.length === 0) {
+                          return "All companies";
+                        }
+                        return selected.join(", ");
+                      },
+                    }}
+                  >
+                    {companyOptions.map((name) => (
+                      <MenuItem key={name} value={name}>
+                        <Checkbox checked={selectedCompanies.indexOf(name) > -1} />
+                        <ListItemText primary={name} />
+                      </MenuItem>
+                    ))}
+                  </TextField>
+
+                  {/* Country filter */}
+                  <TextField
+                    size="small"
+                    select
+                    label="Country"
+                    value={selectedCountries}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedCountries(
+                        typeof value === "string" ? value.split(",") : value
+                      );
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                    SelectProps={{
+                      multiple: true,
+                      displayEmpty: true,
+                      renderValue: (selected) => {
+                        if (!selected || selected.length === 0) {
+                          return "All countries";
+                        }
+                        return selected.join(", ");
+                      },
+                    }}
+                  >
+                    {countryOptions.map((name) => (
+                      <MenuItem key={name} value={name}>
+                        <Checkbox checked={selectedCountries.indexOf(name) > -1} />
+                        <ListItemText primary={name} />
+                      </MenuItem>
+                    ))}
+                  </TextField>
+
+                  {/* Job title filter */}
+                  <TextField
+                    size="small"
+                    select
+                    label="Job title"
+                    value={selectedTitles}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedTitles(
+                        typeof value === "string" ? value.split(",") : value
+                      );
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                    SelectProps={{
+                      multiple: true,
+                      displayEmpty: true,
+                      renderValue: (selected) => {
+                        if (!selected || selected.length === 0) {
+                          return "All job titles";
+                        }
+                        return selected.join(", ");
+                      },
+                    }}
+                  >
+                    {titleOptions.map((name) => (
+                      <MenuItem key={name} value={name}>
+                        <Checkbox checked={selectedTitles.indexOf(name) > -1} />
+                        <ListItemText primary={name} />
+                      </MenuItem>
+                    ))}
+                  </TextField>
+
+                </Stack>
+
+                {/* Tabs row */}
+                <Tabs
+                  value={tabValue}
                   onChange={handleTabChange}
                   textColor="primary"
                   indicatorColor="primary"
                   variant="standard"
-                  sx={{ 
+                  sx={{
                     minHeight: 40,
                     borderBottom: `1px solid ${BORDER}`,
                     "& .MuiTab-root": {
-                        textTransform: "none",
-                        fontWeight: 600,
-                        minHeight: 40,
-                        px: 2
-                    }
+                      textTransform: "none",
+                      fontWeight: 600,
+                      minHeight: 40,
+                      px: 2,
+                    },
                   }}
                 >
                   <Tab label="All Members" />
-                  <Tab label="My Friends" />
+                  <Tab label="My Contacts" />
                 </Tabs>
               </Stack>
             </Paper>
@@ -809,7 +1024,7 @@ export default function MembersPage() {
                 position: { md: "sticky" },
                 top: 88,
                 height: { xs: 520, md: "calc(100vh - 140px)" },
-                width: 600, // Fixed: Changed from 605 to 100% to fit grid
+                width: 500, // Fixed: Changed from 605 to 100% to fit grid
                 display: "flex",
                 flexDirection: "column",
                 gap: 1,
