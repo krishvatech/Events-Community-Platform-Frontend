@@ -2060,7 +2060,7 @@ export default function RichProfile() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Container maxWidth="xl" sx={{ py: 3 }}>
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6">
           <aside>
             {/* Community sidebar */}
@@ -2072,9 +2072,7 @@ export default function RichProfile() {
                 const to =
                   key === "home"
                     ? "/community"
-                    : key === "messages"
-                      ? "/account/messages"
-                      : `/community?view=${key}`;
+                    : `/community?view=${key}`;
                 navigate(to);
               }}
             />
