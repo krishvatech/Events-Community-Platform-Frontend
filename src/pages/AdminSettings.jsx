@@ -35,9 +35,11 @@ import {
   useTheme,
   MenuItem,
 } from "@mui/material";
-
+import Autocomplete from "@mui/material/Autocomplete";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
+import * as isoCountries from "i18n-iso-countries";
+import enLocale from "i18n-iso-countries/langs/en.json";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import LinkedInIcon from "@mui/icons-material/LinkedIn";
 import EmailIcon from "@mui/icons-material/Email";
@@ -147,20 +149,112 @@ async function deleteAvatar() {
 
 // -------------------- Helpers copied from ProfilePage --------------------
 
+const CITY_OPTIONS = [
+  "Mumbai",
+  "Delhi",
+  "Bengaluru",
+  "Hyderabad",
+  "Ahmedabad",
+  "Chennai",
+  "Kolkata",
+  "Pune",
+  "Surat",
+  "Jaipur",
+  "Lucknow",
+  "Nagpur",
+  "Indore",
+  "Thane",
+  "Bhopal",
+  "Vadodara",
+  "Nashik",
+  "Rajkot",
+  "Visakhapatnam",
+  "Patna",
+  // add more as needed
+];
+
+isoCountries.registerLocale(enLocale);
+
+const flagEmoji = (code) =>
+  code
+    ? code
+      .toUpperCase()
+      .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)))
+    : "";
+
+// all countries in English (official names) – same as ProfilePage
+const COUNTRY_OPTIONS = Object.entries(
+  isoCountries.getNames("en", { select: "official" })
+).map(([code, label]) => ({ code, label, emoji: flagEmoji(code) }));
+
+// Works with either ISO2 ("IN") or country name ("India")
+const getSelectedCountry = (obj) => {
+  if (!obj?.location) return null;
+  const loc = String(obj.location);
+  const byCode = COUNTRY_OPTIONS.find((o) => o.code === loc);
+  if (byCode) return byCode;
+  return (
+    COUNTRY_OPTIONS.find(
+      (o) => (o.label || "").toLowerCase() === loc.toLowerCase()
+    ) || null
+  );
+};
+
+const EMPTY_EDU_FORM = {
+  school: "",
+  degree: "",
+  field: "",
+  start: "",
+  end: "",
+  grade: "",
+};
+
+const SCHOOL_OPTIONS = [
+  "Harvard University",
+  "Stanford University",
+  "Indian Institute of Technology Bombay",
+  "Indian Institute of Management Ahmedabad",
+  "University of Oxford",
+  "University of Cambridge",
+  "Massachusetts Institute of Technology (MIT)",
+  "National University of Singapore",
+  "University of Mumbai",
+  "University of Delhi",
+  // add more as needed...
+];
+
+const FIELD_OF_STUDY_OPTIONS = [
+  "Computer Science",
+  "Information Technology",
+  "Electronics & Communication Engineering",
+  "Mechanical Engineering",
+  "Civil Engineering",
+  "Business Administration",
+  "Finance",
+  "Marketing",
+  "Economics",
+  "Psychology",
+  "Law",
+  "Medicine",
+  "Pharmacy",
+  "Design",
+  "Data Science",
+  // add more as needed...
+];
+
 function parseSkills(value) {
   const v = (value ?? "").toString().trim();
   if (!v) return [];
   try {
     const j = JSON.parse(v);
     if (Array.isArray(j)) return j.map(String);
-  } catch {
-    // ignore
-  }
+  } catch { }
   return v
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
 
 function parseLinks(value) {
   const v = (value ?? "").toString().trim();
@@ -306,12 +400,13 @@ export default function AdminSettings() {
 
   const [contactOpen, setContactOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState({
-    firstName: "",
-    lastName: "",
-    jobTitle: "",
+    first_name: "",
+    last_name: "",
     email: "",
+    city: "",
     location: "",
-    linkedinUrl: "",
+    linkedin: "",
+    job_title: "",
   });
 
 
@@ -340,6 +435,7 @@ export default function AdminSettings() {
 
   // --- dialogs & forms for staff view (About / Experience / Education) ---
   const [aboutOpen, setAboutOpen] = React.useState(false);
+  const [aboutMode, setAboutMode] = React.useState("description");
   const [aboutForm, setAboutForm] = React.useState({
     bio: "",
     skillsText: "",
@@ -350,19 +446,15 @@ export default function AdminSettings() {
   const [editEduId, setEditEduId] = React.useState(null);
   const [editExpId, setEditExpId] = React.useState(null);
 
-  const [eduForm, setEduForm] = React.useState({
-    school: "",
-    degree: "",
-    field: "",
-    start: "",
-    end: "",
-    grade: "",
-  });
+  const [eduForm, setEduForm] = React.useState(EMPTY_EDU_FORM);
+  const [eduErrors, setEduErrors] = React.useState({ start: "", end: "" });
+
 
   const emptyExpForm = {
     org: "",
     position: "",
-    location: "",
+    city: "",
+    location: "", // country label for dropdown
     start: "",
     end: "",
     current: false,
@@ -370,11 +462,40 @@ export default function AdminSettings() {
     work_schedule: "",
     relationship_to_org: "",
     career_stage: "",
-    compensation_type: "",
     work_arrangement: "",
+    description: "",
+    exit_reason: "",
+    compensation_type: "",
   };
+
   const [expForm, setExpForm] = React.useState(emptyExpForm);
   const [syncProfileLocation, setSyncProfileLocation] = React.useState(false);
+
+  // Show "Why did you leave this job?" only if
+  // end date exists, not current, and end date is before today
+  const shouldShowExitReason = () => {
+    if (!expForm.end || expForm.current) return false;
+
+    const endDate = new Date(expForm.end);
+    const today = new Date();
+
+    endDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    return endDate < today;
+  };
+
+  // Build "City, Country" string from the form, same as ProfilePage
+  function buildLocationFromForm(form) {
+    const city = (form.city || "").trim();
+    const country = (form.location || "").trim(); // here location = country label
+
+    if (city && country) return `${city}, ${country}`;
+    if (city) return city;
+    if (country) return country;
+    return "";
+  }
+
 
   const [confirm, setConfirm] = React.useState({
     open: false,
@@ -390,7 +511,10 @@ export default function AdminSettings() {
   const avatarFileRef = React.useRef(null);
 
 
-  const openAbout = () => {
+  const openAbout = (mode = "description") => {
+    if (!profile) return;
+
+    setAboutMode(mode);
     setAboutForm({
       bio: profile.bio || "",
       skillsText: profile.skillsText || "",
@@ -398,17 +522,35 @@ export default function AdminSettings() {
     setAboutOpen(true);
   };
 
+
   const openContact = () => {
+    if (!profile) return;
+
     const links = parseLinks(profile.linksText);
+
+    let city = "";
+    let country = "";
+
+    if (profile.location) {
+      const parts = profile.location.split(",").map((p) => p.trim());
+      if (parts.length === 1) {
+        country = parts[0];
+      } else if (parts.length >= 2) {
+        city = parts[0];
+        country = parts.slice(1).join(", ");
+      }
+    }
+
     setContactForm({
-      firstName: profile.first_name || "",
-      lastName: profile.last_name || "",
-      jobTitle: profile.job_title || "",
+      first_name: profile.first_name || "",
+      last_name: profile.last_name || "",
       email: profile.email || "",
-      location: profile.location || "",
-      linkedinUrl:
-        typeof links.linkedin === "string" ? links.linkedin : "",
+      city,
+      location: country,
+      linkedin: links.linkedin || "",
+      job_title: profile.job_title || "",
     });
+
     setContactOpen(true);
   };
 
@@ -416,62 +558,62 @@ export default function AdminSettings() {
     try {
       setSaving(true);
 
-      const links = parseLinks(profile.linksText);
-      const linkedin = (contactForm.linkedinUrl || "").trim();
-      const newLinks = { ...links };
-      if (linkedin) newLinks.linkedin = linkedin;
-      else delete newLinks.linkedin;
+      const { first_name, last_name, email, city, location, linkedin, job_title } =
+        contactForm;
+
+      const trimmedFirst = (first_name || "").trim();
+      const trimmedLast = (last_name || "").trim();
+      const trimmedEmail = (email || "").trim();
+
+      const combinedLocation =
+        city && location ? `${city}, ${location}` : location || city || "";
+
+      const links = {
+        ...(profile?.links || {}),
+        linkedin: (linkedin || "").trim(),
+      };
 
       const userPayload = {
-        first_name: contactForm.firstName || "",
-        last_name: contactForm.lastName || "",
-        email: contactForm.email || "",
+        first_name: trimmedFirst,
+        last_name: trimmedLast,
+        email: trimmedEmail || undefined,
       };
 
       const profilePayload = {
-        job_title: contactForm.jobTitle || "",
-        location: contactForm.location || "",
-        links: newLinks,
+        job_title: (job_title || "").trim(),
+        location: combinedLocation,
+        links,
       };
 
-      const updated = await updateAdminContact(userPayload, profilePayload);
-      const updatedProfile = updated.profile || {};
-
-      const linksText =
-        updatedProfile.links != null
-          ? JSON.stringify(updatedProfile.links)
-          : JSON.stringify(newLinks);
+      await updateAdminContact(userPayload, profilePayload);
 
       setProfile((prev) => ({
         ...prev,
-        first_name: updated.first_name ?? userPayload.first_name,
-        last_name: updated.last_name ?? userPayload.last_name,
-        full_name:
-          updatedProfile.full_name ||
-          prev.full_name ||
-          `${userPayload.first_name} ${userPayload.last_name}`.trim(),
-        email: updated.email ?? userPayload.email,
-        job_title: updatedProfile.job_title ?? profilePayload.job_title,
-        location: updatedProfile.location ?? profilePayload.location,
-        linksText,
+        ...userPayload,
+        job_title: profilePayload.job_title,
+        location: profilePayload.location,
+        links,
+        linksText: JSON.stringify(links),
       }));
 
-      setToast({
-        open: true,
-        type: "success",
-        msg: "Contact updated",
-      });
       setContactOpen(false);
-    } catch (err) {
       setToast({
         open: true,
-        type: "error",
-        msg: err?.message || "Failed to update contact",
+        severity: "success",
+        message: "Contact updated",
+      });
+    } catch (err) {
+      console.error(err);
+      setToast({
+        open: true,
+        severity: "error",
+        message: "Failed to update contact",
       });
     } finally {
       setSaving(false);
     }
   };
+
 
   const saveAbout = async () => {
     try {
@@ -512,11 +654,40 @@ export default function AdminSettings() {
   };
 
   const onEditExperience = (item) => {
+    const loc = (item.location || "").trim();
+    let city = "";
+    let country = "";
+
+    if (loc) {
+      const parts = loc
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      if (parts.length === 1) {
+        // If it's a known country (India, Singapore, etc.), treat as country
+        const maybeCountry = getSelectedCountry({ location: parts[0] });
+        if (maybeCountry) {
+          country = maybeCountry.label; // e.g. "India"
+          city = "";
+        } else {
+          city = parts[0];
+          country = "";
+        }
+      } else if (parts.length >= 2) {
+        city = parts[0];
+        const lastPart = parts[parts.length - 1];
+        const maybeCountry = getSelectedCountry({ location: lastPart });
+        country = maybeCountry ? maybeCountry.label : lastPart;
+      }
+    }
+
     setEditExpId(item.id);
     setExpForm({
       org: item.org || item.community_name || "",
       position: item.position || "",
-      location: item.location || "",
+      city,
+      location: country, // treat as country label for the dropdown
       start: item.start || item.start_date || "",
       end: item.end || item.end_date || "",
       current: !!(item.current || item.currently_work_here),
@@ -524,22 +695,28 @@ export default function AdminSettings() {
       work_schedule: item.work_schedule || "",
       relationship_to_org: item.relationship_to_org || "",
       career_stage: item.career_stage || "",
-      compensation_type: item.compensation_type || "",
       work_arrangement: item.work_arrangement || "",
+      description: item.description || "",
+      exit_reason: item.exit_reason || "",
+      compensation_type: item.compensation_type || "",
     });
+    setSyncProfileLocation(false);
     setExpOpen(true);
   };
 
+
   const onEditEducation = (item) => {
+    const toYear = (d) => (d ? String(d).slice(0, 4) : "");
     setEditEduId(item.id);
     setEduForm({
       school: item.school || "",
       degree: item.degree || "",
       field: item.field_of_study || "",
-      start: item.start_date || "",
-      end: item.end_date || "",
+      start: toYear(item.start_date),
+      end: toYear(item.end_date),
       grade: item.grade || "",
     });
+    setEduErrors({ start: "", end: "" });
     setEduOpen(true);
   };
 
@@ -757,40 +934,84 @@ export default function AdminSettings() {
 
   const createEducation = async () => {
     try {
+      // Clear previous errors
+      setEduErrors({ start: "", end: "" });
+
+      const startY = eduForm.start ? parseInt(eduForm.start, 10) : null;
+      const endY = eduForm.end ? parseInt(eduForm.end, 10) : null;
+      const currentYear = new Date().getFullYear();
+
+      // Same validation as ProfilePage & HomePage
+      if (startY && startY > currentYear) {
+        setEduErrors((prev) => ({
+          ...prev,
+          start: "Start year cannot be in the future",
+        }));
+        return;
+      }
+      if (startY && endY && endY < startY) {
+        setEduErrors((prev) => ({
+          ...prev,
+          end: "End year cannot be before start year",
+        }));
+        return;
+      }
+
+      // Convert year to YYYY-01-01, same as ProfilePage
+      const normalizeYear = (val) => {
+        const y = String(val || "").trim();
+        if (!y) return null;
+        const year = parseInt(y, 10);
+        if (!year || year < 1900 || year > 2100) return null;
+        return `${year}-01-01`;
+      };
+
       const url = editEduId
         ? `${API_ROOT}/auth/me/educations/${editEduId}/`
         : `${API_ROOT}/auth/me/educations/`;
+
+      const payload = {
+        school: (eduForm.school || "").trim(),
+        degree: (eduForm.degree || "").trim(),
+        field_of_study: (eduForm.field || "").trim(),
+        start_date: normalizeYear(eduForm.start),
+        end_date: normalizeYear(eduForm.end),
+        grade: (eduForm.grade || "").trim(),
+      };
+
+      if (!payload.school || !payload.degree) {
+        setToast({
+          open: true,
+          type: "error",
+          msg: "Please fill School and Degree.",
+        });
+        return;
+      }
+
       const r = await fetch(url, {
         method: editEduId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({
-          school: eduForm.school,
-          degree: eduForm.degree,
-          field_of_study: eduForm.field,
-          start_date: eduForm.start || null,
-          end_date: eduForm.end || null,
-          grade: eduForm.grade || "",
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify(payload),
       });
+
       const j = await r.json().catch(() => ({}));
-      if (!r.ok)
-        throw new Error(j?.detail || "Failed to save education");
+      if (!r.ok) {
+        const msg = j?.detail || "Failed to save education";
+        throw new Error(msg);
+      }
 
       setToast({
         open: true,
         type: "success",
         msg: editEduId ? "Education updated" : "Education added",
       });
+
       setEduOpen(false);
       setEditEduId(null);
-      setEduForm({
-        school: "",
-        degree: "",
-        field: "",
-        start: "",
-        end: "",
-        grade: "",
-      });
+      setEduForm(EMPTY_EDU_FORM);
       await loadExtras();
     } catch (e) {
       setToast({
@@ -800,12 +1021,13 @@ export default function AdminSettings() {
       });
     }
   };
-
   const createExperience = async () => {
     try {
       const url = editExpId
         ? `${API_ROOT}/auth/me/experiences/${editExpId}/`
         : `${API_ROOT}/auth/me/experiences/`;
+
+      const locationString = buildLocationFromForm(expForm);
 
       const r = await fetch(url, {
         method: editExpId ? "PATCH" : "POST",
@@ -813,11 +1035,14 @@ export default function AdminSettings() {
         body: JSON.stringify({
           community_name: expForm.org,
           position: expForm.position,
-          location: expForm.location || "",
+          location: locationString,
           start_date: expForm.start || null,
           end_date: expForm.current ? null : expForm.end || null,
           currently_work_here: !!expForm.current,
-          description: "",
+
+          // same payload as ProfilePage
+          description: expForm.description || "",
+          exit_reason: expForm.exit_reason || "",
           employment_type: expForm.employment_type || "full_time",
           work_schedule: expForm.work_schedule || "",
           relationship_to_org: expForm.relationship_to_org || "",
@@ -828,15 +1053,15 @@ export default function AdminSettings() {
       });
 
       const j = await r.json().catch(() => ({}));
-      if (!r.ok)
-        throw new Error(j?.detail || "Failed to save experience");
+      if (!r.ok) throw new Error(j?.detail || "Failed to save experience");
 
-      if (syncProfileLocation && expForm.location) {
+      // Sync profile location with "City, Country"
+      if (syncProfileLocation && locationString) {
         try {
-          await updateAdminProfile({ location: expForm.location });
+          await updateAdminProfile({ location: locationString });
           setProfile((prev) => ({
             ...prev,
-            location: expForm.location,
+            location: locationString,
           }));
         } catch (err) {
           console.error("Failed to sync profile location", err);
@@ -1242,38 +1467,55 @@ export default function AdminSettings() {
 
                 {/* LEFT COLUMN */}
                 <Grid item xs={12} lg={6}>
-                  {/* About */}
+                  {/* About (description only) – same as ProfilePage */}
                   <SectionCard
                     title="About"
                     action={
-                      <Button size="small" onClick={openAbout}>
+                      <Button size="small" onClick={() => openAbout("description")}>
                         Edit
                       </Button>
                     }
                   >
-                    <Label>Summary:</Label>
-                    {profile.bio ? (
-                      <Typography variant="body2">{profile.bio}</Typography>
-                    ) : (
-                      <PlaceholderLine />
-                    )}
+                    <Label>Summary</Label>
+                    <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>
+                      {profile.bio?.trim()
+                        ? profile.bio
+                        : "Add a short description about your role, focus areas, and what you're working on."}
+                    </Typography>
+                  </SectionCard>
 
-                    <Label sx={{ mt: 2 }}>Skills:</Label>
+                  {/* Skills – separate card, same style as ProfilePage */}
+                  <SectionCard
+                    sx={{ mt: 2 }}
+                    title="Skills"
+                    action={
+                      <Button size="small" onClick={() => openAbout("skills")}>
+                        Edit
+                      </Button>
+                    }
+                  >
                     {parseSkills(profile.skillsText).length ? (
-                      <Box
-                        sx={{
-                          mt: 1,
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 1,
-                        }}
-                      >
+                      <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
                         {parseSkills(profile.skillsText).map((s, i) => (
-                          <Chip key={i} size="small" label={s} />
+                          <Chip
+                            key={i}
+                            size="small"
+                            label={s}
+                            sx={{
+                              maxWidth: "100%",
+                              "& .MuiChip-label": {
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              },
+                            }}
+                          />
                         ))}
                       </Box>
                     ) : (
-                      <PlaceholderLine />
+                      <Typography variant="body2" color="text.secondary">
+                        Add your top skills so others can quickly see where you’re strongest.
+                      </Typography>
                     )}
                   </SectionCard>
 
@@ -1320,7 +1562,8 @@ export default function AdminSettings() {
                                     onClick={() =>
                                       askDeleteExperience(
                                         x.id,
-                                        `${x.community_name} — ${x.position}`
+                                        `${x.community_name || x.org || ""} — ${x.position || ""
+                                        }`
                                       )
                                     }
                                   >
@@ -1331,26 +1574,45 @@ export default function AdminSettings() {
                             }
                           >
                             <ListItemText
+                              disableTypography
                               primary={
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 600 }}
-                                >
-                                  {x.position} - {x.community_name}
-                                </Typography>
-                              }
-                              secondary={
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                >
-                                  {rangeLinkedIn(
-                                    x.start_date,
-                                    x.end_date,
-                                    x.current || x.currently_work_here
+                                <Box>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 600 }}
+                                  >
+                                    {x.position || "Role not specified"}
+                                    {x.community_name || x.org
+                                      ? ` · ${x.community_name || x.org}`
+                                      : ""}
+                                  </Typography>
+
+                                  <Typography variant="caption" color="text.secondary">
+                                    {rangeLinkedIn(
+                                      x.start_date || x.start,
+                                      x.end_date || x.end,
+                                      x.currently_work_here ?? x.current
+                                    )}
+                                    {x.location ? ` · ${x.location}` : ""}
+                                  </Typography>
+
+                                  {x.description && (
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                      sx={{
+                                        mt: 0.5,
+                                        display: "-webkit-box",
+                                        WebkitLineClamp: 3,
+                                        WebkitBoxOrient: "vertical",
+                                        overflow: "hidden",
+                                        whiteSpace: "normal",
+                                      }}
+                                    >
+                                      {x.description}
+                                    </Typography>
                                   )}
-                                  {x.location ? ` · ${x.location}` : ""}
-                                </Typography>
+                                </Box>
                               }
                             />
                           </ListItem>
@@ -1373,10 +1635,7 @@ export default function AdminSettings() {
                         >
                           This section is empty
                         </Typography>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                        >
+                        <Typography variant="caption" color="text.secondary">
                           Add an experience to your profile
                         </Typography>
                         <Box>
@@ -1718,80 +1977,94 @@ export default function AdminSettings() {
         onClose={() => setContactOpen(false)}
         fullWidth
         maxWidth="sm"
-        fullScreen={isMobile}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit Contact</DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={6}>
+        <DialogTitle>Edit Contact</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {/* Name row */}
+            <Box sx={{ display: "flex", gap: 2 }}>
               <TextField
                 label="First name"
                 fullWidth
-                value={contactForm.firstName}
+                value={contactForm.first_name}
                 onChange={(e) =>
-                  setContactForm((f) => ({ ...f, firstName: e.target.value }))
+                  setContactForm((f) => ({ ...f, first_name: e.target.value }))
                 }
               />
-            </Grid>
-            <Grid item xs={12} sm={6}>
               <TextField
                 label="Last name"
                 fullWidth
-                value={contactForm.lastName}
+                value={contactForm.last_name}
                 onChange={(e) =>
-                  setContactForm((f) => ({ ...f, lastName: e.target.value }))
+                  setContactForm((f) => ({ ...f, last_name: e.target.value }))
                 }
               />
-            </Grid>
-          </Grid>
+            </Box>
 
-          <TextField
-            label="Job title"
-            fullWidth
-            sx={{ mb: 2 }}
-            value={contactForm.jobTitle}
-            onChange={(e) =>
-              setContactForm((f) => ({ ...f, jobTitle: e.target.value }))
-            }
-          />
+            {/* Email */}
+            <TextField
+              label="Email"
+              type="email"
+              fullWidth
+              value={contactForm.email}
+              onChange={(e) =>
+                setContactForm((f) => ({ ...f, email: e.target.value }))
+              }
+            />
 
-          <TextField
-            label="Email"
-            type="email"
-            fullWidth
-            sx={{ mb: 2 }}
-            value={contactForm.email}
-            onChange={(e) =>
-              setContactForm((f) => ({ ...f, email: e.target.value }))
-            }
-          />
+            {/* City */}
+            <Autocomplete
+              fullWidth
+              size="small"
+              options={CITY_OPTIONS}
+              value={contactForm.city || null}
+              onChange={(_, value) =>
+                setContactForm((f) => ({ ...f, city: value || "" }))
+              }
+              renderInput={(params) => (
+                <TextField {...params} label="City" placeholder="Select city" />
+              )}
+            />
 
-          <TextField
-            label="Location"
-            fullWidth
-            sx={{ mb: 2 }}
-            value={contactForm.location}
-            onChange={(e) =>
-              setContactForm((f) => ({ ...f, location: e.target.value }))
-            }
-          />
+            {/* Country */}
+            <Autocomplete
+              fullWidth
+              size="small"
+              options={COUNTRY_OPTIONS}
+              autoHighlight
+              getOptionLabel={(option) => option.label}
+              value={getSelectedCountry({ location: contactForm.location })}
+              onChange={(_, value) =>
+                setContactForm((f) => ({
+                  ...f,
+                  location: value?.label || "",
+                }))
+              }
+              renderOption={(props, option) => (
+                <Box component="li" sx={{ display: "flex", gap: 1 }} {...props}>
+                  <span>{flagEmoji(option.code)}</span>
+                  <span>{option.label}</span>
+                </Box>
+              )}
+              renderInput={(params) => (
+                <TextField {...params} label="Country" placeholder="Select country" />
+              )}
+            />
 
-          <TextField
-            label="LinkedIn URL"
-            fullWidth
-            value={contactForm.linkedinUrl}
-            onChange={(e) =>
-              setContactForm((f) => ({ ...f, linkedinUrl: e.target.value }))
-            }
-          />
+            {/* LinkedIn */}
+            <TextField
+              label="LinkedIn URL"
+              fullWidth
+              value={contactForm.linkedin}
+              onChange={(e) =>
+                setContactForm((f) => ({ ...f, linkedin: e.target.value }))
+              }
+            />
+          </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setContactOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={saveContact}
-            disabled={saving}
-          >
+          <Button variant="contained" onClick={saveContact} disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
         </DialogActions>
@@ -1803,14 +2076,16 @@ export default function AdminSettings() {
         onClose={() => {
           setEduOpen(false);
           setEditEduId(null);
+          setEduErrors({ start: "", end: "" });
         }}
         fullWidth
         maxWidth="sm"
         fullScreen={isMobile}
       >
         <DialogTitle sx={{ fontWeight: 700 }}>
-          {editEduId ? "Edit education" : "Create education"}
+          {editEduId ? "Edit education" : "Add education"}
         </DialogTitle>
+
         <DialogContent dividers>
           <Typography
             variant="caption"
@@ -1820,15 +2095,30 @@ export default function AdminSettings() {
             *Required fields are marked with an asterisk
           </Typography>
 
-          <TextField
-            label="School *"
+          {/* School */}
+          <Autocomplete
+            freeSolo
+            options={SCHOOL_OPTIONS}
             value={eduForm.school}
-            onChange={(e) =>
-              setEduForm((f) => ({ ...f, school: e.target.value }))
+            onChange={(_, value) =>
+              setEduForm((f) => ({ ...f, school: value || "" }))
             }
-            fullWidth
-            sx={{ mb: 2 }}
+            onInputChange={(event, newInput) => {
+              if (event && event.type === "change") {
+                setEduForm((f) => ({ ...f, school: newInput }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="School *"
+                fullWidth
+                sx={{ mb: 2 }}
+              />
+            )}
           />
+
+          {/* Degree */}
           <TextField
             label="Degree *"
             value={eduForm.degree}
@@ -1838,59 +2128,71 @@ export default function AdminSettings() {
             fullWidth
             sx={{ mb: 2 }}
           />
-          <TextField
-            label="Field of Study *"
+
+          {/* Field of Study */}
+          <Autocomplete
+            freeSolo
+            options={[...FIELD_OF_STUDY_OPTIONS, "Other"]}
             value={eduForm.field}
-            onChange={(e) =>
-              setEduForm((f) => ({ ...f, field: e.target.value }))
+            onChange={(_, value) =>
+              setEduForm((f) => ({ ...f, field: value || "" }))
             }
-            fullWidth
-            sx={{ mb: 2 }}
+            onInputChange={(event, newInput) => {
+              if (event && event.type === "change") {
+                setEduForm((f) => ({ ...f, field: newInput }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Field of Study *"
+                fullWidth
+                sx={{ mb: 2 }}
+                helperText="Pick from list or type your own (Other)."
+              />
+            )}
           />
 
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Start Date"
-                type="date"
-                value={eduForm.start}
-                onChange={(e) =>
-                  setEduForm((f) => ({ ...f, start: e.target.value }))
-                }
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <CalendarTodayIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="End Date"
-                type="date"
-                value={eduForm.end}
-                onChange={(e) =>
-                  setEduForm((f) => ({ ...f, end: e.target.value }))
-                }
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <CalendarTodayIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-          </Grid>
+          {/* Start / End year row */}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2,
+              mb: 2,
+            }}
+          >
+            <TextField
+              label="Start Year"
+              type="number"
+              value={eduForm.start}
+              onChange={(e) =>
+                setEduForm((f) => ({ ...f, start: e.target.value }))
+              }
+              fullWidth
+              sx={{ flex: 1 }}
+              inputProps={{ min: 1900, max: new Date().getFullYear() }}
+              error={!!eduErrors.start}
+              helperText={eduErrors.start || ""}
+            />
+            <TextField
+              label="End Year"
+              type="number"
+              value={eduForm.end}
+              onChange={(e) =>
+                setEduForm((f) => ({ ...f, end: e.target.value }))
+              }
+              fullWidth
+              sx={{ flex: 1 }}
+              inputProps={{ min: 1900, max: new Date().getFullYear() + 10 }}
+              error={!!eduErrors.end}
+              helperText={eduErrors.end || ""}
+            />
+          </Box>
 
+          {/* Grade */}
           <TextField
-            label="Grade *"
+            label="Grade (optional)"
             value={eduForm.grade}
             onChange={(e) =>
               setEduForm((f) => ({ ...f, grade: e.target.value }))
@@ -1898,8 +2200,9 @@ export default function AdminSettings() {
             fullWidth
           />
         </DialogContent>
+
         <DialogActions sx={{ px: 3, py: 2 }}>
-          {!!editEduId && (
+          {editEduId && (
             <Button
               color="error"
               onClick={() =>
@@ -1917,6 +2220,8 @@ export default function AdminSettings() {
             onClick={() => {
               setEduOpen(false);
               setEditEduId(null);
+              setEduErrors({ start: "", end: "" });
+              setEduForm(EMPTY_EDU_FORM);
             }}
           >
             Cancel
@@ -1941,6 +2246,7 @@ export default function AdminSettings() {
         <DialogTitle sx={{ fontWeight: 700 }}>
           {editExpId ? "Edit experience" : "Create experience"}
         </DialogTitle>
+
         <DialogContent dividers>
           <Typography
             variant="caption"
@@ -1970,14 +2276,71 @@ export default function AdminSettings() {
             sx={{ mb: 2 }}
           />
 
-          <TextField
-            label="Location *"
-            value={expForm.location}
-            onChange={(e) =>
-              setExpForm((f) => ({ ...f, location: e.target.value }))
-            }
+          {/* City dropdown */}
+          <Autocomplete
             fullWidth
-            sx={{ mb: 2 }}
+            size="small"
+            options={CITY_OPTIONS}
+            value={CITY_OPTIONS.find((c) => c === expForm.city) || null}
+            onChange={(_, value) =>
+              setExpForm((prev) => ({
+                ...prev,
+                city: value || "",
+              }))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="City"
+                placeholder="Enter city (optional)"
+                fullWidth
+                sx={{ mb: 2 }}
+              />
+            )}
+          />
+
+          {/* Country dropdown */}
+          <Autocomplete
+            fullWidth
+            size="small"
+            options={COUNTRY_OPTIONS}
+            autoHighlight
+            value={getSelectedCountry({ location: expForm.location })}
+            getOptionLabel={(opt) => opt?.label ?? ""}
+            isOptionEqualToValue={(o, v) => o.code === v.code}
+            onChange={(_, newVal) =>
+              setExpForm((f) => ({
+                ...f,
+                location: newVal ? newVal.label : "",
+              }))
+            }
+            renderOption={(props, option) => (
+              <li {...props}>
+                <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                {option.label}
+              </li>
+            )}
+            ListboxProps={{
+              style: {
+                maxHeight: 36 * 7,
+                overflowY: "auto",
+                paddingTop: 0,
+                paddingBottom: 0,
+              },
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Country *"
+                placeholder="Select country"
+                fullWidth
+                inputProps={{
+                  ...params.inputProps,
+                  autoComplete: "new-password",
+                }}
+                sx={{ mb: 2 }}
+              />
+            )}
           />
 
           {/* Relationship to organization (required) */}
@@ -1994,7 +2357,6 @@ export default function AdminSettings() {
             fullWidth
             sx={{ mb: 2 }}
           >
-            <MenuItem value="">—</MenuItem>
             <MenuItem value="employee">Employee (on payroll)</MenuItem>
             <MenuItem value="independent">
               Independent (self-employed / contractor / freelance)
@@ -2015,99 +2377,45 @@ export default function AdminSettings() {
               }))
             }
             fullWidth
+            sx={{ mb: 2 }}
             SelectProps={{
               displayEmpty: true,
               renderValue: (v) =>
-                v
-                  ? ({ full_time: "Full-time", part_time: "Part-time" }[v] ||
-                    v)
-                  : (
-                    <span style={{ color: "rgba(0,0,0,0.6)" }}>
-                      Work schedule
-                    </span>
-                  ),
+                v ? (
+                  {
+                    full_time: "Full-time",
+                    part_time: "Part-time",
+                  }[v] || v
+                ) : (
+                  <span style={{ color: "rgba(0,0,0,0.6)" }}>
+                    Work schedule
+                  </span>
+                ),
             }}
-            sx={{ mb: 2 }}
           >
             <MenuItem value="">—</MenuItem>
             <MenuItem value="full_time">Full-time</MenuItem>
             <MenuItem value="part_time">Part-time</MenuItem>
           </TextField>
 
-          {/* Career stage + Compensation type */}
-          <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
-            <TextField
-              select
-              value={expForm.career_stage}
-              onChange={(e) =>
-                setExpForm((f) => ({
-                  ...f,
-                  career_stage: e.target.value,
-                }))
-              }
-              fullWidth
-              sx={{ flex: 1 }}
-              SelectProps={{
-                displayEmpty: true,
-                renderValue: (v) =>
-                  v
-                    ? ({
-                      internship: "Internship",
-                      apprenticeship: "Apprenticeship",
-                      trainee: "Trainee / Entry program",
-                      entry: "Entry level",
-                      mid: "Mid level",
-                      senior: "Senior level",
-                    }[v] || v)
-                    : (
-                      <span style={{ color: "rgba(0,0,0,0.6)" }}>
-                        Career stage
-                      </span>
-                    ),
-              }}
-            >
-              <MenuItem value="">—</MenuItem>
-              <MenuItem value="internship">Internship</MenuItem>
-              <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
-              <MenuItem value="trainee">Trainee / Entry program</MenuItem>
-              <MenuItem value="entry">Entry level</MenuItem>
-              <MenuItem value="mid">Mid level</MenuItem>
-              <MenuItem value="senior">Senior level</MenuItem>
-            </TextField>
-
-            <TextField
-              select
-              value={expForm.compensation_type}
-              onChange={(e) =>
-                setExpForm((f) => ({
-                  ...f,
-                  compensation_type: e.target.value,
-                }))
-              }
-              fullWidth
-              sx={{ flex: 1 }}
-              SelectProps={{
-                displayEmpty: true,
-                renderValue: (v) =>
-                  v
-                    ? ({
-                      paid: "Paid",
-                      stipend: "Stipend",
-                      volunteer: "Volunteer / Unpaid",
-                    }[v] || v)
-                    : (
-                      <span style={{ color: "rgba(0,0,0,0.6)" }}>
-                        Compensation type
-                      </span>
-                    ),
-              }}
-            >
-              <MenuItem value="">—</MenuItem>
-              <MenuItem value="paid">Paid</MenuItem>
-              <MenuItem value="stipend">Stipend</MenuItem>
-              <MenuItem value="volunteer">Volunteer / Unpaid</MenuItem>
-            </TextField>
-          </Box>
+          {/* Career stage */}
+          <TextField
+            select
+            fullWidth
+            label="Career stage"
+            value={expForm.career_stage}
+            onChange={(e) =>
+              setExpForm((f) => ({ ...f, career_stage: e.target.value }))
+            }
+            sx={{ mb: 1 }}
+          >
+            <MenuItem value="internship">Internship</MenuItem>
+            <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
+            <MenuItem value="trainee">Trainee / Entry program</MenuItem>
+            <MenuItem value="entry">Entry level</MenuItem>
+            <MenuItem value="mid">Mid level</MenuItem>
+            <MenuItem value="senior">Senior level</MenuItem>
+          </TextField>
 
           {/* Work arrangement (optional) */}
           <TextField
@@ -2123,7 +2431,6 @@ export default function AdminSettings() {
             fullWidth
             sx={{ mb: 2 }}
           >
-            <MenuItem value="">—</MenuItem>
             <MenuItem value="onsite">On-site</MenuItem>
             <MenuItem value="hybrid">Hybrid</MenuItem>
             <MenuItem value="remote">Remote</MenuItem>
@@ -2172,6 +2479,7 @@ export default function AdminSettings() {
             </Grid>
           </Grid>
 
+          {/* Current job toggle */}
           <FormControlLabel
             control={
               <Checkbox
@@ -2189,19 +2497,90 @@ export default function AdminSettings() {
             label="I currently work here"
             sx={{ mb: 1 }}
           />
+
+          {/* Exit reason */}
+          {shouldShowExitReason() && (
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              maxRows={4}
+              label="Why did you leave this job?"
+              value={expForm.exit_reason}
+              onChange={(e) =>
+                setExpForm((prev) => ({
+                  ...prev,
+                  exit_reason: e.target.value,
+                }))
+              }
+              sx={{ mt: 2 }}
+            />
+          )}
+
+          {/* Sync location checkbox */}
           {expForm.current && (
             <FormControlLabel
               control={
                 <Checkbox
                   checked={syncProfileLocation}
-                  onChange={(e) => setSyncProfileLocation(e.target.checked)}
+                  onChange={(e) =>
+                    setSyncProfileLocation(e.target.checked)
+                  }
                 />
               }
               label="Make this location my profile’s work location"
               sx={{ mb: 1 }}
             />
           )}
+
+          {/* Description */}
+          <Box sx={{ mt: 2 }}>
+            <Typography
+              variant="subtitle2"
+              color="text.secondary"
+              sx={{ mb: 0.5 }}
+            >
+              Description
+            </Typography>
+
+            <TextField
+              placeholder="List your major duties and successes, highlighting specific projects"
+              value={expForm.description || ""}
+              onChange={(e) =>
+                setExpForm((f) => ({
+                  ...f,
+                  description: e.target.value,
+                }))
+              }
+              fullWidth
+              multiline
+              minRows={4}
+            />
+
+            <Box
+              sx={{
+                mt: 0.5,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Review and edit the draft before saving so it reflects you.
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {(expForm.description?.length || 0)}/2000
+              </Typography>
+            </Box>
+
+            <Box sx={{ mt: 1 }}>
+              <Button variant="outlined" size="small">
+                Rewrite with AI
+              </Button>
+            </Box>
+          </Box>
         </DialogContent>
+
         <DialogActions sx={{ px: 3, py: 2 }}>
           {!!editExpId && (
             <Button
@@ -2263,56 +2642,69 @@ export default function AdminSettings() {
         onClose={() => setAboutOpen(false)}
         fullWidth
         maxWidth="sm"
-        fullScreen={isMobile}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit About</DialogTitle>
-        <DialogContent dividers>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mb: 2 }}
-          >
-            Update your summary and skills
-          </Typography>
-
-          <TextField
-            label="Summary"
-            value={aboutForm.bio}
-            onChange={(e) =>
-              setAboutForm((f) => ({ ...f, bio: e.target.value }))
-            }
-            fullWidth
-            multiline
-            minRows={4}
-            sx={{ mb: 2 }}
-            placeholder="Tell people a little about yourself…"
-          />
-
-          <TextField
-            label="Skills (CSV or JSON array)"
-            value={aboutForm.skillsText}
-            onChange={(e) =>
-              setAboutForm((f) => ({
-                ...f,
-                skillsText: e.target.value,
-              }))
-            }
-            fullWidth
-            placeholder='e.g., M&A, Strategy  OR  ["M&A","Strategy"]'
-            helperText="Saved as a list of strings"
-          />
-
-          <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
-            {parseSkills(aboutForm.skillsText).length ? (
-              parseSkills(aboutForm.skillsText).map((s, i) => (
-                <Chip key={i} label={s} size="small" />
-              ))
+        <DialogTitle>
+          {aboutMode === "description" ? "Edit About" : "Edit Skills"}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {aboutMode === "description" ? (
+              <>
+                <Typography variant="body2" color="text.secondary">
+                  Write a brief summary about your role, experience or focus areas.
+                </Typography>
+                <TextField
+                  multiline
+                  minRows={4}
+                  value={aboutForm.bio}
+                  onChange={(e) =>
+                    setAboutForm((f) => ({ ...f, bio: e.target.value }))
+                  }
+                  inputProps={{ maxLength: 2600 }}
+                  placeholder="e.g. Community manager focused on tech meetups and online workshops."
+                  fullWidth
+                />
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    {(aboutForm.bio?.length || 0)}/2600 characters
+                  </Typography>
+                  <Button size="small" variant="outlined">
+                    Rewrite with AI
+                  </Button>
+                </Box>
+              </>
             ) : (
-              <Typography variant="caption" color="text.secondary">
-                No skills parsed yet
-              </Typography>
+              <>
+                <Typography variant="body2" color="text.secondary">
+                  Add skills separated by commas. We’ll store them as a list.
+                </Typography>
+                <TextField
+                  multiline
+                  minRows={3}
+                  value={aboutForm.skillsText}
+                  onChange={(e) =>
+                    setAboutForm((f) => ({ ...f, skillsText: e.target.value }))
+                  }
+                  placeholder='e.g. Event strategy, Sponsorships, Community building'
+                  fullWidth
+                  helperText='Example: "Community building, Partnerships" or ["Community building","Partnerships"]'
+                />
+                {parseSkills(aboutForm.skillsText).length > 0 && (
+                  <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    {parseSkills(aboutForm.skillsText).map((s, i) => (
+                      <Chip key={i} label={s} size="small" />
+                    ))}
+                  </Box>
+                )}
+              </>
             )}
-          </Box>
+          </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setAboutOpen(false)}>Cancel</Button>
