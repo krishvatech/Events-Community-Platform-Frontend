@@ -1235,9 +1235,9 @@ export default function MembersPage() {
             sx={{
               minWidth: 0,
               display: "flex",
-              // 👉 Fix map width to 600px on large screens (like 1440px)
-              flexBasis: { lg: 600, xl: 600 },
-              maxWidth: { lg: 600, xl: 600 },
+              // ⬇️ narrower map at 1440px (lg), keep 600px for very large (xl)
+              flexBasis: { lg: 520, xl: 600 },
+              maxWidth: { lg: 520, xl: 600 },
             }}
           >
             <Paper
