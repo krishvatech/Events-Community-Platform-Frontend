@@ -4358,7 +4358,7 @@ function AboutTab({ profile, groups, onUpdate }) {
           timezone: "",
           bio: profile.bio || "",
           headline: "",
-          job_title: (contactForm.job_title || "").trim(),
+          job_title: profile.job_title || "",
           company: "",
           location: formattedLocation, // ⭐ "City, Country"
           skills: profile.skills || [],
@@ -5276,15 +5276,6 @@ function AboutTab({ profile, groups, onUpdate }) {
               <TextField label="First name" value={contactForm.first_name} onChange={(e) => setContactForm({ ...contactForm, first_name: e.target.value })} fullWidth sx={{ flex: 1 }} />
               <TextField label="Last name" value={contactForm.last_name} onChange={(e) => setContactForm({ ...contactForm, last_name: e.target.value })} fullWidth sx={{ flex: 1 }} />
             </Box>
-            <TextField
-              label="Job title"
-              value={contactForm.job_title}
-              onChange={(e) =>
-                setContactForm({ ...contactForm, job_title: e.target.value })
-              }
-              fullWidth
-            />
-
             <TextField
               label="Email"
               value={contactForm.email}
