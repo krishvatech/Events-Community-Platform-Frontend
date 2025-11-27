@@ -31,6 +31,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Popover,
 } from "@mui/material";
 import {
   AddRounded as AddRoundedIcon,
@@ -93,6 +94,16 @@ function toAbsolute(url) {
   const base = import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN || "http://127.0.0.1:8000";
   return `${base.replace(/\/$/, "")}/${url.replace(/^\//, "")}`;
 }
+
+// LinkedIn-style reactions for posts
+const POST_REACTIONS = [
+  { id: "like", emoji: "👍", label: "Like" },
+  { id: "intriguing", emoji: "🤔", label: "Intriguing" },
+  { id: "spot_on", emoji: "🎯", label: "Spot On" },
+  { id: "validated", emoji: "🧠", label: "Validated" },
+  { id: "debatable", emoji: "🤷", label: "Debatable" },
+];
+
 
 // -----------------------------------------------------------------------------
 // 2. Data Mappers
@@ -213,10 +224,10 @@ function PostComposer({ communityId, onCreate }) {
 
 function PostCard({
   post,
-  onLike,
+  onReact,          // ⬅️ changed: generic reaction handler
   onComment,
-  onShareAction, // New prop: Triggers the "Share to friend" dialog
-  onViewShares,  // New prop: Triggers the "Who shared" list
+  onShareAction,
+  onViewShares,
   onEdit,
   onDelete,
   onVote,
@@ -230,48 +241,122 @@ function PostCard({
   const likeCount = Number(post.metrics?.likes || 0);
   const shareCount = Number(post.metrics?.shares || 0);
 
+  // NEW: my reaction info for UI
+  const myReactionId =
+    post.my_reaction || (post.liked_by_me ? "like" : null);
+  const myReactionDef = POST_REACTIONS.find(
+    (r) => r.id === myReactionId
+  );
+  const likeBtnLabel = myReactionDef ? myReactionDef.label : "Like";
+  const likeBtnEmoji = myReactionDef ? myReactionDef.emoji : "👍";
+  const hasReaction = !!myReactionId;
+
+  // Popup anchor
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const pickerOpen = Boolean(anchorEl);
+  const handleOpenPicker = (event) => setAnchorEl(event.currentTarget);
+  const handleClosePicker = () => setAnchorEl(null);
+
   // Helper to handle any user shape
   const normalizeUsers = (payload) => {
-    const rows = Array.isArray(payload?.results) ? payload.results : Array.isArray(payload) ? payload : [];
-    return rows.map((r) => {
-      let u = r.user || r.actor || r.liker || r.owner || r.profile || r;
-      if (!u.id && !u.user_id) u = r;
-      const profile = u.profile || u.user_profile || r.profile || {};
-      const id = u?.id ?? u?.user_id ?? r.user_id ?? r.id;
-      const first = u?.first_name || r.user_first_name || "";
-      const last = u?.last_name || r.user_last_name || "";
-      let displayName = u?.name || u?.full_name || r.user_name || r.user_full_name;
-      if (!displayName && (first || last)) displayName = `${first} ${last}`.trim();
-      if (!displayName) displayName = u?.username || r.user_username || "User";
-      const avatarRaw = profile.user_image_url || u.user_image || u.avatar || r.user_image || r.user_avatar || "";
-      return { id, name: displayName, avatar: toAbsolute(avatarRaw) };
-    }).filter(Boolean);
+    const rows = Array.isArray(payload?.results)
+      ? payload.results
+      : Array.isArray(payload)
+        ? payload
+        : [];
+    return rows
+      .map((r) => {
+        let u = r.user || r.actor || r.liker || r.owner || r.profile || r;
+        if (!u.id && !u.user_id) u = r;
+        const profile = u.profile || u.user_profile || r.profile || {};
+        const id = u?.id ?? u?.user_id ?? r.user_id ?? r.id;
+        const first = u?.first_name || r.user_first_name || "";
+        const last = u?.last_name || r.user_last_name || "";
+        let displayName =
+          u?.name || u?.full_name || r.user_name || r.user_full_name;
+        if (!displayName && (first || last))
+          displayName = `${first} ${last}`.trim();
+        if (!displayName)
+          displayName = u?.username || r.user_username || "User";
+        const avatarRaw =
+          profile.user_image_url ||
+          u.user_image ||
+          u.avatar ||
+          r.user_image ||
+          r.user_avatar ||
+          "";
+        const reactionId = r.reaction || r.reaction_type || r.kind || null;
+
+        return {
+          id,
+          name: displayName,
+          avatar: toAbsolute(avatarRaw),
+          reactionId,
+        };
+
+      })
+      .filter(Boolean);
   };
 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const urls = [`${API_ROOT}/engagements/reactions/?reaction=like&target_type=activity_feed.feeditem&target_id=${post.id}&page_size=5`, `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${post.id}&page_size=5`];
+        const urls = [
+          `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${post.id}&page_size=25`,
+          `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${post.id}&page_size=25`,
+        ];
         for (const url of urls) {
           try {
-            const r = await fetch(url, { headers: { Accept: "application/json", ...authHeader() } });
+            const r = await fetch(url, {
+              headers: { Accept: "application/json", ...authHeader() },
+            });
             if (!r.ok) continue;
             const j = await r.json();
             const list = normalizeUsers(j);
             if (!cancelled) setLikers(list);
             if (list.length) break;
-          } catch {}
+          } catch { }
         }
-      } catch { if (!cancelled) setLikers([]); }
+      } catch {
+        if (!cancelled) setLikers([]);
+      }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [post.id]);
 
   const primaryLiker = likers?.[0] || null;
   const othersCount = Math.max(0, (likeCount || 0) - 1);
-  const likeLabel = primaryLiker && likeCount > 0 ? (likeCount === 1 ? `liked by ${primaryLiker.name}` : `liked by ${primaryLiker.name} and ${othersCount} others`) : `${(likeCount || 0).toLocaleString()} likes`;
-  const totalVotes = post.type === "poll" ? (post.options || []).reduce((acc, o) => acc + (o.vote_count || 0), 0) : 0;
+
+  // Unique reaction types present on this post
+  const reactionIds = Array.from(
+    new Set(
+      [
+        ...likers.map((u) => u.reactionId).filter(Boolean),
+        myReactionId, // include my current reaction so bubbles update instantly
+      ].filter(Boolean)
+    )
+  );
+
+
+
+  // Text changed "likes" → "reactions"
+  const likeLabel =
+    primaryLiker && likeCount > 0
+      ? likeCount === 1
+        ? `reacted by ${primaryLiker.name}`
+        : `reacted by ${primaryLiker.name} and ${othersCount} others`
+      : `${(likeCount || 0).toLocaleString()} reactions`;
+
+  const totalVotes =
+    post.type === "poll"
+      ? (post.options || []).reduce(
+        (acc, o) => acc + (o.vote_count || 0),
+        0
+      )
+      : 0;
 
   return (
     <Card variant="outlined" sx={{ borderRadius: 3, mb: 2 }}>
@@ -279,59 +364,280 @@ function PostCard({
         avatar={<Avatar src={photo}>{initial}</Avatar>}
         title={<Typography fontWeight={600}>{name}</Typography>}
         subheader={timeAgo(post.created_at)}
-        action={<Stack direction="row" spacing={0.5}><Tooltip title="Edit"><IconButton size="small" onClick={() => onEdit(post)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip><Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => onDelete(post)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip></Stack>}
+        action={
+          <Stack direction="row" spacing={0.5}>
+            <Tooltip title="Edit">
+              <IconButton
+                size="small"
+                onClick={() => onEdit(post)}
+              >
+                <EditRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => onDelete(post)}
+              >
+                <DeleteOutlineRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        }
       />
       <CardContent sx={{ pt: 0 }}>
-        {post.content && <Typography sx={{ whiteSpace: "pre-wrap" }}>{post.content}</Typography>}
-        {post.type === "link" && post.link && <Button size="small" href={post.link} target="_blank" rel="noreferrer" sx={{ mt: 1, textTransform: "none" }}>{post.link}</Button>}
-        {post.type === "image" && post.images?.length > 0 && <Grid container spacing={1} sx={{ mt: 1 }}>{post.images.map((src, i) => <Grid key={i} item xs={12} sm={6}><img src={src} alt="post" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 8 }} /></Grid>)}</Grid>}
+        {post.content && (
+          <Typography sx={{ whiteSpace: "pre-wrap" }}>
+            {post.content}
+          </Typography>
+        )}
+
+        {post.type === "link" && post.link && (
+          <Button
+            size="small"
+            href={post.link}
+            target="_blank"
+            rel="noreferrer"
+            sx={{ mt: 1, textTransform: "none" }}
+          >
+            {post.link}
+          </Button>
+        )}
+
+        {post.type === "image" && post.images?.length > 0 && (
+          <Grid container spacing={1} sx={{ mt: 1 }}>
+            {post.images.map((src, i) => (
+              <Grid key={i} item xs={12} sm={6}>
+                <img
+                  src={src}
+                  alt="post"
+                  style={{
+                    width: "100%",
+                    maxHeight: 300,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                  }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        )}
+
         {post.type === "poll" && post.options?.length > 0 && (
           <Box sx={{ mt: 2 }}>
             {post.options.map((opt, i) => {
-              const label = typeof opt === "string" ? opt : opt.text || opt.label || `Option ${i + 1}`;
-              const votes = typeof opt === "object" ? opt.vote_count || 0 : 0;
-              const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+              const label =
+                typeof opt === "string"
+                  ? opt
+                  : opt.text || opt.label || `Option ${i + 1}`;
+              const votes =
+                typeof opt === "object" ? opt.vote_count || 0 : 0;
+              const pct =
+                totalVotes > 0
+                  ? Math.round((votes / totalVotes) * 100)
+                  : 0;
               const oid = opt.id || opt.option_id;
               return (
-                <Box key={i} sx={{ mb: 1.5, cursor: oid ? "pointer" : "default" }} onClick={() => oid && onVote(post.id, oid)}>
-                  <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}><Typography variant="body2">{label}</Typography><Typography variant="body2" fontWeight={600}>{pct}%</Typography></Stack>
-                  <LinearProgress variant="determinate" value={pct} sx={{ height: 10, borderRadius: 5 }} />
-                  <Typography variant="caption" color="text.secondary">{votes} vote{votes !== 1 ? "s" : ""}</Typography>
+                <Box
+                  key={i}
+                  sx={{ mb: 1.5, cursor: oid ? "pointer" : "default" }}
+                  onClick={() => oid && onVote(post.id, oid)}
+                >
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    sx={{ mb: 0.5 }}
+                  >
+                    <Typography variant="body2">
+                      {label}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      fontWeight={600}
+                    >
+                      {pct}%
+                    </Typography>
+                  </Stack>
+                  <LinearProgress
+                    variant="determinate"
+                    value={pct}
+                    sx={{ height: 10, borderRadius: 5 }}
+                  />
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                  >
+                    {votes} vote{votes !== 1 ? "s" : ""}
+                  </Typography>
                 </Box>
               );
             })}
-            <Typography variant="caption" color="text.secondary">Total: {totalVotes} votes</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Total: {totalVotes} votes
+            </Typography>
           </Box>
         )}
       </CardContent>
+
       <CardActions sx={{ px: 2, pb: 1, display: "block" }}>
         <Box sx={{ pb: 1 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ cursor: "pointer" }} onClick={() => onOpenLikes(post.id)}>
-              <AvatarGroup max={3} sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}>{likers.slice(0, 3).map((u) => <Avatar key={u.id} src={u.avatar} alt={u.name}>{(u.name || "U")[0]}</Avatar>)}</AvatarGroup>
-              <Typography variant="caption" sx={{ ml: 1 }}>{likeLabel}</Typography>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ cursor: "pointer" }}
+              onClick={() => onOpenLikes(post.id)}
+            >
+              <AvatarGroup
+                max={3}
+                sx={{
+                  "& .MuiAvatar-root": {
+                    width: 24,
+                    height: 24,
+                    fontSize: 14,
+                  },
+                }}
+              >
+                {(reactionIds.length ? reactionIds : ["like"])
+                  .slice(0, 3)
+                  .map((rid) => {
+                    const def =
+                      POST_REACTIONS.find((r) => r.id === rid) ||
+                      POST_REACTIONS[0];
+                    return (
+                      <Avatar key={rid}>
+                        <span style={{ fontSize: 16 }}>{def.emoji}</span>
+                      </Avatar>
+                    );
+                  })}
+              </AvatarGroup>
+
+              <Typography variant="caption" sx={{ ml: 1 }}>
+                {likeLabel}
+              </Typography>
             </Stack>
-            {/* View who shared the post */}
-            <Button size="small" onClick={() => onViewShares(post.id)} sx={{ textTransform: "none", color: "text.secondary", fontSize: 12 }}>{shareCount} Shares</Button>
+
+
+            <Button
+              size="small"
+              onClick={() => onViewShares(post.id)}
+              sx={{
+                textTransform: "none",
+                color: "text.secondary",
+                fontSize: 12,
+              }}
+            >
+              {shareCount} Shares
+            </Button>
           </Stack>
         </Box>
+
         <Divider sx={{ mb: 1 }} />
+
         <Stack direction="row" justifyContent="space-between">
-          <Button size="small" startIcon={post.liked_by_me ? <FavoriteRoundedIcon color="error" /> : <FavoriteBorderRoundedIcon />} onClick={() => onLike(post.id)} sx={{ color: post.liked_by_me ? "error.main" : "text.secondary" }}>Like</Button>
-          <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon />} onClick={() => onComment(post.id)}>Comment</Button>
-          {/* Trigger the Share Action Dialog */}
-          <Button size="small" startIcon={<IosShareRoundedIcon />} onClick={() => onShareAction(post.id)}>Share</Button>
+          {/* Reaction button with popup */}
+          <Button
+            size="small"
+            onClick={handleOpenPicker}
+            sx={{
+              textTransform: "none",
+              color: hasReaction ? "primary.main" : "text.secondary",
+              fontWeight: hasReaction ? 600 : 400,
+            }}
+            startIcon={
+              <span style={{ fontSize: 18, lineHeight: 1 }}>
+                {likeBtnEmoji}
+              </span>
+            }
+          >
+            {likeBtnLabel}
+          </Button>
+
+          <Button
+            size="small"
+            startIcon={<ChatBubbleOutlineRoundedIcon />}
+            onClick={() => onComment(post.id)}
+          >
+            Comment
+          </Button>
+
+          <Button
+            size="small"
+            startIcon={<IosShareRoundedIcon />}
+            onClick={() => onShareAction(post.id)}
+          >
+            Share
+          </Button>
         </Stack>
+
+        {/* Popup with reaction emojis, like LinkedIn */}
+        <Popover
+          open={pickerOpen}
+          anchorEl={anchorEl}
+          onClose={handleClosePicker}
+          anchorOrigin={{
+            vertical: "top",
+            horizontal: "center",
+          }}
+          transformOrigin={{
+            vertical: "bottom",
+            horizontal: "center",
+          }}
+          disableRestoreFocus
+        >
+          <Box
+            sx={{
+              p: 1,
+              display: "flex",
+              gap: 1,
+              px: 1.5,
+            }}
+          >
+            {POST_REACTIONS.map((r) => (
+              <Tooltip key={r.id} title={r.label}>
+                <Box
+                  onClick={() => {
+                    // send selected reaction to parent
+                    onReact(post.id, r.id);
+                    handleClosePicker();
+                  }}
+                  sx={{
+                    cursor: "pointer",
+                    fontSize: 26,
+                    lineHeight: 1,
+                    px: 0.5,
+                    py: 0.25,
+                    borderRadius: "999px",
+                    transition: "transform 120ms ease, background 120ms ease",
+                    "&:hover": {
+                      bgcolor: "action.hover",
+                      transform: "translateY(-2px) scale(1.05)",
+                    },
+                  }}
+                >
+                  {r.emoji}
+                </Box>
+              </Tooltip>
+            ))}
+          </Box>
+        </Popover>
       </CardActions>
     </Card>
   );
 }
 
+
 // -----------------------------------------------------------------------------
 // 4. Dialogs
 // -----------------------------------------------------------------------------
 
-function CommentsDialog({ open, postId, onClose }) { /* ... (unchanged) ... */ 
+function CommentsDialog({ open, postId, onClose }) { /* ... (unchanged) ... */
   const [loading, setLoading] = React.useState(false);
   const [comments, setComments] = React.useState([]);
   const [text, setText] = React.useState("");
@@ -343,23 +649,28 @@ function CommentsDialog({ open, postId, onClose }) { /* ... (unchanged) ... */
   }
   function normalizeUser(u) { if (!u) return { id: null, name: "User", avatar: "" }; const id = u.id || u.user_id; const name = u.name || u.full_name || u.username || "User"; const avatar = toAbsolute(u.user_image || u.avatar || u.user_image_url); return { id, name, avatar }; }
   function normalizeComment(c, currentUserId) { const author = normalizeUser(c.author || c.user); const replies = (c.replies || []).map(r => normalizeComment(r, currentUserId)); return { id: c.id, created: c.created_at, body: c.text || c.body || "", author, likedByMe: !!(c.liked || c.liked_by_me), likeCount: Number(c.like_count || c.likes || 0), canDelete: !!((author.id && currentUserId && author.id === currentUserId)), replies }; }
-  async function fetchComments(pid, uid) { try { const r = await fetch(`${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${pid}`, { headers: authHeader() }); if (!r.ok) return []; const j = await r.json(); const rootsRaw = j.results || []; const roots = rootsRaw.map(r => ({ ...normalizeComment(r, uid), replies: [] })); await Promise.all(roots.map(async (root) => { try { const rr = await fetch(`${API_ROOT}/engagements/comments/?parent=${root.id}`, { headers: authHeader() }); const jj = await rr.json(); root.replies = (jj.results || []).map(x => normalizeComment(x, uid)); } catch {} })); return roots; } catch { return []; } }
+  async function fetchComments(pid, uid) { try { const r = await fetch(`${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${pid}`, { headers: authHeader() }); if (!r.ok) return []; const j = await r.json(); const rootsRaw = j.results || []; const roots = rootsRaw.map(r => ({ ...normalizeComment(r, uid), replies: [] })); await Promise.all(roots.map(async (root) => { try { const rr = await fetch(`${API_ROOT}/engagements/comments/?parent=${root.id}`, { headers: authHeader() }); const jj = await rr.json(); root.replies = (jj.results || []).map(x => normalizeComment(x, uid)); } catch { } })); return roots; } catch { return []; } }
   React.useEffect(() => { let mounted = true; (async () => { if (!open || !postId) return; setLoading(true); const uid = await getMeId(); if (mounted) setMeId(uid); const list = await fetchComments(postId, uid); if (mounted) setComments(list); setLoading(false); })(); return () => { mounted = false; }; }, [open, postId]);
   const handleSubmit = async () => { if (!text.trim()) return; const payload = replyingTo ? { text, parent: replyingTo } : { text, target_type: "activity_feed.feeditem", target_id: postId }; try { await fetch(`${API_ROOT}/engagements/comments/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(payload) }); setText(""); setReplyingTo(null); const list = await fetchComments(postId, meId); setComments(list); } catch { alert("Failed to post"); } };
-  const onLike = async (cid) => { try { await fetch(`${API_ROOT}/engagements/reactions/toggle/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ target_type: "comment", target_id: cid, reaction: "like" }) }); const list = await fetchComments(postId, meId); setComments(list); } catch {} };
-  const onDelete = async (cid) => { if (!confirm("Delete this comment?")) return; try { await fetch(`${API_ROOT}/engagements/comments/${cid}/`, { method: "DELETE", headers: authHeader() }); const list = await fetchComments(postId, meId); setComments(list); } catch {} };
-  const CommentItem = ({ c, depth = 0 }) => ( <Box sx={{ pl: depth * 4, py: 1 }}> <Stack direction="row" spacing={1}> <Avatar src={c.author.avatar} sx={{ width: 32, height: 32 }} /> <Box sx={{ flex: 1 }}> <Box sx={{ bgcolor: "action.hover", p: 1.5, borderRadius: 2 }}> <Typography variant="subtitle2" fontWeight={700}>{c.author.name}</Typography> <Typography variant="body2">{c.body}</Typography> </Box> <Stack direction="row" spacing={2} sx={{ mt: 0.5, ml: 1 }}> <Typography variant="caption" color="text.secondary">{timeAgo(c.created)}</Typography> <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => onLike(c.id)}> {c.likedByMe ? "Unlike" : "Like"} ({c.likeCount}) </Typography> <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => setReplyingTo(c.id)}> Reply </Typography> {c.canDelete && <Typography variant="caption" color="error" sx={{ cursor: "pointer" }} onClick={() => onDelete(c.id)}>Delete</Typography>} </Stack> </Box> </Stack> {c.replies.map(r => <CommentItem key={r.id} c={r} depth={depth + 1} />)} </Box> );
-  return ( <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"> <DialogTitle>Comments</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : comments.length ? comments.map(c => <CommentItem key={c.id} c={c} />) : <Typography color="text.secondary">No comments yet.</Typography>} </DialogContent> <DialogActions sx={{ p: 2, display: "block" }}> {replyingTo && <Typography variant="caption" display="block" sx={{ mb: 1 }}>Replying... <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => setReplyingTo(null)}>Cancel</span></Typography>} <Stack direction="row" spacing={1}> <TextField fullWidth size="small" placeholder="Write a comment..." value={text} onChange={e => setText(e.target.value)} /> <IconButton color="primary" onClick={handleSubmit}><SendRoundedIcon /></IconButton> </Stack> </DialogActions> </Dialog> );
+  const onLike = async (cid) => { try { await fetch(`${API_ROOT}/engagements/reactions/toggle/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ target_type: "comment", target_id: cid, reaction: "like" }) }); const list = await fetchComments(postId, meId); setComments(list); } catch { } };
+  const onDelete = async (cid) => { if (!confirm("Delete this comment?")) return; try { await fetch(`${API_ROOT}/engagements/comments/${cid}/`, { method: "DELETE", headers: authHeader() }); const list = await fetchComments(postId, meId); setComments(list); } catch { } };
+  const CommentItem = ({ c, depth = 0 }) => (<Box sx={{ pl: depth * 4, py: 1 }}> <Stack direction="row" spacing={1}> <Avatar src={c.author.avatar} sx={{ width: 32, height: 32 }} /> <Box sx={{ flex: 1 }}> <Box sx={{ bgcolor: "action.hover", p: 1.5, borderRadius: 2 }}> <Typography variant="subtitle2" fontWeight={700}>{c.author.name}</Typography> <Typography variant="body2">{c.body}</Typography> </Box> <Stack direction="row" spacing={2} sx={{ mt: 0.5, ml: 1 }}> <Typography variant="caption" color="text.secondary">{timeAgo(c.created)}</Typography> <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => onLike(c.id)}> {c.likedByMe ? "Unlike" : "Like"} ({c.likeCount}) </Typography> <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => setReplyingTo(c.id)}> Reply </Typography> {c.canDelete && <Typography variant="caption" color="error" sx={{ cursor: "pointer" }} onClick={() => onDelete(c.id)}>Delete</Typography>} </Stack> </Box> </Stack> {c.replies.map(r => <CommentItem key={r.id} c={r} depth={depth + 1} />)} </Box>);
+  return (<Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"> <DialogTitle>Comments</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : comments.length ? comments.map(c => <CommentItem key={c.id} c={c} />) : <Typography color="text.secondary">No comments yet.</Typography>} </DialogContent> <DialogActions sx={{ p: 2, display: "block" }}> {replyingTo && <Typography variant="caption" display="block" sx={{ mb: 1 }}>Replying... <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => setReplyingTo(null)}>Cancel</span></Typography>} <Stack direction="row" spacing={1}> <TextField fullWidth size="small" placeholder="Write a comment..." value={text} onChange={e => setText(e.target.value)} /> <IconButton color="primary" onClick={handleSubmit}><SendRoundedIcon /></IconButton> </Stack> </DialogActions> </Dialog>);
 }
 
 function LikesDialog({ open, postId, onClose }) {
   const [users, setUsers] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
+  const [activeFilter, setActiveFilter] = React.useState("all");
   React.useEffect(() => {
     if (!open || !postId) return;
+    setActiveFilter("all");
     setLoading(true);
     (async () => {
-      const endpoints = [`${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${postId}&reaction=like`, `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${postId}`];
+      const endpoints = [
+        `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${postId}`,
+        `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${postId}`,
+      ];
       let foundData = false;
       for (const url of endpoints) {
         try {
@@ -369,11 +680,26 @@ function LikesDialog({ open, postId, onClose }) {
           const rows = Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
           if (rows.length === 0) continue;
           const parsed = rows.map(r => {
-             let u = r.user || r.owner || r.liker;
-             if (!u) u = { id: r.user_id ?? r.owner_id ?? r.id, username: r.user_username ?? r.username, first_name: r.user_first_name ?? r.first_name, last_name: r.user_last_name ?? r.last_name, user_image: r.user_image || r.user_avatar || r.avatar, headline: r.user_headline ?? r.headline };
-             const p = u.profile || r.profile || {};
-             const first = u.first_name || u.firstName || ""; const last = u.last_name || u.lastName || ""; let displayName = u.name || u.full_name || (first || last ? `${first} ${last}` : u.username); if (!displayName) displayName = "User";
-             return { id: u.id, name: displayName.trim(), avatar: toAbsolute(u.user_image || u.avatar || p.user_image_url || p.user_image || ""), headline: u.headline || u.job_title || p.headline || "" };
+            let u = r.user || r.owner || r.liker;
+            if (!u) u = { id: r.user_id ?? r.owner_id ?? r.id, username: r.user_username ?? r.username, first_name: r.user_first_name ?? r.first_name, last_name: r.user_last_name ?? r.last_name, user_image: r.user_image || r.user_avatar || r.avatar, headline: r.user_headline ?? r.headline };
+            const p = u.profile || r.profile || {};
+            const first = u.first_name || u.firstName || ""; const last = u.last_name || u.lastName || ""; let displayName = u.name || u.full_name || (first || last ? `${first} ${last}` : u.username); if (!displayName) displayName = "User";
+            const reactionId = r.reaction || r.reaction_type || r.kind || null;
+            const def =
+              POST_REACTIONS.find((x) => x.id === reactionId) ||
+              POST_REACTIONS[0];
+
+            return {
+              id: u.id,
+              name: displayName.trim(),
+              avatar: toAbsolute(
+                u.user_image || u.avatar || p.user_image_url || p.user_image || ""
+              ),
+              headline: u.headline || u.job_title || p.headline || "",
+              reactionId,
+              reactionEmoji: def.emoji,
+              reactionLabel: def.label,
+            };
           }).filter(x => x.id);
           if (parsed.length > 0) { setUsers(parsed); foundData = true; break; }
         } catch (e) { console.error(e); }
@@ -381,7 +707,87 @@ function LikesDialog({ open, postId, onClose }) {
       if (!foundData) setUsers([]); setLoading(false);
     })();
   }, [open, postId]);
-  return ( <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"> <DialogTitle>Liked by</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : users.map(u => ( <ListItem key={u.id}> <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar> <ListItemText primary={u.name} secondary={u.headline} /> </ListItem> ))} {!loading && !users.length && <Typography p={2} color="text.secondary">No likes yet.</Typography>} </DialogContent> <DialogActions><Button onClick={onClose}>Close</Button></DialogActions> </Dialog> );
+
+  const filteredUsers =
+    activeFilter === "all"
+      ? users
+      : users.filter((u) => u.reactionId === activeFilter);
+
+  const reactionCounts = { all: users.length };
+  users.forEach((u) => {
+    if (!u.reactionId) return;
+    reactionCounts[u.reactionId] = (reactionCounts[u.reactionId] || 0) + 1;
+  });
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Reactions</DialogTitle>
+      <DialogContent dividers>
+        {/* Tabs: All / 👍 / 🤔 / 🎯 / 🧠 / 🤷 */}
+        <Box sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}>
+          <Tabs
+            value={activeFilter}
+            onChange={(_, v) => setActiveFilter(v)}
+            variant="scrollable"
+            allowScrollButtonsMobile
+          >
+            <Tab
+              value="all"
+              label={`All (${reactionCounts.all || 0})`}
+            />
+            {POST_REACTIONS.map((r) => (
+              <Tab
+                key={r.id}
+                value={r.id}
+                label={
+                  <Box
+                    sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                  >
+                    <span>{r.emoji}</span>
+                    <span style={{ fontSize: 12 }}>
+                      ({reactionCounts[r.id] || 0})
+                    </span>
+                  </Box>
+                }
+              />
+            ))}
+          </Tabs>
+        </Box>
+        {loading ? (
+          <LinearProgress />
+        ) : (
+          filteredUsers.map((u) => (
+            <ListItem
+              key={u.id}  // ⬅️ render as <div>, no bullet
+            >
+              <ListItemAvatar>
+                <Avatar src={u.avatar} />
+              </ListItemAvatar>
+              <ListItemText primary={u.name} secondary={u.headline} />
+              {u.reactionEmoji && (
+                <ListItemSecondaryAction>
+                  <Tooltip title={u.reactionLabel || ""}>
+                    <Box sx={{ fontSize: 20, mr: 1 }}>
+                      {u.reactionEmoji}
+                    </Box>
+                  </Tooltip>
+                </ListItemSecondaryAction>
+              )}
+            </ListItem>
+          ))
+        )}
+
+        {!loading && !filteredUsers.length && (
+          <Typography p={2} color="text.secondary">
+            No reactions yet.
+          </Typography>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
 }
 
 function SharesDialog({ open, postId, onClose }) {
@@ -395,16 +801,31 @@ function SharesDialog({ open, postId, onClose }) {
       .then(d => {
         const rows = Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
         const parsed = rows.map(r => {
-           let u = r.user || r.actor || r.sharer;
-           if (!u) u = { id: r.user_id ?? r.actor_id ?? r.id, username: r.user_username ?? r.username, first_name: r.user_first_name ?? r.first_name, last_name: r.user_last_name ?? r.last_name, user_image: r.user_image || r.user_avatar || r.avatar, headline: r.user_headline ?? r.headline };
-           const p = u.profile || r.profile || {};
-           const first = u.first_name || u.firstName || ""; const last = u.last_name || u.lastName || ""; const displayName = u.name || u.full_name || (first || last ? `${first} ${last}` : u.username) || "User";
-           return { id: u.id, name: displayName.trim(), avatar: toAbsolute(u.user_image || u.avatar || p.user_image_url || p.user_image || ""), headline: u.headline || u.job_title || p.headline || "" };
+          let u = r.user || r.actor || r.sharer;
+          if (!u) u = { id: r.user_id ?? r.actor_id ?? r.id, username: r.user_username ?? r.username, first_name: r.user_first_name ?? r.first_name, last_name: r.user_last_name ?? r.last_name, user_image: r.user_image || r.user_avatar || r.avatar, headline: r.user_headline ?? r.headline };
+          const p = u.profile || r.profile || {};
+          const first = u.first_name || u.firstName || ""; const last = u.last_name || u.lastName || ""; const displayName = u.name || u.full_name || (first || last ? `${first} ${last}` : u.username) || "User";
+          const reactionId = r.reaction || r.reaction_type || null;
+          const def =
+            POST_REACTIONS.find((x) => x.id === reactionId) ||
+            POST_REACTIONS[0];
+
+          return {
+            id: u.id,
+            name: displayName.trim(),
+            avatar: toAbsolute(
+              u.user_image || u.avatar || p.user_image_url || p.user_image || ""
+            ),
+            headline: u.headline || u.job_title || p.headline || "",
+            reactionId,
+            reactionEmoji: def.emoji,
+            reactionLabel: def.label,
+          };
         }).filter(x => x.id);
         setUsers(parsed);
       }).catch(() => setUsers([])).finally(() => setLoading(false));
   }, [open, postId]);
-  return ( <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"> <DialogTitle>Shared by</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : users.map(u => ( <ListItem key={u.id}> <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar> <ListItemText primary={u.name} secondary={u.headline} /> </ListItem> ))} {!loading && !users.length && <Typography p={2} color="text.secondary">No shares yet.</Typography>} </DialogContent> <DialogActions><Button onClick={onClose}>Close</Button></DialogActions> </Dialog> );
+  return (<Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"> <DialogTitle>Shared by</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : users.map(u => (<ListItem key={u.id}> <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar> <ListItemText primary={u.name} secondary={u.headline} /> </ListItem>))} {!loading && !users.length && <Typography p={2} color="text.secondary">No shares yet.</Typography>} </DialogContent> <DialogActions><Button onClick={onClose}>Close</Button></DialogActions> </Dialog>);
 }
 
 // --- NEW COMPONENT: Share To Friend Dialog ---
@@ -422,32 +843,32 @@ function ShareToFriendDialog({ open, onClose, postId }) {
     const endpoints = [`${API_ROOT}/friends/`, `${API_ROOT}/relationships/friends/`, `${API_ROOT}/users/friends/`];
     let found = false;
     (async () => {
-        for(const url of endpoints){
-            try {
-                const res = await fetch(url, { headers: authHeader() });
-                if(!res.ok) continue;
-                const data = await res.json();
-                const rows = Array.isArray(data) ? data : (data.results || []);
-                if(rows.length > 0) {
-                    const clean = rows.map(r => {
-                        // Normalize friend object
-                        const u = r.friend || r.user || r;
-                        const img = u.avatar || u.user_image || u.user_image_url || "";
-                        return {
-                            id: u.id,
-                            name: u.name || u.full_name || u.username || "Friend",
-                            avatar: toAbsolute(img),
-                            headline: u.headline || u.bio || ""
-                        }
-                    });
-                    setFriends(clean);
-                    found = true;
-                    break;
-                }
-            } catch {}
-        }
-        if(!found) setFriends([]);
-        setLoading(false);
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url, { headers: authHeader() });
+          if (!res.ok) continue;
+          const data = await res.json();
+          const rows = Array.isArray(data) ? data : (data.results || []);
+          if (rows.length > 0) {
+            const clean = rows.map(r => {
+              // Normalize friend object
+              const u = r.friend || r.user || r;
+              const img = u.avatar || u.user_image || u.user_image_url || "";
+              return {
+                id: u.id,
+                name: u.name || u.full_name || u.username || "Friend",
+                avatar: toAbsolute(img),
+                headline: u.headline || u.bio || ""
+              }
+            });
+            setFriends(clean);
+            found = true;
+            break;
+          }
+        } catch { }
+      }
+      if (!found) setFriends([]);
+      setLoading(false);
     })();
   }, [open]);
 
@@ -458,27 +879,27 @@ function ShareToFriendDialog({ open, onClose, postId }) {
   };
 
   const handleSend = async () => {
-    if(selected.length === 0) return;
+    if (selected.length === 0) return;
     setSending(true);
     try {
-        // Generic share endpoint - assumes backend handles creating activity or message
-        await fetch(`${API_ROOT}/engagements/shares/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeader() },
-            body: JSON.stringify({
-                target_type: "activity_feed.feeditem",
-                target_id: postId,
-                user_ids: selected // Sending array of user IDs
-            })
-        });
-        alert("Post shared successfully!");
-        onClose();
-        setSelected([]);
+      // Generic share endpoint - assumes backend handles creating activity or message
+      await fetch(`${API_ROOT}/engagements/shares/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({
+          target_type: "activity_feed.feeditem",
+          target_id: postId,
+          user_ids: selected // Sending array of user IDs
+        })
+      });
+      alert("Post shared successfully!");
+      onClose();
+      setSelected([]);
     } catch (e) {
-        alert("Shared (mock): Verify your backend /api/engagements/shares/ endpoint accepts user_ids.");
-        onClose();
+      alert("Shared (mock): Verify your backend /api/engagements/shares/ endpoint accepts user_ids.");
+      onClose();
     } finally {
-        setSending(false);
+      setSending(false);
     }
   };
 
@@ -487,31 +908,31 @@ function ShareToFriendDialog({ open, onClose, postId }) {
       <DialogTitle>Share with friends</DialogTitle>
       <DialogContent dividers sx={{ p: 0 }}>
         <Box sx={{ p: 2, pb: 1 }}>
-            <TextField 
-                fullWidth size="small" placeholder="Search friends..." 
-                value={search} onChange={e => setSearch(e.target.value)}
-                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small"/></InputAdornment> }}
-            />
+          <TextField
+            fullWidth size="small" placeholder="Search friends..."
+            value={search} onChange={e => setSearch(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+          />
         </Box>
         {loading ? <LinearProgress /> : (
-            <List sx={{ height: 300, overflow: 'auto' }}>
-                {filtered.length === 0 && <Typography p={2} align="center" color="text.secondary">No friends found.</Typography>}
-                {filtered.map(f => (
-                    <ListItem key={f.id} button onClick={() => handleToggle(f.id)}>
-                        <ListItemAvatar><Avatar src={f.avatar}/></ListItemAvatar>
-                        <ListItemText primary={f.name} secondary={f.headline} />
-                        <ListItemSecondaryAction>
-                            <Checkbox edge="end" checked={selected.includes(f.id)} onChange={() => handleToggle(f.id)} />
-                        </ListItemSecondaryAction>
-                    </ListItem>
-                ))}
-            </List>
+          <List sx={{ height: 300, overflow: 'auto' }}>
+            {filtered.length === 0 && <Typography p={2} align="center" color="text.secondary">No friends found.</Typography>}
+            {filtered.map(f => (
+              <ListItem key={f.id} button onClick={() => handleToggle(f.id)}>
+                <ListItemAvatar><Avatar src={f.avatar} /></ListItemAvatar>
+                <ListItemText primary={f.name} secondary={f.headline} />
+                <ListItemSecondaryAction>
+                  <Checkbox edge="end" checked={selected.includes(f.id)} onChange={() => handleToggle(f.id)} />
+                </ListItemSecondaryAction>
+              </ListItem>
+            ))}
+          </List>
         )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" onClick={handleSend} disabled={sending || selected.length === 0}>
-            {sending ? "Sharing..." : `Share (${selected.length})`}
+          {sending ? "Sharing..." : `Share (${selected.length})`}
         </Button>
       </DialogActions>
     </Dialog>
@@ -528,8 +949,8 @@ function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) .
   const [pollOptions, setPollOptions] = React.useState(post?.type === "poll" ? post.options?.map((o) => (typeof o === "string" ? o : o.text || o.label || "")) || ["", ""] : ["", ""]);
   React.useEffect(() => { if (!open || !post) return; const t = post.type || "text"; setTextContent(post.content || ""); setImageCaption(post.content || ""); setLinkUrl(post.link || ""); if (t === "poll") { setPollOptions(post.options?.map((o) => (typeof o === "string" ? o : o.text || o.label || "")) || ["", ""]); } else { setPollOptions(["", ""]); } setImageFile(null); }, [open, post]);
   const handleSave = async () => { if (!post) return; setSaving(true); let options = { method: "PATCH", headers: { ...authHeader() } }; let body; let url; try { if (type === "poll") { const pollId = post.raw_metadata?.poll_id; if (!pollId) throw new Error("Missing poll_id"); url = `${API_ROOT}/activity/feed/polls/${pollId}/`; const validOptions = pollOptions.map((o) => o.trim()).filter(Boolean); if (!textContent.trim() || validOptions.length < 2) { alert("Poll must have a question and at least 2 options."); setSaving(false); return; } options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ question: textContent, options: validOptions }); } else { const communityId = post.raw_metadata?.community_id || post.community_id; if (!communityId) throw new Error("Missing community id"); url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/edit/`; if (type === "text") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ content: textContent }); } else if (type === "link") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ url: linkUrl, description: textContent }); } else if (type === "image") { const fd = new FormData(); fd.append("caption", imageCaption || ""); if (imageFile) fd.append("image", imageFile); body = fd; } } options.body = body; const res = await fetch(url, options); if (!res.ok) throw new Error("Update failed"); const data = await res.json(); let updated = { ...post }; if (type === "poll") { updated.content = data.question; updated.options = data.options; } else { const meta = data.metadata || post.raw_metadata || {}; if (type === "text") updated.content = meta.text || textContent; if (type === "link") { updated.content = meta.description; updated.link = meta.url; } if (type === "image") updated.content = meta.caption; } onSaved(updated); onClose(); } catch (e) { alert("Failed to update post: " + e.message); } finally { setSaving(false); } };
-  const renderBody = () => { if (type === "poll") return <><TextField fullWidth multiline minRows={3} label="Question" value={textContent} onChange={(e) => setTextContent(e.target.value)} sx={{ mb: 2 }} /><Stack spacing={1}><Typography variant="subtitle2">Options</Typography>{pollOptions.map((opt, i) => (<Stack key={i} direction="row" spacing={1}><TextField fullWidth size="small" value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} /><IconButton size="small" onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}><RemoveRoundedIcon fontSize="small" /></IconButton></Stack>))}<Button startIcon={<AddRoundedIcon />} onClick={() => setPollOptions((o) => [...o, ""])} size="small" sx={{ alignSelf: "flex-start" }}>Add Option</Button></Stack></>; if (type === "link") return <><TextField fullWidth label="Link URL" value={linkUrl} onChange={e=>setLinkUrl(e.target.value)} sx={{mb:2}} /><TextField fullWidth multiline minRows={3} label="Description" value={textContent} onChange={e=>setTextContent(e.target.value)} /></>; if (type === "image") return <Stack spacing={2}><TextField fullWidth multiline minRows={3} label="Caption" value={imageCaption} onChange={e=>setImageCaption(e.target.value)} /><Button variant="outlined" component="label">Change image<input hidden type="file" accept="image/*" onChange={e=>setImageFile(e.target.files[0])} /></Button></Stack>; return <TextField fullWidth multiline minRows={3} label="Content" value={textContent} onChange={e=>setTextContent(e.target.value)} />; };
-  return <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"><DialogTitle>Edit Post</DialogTitle><DialogContent dividers>{renderBody()}</DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" onClick={handleSave} disabled={saving}>{saving?"Saving...":"Save"}</Button></DialogActions></Dialog>;
+  const renderBody = () => { if (type === "poll") return <><TextField fullWidth multiline minRows={3} label="Question" value={textContent} onChange={(e) => setTextContent(e.target.value)} sx={{ mb: 2 }} /><Stack spacing={1}><Typography variant="subtitle2">Options</Typography>{pollOptions.map((opt, i) => (<Stack key={i} direction="row" spacing={1}><TextField fullWidth size="small" value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} /><IconButton size="small" onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}><RemoveRoundedIcon fontSize="small" /></IconButton></Stack>))}<Button startIcon={<AddRoundedIcon />} onClick={() => setPollOptions((o) => [...o, ""])} size="small" sx={{ alignSelf: "flex-start" }}>Add Option</Button></Stack></>; if (type === "link") return <><TextField fullWidth label="Link URL" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} sx={{ mb: 2 }} /><TextField fullWidth multiline minRows={3} label="Description" value={textContent} onChange={e => setTextContent(e.target.value)} /></>; if (type === "image") return <Stack spacing={2}><TextField fullWidth multiline minRows={3} label="Caption" value={imageCaption} onChange={e => setImageCaption(e.target.value)} /><Button variant="outlined" component="label">Change image<input hidden type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} /></Button></Stack>; return <TextField fullWidth multiline minRows={3} label="Content" value={textContent} onChange={e => setTextContent(e.target.value)} />; };
+  return <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"><DialogTitle>Edit Post</DialogTitle><DialogContent dividers>{renderBody()}</DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></DialogActions></Dialog>;
 }
 
 function PostDeleteConfirm({ open, post, onClose, onDeleted }) { /* ... (unchanged) ... */
@@ -573,11 +994,37 @@ export default function MyPostsPage() {
             const metricsRes = await fetch(`${API_ROOT}/engagements/metrics/?target_type=activity_feed.feeditem&ids=${ids}`, { headers: authHeader() });
             if (metricsRes.ok) {
               const metricsData = await metricsRes.json();
-              const metricsMap = metricsData.results || metricsData; 
-              const hydrated = uiPosts.map(p => {
-                const m = Array.isArray(metricsMap) ? metricsMap.find(x => String(x.id) === String(p.id)) : metricsMap[String(p.id)];
+              const metricsMap = metricsData.results || metricsData;
+              const hydrated = uiPosts.map((p) => {
+                const m = Array.isArray(metricsMap)
+                  ? metricsMap.find((x) => String(x.id) === String(p.id))
+                  : metricsMap[String(p.id)];
                 if (!m) return p;
-                return { ...p, liked_by_me: m.user_has_liked ?? p.liked_by_me, metrics: { likes: Number(m.likes ?? m.like_count ?? p.metrics.likes), comments: Number(m.comments ?? m.comment_count ?? p.metrics.comments), shares: Number(m.shares ?? m.share_count ?? p.metrics.shares) } };
+
+                // try to read your reaction from metrics (adjust field name to your API)
+                const apiUserReaction =
+                  m.user_reaction || m.reaction || null;
+
+                const likedBy =
+                  m.user_has_liked ?? p.liked_by_me ?? !!apiUserReaction;
+
+                const myReaction =
+                  apiUserReaction || (likedBy ? "like" : null);
+
+                return {
+                  ...p,
+                  liked_by_me: likedBy,
+                  my_reaction: myReaction,
+                  metrics: {
+                    likes: Number(m.likes ?? m.like_count ?? p.metrics.likes),
+                    comments: Number(
+                      m.comments ?? m.comment_count ?? p.metrics.comments
+                    ),
+                    shares: Number(
+                      m.shares ?? m.share_count ?? p.metrics.shares
+                    ),
+                  },
+                };
               });
               setPosts(hydrated);
             }
@@ -621,18 +1068,57 @@ export default function MyPostsPage() {
     } catch (e) { alert("Failed to create post. " + e.message); }
   };
 
-  const handleLike = async (id) => {
-    setPosts((prev) => prev.map((p) => {
-      if (p.id !== id) return p;
-      const liked = !p.liked_by_me;
-      return { ...p, liked_by_me: liked, metrics: { ...p.metrics, likes: Math.max(0, p.metrics.likes + (liked ? 1 : -1)) } };
-    }));
+  const handleReact = async (id, reactionId) => {
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+
+        const prevReaction = p.my_reaction || (p.liked_by_me ? "like" : null);
+        const isSame = prevReaction === reactionId;
+
+        // Decide how total count changes
+        let delta = 0;
+        if (!prevReaction && reactionId) delta = 1;        // first time react
+        else if (prevReaction && !reactionId) delta = -1;  // remove reaction
+        else if (prevReaction && reactionId && isSame)
+          delta = -1;                                      // toggle off same reaction
+        // else switching reaction: keep same total
+
+        const newReaction = isSame ? null : reactionId;
+
+        return {
+          ...p,
+          my_reaction: newReaction,
+          liked_by_me: !!newReaction,
+          metrics: {
+            ...p.metrics,
+            likes: Math.max(
+              0,
+              (p.metrics.likes || 0) + delta
+            ),
+          },
+        };
+      })
+    );
+
     try {
       await fetch(`${API_ROOT}/engagements/reactions/toggle/`, {
-        method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ target_type: "activity_feed.feeditem", target_id: id, reaction: "like" }),
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify({
+          target_type: "activity_feed.feeditem",
+          target_id: id,
+          reaction: reactionId, // "like" / "intriguing" / ...
+        }),
       });
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   };
+
 
   const handleVote = async (postId, optionId) => {
     setPosts((prev) => prev.map((p) => {
@@ -643,7 +1129,7 @@ export default function MyPostsPage() {
       await fetch(`${API_ROOT}/activity/feed/${postId}/poll/vote/`, {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ option_ids: [optionId] }),
       });
-    } catch {}
+    } catch { }
   };
 
   return (
@@ -658,14 +1144,14 @@ export default function MyPostsPage() {
 
       {posts.map((post) => (
         <PostCard
-          key={post.id} post={post} 
-          onLike={handleLike} 
-          onComment={setCommentId} 
+          key={post.id} post={post}
+          onReact={handleReact}
+          onComment={setCommentId}
           onShareAction={setShareActionPostId} // Clicking "Share" icon triggers friend picker
           onViewShares={setSharesId}           // Clicking "X Shares" text triggers list view
-          onEdit={setEditObj} 
-          onDelete={setDeleteObj} 
-          onVote={handleVote} 
+          onEdit={setEditObj}
+          onDelete={setDeleteObj}
+          onVote={handleVote}
           onOpenLikes={setLikesId}
         />
       ))}
@@ -678,12 +1164,12 @@ export default function MyPostsPage() {
       <CommentsDialog open={!!commentId} postId={commentId} onClose={() => setCommentId(null)} />
       <LikesDialog open={!!likesId} postId={likesId} onClose={() => setLikesId(null)} />
       <SharesDialog open={!!sharesId} postId={sharesId} onClose={() => setSharesId(null)} />
-      
+
       {/* The New Share-To-Friend Dialog */}
-      <ShareToFriendDialog 
-        open={!!shareActionPostId} 
-        postId={shareActionPostId} 
-        onClose={() => setShareActionPostId(null)} 
+      <ShareToFriendDialog
+        open={!!shareActionPostId}
+        postId={shareActionPostId}
+        onClose={() => setShareActionPostId(null)}
       />
     </Box>
   );

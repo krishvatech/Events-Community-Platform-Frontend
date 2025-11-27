@@ -381,7 +381,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
               </IconButton>
             </Tooltip>
           ) : isMobile ? (
-            <Tooltip title="Add friend">
+            <Tooltip title="Request Contact">
               <IconButton
                 size="small"
                 onClick={() => onAddFriend?.(u)}
@@ -397,7 +397,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
               startIcon={<PersonAddAlt1RoundedIcon />}
               onClick={() => onAddFriend?.(u)}
             >
-              Add friend
+              Request Contact
             </Button>
           )}
         </Stack>
@@ -1308,7 +1308,7 @@ export default function MembersPage() {
                         border: "1px solid #fff",
                       }}
                     />
-                    <Typography variant="caption">Friends</Typography>
+                    <Typography variant="caption">My Contacts</Typography>
                   </Stack>
                 </Stack>
               </Stack>

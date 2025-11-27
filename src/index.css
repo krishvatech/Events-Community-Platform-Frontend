@@ -54,3 +54,29 @@ body.qna-open dyte-controlbar-button[label="Q&A"] {
 body.qna-open dyte-controlbar-button[label="Q&A"] {
   color: #2160fd;
 }
+
+
+.member-country-cluster {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #f9fafb;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.member-country-cluster-inner {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #312e81; /* deep purple like screenshot */
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
