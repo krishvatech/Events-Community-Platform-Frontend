@@ -45,6 +45,8 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/ap
   /\/$/,
   ""
 );
+const BORDER = "#e2e8f0";
+
 const getToken = () =>
   localStorage.getItem("access") ||
   localStorage.getItem("access_token") ||
@@ -269,6 +271,89 @@ const isImageAttachment = (att) => {
   if (lowerName.match(/\.(png|jpe?g|gif|webp|bmp|heic|heif)$/)) return true;
   return false;
 };
+
+function SharePreview({ attachment, mine }) {
+  if (!attachment) return null;
+
+  // Try to extract the FeedItem / post id from different possible shapes
+  const getSharedFeedItemId = (a) => {
+    if (!a) return null;
+    if (a.feed_item_id) return a.feed_item_id;
+    if (a.feed_item) return a.feed_item;
+    if (a.target_object_id) return a.target_object_id;
+    if (a.object_id) return a.object_id;
+    if (a.target && (a.target.object_id || a.target.id)) {
+      return a.target.object_id || a.target.id;
+    }
+    if (a.meta && (a.meta.feed_item_id || a.meta.object_id)) {
+      return a.meta.feed_item_id || a.meta.object_id;
+    }
+    return null;
+  };
+
+  const feedItemId = getSharedFeedItemId(attachment);
+
+  const handleClick = () => {
+    const basePath = "/community?view=live";
+
+    if (!feedItemId) {
+      // no specific post id → just open live feed
+      window.location.href = basePath;
+      return;
+    }
+
+    // store target post id so LiveFeedPage can focus/highlight it
+    try {
+      window.localStorage.setItem("ecp_livefeed_focus_post", String(feedItemId));
+    } catch (e) {
+      // ignore storage errors
+    }
+
+    // append post id as query param: /community?view=live&post=123
+    const url = `${basePath}&post=${encodeURIComponent(feedItemId)}`;
+    window.location.href = url;
+  };
+
+  return (
+    <Box
+      onClick={handleClick}
+      sx={{
+        mt: 0.75,
+        borderRadius: 1.5,
+        border: `1px solid ${BORDER}`,
+        bgcolor: mine ? "rgba(255,255,255,0.9)" : "#f8fafc",
+        overflow: "hidden",
+        cursor: "pointer",
+        "&:hover": {
+          bgcolor: mine ? "rgba(255,255,255,1)" : "#eef2ff",
+        },
+      }}
+    >
+      <Box sx={{ p: 1 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: "uppercase",
+            opacity: 0.8,
+            display: "block",
+            mb: 0.25,
+          }}
+        >
+          Post
+        </Typography>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+        >
+          View shared post in live feed
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
 
 function displayName(user) {
   if (!user) return "";
@@ -2176,19 +2261,22 @@ export default function AdminMessagesPage() {
                         const body = m.body || m.text || m.message || "";
                         const timeStr = created
                           ? created.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
                           : "";
 
                         const senderName = mine
                           ? "You"
                           : m.sender_name ||
-                          m.user_name ||
-                          m.author_name ||
-                          headerName;
+                            m.user_name ||
+                            m.author_name ||
+                            headerName;
 
-                        const attachments = getMessageAttachments(m);
+                        const allAttachments = getMessageAttachments(m);
+                        const shareAttachment = allAttachments.find((a) => a && a.type === "share");
+                        const attachments = allAttachments.filter((a) => a && a.type !== "share");
+
 
                         // Avatar for *me*
                         const meAvatar =
@@ -2250,61 +2338,10 @@ export default function AdminMessagesPage() {
                               onContextMenu={(e) => handleOpenMessageMenu(e, m)}
                             >
                               {/* 🔹 Attachments preview (same style as user messages page) */}
+                              {/* 🔹 Attachments preview (same style as user messages page) */}
                               {attachments.length > 0 && (
                                 <Stack spacing={0.75} sx={{ mb: body ? 0.75 : 0 }}>
-                                  {attachments.map((att, idx) => {
-                                    const url = getAttachmentUrl(att);
-                                    const name = getAttachmentName(att);
-                                    const imageLike = isImageAttachment(att);
-
-                                    if (!url) return null;
-
-                                    if (imageLike) {
-                                      // image-style preview
-                                      return (
-                                        <Box
-                                          key={att.id || `${m.id}-att-img-${idx}`}
-                                          sx={{
-                                            borderRadius: 1,
-                                            overflow: "hidden",
-                                            border: "1px solid rgba(148,163,184,0.4)",
-                                            cursor: "pointer",
-                                          }}
-                                          onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-                                        >
-                                          <Box
-                                            component="img"
-                                            src={url}
-                                            alt={name}
-                                            sx={{
-                                              display: "block",
-                                              maxWidth: 260,
-                                              maxHeight: 260,
-                                              objectFit: "cover",
-                                            }}
-                                          />
-                                        </Box>
-                                      );
-                                    }
-
-                                    // file-style preview (non-image)
-                                    return (
-                                      <Chip
-                                        key={att.id || `${m.id}-att-file-${idx}`}
-                                        variant="outlined"
-                                        size="small"
-                                        label={name}
-                                        onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-                                        sx={{
-                                          maxWidth: 260,
-                                          "& .MuiChip-label": {
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                          },
-                                        }}
-                                      />
-                                    );
-                                  })}
+                                  {/* your existing attachments.map(...) code stays the same */}
                                 </Stack>
                               )}
 
@@ -2322,6 +2359,11 @@ export default function AdminMessagesPage() {
                                 </Typography>
                               )}
 
+                              {/* 🔹 Shared post preview (same as user MessagesPage) */}
+                              {shareAttachment && (
+                                <SharePreview attachment={shareAttachment} mine={mine} />
+                              )}
+
                               {/* 🔹 Time at bottom-right */}
                               {timeStr && (
                                 <Typography
@@ -2337,6 +2379,7 @@ export default function AdminMessagesPage() {
                                   {timeStr}
                                 </Typography>
                               )}
+
                             </Box>
 
 

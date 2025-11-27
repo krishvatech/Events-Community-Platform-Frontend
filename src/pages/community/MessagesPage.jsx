@@ -96,6 +96,41 @@ const bubbleSx = (mine) => (theme) => ({
 function SharePreview({ attachment, mine }) {
   if (!attachment) return null;
 
+  // ---------- helper utilities ----------
+  const getNested = (obj, path) => {
+    if (!obj) return undefined;
+    const parts = path.split(".");
+    let cur = obj;
+    for (const p of parts) {
+      if (!cur) return undefined;
+      cur = cur[p];
+    }
+    return cur;
+  };
+
+  const pickFirstUrl = (obj, paths) => {
+    if (!obj) return "";
+    for (const p of paths) {
+      const v = p === "." ? obj : getNested(obj, p);
+      if (!v) continue;
+      if (typeof v === "string") return v;
+      if (v.url) return v.url;
+      if (v.file) return v.file;
+      if (v.file_url) return v.file_url;
+      if (v.image) return v.image;
+    }
+    return "";
+  };
+
+  const pickFirstText = (obj, paths) => {
+    if (!obj) return "";
+    for (const p of paths) {
+      const v = p === "." ? obj : getNested(obj, p);
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+  };
+
   // Try to extract the FeedItem / post id from different possible shapes
   const getSharedFeedItemId = (a) => {
     if (!a) return null;
@@ -114,44 +149,353 @@ function SharePreview({ attachment, mine }) {
 
   const feedItemId = getSharedFeedItemId(attachment);
 
+  // ---------- fetch full post once (for real Instagram-style preview) ----------
+  const [post, setPost] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!feedItemId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_ROOT}/activity/feed/${feedItemId}/`, {
+          headers: {
+            Accept: "application/json",
+            ...authHeader(),
+          },
+        });
+        const data = await res.json().catch(() => null);
+        if (!cancelled) {
+          if (res.ok && data) {
+            setPost(data);
+          } else {
+            setPost(null);
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error("Failed to load shared post", e);
+          setPost(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [feedItemId]);
+
+  // If API failed or we don't have id, still keep basic behaviour on click
   const handleClick = () => {
-    // Your live feed URL
     const basePath = "/community?view=live";
 
     if (!feedItemId) {
-      // no specific post id → just open live feed
       window.location.href = basePath;
       return;
     }
 
-    // store target post id so LiveFeedPage can focus/highlight it
     try {
       window.localStorage.setItem("ecp_livefeed_focus_post", String(feedItemId));
     } catch (e) {
       // ignore storage errors
     }
 
-    // append post id as query param: /community?view=live&post=123
     const url = `${basePath}&post=${encodeURIComponent(feedItemId)}`;
     window.location.href = url;
   };
 
+  // ---------- build Instagram-style card data ----------
+  // Prefer data from the API (`post`), fall back to attachment.meta
+  const source = post || attachment;
+
+  // ✅ Detect poll-type posts
+  const isPoll =
+    !!source?.poll ||
+    !!source?.meta?.poll ||
+    !!source?.poll_options ||
+    !!source?.meta?.poll_options ||
+    source?.kind === "poll" ||
+    source?.type === "poll";
+
+  // ---------- POLL-SPECIFIC PARSING ----------
+  let pollQuestion = "";
+  let pollOptions = [];
+  let totalVotes = 0;
+
+  if (isPoll) {
+    pollQuestion =
+      pickFirstText(source, [
+        "poll.question",
+        "meta.poll.question",
+        "meta.poll_question",
+        "question",
+        "title",
+        "meta.title",
+        "text",
+        "body",
+      ]) || "";
+
+    const rawOptions =
+      (Array.isArray(source?.poll?.options) && source.poll.options) ||
+      (Array.isArray(source?.meta?.poll?.options) && source.meta.poll.options) ||
+      (Array.isArray(source?.poll_options) && source.poll_options) ||
+      (Array.isArray(source?.meta?.poll_options) && source.meta.poll_options) ||
+      [];
+
+    pollOptions = rawOptions.map((opt, idx) => {
+      const votes =
+        opt.votes ??
+        opt.vote_count ??
+        opt.count ??
+        opt.total_votes ??
+        0;
+
+      return {
+        id: opt.id ?? idx,
+        label:
+          opt.label ??
+          opt.text ??
+          opt.option ??
+          opt.choice ??
+          `Option ${idx + 1}`,
+        votes,
+        percentage: opt.percentage ?? opt.percent ?? null,
+      };
+    });
+
+    totalVotes = pollOptions.reduce(
+      (sum, o) => sum + (Number.isFinite(o.votes) ? o.votes : 0),
+      0
+    );
+
+    pollOptions = pollOptions.map((o) => ({
+      ...o,
+      pct:
+        o.percentage != null
+          ? o.percentage
+          : totalVotes > 0
+          ? Math.round((o.votes / totalVotes) * 100)
+          : 0,
+    }));
+  }
+
+  // ---------- Generic post data (for non-poll, or to reuse author name) ----------
+  const thumbUrl = pickFirstUrl(source, [
+    "meta.preview_image",
+    "meta.preview_image_url",
+    "meta.image",
+    "meta.cover_image",
+    "preview_image",
+    "preview_image_url",
+    "image",
+    "cover_image",
+    "images.0.url",
+    "images.0.image",
+    "attachments.0.image",
+    "attachments.0.file_url",
+    "attachments.0.file",
+    ".thumbnail",
+  ]);
+
+  const author =
+    pickFirstText(source, [
+      "meta.author_name",
+      "meta.owner_name",
+      "owner_name",
+      "owner.full_name",
+      "owner.name",
+      "user.full_name",
+      "user.name",
+      "creator_name",
+    ]) ||
+    attachment.owner_name ||
+    attachment.author_name ||
+    "";
+
+  const rawCaption =
+    pickFirstText(source, [
+      "meta.preview_text",
+      "meta.title",
+      "title",
+      "meta.caption",
+      "preview_text",
+      "caption",
+      "text",
+      "body",
+      "content",
+    ]) || "";
+
+  const caption =
+    rawCaption.length > 80
+      ? rawCaption.slice(0, 77).trimEnd() + "…"
+      : rawCaption;
+
+  const label = author
+    ? isPoll
+      ? `${author} • Poll`
+      : `${author} • Post`
+    : isPoll
+    ? "Poll"
+    : "Post";
+
+  // ---------- UI: Poll Card ----------
+  if (isPoll) {
+    return (
+      <Box
+        onClick={handleClick}
+        sx={{
+          mt: 0.75,
+          borderRadius: 2,
+          border: `1px solid ${BORDER}`,
+          bgcolor: mine ? "#ffffff" : "#f8fafc",
+          overflow: "hidden",
+          cursor: "pointer",
+          transition: "transform 0.15s ease, box-shadow 0.15s ease",
+          "&:hover": {
+            transform: "translateY(-1px)",
+            boxShadow: "0 4px 12px rgba(15,23,42,0.12)",
+          },
+        }}
+      >
+        <Box sx={{ p: 1.25 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: 11,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              opacity: 0.8,
+              display: "block",
+              mb: 0.25,
+            }}
+          >
+            {label}
+          </Typography>
+
+          {pollQuestion && (
+            <Typography
+              variant="body2"
+              sx={{ fontSize: 13, fontWeight: 600, mb: 1 }}
+            >
+              {pollQuestion}
+            </Typography>
+          )}
+
+          <Stack spacing={0.5} sx={{ mb: 0.75 }}>
+            {pollOptions.slice(0, 4).map((opt) => (
+              <Box key={opt.id}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    mb: 0.25,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ fontSize: 12, fontWeight: 500 }}
+                  >
+                    {opt.label}
+                  </Typography>
+                  {totalVotes > 0 && (
+                    <Typography
+                      variant="caption"
+                      sx={{ fontSize: 11, opacity: 0.8 }}
+                    >
+                      {opt.pct}%
+                    </Typography>
+                  )}
+                </Box>
+                <Box
+                  sx={{
+                    position: "relative",
+                    height: 6,
+                    borderRadius: 9999,
+                    bgcolor: "rgba(148,163,184,0.25)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      width: `${opt.pct}%`,
+                      maxWidth: "100%",
+                      borderRadius: 9999,
+                      bgcolor: "primary.main",
+                    }}
+                  />
+                </Box>
+              </Box>
+            ))}
+          </Stack>
+
+          <Typography
+            variant="caption"
+            sx={{ fontSize: 11, opacity: 0.7, display: "block" }}
+          >
+            {totalVotes > 0
+              ? `${totalVotes} vote${totalVotes === 1 ? "" : "s"}`
+              : loading
+              ? "Loading poll…"
+              : "Tap to open poll"}
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  // ---------- UI: Normal post card ----------
   return (
     <Box
       onClick={handleClick}
       sx={{
         mt: 0.75,
-        borderRadius: 1.5,
+        borderRadius: 2,
         border: `1px solid ${BORDER}`,
-        bgcolor: mine ? "rgba(255,255,255,0.9)" : "#f8fafc",
+        bgcolor: mine ? "#ffffff" : "#f8fafc",
         overflow: "hidden",
         cursor: "pointer",
+        transition: "transform 0.15s ease, box-shadow 0.15s ease",
         "&:hover": {
-          bgcolor: mine ? "rgba(255,255,255,1)" : "#eef2ff",
+          transform: "translateY(-1px)",
+          boxShadow: "0 4px 12px rgba(15,23,42,0.12)",
         },
       }}
     >
-      <Box sx={{ p: 1 }}>
+      {/* Top media preview (image/video thumbnail) */}
+      {thumbUrl && (
+        <Box
+          sx={{
+            position: "relative",
+            pt: "100%", // square like Instagram
+            bgcolor: "#0f172a",
+            overflow: "hidden",
+          }}
+        >
+          <Box
+            component="img"
+            src={thumbUrl}
+            alt="Shared post"
+            sx={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Text / caption area */}
+      <Box sx={{ p: 1.25 }}>
         <Typography
           variant="caption"
           sx={{
@@ -163,19 +507,40 @@ function SharePreview({ attachment, mine }) {
             mb: 0.25,
           }}
         >
-          Post
+          {label}
         </Typography>
+
+        {caption && (
+          <Typography
+            variant="body2"
+            color="text.primary"
+            sx={{
+              fontSize: 13,
+              mb: 0.75,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {caption}
+          </Typography>
+        )}
+
         <Typography
           variant="body2"
-          color="text.secondary"
-          sx={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+          sx={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: "primary.main",
+          }}
         >
-          View shared post in live feed
+          {loading ? "Loading post…" : "View post in live feed"}
         </Typography>
       </Box>
     </Box>
   );
 }
+
 
 // ---------- API helpers ----------
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");

@@ -1,5 +1,5 @@
 // src/pages/LiveMeetingPage.jsx
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -10,27 +10,30 @@ import {
   Paper,
   Avatar,
   keyframes,
-  GlobalStyles
+  GlobalStyles,
+  Switch,
+  Divider,
+  IconButton,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import PodcastsIcon from '@mui/icons-material/Podcasts';
+import PodcastsIcon from "@mui/icons-material/Podcasts";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 
 import {
-  DyteProvider,
   useDyteClient,
+  DyteProvider,
   useDyteMeeting,
 } from "@dytesdk/react-web-core";
 
 import {
   DyteMeeting,
-  registerAddons,            // ⬅️ registerAddons from react-ui-kit
+  registerAddons,
   DyteNotifications,
 } from "@dytesdk/react-ui-kit";
 
 import CustomControlbarButton from "@dytesdk/ui-kit-addons/custom-controlbar-button";
 import LiveQnAPanel from "../components/LiveQnAPanel.jsx";
 
-// --- API base (same pattern as other pages) ---
 const API_ROOT = (
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 ).replace(/\/$/, "");
@@ -58,25 +61,48 @@ function toApiUrl(pathOrUrl) {
   }
 }
 
+// Hook to track permissions
+function useDytePermissions(meeting) {
+  const [permissions, setPermissions] = useState(meeting?.self?.permissions || {});
+
+  useEffect(() => {
+    if (!meeting?.self) return;
+
+    setPermissions(meeting.self.permissions);
+
+    const handleUpdate = (data) => {
+      setPermissions({ ...meeting.self.permissions });
+    };
+
+    meeting.self.on("permissionsUpdate", handleUpdate);
+
+    return () => {
+      meeting.self.off("permissionsUpdate", handleUpdate);
+    };
+  }, [meeting]);
+
+  return permissions;
+}
 
 const pulseAnimation = keyframes`
-  0% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7);
-  }
-  70% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 15px rgba(25, 118, 210, 0);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0);
-  }
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(25, 118, 210, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(25, 118, 210, 0); }
 `;
-// -------- Dyte meeting UI wrapper --------
+
+// Configuration for Dyte UI
+const BASE_UI_CONFIG = {};
 
 function DyteMeetingUI({ config }) {
   const { meeting } = useDyteMeeting();
+
+  if (!meeting) {
+    return (
+      <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ flex: 1, minHeight: 0, height: "100%", width: "100%" }}>
@@ -91,25 +117,23 @@ function DyteMeetingUI({ config }) {
   );
 }
 
+// White Theme Waiting Screen
 function WaitingForHostScreen() {
   return (
     <Box
       sx={{
-        // Force the component to fill the parent container completely
         width: "100%",
-        height: "100%", 
-        
-        // Layout centering
+        height: "100vh",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        
-        // Background design
         background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
-        
-        // Handle padding safely
         p: 3,
-        boxSizing: "border-box", 
+        boxSizing: "border-box",
+        position: "absolute",
+        top: 0,
+        left: 0,
+        zIndex: 9999,
       }}
     >
       <Paper
@@ -127,7 +151,6 @@ function WaitingForHostScreen() {
           backdropFilter: "blur(10px)",
         }}
       >
-        {/* Animated Icon */}
         <Box sx={{ position: "relative", mb: 4 }}>
           <Avatar
             sx={{
@@ -144,46 +167,22 @@ function WaitingForHostScreen() {
         <Typography variant="h5" fontWeight="800" color="text.primary" gutterBottom>
           Waiting for Host
         </Typography>
-        
+
         <Typography variant="body1" color="text.secondary" sx={{ mb: 4, lineHeight: 1.6 }}>
-          The live stream hasn't started yet. Sit tight! 
-          We will connect you automatically as soon as the host goes live.
+          The live stream hasn&apos;t started yet. Sit tight! We will connect
+          you automatically as soon as the host goes live.
         </Typography>
 
-        {/* Loading Indicator */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, color: 'primary.main' }}>
-            <CircularProgress size={24} thickness={5} color="inherit" />
-            <Typography variant="caption" fontWeight="600" sx={{ letterSpacing: 1, textTransform: 'uppercase' }}>
-                Connecting...
-            </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, color: "primary.main" }}>
+          <CircularProgress size={24} thickness={5} color="inherit" />
+          <Typography variant="caption" fontWeight="600" sx={{ letterSpacing: 1, textTransform: "uppercase" }}>
+            Connecting...
+          </Typography>
         </Box>
       </Paper>
     </Box>
   );
 }
-const BASE_UI_CONFIG = {
-  root: {
-    components: {
-      // completely hide Dyte's built-in sidebar
-      sidebar: false,
-    },
-  },
-  controlBarElements: {
-    // hide Dyte's built-in bottom icons
-    chat: false,
-    polls: false,
-    participants: false,
-    plugins: false,
-  },
-  sideBarElements: {
-    // hide sidebar views if something tries to open them
-    chat: false,
-    polls: false,
-    participants: false,
-    plugins: false,
-  },
-};
-
 
 function DyteMeetingWrapper({
   authToken,
@@ -192,50 +191,70 @@ function DyteMeetingWrapper({
   onMeetingEnd,
   onOpenQnA,
   onMeetingReady,
+  dbStatus, // ✅ Recieve DB status to bypass waiting screen
 }) {
   const [meeting, initMeeting] = useDyteClient();
   const [initError, setInitError] = useState("");
   const [initDone, setInitDone] = useState(false);
-  const [liveStatusSent, setLiveStatusSent] = useState(false);
   const [dyteConfig, setDyteConfig] = useState(BASE_UI_CONFIG);
-
-
-  // Waiting room
+  
+  // Host Detection State
   const [hostJoined, setHostJoined] = useState(false);
 
-  // When meeting is ready → expose to parent + enforce UI config once
+  // Expose meeting instance
   useEffect(() => {
     if (!meeting) return;
-    if (typeof onMeetingReady === "function") {
-      onMeetingReady(meeting);
-    }
+    if (typeof onMeetingReady === "function") onMeetingReady(meeting);
   }, [meeting, onMeetingReady]);
 
-  // Init meeting with auth token
+  // Init meeting
   useEffect(() => {
     if (!authToken) return;
+    let cancelled = false;
 
     (async () => {
       try {
+        setInitError("");
+        setInitDone(false);
         await initMeeting({
           authToken,
           defaults: {
             audio: false,
-            video: false,
-            args: {},
+            video: role === "publisher", 
           },
         });
-        setInitDone(true);
+        if (!cancelled) setInitDone(true);
       } catch (err) {
-        console.error("Dyte init failed", err);
-        setInitError(err?.message || "Failed to initialize Dyte meeting");
+        if (cancelled) return;
+        setInitError(err.message || "Failed to initialize Dyte meeting");
       }
     })();
-  }, [authToken, initMeeting]);
+    return () => { cancelled = true; };
+  }, [authToken, initMeeting, role]);
 
+  // ✅ UPDATED: API Call to update DB Status
+  const updateLiveStatus = useCallback(async (action) => {
+    if (!eventId) return;
+    try {
+      await fetch(toApiUrl(`events/${eventId}/live-status/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ action }), // "start" or "end"
+      });
+      console.log(`Updated DB status to: ${action === 'start' ? 'LIVE' : 'ENDED'}`);
+    } catch (e) {
+      console.error("Failed to update live status", e);
+    }
+  }, [eventId]);
 
+  // ✅ LOGIC: Trigger 'start' when Host initializes meeting
+  useEffect(() => {
+    if (initDone && role === "publisher") {
+        updateLiveStatus("start");
+    }
+  }, [initDone, role, updateLiveStatus]);
 
-  // 🟦 HOST DETECTION (same logic as before)
+  // Host Detection (for Waiting Screen)
   useEffect(() => {
     if (!meeting || !initDone) return;
 
@@ -244,204 +263,40 @@ function DyteMeetingWrapper({
       return;
     }
 
-    const scanForHost = () => {
+    // Helper: Check if host is present
+    const checkForHost = () => {
+      if (!meeting?.participants?.joined) return;
       const participants = Array.from(meeting.participants.joined.values());
-
-      const foundHost = participants.some((p) => {
+      const found = participants.some((p) => {
         const preset = (p.presetName || "").toLowerCase();
-        const customId = (p.customParticipantId || "").toLowerCase();
-
         return (
-          preset.includes("host") ||
+          preset.includes("host") || 
           preset.includes("publisher") ||
-          preset.includes("presenter") ||
-          customId.includes("host") ||
-          customId.includes("publisher")
+          preset.includes("admin") ||
+          preset.includes("presenter")
         );
       });
-
-      if (foundHost) setHostJoined(true);
+      if (found) setHostJoined(true);
     };
 
-    scanForHost();
+    checkForHost();
+    const handleJoin = (p) => {
+      const preset = (p.presetName || "").toLowerCase();
+      if (preset.includes("host") || preset.includes("publisher")) {
+        setHostJoined(true);
+      }
+    };
 
-    const handleJoin = () => scanForHost();
     meeting.participants.joined.on("participantJoined", handleJoin);
-
-    const intervalId = setInterval(() => {
-      if (!hostJoined) scanForHost();
-    }, 3000);
+    const interval = setInterval(checkForHost, 3000);
 
     return () => {
       meeting.participants.joined.off("participantJoined", handleJoin);
-      clearInterval(intervalId);
+      clearInterval(interval);
     };
-  }, [meeting, initDone, role, hostJoined]);
+  }, [meeting, initDone, role]);
 
-  // ✅ If event is already live, skip waiting screen (unchanged)
-  useEffect(() => {
-    if (!eventId) return;
-    if (role === "publisher") return;
-    if (!meeting) return;
-    if (hostJoined) return;
-
-    let cancelled = false;
-
-    const checkEventLive = async () => {
-      try {
-        const res = await fetch(toApiUrl(`events/${eventId}/`), {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            ...authHeader(),
-          },
-        });
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-
-        if (!cancelled && data.live_started_at && !data.live_ended_at) {
-          setHostJoined(true);
-        }
-      } catch (e) {
-        console.warn("Failed to check event live status:", e);
-      }
-    };
-
-    checkEventLive();
-
-    const id = window.setInterval(() => {
-      if (cancelled || hostJoined) {
-        window.clearInterval(id);
-        return;
-      }
-      checkEventLive();
-    }, 5000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [eventId, role, meeting, hostJoined]);
-
-  // 🔴 Existing live-status effect (kept same)
-  useEffect(() => {
-    if (!meeting || !eventId || role !== "publisher" || liveStatusSent) return;
-    const sendLiveStatus = async () => {
-      try {
-        await fetch(toApiUrl(`events/${eventId}/live-status/`), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify({ action: "start" }),
-        });
-        setLiveStatusSent(true);
-      } catch (e) {
-        console.warn("Failed to update live-status (start):", e);
-      }
-    };
-    sendLiveStatus();
-  }, [meeting, eventId, role, liveStatusSent]);
-
-  // (Your duplicate live-status effect is left as-is or you can safely delete one copy)
-
-  // 🔊 Active speaker sync (unchanged)
-  useEffect(() => {
-    if (!meeting || !eventId) return;
-    let lastSent;
-
-    const sendActiveSpeaker = (userId) => {
-      if (userId === lastSent) return;
-      lastSent = userId;
-      try {
-        fetch(toApiUrl(`events/${eventId}/active-speaker/`), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify({ user_id: userId }),
-        }).catch((e) =>
-          console.warn("Failed to update active speaker:", e)
-        );
-      } catch (e) {}
-    };
-
-    const handleActiveSpeaker = (participant) => {
-      if (!participant) {
-        if (role === "publisher" && meeting.self) {
-          const hostId =
-            meeting.self.customParticipantId || meeting.self.userId;
-          if (hostId) sendActiveSpeaker(hostId);
-        } else {
-          sendActiveSpeaker(null);
-        }
-        return;
-      }
-      const userId =
-        participant.customParticipantId ||
-        participant.userId ||
-        participant.id;
-      if (userId) sendActiveSpeaker(userId);
-    };
-
-    meeting.participants.on("activeSpeaker", handleActiveSpeaker);
-
-    const markHostOnJoin = () => {
-      if (role !== "publisher" || !meeting.self) return;
-      const hostId = meeting.self.customParticipantId || meeting.self.userId;
-      if (hostId) sendActiveSpeaker(hostId);
-    };
-    meeting.self.on("roomJoined", markHostOnJoin);
-
-    return () => {
-      try {
-        meeting.participants.off("activeSpeaker", handleActiveSpeaker);
-      } catch (e) {}
-      try {
-        meeting.self.off?.("roomJoined", markHostOnJoin);
-      } catch (e) {}
-      sendActiveSpeaker(null);
-    };
-  }, [meeting, eventId, role]);
-
-  // 👥 Participant count sync (unchanged)
-  useEffect(() => {
-    if (!meeting || !eventId) return;
-    let lastSent = -1;
-
-    const pushCount = (total) => {
-      if (!Number.isFinite(total) || total <= 0) return;
-      if (total === lastSent) return;
-      lastSent = total;
-      try {
-        fetch(toApiUrl(`events/${eventId}/attending/`), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify({ op: "set", value: total }),
-        }).catch((e) =>
-          console.warn("Failed to sync attending_count:", e)
-        );
-      } catch (e) {}
-    };
-
-    const computeAndPushCount = () => {
-      try {
-        const participants = meeting.participants;
-        if (!participants) return;
-        let remoteCount = 0;
-        if (typeof participants.count === "number") {
-          remoteCount = participants.count;
-        } else if (participants.joined) {
-          remoteCount = participants.joined.size || 0;
-        }
-        pushCount(remoteCount + 1);
-      } catch (e) {}
-    };
-
-    computeAndPushCount();
-    const intervalId = window.setInterval(computeAndPushCount, 10000);
-    return () => window.clearInterval(intervalId);
-  }, [meeting, eventId]);
-
-  // 🚪 Room left handler (unchanged)
+  // Handle Room Left
   useEffect(() => {
     if (!meeting || !meeting.self) return;
     const handleRoomLeft = ({ state }) => {
@@ -451,185 +306,66 @@ function DyteMeetingWrapper({
     };
     meeting.self.on("roomLeft", handleRoomLeft);
     return () => {
-      try {
-        meeting.self.off?.("roomLeft", handleRoomLeft);
-      } catch (e) {}
+      try { meeting.self.off?.("roomLeft", handleRoomLeft); } catch (e) {}
     };
   }, [meeting, onMeetingEnd]);
 
-  // ⭐ Custom control-bar buttons for our sidebar (Chat / Polls / Participants / Plugins / Q&A)
+  // Q&A Button Addon
   useEffect(() => {
-    if (!meeting) return;
-
+    if (!meeting || !initDone || !meeting.self) return;
     try {
       const openTab = (tab) => {
-        // 1️⃣ Tell Dyte's own UI to close any built-in sidebar (chat / polls / participants / plugins)
-        try {
-          // DyteMeeting renders a <dyte-meeting> web component
-          const dyteRoot =
-            document.querySelector("dyte-meeting") ||
-            document.querySelector("[data-dyte-ui='meeting']");
-
-          if (dyteRoot) {
-            dyteRoot.dispatchEvent(
-              new CustomEvent("dyteStateUpdate", {
-                detail: {
-                  activeSidebar: false, // force sidebar closed
-                  sidebar: "none",
-                },
-                bubbles: true,
-                composed: true,
-              })
-            );
-          }
-        } catch (e) {
-          console.warn(
-            "Failed to dispatch dyteStateUpdate to close sidebar",
-            e
-          );
+        const dyteRoot = document.querySelector("dyte-meeting");
+        if (dyteRoot) {
+          dyteRoot.dispatchEvent(new CustomEvent("dyteStateUpdate", {
+            detail: { sidebar: { open: false, view: null } },
+            bubbles: true, composed: true,
+          }));
         }
-
-        // 2️⃣ Fallback: try closing via sidebarManager if available (older SDKs)
-        const sb =
-          meeting?.sidebar || meeting?.sideBar || meeting?.sidebarManager;
-        if (sb) {
-          try {
-            if (typeof sb.close === "function") sb.close();
-            if (typeof sb.toggle === "function") sb.toggle(false);
-            if (typeof sb.setView === "function") sb.setView("none");
-            if (typeof sb.setActiveSidebar === "function") {
-              sb.setActiveSidebar("none");
-            }
-            if ("activeSidebar" in sb) sb.activeSidebar = "none";
-            if ("isOpen" in sb) sb.isOpen = false;
-          } catch (e) {
-            console.warn("Failed to close Dyte sidebar via sidebarManager", e);
-          }
-        }
-
-        // 3️⃣ Finally open your custom Q&A drawer
-        if (typeof onOpenQnA === "function") {
-          onOpenQnA(tab);
-        }
+        if (typeof onOpenQnA === "function") onOpenQnA(tab || "chat");
       };
 
-      const qnaIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-        viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-      </svg>`;
-
+      const qnaIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-4 4V5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.09 9A3 3 0 0 1 15 10c0 2-3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="1.6"/></svg>`;
       const qnaBtn = new CustomControlbarButton({
         position: "right",
         label: "Q&A",
         icon: qnaIcon,
         onClick: () => openTab("qna"),
       });
-
-      // Add Q&A button to Dyte + get its config
       const addonsConfig = registerAddons([qnaBtn], meeting) || {};
+      setDyteConfig({ ...BASE_UI_CONFIG, ...addonsConfig });
+    } catch (e) { console.warn("Failed to register Q&A addon", e); }
+  }, [meeting, initDone, onOpenQnA]);
 
-      // Merge: our “hide chat/polls/participants/plugins” config + addon config
-      const mergedConfig = {
-        ...BASE_UI_CONFIG,
-        ...addonsConfig,
-
-        root: {
-          ...(BASE_UI_CONFIG.root || {}),
-          ...(addonsConfig.root || {}),
-          components: {
-            ...(BASE_UI_CONFIG.root?.components || {}),
-            ...(addonsConfig.root?.components || {}),
-          },
-        },
-
-        controlBarElements: {
-          ...(addonsConfig.controlBarElements || {}),
-          ...(BASE_UI_CONFIG.controlBarElements || {}),
-        },
-
-        sideBarElements: {
-          ...(addonsConfig.sideBarElements || {}),
-          ...(BASE_UI_CONFIG.sideBarElements || {}),
-        },
-      };
-
-      setDyteConfig(mergedConfig);
-    } catch (e) {
-      console.warn("Failed to register Q&A addon or update UI config", e);
-    }
-  }, [meeting, onOpenQnA]);
-
-  // === Render states ===
-  if (!authToken) {
-    return (
-      <Typography sx={{ p: 3 }} color="error">
-        Missing Dyte auth token.
-      </Typography>
-    );
-  }
-  if (initError) {
-    return (
-      <Typography sx={{ p: 3 }} color="error">
-        {initError}
-      </Typography>
-    );
-  }
+  if (!authToken) return <Typography sx={{ p: 3 }} color="error">Missing Auth Token</Typography>;
+  if (initError) return <Typography sx={{ p: 3 }} color="error">{initError}</Typography>;
+  
   if (!initDone || !meeting) {
     return (
-      <Box
-        sx={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <CircularProgress />
       </Box>
     );
   }
 
-  // Waiting room screen if host not joined yet
-  if (!hostJoined) {
-    return (
-      <DyteProvider value={meeting}>
-        <WaitingForHostScreen />
-      </DyteProvider>
-    );
+  // ✅ LOGIC: Bypass waiting screen if Host is here OR DB status is already 'live'
+  // If hostJoined is true, we always show meeting.
+  // If hostJoined is false BUT dbStatus is 'live', we show meeting (host might be invisible or reconnecting).
+  const shouldShowMeeting = hostJoined || dbStatus === "live";
+
+  if (!shouldShowMeeting) {
+    return <WaitingForHostScreen />;
   }
 
-  // ✅ Main meeting + notifications
   return (
-    <DyteProvider
-      value={meeting}
-      fallback={
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      }
-    >
+    <DyteProvider value={meeting} fallback={<CircularProgress />}>
       <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
         <DyteMeetingUI config={dyteConfig} />
-
-        {/* Dyte-style toast notifications:
-            - new chat messages
-            - participant joined / left
-            (Poll + Q&A toasts will come from your custom logic) */}
         <DyteNotifications
           meeting={meeting}
           config={{
             notifications: ["chat", "poll", "participant_joined", "participant_left"],
-            notification_sounds: [], // no sounds
+            notification_sounds: [],
           }}
         />
       </Box>
@@ -640,366 +376,409 @@ function DyteMeetingWrapper({
 // ------------- Page component -------------
 
 export default function LiveMeetingPage() {
-  const { slug } = useParams(); // URL like /events/:slug/live
+  const { slug } = useParams();
   const navigate = useNavigate();
 
   const [eventId, setEventId] = useState(null);
   const [role, setRole] = useState("audience");
   const [authToken, setAuthToken] = useState("");
   const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
+  const [dbStatus, setDbStatus] = useState("draft"); // Track DB status
+  
+  // Sidebar State
   const [showQnA, setShowQnA] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState("chat"); // "chat" | "polls" | "plugins" | "qna"
+  const [sidebarTab, setSidebarTab] = useState("chat");
   const [sidebarMeeting, setSidebarMeeting] = useState(null);
 
-  // Highlight Q&A button when our custom Q&A drawer is open
+  // Host Controls
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [chatEnabled, setChatEnabled] = useState(true);
+  const [pollsEnabled, setPollsEnabled] = useState(true);
+  const [participantsTabVisible, setParticipantsTabVisible] = useState(true);
+  const [screenShareAllowed, setScreenShareAllowed] = useState(true);
+  const [pluginsAllowed, setPluginsAllowed] = useState(true);
+
+  const isHost = role === "publisher";
+  
+  // Permissions & Broadcasting
+  const selfPermissions = useDytePermissions(sidebarMeeting);
+  const canScreenShare = selfPermissions.canProduceScreenshare === "ALLOWED";
+  const [hostForceBlock, setHostForceBlock] = useState(false);
+
+  // 1. Listen for Broadcasts (Audience Side)
   useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    const dyteRoot =
-      document.querySelector("dyte-meeting") ||
-      document.querySelector("[data-dyte-ui='meeting']");
-
-    if (!dyteRoot) return;
-
-    if (showQnA) {
-      dyteRoot.classList.add("qna-open");
-    } else {
-      dyteRoot.classList.remove("qna-open");
-    }
-  }, [showQnA]);
-  // 👇 For fullscreen
-  const pageRef = useRef(null);
-
-  const handleOpenQnA = React.useCallback((tab = "qna") => {
-    if (typeof document !== "undefined") {
-      try {
-        if (
-          document.fullscreenElement &&
-          document.fullscreenElement !== pageRef.current
-        ) {
-          const exitFs =
-            document.exitFullscreen ||
-            document.webkitExitFullscreen ||
-            document.msExitFullscreen;
-
-          if (exitFs) {
-            exitFs.call(document);
-          }
-        }
-      } catch (e) {
-        console.warn("Failed to exit fullscreen before opening sidebar", e);
+    if (!sidebarMeeting) return;
+    const handleBroadcast = ({ type, payload }) => {
+      if (type === "toggle-screen-share") {
+        setHostForceBlock(!payload.allowed);
       }
+    };
+    sidebarMeeting.participants.on('broadcastedMessage', handleBroadcast);
+    return () => sidebarMeeting.participants.off('broadcastedMessage', handleBroadcast);
+  }, [sidebarMeeting]);
+
+  const shouldHideScreenShare = !isHost && (!canScreenShare || hostForceBlock);
+
+  // 2. Host Control Logic
+  const getAudienceParticipantIds = useCallback(() => {
+    if (!sidebarMeeting?.participants?.joined) return [];
+    const participants = Array.from(sidebarMeeting.participants.joined.values());
+    // Filter out host
+    return participants
+      .filter((p) => p.id !== sidebarMeeting.self.id) 
+      .map((p) => p.id);
+  }, [sidebarMeeting]);
+
+  const updateAudiencePermissions = useCallback(async (permissionsPatch) => {
+    if (!isHost || !sidebarMeeting) return;
+    const audienceIds = getAudienceParticipantIds();
+    if (audienceIds.length === 0) return;
+    try {
+      await sidebarMeeting.participants.updatePermissions(audienceIds, permissionsPatch);
+    } catch (e) {
+      console.error("Failed to update audience permissions:", e);
     }
+  }, [isHost, sidebarMeeting, getAudienceParticipantIds]);
 
-    setSidebarTab(tab);  
+  // Toggle Handlers
+  const handleToggleChat = async () => {
+    const next = !chatEnabled;
+    setChatEnabled(next);
+    await updateAudiencePermissions({
+      chat: {
+        public: { canSend: next, text: next, files: next },
+        private: { canSend: next, text: next, files: next },
+      },
+    });
+  };
+
+  const handleTogglePolls = async () => {
+    const next = !pollsEnabled;
+    setPollsEnabled(next);
+    await updateAudiencePermissions({ polls: { canCreate: next, canVote: next } });
+  };
+
+  const handleToggleScreenShare = async () => {
+    const next = !screenShareAllowed;
+    setScreenShareAllowed(next); 
+    // Permission Update
+    await updateAudiencePermissions({
+      canProduceScreenshare: next ? "ALLOWED" : "NOT_ALLOWED",
+      requestProduceScreenshare: next
+    });
+    // Broadcast Update (Force Signal)
+    if (sidebarMeeting?.participants) {
+        sidebarMeeting.participants.broadcastMessage("toggle-screen-share", { allowed: next });
+    }
+  };
+
+  const handleTogglePlugins = async () => {
+    const next = !pluginsAllowed;
+    setPluginsAllowed(next);
+    await updateAudiencePermissions({ plugins: { canStart: next, canClose: next } });
+  };
+
+  // Sync New Joiners
+  useEffect(() => {
+    if (!isHost || !sidebarMeeting) return;
+    const handleParticipantJoined = async (participant) => {
+      if (participant.id === sidebarMeeting.self.id) return;
+      try {
+        await sidebarMeeting.participants.updatePermissions([participant.id], {
+          canProduceScreenshare: screenShareAllowed ? "ALLOWED" : "NOT_ALLOWED",
+          requestProduceScreenshare: screenShareAllowed,
+          plugins: { canStart: pluginsAllowed, canClose: pluginsAllowed },
+          chat: {
+            public: { canSend: chatEnabled, text: chatEnabled, files: chatEnabled },
+            private: { canSend: chatEnabled, text: chatEnabled, files: chatEnabled },
+          },
+        });
+      } catch (e) { console.warn("Failed to sync permissions", e); }
+    };
+    sidebarMeeting.participants.joined.on("participantJoined", handleParticipantJoined);
+    return () => { sidebarMeeting.participants.joined.off("participantJoined", handleParticipantJoined); };
+  }, [sidebarMeeting, isHost, screenShareAllowed, pluginsAllowed, chatEnabled]);
+
+  // Q&A CSS class toggle
+  useEffect(() => {
+    const dyteRoot = document.querySelector("dyte-meeting");
+    if (!dyteRoot) return;
+    if (showQnA) dyteRoot.classList.add("qna-open");
+    else dyteRoot.classList.remove("qna-open");
+  }, [showQnA]);
+
+  const handleOpenQnA = (tab) => {
+    if (tab) setSidebarTab(tab);
     setShowQnA(true);
-  }, []);
+  };
 
-  // Extract eventId from query (?id=123)
+  const handleBack = () => {
+    if (role === "publisher") {
+        navigate("/admin/events");
+    } else {
+        navigate(-1);
+    }
+  };
+
+  // Setup Role & ID & Fetch Initial Status
   useEffect(() => {
     const search = new URLSearchParams(window.location.search);
     const idFromQuery = search.get("id");
     if (!idFromQuery) {
-      setError("Missing event id (?id=...) in URL.");
+      setError("Missing event id");
       setLoading(false);
       return;
     }
     setEventId(idFromQuery);
-
     const roleFromQuery = (search.get("role") || "audience").toLowerCase();
-    // Normalize to 'publisher' or 'audience' only
-    if (roleFromQuery === "publisher" || roleFromQuery === "host") {
-      setRole("publisher");
-    } else {
-      setRole("audience");
-    }
+    setRole(roleFromQuery === "publisher" || roleFromQuery === "host" ? "publisher" : "audience");
+    
+    // ✅ FETCH DB STATUS (To Check if already LIVE)
+    const fetchStatus = async () => {
+        try {
+            const res = await fetch(toApiUrl(`events/${idFromQuery}/`), {
+                 headers: authHeader()
+            });
+            if(res.ok) {
+                const data = await res.json();
+                setDbStatus(data.status); // "live", "ended", etc.
+            }
+        } catch(e) { console.error("Failed to fetch event status", e); }
+    };
+    fetchStatus();
+
   }, [slug]);
 
-  // Call backend /events/<id>/dyte/join/
+  // Join API Call
   useEffect(() => {
     if (!eventId) return;
-
     const join = async () => {
-      setJoining(true);
-      setError("");
-
       try {
         const url = toApiUrl(`events/${eventId}/dyte/join/`);
         const res = await fetch(url, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...authHeader(),
-          },
-          body: JSON.stringify({ role }), // 👈 send role to backend
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ role }),
         });
-
-        if (!res.ok) {
-          let detail = "Failed to join live meeting.";
-          try {
-            const data = await res.json();
-            detail = data.detail || data.error || detail;
-          } catch (_) {}
-          throw new Error(detail);
-        }
-
+        if (!res.ok) throw new Error("Failed to join live meeting.");
         const data = await res.json();
         setAuthToken(data.authToken);
-        // backend may downgrade role; keep it in state if returned
-        if (data.role) {
-          setRole(data.role);
-        }
+        if (data.role) setRole(data.role);
       } catch (err) {
-        console.error(err);
-        setError(err.message || "Failed to get Dyte auth token");
+        setError(err.message);
       } finally {
         setLoading(false);
-        setJoining(false);
       }
     };
-
     join();
   }, [eventId, role]);
 
-  const handleBack = () => {
-    navigate(-1);
-  };
-
-  // 🔲 Auto fullscreen when we have an authToken (meeting view)
+  // Auto Fullscreen
+  const pageRef = useRef(null);
   useEffect(() => {
-    if (!authToken) return;
-    if (!pageRef.current) return;   // wait for wrapper to mount
-
-    const el = pageRef.current;     // 👉 fullscreen the outer meeting wrapper
-    const requestFs =
-      el.requestFullscreen ||
-      el.webkitRequestFullscreen ||
-      el.msRequestFullscreen;
-
-    if (requestFs) {
-      try {
-        requestFs.call(el);
-      } catch (e) {
-        console.warn("Fullscreen request failed", e);
-      }
-    }
+    if (!authToken || !pageRef.current) return;
+    const el = pageRef.current;
+    const requestFs = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (requestFs) try { requestFs.call(el); } catch (e) {}
   }, [authToken]);
 
-  // 🧹 When meeting ends, exit fullscreen + close window / go back
-  const handleMeetingEnd = React.useCallback(
-    (state) => {
+  // ✅ Helper to update DB Status
+  const updateLiveStatus = async (action) => {
+    if (!eventId) return;
+    try {
+      await fetch(toApiUrl(`events/${eventId}/live-status/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ action }),
+      });
+    } catch (e) {
+      console.error("Failed to update live status", e);
+    }
+  };
+
+  // ✅ FIXED: Correct Redirects on Meeting End & Update DB
+  const handleMeetingEnd = useCallback(async (state) => {
       console.log("Meeting ended with state:", state);
-
-      if (eventId) {
-        try {
-          fetch(toApiUrl(`events/${eventId}/end-meeting/`), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...authHeader(),
-            },
-          }).catch((e) => {
-            console.warn("Failed to mark event as ended:", e);
-          });
-        } catch (e) {
-          console.warn("Failed to call end-meeting API:", e);
-        }
-      }
-
       if (document.fullscreenElement) {
-        try {
-          document.exitFullscreen();
-        } catch (e) {
-          console.warn("Failed to exit fullscreen", e);
-        }
+        try { document.exitFullscreen(); } catch (e) {}
       }
 
-      try {
-        window.close();
-      } catch (e) {}
-      try {
-        navigate(-1);
-      } catch (e) {}
-    },
-    [navigate, eventId]
+      // REDIRECT LOGIC
+      if (role === "publisher") {
+          // 1. Publisher -> Update DB to 'ended' then redirect
+          await updateLiveStatus("end");
+          navigate("/admin/events");
+      } else {
+          // 2. Audience -> Back to previous page
+          navigate(-1);
+      }
+    }, [role, navigate, eventId]
   );
 
+  // 🔴 "Smart" Enforcer for Screen Share Hiding 🔴
+  useEffect(() => {
+    if (isHost) return;
+
+    const updateVisibilityRecursively = (node) => {
+      if (!node) return;
+      const tag = (node.tagName || "").toLowerCase();
+      const label = (node.getAttribute("label") || node.getAttribute("aria-label") || "").toLowerCase();
+
+      const isShareComponent = tag === "dyte-screen-share-toggle" || tag === "dyte-screenshare-view-toggle";
+      const isShareLabel = label.includes("share") && label.includes("screen");
+      const isGenericShare = (tag === "dyte-controlbar-button" || tag === "dyte-menu-item") && label === "share";
+
+      if (isShareComponent || isShareLabel || isGenericShare) {
+        if (shouldHideScreenShare) {
+          if (node.style.display !== "none") {
+            node.style.display = "none";
+            node.style.visibility = "hidden";
+            node.style.width = "0px";
+            node.style.height = "0px";
+            node.style.position = "absolute";
+          }
+        } else {
+          if (node.style.display === "none") {
+            node.style.display = "";
+            node.style.visibility = "";
+            node.style.width = "";
+            node.style.height = "";
+            node.style.position = "";
+          }
+        }
+      }
+      if (node.shadowRoot) Array.from(node.shadowRoot.children).forEach(updateVisibilityRecursively);
+      if (node.children) Array.from(node.children).forEach(updateVisibilityRecursively);
+    };
+
+    const timer = setInterval(() => {
+      const meetingEl = document.querySelector("dyte-meeting");
+      if (meetingEl) updateVisibilityRecursively(meetingEl);
+    }, 500);
+    return () => clearInterval(timer);
+  }, [isHost, shouldHideScreenShare]);
+
+
+  // Loading / Error States
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          height: "100vh",
-          width: "100vw",
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
-            size="small"
-          >
-            Back
-          </Button>
-        </Box>
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <CircularProgress />
-        </Box>
+      <Box sx={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <CircularProgress />
       </Box>
     );
   }
 
-  if (error) {
+  if (error && !authToken) {
     return (
-      <Box
-        sx={{
-          height: "100vh",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
-            size="small"
-          >
-            Back
-          </Button>
-        </Box>
-        <Box sx={{ p: 3 }}>
-          <Typography color="error" sx={{ mb: 1 }}>
-            {error}
-          </Typography>
-          {!getToken() && (
-            <Typography variant="body2">
-              Make sure you are logged in; this endpoint requires
-              authentication.
-            </Typography>
-          )}
-        </Box>
+      <Box sx={{ p: 3 }}>
+        <Typography color="error">{error}</Typography>
+        <Button onClick={handleBack} sx={{ mt: 2 }}>Back</Button>
       </Box>
     );
   }
 
-  if (!authToken) {
-    return (
-      <Box
-        sx={{
-          height: "100vh",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
-            size="small"
-          >
-            Back
-          </Button>
-        </Box>
-        <Box sx={{ p: 3 }}>
-          <Typography color="error">
-            Could not get Dyte auth token. Please try again.
-          </Typography>
-        </Box>
-      </Box>
-    );
-  }
-
-  // Happy path: show Dyte meeting
   return (
     <Box
       ref={pageRef}
       sx={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1300,
-        bgcolor: "#000",
+        position: "relative",
+        height: "100vh",
         display: "flex",
         flexDirection: "column",
+        bgcolor: "#020617",
+        color: "#e5e7eb",
+        overflow: "hidden",
       }}
     >
-       <GlobalStyles
+      <GlobalStyles
         styles={{
-          // still hide Dyte’s built-in sidebar toggles if you want
-          "dyte-chat-toggle, dyte-polls-toggle, dyte-participants-toggle, dyte-plugins-toggle":
-            {
-              display: "none !important",
-            },
-
-          // 🔵 When our custom Q&A drawer is open, visually
-          // highlight the Q&A controlbar button like Chat does
-          "dyte-meeting.qna-open dyte-controlbar-button[label='Q&A'], \
-dyte-meeting.qna-open dyte-controlbar-button[aria-label='Q&A']": {
-            backgroundColor: "rgba(59, 130, 246, 0.16)", // light blue fill
-            boxShadow: "0 0 0 1px #3b82f6 inset",        // blue border
+          "dyte-meeting.qna-open dyte-controlbar-button[label='Q&A'], dyte-meeting.qna-open dyte-controlbar-button[aria-label='Q&A']": {
+            backgroundColor: "rgba(59, 130, 246, 0.16)",
+            boxShadow: "0 0 0 1px #3b82f6 inset",
             borderRadius: "999px",
           },
         }}
       />
-      {/* 🔝 Header overlay ABOVE Dyte */}
+
+      {/* Force Hide CSS for initial load */}
+      {!isHost && shouldHideScreenShare && (
+        <style>{`
+          dyte-meeting dyte-screen-share-toggle,
+          dyte-screen-share-toggle,
+          dyte-meeting dyte-controlbar-button[icon="screenshare"],
+          dyte-controlbar-button[label="Share Screen"],
+          dyte-controlbar-button[label="Share screen"],
+          button[aria-label="Share Screen"] {
+            display: none !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            width: 0 !important;
+          }
+        `}</style>
+      )}
+
+      {/* Header Bar */}
       <Box
         sx={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          p: 1,
-          zIndex: 9998, // higher than Dyte, lower than QnA Drawer
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          pointerEvents: "none", // let clicks pass through, except where we override
-          bgcolor: "rgba(0,0,0,0.5)",
-          backdropFilter: "blur(6px)",
+          position: "absolute", top: 0, left: 0, right: 0, p: 1, zIndex: 9998,
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          pointerEvents: "none", bgcolor: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)",
         }}
       >
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={1}
-          sx={{ pointerEvents: "auto" }} // clickable
-        >
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBack}
-            size="small"
-            variant="outlined"
-            sx={{ borderRadius: 999 }}
-          >
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ pointerEvents: "auto", pl: 1 }}>
+          <Button startIcon={<ArrowBackIcon />} onClick={handleBack} size="small" variant="outlined" sx={{ borderRadius: 999 }}>
             Back
           </Button>
-          <Typography variant="body2" color="grey.400">
-            Live meeting powered by Dyte
-          </Typography>
+          <Typography variant="body2" color="grey.400">Live meeting powered by Dyte</Typography>
         </Stack>
 
+        {isHost && (
+          <Box sx={{ position: "relative", pointerEvents: "auto", mr: 1 }}>
+            <IconButton
+              size="small"
+              onClick={() => setControlsOpen((prev) => !prev)}
+              sx={{ color: "grey.100", bgcolor: "rgba(0,0,0,0.45)", "&:hover": { bgcolor: "rgba(255,255,255,0.18)" } }}
+            >
+              <SettingsOutlinedIcon fontSize="small" />
+            </IconButton>
+
+            {controlsOpen && (
+              <Paper
+                elevation={8}
+                sx={{
+                  position: "absolute", top: 40, right: 0, minWidth: 260,
+                  borderRadius: 3, p: 2, bgcolor: "rgba(18,18,18,0.98)", color: "grey.100",
+                }}
+              >
+                <Typography variant="overline" sx={{ letterSpacing: 1, fontWeight: 600 }}>CONTROLS</Typography>
+                <Divider sx={{ mb: 1 }} />
+                
+                <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
+                  <Typography variant="body2">Enable Chat</Typography>
+                  <Switch size="small" checked={chatEnabled} onChange={handleToggleChat} />
+                </Stack>
+                <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
+                  <Typography variant="body2">Show Polls Tab</Typography>
+                  <Switch size="small" checked={pollsEnabled} onChange={handleTogglePolls} />
+                </Stack>
+                <Divider sx={{ my: 1 }} />
+                <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
+                  <Typography variant="body2">Allow Screen Share</Typography>
+                  <Switch size="small" checked={screenShareAllowed} onChange={handleToggleScreenShare} />
+                </Stack>
+                <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
+                  <Typography variant="body2">Allow Plugins</Typography>
+                  <Switch size="small" checked={pluginsAllowed} onChange={handleTogglePlugins} />
+                </Stack>
+              </Paper>
+            )}
+          </Box>
+        )}
       </Box>
 
-      {/* Meeting fills the background */}
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          pr: showQnA
-            ? { xs: 0, sm: "360px", md: "400px" } // same width as Q&A panel
-            : 0,
-          transition: "padding-right 200ms ease",
-        }}
-      >
+      {/* Main Meeting Area */}
+      <Box sx={{ flex: 1, minHeight: 0, pr: showQnA ? { xs: 0, sm: "360px", md: "400px" } : 0, transition: "padding-right 200ms ease" }}>
         <DyteMeetingWrapper
           authToken={authToken}
           eventId={eventId}
@@ -1007,10 +786,11 @@ dyte-meeting.qna-open dyte-controlbar-button[aria-label='Q&A']": {
           onMeetingEnd={handleMeetingEnd}
           onOpenQnA={handleOpenQnA}
           onMeetingReady={setSidebarMeeting}
+          dbStatus={dbStatus}
         />
       </Box>
 
-      {/* Custom Q&A drawer (width matches the reserved padding above) */}
+      {/* Side Panels */}
       <LiveQnAPanel
         open={showQnA}
         onClose={() => setShowQnA(false)}
@@ -1018,6 +798,11 @@ dyte-meeting.qna-open dyte-controlbar-button[aria-label='Q&A']": {
         meeting={sidebarMeeting}
         activeTab={sidebarTab}
         onChangeTab={setSidebarTab}
+        chatEnabled={chatEnabled}
+        pollsEnabled={pollsEnabled}
+        participantsTabVisible={participantsTabVisible}
+        screenShareAllowed={screenShareAllowed}
+        pluginsAllowed={pluginsAllowed}
       />
     </Box>
   );
