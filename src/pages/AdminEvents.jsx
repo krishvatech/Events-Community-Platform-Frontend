@@ -49,6 +49,10 @@ import MyRecordingsPage from "./MyRecordingsPage.jsx"
 import AdminNotificationsPage from "./AdminNotificationsPage.jsx";
 import AdminSettings from "./AdminSettings.jsx"
 import AdminSidebar from "../components/AdminSidebar.jsx";
+import Autocomplete from "@mui/material/Autocomplete";
+import * as isoCountries from "i18n-iso-countries";
+import enLocale from "i18n-iso-countries/langs/en.json";
+
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
 const BASE = RAW.replace(/\/+$/, "");
@@ -69,6 +73,36 @@ const urlJoin = (base, path) => {
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;
 };
+
+isoCountries.registerLocale(enLocale);
+
+// 🇮🇳 flag from "IN"
+const flagEmoji = (code) =>
+  code
+    .toUpperCase()
+    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt()));
+
+const COUNTRY_OPTIONS = Object.entries(
+  isoCountries.getNames("en", { select: "official" })
+).map(([code, label]) => ({ code, label, emoji: flagEmoji(code) }));
+
+// Same logic as HomePage – but we pass `{ location }`
+const getSelectedCountry = ({ location }) => {
+  if (!location) return null;
+
+  // if you ever store code directly
+  const byCode = COUNTRY_OPTIONS.find((opt) => opt.code === location);
+  if (byCode) return byCode;
+
+  // match by name (what you use now)
+  return (
+    COUNTRY_OPTIONS.find(
+      (opt) =>
+        (opt.label || "").toLowerCase() === String(location).toLowerCase()
+    ) || null
+  );
+};
+
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
@@ -188,7 +222,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [location, setLocation] = React.useState("");
   const [category, setCategory] = React.useState("Workshop");
   const [format, setFormat] = React.useState("virtual");
-  const [price, setPrice] = React.useState(0);
+  const [price, setPrice] = React.useState();
 
   const today = dayjs().format("YYYY-MM-DD");
   const [startDate, setStartDate] = React.useState(today);
@@ -416,25 +450,81 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 sx={{ mb: 2 }}
               />
 
-              <TextField
-                label="Location *"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+              {/* Country */}
+              <Autocomplete
+                size="small"
                 fullWidth
-                error={!!errors.location}
-                helperText={errors.location}
-                sx={{ mb: 2 }}
+                options={COUNTRY_OPTIONS}
+                autoHighlight
+                value={getSelectedCountry({ location })}
+                getOptionLabel={(opt) => opt?.label ?? ""}
+                isOptionEqualToValue={(o, v) => o.code === v.code}
+                onChange={(_, newVal) => {
+                  setLocation(newVal ? newVal.label : "");
+                  setErrors((prev) => ({ ...prev, location: "" }));
+                }}
+                ListboxProps={{
+                  style: {
+                    maxHeight: 36 * 7,
+                    overflowY: "auto",
+                    paddingTop: 0,
+                    paddingBottom: 0,
+                  },
+                }}
+                renderOption={(props, option) => (
+                  <li {...props} key={option.code}>
+                    <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                    {option.label}
+                  </li>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Country *"
+                    placeholder="Select country"
+                    fullWidth
+                    error={!!errors.location}
+                    helperText={errors.location}
+                    inputProps={{
+                      ...params.inputProps,
+                      autoComplete: "new-password",
+                    }}
+                    sx={{ mb: 2 }}
+                  />
+                )}
               />
-
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField label="Category" select value={category} onChange={(e) => setCategory(e.target.value)} fullWidth>
-                    {categories.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                {/* Category – full width */}
+                <Grid item xs={12}>
+                  <TextField
+                    label="Category"
+                    select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    fullWidth
+                  >
+                    {categories.map((c) => (
+                      <MenuItem key={c} value={c}>
+                        {c}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField label="Format" select value={format} onChange={(e) => setFormat(e.target.value)} fullWidth>
-                    {formats.map((f) => <MenuItem key={f.value} value={f.value}>{f.label}</MenuItem>)}
+
+                {/* Format – full width */}
+                <Grid item xs={12}>
+                  <TextField
+                    label="Format"
+                    select
+                    value={format}
+                    onChange={(e) => setFormat(e.target.value)}
+                    fullWidth
+                  >
+                    {formats.map((f) => (
+                      <MenuItem key={f.value} value={f.value}>
+                        {f.label}
+                      </MenuItem>
+                    ))}
                   </TextField>
                 </Grid>
               </Grid>
@@ -467,11 +557,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               <Box
                 className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
                 sx={{
-                  width: "100%",
-                  maxWidth: 340,
+                  width: { xs: "100%", sm: 360 }, // nice fixed width on tablet/desktop
+                  maxWidth: "100%",
                   position: "relative",
-                  paddingTop: "56.25%",      // 16:9 box, fixed height
-                  mx: { xs: 0, md: "auto" },
+                  paddingTop: "56.25%",          // 16:9 ratio
+                  mx: "auto",                    // ⬅️ center horizontally on ALL breakpoints
                   mb: 1.5,
                   overflow: "hidden",
                 }}
@@ -954,12 +1044,47 @@ function EditEventDialog({ open, onClose, event, onUpdated }) {
                 error={!!errors.description} helperText={errors.description}
               />
 
-              <TextField
-                label="Location *"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                fullWidth className="mb-3"
-                error={!!errors.location} helperText={errors.location}
+              <Autocomplete
+                size="small"
+                fullWidth
+                className="mb-3"
+                options={COUNTRY_OPTIONS}
+                autoHighlight
+                value={getSelectedCountry({ location })}
+                getOptionLabel={(opt) => opt?.label ?? ""}
+                isOptionEqualToValue={(o, v) => o.code === v.code}
+                onChange={(_, newVal) => {
+                  setLocation(newVal ? newVal.label : "");
+                  setErrors((prev) => ({ ...prev, location: "" }));
+                }}
+                ListboxProps={{
+                  style: {
+                    maxHeight: 36 * 7,
+                    overflowY: "auto",
+                    paddingTop: 0,
+                    paddingBottom: 0,
+                  },
+                }}
+                renderOption={(props, option) => (
+                  <li {...props} key={option.code}>
+                    <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                    {option.label}
+                  </li>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Country *"
+                    placeholder="Select country"
+                    fullWidth
+                    error={!!errors.location}
+                    helperText={errors.location}
+                    inputProps={{
+                      ...params.inputProps,
+                      autoComplete: "new-password",
+                    }}
+                  />
+                )}
               />
 
               <TextField
