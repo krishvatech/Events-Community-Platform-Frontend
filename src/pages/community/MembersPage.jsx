@@ -946,18 +946,26 @@ export default function MembersPage() {
         <Grid
           item
           xs={12}
-          md={hasSideMap ? 5 : 12}   // 5/12 at 1024px  → ~427px
-          lg={hasSideMap ? 7 : 12}   // 7/12 at 1440px → ~840px
+          md={hasSideMap ? 5 : 12}
+          lg={hasSideMap ? 7 : 12}
           xl={hasSideMap ? 7 : 12}
           sx={{ minWidth: 0, display: "flex" }}
         >
           <Box
             sx={{
-              width: "100%",
-              mx: 0,
-              display: "flex",                           // ⬅️ make column
+              // 👇 Set width per device
+              width: {
+                xs: 410,  // 0–599px  → mobile
+                sm: 740,     // 600–899px → tablet (includes 768px)
+                md: "100%",  // 900px+    → desktop (use full grid width)
+                // if you want, you can also add:
+                // lg: 840,
+                // xl: 960,
+              },
+              mx: "auto",        // center when width is a fixed number
+              display: "flex",
               flexDirection: "column",
-              height: "100%",                            // ⬅️ stretch to grid height
+              height: "100%",
             }}
           >
             {/* Header Paper */}
@@ -1221,10 +1229,16 @@ export default function MembersPage() {
           <Grid
             item
             xs={12}
-            md={7}   // 7/12 of 1024px ≈ 597px  ≈ 600px
-            lg={5}   // 5/12 of 1440px = 600px
+            md={7}
+            lg={5}
             xl={5}
-            sx={{ minWidth: 0, display: "flex" }}
+            sx={{
+              minWidth: 0,
+              display: "flex",
+              // 👉 Fix map width to 600px on large screens (like 1440px)
+              flexBasis: { lg: 600, xl: 600 },
+              maxWidth: { lg: 600, xl: 600 },
+            }}
           >
             <Paper
               sx={{
