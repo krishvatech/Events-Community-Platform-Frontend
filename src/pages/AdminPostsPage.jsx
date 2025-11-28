@@ -22,6 +22,9 @@ import {
   CardActions,
   Snackbar,
   Alert,
+  Popover, // Added
+  Tab,     // Added
+  Tabs,    // Added
 } from "@mui/material";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
@@ -43,8 +46,6 @@ import RepeatRoundedIcon from "@mui/icons-material/RepeatRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 
 
-
-
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 function getToken() {
   return (
@@ -60,6 +61,15 @@ function authHeader() {
 }
 
 const BORDER = "#e5e7eb";
+
+// --- LinkedIn-style reactions ---
+const POST_REACTIONS = [
+  { id: "like", emoji: "👍", label: "Like" },
+  { id: "intriguing", emoji: "🤔", label: "Intriguing" },
+  { id: "spot_on", emoji: "🎯", label: "Spot On" },
+  { id: "validated", emoji: "🧠", label: "Validated" },
+  { id: "debatable", emoji: "🤷", label: "Debatable" },
+];
 
 // --- BEGIN: engagements helpers (ported from LiveFeed) ---
 function toApiUrl(pathOrUrl) {
@@ -187,7 +197,10 @@ async function fetchEngagementCountsForTarget(target) {
   );
   if (!r.ok) return { likes: 0, comments: 0, shares: 0, user_has_liked: false };
   const j = await r.json();
-  return j[String(target.id)] || { likes: 0, comments: 0, shares: 0, user_has_liked: false };
+  const d = j[String(target.id)] || { likes: 0, comments: 0, shares: 0, user_has_liked: false };
+  // map reaction if available
+  if (d.user_reaction) d.my_reaction = d.user_reaction;
+  return d;
 }
 
 // small concurrency helper (for fetching replies)
@@ -640,15 +653,13 @@ function DeleteConfirmDialog({ open, onClose, communityId, item, onDeleted }) {
   );
 }
 
-// Like Dialog
-// ---------- Likes dialog ----------
-// ---------- Likes dialog (uses engagements/*, with fallbacks) ----------
-// ---------- Likes dialog (engagements-first with robust fallbacks) ----------
+
+// ---------- Likes/Reactions Dialog ----------
 function LikesDialog({ open, onClose, communityId, postId, target: propTarget }) {
   const [loading, setLoading] = React.useState(true);
   const [rows, setRows] = React.useState([]);
+  const [activeFilter, setActiveFilter] = React.useState("all");
 
-  // normalize many possible payload shapes -> [{id,name,avatar}]
   const normalizeUsers = (payload) => {
     const arr = Array.isArray(payload) ? payload
       : Array.isArray(payload?.results) ? payload.results
@@ -668,7 +679,11 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
       const avatar =
         avatarFrom(u) ||
         absMedia(r.user_image || r.user_image_url || r.avatar || r.avatar_url || "");
-      return id ? { id, name, avatar } : null;
+      
+      const reactionId = r.reaction || r.reaction_type || r.kind || null;
+      const def = POST_REACTIONS.find(x => x.id === reactionId) || POST_REACTIONS[0]; // fallback to like
+
+      return id ? { id, name, avatar, reactionId, reactionEmoji: def.emoji, reactionLabel: def.label } : null;
     }).filter(Boolean);
   };
 
@@ -676,29 +691,18 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
   const load = React.useCallback(async () => {
     if (!open) return;
     setLoading(true);
+    setActiveFilter("all");
 
     const tgt = propTarget?.id ? propTarget : { id: postId, type: null };
-
-    // Try the new engagements APIs first, then legacy fallbacks.
     const urls = [
-      // primary: reactions filtered to like
       (tgt.type
-        ? `${API_ROOT}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
-        : `${API_ROOT}/engagements/reactions/?reaction=like&target_id=${tgt.id}&page_size=200`),
-
-      // helper: who-liked (feed_item form)
+        ? `${API_ROOT}/engagements/reactions/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=200`
+        : `${API_ROOT}/engagements/reactions/?target_id=${tgt.id}&page_size=200`),
       `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${tgt.id}`,
-
-      // helper: who-liked (target_type/target_id form, if supported)
       (tgt.type
         ? `${API_ROOT}/engagements/reactions/who-liked/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}`
         : null),
-
-      // legacy community/feed fallbacks
-      (communityId ? `${API_ROOT}/communities/${communityId}/posts/${postId}/likes/` : null),
-      `${API_ROOT}/activity/feed/${postId}/likes/`,
     ].filter(Boolean);
-
 
     const collected = [];
     for (const url of urls) {
@@ -712,7 +716,7 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
           const n = json?.next;
           next = n ? (/^https?:/i.test(n) ? n : `${API_ROOT}${n.startsWith("/") ? "" : "/"}${n}`) : null;
         }
-        if (collected.length) break; // stop once one endpoint works
+        if (collected.length) break; 
       } catch { }
     }
 
@@ -724,26 +728,69 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
       if (!seen.has(k)) { seen.add(k); dedup.push(u); }
     }
     setRows(dedup);
-
     setLoading(false);
   }, [open, communityId, postId, propTarget?.id, propTarget?.type]);
 
   React.useEffect(() => { load(); }, [load]);
 
+  const filteredRows = activeFilter === "all"
+    ? rows
+    : rows.filter(r => r.reactionId === activeFilter);
+
+  const reactionCounts = { all: rows.length };
+  rows.forEach(u => {
+    if (!u.reactionId) return;
+    reactionCounts[u.reactionId] = (reactionCounts[u.reactionId] || 0) + 1;
+  });
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>{`Liked by${rows.length ? ` (${rows.length})` : ""}`}</DialogTitle>
+      <DialogTitle>Reactions</DialogTitle>
       <DialogContent dividers>
+         <Box sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}>
+          <Tabs
+            value={activeFilter}
+            onChange={(_, v) => setActiveFilter(v)}
+            variant="scrollable"
+            allowScrollButtonsMobile
+            sx={{ minHeight: 40 }}
+          >
+            <Tab
+              value="all"
+              label={`All (${reactionCounts.all || 0})`}
+              sx={{ minHeight: 40, py: 1 }}
+            />
+            {POST_REACTIONS.map((r) => (
+              <Tab
+                key={r.id}
+                value={r.id}
+                sx={{ minHeight: 40, py: 1 }}
+                label={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <span>{r.emoji}</span>
+                    <span style={{ fontSize: 12 }}>({reactionCounts[r.id] || 0})</span>
+                  </Box>
+                }
+              />
+            ))}
+          </Tabs>
+        </Box>
+
         {loading ? (
           <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
-        ) : rows.length === 0 ? (
-          <Typography color="text.secondary">No likes yet.</Typography>
+        ) : filteredRows.length === 0 ? (
+          <Typography color="text.secondary" p={2}>No reactions yet.</Typography>
         ) : (
-          <List>
-            {rows.map((u) => (
+          <List dense>
+            {filteredRows.map((u) => (
               <ListItem key={u.id}>
                 <ListItemAvatar><Avatar src={u.avatar} alt={u.name} /></ListItemAvatar>
                 <ListItemText primary={u.name} />
+                {u.reactionEmoji && (
+                   <Tooltip title={u.reactionLabel || ""}>
+                     <Box sx={{ fontSize: 20 }}>{u.reactionEmoji}</Box>
+                   </Tooltip>
+                )}
               </ListItem>
             ))}
           </List>
@@ -1437,7 +1484,10 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const target = React.useMemo(() => engageTargetOf(post), [post]);
   const [likeCount, setLikeCount] = React.useState(post.like_count ?? post.metrics?.likes ?? 0);
   const [commentCount, setCommentCount] = React.useState(post.comment_count ?? post.metrics?.comments ?? 0);
-  const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
+  
+  // Changed: Use reaction state instead of simple liked boolean
+  const [myReaction, setMyReaction] = React.useState(post.my_reaction || post.user_reaction || (post.user_has_liked ? "like" : null));
+  
   const [likesOpen, setLikesOpen] = React.useState(false);
   const commentInputRef = React.useRef(null);
   const [shareCount, setShareCount] = React.useState(post.share_count ?? post.metrics?.shares ?? 0);
@@ -1445,6 +1495,18 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [likers, setLikers] = React.useState([]);
   const [sharePickerOpen, setSharePickerOpen] = React.useState(false);
+  
+  // Popover state
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const pickerOpen = Boolean(anchorEl);
+
+  // Derived UI state
+  const myReactionDef = POST_REACTIONS.find((r) => r.id === myReaction);
+  const likeBtnLabel = myReactionDef ? myReactionDef.label : "Like";
+  const likeBtnEmoji = myReactionDef ? myReactionDef.emoji : "👍";
+  const hasReaction = !!myReaction;
+
+
   const normalizeUsers = (payload) => {
     const arr = Array.isArray(payload) ? payload
       : Array.isArray(payload?.results) ? payload.results
@@ -1472,8 +1534,8 @@ function PostSocialBar({ communityId, post, onCounts }) {
     const tgt = target?.id ? target : { id: post.id, type: null };
     const urls = [
       (tgt.type
-        ? `${API_ROOT}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=5`
-        : `${API_ROOT}/engagements/reactions/?reaction=like&target_id=${tgt.id}&page_size=5`),
+        ? `${API_ROOT}/engagements/reactions/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=5`
+        : `${API_ROOT}/engagements/reactions/?target_id=${tgt.id}&page_size=5`),
       `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${tgt.id}&page_size=5`,
     ];
     for (const url of urls) {
@@ -1496,35 +1558,59 @@ function PostSocialBar({ communityId, post, onCounts }) {
     setLikeCount(c.likes ?? 0);
     setCommentCount(c.comments ?? 0);
     setShareCount(c.shares ?? 0);
-    setUserHasLiked(!!c.user_has_liked);
+    // set my reaction if provided by backend, else fallback to existing
+    if (c.my_reaction !== undefined) setMyReaction(c.my_reaction);
+    else if (c.user_has_liked !== undefined && c.my_reaction === undefined) {
+         // if API only gives us bool, assume "like" if true, null if false, 
+         // BUT if we already have a specific reaction locally, keep it unless it conflicts
+         setMyReaction(c.user_has_liked ? (myReaction || "like") : null);
+    }
+
     onCounts?.({ likeCount: c.likes ?? 0, commentCount: c.comments ?? 0, shareCount: c.shares ?? 0 });
 
   }
   React.useEffect(() => { refreshCounts(); /* on mount */ }, [post.id]);
 
-  async function togglePostLike() {
-    // optimistic
-    const willUnlike = userHasLiked;
-    setUserHasLiked(!willUnlike);
-    setLikeCount(n => Math.max(0, n + (willUnlike ? -1 : +1)));
+  const handleOpenPicker = (event) => setAnchorEl(event.currentTarget);
+  const handleClosePicker = () => setAnchorEl(null);
 
-    try {
-      const body = target.type
-        ? { target_type: target.type, target_id: target.id, reaction: "like" }
-        : { target_id: target.id, reaction: "like" };
+  async function handleReact(reactionId) {
+     const prevReaction = myReaction;
+     const isSame = prevReaction === reactionId;
+     
+     // Optimistic Update
+     let delta = 0;
+     if (!prevReaction && reactionId) delta = 1;        
+     else if (prevReaction && !reactionId) delta = -1;  
+     else if (prevReaction && reactionId && isSame) delta = -1; // toggle off
+     // else switching (no total count change)
 
-      const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error();
-      await refreshCounts();
-    } catch {
-      // rollback by resync
-      await refreshCounts();
-    }
+     const newReaction = (isSame && reactionId) ? null : reactionId;
+     
+     setMyReaction(newReaction);
+     setLikeCount(n => Math.max(0, n + delta));
+     
+     // Send Request
+     try {
+       const body = target.type
+        ? { target_type: target.type, target_id: target.id, reaction: reactionId }
+        : { target_id: target.id, reaction: reactionId };
+        
+       // Use toggle endpoint (it usually handles switching reaction types intelligently)
+       const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(body),
+       });
+       if (!res.ok) throw new Error();
+       await refreshCounts();
+     } catch {
+       // rollback
+       setMyReaction(prevReaction);
+       await refreshCounts();
+     }
   }
+
 
   return (
     <>
@@ -1551,12 +1637,14 @@ function PostSocialBar({ communityId, post, onCounts }) {
             </AvatarGroup>
 
             <Typography variant="body2">
-              {likers?.[0]?.name ? (
-                Math.max(0, (likeCount || 0) - 1) > 0
-                  ? `${likers[0].name} and ${Math.max(0, (likeCount || 0) - 1).toLocaleString()} others`
-                  : likers[0].name
+              {/* If we have specific names, show them, otherwise generic count */}
+              {likers.length > 0 ? (
+                 <>
+                   {likers[0].name}
+                   {likeCount > 1 && ` and ${Math.max(0, likeCount - 1).toLocaleString()} others`}
+                 </>
               ) : (
-                `${(likeCount || 0).toLocaleString()} ${Number(likeCount || 0) === 1 ? "like" : "likes"}`
+                `${(likeCount || 0).toLocaleString()} reactions`
               )}
             </Typography>
 
@@ -1572,20 +1660,24 @@ function PostSocialBar({ communityId, post, onCounts }) {
         </Stack>
       </Box>
 
-      {/* Action row: Like / Comment / Repost / Send */}
+      {/* Action row: Reaction Picker / Comment / Share */}
       <Stack
         direction="row"
         justifyContent="space-around"
         alignItems="center"
         sx={{ borderTop: `1px solid ${BORDER}`, px: 0.5, py: 0.5 }}
       >
-        {/* IMPORTANT: Like opens dialog (no toggle) */}
         <Button
           size="small"
-          startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
-          onClick={togglePostLike}
+          onClick={handleOpenPicker}
+          sx={{
+             textTransform: "none",
+             color: hasReaction ? "primary.main" : "text.secondary",
+             fontWeight: hasReaction ? 600 : 400,
+          }}
+          startIcon={<span style={{ fontSize: 18, lineHeight: 1 }}>{likeBtnEmoji}</span>}
         >
-          Like
+          {likeBtnLabel}
         </Button>
 
         <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon />} onClick={() => setCommentsOpen(true)}>
@@ -1597,6 +1689,45 @@ function PostSocialBar({ communityId, post, onCounts }) {
         </Button>
 
       </Stack>
+      
+      {/* Reaction Popover */}
+      <Popover
+          open={pickerOpen}
+          anchorEl={anchorEl}
+          onClose={handleClosePicker}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+          disableRestoreFocus
+      >
+         <Box sx={{ p: 1, display: "flex", gap: 1, px: 1.5 }}>
+            {POST_REACTIONS.map((r) => (
+              <Tooltip key={r.id} title={r.label}>
+                <Box
+                  onClick={() => {
+                    handleReact(r.id);
+                    handleClosePicker();
+                  }}
+                  sx={{
+                    cursor: "pointer",
+                    fontSize: 26,
+                    lineHeight: 1,
+                    px: 0.5,
+                    py: 0.25,
+                    borderRadius: "999px",
+                    transition: "transform 120ms ease, background 120ms ease",
+                    "&:hover": {
+                      bgcolor: "action.hover",
+                      transform: "translateY(-2px) scale(1.05)",
+                    },
+                  }}
+                >
+                  {r.emoji}
+                </Box>
+              </Tooltip>
+            ))}
+         </Box>
+      </Popover>
+
       <LikesDialog
         open={likesOpen}
         onClose={() => setLikesOpen(false)}
