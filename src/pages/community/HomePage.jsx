@@ -4540,7 +4540,7 @@ function AboutTab({ profile, groups, onUpdate }) {
           <TextField select label="Employment type *" value={expForm.relationship_to_org} onChange={(e) => setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))} fullWidth sx={{ mb: 2 }}>
             <MenuItem value="employee">Employee</MenuItem><MenuItem value="independent">Independent</MenuItem><MenuItem value="third_party">Third-party</MenuItem>
           </TextField>
-          <TextField select value={expForm.work_schedule} onChange={(e) => setExpForm((f) => ({ ...f, work_schedule: e.target.value }))} fullWidth sx={{ mb: 2 }} SelectProps={{ displayEmpty: true, renderValue: (v) => v ? ({ full_time: "Full-time", part_time: "Part-time" }[v] || v) : <span style={{ color: "rgba(0,0,0,0.6)" }}>Work schedule</span> }}>
+          <TextField select label="Work schedule" value={expForm.work_schedule} onChange={(e) => setExpForm((f) => ({ ...f, work_schedule: e.target.value }))} fullWidth sx={{ mb: 2 }} SelectProps={{ displayEmpty: true, renderValue: (v) => v ? ({ full_time: "Full-time", part_time: "Part-time" }[v] || v) : <span style={{ color: "rgba(0,0,0,0.6)" }}>Work schedule</span> }}>
             <MenuItem value="full_time">Full-time</MenuItem><MenuItem value="part_time">Part-time</MenuItem>
           </TextField>
           <Box sx={{ display: "flex", gap: 2, mb: 1 }}>
