@@ -316,7 +316,10 @@ function normalizeMyGroup(row) {
       id: g.id,
       name: g.name,
       description: g.description || g.about || "",
-      member_count: g.member_count ?? g.members_count ?? g.members ?? 0,
+      member_count:
+        g.member_count ??
+        g.members_count ??
+        (Array.isArray(g.members) ? g.members.length : g.members ?? 0),
       cover_image: g.cover_image || g.coverImage || null,
       visibility: g.visibility || "public",
       is_member: true,
@@ -325,6 +328,7 @@ function normalizeMyGroup(row) {
   }
   return null;
 }
+
 
 export default function GroupsPage({ onJoinGroup = async () => {}, user }) {
   const navigate = useNavigate();

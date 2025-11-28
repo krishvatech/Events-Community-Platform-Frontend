@@ -5,7 +5,7 @@ import {
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
     TextField, Typography, Switch, FormControlLabel, CircularProgress,
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup, Badge,
-    IconButton, Menu, ListItemIcon, Popper, Drawer
+    IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
@@ -51,6 +51,13 @@ const MESSAGING_API = {
     sendMessage: (cid) => `${API_ROOT}/messaging/conversations/${cid}/messages/`,
 };
 
+const POST_REACTIONS = [
+    { id: "like", emoji: "👍", label: "Like" },
+    { id: "intriguing", emoji: "🤔", label: "Intriguing" },
+    { id: "spot_on", emoji: "🎯", label: "Spot On" },
+    { id: "validated", emoji: "🧠", label: "Validated" },
+    { id: "debatable", emoji: "🤷", label: "Debatable" },
+];
 
 const toAbs = (u) => {
     if (!u) return u;
@@ -106,6 +113,8 @@ const cleanPollOptions = (arr) => {
     }
     return out;
 };
+
+
 function mapFeedPollToPost(row) {
     const m = row?.metadata || {};
     const t = (m.type || row.type || "").toLowerCase();
@@ -999,76 +1008,141 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
     );
 }
 
-
-// ---------- Likes Popup ----------
+// ---------- Likes/Reactions Popup (Updated with Tabs) ----------
 function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
     const [loading, setLoading] = React.useState(false);
     const [rows, setRows] = React.useState([]);
+    const [activeFilter, setActiveFilter] = React.useState("all");
+
+    // Helper to normalize user/reaction data
+    const normalizeUsers = (payload) => {
+        const arr = Array.isArray(payload) ? payload
+            : Array.isArray(payload?.results) ? payload.results
+                : Array.isArray(payload?.data) ? payload.data
+                    : Array.isArray(payload?.items) ? payload.items
+                        : [];
+
+        return arr.map((r) => {
+            // Support various user shapes (liker, actor, user, etc.)
+            const u = r.user || r.actor || r.liker || r.owner || r.created_by || r;
+            const id = u?.id ?? r.user_id ?? r.id;
+            
+            const name = u.name || u.full_name || u.username || (u.first_name ? `${u.first_name} ${u.last_name || ""}` : `User #${id}`);
+            const avatar = toAbs(u.avatar || u.photo || u.photo_url || u.image || null);
+
+            // Determine reaction type
+            const reactionId = r.reaction || r.reaction_type || r.kind || "like"; 
+            const def = POST_REACTIONS.find(x => x.id === reactionId) || POST_REACTIONS[0]; 
+
+            return id ? { id, name, avatar, reactionId, reactionEmoji: def.emoji, reactionLabel: def.label } : null;
+        }).filter(Boolean);
+    };
 
     const load = React.useCallback(async () => {
         if (!open || !postId) return;
         setLoading(true);
+        setActiveFilter("all"); // reset filter on open
 
         const token = getToken();
         const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-
         const fid = Number(postId);
-        // Your working endpoints (tries in order)
-        const candidates = [
-            // primary: reactions filtered to like for a FeedItem
-            `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${fid}&reaction=like&page_size=200`,
-            // optional helper shape
+
+        // Try both endpoints to gather all reactions
+        const urls = [
+            `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${fid}&page_size=200`,
             `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${fid}`,
         ];
 
-        let got = [];
-        for (const url of candidates) {
+        let collected = [];
+        for (const url of urls) {
             try {
                 const r = await fetch(url, { headers });
                 if (!r.ok) continue;
-                const j = await r.json().catch(() => []);
-                const arr = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : j?.data || []);
-                if (arr && arr.length >= 0) {
-                    got = arr.map((it) => {
-                        // normalize user shape
-                        const u = it.user || it.actor || it.liker || it;
-                        return {
-                            id: u.id ?? it.id,
-                            name: u.name || u.full_name || u.username || `User #${u.id ?? it.id ?? ""}`,
-                            avatar: u.avatar || u.photo || u.photo_url || u.image || null,
-                        };
-                    });
-                    break;
-                }
+                const j = await r.json().catch(() => ({}));
+                collected.push(...normalizeUsers(j));
+                if (collected.length > 0) break; // Use first successful non-empty response
             } catch { }
         }
 
-        setRows(got);
+        // De-duplicate by User ID
+        const seen = new Set();
+        const unique = [];
+        for (const row of collected) {
+            if (!seen.has(row.id)) {
+                seen.add(row.id);
+                unique.push(row);
+            }
+        }
+
+        setRows(unique);
         setLoading(false);
     }, [open, postId]);
 
-
     React.useEffect(() => { load(); }, [load]);
+
+    // Filter logic
+    const filteredRows = activeFilter === "all"
+        ? rows
+        : rows.filter(r => r.reactionId === activeFilter);
+
+    // Count per reaction type
+    const reactionCounts = { all: rows.length };
+    rows.forEach(u => {
+        if (!u.reactionId) return;
+        reactionCounts[u.reactionId] = (reactionCounts[u.reactionId] || 0) + 1;
+    });
 
     return (
         <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
-            <DialogTitle>Liked by</DialogTitle>
+            <DialogTitle>Reactions</DialogTitle>
             <DialogContent dividers>
+                {/* Tabs for filtering */}
+                <Box sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}>
+                    <Tabs
+                        value={activeFilter}
+                        onChange={(_, v) => setActiveFilter(v)}
+                        variant="scrollable"
+                        allowScrollButtonsMobile
+                        sx={{ minHeight: 40 }}
+                    >
+                        <Tab
+                            value="all"
+                            label={`All (${reactionCounts.all || 0})`}
+                            sx={{ minHeight: 40, py: 1 }}
+                        />
+                        {POST_REACTIONS.map((r) => (
+                            <Tab
+                                key={r.id}
+                                value={r.id}
+                                sx={{ minHeight: 40, py: 1 }}
+                                label={
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                        <span>{r.emoji}</span>
+                                        <span style={{ fontSize: 12 }}>({reactionCounts[r.id] || 0})</span>
+                                    </Box>
+                                }
+                            />
+                        ))}
+                    </Tabs>
+                </Box>
+
                 {loading ? (
                     <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
-                ) : rows.length === 0 ? (
-                    <Typography color="text.secondary">No likes yet.</Typography>
+                ) : filteredRows.length === 0 ? (
+                    <Typography color="text.secondary" sx={{ p: 2 }}>No reactions yet.</Typography>
                 ) : (
-                    <List>
-                        {rows.map((u, i) => {
-                            const user = u.user || u; // tolerate shapes
-                            return (
-                                <ListItem key={user.id ?? i}>
-                                    <ListItemAvatar><Avatar src={user.avatar} /></ListItemAvatar>
-                                    <ListItemText primary={user.name || user.username || `User #${user.id}`} />
-                                </ListItem>
-                            );
-                        })}
+                    <List dense>
+                        {filteredRows.map((u, i) => (
+                            <ListItem key={u.id || i}>
+                                <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar>
+                                <ListItemText primary={u.name} />
+                                {u.reactionEmoji && (
+                                    <Tooltip title={u.reactionLabel || ""}>
+                                        <Box sx={{ fontSize: 20 }}>{u.reactionEmoji}</Box>
+                                    </Tooltip>
+                                )}
+                            </ListItem>
+                        ))}
                     </List>
                 )}
             </DialogContent>
@@ -1078,6 +1152,8 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
         </Dialog>
     );
 }
+
+
 // ---------- Shares Popup ----------
 function GroupSharesDialog({ open, onClose, groupIdOrSlug, postId }) {
     const [loading, setLoading] = React.useState(false);
@@ -1504,153 +1580,147 @@ function GroupCommentsDialog({
     );
 }
 
-
-// ---------- Social row under each post ----------
-// ---------- Social row under each post ----------
+// ---------- Social row under each post (Updated with Reactions) ----------
 function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
     const [likesOpen, setLikesOpen] = React.useState(false);
     const [commentsOpen, setCommentsOpen] = React.useState(false);
     const [sharesOpen, setSharesOpen] = React.useState(false);
 
+    // Identify Feed Item ID
     const fid = React.useMemo(() => Number(post.feed_item_id ?? post.id), [post.feed_item_id, post.id]);
 
-    const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
+    // Reaction State
     const [counts, setCounts] = React.useState({
         likes: post.like_count ?? post.metrics?.likes ?? 0,
         comments: post.comment_count ?? post.metrics?.comments ?? 0,
     });
     const [shareCount, setShareCount] = React.useState(post.share_count ?? post.metrics?.shares ?? 0);
+    
+    // "myReaction" holds the string ID (e.g., 'like', 'spot_on') or null
+    const [myReaction, setMyReaction] = React.useState(
+        post.my_reaction || post.user_reaction || (post.user_has_liked ? "like" : null)
+    );
 
-    // preview of first few likers (for "admin and N others")
+    // Popover State
+    const [anchorEl, setAnchorEl] = React.useState(null);
+    const pickerOpen = Boolean(anchorEl);
+
+    // Liker preview (avatars)
     const [likerPreview, setLikerPreview] = React.useState([]);
 
-    React.useEffect(() => {
+    // --- Derived UI Data ---
+    const myReactionDef = POST_REACTIONS.find((r) => r.id === myReaction);
+    const likeBtnLabel = myReactionDef ? myReactionDef.label : "Like";
+    const likeBtnEmoji = myReactionDef ? myReactionDef.emoji : "👍"; // Default emoji if no reaction
+    const hasReaction = !!myReaction;
+    const LikeIcon = hasReaction ? FavoriteRoundedIcon : FavoriteBorderRoundedIcon; // Fallback icon
+
+    // Fetch fresh metrics
+    const fetchCounts = React.useCallback(async () => {
         if (!fid) return;
-
-        (async () => {
-            try {
-                const token = getToken?.();
-                const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-
-                // metrics (for counts + liked-by-me)
-                const url = `${API_ROOT}/engagements/metrics/?target_type=activity_feed.feeditem&ids=${fid}`;
-                const res = await fetch(url, { headers });
-                if (res.ok) {
-                    const j = await res.json().catch(() => ({}));
-                    const rows =
-                        Array.isArray(j?.results) ? j.results :
-                            Array.isArray(j?.data) ? j.data :
-                                Array.isArray(j?.items) ? j.items :
-                                    Array.isArray(j) ? j :
-                                        (j && typeof j === "object" && j[fid]) ? [j[fid]] : [];
-
-                    const row = rows?.[0] || {};
-                    const m = row.metrics || row;
-
-                    const likes = (m.likes ?? m.like_count ?? 0);
-                    const comments = (m.comments ?? m.comment_count ?? 0);
-                    const shares = (m.shares ?? m.share_count ?? 0);
-                    const meLiked = (row.user_has_liked ?? m.user_has_liked);
-
-                    setCounts({ likes, comments });
-                    setShareCount(shares);
-                    if (typeof meLiked === "boolean") setUserHasLiked(meLiked);
-                }
-            } catch { }
-        })();
-    }, [fid]);
-
-    // fetch 2 likers for the left-side "avatars + text"
-    React.useEffect(() => {
-        if (!fid) return;
-
-        (async () => {
-            try {
-                const token = getToken?.();
-                const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-                const candidates = [
-                    `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${fid}&reaction=like&page_size=2`,
-                    `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${fid}&limit=2`,
-                ];
-
-                let got = [];
-                for (const u of candidates) {
-                    const r = await fetch(u, { headers });
-                    if (!r.ok) continue;
-                    const j = await r.json().catch(() => []);
-                    const arr = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : j?.data || []);
-                    if (arr) {
-                        got = arr.map((it) => {
-                            const u = it.user || it.actor || it.liker || it;
-                            return {
-                                id: u.id ?? it.id,
-                                name: u.name || u.full_name || u.username || `User #${u.id ?? it.id ?? ""}`,
-                                avatar: toAbs(u.avatar || u.photo || u.photo_url || u.image || null),
-                            };
-                        });
-                        break;
-                    }
-                }
-                setLikerPreview(got.slice(0, 2));
-            } catch {
-                setLikerPreview([]);
-            }
-        })();
-    }, [fid, counts.likes]);
-    async function fetchCounts() {
         try {
-            const headers = { Accept: "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) };
+            const token = getToken?.();
+            const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
             const url = `${API_ROOT}/engagements/metrics/?target_type=activity_feed.feeditem&ids=${fid}`;
+            
             const res = await fetch(url, { headers });
             if (!res.ok) return;
 
             const j = await res.json().catch(() => ({}));
-            const rows =
-                Array.isArray(j?.results) ? j.results :
-                    Array.isArray(j?.data) ? j.data :
-                        Array.isArray(j?.items) ? j.items :
-                            Array.isArray(j) ? j :
-                                (j && typeof j === "object" && j[fid]) ? [j[fid]] : [];
-
+            // Handle various response shapes
+            const rows = Array.isArray(j?.results) ? j.results : 
+                         (j && typeof j === "object" && j[fid]) ? [j[fid]] : [];
+            
             const row = rows?.[0] || {};
             const m = row.metrics || row;
 
-            const likes = m.likes ?? m.like_count ?? 0;
-            const comments = m.comments ?? m.comment_count ?? 0;
-            const shares = m.shares ?? m.share_count ?? 0;
-            const meLiked = (row.user_has_liked ?? m.user_has_liked);
+            setCounts({ 
+                likes: m.likes ?? m.like_count ?? 0, 
+                comments: m.comments ?? m.comment_count ?? 0 
+            });
+            setShareCount(m.shares ?? m.share_count ?? 0);
 
-            setCounts({ likes, comments });
-            setShareCount(shares);
-            if (typeof meLiked === "boolean") setUserHasLiked(meLiked);
-        } catch { /* ignore */ }
-    }
+            // Update my reaction from server
+            if (row.my_reaction !== undefined) setMyReaction(row.my_reaction);
+            else if (row.user_reaction !== undefined) setMyReaction(row.user_reaction);
+            else if (row.user_has_liked !== undefined) {
+                // If backend only gives boolean, maintain specific reaction if set locally, else "like"
+                setMyReaction(row.user_has_liked ? (myReaction || "like") : null);
+            }
 
+        } catch { }
+    }, [fid, myReaction]);
 
-    async function toggleLike() {
-        const willUnlike = userHasLiked;
+    // Initial Load
+    React.useEffect(() => {
+        fetchCounts();
+        
+        // Fetch liker preview
+        (async () => {
+            try {
+                const token = getToken?.();
+                const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+                const r = await fetch(`${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${fid}&page_size=3`, { headers });
+                if (r.ok) {
+                    const j = await r.json();
+                    const arr = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+                    setLikerPreview(arr.map(it => {
+                        const u = it.user || it.actor || it.liker || it;
+                        return {
+                            id: u.id,
+                            name: u.name || u.full_name || u.username,
+                            avatar: toAbs(u.avatar || u.photo)
+                        };
+                    }));
+                }
+            } catch {}
+        })();
+    }, [fid, fetchCounts]);
 
-        // optimistic
-        setUserHasLiked(!willUnlike);
-        setCounts(c => ({ ...c, likes: Math.max(0, (c.likes || 0) + (willUnlike ? -1 : +1)) }));
+    // Handle React Logic (Optimistic + API)
+    const handleReact = async (reactionId) => {
+        const prevReaction = myReaction;
+        const isSame = prevReaction === reactionId;
 
+        // 1. Optimistic Update
+        let delta = 0;
+        if (!prevReaction && reactionId) delta = 1;        // New reaction
+        else if (prevReaction && !reactionId) delta = -1;  // Removed reaction
+        else if (prevReaction && reactionId && isSame) delta = -1; // Toggle off
+        // else switching (no total count change)
+
+        const newReaction = (isSame && reactionId) ? null : reactionId;
+        
+        setMyReaction(newReaction);
+        setCounts(c => ({ ...c, likes: Math.max(0, c.likes + delta) }));
+
+        // 2. API Call
         try {
+            const token = getToken();
             const res = await fetch(`${API_ROOT}/engagements/reactions/toggle/`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
-                body: JSON.stringify({ target_type: "activity_feed.feeditem", target_id: fid, reaction: "like" }),
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({ 
+                    target_type: "activity_feed.feeditem", 
+                    target_id: fid, 
+                    reaction: reactionId // Send specific reaction ID
+                }),
             });
             if (!res.ok) throw new Error();
-            // re-sync exact counts (like Admin)
-            await fetchCounts();
+            await fetchCounts(); // Sync strict counts
         } catch {
+            // Rollback
+            setMyReaction(prevReaction);
             await fetchCounts();
         }
-    }
+    };
 
+    // Popover handlers
+    const handleOpenPicker = (event) => setAnchorEl(event.currentTarget);
+    const handleClosePicker = () => setAnchorEl(null);
     const bumpCommentCount = () => setCounts((c) => ({ ...c, comments: c.comments + 1 }));
 
-    // text like "admin and 1 others" (kept intentionally as "others")
+    // Text for "Name and X others"
     const likeNames = likerPreview.map(l => l.name).filter(Boolean);
     let likeLine = "";
     if (counts.likes > 0) {
@@ -1660,12 +1730,14 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
         } else if (likeNames.length >= 2) {
             const others = Math.max(0, counts.likes - 2);
             likeLine = others > 0 ? `${likeNames[0]} and ${others} others` : `${likeNames[0]} and ${likeNames[1]}`;
+        } else {
+             likeLine = `${counts.likes} reactions`;
         }
     }
 
     return (
         <>
-            {/* TOP META ROW — likers preview on left, SHARES on right (clickable) */}
+            {/* TOP META ROW — likers preview on left, SHARES on right */}
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1, pb: 1 }}>
                 <Stack
                     direction="row"
@@ -1675,10 +1747,10 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                     sx={{ cursor: "pointer" }}
                 >
                     <AvatarGroup
-                        max={2}
+                        max={3}
                         sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}
                     >
-                        {likerPreview.slice(0, 2).map(u => (
+                        {likerPreview.slice(0, 3).map(u => (
                             <Avatar key={u.id} src={u.avatar}>{(u.name || "U").slice(0, 1).toUpperCase()}</Avatar>
                         ))}
                     </AvatarGroup>
@@ -1696,15 +1768,25 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                 </Typography>
             </Stack>
 
-            {/* BOTTOM ROW — actions (LIKE / COMMENT / SHARE) */}
+            {/* BOTTOM ROW — actions (REACTION / COMMENT / SHARE) */}
             <Stack direction="row" spacing={1.5} alignItems="center" sx={{ px: 1, pb: 1 }}>
+                
+                {/* REACTION BUTTON */}
                 <Button
                     size="small"
-                    startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderRoundedIcon />}
-                    onClick={toggleLike}
-                    sx={{ textTransform: "uppercase" }}
+                    onClick={handleOpenPicker}
+                    sx={{
+                         textTransform: "uppercase",
+                         color: hasReaction ? "#10b8a6" : "inherit", // Teal if active
+                         fontWeight: hasReaction ? 700 : 400,
+                    }}
+                    // Show Emoji if specific reaction, else Heart icon fallback
+                    startIcon={hasReaction 
+                        ? <span style={{ fontSize: 18, lineHeight: 1, marginRight: 4 }}>{likeBtnEmoji}</span> 
+                        : <FavoriteBorderRoundedIcon />
+                    }
                 >
-                    Like
+                    {likeBtnLabel}
                 </Button>
 
                 <Button
@@ -1726,7 +1808,44 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                 </Button>
             </Stack>
 
-            {/* Popups */}
+            {/* REACTION PICKER POPOVER */}
+            <Popover
+                open={pickerOpen}
+                anchorEl={anchorEl}
+                onClose={handleClosePicker}
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}
+                transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+                disableRestoreFocus
+            >
+                <Box sx={{ p: 1, display: "flex", gap: 1, px: 1.5 }}>
+                    {POST_REACTIONS.map((r) => (
+                        <Tooltip key={r.id} title={r.label}>
+                            <Box
+                                onClick={() => {
+                                    handleReact(r.id);
+                                    handleClosePicker();
+                                }}
+                                sx={{
+                                    cursor: "pointer",
+                                    fontSize: 24,
+                                    lineHeight: 1,
+                                    p: 0.5,
+                                    borderRadius: "50%",
+                                    transition: "transform 120ms ease",
+                                    "&:hover": {
+                                        backgroundColor: "#f1f5f9",
+                                        transform: "scale(1.2)",
+                                    },
+                                }}
+                            >
+                                {r.emoji}
+                            </Box>
+                        </Tooltip>
+                    ))}
+                </Box>
+            </Popover>
+
+            {/* Dialogs */}
             <GroupCommentsDialog
                 open={commentsOpen}
                 onClose={() => setCommentsOpen(false)}
