@@ -31,6 +31,8 @@ import {
   Tab,
   CircularProgress,   // 👈 NEW
   Checkbox,           // 👈 NEW
+  Popover,   // 👈 add this
+  Tooltip,
   ListItemButton,     // 👈 NEW
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -57,12 +59,28 @@ const tokenHeader = () => {
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
+const POST_REACTIONS = [
+  { id: "like", label: "Like", emoji: "👍" },
+  { id: "intriguing", label: "Intriguing", emoji: "🤔" },
+  { id: "spot_on", label: "Spot On", emoji: "🎯" },
+  { id: "validated", label: "Validated", emoji: "🧠" },
+  { id: "debatable", label: "Debatable", emoji: "🤷" },
+];
+
+
 // --- Engagement helpers for Rich Profile posts ---
 
+// Same target type as feed items on My Posts – needed for reactions & metrics
 function engageTargetOfProfilePost(post) {
-  if (!post) return { type: null, id: null };
-  return { type: null, id: Number(post.id) || null }; // treat as feed item
+  const id = post ? Number(post.id) || null : null;
+
+  return {
+    type: "activity_feed.feeditem",
+    id,
+  };
 }
+
+
 
 async function fetchEngagementCountsForProfilePost(post) {
   const target = engageTargetOfProfilePost(post);
@@ -115,6 +133,25 @@ async function toggleProfilePostLike(post) {
   });
 }
 
+// 👉 NEW: full reactions toggle (Like / Intriguing / Spot On / Validated / Debatable)
+async function toggleProfilePostReaction(post, reactionId) {
+  const target = engageTargetOfProfilePost(post);
+  if (!target.id || !reactionId) return;
+
+  const body = target.type
+    ? { target_type: target.type, target_id: target.id, reaction: reactionId }
+    : { target_id: target.id, reaction: reactionId };
+
+  await fetch(`${API_BASE}/engagements/reactions/toggle/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...tokenHeader(),
+    },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+}
 
 const pickAvatarUrl = (u) => {
   if (!u) return "";
@@ -220,6 +257,26 @@ function RichPostCard({
   const [liked, setLiked] = React.useState(
     !!(post?.liked_by_me ?? post?.user_has_liked)
   );
+  // --- My reaction for this post (Like / Intriguing / Spot On / Validated / Debatable) ---
+  const initialReaction = useMemo(() => {
+    if (post?.my_reaction) return post.my_reaction;
+    if (post?.reaction) return post.reaction;
+    if (post?.liked_by_me || post?.user_has_liked) return "like";
+    return null;
+  }, [post]);
+
+  const [myReactionId, setMyReactionId] = useState(initialReaction);
+
+  useEffect(() => {
+    setMyReactionId(initialReaction);
+  }, [initialReaction]);
+
+  const myReactionDef =
+    POST_REACTIONS.find((r) => r.id === myReactionId) || null;
+  const likeBtnLabel = myReactionDef ? myReactionDef.label : "Like";
+  const likeBtnEmoji = myReactionDef ? myReactionDef.emoji : "👍";
+  const hasReaction = !!myReactionId;
+
 
   // counters based on metrics (and will be refreshed from /engagements/metrics/)
   const [likeCount, setLikeCount] = React.useState(
@@ -261,20 +318,19 @@ function RichPostCard({
     };
   }, [post?.id]);
 
-  // Load top likers to show avatars in the bubble
   const loadTopLikers = React.useCallback(async () => {
     const target = engageTargetOfProfilePost(post);
     if (!target.id) return;
 
     const urls = [
-      // generic likes list
+      // all reactions for this post
       target.type
-        ? `${API_BASE}/engagements/reactions/?reaction=like&target_type=${encodeURIComponent(
+        ? `${API_BASE}/engagements/reactions/?target_type=${encodeURIComponent(
           target.type
-        )}&target_id=${target.id}&page_size=5`
-        : `${API_BASE}/engagements/reactions/?reaction=like&target_id=${target.id}&page_size=5`,
-      // specialised "who liked" endpoint – will silently fail if not present
-      `${API_BASE}/engagements/reactions/who-liked/?feed_item=${target.id}&page_size=5`,
+        )}&target_id=${target.id}&page_size=25`
+        : `${API_BASE}/engagements/reactions/?target_id=${target.id}&page_size=25`,
+      // specialised "who liked" endpoint – safe fallback if present
+      `${API_BASE}/engagements/reactions/who-liked/?feed_item=${target.id}&page_size=25`,
     ];
 
     const normalizeUsers = (payload) => {
@@ -285,30 +341,46 @@ function RichPostCard({
           : Array.isArray(payload?.data)
             ? payload.data
             : [];
+
       return arr
         .map((row) => {
           const u =
             row.user ||
             row.actor ||
             row.profile ||
-            row.author ||
             row.owner ||
+            row.author ||
             row;
+
           const id = u?.id ?? row.user_id ?? row.id;
+          if (!id) return null;
+
+          const first = u.first_name || u.firstName || "";
+          const last = u.last_name || u.lastName || "";
+
           const name =
-            u?.full_name ||
-            u?.name ||
-            u?.username ||
-            [u?.first_name, u?.last_name].filter(Boolean).join(" ") ||
-            (id ? `User #${id}` : "User");
+            u.full_name ||
+            u.name ||
+            (first || last ? `${first} ${last}`.trim() : u.username) ||
+            `User #${id}`;
+
           const avatar =
-            u?.avatar_url ||
-            u?.user_image_url ||
-            u?.avatar ||
-            u?.photo ||
-            u?.image ||
+            u.avatar_url ||
+            u.user_image_url ||
+            u.avatar ||
+            u.photo ||
+            u.image ||
             "";
-          return id ? { id, name, avatar } : null;
+
+          // 👉 which reaction this user gave
+          const reactionId =
+            row.reaction ||
+            row.reaction_type ||
+            row.kind ||
+            row.type ||
+            "like";
+
+          return { id, name, avatar, reactionId };
         })
         .filter(Boolean);
     };
@@ -333,6 +405,7 @@ function RichPostCard({
     setLikers([]);
   }, [post?.id]);
 
+
   React.useEffect(() => {
     loadTopLikers();
   }, [loadTopLikers]);
@@ -342,39 +415,81 @@ function RichPostCard({
   const [shareOpen, setShareOpen] = React.useState(false);         // send-to-friends popup
   const [shareListOpen, setShareListOpen] = React.useState(false); // who-received popup
   const [commentsOpen, setCommentsOpen] = React.useState(false);
+  const [reactionsOpen, setReactionsOpen] = React.useState(false);
 
+  // --- Meta text + reaction bubbles (same as My Posts) ---
+  const primaryLiker = likers?.[0] || null;
+  const othersCount = Math.max(0, (likeCount || 0) - 1);
+
+  const reactionIds = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            ...likers.map((u) => u.reactionId).filter(Boolean),
+            myReactionId, // include my reaction so UI updates instantly
+          ].filter(Boolean)
+        )
+      ),
+    [likers, myReactionId]
+  );
 
   const likeLabel =
-    likeCount === 0
-      ? "No likes yet"
-      : likeCount === 1
-        ? "1 like"
-        : `${likeCount} likes`;
+    primaryLiker && likeCount > 0
+      ? likeCount === 1
+        ? `reacted by ${primaryLiker.name}`
+        : `reacted by ${primaryLiker.name} and ${othersCount} others`
+      : `${(likeCount || 0).toLocaleString()} reactions`;
 
+  // Same text style as MyPosts: "reacted by avinash and 1 others"
+  const metaLikeLabel =
+    primaryLiker && likeCount > 0
+      ? likeCount === 1
+        ? `reacted by ${primaryLiker.name}`
+        : `reacted by ${primaryLiker.name} and ${othersCount} others`
+      : `${(likeCount || 0).toLocaleString()} reactions`;
 
-  const handleLikeClick = async () => {
-    const willUnlike = liked;
+  // --- Reaction picker popup (like MyPosts) ---
+  const [reactionAnchorEl, setReactionAnchorEl] = useState(null);
+  const pickerOpen = Boolean(reactionAnchorEl);
 
-    // optimistic UI
-    setLiked(!willUnlike);
-    setLikeCount((c) => Math.max(0, c + (willUnlike ? -1 : +1)));
+  const handleLikeClick = (event) => {
+    // open reactions popup instead of direct toggle
+    setReactionAnchorEl(event.currentTarget);
+  };
+
+  const handleClosePicker = () => setReactionAnchorEl(null);
+
+  const handleSelectReaction = async (reactionId) => {
+    handleClosePicker();
+
+    // Optimistic local update of my reaction
+    setMyReactionId((prev) => {
+      const next = prev === reactionId ? null : reactionId; // same → remove
+      setLiked(!!next);
+      return next;
+    });
 
     try {
-      await toggleProfilePostLike(post);
+      await toggleProfilePostReaction(post, reactionId);
       const counts = await fetchEngagementCountsForProfilePost(post);
       setLikeCount(counts.likes ?? 0);
       setShareCount(counts.shares ?? 0);
       setCommentCount(counts.comments ?? 0);
       setLiked(!!counts.user_has_liked);
     } catch (e) {
-      // rollback via re-fetch
-      const counts = await fetchEngagementCountsForProfilePost(post);
-      setLikeCount(counts.likes ?? 0);
-      setShareCount(counts.shares ?? 0);
-      setCommentCount(counts.comments ?? 0);
-      setLiked(!!counts.user_has_liked);
+      console.error("Failed to toggle reaction", e);
+      // counts re-sync keeps likeCount correct even if there’s an error
+      try {
+        const counts = await fetchEngagementCountsForProfilePost(post);
+        setLikeCount(counts.likes ?? 0);
+        setShareCount(counts.shares ?? 0);
+        setCommentCount(counts.comments ?? 0);
+        setLiked(!!counts.user_has_liked);
+      } catch { }
     }
   };
+
 
   return (
     <Card variant="outlined" sx={{ borderRadius: 2 }}>
@@ -534,44 +649,58 @@ function RichPostCard({
           })()}
       </CardContent>
       {/* Meta strip: likes bubble + shares count (same style as HomePage) */}
-      <Box sx={{ px: 1.25, pt: 0.75, pb: 0.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          {/* Left: liker avatars + text */}
-          <Stack direction="row" spacing={1} alignItems="center">
-            {/* If later you have real liker list, you can map it here.
-               For now we just show the avatars of the profile owner */}
-            <AvatarGroup
-              max={3}
-              sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}
+      {(likeCount > 0 || shareCount > 0) && (
+        <Box sx={{ px: 1.25, pt: 0.75, pb: 0.5 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            {/* Left: reaction bubbles + text (like My Posts) */}
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ cursor: likeCount > 0 ? "pointer" : "default" }}
+              onClick={() => {
+                if (likeCount > 0) setReactionsOpen(true);
+              }}
             >
-              {(likers || []).slice(0, 3).map((u) => (
-                <Avatar key={u.id || u.name} src={u.avatar}>
-                  {(u.name || "U").slice(0, 1)}
-                </Avatar>
-              ))}
-            </AvatarGroup>
+              {/* Reaction emoji bubbles */}
+              <AvatarGroup
+                max={3}
+                sx={{
+                  "& .MuiAvatar-root": {
+                    width: 24,
+                    height: 24,
+                    fontSize: 14,
+                  },
+                }}
+              >
+                {(reactionIds.length ? reactionIds : ["like"])
+                  .slice(0, 3)
+                  .map((rid) => {
+                    const def =
+                      POST_REACTIONS.find((r) => r.id === rid) ||
+                      POST_REACTIONS[0];
+                    return (
+                      <Avatar key={rid}>
+                        <span style={{ fontSize: 16 }}>{def.emoji}</span>
+                      </Avatar>
+                    );
+                  })}
+              </AvatarGroup>
 
-            <Typography variant="body2">
-              {likers?.[0]?.name
-                ? Math.max(0, (likeCount || 0) - 1) > 0
-                  ? `${likers[0].name} and ${Math.max(
-                    0,
-                    (likeCount || 0) - 1
-                  ).toLocaleString()} others`
-                  : likers[0].name
-                : `${(likeCount || 0).toLocaleString()} ${Number(likeCount || 0) === 1 ? "like" : "likes"
-                }`}
-            </Typography>
+              <Typography variant="body2">
+                {metaLikeLabel}
+              </Typography>
+            </Stack>
+
+            {/* Right: share count, like HomePage "My posts" section */}
+            <Button size="small" disabled={!shareCount} onClick={() => {
+              if (shareCount) setShareListOpen(true);
+            }}>
+              {shareCount.toLocaleString()} SHARES
+            </Button>
           </Stack>
-
-          {/* Right: share count, like HomePage "My posts" section */}
-          <Button size="small" disabled={!shareCount} onClick={() => {
-            if (shareCount) setShareListOpen(true);
-          }}>
-            {shareCount.toLocaleString()} SHARES
-          </Button>
-        </Stack>
-      </Box>
+        </Box>
+      )}
 
       <Divider sx={{ my: 1 }} />
 
@@ -587,23 +716,29 @@ function RichPostCard({
           flexWrap: "nowrap",
         }}
       >
-        {/* LIKE */}
+        {/* LIKE / REACTIONS */}
         <Button
           size="small"
-          startIcon={liked ? <FavoriteRoundedIcon /> : <FavoriteBorderIcon />}
           onClick={handleLikeClick}
           sx={{
             flex: { xs: 1, sm: "0 0 auto" },
             minWidth: 0,
             px: { xs: 0.25, sm: 1 },
             fontSize: { xs: 11, sm: 12 },
-            color: liked ? "error.main" : "text.secondary",
+            textTransform: "none",
+            color: hasReaction ? "primary.main" : "text.secondary",
+            fontWeight: hasReaction ? 600 : 400,
             "& .MuiButton-startIcon": {
               mr: { xs: 0.25, sm: 0.5 },
             },
           }}
+          startIcon={
+            <span style={{ fontSize: 18, lineHeight: 1 }}>
+              {likeBtnEmoji}
+            </span>
+          }
         >
-          LIKE
+          {likeBtnLabel}
         </Button>
 
         {/* COMMENT */}
@@ -673,6 +808,52 @@ function RichPostCard({
         onClose={() => setShareListOpen(false)}
         postId={post.id}
       />
+      <ProfileReactionsDialog
+        open={reactionsOpen}
+        onClose={() => setReactionsOpen(false)}
+        postId={post.id}
+      />
+      {/* Reactions picker popover (LinkedIn-style) */}
+      <Popover
+        open={pickerOpen}
+        anchorEl={reactionAnchorEl}
+        onClose={handleClosePicker}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+        disableRestoreFocus
+      >
+        <Box
+          sx={{
+            p: 1,
+            display: "flex",
+            gap: 1,
+            px: 1.5,
+          }}
+        >
+          {POST_REACTIONS.map((r) => (
+            <Tooltip key={r.id} title={r.label}>
+              <Box
+                onClick={() => handleSelectReaction(r.id)}
+                sx={{
+                  cursor: "pointer",
+                  fontSize: 26,
+                  lineHeight: 1,
+                  px: 0.5,
+                  py: 0.25,
+                  borderRadius: "999px",
+                  transition: "transform 120ms ease, background 120ms ease",
+                  "&:hover": {
+                    bgcolor: "action.hover",
+                    transform: "translateY(-2px) scale(1.05)",
+                  },
+                }}
+              >
+                {r.emoji}
+              </Box>
+            </Tooltip>
+          ))}
+        </Box>
+      </Popover>
     </Card>
   );
 }
@@ -687,6 +868,204 @@ function pickBestExperience(exps = []) {
     return new Date(bEnd) - new Date(aEnd);
   })[0];
 }
+
+// --- Reactions popup for Rich Profile posts ---
+function ProfileReactionsDialog({ open, onClose, postId }) {
+  const [users, setUsers] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [activeFilter, setActiveFilter] = React.useState("all");
+
+  React.useEffect(() => {
+    if (!open || !postId) return;
+
+    setActiveFilter("all");
+    setLoading(true);
+
+    (async () => {
+      try {
+        const targetType = "activity_feed.feeditem";
+
+        // Try main reactions endpoint first, then who-liked (same style as MyPostsPage)
+        const endpoints = [
+          `${API_BASE}/engagements/reactions/?target_type=${encodeURIComponent(
+            targetType
+          )}&target_id=${postId}&page_size=500`,
+          `${API_BASE}/engagements/reactions/who-liked/?feed_item=${postId}&page_size=500`,
+        ];
+
+        let rows = [];
+
+        for (const url of endpoints) {
+          try {
+            const res = await fetch(url, {
+              headers: { Accept: "application/json", ...tokenHeader() },
+              credentials: "include",
+            });
+            if (!res.ok) continue;
+
+            const j = await res.json().catch(() => null);
+            const candidate = Array.isArray(j?.results)
+              ? j.results
+              : Array.isArray(j)
+                ? j
+                : Array.isArray(j?.data)
+                  ? j.data
+                  : [];
+
+            if (!candidate.length) continue;
+
+            rows = candidate;
+            break;
+          } catch (err) {
+            console.error("ProfileReactionsDialog: error from", url, err);
+          }
+        }
+
+        const parsed = rows
+          .map((row) => {
+            const u =
+              row.user ||
+              row.actor ||
+              row.profile ||
+              row.owner ||
+              row.author ||
+              {};
+
+            const id = u.id ?? row.user_id ?? row.id;
+            if (!id) return null;
+
+            const first = u.first_name || u.firstName || "";
+            const last = u.last_name || u.lastName || "";
+
+            const name =
+              u.full_name ||
+              u.name ||
+              (first || last ? `${first} ${last}`.trim() : u.username) ||
+              `User #${id}`;
+
+            const avatar =
+              u.avatar_url ||
+              u.user_image_url ||
+              u.avatar ||
+              u.photo ||
+              u.image ||
+              "";
+
+            const reactionId =
+              row.reaction ||
+              row.reaction_type ||
+              row.kind ||
+              row.type ||
+              "like";
+
+            const reactionDef =
+              POST_REACTIONS.find((r) => r.id === reactionId) ||
+              POST_REACTIONS[0];
+
+            return {
+              id,
+              name,
+              avatar,
+              reactionId,
+              reactionEmoji: reactionDef.emoji,
+              reactionLabel: reactionDef.label,
+            };
+          })
+          .filter(Boolean);
+
+        setUsers(parsed);
+      } catch (e) {
+        console.error("Failed to load reactions:", e);
+        setUsers([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [open, postId]);
+
+  const reactionSummary = React.useMemo(() => {
+    const map = {};
+    for (const u of users) {
+      const key = u.reactionId || "like";
+      map[key] = (map[key] || 0) + 1;
+    }
+    return map;
+  }, [users]);
+
+  const filteredUsers =
+    activeFilter === "all"
+      ? users
+      : users.filter((u) => u.reactionId === activeFilter);
+
+  return (
+    <Dialog open={!!open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Reactions</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}>
+            <CircularProgress size={22} />
+          </Stack>
+        ) : (
+          <>
+            {/* Filter chips: All + each reaction with count */}
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
+              <Chip
+                size="small"
+                label={`All (${users.length})`}
+                variant={activeFilter === "all" ? "filled" : "outlined"}
+                onClick={() => setActiveFilter("all")}
+              />
+              {POST_REACTIONS.map((r) => {
+                const count = reactionSummary[r.id] || 0;
+                if (!count) return null;
+                return (
+                  <Chip
+                    key={r.id}
+                    size="small"
+                    label={`${r.emoji} ${r.label} (${count})`}
+                    variant={activeFilter === r.id ? "filled" : "outlined"}
+                    onClick={() => setActiveFilter(r.id)}
+                  />
+                );
+              })}
+            </Stack>
+
+            {/* List of users + which reaction they gave */}
+            {filteredUsers.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No reactions yet.
+              </Typography>
+            ) : (
+              <List dense>
+                {filteredUsers.map((u) => (
+                  <ListItem key={u.id}>
+                    <ListItemAvatar>
+                      <Avatar src={u.avatar}>
+                        {(u.name || "U").slice(0, 1)}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={u.name}
+                      secondary={
+                        u.reactionEmoji
+                          ? `${u.reactionEmoji} ${u.reactionLabel}`
+                          : undefined
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 
 
 function ProfileCommentsDialog({ open, onClose, postId }) {
