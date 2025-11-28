@@ -481,62 +481,64 @@ function PostCard({
       </CardContent>
 
       <CardActions sx={{ px: 2, pb: 1, display: "block" }}>
-        <Box sx={{ pb: 1 }}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-          >
+        {(likeCount > 0 || shareCount > 0) && (
+          <Box sx={{ pb: 1 }}>
             <Stack
               direction="row"
-              spacing={1}
               alignItems="center"
-              sx={{ cursor: "pointer" }}
-              onClick={() => onOpenLikes(post.id)}
+              justifyContent="space-between"
             >
-              <AvatarGroup
-                max={3}
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                sx={{ cursor: "pointer" }}
+                onClick={() => onOpenLikes(post.id)}
+              >
+                <AvatarGroup
+                  max={3}
+                  sx={{
+                    "& .MuiAvatar-root": {
+                      width: 24,
+                      height: 24,
+                      fontSize: 14,
+                    },
+                  }}
+                >
+                  {(reactionIds.length ? reactionIds : ["like"])
+                    .slice(0, 3)
+                    .map((rid) => {
+                      const def =
+                        POST_REACTIONS.find((r) => r.id === rid) ||
+                        POST_REACTIONS[0];
+                      return (
+                        <Avatar key={rid}>
+                          <span style={{ fontSize: 16 }}>{def.emoji}</span>
+                        </Avatar>
+                      );
+                    })}
+                </AvatarGroup>
+
+                <Typography variant="caption" sx={{ ml: 1 }}>
+                  {likeLabel}
+                </Typography>
+              </Stack>
+
+
+              <Button
+                size="small"
+                onClick={() => onViewShares(post.id)}
                 sx={{
-                  "& .MuiAvatar-root": {
-                    width: 24,
-                    height: 24,
-                    fontSize: 14,
-                  },
+                  textTransform: "none",
+                  color: "text.secondary",
+                  fontSize: 12,
                 }}
               >
-                {(reactionIds.length ? reactionIds : ["like"])
-                  .slice(0, 3)
-                  .map((rid) => {
-                    const def =
-                      POST_REACTIONS.find((r) => r.id === rid) ||
-                      POST_REACTIONS[0];
-                    return (
-                      <Avatar key={rid}>
-                        <span style={{ fontSize: 16 }}>{def.emoji}</span>
-                      </Avatar>
-                    );
-                  })}
-              </AvatarGroup>
-
-              <Typography variant="caption" sx={{ ml: 1 }}>
-                {likeLabel}
-              </Typography>
+                {shareCount} Shares
+              </Button>
             </Stack>
-
-
-            <Button
-              size="small"
-              onClick={() => onViewShares(post.id)}
-              sx={{
-                textTransform: "none",
-                color: "text.secondary",
-                fontSize: 12,
-              }}
-            >
-              {shareCount} Shares
-            </Button>
-          </Stack>
-        </Box>
+          </Box>
+        )}
 
         <Divider sx={{ mb: 1 }} />
 
@@ -679,28 +681,69 @@ function LikesDialog({ open, postId, onClose }) {
           const d = await r.json();
           const rows = Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
           if (rows.length === 0) continue;
-          const parsed = rows.map(r => {
-            let u = r.user || r.owner || r.liker;
-            if (!u) u = { id: r.user_id ?? r.owner_id ?? r.id, username: r.user_username ?? r.username, first_name: r.user_first_name ?? r.first_name, last_name: r.user_last_name ?? r.last_name, user_image: r.user_image || r.user_avatar || r.avatar, headline: r.user_headline ?? r.headline };
-            const p = u.profile || r.profile || {};
-            const first = u.first_name || u.firstName || ""; const last = u.last_name || u.lastName || ""; let displayName = u.name || u.full_name || (first || last ? `${first} ${last}` : u.username); if (!displayName) displayName = "User";
-            const reactionId = r.reaction || r.reaction_type || r.kind || null;
-            const def =
-              POST_REACTIONS.find((x) => x.id === reactionId) ||
-              POST_REACTIONS[0];
+          const parsed = rows
+            .map((r) => {
+              // 1) resolve user object
+              let u =
+                r.user ||
+                r.owner ||
+                r.liker ||
+                r.actor ||
+                r.profile ||
+                r; // fallback
 
-            return {
-              id: u.id,
-              name: displayName.trim(),
-              avatar: toAbsolute(
-                u.user_image || u.avatar || p.user_image_url || p.user_image || ""
-              ),
-              headline: u.headline || u.job_title || p.headline || "",
-              reactionId,
-              reactionEmoji: def.emoji,
-              reactionLabel: def.label,
-            };
-          }).filter(x => x.id);
+              const profile = u.profile || r.profile || {};
+              const id =
+                u.id ??
+                r.user_id ??
+                r.owner_id ??
+                r.actor_id ??
+                r.id;
+
+              const first = u.first_name || u.firstName || "";
+              const last = u.last_name || u.lastName || "";
+
+              let displayName =
+                u.name ||
+                u.full_name ||
+                r.user_name ||
+                r.owner_name ||
+                r.actor_name;
+
+              if (!displayName && (first || last)) {
+                displayName = `${first} ${last}`.trim();
+              }
+              if (!displayName) {
+                displayName = u.username || `User #${id}`;
+              }
+
+              const avatarRaw =
+                profile.user_image_url ||
+                profile.user_image ||
+                u.user_image ||
+                u.avatar ||
+                r.user_image ||
+                r.avatar ||
+                "";
+
+              // 2) reaction info from backend
+              const reactionId =
+                r.reaction || r.reaction_type || r.kind || null;
+
+              const def =
+                POST_REACTIONS.find((x) => x.id === reactionId) ||
+                POST_REACTIONS[0]; // default to 👍 Like
+
+              return {
+                id,
+                name: displayName.trim(),
+                avatar: toAbsolute(avatarRaw),
+                reactionId,
+                reactionEmoji: def.emoji,
+                reactionLabel: def.label,
+              };
+            })
+            .filter((x) => x.id);
           if (parsed.length > 0) { setUsers(parsed); foundData = true; break; }
         } catch (e) { console.error(e); }
       }
@@ -755,33 +798,33 @@ function LikesDialog({ open, postId, onClose }) {
         </Box>
         {loading ? (
           <LinearProgress />
+        ) : filteredUsers.length ? (
+          <List dense disablePadding>
+            {filteredUsers.map((u) => (
+              <ListItem key={u.id}>
+                <ListItemAvatar>
+                  <Avatar src={u.avatar} />
+                </ListItemAvatar>
+                <ListItemText primary={u.name} secondary={u.headline} />
+                {u.reactionEmoji && (
+                  <ListItemSecondaryAction>
+                    <Tooltip title={u.reactionLabel || ""}>
+                      <Box sx={{ fontSize: 20, mr: 1 }}>
+                        {u.reactionEmoji}
+                      </Box>
+                    </Tooltip>
+                  </ListItemSecondaryAction>
+                )}
+              </ListItem>
+            ))}
+          </List>
         ) : (
-          filteredUsers.map((u) => (
-            <ListItem
-              key={u.id}  // ⬅️ render as <div>, no bullet
-            >
-              <ListItemAvatar>
-                <Avatar src={u.avatar} />
-              </ListItemAvatar>
-              <ListItemText primary={u.name} secondary={u.headline} />
-              {u.reactionEmoji && (
-                <ListItemSecondaryAction>
-                  <Tooltip title={u.reactionLabel || ""}>
-                    <Box sx={{ fontSize: 20, mr: 1 }}>
-                      {u.reactionEmoji}
-                    </Box>
-                  </Tooltip>
-                </ListItemSecondaryAction>
-              )}
-            </ListItem>
-          ))
-        )}
-
-        {!loading && !filteredUsers.length && (
           <Typography p={2} color="text.secondary">
             No reactions yet.
           </Typography>
         )}
+
+
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
