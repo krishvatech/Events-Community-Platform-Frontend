@@ -158,6 +158,35 @@ function getCountryFromUser(u) {
   return (displayCountry(u) || "").trim();
 }
 
+// ✅ HELPER: Industry
+function getIndustryFromUser(u) {
+  return (
+    u?.industry_from_experience || 
+    u?.profile?.industry || 
+    u?.industry || 
+    ""
+  ).trim();
+}
+
+// ✅ HELPER: Company Size
+function getCompanySizeFromUser(u) {
+  return (
+    u?.number_of_employees_from_experience || 
+    u?.profile?.number_of_employees || 
+    u?.number_of_employees || 
+    ""
+  ).trim();
+}
+
+// ✅ HELPER: Parse size for sorting (e.g. "11-50" -> 11, "5000+" -> 5000)
+function getMinCompanySize(s) {
+  if (!s) return 0;
+  // Handle formats like "1-10", "5000+", "10,000+"
+  const firstPart = s.split("-")[0]; // Take the part before dash
+  const clean = firstPart.replace(/[^0-9]/g, ""); // Remove non-digits (like +, commas)
+  return parseInt(clean, 10) || 0;
+}
+
 function flagEmojiFromISO2(code) {
   if (!code || code.length !== 2) return "";
   const cc = code.toUpperCase();
@@ -571,6 +600,19 @@ export default function MembersPage() {
   const [selectedCountries, setSelectedCountries] = useState([]);
   const [selectedTitles, setSelectedTitles] = useState([]);
 
+  // ✅ 1. NEW STATES
+  const [selectedIndustries, setSelectedIndustries] = useState([]);
+  const [selectedCompanySizes, setSelectedCompanySizes] = useState([]);
+
+  // ✅ 2. GLOBAL OPTIONS STATE
+  const [globalOptions, setGlobalOptions] = useState({
+    companies: [],
+    titles: [],
+    industries: [],
+    sizes: [],
+    countries: [],
+  });
+
 
   const [tabValue, setTabValue] = useState(0);
 
@@ -578,7 +620,7 @@ export default function MembersPage() {
   const [showMap, setShowMap] = useState(true);
   const [mapPos, setMapPos] = useState({ coordinates: [0, 0], zoom: 1 });
 
-  const hasSideMap = !isCompact;
+  const hasSideMap = true;
 
   const [page, setPage] = useState(1);
   const ROWS_PER_PAGE = 5;
@@ -628,6 +670,48 @@ export default function MembersPage() {
       alert(e?.message || "Failed to send request");
     }
   }
+
+  // ✅ 3. LOAD GLOBAL FILTER OPTIONS
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/users/filters/`, {
+          headers: tokenHeader(),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (!alive) return;
+
+        // Extract clean country names from location strings
+        const countrySet = new Set();
+        (data.locations || []).forEach((loc) => {
+          const c = extractCountryFromLocation(loc);
+          if (c) countrySet.add(c);
+        });
+        const sortedCountries = Array.from(countrySet).sort((a, b) =>
+          a.localeCompare(b)
+        );
+
+        // ✅ Sort company sizes numerically (Small -> Large)
+        const sortedSizes = (data.sizes || []).sort((a, b) => getMinCompanySize(a) - getMinCompanySize(b));
+
+        setGlobalOptions({
+          companies: data.companies || [],
+          titles: data.titles || [],
+          industries: data.industries || [],
+          sizes: sortedSizes, // Uses new numeric sort
+          countries: sortedCountries,
+        });
+      } catch (e) {
+        console.error("Failed to load filter options", e);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // data load
   useEffect(() => {
@@ -680,43 +764,6 @@ export default function MembersPage() {
     return () => { alive = false; ctrl.abort(); };
   }, [me?.id]);
 
-  const companyOptions = useMemo(() => {
-    const set = new Set();
-    users.forEach((u) => {
-      const c = getCompanyFromUser(u);
-      if (c) set.add(c);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [users]);
-
-  const countryOptions = useMemo(() => {
-    const map = new Map();
-
-    users.forEach((u) => {
-      const raw = getCountryFromUser(u);
-      if (!raw) return;
-
-      const cleaned = raw.trim();
-      const key = cleaned.toLowerCase(); // use lower-case for dedupe
-
-      if (!map.has(key)) {
-        map.set(key, cleaned); // store the nicely formatted label once
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
-  }, [users]);
-
-
-  const titleOptions = useMemo(() => {
-    const set = new Set();
-    users.forEach((u) => {
-      const t = getJobTitleFromUser(u);
-      if (t) set.add(t);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [users]);
-
 
   const filtered = useMemo(() => {
     let sourceList = users;
@@ -729,25 +776,34 @@ export default function MembersPage() {
       });
     }
 
-    // ✅ Company filter
+    // Company filter
     if (selectedCompanies.length) {
       sourceList = sourceList.filter((u) =>
         selectedCompanies.includes(getCompanyFromUser(u))
       );
     }
 
-    // ✅ Country filter
+    // Country filter
     if (selectedCountries.length) {
       sourceList = sourceList.filter((u) =>
         selectedCountries.includes(getCountryFromUser(u))
       );
     }
 
-    // ✅ Job title filter
+    // Job title filter
     if (selectedTitles.length) {
       sourceList = sourceList.filter((u) =>
         selectedTitles.includes(getJobTitleFromUser(u))
       );
+    }
+
+    // ✅ 4. FILTER BY INDUSTRY & SIZE
+    if (selectedIndustries.length) {
+      sourceList = sourceList.filter((u) => selectedIndustries.includes(getIndustryFromUser(u)));
+    }
+
+    if (selectedCompanySizes.length) {
+      sourceList = sourceList.filter((u) => selectedCompanySizes.includes(getCompanySizeFromUser(u)));
     }
 
     const s = (q || "").toLowerCase().trim();
@@ -789,6 +845,9 @@ export default function MembersPage() {
         ""
       ).toLowerCase();
 
+      // ✅ Add Industry to text search haystack
+      const ind = getIndustryFromUser(u).toLowerCase();
+
       const haystack = [
         fn,
         ln,
@@ -799,6 +858,7 @@ export default function MembersPage() {
         role,
         countryName,
         city,
+        ind, // Added
         ...skills,
       ];
 
@@ -812,6 +872,8 @@ export default function MembersPage() {
     selectedCompanies,
     selectedCountries,
     selectedTitles,
+    selectedIndustries,   // Added
+    selectedCompanySizes, // Added
   ]);
 
 
@@ -892,7 +954,7 @@ export default function MembersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [q, tabValue, selectedCompanies, selectedCountries, selectedTitles]);
+  }, [q, tabValue, selectedCompanies, selectedCountries, selectedTitles, selectedIndustries, selectedCompanySizes]); // ✅ Added deps
 
 
   const handleTabChange = (event, newValue) => {
@@ -935,41 +997,44 @@ export default function MembersPage() {
   const resetView = () => setMapPos({ coordinates: [0, 0], zoom: MIN_ZOOM });
 
   /* -------------------------------- UI -------------------------------- */
+    /* -------------------------------- UI -------------------------------- */
   return (
     <>
-      <Grid
-        container
-        spacing={hasSideMap ? 2 : 0}
-        alignItems={hasSideMap ? "stretch" : "flex-start"}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          gap: 2,
+          alignItems: "stretch",
+        }}
       >
-        {/* Left: Member list */}
-        <Grid
-          item
-          xs={12}
-          md={hasSideMap ? 5 : 12}
-          lg={hasSideMap ? 7 : 12}
-          xl={hasSideMap ? 7 : 12}
-          sx={{ minWidth: 0, display: "flex" }}
+        {/* LEFT: members list + filters (50%) */}
+        <Box
+          sx={{
+            flexBasis: { xs: "100%", md: "50%" },
+            maxWidth: { xs: "100%", md: "50%" },
+            minWidth: 0,
+            display: "flex",
+          }}
         >
           <Box
             sx={{
-              // 👇 Set width per device
-              width: {
-                xs: 410,  // 0–599px  → mobile
-                sm: 740,     // 600–899px → tablet (includes 768px)
-                md: "100%",  // 900px+    → desktop (use full grid width)
-                // if you want, you can also add:
-                // lg: 840,
-                // xl: 960,
-              },
-              mx: "auto",        // center when width is a fixed number
+              width: "100%",
+              mx: "auto",
               display: "flex",
               flexDirection: "column",
               height: "100%",
             }}
           >
             {/* Header Paper */}
-            <Paper sx={{ p: 1.5, mb: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+            <Paper
+              sx={{
+                p: 1.5,
+                mb: 1.5,
+                border: `1px solid ${BORDER}`,
+                borderRadius: 3,
+              }}
+            >
               <Stack spacing={1.25}>
                 {/* Title row */}
                 <Stack
@@ -978,7 +1043,8 @@ export default function MembersPage() {
                   justifyContent="space-between"
                 >
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    {tabValue === 0 ? "All Members" : "My Contacts"} ({filtered.length})
+                    {tabValue === 0 ? "All Members" : "My Contacts"} (
+                    {filtered.length})
                   </Typography>
 
                   {isCompact && (
@@ -1010,116 +1076,195 @@ export default function MembersPage() {
                   }}
                 />
 
-                {/* Filters row: company / country / job title */}
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1}
+                {/* Filters row: top = company/country/job title, bottom = industry/company size */}
+                <Box
                   sx={{
                     width: "100%",
-                    flexWrap: "wrap",
-                    "& > *": {
-                      minWidth: { xs: "100%", sm: 180 },
-                      maxWidth: { xs: "100%", sm: 260 },
-                    },
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1,
                   }}
                 >
-                  {/* Company filter */}
-                  <TextField
-                    size="small"
-                    select
-                    label="Company"
-                    value={selectedCompanies}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedCompanies(
-                        typeof value === "string" ? value.split(",") : value
-                      );
-                    }}
-                    InputLabelProps={{ shrink: true }}
-                    SelectProps={{
-                      multiple: true,
-                      displayEmpty: true,
-                      renderValue: (selected) => {
-                        if (!selected || selected.length === 0) {
-                          return "All companies";
-                        }
-                        return selected.join(", ");
-                      },
-                    }}
+                  {/* Row 1: Company, Country, Job title */}
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1}
                   >
-                    {companyOptions.map((name) => (
-                      <MenuItem key={name} value={name}>
-                        <Checkbox checked={selectedCompanies.indexOf(name) > -1} />
-                        <ListItemText primary={name} />
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                    {/* Company */}
+                    <TextField
+                      size="small"
+                      select
+                      fullWidth
+                      label="Company"
+                      value={selectedCompanies}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedCompanies(
+                          typeof value === "string" ? value.split(",") : value
+                        );
+                      }}
+                      InputLabelProps={{ shrink: true }}
+                      SelectProps={{
+                        multiple: true,
+                        displayEmpty: true,
+                        renderValue: (selected) => {
+                          if (!selected || selected.length === 0) {
+                            return "All companies";
+                          }
+                          return selected.join(", ");
+                        },
+                      }}
+                      sx={{ flex: 1 }}
+                    >
+                      {globalOptions.companies.map((name) => (
+                        <MenuItem key={name} value={name}>
+                          <Checkbox checked={selectedCompanies.indexOf(name) > -1} />
+                          <ListItemText primary={name} />
+                        </MenuItem>
+                      ))}
+                    </TextField>
 
-                  {/* Country filter */}
-                  <TextField
-                    size="small"
-                    select
-                    label="Country"
-                    value={selectedCountries}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedCountries(
-                        typeof value === "string" ? value.split(",") : value
-                      );
-                    }}
-                    InputLabelProps={{ shrink: true }}
-                    SelectProps={{
-                      multiple: true,
-                      displayEmpty: true,
-                      renderValue: (selected) => {
-                        if (!selected || selected.length === 0) {
-                          return "All countries";
-                        }
-                        return selected.join(", ");
-                      },
-                    }}
+                    {/* Country */}
+                    <TextField
+                      size="small"
+                      select
+                      fullWidth
+                      label="Country"
+                      value={selectedCountries}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedCountries(
+                          typeof value === "string" ? value.split(",") : value
+                        );
+                      }}
+                      InputLabelProps={{ shrink: true }}
+                      SelectProps={{
+                        multiple: true,
+                        displayEmpty: true,
+                        renderValue: (selected) => {
+                          if (!selected || selected.length === 0) {
+                            return "All countries";
+                          }
+                          return selected.join(", ");
+                        },
+                      }}
+                      sx={{ flex: 1 }}
+                    >
+                      {globalOptions.countries.map((name) => (
+                        <MenuItem key={name} value={name}>
+                          <Checkbox checked={selectedCountries.indexOf(name) > -1} />
+                          <ListItemText primary={name} />
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    {/* Job title */}
+                    <TextField
+                      size="small"
+                      select
+                      fullWidth
+                      label="Job title"
+                      value={selectedTitles}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedTitles(
+                          typeof value === "string" ? value.split(",") : value
+                        );
+                      }}
+                      InputLabelProps={{ shrink: true }}
+                      SelectProps={{
+                        multiple: true,
+                        displayEmpty: true,
+                        renderValue: (selected) => {
+                          if (!selected || selected.length === 0) {
+                            return "All job titles";
+                          }
+                          return selected.join(", ");
+                        },
+                      }}
+                      sx={{ flex: 1 }}
+                    >
+                      {globalOptions.titles.map((name) => (
+                        <MenuItem key={name} value={name}>
+                          <Checkbox checked={selectedTitles.indexOf(name) > -1} />
+                          <ListItemText primary={name} />
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Stack>
+
+                  {/* Row 2: Industry, Company size */}
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1}
                   >
-                    {countryOptions.map((name) => (
-                      <MenuItem key={name} value={name}>
-                        <Checkbox checked={selectedCountries.indexOf(name) > -1} />
-                        <ListItemText primary={name} />
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                    {/* Industry */}
+                    <TextField
+                      size="small"
+                      select
+                      fullWidth
+                      label="Industry"
+                      value={selectedIndustries}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedIndustries(
+                          typeof value === "string" ? value.split(",") : value
+                        );
+                      }}
+                      InputLabelProps={{ shrink: true }}
+                      SelectProps={{
+                        multiple: true,
+                        displayEmpty: true,
+                        renderValue: (selected) => {
+                          if (!selected || selected.length === 0) return "All industries";
+                          return selected.join(", ");
+                        },
+                      }}
+                      sx={{ flex: 1 }}
+                    >
+                      {globalOptions.industries.map((name) => (
+                        <MenuItem key={name} value={name}>
+                          <Checkbox checked={selectedIndustries.indexOf(name) > -1} />
+                          <ListItemText primary={name} />
+                        </MenuItem>
+                      ))}
+                    </TextField>
 
-                  {/* Job title filter */}
-                  <TextField
-                    size="small"
-                    select
-                    label="Job title"
-                    value={selectedTitles}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedTitles(
-                        typeof value === "string" ? value.split(",") : value
-                      );
-                    }}
-                    InputLabelProps={{ shrink: true }}
-                    SelectProps={{
-                      multiple: true,
-                      displayEmpty: true,
-                      renderValue: (selected) => {
-                        if (!selected || selected.length === 0) {
-                          return "All job titles";
-                        }
-                        return selected.join(", ");
-                      },
-                    }}
-                  >
-                    {titleOptions.map((name) => (
-                      <MenuItem key={name} value={name}>
-                        <Checkbox checked={selectedTitles.indexOf(name) > -1} />
-                        <ListItemText primary={name} />
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                    {/* Company size */}
+                    <TextField
+                      size="small"
+                      select
+                      fullWidth
+                      label="Company Size"
+                      value={selectedCompanySizes}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedCompanySizes(
+                          typeof value === "string" ? value.split(",") : value
+                        );
+                      }}
+                      InputLabelProps={{ shrink: true }}
+                      SelectProps={{
+                        multiple: true,
+                        displayEmpty: true,
+                        renderValue: (selected) => {
+                          if (!selected || selected.length === 0) return "All sizes";
+                          return selected.join(", ");
+                        },
+                      }}
+                      sx={{ flex: 1 }}
+                    >
+                      {globalOptions.sizes.map((name) => (
+                        <MenuItem key={name} value={name}>
+                          <Checkbox checked={selectedCompanySizes.indexOf(name) > -1} />
+                          <ListItemText primary={name} />
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Stack>
+                </Box>
 
-                </Stack>
+
 
                 {/* Tabs row */}
                 <Tabs
@@ -1148,7 +1293,13 @@ export default function MembersPage() {
             {loading && <LinearProgress />}
 
             {!loading && error && (
-              <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+              <Paper
+                sx={{
+                  p: 2,
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 3,
+                }}
+              >
                 <Typography color="error">⚠️ {error}</Typography>
               </Paper>
             )}
@@ -1187,7 +1338,8 @@ export default function MembersPage() {
                       }}
                     >
                       <Typography>
-                        {tabValue === 1 && Object.keys(friendStatusByUser).length === 0
+                        {tabValue === 1 &&
+                        Object.keys(friendStatusByUser).length === 0
                           ? "No friends found."
                           : "No members match your search."}
                       </Typography>
@@ -1207,9 +1359,9 @@ export default function MembersPage() {
                     {filtered.length === 0
                       ? "0"
                       : `${startIdx + 1}–${Math.min(
-                        startIdx + ROWS_PER_PAGE,
-                        filtered.length
-                      )} of ${filtered.length}`}
+                          startIdx + ROWS_PER_PAGE,
+                          filtered.length
+                        )} of ${filtered.length}`}
                   </Typography>
                   <Pagination
                     count={pageCount}
@@ -1222,22 +1374,16 @@ export default function MembersPage() {
               </>
             )}
           </Box>
-        </Grid>
+        </Box>
 
-        {/* Right: map panel */}
+        {/* RIGHT: map panel (50%) – hidden on small screens */}
         {hasSideMap && (
-          <Grid
-            item
-            xs={12}
-            md={7}
-            lg={5}
-            xl={5}
+          <Box
             sx={{
+              flexBasis: { xs: "100%", md: "50%" },
+              maxWidth: { xs: "100%", md: "50%" },
               minWidth: 0,
-              display: "flex",
-              // ⬇️ narrower map at 1440px (lg), keep 600px for very large (xl)
-              flexBasis: { lg: 520, xl: 600 },
-              maxWidth: { lg: 520, xl: 600 },
+              display: { xs: "none", md: "flex" },
             }}
           >
             <Paper
@@ -1245,11 +1391,10 @@ export default function MembersPage() {
                 p: 1.5,
                 border: `1px solid ${BORDER}`,
                 borderRadius: 3,
-                // ⬇️ REMOVE sticky + fixed viewport height
-                // position: { md: "sticky" },
-                // top: 88,
-                // height: { xs: 520, md: "calc(100vh - 140px)" },
-                width: "100%",                         // ⬅️ full width of grid cell
+                position: { md: "sticky" },
+                top: 88,
+                height: { xs: 520, md: "calc(100vh - 140px)" },
+                width: "100%",
                 display: "flex",
                 flexDirection: "column",
                 gap: 1,
@@ -1319,11 +1464,11 @@ export default function MembersPage() {
                 showMap={showMap}
               />
             </Paper>
-          </Grid>
+          </Box>
         )}
-      </Grid>
+      </Box>
 
-      {/* 🔹 Full-screen map overlay for mobile / tablet / 900px */}
+      {/* Full-screen map overlay for mobile / tablet */}
       {isCompact && mapOverlayOpen && (
         <Box
           sx={{
@@ -1345,7 +1490,7 @@ export default function MembersPage() {
               gap: 1,
             }}
           >
-            {/* Top bar with back button */}
+            {/* Top bar */}
             <Stack
               direction="row"
               alignItems="center"
@@ -1363,7 +1508,7 @@ export default function MembersPage() {
               </Typography>
             </Stack>
 
-            {/* Header + legend (similar to desktop map) */}
+            {/* Header + legend */}
             <Stack
               direction={{ xs: "column", sm: "row" }}
               alignItems={{ xs: "flex-start", sm: "center" }}
@@ -1401,7 +1546,7 @@ export default function MembersPage() {
                       height: 12,
                       borderRadius: "50%",
                       bgcolor: CURRENT_MAP_THEME.memberDot,
-                      border: "1px solid #fff",
+                      border: "1px solid #fff",    // ✅ fixed
                     }}
                   />
                   <Typography variant="caption">Members</Typography>
@@ -1432,4 +1577,5 @@ export default function MembersPage() {
       )}
     </>
   );
+
 }
