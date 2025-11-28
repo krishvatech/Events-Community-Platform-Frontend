@@ -211,11 +211,7 @@ function DyteMeetingWrapper({
   const [meeting, initMeeting] = useDyteClient();
   const [initError, setInitError] = useState("");
   const [initDone, setInitDone] = useState(false);
-  
-  // ✅ FIX: Initialize as undefined. Do NOT use {}
   const [dyteConfig, setDyteConfig] = useState(undefined);
-  
-  // Host Detection State
   const [hostJoined, setHostJoined] = useState(false);
 
   // Expose meeting instance
@@ -237,7 +233,7 @@ function DyteMeetingWrapper({
           authToken,
           defaults: {
             audio: false,
-            video: role === "publisher", 
+            video: role === "publisher",
           },
         });
         if (!cancelled) setInitDone(true);
@@ -256,7 +252,7 @@ function DyteMeetingWrapper({
       await fetch(toApiUrl(`events/${eventId}/live-status/`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ action }), 
+        body: JSON.stringify({ action }),
       });
       console.log(`Updated DB status to: ${action === 'start' ? 'LIVE' : 'ENDED'}`);
     } catch (e) {
@@ -271,58 +267,89 @@ function DyteMeetingWrapper({
     }
   }, [initDone, role, updateLiveStatus]);
 
-  // Host Detection (for Waiting Screen) AND Auto-Pinning (for Spotlight)
+  // -------------------------------------------------------------
+  // ✅ FIX: SPOTLIGHT LOGIC & PINNING
+  // -------------------------------------------------------------
   useEffect(() => {
-    if (!meeting || !initDone) return;
+    if (!meeting || !initDone || !meeting.self) return;
 
+    // Helper: Enforce Spotlight Layout
+    const enforceSpotlightLayout = () => {
+       // 'ACTIVE_GRID' automatically handles: Pinned User = Big, Others = Small/Sidebar
+       if (meeting.participants && typeof meeting.participants.setViewMode === 'function') {
+           meeting.participants.setViewMode('ACTIVE_GRID');
+       }
+    };
+
+    // 1. HOST LOGIC: Wait for room join, then pin self
     if (role === "publisher") {
       setHostJoined(true);
-      return;
+
+      const performHostSetup = async () => {
+        try {
+          // Pin self so the host sees themselves big (optional, but good for confidence)
+          if (!meeting.self.isPinned) {
+            await meeting.self.pin();
+          }
+          enforceSpotlightLayout();
+        } catch (e) {
+          console.warn("Host setup error:", e);
+        }
+      };
+
+      // Listener for when the user ACTUALLY enters the room
+      const handleRoomJoined = () => performHostSetup();
+
+      meeting.self.on('roomJoined', handleRoomJoined);
+      
+      // Edge case: If already joined (e.g. hot reload), run immediately
+      if (meeting.self.roomJoined) {
+        performHostSetup();
+      }
+
+      return () => {
+        meeting.self.off('roomJoined', handleRoomJoined);
+      };
     }
 
+    // 2. AUDIENCE LOGIC: Find Host, Pin Host
     const checkForHostAndPin = (participant) => {
       if (!participant) return;
-      
+
       const preset = (participant.presetName || "").toLowerCase();
-      const isHost = 
-        preset.includes("host") || 
+      // Adjust these checks based on your actual Dyte Preset names
+      const isHost =
+        preset.includes("host") ||
         preset.includes("publisher") ||
         preset.includes("admin") ||
         preset.includes("presenter");
 
       if (isHost) {
         setHostJoined(true);
-        // Pin Logic
-        if (!meeting.participants.pinned.has(participant.id)) {
-            meeting.participants.pin(participant.id).catch((e) => {
-                console.warn("Failed to pin host:", e);
-            });
+        enforceSpotlightLayout(); // Ensure audience is in Grid mode to see the Pin effect
+
+        if (!participant.isPinned && typeof participant.pin === "function") {
+          participant.pin().catch((e) => {
+            console.warn("Failed to pin host from audience:", e);
+          });
         }
       }
     };
 
-    // 1. Check existing
-    if (meeting?.participants?.joined) {
-        Array.from(meeting.participants.joined.values()).forEach(checkForHostAndPin);
+    // Check currently joined participants
+    if (meeting.participants.joined) {
+      Array.from(meeting.participants.joined.values()).forEach(checkForHostAndPin);
     }
 
-    // 2. Listen for new joiners
+    // Listen for new joiners
     const handleJoin = (p) => checkForHostAndPin(p);
-
     meeting.participants.joined.on("participantJoined", handleJoin);
-
-    // 3. Polling Backup
-    const interval = setInterval(() => {
-        if (meeting?.participants?.joined) {
-            Array.from(meeting.participants.joined.values()).forEach(checkForHostAndPin);
-        }
-    }, 3000);
 
     return () => {
       meeting.participants.joined.off("participantJoined", handleJoin);
-      clearInterval(interval);
     };
   }, [meeting, initDone, role]);
+
 
   // Handle Room Left
   useEffect(() => {
@@ -338,11 +365,9 @@ function DyteMeetingWrapper({
     };
   }, [meeting, onMeetingEnd]);
 
-  // Q&A Button Addon (Safer Implementation)
+  // Q&A Button Addon
   useEffect(() => {
     if (!meeting || !initDone || !meeting.self) return;
-    
-    // Safety check to ensure we don't run this multiple times unnecessarily
     if (dyteConfig) return; 
 
     try {
@@ -366,14 +391,8 @@ function DyteMeetingWrapper({
         onClick: () => openTab("qna"),
       });
 
-      // Register the addon
       const addonsConfig = registerAddons([qnaBtn], meeting);
-      
-      // ✅ FIX: Merge with BASE config to prevent overwriting themes
-      setDyteConfig({
-        ...BASE_UI_CONFIG,
-        ...addonsConfig
-      });
+      setDyteConfig({ ...BASE_UI_CONFIG, ...addonsConfig });
 
     } catch (e) { 
       console.warn("Failed to register Q&A addon", e); 
