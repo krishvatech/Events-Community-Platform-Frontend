@@ -1083,6 +1083,7 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
     if (!open || !postId) return;
     setLoading(true);
     try {
+      // 1. Fetch Roots (Level 0)
       const params = new URLSearchParams();
       params.set("target_id", String(postId));
       params.set("page_size", "200");
@@ -1095,17 +1096,37 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
         }
       );
 
+      let rootsRaw = [];
       if (res.ok) {
         const j = await res.json().catch(() => null);
-        const raw = Array.isArray(j?.results)
-          ? j.results
-          : Array.isArray(j)
-            ? j
-            : [];
-        setItems(raw);
-      } else {
-        setItems([]);
+        rootsRaw = Array.isArray(j?.results) ? j.results : Array.isArray(j) ? j : [];
       }
+
+      // 2. Fetch Replies for each Root (Level 1)
+      // Your LiveFeedPage does this, so RichProfile must do it too.
+      const replyPromises = rootsRaw.map(async (root) => {
+        try {
+          const r = await fetch(
+            `${API_BASE}/engagements/comments/?parent=${root.id}&page_size=200`, 
+            {
+              headers: { Accept: "application/json", ...tokenHeader() },
+              credentials: "include",
+            }
+          );
+          if (!r.ok) return [];
+          const j = await r.json();
+          return Array.isArray(j?.results) ? j.results : Array.isArray(j) ? j : [];
+        } catch {
+          return [];
+        }
+      });
+
+      const nestedReplies = await Promise.all(replyPromises);
+      const allReplies = nestedReplies.flat();
+
+      // 3. Combine them so the tree builder can link them
+      setItems([...rootsRaw, ...allReplies]);
+
     } catch (e) {
       console.error("Failed to load comments:", e);
       setItems([]);
@@ -1148,22 +1169,37 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
         author.photo ||
         "";
 
+      // 🔴 IMPORTANT: normalize parent id from various possible fields
+      const parentId =
+        row.parent_id ??
+        (typeof row.parent === "object" ? row.parent?.id : row.parent) ??
+        row.parent_comment_id ??
+        (typeof row.parent_comment === "object"
+          ? row.parent_comment?.id
+          : row.parent_comment) ??
+        row.reply_to_id ??
+        (typeof row.reply_to === "object" ? row.reply_to?.id : row.reply_to) ??
+        null;
+
       map.set(row.id, {
         ...row,
+        parentId,          // normalized parent id
         authorName: name,
         authorAvatar: avatar,
         children: [],
       });
     });
 
+    // link children → parent
     map.forEach((c) => {
-      if (c.parent_id && map.get(c.parent_id)) {
-        map.get(c.parent_id).children.push(c);
+      if (c.parentId && map.get(c.parentId)) {
+        map.get(c.parentId).children.push(c);
       }
     });
 
     const all = Array.from(map.values());
-    const rootNodes = all.filter((c) => !c.parent_id);
+    // roots = comments without a parent
+    const rootNodes = all.filter((c) => !c.parentId);
 
     // newest first
     rootNodes.sort(
@@ -1176,44 +1212,42 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
 
   // -------- Create / reply comment (POST) --------
   async function createComment(body, parentId = null) {
-    const trimmed = (body || "").trim();
-    if (!trimmed || !postId) return;
+  const trimmed = (body || "").trim();
+  if (!trimmed || !postId) return;
 
-    setSubmitting(true);
-    try {
-      const topLevelPayload = {
-        text: trimmed,
-        target_id: Number(postId),
-      };
+  setSubmitting(true);
+  try {
+    // always send target_id for this post
+    const payload = {
+      text: trimmed,
+      target_id: Number(postId),
+      ...(parentId ? { parent: parentId } : {}),
+    };
 
-      const payload = parentId
-        ? { text: trimmed, parent: parentId } // reply – backend uses parent to inherit target
-        : topLevelPayload;
+    const res = await fetch(`${API_BASE}/engagements/comments/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...tokenHeader(),
+      },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
 
-      const res = await fetch(`${API_BASE}/engagements/comments/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...tokenHeader(),
-        },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        setText("");
-        setReplyTo(null);
-        await load();
-      } else {
-        console.error("Comment POST failed:", res.status);
-      }
-    } catch (e) {
-      console.error("Failed to post comment:", e);
-    } finally {
-      setSubmitting(false);
+    if (res.ok) {
+      setText("");
+      setReplyTo(null);
+      // reload full list (roots + replies)
+      await load();
+    } else {
+      console.error("Comment POST failed:", res.status);
     }
+  } catch (e) {
+    console.error("Failed to post comment:", e);
+  } finally {
+    setSubmitting(false);
   }
-
+}
   // -------- Delete comment (and its replies) --------
   function handleDelete(c) {
     // just open the modern dialog
