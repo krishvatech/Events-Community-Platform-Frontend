@@ -2,688 +2,969 @@
 import * as React from "react";
 import { useParams, Link as RouterLink, useNavigate } from "react-router-dom";
 import {
-  Avatar,
-  AvatarGroup,
-  Box,
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  CardHeader,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  Grid,
-  IconButton,
-  InputAdornment,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  Pagination,
-  Stack,
-  Tab,
-  Tabs,
-  TextField,
-  Tooltip,
-  Typography,
-  CircularProgress,
-  Popover,
+  Avatar, AvatarGroup, Box, Button, Card, CardContent,
+  Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider,
+  Grid, IconButton, InputAdornment, List, ListItem, ListItemAvatar,
+  ListItemText, ListItemButton, ListItemSecondaryAction, Pagination,
+  Paper, Popover, Stack, Tab, Tabs, TextField, Tooltip, Typography,
+  CircularProgress, LinearProgress, Link, Checkbox
 } from "@mui/material";
-import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
-import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
-import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
-import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import SearchIcon from "@mui/icons-material/Search";
-import SendRoundedIcon from "@mui/icons-material/SendRounded";
+
+// Icons
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+import IosShareIcon from "@mui/icons-material/IosShare";
+import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import SearchIcon from "@mui/icons-material/Search";
 import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+
 import CommunitySidebar from "../../components/CommunitySideBar.jsx";
 import CommunityRightRailLayout from "../../components/layout/CommunityRightRailLayout.jsx";
 
+// -----------------------------------------------------------------------------
+// 1. CONSTANTS & API HELPERS
+// -----------------------------------------------------------------------------
+
 const BORDER = "#e2e8f0";
-
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
-const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
-const API_ORIGIN = (() => {
-  try { const u = new URL(API_ROOT); return `${u.protocol}//${u.host}`; } catch { return ""; }
-})();
-const MEDIA_ORIGIN = import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN;
-
-
-const getToken = () => {
-  const keys = ["token", "access", "access_token", "accessToken", "jwt", "JWT"];
-  for (const k of keys) {
-    const v = localStorage.getItem(k);
-    if (v) return v;
-  }
-  return "";
-};
-const authHeader = () => {
-  const t = getToken();
-  return t ? { Authorization: `Bearer ${t}` } : {};
-};
-const timeAgo = (date) => {
-  if (!date) return "";
-  const diff = (Date.now() - new Date(date).getTime()) / 1000;
-  if (diff < 60) return `${Math.floor(diff)}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-};
-const nameOf = (u = {}) =>
-  u.profile?.full_name ||
-  u.full_name ||
-  u.user_full_name ||
-  u.name ||
-  [u.first_name, u.last_name].filter(Boolean).join(" ") ||
-  u.display_name ||
-  u.username ||
-  u.email ||
-  "Member";
-
-const toAbsolute = (url) =>
-  !url
-    ? ""
-    : /^https?:\/\//i.test(url)
-      ? url
-      : `${MEDIA_ORIGIN}${url.startsWith("/") ? "" : "/"}${url}`;
-
-const avatarOf = (u = {}) =>
-  toAbsolute(
-    u.user_image_url ||
-    u.user_image ||
-    u.avatar ||
-    u.avatar_url ||
-    u.profile_image ||
-    u.image_url ||
-    u.photo ||
-    u.profile?.user_image_url ||
-    u.profile?.user_image ||
-    u.profile?.avatar ||
-    u.profile?.image_url ||
-    u.profile?.photo ||
-    ""
-  );
-
 const POST_REACTIONS = [
-  { id: "like", label: "Like", emoji: "👍" },
-  { id: "intriguing", label: "Intriguing", emoji: "🤔" },
-  { id: "spot_on", label: "Spot On", emoji: "🎯" },
-  { id: "validated", label: "Validated", emoji: "🧠" },
-  { id: "debatable", label: "Debatable", emoji: "🤷" },
+  { id: "like", emoji: "👍", label: "Like" },
+  { id: "intriguing", emoji: "🤔", label: "Intriguing" },
+  { id: "spot_on", emoji: "🎯", label: "Spot On" },
+  { id: "validated", emoji: "🧠", label: "Validated" },
+  { id: "debatable", emoji: "🤷", label: "Debatable" },
 ];
 
+const RAW_BASE =
+  (typeof window !== "undefined" && window.API_BASE_URL) ||
+  import.meta?.env?.VITE_API_BASE_URL ||
+  "http://127.0.0.1:8000";
+
+const ORIGIN = String(RAW_BASE).trim().replace(/\/+$/, "");
+const API_BASE = /\/api(\/|$)/i.test(ORIGIN) ? ORIGIN : `${ORIGIN}/api`;
+const API_ORIGIN = API_BASE.replace(/\/api(\/|$)/i, "");
+
+function toMediaUrl(p) {
+  if (!p) return "";
+  try { return new URL(p).toString(); } catch { }
+  const rel = String(p).replace(/^\/+/, "");
+  const keepAsIs = /^(media|static|uploads|images|files|storage)\//i.test(rel);
+  return `${API_ORIGIN}/${keepAsIs ? rel : `media/${rel}`}`;
+}
+
+function toApiUrl(pathOrUrl) {
+  if (!pathOrUrl) return API_BASE;
+  try {
+    return new URL(pathOrUrl).toString();
+  } catch {
+    const rel = String(pathOrUrl).replace(/^\/+/, "");
+    const relNoApi = rel.replace(/^api\/+/, "");
+    return `${API_BASE}/${relNoApi}`;
+  }
+}
+
+function authHeaders() {
+  const token =
+    localStorage.getItem("access") ||
+    localStorage.getItem("access_token") ||
+    sessionStorage.getItem("access") ||
+    sessionStorage.getItem("access_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// Cached User Fetcher
+let _meCache = null;
+async function getMeCached() {
+  if (_meCache) return _meCache;
+  try {
+    const r = await fetch(toApiUrl("users/me/"), { headers: { ...authHeaders(), Accept: "application/json" } });
+    _meCache = r.ok ? await r.json() : null;
+  } catch { _meCache = null; }
+  return _meCache;
+}
+
+// ⬇️ NEW: Helper for concurrent fetching (needed for comments+replies)
+async function runLimited(items, limit, worker) {
+  const ret = new Array(items.length);
+  let i = 0;
+  const pool = new Set();
+  async function runOne(idx) {
+    const p = worker(items[idx]).then((res) => { ret[idx] = res; }).finally(() => pool.delete(p));
+    pool.add(p);
+    if (pool.size >= limit) await Promise.race(pool);
+  }
+  while (i < items.length) await runOne(i++);
+  await Promise.all(pool);
+  return ret;
+}
+
+function formatWhen(ts) {
+  try { return new Date(ts).toLocaleString(); } catch { return ts; }
+}
+
+function pickId(...cands) {
+  for (const v of cands) {
+    if (v === 0 || v === "0") return 0;
+    if (v !== null && v !== undefined && v !== "" && v !== "null") {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : v;
+    }
+  }
+  return null;
+}
+
+function engageTargetOf(post) {
+  if (post?.engage?.id) return post.engage;
+  if (post?.type === "resource" && post?.resource?.id) {
+    return { type: "content.resource", id: Number(post.resource.id) };
+  }
+  if (post?.type === "event" && (post?.event?.id || post?.id)) {
+    return { type: "events.event", id: Number(post.event?.id || post.id) };
+  }
+  return { type: null, id: Number(post.id) };
+}
+
+async function fetchBatchMetrics(ids) {
+  if (!ids?.length) return {};
+  const url = toApiUrl(`engagements/metrics/?ids=${ids.join(",")}`);
+  try {
+    const res = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+    if (!res.ok) return {};
+    return await res.json(); 
+  } catch {
+    return {};
+  }
+}
 
 // -----------------------------------------------------------------------------
-// Minimal PostCard (local) so we don't touch your existing files
+// 2. ROBUST FEED MAPPER
 // -----------------------------------------------------------------------------
-function PostCard({ post }) {
-  // --- small helpers -------------------------------------------------
-  const normalizeUser = React.useCallback((u) => {
-    if (!u) return { id: null, name: "User", avatar: "", reactionId: null };
-    if (typeof u === "string") return { id: null, name: u, avatar: "", reactionId: null };
-
-    const id = u.id ?? u.user_id ?? u.owner_id ?? u.profile?.id ?? null;
-    const name =
-      u.name || u.full_name || nameOf(u) || (id ? `User #${id}` : "User");
-    const avatar = toAbsolute(
-      u.avatar ||
-      u.avatar_url ||
-      u.user_image ||
-      u.user_image_url ||
-      u.profile_image ||
-      u.image_url ||
-      u.photo ||
-      u.profile?.user_image_url ||
-      u.profile?.user_image ||
-      ""
-    );
-
-    return { id, name, avatar, reactionId: u.reactionId || null };
-  }, []);
-
-  // --- target info for engagement APIs --------------------------------
-  const targetId = React.useMemo(() => Number(post?.id) || null, [post?.id]);
-  const targetType = "activity_feed.feeditem";
-
-  // --- my current reaction (for button label / color) -----------------
-  const initialReaction = React.useMemo(() => {
-    if (post?.my_reaction) return post.my_reaction;
-    if (post?.reaction) return post.reaction;
-    if (post?.liked_by_me) return "like";
-    return null;
-  }, [post]);
-
-  const [myReactionId, setMyReactionId] = React.useState(initialReaction);
-
-  React.useEffect(() => {
-    setMyReactionId(initialReaction);
-  }, [initialReaction]);
-
-  const myReactionDef =
-    POST_REACTIONS.find((r) => r.id === myReactionId) || null;
-  const likeBtnLabel = myReactionDef ? myReactionDef.label : "Like";
-  const likeBtnEmoji = myReactionDef ? myReactionDef.emoji : "👍";
-  const hasReaction = !!myReactionId;
-
-  // --- counters (likes / comments / shares) ---------------------------
-  const [likeCount, setLikeCount] = React.useState(
-    Number(post.metrics?.likes ?? post.like_count ?? 0)
-  );
-  const [commentCount] = React.useState(
-    Number(post.metrics?.comments ?? post.comment_count ?? 0)
-  );
-  const [shareCount, setShareCount] = React.useState(
-    Number(post.metrics?.shares ?? post.share_count ?? 0)
-  );
-
-  // --- who reacted (for bubbles + "reacted by X and Y others") --------
-  const initLikers = React.useMemo(() => {
-    const raw = post.likers || post.metrics?.likers || [];
-    return Array.isArray(raw)
-      ? raw.map((row) => normalizeUser(row.user || row))
-      : [];
-  }, [post.likers, post.metrics?.likers, normalizeUser]);
-
-  const [likers, setLikers] = React.useState(initLikers);
-
-  // load unique reactions + users (same style as RichProfile)
-  const loadTopLikers = React.useCallback(async () => {
-    if (!targetId) return;
-
-    const urls = [
-      `${API_ROOT}/engagements/reactions/?target_type=${encodeURIComponent(
-        targetType
-      )}&target_id=${targetId}&page_size=25`,
-      `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${targetId}&page_size=25`,
-    ];
-
-    const normalizeFromPayload = (payload) => {
-      const arr = Array.isArray(payload?.results)
-        ? payload.results
-        : Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.data)
-            ? payload.data
-            : [];
-
-      return arr
-        .map((row) => {
-          const u =
-            row.user ||
-            row.actor ||
-            row.profile ||
-            row.owner ||
-            row.author ||
-            row;
-          if (!u) return null;
-
-          const id = u.id ?? row.user_id ?? row.id;
-          if (!id) return null;
-
-          const first = u.first_name || u.firstName || "";
-          const last = u.last_name || u.lastName || "";
-          const name =
-            u.full_name ||
-            u.name ||
-            (first || last ? `${first} ${last}`.trim() : u.username) ||
-            `User #${id}`;
-
-          const avatar =
-            u.avatar_url ||
-            u.user_image_url ||
-            u.avatar ||
-            u.photo ||
-            u.image ||
-            "";
-
-          const reactionId =
-            row.reaction ||
-            row.reaction_type ||
-            row.kind ||
-            row.type ||
-            "like";
-
-          return { id, name, avatar, reactionId };
-        })
-        .filter(Boolean);
-    };
-
-    for (const url of urls) {
-      try {
-        const res = await fetch(url, {
-          headers: { Accept: "application/json", ...authHeader() },
-          credentials: "include",
-        });
-        if (!res.ok) continue;
-        const data = await res.json().catch(() => ({}));
-        const list = normalizeFromPayload(data);
-        if (list.length) {
-          setLikers(list);
-          return;
-        }
-      } catch {
-        // try next url
-      }
+function mapFeedItem(item) {
+  const rawMeta = item?.metadata ?? item?.meta ?? item?.data ?? item?.payload ?? null;
+  let m = {};
+  if (rawMeta) {
+    if (typeof rawMeta === "string") {
+      try { m = JSON.parse(rawMeta); } catch { m = {}; }
+    } else if (typeof rawMeta === "object") {
+      m = rawMeta;
     }
-    setLikers([]);
-  }, [targetId]);
+  }
 
-  React.useEffect(() => {
-    loadTopLikers();
-  }, [loadTopLikers]);
+  // Fallback for flat group post structures
+  if (!m.text && !m.content) m = { ...item, ...m };
 
-  const primaryLiker = likers?.[0] || null;
-  const othersCount = Math.max(0, (likeCount || 0) - 1);
+  const verb = String(item?.verb || item?.action || item?.activity || "").toLowerCase();
+  const isEventVerb = verb.includes("event");
 
-  // unique reaction types present on this post (for emoji bubbles)
-  const reactionIds = React.useMemo(
-    () =>
-      Array.from(
-        new Set(
-          [
-            ...likers.map((u) => u.reactionId).filter(Boolean),
-            myReactionId,
-          ].filter(Boolean)
-        )
-      ),
-    [likers, myReactionId]
-  );
+  const rawAuthor = item.actor || item.author || item.user || item.owner || item.created_by || {};
+  const authorId = 
+    rawAuthor.id ?? 
+    item.actor_id ?? 
+    item.user_id ?? 
+    item.author_id ?? 
+    m.user_id ?? 
+    null;
 
-  const metaLikeLabel =
-    primaryLiker && likeCount > 0
-      ? likeCount === 1
-        ? `reacted by ${primaryLiker.name}`
-        : `reacted by ${primaryLiker.name} and ${othersCount} others`
-      : `${(likeCount || 0).toLocaleString()} reactions`;
+  const displayName = 
+    rawAuthor.name || 
+    rawAuthor.full_name || 
+    rawAuthor.username || 
+    item.actor_name || 
+    item.actor_username || 
+    (authorId ? `User #${authorId}` : "Unknown User");
 
-  // --- share count sync (keep your existing behaviour) ----------------
-  React.useEffect(() => {
-    let active = true;
-    async function loadShares() {
-      try {
-        const res = await fetch(
-          `${API_ROOT}/engagements/shares/?target_type=activity_feed.feeditem&target_id=${post.id}&page_size=200`,
-          { headers: { ...authHeader(), accept: "application/json" } }
-        );
-        if (!res.ok) return;
-        const data = await res.json();
-        const rows = Array.isArray(data?.results)
-          ? data.results
-          : Array.isArray(data)
-            ? data
-            : Array.isArray(data?.items)
-              ? data.items
-              : Array.isArray(data?.shares)
-                ? data.shares
-                : [];
-        if (active) setShareCount(rows.length || 0);
-      } catch {
-        /* ignore */
-      }
-    }
-    if (!shareCount) loadShares();
-    return () => {
-      active = false;
-    };
-  }, [post.id]); // eslint-disable-line
+  const authorAvatar = 
+    rawAuthor.avatar || 
+    rawAuthor.avatar_url || 
+    rawAuthor.user_image || 
+    item.actor_avatar || 
+    m.author_avatar || 
+    "";
 
-  // --- dialogs / popovers ---------------------------------------------
-  const [reactionsOpen, setReactionsOpen] = React.useState(false);
-
-  const [reactionAnchorEl, setReactionAnchorEl] = React.useState(null);
-  const pickerOpen = Boolean(reactionAnchorEl);
-
-  const handleReactionButtonClick = (event) => {
-    setReactionAnchorEl(event.currentTarget);
-  };
-  const handleClosePicker = () => setReactionAnchorEl(null);
-
-  const handleSelectReaction = async (reactionId) => {
-    handleClosePicker();
-
-    setMyReactionId((prev) => {
-      const next = prev === reactionId ? null : reactionId;
-
-      // adjust local like count: add when going from no reaction → some,
-      // subtract when removing reaction, keep same when switching reaction.
-      if (!prev && next) {
-        setLikeCount((c) => c + 1);
-      } else if (prev && !next) {
-        setLikeCount((c) => Math.max(0, c - 1));
-      }
-
-      return next;
-    });
-
-    try {
-      await fetch(`${API_ROOT}/engagements/reactions/toggle/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeader(),
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          target_type: targetType,
-          target_id: targetId,
-          reaction: reactionId,
-        }),
-      });
-
-      // refresh bubbles + "reacted by …" from backend
-      await loadTopLikers();
-    } catch (e) {
-      console.error("Failed to toggle reaction", e);
-    }
+  const base = {
+    id: item.id,
+    created_at: item.created_at || item.created,
+    author_id: authorId,
+    author: {
+      id: authorId,
+      name: displayName,
+      avatar: toMediaUrl(authorAvatar),
+    },
+    group_id: item.group_id ?? m.group_id ?? null,
+    group: m.group_name ?? null,
+    metrics: {
+      likes: Number(m.likes ?? item.like_count ?? 0),
+      comments: Number(m.comments ?? item.comment_count ?? 0),
+      shares: Number(m.shares ?? item.share_count ?? 0),
+    },
+    user_has_liked: !!(item.liked_by_me ?? item.user_has_liked ?? false),
+    my_reaction: item.my_reaction || (item.liked_by_me ? "like" : null),
   };
 
-  // -------------------------------------------------------------------
-  // RENDER
-  // -------------------------------------------------------------------
+  if (m.is_hidden || m.is_deleted) return null;
+
+  const t = (m.type || m.post_type || item.type || "text").toLowerCase();
+
+  // IMAGE
+  if (t === "image" || m.image || m.image_url || m.imageUrl) {
+    return {
+      ...base,
+      type: "image",
+      text: m.text || m.caption || m.title || "",
+      image_url: m.image || m.image_url || m.imageUrl || m.file || "",
+    };
+  }
+
+  // POLL
+  if (t === "poll" || Array.isArray(m.options) || m.poll_id) {
+    const question = m.question ?? item.question ?? item.title ?? "";
+    const options = (m.options || []).map((o, i) => ({
+      id: o.id ?? o.option_id ?? i + 1,
+      label: o.text ?? o.label ?? String(o),
+      votes: o.vote_count ?? o.votes ?? 0,
+    }));
+    return {
+      ...base,
+      type: "poll",
+      text: question,
+      poll_id: pickId(m.poll_id, item.poll_id, item.target_object_id, item.id),
+      options,
+      user_votes: m.user_votes || [],
+      is_closed: Boolean(m.is_closed),
+    };
+  }
+
+  // EVENT
+  if (t === "event" || t === "event_update" || isEventVerb) {
+    const eventId = m.event_id ?? item.target_object_id ?? item.id;
+    return {
+      ...base,
+      type: "event",
+      text: m.description || m.summary || m.text || "",
+      event: {
+        id: eventId,
+        title: m.event_title || m.title || "Event",
+        when: m.start_time || m.time || "",
+        where: m.venue || m.location || "",
+      },
+      engage: eventId ? { type: "events.event", id: Number(eventId) } : undefined,
+    };
+  }
+
+  // RESOURCE
+  if (t === "resource" || t === "file" || t === "link" || t === "video" || m.resource_id) {
+    const rid = m.resource_id ?? item.object_id ?? item.id;
+    return {
+      ...base,
+      type: "resource",
+      text: m.description || m.text || "",
+      resource: {
+        id: rid,
+        title: m.title || "Resource",
+        file_url: toMediaUrl(m.file_url || m.file || ""),
+        link_url: m.link_url || null,
+        video_url: toMediaUrl(m.video_url || ""),
+      },
+      engage: rid ? { type: "content.resource", id: Number(rid) } : undefined,
+    };
+  }
+
+  // LINK (Simple)
+  if ((t === "link" || m.url) && !m.resource_id) {
+    return {
+      ...base,
+      type: "link",
+      text: m.text || "",
+      url: m.url,
+      url_title: m.url_title,
+      url_desc: m.url_desc,
+    };
+  }
+
+  // DEFAULT TEXT
+  return {
+    ...base,
+    type: "text",
+    text: m.text || m.content || ""
+  };
+}
+
+// -----------------------------------------------------------------------------
+// 3. UI BLOCKS
+// -----------------------------------------------------------------------------
+
+function PollBlock({ post, onVote }) {
+  const userVotes = Array.isArray(post.user_votes) ? post.user_votes : [];
+  const totalVotes = (post.options || []).reduce(
+    (sum, o) => sum + (typeof o.votes === "number" ? o.votes : (o.vote_count || 0)), 0
+  );
+  const canVote = !post.is_closed;
+
   return (
-    <Card
-      variant="outlined"
-      sx={{
-        mb: 2,
-        borderRadius: 2,
-        borderColor: BORDER,
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
-      }}
-    >
-      {/* HEADER */}
-      <CardHeader
-        avatar={
-          <Avatar
-            src={post.actor_avatar || undefined}
-            alt={post.actor_name || "User"}
-          >
-            {(post.actor_name || "?").charAt(0).toUpperCase()}
-          </Avatar>
-        }
-        title={
-          <Typography variant="subtitle2" fontWeight={600}>
-            {post.actor_name || "Member"}
-          </Typography>
-        }
-        subheader={
-          <Typography variant="caption" color="text.secondary">
-            {new Date(post.created_at).toLocaleString()}
-          </Typography>
-        }
-      />
+    <Box>
+      {post.text && <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>{post.text}</Typography>}
+      <Stack spacing={1}>
+        {(post.options || []).map((opt) => {
+          const optionId = opt.id ?? opt.option_id;
+          const label = opt.label ?? opt.text ?? String(opt);
+          const votes = typeof opt.votes === "number" ? opt.votes : (opt.vote_count ?? 0);
+          const percent = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+          const chosen = optionId && userVotes.includes(optionId);
 
-      {/* MAIN CONTENT (same as before) */}
-      <CardContent sx={{ pt: 0 }}>
-        {post.content && (
-          <Typography
-            variant="body2"
-            sx={{ whiteSpace: "pre-wrap", mb: 1.5 }}
-          >
-            {post.content}
-          </Typography>
-        )}
+          const tryVote = () => {
+            if (!canVote || chosen) return;
+            onVote?.(optionId);
+          };
 
-        {post.link && (
-          <Box
-            sx={{
-              borderRadius: 1.5,
-              border: "1px solid",
-              borderColor: BORDER,
-              p: 1.5,
-              mt: 0.5,
-            }}
-          >
-            {post.link.title && (
-              <Typography variant="subtitle2" gutterBottom>
-                {post.link.title}
-              </Typography>
-            )}
-            {post.link.description && (
-              <Typography variant="body2" color="text.secondary">
-                {post.link.description}
-              </Typography>
-            )}
-            {post.link.url && (
-              <Typography
-                variant="caption"
-                color="primary"
-                sx={{ mt: 0.5, display: "inline-block" }}
-              >
-                {post.link.url}
-              </Typography>
-            )}
-          </Box>
-        )}
-
-        {post.image && (
-          <Box
-            sx={{
-              borderRadius: 1.5,
-              overflow: "hidden",
-              mt: 1,
-              border: "1px solid",
-              borderColor: BORDER,
-            }}
-          >
-            <img
-              src={post.image}
-              alt=""
-              style={{ width: "100%", display: "block" }}
-            />
-          </Box>
-        )}
-
-        {post.poll && Array.isArray(post.poll.options) && (
-          <Box sx={{ mt: 1.5 }}>
-            {post.poll.options.map((opt, idx) => (
-              <Box key={idx} sx={{ mb: 1 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  sx={{
-                    justifyContent: "space-between",
-                    textTransform: "none",
-                    borderRadius: 999,
-                  }}
-                >
-                  <span>{opt.label || opt.text || opt}</span>
-                  {typeof opt.votes === "number" && (
-                    <Typography variant="caption" color="text.secondary">
-                      {opt.votes} votes
-                    </Typography>
-                  )}
-                </Button>
-              </Box>
-            ))}
-          </Box>
-        )}
-      </CardContent>
-
-      {/* METRICS STRIP – reactions bubbles + text + shares (like RichProfile) */}
-      {(likeCount > 0 || shareCount > 0) && (
-        <Box sx={{ px: 2, pb: 1, pt: 0.5 }}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-          >
-            {/* Left: reaction bubbles + "reacted by …" */}
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{ cursor: likeCount > 0 ? "pointer" : "default" }}
-              onClick={() => {
-                if (likeCount > 0) setReactionsOpen(true);
+          return (
+            <Paper
+              key={optionId ?? label}
+              variant="outlined"
+              onClick={tryVote}
+              sx={{
+                p: 1, borderRadius: 2, borderColor: BORDER,
+                bgcolor: chosen ? "action.selected" : "background.paper",
+                cursor: canVote && !chosen ? "pointer" : "default",
+                "&:hover": canVote && !chosen ? { borderColor: "primary.main" } : undefined,
               }}
             >
-              <AvatarGroup
-                max={3}
-                sx={{
-                  "& .MuiAvatar-root": {
-                    width: 24,
-                    height: 24,
-                    fontSize: 14,
-                  },
-                }}
-              >
-                {(reactionIds.length ? reactionIds : ["like"])
-                  .slice(0, 3)
-                  .map((rid) => {
-                    const def =
-                      POST_REACTIONS.find((r) => r.id === rid) ||
-                      POST_REACTIONS[0];
-                    return (
-                      <Avatar key={rid}>
-                        <span style={{ fontSize: 16 }}>{def.emoji}</span>
-                      </Avatar>
-                    );
-                  })}
-              </AvatarGroup>
+              <Stack spacing={0.5}>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{label}</Typography>
+                  {chosen && <Chip size="small" icon={<CheckCircleOutlineIcon sx={{ fontSize: 16 }} />} label="Your vote" color="success" variant="outlined" />}
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{percent}%</Typography>
+                </Stack>
+                <LinearProgress variant="determinate" value={percent} sx={{ height: 8, borderRadius: 1 }} />
+              </Stack>
+            </Paper>
+          );
+        })}
+      </Stack>
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+        Total: {totalVotes} vote{totalVotes === 1 ? "" : "s"}{post.is_closed ? " · Poll closed" : ""}
+      </Typography>
+    </Box>
+  );
+}
 
-              <Typography variant="body2">{metaLikeLabel}</Typography>
-            </Stack>
+function EventBlock({ post, onOpen }) {
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{post.event?.title}</Typography>
+      <Typography variant="caption" color="text.secondary">
+        {post.event?.when ? new Date(post.event.when).toLocaleString() : ""} · {post.event?.where}
+      </Typography>
+      {post.text && <Typography variant="body2" sx={{ mt: 1 }}>{post.text}</Typography>}
+      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+        <Button size="small" variant="contained" onClick={onOpen} startIcon={<ThumbUpAltOutlinedIcon />}>
+          View Event
+        </Button>
+      </Stack>
+    </Paper>
+  );
+}
 
-            {/* Right: share count (same behaviour as before) */}
-            <Button
-              size="small"
-              onClick={() =>
-                window.__openShares &&
-                window.__openShares(post.id)
-              }
-            >
-              {(shareCount || 0).toLocaleString()} SHARES
+function ResourceBlock({ post }) {
+  const r = post.resource || {};
+  const hasVideo = !!r.video_url;
+  const primaryHref = r.link_url || r.file_url || r.video_url;
+
+  const ytId = (r.video_url || "").match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1];
+  const vmId = (r.video_url || "").match(/vimeo\.com\/(\d+)/)?.[1];
+  const iframeSrc = ytId ? `https://www.youtube.com/embed/${ytId}` : vmId ? `https://player.vimeo.com/video/${vmId}` : null;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{r.title}</Typography>
+      {post.text && <Typography variant="body2" sx={{ mt: 1 }}>{post.text}</Typography>}
+
+      {hasVideo && (
+        <Box sx={{ mt: 1 }}>
+          {iframeSrc ? (
+            <Box component="iframe" src={iframeSrc} allowFullScreen sx={{ width: "100%", height: 360, border: 0, borderRadius: 2 }} />
+          ) : (
+            <Box component="video" src={r.video_url} controls sx={{ width: "100%", maxHeight: 420, borderRadius: 2 }} />
+          )}
+        </Box>
+      )}
+
+      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+        {primaryHref && (
+          <Button size="small" variant="contained" component="a" href={primaryHref} target="_blank">
+            {hasVideo ? "Watch Video" : r.link_url ? "Open Link" : "View File"}
+          </Button>
+        )}
+      </Stack>
+    </Paper>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// 4. COMMENTS & SHARES (UPDATED FOR REPLY FETCHING)
+// -----------------------------------------------------------------------------
+
+function normalizeCommentRow(c) {
+  const parent_id = c.parent_id ?? (typeof c.parent === "number" ? c.parent : c.parent?.id) ?? null;
+  const rawAuthor = c.author || c.user || c.created_by || {};
+  const author_id = rawAuthor.id ?? c.author_id ?? c.user_id ?? null;
+  const name = rawAuthor.name || rawAuthor.full_name || rawAuthor.username || `User #${author_id}`;
+  const avatar = toMediaUrl(rawAuthor.avatar || rawAuthor.avatar_url || rawAuthor.user_image || "");
+
+  return {
+    ...c,
+    parent_id,
+    author_id,
+    author: { id: author_id, name, avatar },
+  };
+}
+
+function CommentsDialog({ open, onClose, postId, target, inline = false, initialCount = 3, onBumpCount, inputRef }) {
+  const [loading, setLoading] = React.useState(false);
+  const [items, setItems] = React.useState([]);
+  const [text, setText] = React.useState("");
+  const [replyTo, setReplyTo] = React.useState(null);
+  const [visibleCount, setVisibleCount] = React.useState(initialCount);
+
+  const load = React.useCallback(async () => {
+    if (!postId && !target?.id) return;
+    if (!inline && !open) return;
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (target?.id) {
+        if (target?.type) params.set("target_type", target.type);
+        params.set("target_id", String(target.id));
+      } else {
+        params.set("target_id", String(postId));
+      }
+      params.set("page_size", "100");
+      const r = await fetch(toApiUrl(`engagements/comments/?${params.toString()}`), {
+        headers: { Accept: "application/json", ...authHeaders() },
+      });
+      const j = r.ok ? await r.json() : [];
+      const flatRaw = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+      const rootsOnly = flatRaw.map(normalizeCommentRow);
+
+      // ⬇️ FIX: Fetch replies for these roots! (Live Feed Style)
+      const replyUrls = rootsOnly.map((root) =>
+        toApiUrl(`engagements/comments/?parent=${root.id}&page_size=100`)
+      );
+
+      const replyPages = await runLimited(replyUrls, 3, async (url) => {
+        try {
+          const rr = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+          return rr.ok ? await rr.json() : [];
+        } catch { return []; }
+      });
+
+      const replies = replyPages.flatMap((jr) => {
+        const arr = Array.isArray(jr?.results) ? jr.results : (Array.isArray(jr) ? jr : []);
+        return arr.map(normalizeCommentRow);
+      });
+
+      const flat = [...rootsOnly, ...replies];
+      setItems(flat);
+
+      // Hydrate counts
+      try {
+        const ids = flat.map(c => c.id);
+        if (ids.length) {
+          const resCounts = await fetch(toApiUrl(`engagements/reactions/counts/?target_type=comment&ids=${ids.join(",")}`), { headers: { ...authHeaders() } });
+          if (resCounts.ok) {
+            const p = await resCounts.json();
+            const map = p?.results || {};
+            setItems(curr => curr.map(c => {
+              const m = map[String(c.id)];
+              return m ? { ...c, like_count: m.like_count ?? c.like_count, user_has_liked: !!m.user_has_liked } : c;
+            }));
+          }
+        }
+      } catch { }
+
+    } catch { setItems([]); }
+    setLoading(false);
+  }, [postId, target, open, inline]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const roots = React.useMemo(() => {
+    const map = new Map();
+    items.forEach(c => map.set(c.id, { ...c, children: [] }));
+    items.forEach(c => {
+      if (c.parent_id && map.get(c.parent_id)) map.get(c.parent_id).children.push(map.get(c.id));
+    });
+    return [...map.values()]
+      .filter(c => !c.parent_id)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  }, [items]);
+
+  async function createComment(body, parentId = null) {
+    if (!body.trim()) return;
+    try {
+      const topLevelPayload = target?.id
+        ? (target?.type ? { text: body, target_type: target.type, target_id: target.id } : { text: body, target_id: target.id })
+        : { text: body, target_id: postId };
+      const payload = parentId ? { text: body, parent: parentId } : topLevelPayload;
+
+      const r = await fetch(toApiUrl(`engagements/comments/`), {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+      });
+      if (r.ok) {
+        setText(""); setReplyTo(null); await load(); onBumpCount?.();
+      }
+    } catch { }
+  }
+
+  async function toggleCommentLike(commentId) {
+    setItems(curr => curr.map(c => c.id === commentId ? { ...c, user_has_liked: !c.user_has_liked, like_count: c.like_count + (c.user_has_liked ? -1 : 1) } : c));
+    try {
+      await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ target_type: "comment", target_id: commentId, reaction: "like" }),
+      });
+    } catch { }
+  }
+
+  const CommentItem = ({ c, depth = 0 }) => (
+    <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #e2e8f0" : "none", ml: depth ? 1.5 : 0, mt: 1 }}>
+      <Stack direction="row" spacing={1}>
+        <Avatar src={c.author.avatar} sx={{ width: 24, height: 24 }}>{(c.author.name || "U")[0]}</Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Box sx={{ bgcolor: "#f1f5f9", p: 1, borderRadius: 2 }}>
+            <Typography variant="subtitle2">{c.author.name}</Typography>
+            <Typography variant="body2">{c.text}</Typography>
+          </Box>
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+            <Button size="small" startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />} onClick={() => toggleCommentLike(c.id)}>
+              {c.like_count || 0}
             </Button>
+            <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={() => setReplyTo(c)}>Reply</Button>
+          </Stack>
+        </Box>
+      </Stack>
+      {/* ⬇️ FIX: Ensure children are rendered recursively */}
+      {c.children && c.children.length > 0 && (
+        <Box sx={{ mt: 1 }}>
+           {c.children
+             .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+             .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+        </Box>
+      )}
+    </Box>
+  );
+
+  const content = (
+    <Box>
+      {replyTo && (
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="caption">Replying to {replyTo.author?.name}</Typography>
+          <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+        </Stack>
+      )}
+      <Stack direction="row" spacing={1}>
+        <TextField
+          size="small" fullWidth placeholder={replyTo ? "Write a reply..." : "Write a comment..."}
+          value={text} onChange={(e) => setText(e.target.value)} inputRef={inputRef}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); createComment(text, replyTo?.id); } }}
+        />
+        <Button variant="contained" onClick={() => createComment(text, replyTo?.id)} disabled={!text.trim()}>Post</Button>
+      </Stack>
+      <Box sx={{ mt: 2 }}>
+        {loading ? <CircularProgress size={20} /> : roots.slice(0, inline ? visibleCount : undefined).map(c => <CommentItem key={c.id} c={c} />)}
+        {inline && roots.length > visibleCount && (
+          <Button size="small" onClick={() => setVisibleCount(v => v + initialCount)}>Load more comments</Button>
+        )}
+      </Box>
+    </Box>
+  );
+
+  if (inline) return <Box sx={{ mt: 1.5 }}>{content}</Box>;
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Comments</DialogTitle>
+      <DialogContent dividers>{content}</DialogContent>
+    </Dialog>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// 5. SHARE DIALOG
+// -----------------------------------------------------------------------------
+function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupId }) {
+  const [loading, setLoading] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [friends, setFriends] = React.useState([]);
+  const [query, setQuery] = React.useState("");
+  const [selected, setSelected] = React.useState(new Set());
+
+  // Normalize any friends API shape -> { id, name, avatar }
+  function normalizeFriends(list, meId) {
+    if (!Array.isArray(list)) return [];
+    return list.map((f) => {
+      // Logic: If from_user and to_user exist, pick the one that ISN'T me.
+      let u;
+      if (f.from_user && f.to_user && meId) {
+        u = (String(f.from_user.id) === String(meId)) ? f.to_user : f.from_user;
+      } else {
+        u = f.user || f.friend || f.to_user || f.peer || f.profile || f;
+      }
+
+      const id = u?.id ?? f.user_id ?? f.friend_id ?? f.peer_id ?? f.id;
+      const name =
+        u?.name ||
+        u?.full_name ||
+        (u?.first_name || u?.last_name ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : null) ||
+        u?.username ||
+        `User #${id}`;
+      const avatar = toMediaUrl(
+        u?.avatar || u?.avatar_url || u?.user_image || u?.user_image_url ||
+        u?.image || u?.photo ||
+        u?.profile?.avatar || u?.profile?.avatar_url || u?.profile?.user_image || u?.profile?.user_image_url ||
+        f?.avatar || f?.avatar_url || f?.user_image || f?.user_image_url || f?.image || f?.photo || ""
+      );
+
+      return { id, name, avatar };
+    }).filter(x => x.id && String(x.id) !== String(meId)); // Safety check to remove self
+  }
+
+  // Helper to fetch friends
+  async function fetchMyFriends(meId) {
+    const candidates = [
+      "friends?status=accepted",
+      "friends/accepted",
+      "friends/list",
+      "friendships?status=accepted",
+      "users/me/friends",
+    ];
+    const limitParams = "&page_size=1000&limit=1000"; 
+
+    for (const path of candidates) {
+      try {
+        const join = path.includes("?") ? "&" : "?";
+        const r = await fetch(toApiUrl(path + join + limitParams), { headers: { Accept: "application/json", ...authHeaders() } });
+        if (!r.ok) continue;
+        const j = await r.json();
+        return normalizeFriends(Array.isArray(j?.results) ? j.results : j, meId);
+      } catch {}
+    }
+    return [];
+  }
+
+  // Helper to fetch Group Members (Robust)
+  async function fetchGroupMembers(gId) {
+    // Try multiple endpoints to catch members
+    const candidates = [
+      `groups/${gId}/members/`, // Best candidate
+      `groups/${gId}/memberships/`,
+      `group-members/?group=${gId}`,
+    ];
+    // We append query params safely
+    const limitParams = "?page_size=1000";
+
+    for (const path of candidates) {
+      try {
+        // Construct URL safely
+        let url = path;
+        if (!path.includes("?")) {
+           url = path.endsWith("/") ? path + limitParams : path + "/" + limitParams;
+        } else {
+           url = path + limitParams.replace("?", "&");
+        }
+        
+        const r = await fetch(toApiUrl(url), { headers: { Accept: "application/json", ...authHeaders() } });
+        if (!r.ok) continue;
+        const j = await r.json();
+        const rawMems = Array.isArray(j?.results) ? j.results : j?.members || (Array.isArray(j) ? j : []);
+        if (rawMems.length > 0) return rawMems;
+      } catch {}
+    }
+    return [];
+  }
+
+  const fetchFriendsList = React.useCallback(async () => {
+    if (!open) return;
+    setLoading(true);
+
+    try {
+      let meId = null;
+      try { const me = await getMeCached(); meId = me?.id || me?.user?.id; } catch {}
+
+      if (groupId) {
+        // Parallel fetch: Friends & Group Members
+        const [myFriends, rawMems] = await Promise.all([
+          fetchMyFriends(meId),
+          fetchGroupMembers(groupId)
+        ]);
+
+        let groupMembers = new Set();
+        if (rawMems.length > 0) {
+          rawMems.forEach(m => {
+            const uid = m.user?.id || m.user_id || m.id;
+            if(uid) groupMembers.add(String(uid));
+          });
+        }
+
+        // ⬇️ STRICT INTERSECTION: Only show friends who are ALSO group members.
+        // No fallback to 'all friends' if fetch fails.
+        const mutuals = myFriends.filter(f => groupMembers.has(String(f.id)));
+        setFriends(mutuals);
+      
+      } else {
+        // Non-group posts
+        const list = await fetchMyFriends(meId);
+        setFriends(list);
+      }
+    } catch (e) {
+      console.error(e);
+      setFriends([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [open, groupId]);
+
+  React.useEffect(() => { fetchFriendsList(); }, [fetchFriendsList]);
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return friends;
+    return friends.filter(f => (f.name || "").toLowerCase().includes(q));
+  }, [friends, query]);
+
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function shareNow() {
+    if (!selected.size || !postId) return;
+    setSending(true);
+    try {
+      const base = target?.id
+        ? (target?.type
+          ? { target_type: target.type, target_id: target.id }
+          : { target_id: target.id })
+        : { target_id: postId };
+
+      const r = await fetch(toApiUrl(`engagements/shares/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ ...base, to_users: [...selected] }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+      setSending(false);
+      onShared?.();
+      onClose?.();
+      setSelected(new Set());
+      setQuery("");
+    } catch (e) {
+      setSending(false);
+      alert("Could not share this post. Please check your share endpoint.");
+    }
+  }
+  return (
+    <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Share post</DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+        ) : friends.length === 0 ? (
+          <Typography color="text.secondary">
+            {groupId ? "No friends found in this group." : "No friends found."}
+          </Typography>
+        ) : (
+          <>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Search friends…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 1.5 }}
+            />
+            <Divider sx={{ mb: 1 }} />
+            <List dense disablePadding>
+              {filtered.map((f) => (
+                <ListItem key={f.id} disablePadding secondaryAction={
+                  <Checkbox edge="end" onChange={() => toggle(f.id)} checked={selected.has(f.id)} />
+                }>
+                  <ListItemButton onClick={() => toggle(f.id)}>
+                    <ListItemAvatar><Avatar src={f.avatar} /></ListItemAvatar>
+                    <ListItemText primary={f.name} />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={sending}>Cancel</Button>
+        <Button variant="contained" onClick={shareNow} disabled={!selected.size || sending}>
+          {sending ? "Sharing…" : "Share"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// 6. POST CARD
+// -----------------------------------------------------------------------------
+function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
+  const [local, setLocal] = React.useState(post);
+  const [commentsOpen, setCommentsOpen] = React.useState(false);
+  const [shareOpen, setShareOpen] = React.useState(false);
+  const commentInputRef = React.useRef(null);
+
+  // Reaction Picker
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const pickerOpen = Boolean(anchorEl);
+
+  React.useEffect(() => { setLocal(post); }, [post]);
+
+  const myReactionId = local.my_reaction || (local.liked_by_me ? "like" : null);
+  const myReactionDef = POST_REACTIONS.find(r => r.id === myReactionId);
+  const likeBtnLabel = myReactionDef?.label || "Like";
+  const likeBtnEmoji = myReactionDef?.emoji || "👍";
+  const hasReaction = !!myReactionId;
+
+  // Optimistic update wrapper
+  const handleReactionClick = async (reactionId) => {
+    setAnchorEl(null);
+    const oldReaction = local.my_reaction;
+    const isSame = oldReaction === reactionId;
+    const nextReaction = isSame ? null : reactionId;
+
+    let nextLikes = local.metrics.likes;
+    if (!oldReaction && nextReaction) nextLikes++;
+    if (oldReaction && !nextReaction) nextLikes = Math.max(0, nextLikes - 1);
+
+    const nextState = {
+      ...local,
+      my_reaction: nextReaction,
+      user_has_liked: !!nextReaction,
+      metrics: { ...local.metrics, likes: nextLikes }
+    };
+    setLocal(nextState);
+    onReact(local.id, reactionId); // Call parent to sync API
+  };
+
+  const bumpCommentCount = () => {
+    setLocal(curr => ({ ...curr, metrics: { ...curr.metrics, comments: (curr.metrics.comments || 0) + 1 } }));
+  };
+
+  const bumpShareCount = () => {
+    setLocal(curr => ({ ...curr, metrics: { ...curr.metrics, shares: (curr.metrics.shares || 0) + 1 } }));
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3, borderColor: BORDER }}>
+      {/* Header */}
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
+        <Avatar src={local.author?.avatar} />
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" fontWeight={700}>{local.author?.name}</Typography>
+          <Typography variant="caption" color="text.secondary">{formatWhen(local.created_at)}</Typography>
+        </Box>
+        {local.type !== 'text' && <Chip size="small" label={local.type.toUpperCase()} variant="outlined" />}
+      </Stack>
+
+      {/* Body */}
+      <Box sx={{ mb: 2 }}>
+        {local.type === "text" && <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{local.text}</Typography>}
+        {local.type === "resource" && <ResourceBlock post={local} />}
+        {local.type === "image" && (
+          <>
+            {local.text && <Typography variant="body2" sx={{ mb: 1 }}>{local.text}</Typography>}
+            <Box component="img" src={toMediaUrl(local.image_url)} sx={{ width: "100%", borderRadius: 2, maxHeight: 500, objectFit: "cover" }} />
+          </>
+        )}
+        {local.type === "poll" && <PollBlock post={local} onVote={(oid) => onPollVote(local, oid)} />}
+        {local.type === "event" && <EventBlock post={local} onOpen={() => onOpenEvent?.(local.event?.id || local.id)} />}
+        {local.type === "link" && (
+          <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#fafafa" }}>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>{local.text}</Typography>
+            <Link href={local.url} target="_blank" fontWeight={600}>{local.url_title || local.url}</Link>
+            {local.url_desc && <Typography variant="caption" display="block" color="text.secondary">{local.url_desc}</Typography>}
+          </Paper>
+        )}
+      </Box>
+
+      {/* Metrics */}
+      {(local.metrics.likes > 0 || local.metrics.shares > 0) && (
+        <Box sx={{ px: 0.5, pt: 0.5, mb: 1 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ cursor: "pointer" }} onClick={() => window.__openLikes?.(engageTargetOf(local))}>
+              <Box sx={{ bgcolor: "primary.main", borderRadius: "50%", p: 0.25, display: "flex" }}>
+                <ThumbUpAltOutlinedIcon sx={{ fontSize: 12, color: "white" }} />
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ "&:hover": { textDecoration: "underline" } }}>
+                {local.metrics.likes} reaction{local.metrics.likes !== 1 ? 's' : ''}
+              </Typography>
+            </Stack>
+            {local.metrics.shares > 0 && (
+              <Typography variant="caption" color="text.secondary" sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }} onClick={() => window.__openShares?.(engageTargetOf(local))}>
+                {local.metrics.shares} share{local.metrics.shares !== 1 ? 's' : ''}
+              </Typography>
+            )}
           </Stack>
         </Box>
       )}
 
-      {/* ACTIONS ROW – LIKE (with reactions) / COMMENT / SHARE */}
-      <CardActions
-        sx={{
-          px: 1.5,
-          pt: 0.5,
-          pb: 1,
-          display: "flex",
-          justifyContent: "space-around",
-          borderTop: "1px solid",
-          borderColor: BORDER,
-        }}
-      >
-        {/* LIKE → reactions popover */}
+      <Divider sx={{ mb: 1 }} />
+
+      {/* Actions */}
+      <Stack direction="row" justifyContent="space-around">
         <Button
-          fullWidth
-          startIcon={
-            <span style={{ fontSize: 18, lineHeight: 1 }}>
-              {likeBtnEmoji}
-            </span>
-          }
-          onClick={handleReactionButtonClick}
-          sx={{
-            textTransform: "uppercase",
-            fontSize: 11,
-            fontWeight: 600,
-            color: hasReaction ? "primary.main" : "text.secondary",
-            "& .MuiButton-startIcon": { mr: 0.5 },
-          }}
+          startIcon={<span style={{ fontSize: 18 }}>{likeBtnEmoji}</span>}
+          sx={{ color: hasReaction ? "primary.main" : "text.secondary", fontWeight: hasReaction ? 600 : 400 }}
+          onClick={(e) => setAnchorEl(e.currentTarget)}
         >
           {likeBtnLabel}
         </Button>
-
-        {/* COMMENT – unchanged */}
         <Button
-          fullWidth
-          startIcon={<ChatBubbleOutlineRoundedIcon sx={{ fontSize: 18 }} />}
-          onClick={() =>
-            (window.__openComments && window.__openComments(post.id)) ||
-            (window.__openGroupComments &&
-              window.__openGroupComments(post.id))
-          }
-          sx={{
-            textTransform: "uppercase",
-            fontSize: 11,
-            fontWeight: 600,
-            color: "text.secondary",
-            "& .MuiButton-startIcon": { mr: 0.5 },
+          startIcon={<ChatBubbleOutlineIcon />}
+          color="inherit"
+          onClick={() => {
+            setCommentsOpen(prev => {
+              if (!prev) setTimeout(() => commentInputRef.current?.focus(), 0);
+              return !prev;
+            });
           }}
         >
           Comment
         </Button>
+        <Button startIcon={<IosShareIcon />} color="inherit" onClick={() => setShareOpen(true)}>Share</Button>
+      </Stack>
 
-        {/* SHARE – unchanged */}
-        <Button
-          fullWidth
-          startIcon={<IosShareRoundedIcon sx={{ fontSize: 18 }} />}
-          onClick={() =>
-            (window.__openShares && window.__openShares(post.id)) ||
-            (window.__openShareDialog &&
-              window.__openShareDialog(post.id)) ||
-            (window.__openShare && window.__openShare(post.id))
-          }
-          sx={{
-            textTransform: "uppercase",
-            fontSize: 11,
-            fontWeight: 600,
-            color: "text.secondary",
-            "& .MuiButton-startIcon": { mr: 0.5 },
-          }}
-        >
-          Share
-        </Button>
-      </CardActions>
-
-      {/* REACTIONS DIALOG */}
-      <GroupReactionsDialog
-        open={reactionsOpen}
-        onClose={() => setReactionsOpen(false)}
-        postId={post.id}
-      />
-
-      {/* REACTIONS PICKER POPOVER (LinkedIn-style) */}
       <Popover
-        open={pickerOpen}
-        anchorEl={reactionAnchorEl}
-        onClose={handleClosePicker}
+        open={pickerOpen} anchorEl={anchorEl} onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
         transformOrigin={{ vertical: "bottom", horizontal: "center" }}
-        disableRestoreFocus
       >
-        <Box
-          sx={{
-            p: 1,
-            display: "flex",
-            gap: 1,
-            px: 1.5,
-          }}
-        >
-          {POST_REACTIONS.map((r) => (
+        <Box sx={{ p: 1, display: "flex", gap: 1 }}>
+          {POST_REACTIONS.map(r => (
             <Tooltip key={r.id} title={r.label}>
               <Box
-                onClick={() => handleSelectReaction(r.id)}
-                sx={{
-                  cursor: "pointer",
-                  fontSize: 26,
-                  lineHeight: 1,
-                  px: 0.5,
-                  py: 0.25,
-                  borderRadius: "999px",
-                  transition: "transform 120ms ease, background 120ms ease",
-                  "&:hover": {
-                    bgcolor: "action.hover",
-                    transform: "translateY(-2px) scale(1.05)",
-                  },
-                }}
+                onClick={() => handleReactionClick(r.id)}
+                sx={{ fontSize: 24, cursor: "pointer", transition: "transform 0.1s", "&:hover": { transform: "scale(1.2)" } }}
               >
                 {r.emoji}
               </Box>
@@ -691,438 +972,35 @@ function PostCard({ post }) {
           ))}
         </Box>
       </Popover>
-    </Card>
+
+      {/* Inline Comments */}
+      {commentsOpen && (
+        <CommentsDialog
+          inline
+          postId={local.id}
+          target={engageTargetOf(local)}
+          onBumpCount={bumpCommentCount}
+          inputRef={commentInputRef}
+        />
+      )}
+
+      {/* Share Dialog */}
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        postId={local.id}
+        target={engageTargetOf(local)}
+        authorId={local.author_id || local.author?.id}
+        groupId={local.group_id}
+        onShared={bumpShareCount}
+      />
+    </Paper>
   );
-}
-
-function GroupReactionsDialog({ open, onClose, postId }) {
-  const [users, setUsers] = React.useState([]);
-  const [loading, setLoading] = React.useState(false);
-  const [activeFilter, setActiveFilter] = React.useState("all");
-
-  React.useEffect(() => {
-    if (!open || !postId) return;
-    setActiveFilter("all");
-    setLoading(true);
-
-    (async () => {
-      // Helper to normalize payload from both endpoints
-      const normalize = (payload) => {
-        const arr = Array.isArray(payload?.results)
-          ? payload.results
-          : Array.isArray(payload)
-            ? payload
-            : Array.isArray(payload?.data)
-              ? payload.data
-              : [];
-
-        return arr
-          .map((row) => {
-            const u =
-              row.user ||
-              row.actor ||
-              row.profile ||
-              row.owner ||
-              row.author ||
-              row; // fallback
-
-            const id = u.id ?? row.user_id ?? row.id;
-            if (!id) return null;
-
-            const first = u.first_name || u.firstName || "";
-            const last = u.last_name || u.lastName || "";
-            const name =
-              u.full_name ||
-              u.name ||
-              (first || last ? `${first} ${last}`.trim() : u.username) ||
-              `User #${id}`;
-
-            const avatar =
-              u.avatar_url ||
-              u.user_image_url ||
-              u.avatar ||
-              u.photo ||
-              u.image ||
-              "";
-
-            // For /who-liked/ we may not get a reaction field -> default "like"
-            const reactionId =
-              row.reaction ||
-              row.reaction_type ||
-              row.kind ||
-              row.type ||
-              "like";
-
-            const reactionDef =
-              POST_REACTIONS.find((r) => r.id === reactionId) ||
-              POST_REACTIONS[0];
-
-            return {
-              id,
-              name,
-              avatar,
-              reactionId,
-              reactionEmoji: reactionDef.emoji,
-              reactionLabel: reactionDef.label,
-            };
-          })
-          .filter(Boolean);
-      };
-
-      try {
-        const params = new URLSearchParams();
-        params.set("target_type", "activity_feed.feeditem");
-        params.set("target_id", String(postId));
-        params.set("page_size", "500");
-
-        const urls = [
-          // 1) full reactions endpoint (if you add it later)
-          `${API_ROOT}/engagements/reactions/?${params.toString()}`,
-          // 2) current working endpoint on your backend
-          `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${postId}&page_size=500`,
-        ];
-
-        for (const url of urls) {
-          try {
-            const res = await fetch(url, {
-              headers: { Accept: "application/json", ...authHeader() },
-              credentials: "include",
-            });
-            if (!res.ok) continue;
-
-            const data = await res.json().catch(() => ({}));
-            const parsed = normalize(data);
-            if (parsed.length) {
-              setUsers(parsed);
-              setLoading(false);
-              return;
-            }
-          } catch {
-            // try next URL
-          }
-        }
-
-        // nothing worked
-        setUsers([]);
-      } catch (e) {
-        console.error("Failed to load reactions:", e);
-        setUsers([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [open, postId]);
-
-  const reactionSummary = React.useMemo(() => {
-    const map = {};
-    for (const u of users) {
-      const key = u.reactionId || "like";
-      map[key] = (map[key] || 0) + 1;
-    }
-    return map;
-  }, [users]);
-
-  const filteredUsers =
-    activeFilter === "all"
-      ? users
-      : users.filter((u) => u.reactionId === activeFilter);
-
-  return (
-    <Dialog open={!!open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Reactions</DialogTitle>
-      <DialogContent dividers>
-        {loading ? (
-          <Stack alignItems="center" py={3}>
-            <CircularProgress size={22} />
-          </Stack>
-        ) : (
-          <>
-            {/* filter chips: All + each reaction with count */}
-            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
-              <Chip
-                size="small"
-                label={`All (${users.length})`}
-                variant={activeFilter === "all" ? "filled" : "outlined"}
-                onClick={() => setActiveFilter("all")}
-              />
-              {POST_REACTIONS.map((r) => {
-                const count = reactionSummary[r.id] || 0;
-                if (!count) return null;
-                return (
-                  <Chip
-                    key={r.id}
-                    size="small"
-                    label={`${r.emoji} ${r.label} (${count})`}
-                    variant={activeFilter === r.id ? "filled" : "outlined"}
-                    onClick={() => setActiveFilter(r.id)}
-                  />
-                );
-              })}
-            </Stack>
-
-            {/* list of users with their reaction */}
-            {filteredUsers.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                No reactions yet.
-              </Typography>
-            ) : (
-              <List dense>
-                {filteredUsers.map((u) => (
-                  <ListItem key={u.id}>
-                    <ListItemAvatar>
-                      <Avatar src={u.avatar}>
-                        {(u.name || "U").slice(0, 1)}
-                      </Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={u.name}
-                      secondary={
-                        u.reactionEmoji
-                          ? `${u.reactionEmoji} ${u.reactionLabel}`
-                          : undefined
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-
-function shapePost(row) {
-  const m = row?.metadata || {};
-  const actor =
-    m.actor ||
-    row.actor ||
-    row.user ||
-    row.owner ||
-    row.created_by;
-
-  const type = m.post_type || row.post_type || row.type || "text";
-
-  const likeCount =
-    Number(
-      row.like_count ??
-      row.likes_count ??
-      row.likes ??
-      m.like_count ??
-      m.likes ??
-      0
-    ) || 0;
-
-  const commentCount =
-    Number(
-      row.comment_count ??
-      row.comments_count ??
-      row.comments ??
-      m.comment_count ??
-      m.comments ??
-      0
-    ) || 0;
-
-  const shareCount =
-    Number(
-      row.share_count ??
-      row.shares_count ??
-      row.shares ??
-      m.share_count ??
-      m.shares ??
-      0
-    ) || 0;
-
-  const base = {
-    id: row.id,
-    created_at: row.created_at || row.created || row.timestamp || Date.now(),
-    type,
-    actor_name: nameOf(actor),
-    actor_avatar: avatarOf(actor),
-    liked_by_me: !!(
-      row.liked_by_me ??
-      row.liked ??
-      row.is_liked ??
-      row.me_liked ??
-      m.liked_by_me
-    ),
-    like_count: likeCount,
-    comment_count: commentCount,
-    share_count: shareCount,
-    metrics: {
-      likes: likeCount,
-      comments: commentCount,
-      shares: shareCount,
-    },
-    likers: m.likers || row.likers || row.recent_likers || [],
-  };
-
-  const text =
-    row.text ||
-    m.text ||
-    row.content ||
-    row.body ||
-    row.description ||
-    row.message ||
-    "";
-
-  if (type === "link") {
-    return {
-      ...base,
-      content: text,
-      link: {
-        url: m.url || row.url,
-        title: m.link_title || row.link_title,
-        description: m.link_description || row.link_description,
-      },
-    };
-  }
-
-  if (type === "image") {
-    return {
-      ...base,
-      content: text,
-      image: m.image || row.image || row.image_url,
-    };
-  }
-
-  if (type === "poll") {
-    return {
-      ...base,
-      content: text,
-      poll: {
-        options: m.options || row.options || [],
-      },
-    };
-  }
-
-  return { ...base, content: text };
 }
 
 // -----------------------------------------------------------------------------
-// Tabs
+// 7. TABS CONTENT
 // -----------------------------------------------------------------------------
-function ChatTab({ groupId }) {
-  const [messages, setMessages] = React.useState([]);
-  const [text, setText] = React.useState("");
-  const [loading, setLoading] = React.useState(true);
-  const [sending, setSending] = React.useState(false);
-  const listRef = React.useRef(null);
-
-  const scrollToBottom = React.useCallback(() => {
-    const el = listRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, []);
-
-  const fetchMessages = React.useCallback(async () => {
-    setLoading(true);
-    const candidates = [
-      `${API_ROOT}/groups/${groupId}/chat/messages/`,
-      `${API_ROOT}/messaging/threads/group-${groupId}/messages/`,
-      `${API_ROOT}/chat/groups/${groupId}/messages/`,
-    ];
-    for (const url of candidates) {
-      try {
-        const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
-        if (!res.ok) continue;
-        const data = await res.json();
-        const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-        setMessages(rows);
-        setLoading(false);
-        setTimeout(scrollToBottom, 50);
-        return;
-      } catch { }
-    }
-    setMessages([]);
-    setLoading(false);
-  }, [groupId, scrollToBottom]);
-
-  React.useEffect(() => { fetchMessages(); }, [fetchMessages]);
-
-  const sendMessage = async () => {
-    const body = { text: text.trim() };
-    if (!body.text) return;
-    setSending(true);
-    const candidates = [
-      `${API_ROOT}/groups/${groupId}/chat/messages/`,
-      `${API_ROOT}/messaging/threads/group-${groupId}/messages/`,
-      `${API_ROOT}/chat/groups/${groupId}/messages/`,
-    ];
-    for (const url of candidates) {
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) continue;
-        setText("");
-        await fetchMessages();
-        setSending(false);
-        return;
-      } catch { }
-    }
-    setSending(false);
-    alert("Couldn't send message.");
-  };
-
-  return (
-    <Stack spacing={2}>
-      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
-        <CardContent sx={{ p: 0 }}>
-          <Box
-            ref={listRef}
-            sx={{ maxHeight: 420, overflowY: "auto", p: 2 }}
-          >
-            {loading ? (
-              <Stack direction="row" alignItems="center" justifyContent="center" sx={{ py: 4 }}>
-                <CircularProgress size={24} />
-              </Stack>
-            ) : messages.length === 0 ? (
-              <Typography color="text.secondary" sx={{ p: 2 }}>No messages yet.</Typography>
-            ) : (
-              <Stack spacing={1.25}>
-                {messages.map((m) => (
-                  <Stack key={m.id} direction="row" spacing={1.25} alignItems="flex-start">
-                    <Avatar src={m.user?.avatar || ""} sx={{ width: 36, height: 36 }}>
-                      {(m.user?.name || "U").slice(0, 1)}
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {m.user?.name || "Member"} <Box component="span" sx={{ color: "text.secondary", fontWeight: 400, ml: 1 }}>{timeAgo(m.created_at || m.timestamp)}</Box>
-                      </Typography>
-                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{m.text || m.message || ""}</Typography>
-                    </Box>
-                  </Stack>
-                ))}
-              </Stack>
-            )}
-          </Box>
-          <Divider />
-          <Box sx={{ display: "flex", gap: 1, p: 1.5 }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Type a message…"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            />
-            <Button variant="contained" endIcon={<SendRoundedIcon />} onClick={sendMessage} disabled={sending}>
-              Send
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
-    </Stack>
-  );
-}
 
 function PostsTab({ groupId }) {
   const [posts, setPosts] = React.useState([]);
@@ -1130,1222 +1008,409 @@ function PostsTab({ groupId }) {
 
   const fetchPosts = React.useCallback(async () => {
     setLoading(true);
-    const candidates = [
-      `${API_ROOT}/groups/${groupId}/posts/`,
-    ];
-    for (const url of candidates) {
-      try {
-        const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
-        if (!res.ok) continue;
+    try {
+      const res = await fetch(toApiUrl(`groups/${groupId}/posts/`), { headers: { Accept: "application/json", ...authHeaders() } });
+      if (res.ok) {
         const data = await res.json();
-        const list = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-        setPosts(list.map(shapePost));
-        setLoading(false);
-        return;
-      } catch { }
-    }
-    setPosts([]);
+        const raw = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+        const mapped = raw.map(mapFeedItem).filter(Boolean);
+        
+        // ⬇️ FIX: Force attach current Group ID to all posts so ShareDialog works
+        const numericGroupId = Number(groupId);
+
+        const ids = mapped.map(p => p.id).filter(id => Number.isInteger(id));
+        if (ids.length) {
+           const metrics = await fetchBatchMetrics(ids);
+           const hydrated = mapped.map(p => {
+              const m = metrics[p.id];
+              const base = m ? { 
+                ...p, 
+                user_has_liked: !!(m.user_has_liked ?? m.me_liked),
+                my_reaction: m.my_reaction || (m.user_has_liked ? "like" : null),
+                metrics: { ...p.metrics, ...m } 
+              } : p;
+              
+              // Attach group_id explicitly
+              return { ...base, group_id: numericGroupId };
+           });
+           setPosts(hydrated);
+        } else {
+           // Attach group_id explicitly even if no metrics
+           setPosts(mapped.map(p => ({ ...p, group_id: numericGroupId })));
+        }
+      }
+    } catch { }
     setLoading(false);
   }, [groupId]);
 
   React.useEffect(() => { fetchPosts(); }, [fetchPosts]);
-  React.useEffect(() => {
-    window.__updateSharesCount = (pid, n) => {
-      setPosts(prev => prev.map(p => p.id === pid ? {
-        ...p,
-        share_count: n,
-        metrics: { ...(p.metrics || {}), shares: n }
-      } : p));
-    };
-    return () => { try { delete window.__updateSharesCount; } catch { } };
-  }, []);
 
-  // Global toggler to avoid changing PostCard props
-  React.useEffect(() => {
-    window.__toggleGroupPostLike = async (postId) => {
-      // optimistic flip (also keep metrics.likes in sync)
-      setPosts((prev) =>
-        prev.map((p) => {
-          if (p.id !== postId) return p;
-          const delta = p.liked_by_me ? -1 : +1;
-          const me = (window.__me || null);
-          let newLikers = Array.isArray(p.likers) ? [...p.likers] : [];
-          if (delta > 0 && me) {
-            // add me if missing at front
-            if (!newLikers.find(x => String(x.id) === String(me.id))) {
-              newLikers = [{ id: me.id, name: me.name, avatar: me.avatar }, ...newLikers].slice(0, 3);
-            }
-          } else if (delta < 0 && me) {
-            newLikers = newLikers.filter(x => String(x.id) !== String(me.id));
-          }
-          return {
-            ...p,
-            liked_by_me: !p.liked_by_me,
-            like_count: Math.max(0, (p.like_count || 0) + delta),
-            metrics: {
-              ...(p.metrics || {}),
-              likes: Math.max(0, (p.metrics?.likes || 0) + delta),
-            },
-            likers: newLikers
-          };
-
-        })
-      );
-
-      // try common endpoints
-      const endpoints = [
-        `${API_ROOT}/engagements/reactions/toggle/`, // preferred
-        `${API_ROOT}/posts/${postId}/like/`,
-        `${API_ROOT}/posts/${postId}/toggle-like/`,
-        `${API_ROOT}/groups/${groupId}/posts/${postId}/like/`,
-      ];
-      let ok = false;
-      for (const url of endpoints) {
-        try {
-          const r = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeader() },
-            body: url.endsWith("/toggle/") || url.includes("/reactions/")
-              ? JSON.stringify({
-                target_type: "activity_feed.feeditem",
-                target_id: postId,
-                reaction: "like",
-              })
-              : undefined,
-          });
-          if (r.ok) { ok = true; break; }
-        } catch { }
+  const handlePollVote = async (post, optionId) => {
+    if (!optionId) return;
+    try {
+      const res = await fetch(toApiUrl(`activity/feed/${post.id}/poll/vote/`), {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ option_ids: [optionId] })
+      });
+      if (res.ok) {
+        const p = await res.json();
+        const updatedPoll = p.poll || p;
+        setPosts(curr => curr.map(x => x.id === post.id ? {
+          ...x,
+          is_closed: updatedPoll.is_closed,
+          user_votes: updatedPoll.user_votes,
+          options: (updatedPoll.options || []).map((o, i) => ({
+            id: o.id ?? o.option_id ?? i + 1, label: o.text ?? o.label, votes: o.vote_count ?? o.votes ?? 0
+          }))
+        } : x));
       }
-      if (!ok) {
-        // revert if server failed
-        setPosts((prev) =>
-          prev.map((p) => {
-            if (p.id !== postId) return p;
-            const delta = p.liked_by_me ? -1 : +1; // reverse the above
-            return {
-              ...p,
-              liked_by_me: !p.liked_by_me,
-              like_count: Math.max(0, (p.like_count || 0) + delta),
-              metrics: {
-                ...(p.metrics || {}),
-                likes: Math.max(0, (p.metrics?.likes || 0) + delta),
-              },
-            };
-          })
-        );
-      }
-    };
-    return () => { try { delete window.__toggleGroupPostLike; } catch { } };
-  }, [groupId]);
+    } catch { alert("Vote failed"); }
+  };
 
+  const handleReact = async (postId, reactionId) => {
+    try {
+      const p = posts.find(x => x.id === postId);
+      const target = engageTargetOf(p);
+      await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ target_type: target.type || "activity_feed.feeditem", target_id: target.id, reaction: reactionId })
+      });
+    } catch (e) { console.error(e); }
+  };
 
-  if (loading) {
-    return (
-      <Stack alignItems="center" sx={{ py: 4 }}>
-        <CircularProgress size={24} />
-      </Stack>
-    );
-  }
-
-  if (posts.length === 0) {
-    return <Typography color="text.secondary">No posts in this group yet.</Typography>;
-  }
+  if (loading) return <Stack alignItems="center" py={4}><CircularProgress /></Stack>;
+  if (!posts.length) return <Typography color="text.secondary" align="center" py={4}>No posts in this group yet.</Typography>;
 
   return (
-    <Stack spacing={2}>
-      {posts.map((p) => <PostCard key={p.id} post={p} />)}
-    </Stack>
+    <Box>
+      {posts.map(p => (
+        <PostCard
+          key={p.id}
+          post={p}
+          onReact={handleReact}
+          onPollVote={(post, optId) => handlePollVote(post, optId)}
+        />
+      ))}
+    </Box>
+  );
+}
+
+function ChatTab({ groupId }) {
+  const [messages, setMessages] = React.useState([]);
+  const [text, setText] = React.useState("");
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(toApiUrl(`groups/${groupId}/chat/messages/`), { headers: { Accept: "application/json", ...authHeaders() } });
+        const d = r.ok ? await r.json() : [];
+        setMessages(Array.isArray(d?.results) ? d.results : (Array.isArray(d) ? d : []));
+      } catch { }
+    })();
+  }, [groupId]);
+
+  const send = async () => {
+    if (!text.trim()) return;
+    try {
+      await fetch(toApiUrl(`groups/${groupId}/chat/messages/`), {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ text })
+      });
+      setText("");
+      const r = await fetch(toApiUrl(`groups/${groupId}/chat/messages/`), { headers: { Accept: "application/json", ...authHeaders() } });
+      const d = await r.json();
+      setMessages(Array.isArray(d?.results) ? d.results : d);
+    } catch { }
+  };
+
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
+      <Box sx={{ height: 400, overflowY: "auto", p: 2 }}>
+        {messages.map(m => (
+          <Stack key={m.id} direction="row" spacing={1} sx={{ mb: 2 }}>
+            <Avatar src={toMediaUrl(m.user?.avatar)} sx={{ width: 32, height: 32 }} />
+            <Box>
+              <Typography variant="subtitle2">{m.user?.name || "User"}</Typography>
+              <Typography variant="body2">{m.text}</Typography>
+            </Box>
+          </Stack>
+        ))}
+      </Box>
+      <Divider />
+      <Box sx={{ p: 2, display: "flex", gap: 1 }}>
+        <TextField fullWidth size="small" value={text} onChange={e => setText(e.target.value)} placeholder="Type a message..." />
+        <Button variant="contained" onClick={send}><SendRoundedIcon /></Button>
+      </Box>
+    </Card>
   );
 }
 
 function MembersTab({ groupId }) {
   const [members, setMembers] = React.useState([]);
-  const [query, setQuery] = React.useState("");
-  const [page, setPage] = React.useState(1);
-  const perPage = 12;
-
-  const fetchMembers = React.useCallback(async () => {
-    const candidates = [
-      `${API_ROOT}/groups/${groupId}/member/?page_size=100`,
-      `${API_ROOT}/groups/${groupId}/members/?page_size=100`,
-      `${API_ROOT}/groups/${groupId}/memberships/?page_size=100`,
-      `${API_ROOT}/memberships/?group=${groupId}&page_size=100`,
-      `${API_ROOT}/groups/${groupId}/member`,
-      `${API_ROOT}/groups/${groupId}/members`,
-    ];
-    for (const url of candidates) {
+  React.useEffect(() => {
+    (async () => {
       try {
-        const res = await fetch(url,
-          { headers: { ...authHeader(), accept: "application/json" } }
-        );
-        if (!res.ok) continue;
-        const data = await res.json();
-        const rows =
-          Array.isArray(data?.results) ? data.results :
-            Array.isArray(data?.members) ? data.members :
-              Array.isArray(data?.items) ? data.items :
-                (Array.isArray(data) ? data : []);
-        if (!rows) continue;
-        const normalized = rows.map((r) => {
-          const u = r.user || r.member || r.participant || r.account || r.profile || r;
-          const displayName =
-            r.user_full_name || r.member_name || r.display_name || null;
-          const role =
-            r.role ||
-            r.role_display ||
-            r.membership_role ||
-            r.role_name ||
-            r.user_role ||
-            r.membership?.role ||
-            (r.is_owner ? "owner" : r.is_admin ? "admin" : r.is_moderator ? "moderator" : "member");
-          return {
-            id: u?.id || r.id,
-            name: displayName || nameOf(u) || nameOf(r),
-            avatar: avatarOf(u) || avatarOf(r),
-            role: (role || "member").toString().toLowerCase(),
-            email: u?.email || r?.email || null,
-          };
-        });
-        setMembers(normalized);
-        return;
-      } catch (e) { }
-    }
-    setMembers([]);
+        const r = await fetch(toApiUrl(`groups/${groupId}/members/`), { headers: { Accept: "application/json", ...authHeaders() } });
+        const d = r.ok ? await r.json() : [];
+        setMembers(Array.isArray(d?.results) ? d.results : (Array.isArray(d) ? d : []));
+      } catch { }
+    })();
   }, [groupId]);
 
-  React.useEffect(() => { fetchMembers(); }, [fetchMembers]);
-
-  const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return members;
-    return members.filter((m) => m.name.toLowerCase().includes(q));
-  }, [members, query]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-  const startIdx = (page - 1) * perPage;
-  const pageItems = filtered.slice(startIdx, startIdx + perPage);
-
-  React.useEffect(() => { setPage(1); }, [query, filtered.length]);
-
   return (
-    <Stack spacing={2}>
-      <TextField
-        fullWidth
-        placeholder="Search members"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>) }}
-      />
-      <Stack spacing={1.25}>
-        {pageItems.map((m) => (
-          <Box
-            key={m.id}
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              border: "1px solid",
-              borderColor: BORDER,
-              borderRadius: 2,
-              p: 1.25,
-              width: "100%",
-            }}
-          >
-            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
-              <Avatar src={m.avatar}>{(m.name || "M").slice(0, 1)}</Avatar>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="body1" fontWeight={600} noWrap title={m.name}>
-                  {m.name}
-                </Typography>
-                {!!m.email && (
-                  <Typography variant="caption" color="text.secondary" noWrap title={m.email}>
-                    {m.email}
-                  </Typography>
-                )}
-              </Box>
-            </Stack>
-            <Chip label={m.role} size="small" />
-          </Box>
-        ))}
-      </Stack>
-      <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between">
-        <Typography variant="body2" color="text.secondary">
-          Showing {filtered.length === 0 ? 0 : startIdx + 1}–{Math.min(startIdx + perPage, filtered.length)} of {filtered.length}
-        </Typography>
-        <Pagination
-          count={totalPages}
-          page={page}
-          onChange={(_, p) => setPage(p)}
-          color="primary"
-          size="medium"
-          siblingCount={0}
-          boundaryCount={1}
-        />
-      </Stack>
-    </Stack>
+    <List>
+      {members.map(m => {
+        const u = m.user || m;
+        return (
+          <ListItem key={u.id} sx={{ border: "1px solid #eee", borderRadius: 2, mb: 1 }}>
+            <ListItemAvatar><Avatar src={toMediaUrl(u.avatar || u.user_image)} /></ListItemAvatar>
+            <ListItemText primary={u.name || u.full_name || u.username} secondary={m.role || "Member"} />
+          </ListItem>
+        );
+      })}
+    </List>
   );
 }
 
 function OverviewTab({ group }) {
   if (!group) return null;
   return (
-    <Stack spacing={3}>
-      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
-        <CardHeader title={<Typography variant="h6" sx={{ fontWeight: 600 }}>About this group</Typography>} />
-        <CardContent sx={{ pt: 0 }}>
-          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-            {group.description || group.about || "No description yet."}
-          </Typography>
-        </CardContent>
+    <Stack spacing={2}>
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 2 }}>
+        <Typography variant="h6" gutterBottom>About</Typography>
+        <Typography variant="body2">{group.description || "No description."}</Typography>
       </Card>
-
-      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
-        <CardHeader title={<Typography variant="h6" sx={{ fontWeight: 600 }}>Group info</Typography>} />
-        <CardContent sx={{ pt: 0 }}>
-          <Stack spacing={1} divider={<Divider />}>
-            {group.parent_id && group.parent_id !== group.id && (
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-                <Typography variant="body2" color="text.secondary">Parent group</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  <Button
-                    component={RouterLink}
-                    to={`/community/groups/${group.parent_id}`}
-                    variant="text"
-                    size="small"
-                    sx={{ textTransform: "none", p: 0, minWidth: 0 }}
-                  >
-                    {group.parent_name || `#${group.parent_id}`}
-                  </Button>
-                </Typography>
-              </Box>
-            )}
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-              <Typography variant="body2" color="text.secondary">Members</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                {group.member_count ?? group.members_count ?? "—"}
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-              <Typography variant="body2" color="text.secondary">Visibility</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 500, textTransform: "capitalize" }}>
-                {(group.visibility || "private").toString()}
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-              <Typography variant="body2" color="text.secondary">Created</Typography>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                {(group.created_at && new Date(group.created_at).toLocaleDateString()) || "—"}
-              </Typography>
-            </Box>
-          </Stack>
-        </CardContent>
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 2 }}>
+        <Typography variant="h6" gutterBottom>Details</Typography>
+        <Typography variant="body2">Visibility: {group.visibility}</Typography>
+        <Typography variant="body2">Created: {new Date(group.created_at).toLocaleDateString()}</Typography>
       </Card>
     </Stack>
   );
 }
 
 // -----------------------------------------------------------------------------
-// Likes / Shares dialogs (copied style from HomePage)
+// 8. MAIN PAGE
 // -----------------------------------------------------------------------------
-function LikesDialog({ open, postId, onClose }) {
-  const [loading, setLoading] = React.useState(false);
-  const [likers, setLikers] = React.useState([]);
 
-  function normalizeUser(u) {
-    if (!u) return { id: null, name: "User", avatar: "" };
-    const id = u.id ?? u.user_id ?? u.owner_id ?? null;
-    const first = u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
-    const last = u.last_name ?? u.lastName ?? u.user_last_name ?? u.user__last_name ?? "";
-    const name = u.name || `${first} ${last}`.trim() || u.username || (id ? `User #${id}` : "User");
-    const profile = u.profile || u.userprofile || u.user_profile || {};
-    const avatarRaw =
-      u.user_image || u.user_image_url || u.avatar || u.profile_image || u.photo || u.image_url || u.avatar_url ||
-      profile.user_image_url || profile.user_image || "";
-    return { id, name, avatar: toAbsolute(avatarRaw), headline: u.headline || u.job_title || u.title || u.bio || u.about || "" };
-  }
-
-  function normalizeRow(row) {
-    const nested = row?.user || row?.owner || row?.liked_by || row?.actor || null;
-    if (nested) return normalizeUser(nested);
-    const u = {
-      id: row?.user_id ?? row?.owner_id ?? row?.liked_by_id ?? null,
-      first_name: row?.user_first_name ?? row?.user__first_name,
-      last_name: row?.user_last_name ?? row?.user__last_name,
-      username: row?.user_username ?? row?.user__username,
-      user_image: row?.user_image ?? row?.user_image_url ?? row?.user_avatar ?? row?.user__avatar,
-      headline: row?.user_headline,
-    };
-    return normalizeUser(u);
-  }
-
-  async function fetchLikers(feedId) {
-    const urls = [
-      `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${feedId}&reaction=like&page_size=200`,
-      `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${feedId}`,
-    ];
-    for (const url of urls) {
-      try {
-        const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
-        if (!r.ok) continue;
-        const data = await r.json();
-        const rows =
-          Array.isArray(data?.results) ? data.results :
-            Array.isArray(data) ? data :
-              Array.isArray(data?.items) ? data.items :
-                Array.isArray(data?.likers) ? data.likers :
-                  Array.isArray(data?.data) ? data.data : [];
-        return rows.map(normalizeRow);
-      } catch { }
-    }
-    return [];
-  }
-
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!open || !postId) return;
-      setLoading(true);
-      const list = await fetchLikers(postId);
-      if (mounted) setLikers(list);
-      setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [open, postId]);
-
-  return (
-    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{`Liked by${likers.length ? ` (${likers.length})` : ""}`}</DialogTitle>
-      <DialogContent dividers>
-        {loading ? (
-          <Typography variant="body2" color="text.secondary">Loading…</Typography>
-        ) : likers.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No likes yet.</Typography>
-        ) : (
-          <List dense>
-            {likers.map((u) => (
-              <ListItem key={u.id || u.name} disableGutters>
-                <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0, 1).toUpperCase()}</Avatar></ListItemAvatar>
-                <ListItemText
-                  primary={u.name}
-                  secondary={u.headline || null}
-                  primaryTypographyProps={{ variant: "body2", fontWeight: 600 }}
-                  secondaryTypographyProps={{ variant: "caption" }}
-                />
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </DialogContent>
-      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
-    </Dialog>
-  );
-}
-
-function SharesDialog({ open, postId, onClose }) {
-  const [loading, setLoading] = React.useState(false);
-  const [sharers, setSharers] = React.useState([]);
-
-  function normalizeUser(u) {
-    if (!u) return { id: null, name: "User", avatar: "" };
-    const id = u.id ?? u.user_id ?? u.owner_id ?? null;
-    const first = u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
-    const last = u.last_name ?? u.lastName ?? u.user_last_name ?? u.user__last_name ?? "";
-    const name = u.name || `${first} ${last}`.trim() || u.username || (id ? `User #${id}` : "User");
-    const profile = u.profile || u.userprofile || u.user_profile || {};
-    const avatarRaw =
-      profile.user_image_url || profile.user_image ||
-      u.user_image || u.user_image_url || u.avatar || u.profile_image || u.photo || u.image_url || u.avatar_url || "";
-    return { id, name, avatar: toAbsolute(avatarRaw), headline: u.headline || u.job_title || u.title || u.bio || u.about || "" };
-  }
-  function normalizeShareRow(row) {
-    const nested = row?.user || row?.owner || row?.actor || row?.shared_by || row?.created_by || row?.sharer || row?.sharer_user || null;
-    if (nested) return normalizeUser(nested);
-    const profile = row?.profile || row?.user_profile || row?.actor_profile || row?.user?.profile || row?.actor?.profile || null;
-    const u = {
-      id: row?.user_id ?? row?.owner_id ?? row?.actor_id ?? null,
-      first_name: row?.user_first_name ?? row?.user__first_name,
-      last_name: row?.user_last_name ?? row?.user__last_name,
-      username: row?.user_username ?? row?.user__username,
-      name: row?.actor_name ?? row?.user_full_name ?? row?.full_name,
-      user_image:
-        row?.actor_avatar ?? row?.user_image ?? row?.user_image_url ?? row?.user_avatar ?? row?.user__avatar ??
-        profile?.user_image_url ?? profile?.user_image ?? "",
-      headline: row?.user_headline,
-      profile: profile || undefined,
-    };
-    return normalizeUser(u);
-  }
-
-  async function fetchSharers(feedId) {
-    const urls = [
-      `${API_ROOT}/engagements/shares/?target_type=activity_feed.feeditem&target_id=${feedId}&page_size=200`,
-      `${API_ROOT}/engagements/shares/?feed_item=${feedId}&page_size=200`,
-    ];
-    for (const url of urls) {
-      try {
-        const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
-        if (!r.ok) continue;
-        const data = await r.json();
-        const rows =
-          Array.isArray(data?.results) ? data.results :
-            Array.isArray(data) ? data :
-              Array.isArray(data?.items) ? data.items :
-                Array.isArray(data?.shares) ? data.shares :
-                  Array.isArray(data?.data) ? data.data : [];
-        return rows.map(normalizeShareRow);
-      } catch { }
-    }
-    return [];
-  }
-
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!open || !postId) return;
-      setLoading(true);
-      const list = await fetchSharers(postId);
-
-      const seen = new Set();
-      const unique = [];
-      for (const u of list) {
-        const key = (u.id != null) ? `id:${u.id}` : `name:${(u.name || "").toLowerCase()}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        unique.push(u);
-      }
-
-      if (mounted) setSharers(unique);
-      try { window.__updateSharesCount && window.__updateSharesCount(postId, unique.length); } catch { }
-
-      setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [open, postId]);
-
-  return (
-    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{`Shared by${sharers.length ? ` (${sharers.length})` : ""}`}</DialogTitle>
-      <DialogContent dividers>
-        {loading ? (
-          <Typography variant="body2" color="text.secondary">Loading…</Typography>
-        ) : sharers.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No shares yet.</Typography>
-        ) : (
-          <List dense>
-            {sharers.map((u) => (
-              <ListItem key={`${u.id || u.name}-share`} disableGutters>
-                <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0, 1).toUpperCase()}</Avatar></ListItemAvatar>
-                <ListItemText
-                  primary={u.name}
-                  secondary={u.headline || null}
-                  primaryTypographyProps={{ variant: "body2", fontWeight: 600 }}
-                  secondaryTypographyProps={{ variant: "caption" }}
-                />
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </DialogContent>
-      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
-    </Dialog>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Comments dialog (group-aware) — now posts replies reliably
-// -----------------------------------------------------------------------------
-function CommentsDialog({
-  open,
-  postId,
-  groupId,
-  onClose,
-  inline = false,
-  initialCount = 3,
-  inputRef = null,
-}) {
-  const [loading, setLoading] = React.useState(false);
-  const [submitting, setSubmitting] = React.useState(false);
-  const [comments, setComments] = React.useState([]);
-  const [text, setText] = React.useState("");
-  const [replyingTo, setReplyingTo] = React.useState(null);
-  const [replyText, setReplyText] = React.useState("");
-  const [visibleCount, setVisibleCount] = React.useState(initialCount);
-
-  function normalizeUser(u) {
-    if (!u) return { id: null, name: "User", avatar: "" };
-    const id = u.id ?? u.user_id ?? null;
-    const first = u.first_name ?? u.firstName ?? u.user_first_name ?? u.user__first_name ?? "";
-    const last = u.last_name ?? u.lastName ?? u.user_last_name ?? u.user__last_name ?? "";
-    const name =
-      u.name ||
-      u.full_name ||
-      `${first} ${last}`.trim() ||
-      u.username ||
-      (id ? `User #${id}` : "User");
-
-    const profile = u.profile || u.userprofile || u.user_profile || {};
-    const avatarRaw =
-      u.user_image || u.user_image_url || u.avatar || u.profile_image || u.photo || u.image_url || u.avatar_url ||
-      profile.user_image_url || profile.user_image || "";
-    return { id, name, avatar: toAbsolute(avatarRaw) };
-  }
-
-  function normalizeFlat(row) {
-    const author = normalizeUser(row.author || row.user || row.created_by || row.owner || row.actor || {});
-    return {
-      id: row.id,
-      body: row.text || row.body || row.content || "",
-      created: row.created_at || row.created || row.timestamp || null,
-      likedByMe: !!(row.liked || row.liked_by_me || row.user_has_liked),
-      likeCount: Number(row.like_count ?? row.likes ?? 0) || 0,
-      canDelete: !!(row.can_delete || row.is_owner || row.is_mine),
-      parent: row.parent || row.parent_id || row.reply_to || null,
-      author,
-      replies: [],
-    };
-  }
-
-  function buildTreeWithReplies(roots, repliesByParent) {
-    const nodes = new Map();
-    roots.forEach(r => nodes.set(r.id, { ...r, replies: [] }));
-    roots.forEach(r => {
-      const kids = repliesByParent.get(r.id) || [];
-      const childNodes = kids.map(k => ({ ...k, replies: [] }));
-      nodes.get(r.id).replies = childNodes;
-    });
-    // newest first at root
-    const list = Array.from(nodes.values());
-    list.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
-    return list;
-  }
-
-  async function fetchComments(feedId) {
-    // 1) roots
-    const rootCandidates = [
-      `${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${feedId}&page_size=200`,
-      ...(groupId ? [`${API_ROOT}/groups/${groupId}/posts/${feedId}/comments/`] : []),
-      `${API_ROOT}/posts/${feedId}/comments/`,
-      `${API_ROOT}/comments/?post=${feedId}`,
-    ];
-
-    let rootRows = [];
-    for (const url of rootCandidates) {
-      try {
-        const r = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
-        if (!r.ok) continue;
-        const data = await r.json();
-        const rows = Array.isArray(data?.results) ? data.results :
-          Array.isArray(data) ? data :
-            Array.isArray(data?.comments) ? data.comments : [];
-        if (rows.length) {
-          rootRows = rows;
-          break;
-        }
-      } catch { }
-    }
-    if (!rootRows.length) return [];
-
-    const flatRoots = rootRows
-      .filter((x) => !x.parent && !x.parent_id) // only roots
-      .map(normalizeFlat);
-
-    // 2) replies for each root (parent=<id>)
-    const repliesByParent = new Map();
-    await Promise.all(
-      flatRoots.map(async (root) => {
-        const replyUrls = [
-          `${API_ROOT}/engagements/comments/?parent=${root.id}&page_size=200`,
-          ...(groupId ? [`${API_ROOT}/groups/${groupId}/posts/${feedId}/comments/?parent=${root.id}`] : []),
-          `${API_ROOT}/comments/?parent=${root.id}`,
-        ];
-        for (const u of replyUrls) {
-          try {
-            const rr = await fetch(u, { headers: { ...authHeader(), accept: "application/json" } });
-            if (!rr.ok) continue;
-            const dj = await rr.json();
-            const rows = Array.isArray(dj?.results) ? dj.results :
-              Array.isArray(dj) ? dj :
-                Array.isArray(dj?.comments) ? dj.comments : [];
-            if (rows.length) {
-              repliesByParent.set(
-                root.id,
-                rows.map(normalizeFlat)
-              );
-              break;
-            }
-          } catch { }
-        }
-      })
-    );
-
-    return buildTreeWithReplies(flatRoots, repliesByParent);
-  }
-
-  // Robust createComment: covers root + reply with multiple payload shapes
-  async function createComment(feedId, body, parentId = null) {
-    const text = (body || "").trim();
-    if (!text) return null;
-
-    // Build a payload that satisfies strict serializers (send redundant fields safely)
-    const base = {
-      text,
-      target_type: "activity_feed.feeditem",
-      target_id: feedId,
-      post: feedId,
-      object_id: feedId,
-      content_type: "activity_feed.feeditem",
-    };
-    const replyBits = parentId ? { parent: parentId, parent_id: parentId, reply_to: parentId } : {};
-
-    // 1) preferred engagements endpoint
-    try {
-      const r = await fetch(`${API_ROOT}/engagements/comments/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ ...(base), ...(replyBits) }),
-      });
-      if (r.ok) return normalizeFlat(await r.json());
-    } catch { }
-
-    // 2) group-scoped
-    if (groupId) {
-      try {
-        const r = await fetch(`${API_ROOT}/groups/${groupId}/posts/${feedId}/comments/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify(parentId ? { text, parent: parentId, parent_id: parentId, reply_to: parentId } : { text }),
-        });
-        if (r.ok) return normalizeFlat(await r.json());
-      } catch { }
-    }
-
-    // 3) generic by post id
-    try {
-      const r = await fetch(`${API_ROOT}/posts/${feedId}/comments/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify(parentId ? { text, parent: parentId, parent_id: parentId, reply_to: parentId } : { text }),
-      });
-      if (r.ok) return normalizeFlat(await r.json());
-    } catch { }
-
-    // 4) bare comments collection
-    try {
-      const r = await fetch(`${API_ROOT}/comments/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ post: feedId, text, parent: parentId || undefined, parent_id: parentId || undefined }),
-      });
-      if (r.ok) return normalizeFlat(await r.json());
-    } catch { }
-
-    throw new Error("Could not create comment");
-  }
-
-
-  async function toggleLikeComment(commentId) {
-    const candidates = [
-      `${API_ROOT}/comments/${commentId}/toggle-like/`,
-      `${API_ROOT}/comments/${commentId}/like/`,
-      `${API_ROOT}/engagements/comments/${commentId}/toggle-like/`,
-      // generic reaction toggle against comment content type
-      { url: `${API_ROOT}/engagements/reactions/toggle/`, body: { target_type: "engagements.comment", target_id: commentId, reaction: "like" } },
-    ];
-    for (const c of candidates) {
-      try {
-        if (typeof c === "string") {
-          const r = await fetch(c, { method: "POST", headers: { ...authHeader(), accept: "application/json" } });
-          if (r.ok) return true;
-        } else {
-          const r = await fetch(c.url, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(c.body) });
-          if (r.ok) return true;
-        }
-      } catch { }
-    }
-    return false;
-  }
-
-  async function deleteComment(commentId) {
-    const candidates = [
-      `${API_ROOT}/comments/${commentId}/`,
-      `${API_ROOT}/comments/${commentId}/delete/`,
-      `${API_ROOT}/engagements/comments/${commentId}/`,
-      `${API_ROOT}/engagements/comments/${commentId}/delete/`,
-    ];
-    for (const url of candidates) {
-      try {
-        const r = await fetch(url, {
-          method: url.endsWith("/delete/") ? "POST" : "DELETE",
-          headers: { ...authHeader(), accept: "application/json" },
-        });
-        if (r.ok || r.status === 204) return true;
-      } catch { }
-    }
-    return false;
-  }
-
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if ((!inline && !open) || !postId) return;
-      setLoading(true);
-      const list = await fetchComments(postId);
-      if (mounted) {
-        setComments(list);
-        setVisibleCount(initialCount);
-      }
-      setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [open, inline, postId, groupId, initialCount]);
-
-  const onSubmitNew = async () => {
-    if (!text.trim()) return;
-    setSubmitting(true);
-    try {
-      await createComment(postId, text.trim(), null);
-      const list = await fetchComments(postId); // reload to stay consistent
-      setComments(list);
-      setText("");
-    } catch (e) { alert(e.message || "Failed to add comment"); }
-    setSubmitting(false);
-  };
-
-  const onSubmitReply = async () => {
-    if (!replyingTo || !replyText.trim()) return;
-    setSubmitting(true);
-    try {
-      await createComment(postId, replyText.trim(), replyingTo);
-      setReplyingTo(null);
-      setReplyText("");
-      const list = await fetchComments(postId); // reload so replies show immediately
-      setComments(list);
-    } catch (e) { alert(e.message || "Failed to reply"); }
-    setSubmitting(false);
-  };
-
-  const onLike = async (id) => {
-    setComments((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1 }
-          : c
-      )
-    );
-    const ok = await toggleLikeComment(id);
-    if (!ok) {
-      // revert
-      setComments((prev) =>
-        prev.map((c) =>
-          c.id === id
-            ? { ...c, likedByMe: !c.likedByMe, likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1 }
-            : c
-        )
-      );
-    }
-  };
-
-  const onDelete = async (id, isReply = false, parentId = null) => {
-    const ok = await deleteComment(id);
-    if (!ok) return alert("Delete failed");
-    setComments((prev) => {
-      if (!isReply) return prev.filter((c) => c.id !== id);
-      return prev.map((p) => (p.id === parentId ? { ...p, replies: (p.replies || []).filter((r) => r.id !== id) } : p));
-    });
-  };
-
-  const Item = ({ c, depth = 0, parentId = null }) => (
-    <Box sx={{ pl: depth ? 5 : 0, py: 1 }}>
-      <Stack direction="row" spacing={1}>
-        <Avatar src={c.author.avatar}>{(c.author.name[0] || "").toUpperCase()}</Avatar>
-        <Box sx={{ flex: 1 }}>
-          <Stack direction="row" alignItems="baseline" spacing={1}>
-            <Typography variant="subtitle2">{c.author.name}</Typography>
-            {c.created && <Typography variant="caption" color="text.secondary">{timeAgo(c.created)}</Typography>}
-          </Stack>
-          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mt: 0.25 }}>{c.body}</Typography>
-
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-            <IconButton size="small" onClick={() => onLike(c.id)}>
-              {c.likedByMe ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
-            </IconButton>
-            <Typography variant="caption">{c.likeCount || 0}</Typography>
-
-            <Button size="small" startIcon={<ReplyRoundedIcon />} onClick={() => { setReplyingTo(c.id); setReplyText(""); }}>
-              Reply
-            </Button>
-
-            {c.canDelete && (
-              <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => onDelete(c.id, !!parentId, parentId)}>
-                Delete
-              </Button>
-            )}
-          </Stack>
-
-          {c.replies && c.replies.length > 0 && (
-            <Box sx={{ mt: 1 }}>
-              {c.replies.map((r) => <Item key={r.id} c={r} depth={1} parentId={c.id} />)}
-            </Box>
-          )}
-
-          {replyingTo === c.id && (
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-              <TextField
-                size="small"
-                fullWidth
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Write a reply…"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onSubmitReply();
-                  }
-                }}
-              />
-
-              <Button variant="contained" onClick={onSubmitReply} disabled={submitting || !replyText.trim()}>
-                Send
-              </Button>
-              <Button onClick={() => { setReplyingTo(null); setReplyText(""); }}>Cancel</Button>
-            </Stack>
-          )}
-        </Box>
-      </Stack>
-    </Box>
-  );
-
-  if (inline) {
-    const roots = comments;
-    const visibleRoots = roots.slice(0, visibleCount);
-    const hasMore = roots.length > visibleRoots.length;
-
-    return (
-      <Box sx={{ mt: 1 }}>
-        <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Write a comment…"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            inputRef={inputRef || undefined}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSubmitNew();
-              }
-            }}
-          />
-        </Stack>
-
-        {loading ? (
-          <Stack alignItems="center" py={1.5}><CircularProgress size={18} /></Stack>
-        ) : visibleRoots.length === 0 ? (
-          <Typography variant="caption" color="text.secondary">Be the first to comment.</Typography>
-        ) : (
-          <Box>
-            {visibleRoots.map((c) => <Item key={c.id} c={c} />)}
-          </Box>
-        )}
-
-        {hasMore && (
-          <Box sx={{ mt: 1 }}>
-            <Button size="small" onClick={() => setVisibleCount((v) => v + initialCount)}>
-              Load more comments
-            </Button>
-          </Box>
-        )}
-      </Box>
-    );
-  }
-
-  return (
-    <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Comments</DialogTitle>
-      <DialogContent dividers sx={{ pt: 1 }}>
-        {loading ? (
-          <Typography variant="body2" color="text.secondary">Loading comments…</Typography>
-        ) : comments.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No comments yet. Be the first to comment!</Typography>
-        ) : (
-          <Box>{comments.map((c) => <Item key={c.id} c={c} />)}</Box>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="Write a comment…"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-        <Button variant="contained" onClick={onSubmitNew} disabled={submitting || !text.trim()}>
-          Post
-        </Button>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Page
-// -----------------------------------------------------------------------------
 export default function GroupDetailsPage() {
-  const navigate = useNavigate();
   const { groupId } = useParams();
-  const [tab, setTab] = React.useState(2); // default to OVERVIEW (keep your original)
+  const navigate = useNavigate();
   const [group, setGroup] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+  const [tab, setTab] = React.useState(0);
   const [me, setMe] = React.useState(null);
 
-  // comments dialog
-  const [commentOpen, setCommentOpen] = React.useState(false);
-  const [commentPostId, setCommentPostId] = React.useState(null);
+  // --- Global Lists State (Who Liked, Who Shared) ---
+  const [likesTarget, setLikesTarget] = React.useState(null);
+  const [sharesTarget, setSharesTarget] = React.useState(null);
+  const [listUsers, setListUsers] = React.useState([]);
+  const [listLoading, setListLoading] = React.useState(false);
 
-  // NEW: likes / shares dialogs (wire same as HomePage)
-  const [likesOpen, setLikesOpen] = React.useState(false);
-  const [likesPostId, setLikesPostId] = React.useState(null);
-  const [sharesOpen, setSharesOpen] = React.useState(false);
-  const [sharesPostId, setSharesPostId] = React.useState(null);
+  // Specific state for the Tabbed Likes Dialog
+  const [likesFilter, setLikesFilter] = React.useState("all");
+
+  // Install Global Openers for PostCard
+  React.useEffect(() => {
+    window.__openLikes = (target) => setLikesTarget(target);
+    window.__openShares = (target) => setSharesTarget(target);
+    return () => { delete window.__openLikes; delete window.__openShares; };
+  }, []);
+
+  // Fetch "Who Liked" data (ROBUST MULTI-URL FETCH like LiveFeed)
+  React.useEffect(() => {
+    if (!likesTarget) return;
+    setListLoading(true);
+    setLikesFilter("all");
+    (async () => {
+      const { id, type } = likesTarget;
+      // Try multiple endpoint patterns to find where the reactions are stored
+      const urls = [
+        type ? toApiUrl(`engagements/reactions/?target_type=${encodeURIComponent(type)}&target_id=${id}&page_size=100`) : null,
+        toApiUrl(`engagements/reactions/?target_type=activity_feed.feeditem&target_id=${id}&page_size=100`),
+        toApiUrl(`engagements/reactions/who-liked/?feed_item=${id}&page_size=100`),
+      ].filter(Boolean);
+
+      let rows = [];
+      for (const url of urls) {
+        try {
+          const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+          if (!r.ok) continue;
+          const j = await r.json();
+          rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+          if (rows.length) break; // Found data, stop looking
+        } catch { }
+      }
+
+      setListUsers(rows.map(row => {
+        const u = row.user || row.actor || row.profile || row;
+        const reactionId = row.reaction || row.kind || "like";
+        const def = POST_REACTIONS.find(x => x.id === reactionId) || POST_REACTIONS[0];
+        return {
+          id: u.id,
+          name: u.name || u.full_name || u.username || "User",
+          avatar: toMediaUrl(u.avatar || u.user_image),
+          reactionId,
+          reactionEmoji: def?.emoji,
+          reactionLabel: def?.label,
+        };
+      }));
+      setListLoading(false);
+    })();
+  }, [likesTarget]);
+
+  // Fetch "Who Shared" data (ROBUST MULTI-URL FETCH like LiveFeed)
+  React.useEffect(() => {
+    if (!sharesTarget) return;
+    setListLoading(true);
+    (async () => {
+      const { id, type } = sharesTarget;
+      // Try multiple endpoint patterns
+      const urls = [
+        type ? toApiUrl(`engagements/shares/?target_type=${encodeURIComponent(type)}&target_id=${id}&page_size=100`) : null,
+        toApiUrl(`engagements/shares/who-shared/?feed_item=${id}&page_size=100`),
+        toApiUrl(`engagements/shares/?target_type=activity_feed.feeditem&target_id=${id}&page_size=100`),
+      ].filter(Boolean);
+
+      let rows = [];
+      for (const url of urls) {
+        try {
+          const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+          if (!r.ok) continue;
+          const j = await r.json();
+          rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+          if (rows.length) break;
+        } catch { }
+      }
+
+      setListUsers(rows.map(row => {
+        const u = row.user || row.actor || row.profile || row.from_user || row;
+        return {
+          id: u.id,
+          name: u.name || u.full_name || u.username || "User",
+          avatar: toMediaUrl(u.avatar || u.user_image),
+        };
+      }));
+      setListLoading(false);
+    })();
+  }, [sharesTarget]);
 
   React.useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${API_ROOT}/users/me/`, {
-          headers: { ...authHeader(), accept: "application/json" },
-        });
-        if (res.ok) {
-          const user = await res.json();
-          setMe(user);
-          // Expose current user for optimistic like avatars (same as Home)
-          try {
-            window.__me = {
-              id: user.id ?? user.user?.id ?? null,
-              name: nameOf(user),
-              avatar: avatarOf(user),
-            };
-          } catch { }
-        }
+        const rMe = await fetch(toApiUrl("users/me/"), { headers: { Accept: "application/json", ...authHeaders() } });
+        if (rMe.ok) setMe(await rMe.json());
+        const rGroup = await fetch(toApiUrl(`groups/${groupId}/`), { headers: { Accept: "application/json", ...authHeaders() } });
+        if (rGroup.ok) setGroup(await rGroup.json());
       } catch { }
     })();
-  }, []);
-
-  // expose openers just like HomePage so PostCard hooks work
-  React.useEffect(() => {
-    window.__openGroupComments = (postId) => { setCommentPostId(postId); setCommentOpen(true); };
-    window.__openComments = (postId) => { setCommentPostId(postId); setCommentOpen(true); };
-    window.__openLikes = (postId) => { setLikesPostId(postId); setLikesOpen(true); };
-    window.__openShares = (postId) => { setSharesPostId(postId); setSharesOpen(true); };
-    window.__openShare = (postId) => { setSharesPostId(postId); setSharesOpen(true); };
-    window.__openShareDialog = (postId) => { setSharesPostId(postId); setSharesOpen(true); };
-    return () => {
-      try {
-        delete window.__openGroupComments;
-        delete window.__openComments;
-        delete window.__openLikes;
-        delete window.__openShares;
-        delete window.__openShare;
-        delete window.__openShareDialog;
-      } catch { }
-    };
-  }, []);
-
-  const fetchGroup = React.useCallback(async () => {
-    setLoading(true);
-    const candidates = [
-      `${API_ROOT}/groups/${groupId}/`,
-      `${API_ROOT}/groups/detail/${groupId}/`,
-    ];
-    for (const url of candidates) {
-      try {
-        const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
-        if (!res.ok) continue;
-        const data = await res.json();
-
-        const parentId =
-          data.parent_id ??
-          data.parent?.id ??
-          data.parent_group_id ??
-          data.parent_group?.id ??
-          data.parentGroupId ??
-          data.parentGroup?.id ??
-          null;
-        let parentName =
-          data.parent?.name ??
-          data.parent_name ??
-          data.parent_group?.name ??
-          data.parentGroup?.name ??
-          null;
-
-        if (parentId && !parentName) {
-          try {
-            const pres = await fetch(`${API_ROOT}/groups/${parentId}/`, {
-              headers: { ...authHeader(), accept: "application/json" },
-            });
-            if (pres.ok) {
-              const pdata = await pres.json();
-              parentName = pdata.name || pdata.title || pdata.display_name || parentName;
-            }
-          } catch { }
-        }
-
-        setGroup({
-          id: data.id,
-          name: data.name,
-          description: data.description || data.about || "",
-          member_count: data.member_count ?? data.members_count ?? 0,
-          avatar: data.avatar || "",
-          created_at: data.created_at,
-          visibility: data.visibility || "private",
-          parent_id: parentId || null,
-          parent_name: parentName || null,
-        });
-        setLoading(false);
-        return;
-      } catch { }
-    }
-    setGroup(null);
-    setLoading(false);
   }, [groupId]);
 
-  React.useEffect(() => { fetchGroup(); }, [fetchGroup]);
+  // Filter Logic for Likes Dialog
+  const likesFilteredUsers = likesFilter === "all" ? listUsers : listUsers.filter(u => u.reactionId === likesFilter);
+  const likesReactionCounts = { all: listUsers.length };
+  listUsers.forEach(u => {
+    if (u.reactionId) likesReactionCounts[u.reactionId] = (likesReactionCounts[u.reactionId] || 0) + 1;
+  });
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
-      <Box sx={{ display: "flex", gap: 3, px: { xs: 2, sm: 2, md: 3 }, maxWidth: "1200px", mx: "auto" }}>
-        {/* LEFT: sidebar */}
-        <Box
-          sx={{
-            width: 280,
-            display: { xs: "none", md: "block" },
-            position: "sticky",
-            top: 88,
-            height: "fit-content",
-            flexShrink: 0,
-          }}
-        >
-          <CommunitySidebar
-            view="feed"
-            onChangeView={(key) =>
-              navigate(key === "home" ? "/community" : `/community?view=${key}`)
-            }
-          />
+    <Box sx={{ width: "100%", py: 3 }}>
+      <Box sx={{ display: "flex", gap: 3, px: { xs: 2, md: 3 }, maxWidth: "1200px", mx: "auto" }}>
+
+        {/* Left Sidebar */}
+        <Box sx={{ width: 280, display: { xs: "none", md: "block" }, position: "sticky", top: 88, height: "fit-content" }}>
+          <CommunitySidebar view="feed" onChangeView={(k) => navigate(k === "home" ? "/community" : `/community?view=${k}`)} />
         </Box>
 
-        {/* RIGHT: content */}
+        {/* Main Content */}
         <CommunityRightRailLayout user={me}>
-          {/* Header */}
-          <Card
-            variant="outlined"
-            sx={{
-              borderRadius: 3,
-              borderColor: BORDER,
-              mb: 3,
-              overflow: "visible"
-            }}
-          >
-            <CardContent sx={{ p: 3 }}>
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={2.5}
-                alignItems={{ xs: "flex-start", sm: "center" }}
-                justifyContent="space-between"
-              >
-                <Stack
-                  direction="row"
-                  spacing={2.5}
-                  alignItems="center"
-                  sx={{ flex: 1 }}
-                >
-                  <Avatar
-                    src={group?.avatar || ""}
-                    sx={{
-                      width: 80,
-                      height: 80,
-                      bgcolor: "#e0f2fe",
-                      color: "#0284c7",
-                      fontSize: "2rem",
-                      fontWeight: 600
-                    }}
-                  >
-                    {(group?.name || "G").slice(0, 1)}
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
-                      {loading ? "Loading…" : (group?.name || "Group")}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {loading ? "" : `${group?.member_count ?? 0} members`}
-                    </Typography>
-                  </Box>
-                </Stack>
-
-                <Button
-                  variant="contained"
-                  startIcon={<ChatBubbleOutlineRoundedIcon />}
-                  onClick={() =>
-                    navigate(`/community?view=messages&groupId=${groupId}`)
-                  }
-                  sx={{ mt: { xs: 1, sm: 0 } }}
-                >
-                  Message
-                </Button>
+          <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, mb: 3 }}>
+            <CardContent sx={{ p: 3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar src={toMediaUrl(group?.avatar)} sx={{ width: 80, height: 80, fontSize: 32, bgcolor: "primary.light" }}>{(group?.name || "G")[0]}</Avatar>
+                <Box>
+                  <Typography variant="h5" fontWeight={700}>{group?.name || "Loading..."}</Typography>
+                  <Typography variant="body2" color="text.secondary">{group?.member_count || 0} members</Typography>
+                </Box>
               </Stack>
+              <Button variant="contained" startIcon={<ChatBubbleOutlineRoundedIcon />} onClick={() => setTab(3)}>Message</Button>
             </CardContent>
           </Card>
 
-          {/* Tabs */}
           <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-              <Tabs
-                value={tab}
-                onChange={(_, v) => setTab(v)}
-                variant="scrollable"
-                scrollButtons="auto"
-                allowScrollButtonsMobile
-                sx={{
-                  px: 2,
-                  "& .MuiTab-root": {
-                    textTransform: "none",
-                    minHeight: 64,
-                    fontWeight: 500,
-                  }
-                }}
-              >
+              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2 }}>
                 <Tab icon={<ArticleOutlinedIcon />} iconPosition="start" label="POSTS" />
                 <Tab icon={<PeopleOutlineRoundedIcon />} iconPosition="start" label="MEMBERS" />
                 <Tab icon={<InfoOutlinedIcon />} iconPosition="start" label="OVERVIEW" />
+                <Tab icon={<ChatBubbleOutlineRoundedIcon />} iconPosition="start" label="CHAT" />
               </Tabs>
             </Box>
-
             <CardContent sx={{ p: 3 }}>
               {tab === 0 && <PostsTab groupId={groupId} />}
               {tab === 1 && <MembersTab groupId={groupId} />}
               {tab === 2 && <OverviewTab group={group} />}
+              {tab === 3 && <ChatTab groupId={groupId} />}
             </CardContent>
           </Card>
         </CommunityRightRailLayout>
       </Box>
 
-      {/* dialogs */}
-      <CommentsDialog
-        open={commentOpen}
-        postId={commentPostId}
-        groupId={groupId}
-        onClose={() => setCommentOpen(false)}
-      />
-      <LikesDialog
-        open={likesOpen}
-        postId={likesPostId}
-        onClose={() => setLikesOpen(false)}
-      />
-      <SharesDialog
-        open={sharesOpen}
-        postId={sharesPostId}
-        onClose={() => setSharesOpen(false)}
-      />
+      {/* REACTION DIALOG (Tabbed) */}
+      <Dialog open={!!likesTarget} onClose={() => setLikesTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Reactions</DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}>
+            <Tabs value={likesFilter} onChange={(_, v) => setLikesFilter(v)} variant="scrollable" allowScrollButtonsMobile>
+              <Tab value="all" label={`All (${likesReactionCounts.all || 0})`} />
+              {POST_REACTIONS.map(r => (
+                <Tab key={r.id} value={r.id} label={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <span>{r.emoji}</span><span style={{ fontSize: 12 }}>({likesReactionCounts[r.id] || 0})</span>
+                  </Box>
+                } />
+              ))}
+            </Tabs>
+          </Box>
+          {listLoading ? <LinearProgress /> : !likesFilteredUsers.length ? (
+            <Typography p={2} color="text.secondary">No reactions.</Typography>
+          ) : (
+            <List dense>
+              {likesFilteredUsers.map(u => (
+                <ListItem key={u.id}>
+                  <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U")[0]}</Avatar></ListItemAvatar>
+                  <ListItemText primary={u.name} />
+                  {u.reactionEmoji && (
+                    <ListItemSecondaryAction>
+                      <Tooltip title={u.reactionLabel || ""}><Box sx={{ fontSize: 20, mr: 1 }}>{u.reactionEmoji}</Box></Tooltip>
+                    </ListItemSecondaryAction>
+                  )}
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setLikesTarget(null)}>Close</Button></DialogActions>
+      </Dialog>
+
+      {/* SHARE LIST DIALOG (Simple List) */}
+      <Dialog open={!!sharesTarget} onClose={() => setSharesTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Shares</DialogTitle>
+        <DialogContent dividers>
+          {listLoading ? <LinearProgress /> : !listUsers.length ? (
+            <Typography p={2} color="text.secondary">No shares yet.</Typography>
+          ) : (
+            <List dense>
+              {listUsers.map(u => (
+                <ListItem key={u.id}>
+                  <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U")[0]}</Avatar></ListItemAvatar>
+                  <ListItemText primary={u.name} />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setSharesTarget(null)}>Close</Button></DialogActions>
+      </Dialog>
     </Box>
   );
 }
