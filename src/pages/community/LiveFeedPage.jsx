@@ -2,7 +2,7 @@
 import * as React from "react";
 import {
   Avatar, AvatarGroup, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
-  Paper, Stack, TextField, Typography, InputAdornment
+  Paper, Stack, TextField, Typography, InputAdornment, Popover, Tooltip
 } from "@mui/material";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -19,9 +19,19 @@ import {
   CircularProgress, List, ListItem, ListItemAvatar, ListItemText, Divider
 } from "@mui/material";
 import { Checkbox, ListItemButton } from "@mui/material";
+import { Tabs, Tab, ListItemSecondaryAction } from "@mui/material";
+
 
 
 const BORDER = "#e2e8f0";
+// LinkedIn-style reactions 
+const POST_REACTIONS = [
+  { id: "like", emoji: "👍", label: "Like" },
+  { id: "intriguing", emoji: "🤔", label: "Intriguing" },
+  { id: "spot_on", emoji: "🎯", label: "Spot On" },
+  { id: "validated", emoji: "🧠", label: "Validated" },
+  { id: "debatable", emoji: "🤷", label: "Debatable" },
+];
 
 
 function SuggestedConnections({ list = [] }) {
@@ -1588,54 +1598,44 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   const [local, setLocal] = React.useState(post);
   const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
-  const [likers, setLikers] = React.useState([]);
   const [shareOpen, setShareOpen] = React.useState(false);
-  // --- Normalize likers same as HomePage.jsx ---
-  function normalizeUsers(payload) {
-    const rows = Array.isArray(payload?.results)
-      ? payload.results
-      : Array.isArray(payload) ? payload : [];
 
-    // const makeAbsolute = (url) =>
-    //   !url
-    //     ? ""
-    //     : /^https?:\/\//i.test(url)
-    //       ? url
-    //       : `${import.meta.env.VITE_MEDIA_BASE_URL || ""}${url.startsWith("/") ? "" : "/"}${url}`;
+  const [likers, setLikers] = React.useState([]);
+  const likeCount = Number(post.metrics?.likes || 0);
+  const shareCount = Number(post.metrics?.shares || 0);
 
-    return rows.map((r) => {
-      const u = r.user || r.actor || r.liker || r.owner || r.profile || r;
-      const profile = u.profile || u.user_profile || u.userprofile || {};
+  // my reaction info
+  const myReactionId =
+    post.my_reaction || (post.liked_by_me ? "like" : null);
+  const myReactionDef = POST_REACTIONS.find((r) => r.id === myReactionId);
+  const likeBtnLabel = myReactionDef ? myReactionDef.label : "Like";
+  const likeBtnEmoji = myReactionDef ? myReactionDef.emoji : "👍";
+  const hasReaction = !!myReactionId;
 
-      const id = u.id || u.user_id || r.user_id || r.id;
-      const first = u.first_name || u.firstName || r.user_first_name || "";
-      const last = u.last_name || u.lastName || r.user_last_name || "";
-      const name =
-        u.name ||
-        u.full_name ||
-        `${first} ${last}`.trim() ||
-        u.username ||
-        `User #${id}`;
+  // Popup anchor
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const pickerOpen = Boolean(anchorEl);
+  const handleOpenPicker = (event) => setAnchorEl(event.currentTarget);
+  const handleClosePicker = () => setAnchorEl(null);
+  const primaryLiker = likers?.[0] || null;
+  const othersCount = Math.max(0, (likeCount || 0) - 1);
 
-      const avatarRaw =
-        profile.user_image_url ||
-        profile.user_image ||
-        u.user_image_url ||
-        u.user_image ||
-        r.user_image_url ||
-        r.user_image ||
-        u.avatar ||
-        u.profile_image ||
-        "";
+  // Unique reaction types present on this post
+  const reactionIds = Array.from(
+    new Set(
+      [
+        ...likers.map((u) => u.reactionId).filter(Boolean),
+        myReactionId, // include my current reaction so bubbles update instantly
+      ].filter(Boolean)
+    )
+  );
 
-      return {
-        id,
-        name,
-        avatar: makeAbsolute(avatarRaw),
-      };
-    });
-  }
-
+  const likeLabel =
+    primaryLiker && likeCount > 0
+      ? likeCount === 1
+        ? `reacted by ${primaryLiker.name}`
+        : `reacted by ${primaryLiker.name} and ${othersCount} others`
+      : `${(likeCount || 0).toLocaleString()} reactions`;
 
   React.useEffect(() => { setLocal(post); }, [post]);
   const commentInputRef = React.useRef(null);
@@ -1691,7 +1691,9 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
               row.actor_avatar || row.avatar || row.avatar_url || row.user_image || row.user_image_url || row.image || row.photo || ""
             );
             const id = u?.id || row.user_id || row.id;
-            return { id, name, avatar };
+            const reactionId = row.reaction || row.reaction_type || row.kind || null;  // 👈 add this
+
+            return { id, name, avatar, reactionId };
           }).filter(Boolean);
 
           if (!cancelled) setLikers(norm);
@@ -1839,48 +1841,60 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
 
       {/* Actions */}
       {/* Meta strip: likers avatars + sentence | shares on right */}
-      <Box sx={{ px: 0.5, pt: 0.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" spacing={1} alignItems="center">
-            <AvatarGroup max={3} sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}>
-              {(likers || []).slice(0, 3).map((u) => (
-                <Avatar key={u.id || u.name} src={u.avatar}>
-                  {(u.name || "U").slice(0, 1)}
-                </Avatar>
-              ))}
-            </AvatarGroup>
-            <Typography
-              variant="body2"
-              sx={{ cursor: "pointer" }}
-              onClick={() => window.__openLikes?.(engageTargetOf(post))?.()}
-            >
-              {likers?.[0]?.name
-                ? (
-                  local.metrics?.likes === 1
-                    ? `liked by ${likers[0].name}`
-                    : `liked by ${likers[0].name} and ${(local.metrics?.likes - 1)} others`
-                )
-                : `${(local.metrics?.likes || 0).toLocaleString()} likes`}
-            </Typography>
+      {(local.metrics?.likes || 0) > 0 || (local.metrics?.shares || 0) > 0 ? (
+        <Box sx={{ px: 0.5, pt: 0.5 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" spacing={1} alignItems="center">
+              <AvatarGroup
+                max={3}
+                sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 14 } }}
+              >
+                {(reactionIds.length ? reactionIds : ["like"])
+                  .slice(0, 3)
+                  .map((rid) => {
+                    const def =
+                      POST_REACTIONS.find((r) => r.id === rid) || POST_REACTIONS[0];
+                    return (
+                      <Avatar key={rid} onClick={() => window.__openLikes?.(engageTargetOf(post))?.()}>
+                        <span style={{ fontSize: 16 }}>{def.emoji}</span>
+                      </Avatar>
+                    );
+                  })}
+              </AvatarGroup>
+              <Typography
+                variant="body2"
+                sx={{ cursor: "pointer" }}
+                onClick={() => window.__openLikes?.(engageTargetOf(post))?.()}
+              >
+                {likeLabel}
+              </Typography>
+            </Stack>
 
+            <Button size="small" onClick={() => window.__openShares?.(engageTargetOf(post))?.()}>
+              {(local.metrics?.shares || 0).toLocaleString()} SHARES
+            </Button>
           </Stack>
-
-          <Button size="small" onClick={() => window.__openShares?.(engageTargetOf(post))?.()}>
-            {(local.metrics?.shares || 0).toLocaleString()} SHARES
-          </Button>
-        </Stack>
-      </Box>
-
+        </Box>
+      ) : null}
       <Divider sx={{ my: 1 }} />
 
       {/* Action row: Like / Comment / Share */}
       <Stack direction="row" justifyContent="space-around" alignItems="center" sx={{ px: 0.5, pb: 0.5 }}>
         <Button
           size="small"
-          startIcon={userHasLiked ? <FavoriteRoundedIcon /> : <FavoriteBorderIcon />}
-          onClick={toggleLike}
+          onClick={handleOpenPicker}
+          sx={{
+            textTransform: "none",
+            color: hasReaction ? "primary.main" : "text.secondary",
+            fontWeight: hasReaction ? 600 : 400,
+          }}
+          startIcon={
+            <span style={{ fontSize: 18, lineHeight: 1 }}>
+              {likeBtnEmoji}
+            </span>
+          }
         >
-          LIKE
+          {likeBtnLabel}
         </Button>
 
         <Button
@@ -1907,6 +1921,51 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         </Button>
       </Stack>
 
+      <Popover
+        open={pickerOpen}
+        anchorEl={anchorEl}
+        onClose={handleClosePicker}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+        disableRestoreFocus
+      >
+        <Box
+          sx={{
+            p: 1,
+            display: "flex",
+            gap: 1,
+            px: 1.5,
+          }}
+        >
+          {POST_REACTIONS.map((r) => (
+            <Tooltip key={r.id} title={r.label}>
+              <Box
+                onClick={async () => {
+                  // delegate to parent (same as My Posts)
+                  await onReact?.(post.id, r.id);
+                  handleClosePicker();
+                }}
+                sx={{
+                  cursor: "pointer",
+                  fontSize: 26,
+                  lineHeight: 1,
+                  px: 0.5,
+                  py: 0.25,
+                  borderRadius: "999px",
+                  transition:
+                    "transform 120ms ease, background 120ms ease",
+                  "&:hover": {
+                    bgcolor: "action.hover",
+                    transform: "translateY(-2px) scale(1.05)",
+                  },
+                }}
+              >
+                {r.emoji}
+              </Box>
+            </Tooltip>
+          ))}
+        </Box>
+      </Popover>
 
       {/* Inline comments, always visible like LinkedIn/Instagram */}
       {commentsOpen && (
@@ -1989,6 +2048,7 @@ export default function LiveFeedPage({
   const [likesTarget, setLikesTarget] = React.useState(null); // {id, type|null}
   const [likesLoading, setLikesLoading] = React.useState(false);
   const [likesUsers, setLikesUsers] = React.useState([]);
+  const [likesFilter, setLikesFilter] = React.useState("all");
   // --- Shares modal state (global for this page) ---
   const [sharesOpen, setSharesOpen] = React.useState(false);
   const [sharesTarget, setSharesTarget] = React.useState(null);
@@ -1997,6 +2057,116 @@ export default function LiveFeedPage({
 
   // 🔼 Show "scroll to top" button after user scrolls down
   const [showScrollTop, setShowScrollTop] = React.useState(false);
+
+  // 🔹 Multi-reaction handler (Like / Intriguing / Spot On / etc.)
+  async function handleReact(postId, reactionId) {
+    if (!postId || !reactionId) return;
+
+    // 1) Optimistic update in local state (same feel as My Posts)
+    setPosts((curr) =>
+      curr.map((p) => {
+        if (p.id !== postId) return p;
+
+        const currentReaction = p.my_reaction || (p.liked_by_me ? "like" : null);
+        const hadReaction = !!currentReaction;
+        const isSame = currentReaction === reactionId;
+
+        // clicking same reaction again → remove reaction
+        const nextReaction = isSame ? null : reactionId;
+
+        const currentLikes = p.metrics?.likes ?? 0;
+        let nextLikes = currentLikes;
+
+        if (!hadReaction && nextReaction) {
+          // no reaction before → add one like
+          nextLikes = currentLikes + 1;
+        } else if (hadReaction && !nextReaction) {
+          // removing reaction → minus one like
+          nextLikes = Math.max(0, currentLikes - 1);
+        }
+        // changing from one reaction to another keeps like count the same
+
+        return {
+          ...p,
+          my_reaction: nextReaction,
+          liked_by_me: !!nextReaction,
+          user_has_liked: !!nextReaction,
+          metrics: {
+            ...(p.metrics || {}),
+            likes: nextLikes,
+          },
+        };
+      })
+    );
+
+    // 2) Call backend toggle endpoint (same API as other places in this file)
+    try {
+      // find the post & engagement target
+      const post = posts.find((p) => p.id === postId);
+      if (!post) return;
+      const target = engageTargetOf(post);
+
+      const payload = {
+        target_id: target.id,
+        reaction: reactionId,       // 👈 IMPORTANT: backend expects `reaction`
+      };
+      if (target.type) payload.target_type = target.type;
+
+      const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      // 3) Re-sync exact counts from server so Live Feed stays accurate
+      const counts = await fetchEngagementCountsForTarget(target);
+      setPosts((curr) =>
+        curr.map((p) =>
+          p.id === postId
+            ? {
+              ...p,
+              user_has_liked: !!counts.user_has_liked,
+              metrics: {
+                ...(p.metrics || {}),
+                ...counts, // {likes, comments, shares, user_has_liked}
+              },
+            }
+            : p
+        )
+      );
+    } catch (e) {
+      console.error("handleReact failed:", e);
+      // If something goes wrong, do a hard refresh of metrics so UI recovers
+      try {
+        const post = posts.find((p) => p.id === postId);
+        if (!post) return;
+        const target = engageTargetOf(post);
+        const counts = await fetchEngagementCountsForTarget(target);
+        setPosts((curr) =>
+          curr.map((p) =>
+            p.id === postId
+              ? {
+                ...p,
+                user_has_liked: !!counts.user_has_liked,
+                metrics: {
+                  ...(p.metrics || {}),
+                  ...counts,
+                },
+              }
+              : p
+          )
+        );
+      } catch (e2) {
+        console.error("Failed to resync metrics:", e2);
+      }
+    }
+
+    // 4) Also call parent callback if someone passed onReact prop
+    onReact?.(postId, reactionId);
+  }
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -2037,49 +2207,104 @@ export default function LiveFeedPage({
   }, []);
 
 
-  // Fetch who-liked for the current target
+
+
+  // Fetch all reactions (not only likes) for the current target
   React.useEffect(() => {
     if (!likesOpen || !likesTarget?.id) return;
 
     (async () => {
+      setLikesFilter("all");       // reset tabs to "All" every time
       setLikesLoading(true);
       const { id, type } = likesTarget;
+
       const urls = [
-        // if we know the concrete CT (events.event, content.resource, etc.)
-        type ? toApiUrl(`engagements/reactions/?reaction=like&target_type=${encodeURIComponent(type)}&target_id=${id}&page_size=100`) : null,
-        // dedicated feed-item helper
-        toApiUrl(`engagements/reactions/who-liked/?feed_item=${id}&page_size=100`),
-        // final fallback assumes FeedItem CT
-        toApiUrl(`engagements/reactions/?reaction=like&target_type=activity_feed.feeditem&target_id=${id}&page_size=100`),
+        // 1) if we know exact target_type (events.event, content.resource, etc.)
+        type ? toApiUrl(
+          `engagements/reactions/?target_type=${encodeURIComponent(type)}&target_id=${id}&page_size=100`
+        ) : null,
+        // 2) generic feed item (same as MyPostsPage)
+        toApiUrl(
+          `engagements/reactions/?target_type=activity_feed.feeditem&target_id=${id}&page_size=100`
+        ),
+        // 3) legacy "who-liked" endpoint (fallback, may only return likes)
+        toApiUrl(
+          `engagements/reactions/who-liked/?feed_item=${id}&page_size=100`
+        ),
       ].filter(Boolean);
 
       let rows = [];
       for (const url of urls) {
         try {
-          const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+          const r = await fetch(url, {
+            headers: { Accept: "application/json", ...authHeaders() },
+          });
           if (!r.ok) continue;
           const j = await r.json();
-          rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+          rows = Array.isArray(j?.results)
+            ? j.results
+            : Array.isArray(j)
+              ? j
+              : [];
           if (rows.length) break;
-        } catch { }
+        } catch {
+          // ignore and try next url
+        }
       }
 
       const list = rows.map((row) => {
+        // pick user from various shapes
         const u = row.user || row.actor || row.profile || row;
         const id2 = u?.id || row.user_id || row.id;
-        const name =
-          u?.name || u?.full_name ||
-          ((u?.first_name || u?.last_name) ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim() : u?.username) ||
-          `User #${id2}`;
-        const avatar = toMediaUrl(
-          u?.avatar || u?.avatar_url || u?.user_image || u?.user_image_url ||
-          u?.image || u?.photo ||
-          u?.profile?.avatar || u?.profile?.avatar_url || u?.profile?.user_image || u?.profile?.user_image_url ||
-          row.actor_avatar || row.avatar || row.avatar_url || row.user_image || row.user_image_url || row.image || row.photo || ""
-        );
-        return { id: id2, name, avatar };
-      });
 
+        const name =
+          u?.name ||
+          u?.full_name ||
+          ((u?.first_name || u?.last_name)
+            ? `${u?.first_name || ""} ${u?.last_name || ""}`.trim()
+            : u?.username) ||
+          `User #${id2}`;
+
+        const avatar = toMediaUrl(
+          u?.avatar ||
+          u?.avatar_url ||
+          u?.user_image ||
+          u?.user_image_url ||
+          u?.image ||
+          u?.photo ||
+          u?.profile?.avatar ||
+          u?.profile?.avatar_url ||
+          u?.profile?.user_image ||
+          u?.profile?.user_image_url ||
+          row.actor_avatar ||
+          row.avatar ||
+          row.avatar_url ||
+          row.actor_user_image ||
+          row.actor_user_image_url ||
+          row.user_image ||
+          row.user_image_url ||
+          row.image ||
+          row.photo ||
+          ""
+        );
+
+        // ⭐ reaction type from backend
+        const reactionId =
+          row.reaction || row.reaction_type || row.kind || null;
+
+        const def =
+          POST_REACTIONS.find((x) => x.id === reactionId) ||
+          POST_REACTIONS[0]; // default to "Like"
+
+        return {
+          id: id2,
+          name,
+          avatar,
+          reactionId,
+          reactionEmoji: def?.emoji,
+          reactionLabel: def?.label,
+        };
+      });
 
       setLikesUsers(list);
       setLikesLoading(false);
@@ -2408,6 +2633,18 @@ export default function LiveFeedPage({
     }
   }, [focusPostId, displayPosts]);
 
+  // --- Derived data for Reactions popup (same idea as MyPostsPage) ---
+  const likesFilteredUsers =
+    likesFilter === "all"
+      ? likesUsers
+      : likesUsers.filter((u) => u.reactionId === likesFilter);
+
+  const likesReactionCounts = { all: likesUsers.length };
+  likesUsers.forEach((u) => {
+    if (!u.reactionId) return;
+    likesReactionCounts[u.reactionId] =
+      (likesReactionCounts[u.reactionId] || 0) + 1;
+  });
 
 
   return (
@@ -2520,7 +2757,7 @@ export default function LiveFeedPage({
                 >
                   <PostCard
                     post={p}
-                    onReact={onReact}
+                    onReact={handleReact}
                     onOpenEvent={onOpenEvent}
                     onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
                   />
@@ -2542,19 +2779,74 @@ export default function LiveFeedPage({
             </Stack>
           )}
         </Box>
-        <Dialog open={likesOpen} onClose={() => setLikesOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle>Likes</DialogTitle>
+        <Dialog
+          open={likesOpen}
+          onClose={() => setLikesOpen(false)}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>Reactions</DialogTitle>
           <DialogContent dividers>
+            {/* Tabs: All / 👍 / 🤔 / 🎯 / 🧠 / 🤷 just like MyPostsPage */}
+            <Box sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}>
+              <Tabs
+                value={likesFilter}
+                onChange={(_, v) => setLikesFilter(v)}
+                variant="scrollable"
+                allowScrollButtonsMobile
+              >
+                <Tab
+                  value="all"
+                  label={`All (${likesReactionCounts.all || 0})`}
+                />
+                {POST_REACTIONS.map((r) => (
+                  <Tab
+                    key={r.id}
+                    value={r.id}
+                    label={
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                        }}
+                      >
+                        <span>{r.emoji}</span>
+                        <span style={{ fontSize: 12 }}>
+                          ({likesReactionCounts[r.id] || 0})
+                        </span>
+                      </Box>
+                    }
+                  />
+                ))}
+              </Tabs>
+            </Box>
+
             {likesLoading ? (
-              <Stack alignItems="center" py={2}><CircularProgress size={22} /></Stack>
-            ) : likesUsers.length === 0 ? (
-              <Typography color="text.secondary">No likes yet.</Typography>
+              <LinearProgress />
+            ) : !likesFilteredUsers.length ? (
+              <Typography p={2} color="text.secondary">
+                No reactions yet.
+              </Typography>
             ) : (
               <List dense>
-                {likesUsers.map(u => (
+                {likesFilteredUsers.map((u) => (
                   <ListItem key={u.id}>
-                    <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0, 1)}</Avatar></ListItemAvatar>
+                    <ListItemAvatar>
+                      <Avatar src={u.avatar}>
+                        {(u.name || "U").slice(0, 1)}
+                      </Avatar>
+                    </ListItemAvatar>
                     <ListItemText primary={u.name} />
+                    {u.reactionEmoji && (
+                      <ListItemSecondaryAction>
+                        <Tooltip title={u.reactionLabel || ""}>
+                          <Box sx={{ fontSize: 20, mr: 1 }}>
+                            {u.reactionEmoji}
+                          </Box>
+                        </Tooltip>
+                      </ListItemSecondaryAction>
+                    )}
                   </ListItem>
                 ))}
               </List>
