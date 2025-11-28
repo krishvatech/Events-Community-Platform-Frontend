@@ -91,7 +91,15 @@ const pulseAnimation = keyframes`
 `;
 
 // Configuration for Dyte UI
-const BASE_UI_CONFIG = {};
+const BASE_UI_CONFIG = {
+  designTokens: {
+    theme: {
+      text: "255, 255, 255",
+      onBackground: "255, 255, 255",
+      background: "0, 0, 0",
+    },
+  },
+};
 
 function DyteMeetingUI({ config }) {
   const { meeting } = useDyteMeeting();
@@ -104,15 +112,22 @@ function DyteMeetingUI({ config }) {
     );
   }
 
+  // ✅ CRITICAL FIX: Only pass config if it is explicitly defined.
+  // Passing {} triggers the "reading 'dyte-meeting'" error.
+  const meetingProps = {
+    meeting: meeting,
+    mode: "fill",
+    showSetupScreen: false,
+    style: { width: "100%", height: "100%" },
+  };
+
+  if (config) {
+    meetingProps.config = config;
+  }
+
   return (
     <Box sx={{ flex: 1, minHeight: 0, height: "100%", width: "100%" }}>
-      <DyteMeeting
-        meeting={meeting}
-        mode="fill"
-        showSetupScreen={false}
-        style={{ width: "100%", height: "100%" }}
-        {...(config ? { config } : {})}
-      />
+      <DyteMeeting {...meetingProps} />
     </Box>
   );
 }
@@ -191,12 +206,14 @@ function DyteMeetingWrapper({
   onMeetingEnd,
   onOpenQnA,
   onMeetingReady,
-  dbStatus, // ✅ Recieve DB status to bypass waiting screen
+  dbStatus,
 }) {
   const [meeting, initMeeting] = useDyteClient();
   const [initError, setInitError] = useState("");
   const [initDone, setInitDone] = useState(false);
-  const [dyteConfig, setDyteConfig] = useState(BASE_UI_CONFIG);
+  
+  // ✅ FIX: Initialize as undefined. Do NOT use {}
+  const [dyteConfig, setDyteConfig] = useState(undefined);
   
   // Host Detection State
   const [hostJoined, setHostJoined] = useState(false);
@@ -232,14 +249,14 @@ function DyteMeetingWrapper({
     return () => { cancelled = true; };
   }, [authToken, initMeeting, role]);
 
-  // ✅ UPDATED: API Call to update DB Status
+  // API Call to update DB Status
   const updateLiveStatus = useCallback(async (action) => {
     if (!eventId) return;
     try {
       await fetch(toApiUrl(`events/${eventId}/live-status/`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ action }), // "start" or "end"
+        body: JSON.stringify({ action }), 
       });
       console.log(`Updated DB status to: ${action === 'start' ? 'LIVE' : 'ENDED'}`);
     } catch (e) {
@@ -247,14 +264,14 @@ function DyteMeetingWrapper({
     }
   }, [eventId]);
 
-  // ✅ LOGIC: Trigger 'start' when Host initializes meeting
+  // Trigger 'start' when Host initializes meeting
   useEffect(() => {
     if (initDone && role === "publisher") {
         updateLiveStatus("start");
     }
   }, [initDone, role, updateLiveStatus]);
 
-  // Host Detection (for Waiting Screen)
+  // Host Detection (for Waiting Screen) AND Auto-Pinning (for Spotlight)
   useEffect(() => {
     if (!meeting || !initDone) return;
 
@@ -263,32 +280,43 @@ function DyteMeetingWrapper({
       return;
     }
 
-    // Helper: Check if host is present
-    const checkForHost = () => {
-      if (!meeting?.participants?.joined) return;
-      const participants = Array.from(meeting.participants.joined.values());
-      const found = participants.some((p) => {
-        const preset = (p.presetName || "").toLowerCase();
-        return (
-          preset.includes("host") || 
-          preset.includes("publisher") ||
-          preset.includes("admin") ||
-          preset.includes("presenter")
-        );
-      });
-      if (found) setHostJoined(true);
-    };
+    const checkForHostAndPin = (participant) => {
+      if (!participant) return;
+      
+      const preset = (participant.presetName || "").toLowerCase();
+      const isHost = 
+        preset.includes("host") || 
+        preset.includes("publisher") ||
+        preset.includes("admin") ||
+        preset.includes("presenter");
 
-    checkForHost();
-    const handleJoin = (p) => {
-      const preset = (p.presetName || "").toLowerCase();
-      if (preset.includes("host") || preset.includes("publisher")) {
+      if (isHost) {
         setHostJoined(true);
+        // Pin Logic
+        if (!meeting.participants.pinned.has(participant.id)) {
+            meeting.participants.pin(participant.id).catch((e) => {
+                console.warn("Failed to pin host:", e);
+            });
+        }
       }
     };
 
+    // 1. Check existing
+    if (meeting?.participants?.joined) {
+        Array.from(meeting.participants.joined.values()).forEach(checkForHostAndPin);
+    }
+
+    // 2. Listen for new joiners
+    const handleJoin = (p) => checkForHostAndPin(p);
+
     meeting.participants.joined.on("participantJoined", handleJoin);
-    const interval = setInterval(checkForHost, 3000);
+
+    // 3. Polling Backup
+    const interval = setInterval(() => {
+        if (meeting?.participants?.joined) {
+            Array.from(meeting.participants.joined.values()).forEach(checkForHostAndPin);
+        }
+    }, 3000);
 
     return () => {
       meeting.participants.joined.off("participantJoined", handleJoin);
@@ -310,9 +338,13 @@ function DyteMeetingWrapper({
     };
   }, [meeting, onMeetingEnd]);
 
-  // Q&A Button Addon
+  // Q&A Button Addon (Safer Implementation)
   useEffect(() => {
     if (!meeting || !initDone || !meeting.self) return;
+    
+    // Safety check to ensure we don't run this multiple times unnecessarily
+    if (dyteConfig) return; 
+
     try {
       const openTab = (tab) => {
         const dyteRoot = document.querySelector("dyte-meeting");
@@ -326,16 +358,27 @@ function DyteMeetingWrapper({
       };
 
       const qnaIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-4 4V5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.09 9A3 3 0 0 1 15 10c0 2-3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="1.6"/></svg>`;
+      
       const qnaBtn = new CustomControlbarButton({
         position: "right",
         label: "Q&A",
         icon: qnaIcon,
         onClick: () => openTab("qna"),
       });
-      const addonsConfig = registerAddons([qnaBtn], meeting) || {};
-      setDyteConfig({ ...BASE_UI_CONFIG, ...addonsConfig });
-    } catch (e) { console.warn("Failed to register Q&A addon", e); }
-  }, [meeting, initDone, onOpenQnA]);
+
+      // Register the addon
+      const addonsConfig = registerAddons([qnaBtn], meeting);
+      
+      // ✅ FIX: Merge with BASE config to prevent overwriting themes
+      setDyteConfig({
+        ...BASE_UI_CONFIG,
+        ...addonsConfig
+      });
+
+    } catch (e) { 
+      console.warn("Failed to register Q&A addon", e); 
+    }
+  }, [meeting, initDone, onOpenQnA, dyteConfig]);
 
   if (!authToken) return <Typography sx={{ p: 3 }} color="error">Missing Auth Token</Typography>;
   if (initError) return <Typography sx={{ p: 3 }} color="error">{initError}</Typography>;
@@ -348,9 +391,6 @@ function DyteMeetingWrapper({
     );
   }
 
-  // ✅ LOGIC: Bypass waiting screen if Host is here OR DB status is already 'live'
-  // If hostJoined is true, we always show meeting.
-  // If hostJoined is false BUT dbStatus is 'live', we show meeting (host might be invisible or reconnecting).
   const shouldShowMeeting = hostJoined || dbStatus === "live";
 
   if (!shouldShowMeeting) {
@@ -384,7 +424,7 @@ export default function LiveMeetingPage() {
   const [authToken, setAuthToken] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [dbStatus, setDbStatus] = useState("draft"); // Track DB status
+  const [dbStatus, setDbStatus] = useState("draft"); 
   
   // Sidebar State
   const [showQnA, setShowQnA] = useState(false);
@@ -410,8 +450,13 @@ export default function LiveMeetingPage() {
   useEffect(() => {
     if (!sidebarMeeting) return;
     const handleBroadcast = ({ type, payload }) => {
+      // Logic: Screen Share Toggle
       if (type === "toggle-screen-share") {
         setHostForceBlock(!payload.allowed);
+      }
+      // Logic: Host ID for Pinning
+      if (type === "host-id" && payload.hostId) {
+         // This is handled inside DyteMeetingWrapper's pinning logic via side-effect
       }
     };
     sidebarMeeting.participants.on('broadcastedMessage', handleBroadcast);
@@ -420,11 +465,25 @@ export default function LiveMeetingPage() {
 
   const shouldHideScreenShare = !isHost && (!canScreenShare || hostForceBlock);
 
-  // 2. Host Control Logic
+  // 2. Host Logic: Control Audience & Broadcast Presence
+  useEffect(() => {
+    if (!isHost || !sidebarMeeting) return;
+    
+    // Broadcast Host ID so Audience can Pin them
+    const broadcastPresence = () => {
+        const myId = sidebarMeeting.self.id;
+        sidebarMeeting.participants.broadcastMessage("host-id", { hostId: myId });
+    };
+
+    broadcastPresence(); 
+    const interval = setInterval(broadcastPresence, 4000); 
+
+    return () => clearInterval(interval);
+  }, [isHost, sidebarMeeting]);
+
   const getAudienceParticipantIds = useCallback(() => {
     if (!sidebarMeeting?.participants?.joined) return [];
     const participants = Array.from(sidebarMeeting.participants.joined.values());
-    // Filter out host
     return participants
       .filter((p) => p.id !== sidebarMeeting.self.id) 
       .map((p) => p.id);
@@ -534,7 +593,7 @@ export default function LiveMeetingPage() {
     const roleFromQuery = (search.get("role") || "audience").toLowerCase();
     setRole(roleFromQuery === "publisher" || roleFromQuery === "host" ? "publisher" : "audience");
     
-    // ✅ FETCH DB STATUS (To Check if already LIVE)
+    // FETCH DB STATUS
     const fetchStatus = async () => {
         try {
             const res = await fetch(toApiUrl(`events/${idFromQuery}/`), {
@@ -542,7 +601,7 @@ export default function LiveMeetingPage() {
             });
             if(res.ok) {
                 const data = await res.json();
-                setDbStatus(data.status); // "live", "ended", etc.
+                setDbStatus(data.status); 
             }
         } catch(e) { console.error("Failed to fetch event status", e); }
     };
@@ -583,7 +642,7 @@ export default function LiveMeetingPage() {
     if (requestFs) try { requestFs.call(el); } catch (e) {}
   }, [authToken]);
 
-  // ✅ Helper to update DB Status
+  // Helper to update DB Status
   const updateLiveStatus = async (action) => {
     if (!eventId) return;
     try {
@@ -597,7 +656,7 @@ export default function LiveMeetingPage() {
     }
   };
 
-  // ✅ FIXED: Correct Redirects on Meeting End & Update DB
+  // Correct Redirects on Meeting End & Update DB
   const handleMeetingEnd = useCallback(async (state) => {
       console.log("Meeting ended with state:", state);
       if (document.fullscreenElement) {
@@ -606,17 +665,15 @@ export default function LiveMeetingPage() {
 
       // REDIRECT LOGIC
       if (role === "publisher") {
-          // 1. Publisher -> Update DB to 'ended' then redirect
           await updateLiveStatus("end");
           navigate("/admin/events");
       } else {
-          // 2. Audience -> Back to previous page
           navigate(-1);
       }
     }, [role, navigate, eventId]
   );
 
-  // 🔴 "Smart" Enforcer for Screen Share Hiding 🔴
+  // "Smart" Enforcer for Screen Share Hiding
   useEffect(() => {
     if (isHost) return;
 
