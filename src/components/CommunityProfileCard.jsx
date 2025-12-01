@@ -1,5 +1,6 @@
 // src/components/CommunityProfileCard.jsx
 import * as React from "react";
+import axios from "axios";
 import {
   Avatar,
   Box,
@@ -22,7 +23,9 @@ import {
 } from "@mui/material";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { clearAuth } from "../utils/authStorage";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 
 const BORDER = "#e2e8f0";
 const SLATE_700 = "#334155";
@@ -34,6 +37,16 @@ function initials(name = "") {
   const second = parts[1]?.[0] || "";
   return (first + second).toUpperCase();
 }
+
+const apiBase =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+
+const getCookie = (name) =>
+  document.cookie
+    .split("; ")
+    .find((x) => x.startsWith(name + "="))
+    ?.split("=")[1];
+
 
 // ---- helpers for data wiring (single-file) ----
 // Support BOTH env names used across your app.
@@ -147,6 +160,24 @@ export default function CommunityProfileCard({
   onViewAllCommunities,
   onViewAllFriends,
 }) {
+  const navigate = useNavigate();
+
+  const signOut = async () => {
+    try {
+      await axios.post(
+        `${apiBase}/auth/session/logout/`,
+        {},
+        {
+          withCredentials: true,
+          headers: { "X-CSRFToken": getCookie("csrftoken") || "" },
+        }
+      );
+    } catch (e) {
+      // ignore errors, still clear local auth
+    }
+    clearAuth();
+    navigate("/", { replace: true });
+  };
   const [openGroups, setOpenGroups] = React.useState(false);
   const [openFriends, setOpenFriends] = React.useState(false);
 
@@ -401,9 +432,9 @@ export default function CommunityProfileCard({
             )}
 
             <Stack direction="row" spacing={1}>
-              <Tooltip title="Message">
-                <IconButton size="small" onClick={onMessage}>
-                  <ChatBubbleOutlineRoundedIcon fontSize="small" />
+              <Tooltip title="Logout">
+                <IconButton size="small" onClick={signOut}>
+                  <LogoutRoundedIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="More">
