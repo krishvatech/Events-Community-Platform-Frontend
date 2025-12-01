@@ -23,9 +23,8 @@ import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
-
+import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 import CommunitySidebar from "../../components/CommunitySideBar.jsx";
-import CommunityRightRailLayout from "../../components/layout/CommunityRightRailLayout.jsx";
 
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS & API HELPERS
@@ -135,7 +134,7 @@ async function fetchBatchMetrics(ids) {
   try {
     const res = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
     if (!res.ok) return {};
-    return await res.json(); 
+    return await res.json();
   } catch {
     return {};
   }
@@ -162,28 +161,28 @@ function mapFeedItem(item) {
   const isEventVerb = verb.includes("event");
 
   const rawAuthor = item.actor || item.author || item.user || item.owner || item.created_by || {};
-  const authorId = 
-    rawAuthor.id ?? 
-    item.actor_id ?? 
-    item.user_id ?? 
-    item.author_id ?? 
-    m.user_id ?? 
+  const authorId =
+    rawAuthor.id ??
+    item.actor_id ??
+    item.user_id ??
+    item.author_id ??
+    m.user_id ??
     null;
 
-  const displayName = 
-    rawAuthor.name || 
-    rawAuthor.full_name || 
-    rawAuthor.username || 
-    item.actor_name || 
-    item.actor_username || 
+  const displayName =
+    rawAuthor.name ||
+    rawAuthor.full_name ||
+    rawAuthor.username ||
+    item.actor_name ||
+    item.actor_username ||
     (authorId ? `User #${authorId}` : "Unknown User");
 
-  const authorAvatar = 
-    rawAuthor.avatar || 
-    rawAuthor.avatar_url || 
-    rawAuthor.user_image || 
-    item.actor_avatar || 
-    m.author_avatar || 
+  const authorAvatar =
+    rawAuthor.avatar ||
+    rawAuthor.avatar_url ||
+    rawAuthor.user_image ||
+    item.actor_avatar ||
+    m.author_avatar ||
     "";
 
   const base = {
@@ -551,9 +550,9 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
       {/* ⬇️ FIX: Ensure children are rendered recursively */}
       {c.children && c.children.length > 0 && (
         <Box sx={{ mt: 1 }}>
-           {c.children
-             .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
-             .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+          {c.children
+            .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+            .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
         </Box>
       )}
     </Box>
@@ -642,7 +641,7 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
       "friendships?status=accepted",
       "users/me/friends",
     ];
-    const limitParams = "&page_size=1000&limit=1000"; 
+    const limitParams = "&page_size=1000&limit=1000";
 
     for (const path of candidates) {
       try {
@@ -651,7 +650,7 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
         if (!r.ok) continue;
         const j = await r.json();
         return normalizeFriends(Array.isArray(j?.results) ? j.results : j, meId);
-      } catch {}
+      } catch { }
     }
     return [];
   }
@@ -672,17 +671,17 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
         // Construct URL safely
         let url = path;
         if (!path.includes("?")) {
-           url = path.endsWith("/") ? path + limitParams : path + "/" + limitParams;
+          url = path.endsWith("/") ? path + limitParams : path + "/" + limitParams;
         } else {
-           url = path + limitParams.replace("?", "&");
+          url = path + limitParams.replace("?", "&");
         }
-        
+
         const r = await fetch(toApiUrl(url), { headers: { Accept: "application/json", ...authHeaders() } });
         if (!r.ok) continue;
         const j = await r.json();
         const rawMems = Array.isArray(j?.results) ? j.results : j?.members || (Array.isArray(j) ? j : []);
         if (rawMems.length > 0) return rawMems;
-      } catch {}
+      } catch { }
     }
     return [];
   }
@@ -693,7 +692,7 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
 
     try {
       let meId = null;
-      try { const me = await getMeCached(); meId = me?.id || me?.user?.id; } catch {}
+      try { const me = await getMeCached(); meId = me?.id || me?.user?.id; } catch { }
 
       if (groupId) {
         // Parallel fetch: Friends & Group Members
@@ -706,7 +705,7 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
         if (rawMems.length > 0) {
           rawMems.forEach(m => {
             const uid = m.user?.id || m.user_id || m.id;
-            if(uid) groupMembers.add(String(uid));
+            if (uid) groupMembers.add(String(uid));
           });
         }
 
@@ -714,7 +713,7 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
         // No fallback to 'all friends' if fetch fails.
         const mutuals = myFriends.filter(f => groupMembers.has(String(f.id)));
         setFriends(mutuals);
-      
+
       } else {
         // Non-group posts
         const list = await fetchMyFriends(meId);
@@ -1014,29 +1013,29 @@ function PostsTab({ groupId }) {
         const data = await res.json();
         const raw = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
         const mapped = raw.map(mapFeedItem).filter(Boolean);
-        
+
         // ⬇️ FIX: Force attach current Group ID to all posts so ShareDialog works
         const numericGroupId = Number(groupId);
 
         const ids = mapped.map(p => p.id).filter(id => Number.isInteger(id));
         if (ids.length) {
-           const metrics = await fetchBatchMetrics(ids);
-           const hydrated = mapped.map(p => {
-              const m = metrics[p.id];
-              const base = m ? { 
-                ...p, 
-                user_has_liked: !!(m.user_has_liked ?? m.me_liked),
-                my_reaction: m.my_reaction || (m.user_has_liked ? "like" : null),
-                metrics: { ...p.metrics, ...m } 
-              } : p;
-              
-              // Attach group_id explicitly
-              return { ...base, group_id: numericGroupId };
-           });
-           setPosts(hydrated);
+          const metrics = await fetchBatchMetrics(ids);
+          const hydrated = mapped.map(p => {
+            const m = metrics[p.id];
+            const base = m ? {
+              ...p,
+              user_has_liked: !!(m.user_has_liked ?? m.me_liked),
+              my_reaction: m.my_reaction || (m.user_has_liked ? "like" : null),
+              metrics: { ...p.metrics, ...m }
+            } : p;
+
+            // Attach group_id explicitly
+            return { ...base, group_id: numericGroupId };
+          });
+          setPosts(hydrated);
         } else {
-           // Attach group_id explicitly even if no metrics
-           setPosts(mapped.map(p => ({ ...p, group_id: numericGroupId })));
+          // Attach group_id explicitly even if no metrics
+          setPosts(mapped.map(p => ({ ...p, group_id: numericGroupId })));
         }
       }
     } catch { }
@@ -1313,36 +1312,107 @@ export default function GroupDetailsPage() {
   });
 
   return (
-    <Box sx={{ width: "100%", py: 3 }}>
-      <Box sx={{ display: "flex", gap: 3, px: { xs: 2, md: 3 }, maxWidth: "1200px", mx: "auto" }}>
-
-        {/* Left Sidebar */}
-        <Box sx={{ width: 280, display: { xs: "none", md: "block" }, position: "sticky", top: 88, height: "fit-content" }}>
-          <CommunitySidebar view="feed" onChangeView={(k) => navigate(k === "home" ? "/community" : `/community?view=${k}`)} />
+    <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 3,
+          px: { xs: 0, sm: 2, md: 2.5, lg: 3 },
+          maxWidth: { xs: "100%", lg: "1480px" },
+          mx: "auto",
+        }}
+      >
+        {/* LEFT: Community sidebar (same as other community pages) */}
+        <Box
+          sx={{
+            width: 280,
+            display: { xs: "none", md: "block" },
+            position: "sticky",
+            top: 88,
+            height: "fit-content",
+            flexShrink: 0,
+          }}
+        >
+          <CommunitySidebar
+            view="groups"
+            onChangeView={(k) =>
+              navigate(k === "home" ? "/community" : `/community?view=${k}`)
+            }
+          />
         </Box>
-
-        {/* Main Content */}
-        <CommunityRightRailLayout user={me}>
-          <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, mb: 3 }}>
-            <CardContent sx={{ p: 3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {/* LEFT: Main group content (full-width like Groups page) */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {/* Group header */}
+          <Card
+            variant="outlined"
+            sx={{ borderRadius: 3, borderColor: BORDER, mb: 3 }}
+          >
+            <CardContent
+              sx={{
+                p: 3,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
               <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar src={toMediaUrl(group?.avatar)} sx={{ width: 80, height: 80, fontSize: 32, bgcolor: "primary.light" }}>{(group?.name || "G")[0]}</Avatar>
+                <Avatar
+                  src={toMediaUrl(group?.avatar)}
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    fontSize: 32,
+                    bgcolor: "primary.light",
+                  }}
+                >
+                  {(group?.name || "G")[0]}
+                </Avatar>
                 <Box>
-                  <Typography variant="h5" fontWeight={700}>{group?.name || "Loading..."}</Typography>
-                  <Typography variant="body2" color="text.secondary">{group?.member_count || 0} members</Typography>
+                  <Typography variant="h5" fontWeight={700}>
+                    {group?.name || "Loading..."}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {group?.member_count || 0} members
+                  </Typography>
                 </Box>
               </Stack>
-              <Button variant="contained" startIcon={<ChatBubbleOutlineRoundedIcon />} onClick={() => setTab(3)}>Message</Button>
+              <Button
+                variant="contained"
+                startIcon={<ChatBubbleOutlineRoundedIcon />}
+                onClick={() => setTab(3)}
+              >
+                Message
+              </Button>
             </CardContent>
           </Card>
 
-          <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
+          {/* Tabs + tab content */}
+          <Card
+            variant="outlined"
+            sx={{ borderRadius: 3, borderColor: BORDER }}
+          >
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
               <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2 }}>
-                <Tab icon={<ArticleOutlinedIcon />} iconPosition="start" label="POSTS" />
-                <Tab icon={<PeopleOutlineRoundedIcon />} iconPosition="start" label="MEMBERS" />
-                <Tab icon={<InfoOutlinedIcon />} iconPosition="start" label="OVERVIEW" />
-                <Tab icon={<ChatBubbleOutlineRoundedIcon />} iconPosition="start" label="CHAT" />
+                <Tab
+                  icon={<ArticleOutlinedIcon />}
+                  iconPosition="start"
+                  label="POSTS"
+                />
+                <Tab
+                  icon={<PeopleOutlineRoundedIcon />}
+                  iconPosition="start"
+                  label="MEMBERS"
+                />
+                <Tab
+                  icon={<InfoOutlinedIcon />}
+                  iconPosition="start"
+                  label="OVERVIEW"
+                />
+                <Tab
+                  icon={<ChatBubbleOutlineRoundedIcon />}
+                  iconPosition="start"
+                  label="CHAT"
+                />
               </Tabs>
             </Box>
             <CardContent sx={{ p: 3 }}>
@@ -1352,9 +1422,26 @@ export default function GroupDetailsPage() {
               {tab === 3 && <ChatTab groupId={groupId} />}
             </CardContent>
           </Card>
-        </CommunityRightRailLayout>
+        </Box>
+        {/* RIGHT: Sidebar – same style as GroupsPage */}
+        <Box
+          sx={{
+            width: 150,
+            display: "none",
+            "@media (min-width:1440px)": {
+              display: "block",
+            },
+            position: "sticky",
+            top: 88,
+            height: "fit-content",
+            flexShrink: 0,
+          }}
+        >
+          <Stack spacing={2}>
+            <CommunityProfileCard user={me} />
+          </Stack>
+        </Box>
       </Box>
-
       {/* REACTION DIALOG (Tabbed) */}
       <Dialog open={!!likesTarget} onClose={() => setLikesTarget(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Reactions</DialogTitle>
