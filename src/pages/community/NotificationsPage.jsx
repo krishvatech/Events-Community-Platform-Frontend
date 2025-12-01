@@ -19,6 +19,7 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import HourglassBottomRoundedIcon from "@mui/icons-material/HourglassBottomRounded";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
+import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 
 
 const BORDER = "#e2e8f0";
@@ -115,6 +116,9 @@ function NotificationRow({
   const unread = !item.is_read;
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+    const showDescription =
+    item.description &&
+    !/^Post #\d+$/i.test(String(item.description).trim());
 
   const ActionsByKind = () => {
     if (item.kind === "friend_request" || item.kind === "connection_request") {
@@ -206,7 +210,7 @@ function NotificationRow({
             )}
           </Stack>
 
-          {item.description ? (
+          {showDescription ? (
             <Typography
               variant="caption"
               color="text.secondary"
@@ -293,13 +297,36 @@ export default function NotificationsPage({
   const [items, setItems] = React.useState([]);
   const [showOnlyUnread, setShowOnlyUnread] = React.useState(false);
   const [kind, setKind] = React.useState("All");
+  React.useEffect(() => {
+    setVisibleCount(8);
+  }, [showOnlyUnread, kind]);
 
   // --- Pagination State ---
   const [loading, setLoading] = React.useState(true);
   const [hasMore, setHasMore] = React.useState(true);
   // Initial URL includes ?page_size=10
-  const [nextUrl, setNextUrl] = React.useState(`${API_BASE}/notifications/?page_size=10`);
+  const [nextUrl, setNextUrl] = React.useState(`${API_BASE}/notifications/?page_size=8`);
   const observerTarget = React.useRef(null);
+
+  const [visibleCount, setVisibleCount] = React.useState(8);       // how many notifications to show
+  const [isLoadingMoreLocal, setIsLoadingMoreLocal] = React.useState(false); // local "load next 8"
+
+  const [showScrollTop, setShowScrollTop] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window === "undefined") return;
+      setShowScrollTop(window.scrollY > 300);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const handleScrollTop = () => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Derived state (filters & counts)
   const unreadCount = React.useMemo(() => items.filter((i) => !i.is_read).length, [items]);
@@ -326,7 +353,10 @@ export default function NotificationsPage({
     return arr;
   }, [items, showOnlyUnread, kind]);
 
-  const grouped = groupByDay(filtered);
+  const groupedLimited = React.useMemo(() => {
+    const sliced = filtered.slice(0, visibleCount);
+    return groupByDay(sliced);
+  }, [filtered, visibleCount]);
 
   // --- Load Function ---
   const loadNotifications = React.useCallback(async (url, isAppend = false) => {
@@ -382,7 +412,7 @@ export default function NotificationsPage({
       if (idsToMark.length) {
         // We update local state to read immediately
         setItems(curr => curr.map(i => idsToMark.includes(i.id) ? { ...i, is_read: true } : i));
-        
+
         // Fire & forget the backend update
         try {
           await fetch(`${API_BASE}/notifications/mark-read/`, {
@@ -411,7 +441,7 @@ export default function NotificationsPage({
   // --- 1. Initial Load ---
   React.useEffect(() => {
     // Load first page (size=10)
-    loadNotifications(`${API_BASE}/notifications/?page_size=10`, false);
+    loadNotifications(`${API_BASE}/notifications/?page_size=8`, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -419,19 +449,44 @@ export default function NotificationsPage({
   React.useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        // Trigger load only if target is visible, we have more pages, and not currently loading
-        if (entries[0].isIntersecting && hasMore && !loading && nextUrl) {
+        const entry = entries[0];
+        if (!entry.isIntersecting) return;
+
+        // 1) Local: show next 8 if we already have more items in memory
+        if (filtered.length > visibleCount && !isLoadingMoreLocal) {
+          setIsLoadingMoreLocal(true);
+          setTimeout(() => {
+            setVisibleCount((prev) =>
+              Math.min(prev + 8, filtered.length)
+            );
+            setIsLoadingMoreLocal(false);
+          }, 400); // small delay for skeleton feel
+          return;
+        }
+
+        // 2) Remote: if we've shown everything we have, ask backend for next page
+        if (hasMore && !loading && nextUrl) {
           loadNotifications(nextUrl, true);
         }
       },
       { threshold: 0.1 }
     );
+
     if (observerTarget.current) observer.observe(observerTarget.current);
-    
+
     return () => {
       if (observerTarget.current) observer.unobserve(observerTarget.current);
     };
-  }, [hasMore, loading, nextUrl, loadNotifications]);
+  }, [
+    filtered.length,
+    visibleCount,
+    isLoadingMoreLocal,
+    hasMore,
+    loading,
+    nextUrl,
+    loadNotifications,
+  ]);
+
 
 
   // --- Helper API Calls ---
@@ -652,13 +707,13 @@ export default function NotificationsPage({
           <>
             {/* Grouped Lists */}
             {["Today", "Yesterday", "Earlier"].map((section) =>
-              grouped[section]?.length ? (
+              groupedLimited[section]?.length ? (
                 <Box key={section} sx={{ mb: 2 }}>
                   <Typography variant="overline" sx={{ color: "text.secondary" }}>
                     {section}
                   </Typography>
                   <List sx={{ mt: 1 }}>
-                    {grouped[section].map((it) => (
+                    {groupedLimited[section].map((it) => (
                       <ListItem key={it.id} disableGutters sx={{ px: 0 }}>
                         <NotificationRow
                           item={it}
@@ -676,14 +731,40 @@ export default function NotificationsPage({
             )}
 
             {/* Bottom Loader / Scroll Trigger */}
-            {hasMore && (
+            {(hasMore || filtered.length > visibleCount) && (
               <Box ref={observerTarget} sx={{ py: 1, textAlign: "center", width: "100%" }}>
-                {loading && <NotificationSkeleton />}
+                {(loading || isLoadingMoreLocal) && <NotificationSkeleton />}
               </Box>
             )}
           </>
         )}
       </Grid>
+      {showScrollTop && (
+        <Box
+          sx={{
+            position: "fixed",
+            bottom: { xs: 72, md: 32 },
+            right: { xs: 16, md: 32 },
+            zIndex: 1300,
+          }}
+        >
+          <IconButton
+            onClick={handleScrollTop}
+            size="large"
+            sx={{
+              bgcolor: "primary.main",
+              color: "#fff",
+              boxShadow: 4,
+              borderRadius: "999px",
+              "&:hover": {
+                bgcolor: "primary.dark",
+              },
+            }}
+          >
+            <KeyboardArrowUpRoundedIcon />
+          </IconButton>
+        </Box>
+      )}
     </Grid>
   );
 }

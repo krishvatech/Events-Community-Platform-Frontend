@@ -51,6 +51,7 @@ import {
   ReplyRounded as ReplyRoundedIcon,
   Search as SearchIcon, // Added
 } from "@mui/icons-material";
+import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 
 // -----------------------------------------------------------------------------
 // 1. API Helpers & Constants
@@ -1082,6 +1083,24 @@ export default function MyPostsPage() {
   const [visibleCount, setVisibleCount] = React.useState(4);      // how many posts to show
   const [isLoadingMore, setIsLoadingMore] = React.useState(false); // skeleton while loading next batch
   const observerTarget = React.useRef(null);                      // intersection trigger at bottom
+  const [showScrollTop, setShowScrollTop] = React.useState(false);
+
+
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window === "undefined") return;
+      setShowScrollTop(window.scrollY > 300); // show after 300px
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const handleScrollTop = () => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
 
   React.useEffect(() => {
     async function init() {
@@ -1342,6 +1361,32 @@ export default function MyPostsPage() {
         postId={shareActionPostId}
         onClose={() => setShareActionPostId(null)}
       />
+      {showScrollTop && (
+        <Box
+          sx={{
+            position: "fixed",
+            bottom: { xs: 72, md: 32 },
+            right: { xs: 16, md: 32 },
+            zIndex: 1300,
+          }}
+        >
+          <IconButton
+            onClick={handleScrollTop}
+            size="large"
+            sx={{
+              bgcolor: "primary.main",
+              color: "#fff",
+              boxShadow: 4,
+              borderRadius: "999px",
+              "&:hover": {
+                bgcolor: "primary.dark",
+              },
+            }}
+          >
+            <KeyboardArrowUpRoundedIcon />
+          </IconButton>
+        </Box>
+      )}
     </Box>
   );
 }
