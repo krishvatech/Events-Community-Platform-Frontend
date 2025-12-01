@@ -279,8 +279,8 @@ function SharePreview({ attachment, mine }) {
         o.percentage != null
           ? o.percentage
           : totalVotes > 0
-          ? Math.round((o.votes / totalVotes) * 100)
-          : 0,
+            ? Math.round((o.votes / totalVotes) * 100)
+            : 0,
     }));
   }
 
@@ -340,8 +340,8 @@ function SharePreview({ attachment, mine }) {
       ? `${author} • Poll`
       : `${author} • Post`
     : isPoll
-    ? "Poll"
-    : "Post";
+      ? "Poll"
+      : "Post";
 
   // ---------- UI: Poll Card ----------
   if (isPoll) {
@@ -443,8 +443,8 @@ function SharePreview({ attachment, mine }) {
             {totalVotes > 0
               ? `${totalVotes} vote${totalVotes === 1 ? "" : "s"}`
               : loading
-              ? "Loading poll…"
-              : "Tap to open poll"}
+                ? "Loading poll…"
+                : "Tap to open poll"}
           </Typography>
         </Box>
       </Box>
@@ -954,9 +954,9 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
               {title}
             </Typography>
             <Stack direction="row" alignItems="center" spacing={0.5}>
-               {/* Show Pin Icon if pinned */}
-               {thread.is_pinned && <PushPinIcon sx={{ fontSize: 14, color: "text.secondary", transform: "rotate(45deg)" }} />}
-               <Typography variant="caption" color="text.secondary" sx={CAPTION_SX}>
+              {/* Show Pin Icon if pinned */}
+              {thread.is_pinned && <PushPinIcon sx={{ fontSize: 14, color: "text.secondary", transform: "rotate(45deg)" }} />}
+              <Typography variant="caption" color="text.secondary" sx={CAPTION_SX}>
                 {time}
               </Typography>
             </Stack>
@@ -981,11 +981,11 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
 }
 function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, conversationId }) {
   const mine = Boolean(m.mine);
-  
+
   const attachments = m.attachments || [];
   const shareAttachment = attachments.find((a) => a && a.type === "share");
   const standardAttachments = attachments.filter((a) => a && a.type !== "share");
-  
+
   // Check if we need to hide the main timestamp (because we overlay it on the image)
   const hasFullWidthAttachmentNoText =
     standardAttachments.some((a) => {
@@ -993,7 +993,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
       const type = (a.type || "").toLowerCase();
       const isImage = type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
       const isVideo = type.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(url);
-      const isPdf   = type === "application/pdf" || url.toLowerCase().endsWith(".pdf");
+      const isPdf = type === "application/pdf" || url.toLowerCase().endsWith(".pdf");
       return isImage || isVideo || isPdf;
     }) && !m.body;
 
@@ -1092,21 +1092,21 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
               const name = att.name || "Unknown File";
               const fullWidthSx = !m.body
                 ? {
-                    // pure attachment message → fill entire bubble
-                    width: "100%",
-                    maxWidth: "100%",
-                    borderRadius: "inherit",
-                    overflow: "hidden",
-                  }
+                  // pure attachment message → fill entire bubble
+                  width: "100%",
+                  maxWidth: "100%",
+                  borderRadius: "inherit",
+                  overflow: "hidden",
+                }
                 : {
-                    // attachment + text → stay inside normal padding
-                    width: "100%",
-                    maxWidth: "100%",
-                    borderRadius: 2,
-                    overflow: "hidden",
-                    mt: 0.5,
-                  };
-              
+                  // attachment + text → stay inside normal padding
+                  width: "100%",
+                  maxWidth: "100%",
+                  borderRadius: 2,
+                  overflow: "hidden",
+                  mt: 0.5,
+                };
+
               const isImage = type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
               const isVideo = type.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(url);
               const isPdf = type === "application/pdf" || url.toLowerCase().endsWith(".pdf");
@@ -1126,39 +1126,39 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                       bgcolor: "rgba(0,0,0,0.05)",
                     }}
                   >
-                    <img 
-                      src={url} 
-                      alt={name} 
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                    <img
+                      src={url}
+                      alt={name}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
 
                     {/* 🔹 WhatsApp Style Time Overlay (Only if no text) */}
                     {!m.body && (
-                       <Box
-                         sx={{
-                           position: "absolute",
-                           bottom: 0,
-                           left: 0,
-                           width: "100%",
-                           height: 40,
-                           background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)",
-                           display: "flex",
-                           alignItems: "flex-end",
-                           justifyContent: "flex-end",
-                           p: 1
-                         }}
-                       >
-                         <Typography variant="caption" sx={{ color: "white", fontSize: 11, fontWeight: 500 }}>
-                           {m._time}
-                         </Typography>
-                       </Box>
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          width: "100%",
+                          height: 40,
+                          background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)",
+                          display: "flex",
+                          alignItems: "flex-end",
+                          justifyContent: "flex-end",
+                          p: 1
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ color: "white", fontSize: 11, fontWeight: 500 }}>
+                          {m._time}
+                        </Typography>
+                      </Box>
                     )}
                   </Box>
                 );
               }
 
               // 🟢 2. VIDEO DISPLAY
-             if (isVideo) {
+              if (isVideo) {
                 return (
                   <Box
                     key={index}
@@ -1181,11 +1181,11 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
               // 🟢 3. PDF
               if (isPdf) {
                 return (
-                  <Box 
+                  <Box
                     key={index}
                     onClick={() => handleDownloadClick(realIndex, name)}
                     sx={{
-                      width: 240, 
+                      width: 240,
                       maxWidth: "100%",
                       borderRadius: 2,
                       overflow: "hidden",
@@ -1219,13 +1219,13 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
 
               // 🟢 4. GENERIC FILE
               return (
-                <Stack 
+                <Stack
                   key={index}
-                  direction="row" 
-                  alignItems="center" 
+                  direction="row"
+                  alignItems="center"
                   spacing={1.5}
                   onClick={() => window.open(url, "_blank")}
-                  sx={{ 
+                  sx={{
                     p: 1.5, borderRadius: 2, bgcolor: "rgba(0,0,0,0.06)", cursor: "pointer", mb: 0.5
                   }}
                 >
@@ -1718,7 +1718,7 @@ export default function MessagesPage() {
   // 🔹 Attachment Menu State
   const [attachMenuAnchor, setAttachMenuAnchor] = React.useState(null);
   const isAttachMenuOpen = Boolean(attachMenuAnchor);
-  
+
   // 🔹 Hidden Input Refs
   const fileInputRef = React.useRef(null);
   const cameraInputRef = React.useRef(null);
@@ -1741,7 +1741,7 @@ export default function MessagesPage() {
     handleAttachClose();
     // On mobile, you might still want the native input (optional), 
     // but for consistency let's use the modal or check strictly for desktop.
-    setCameraOpen(true); 
+    setCameraOpen(true);
   };
 
   // 🔹 Handle actual file selection (Placeholder logic)
@@ -1749,65 +1749,65 @@ export default function MessagesPage() {
     const files = event.target.files;
     if (files && files.length > 0) {
       const fileArray = Array.from(files);
-      
+
       // Resize all selected images before adding to state
       const processedFiles = await Promise.all(
-        fileArray.map(f => resizeImage(f)) 
+        fileArray.map(f => resizeImage(f))
       );
 
       setDraftAttachments(prev => [...prev, ...processedFiles]);
-      setActivePreviewIndex(0); 
+      setActivePreviewIndex(0);
     }
-    event.target.value = ""; 
+    event.target.value = "";
   };
 
   // 1. Handle opening the context menu
-const handleConvContextMenu = (e, thread) => {
-  e.preventDefault();
-  setConvMenuTarget(thread);
-  setConvMenuAnchor(e.currentTarget); // Or e.clientX/Y for precise position
-};
+  const handleConvContextMenu = (e, thread) => {
+    e.preventDefault();
+    setConvMenuTarget(thread);
+    setConvMenuAnchor(e.currentTarget); // Or e.clientX/Y for precise position
+  };
 
-const handleCloseConvMenu = () => {
-  setConvMenuAnchor(null);
-  setConvMenuTarget(null);
-};
+  const handleCloseConvMenu = () => {
+    setConvMenuAnchor(null);
+    setConvMenuTarget(null);
+  };
 
-// 2. Handle the Pin API Call
-const handleTogglePinConversation = async () => {
-  if (!convMenuTarget) return;
-  const targetId = convMenuTarget.id;
-  handleCloseConvMenu();
+  // 2. Handle the Pin API Call
+  const handleTogglePinConversation = async () => {
+    if (!convMenuTarget) return;
+    const targetId = convMenuTarget.id;
+    handleCloseConvMenu();
 
-  try {
-    const res = await apiFetch(`${MESSAGING}/conversations/${targetId}/toggle-pin/`, {
-      method: "POST"
-    });
-    
-    if (res.ok) {
-      const data = await res.json();
-      const isNowPinned = data.is_pinned;
-
-      // Update local state immediately without full reload
-      setThreads(prev => {
-        const updated = prev.map(t => 
-          t.id === targetId ? { ...t, is_pinned: isNowPinned } : t
-        );
-        
-        // RE-SORT: Pinned first, then Newest Timestamp
-        return updated.sort((a, b) => {
-          const pinA = Boolean(a.is_pinned);
-          const pinB = Boolean(b.is_pinned);
-          if (pinA !== pinB) return pinA ? -1 : 1;
-
-          return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
-        });
+    try {
+      const res = await apiFetch(`${MESSAGING}/conversations/${targetId}/toggle-pin/`, {
+        method: "POST"
       });
+
+      if (res.ok) {
+        const data = await res.json();
+        const isNowPinned = data.is_pinned;
+
+        // Update local state immediately without full reload
+        setThreads(prev => {
+          const updated = prev.map(t =>
+            t.id === targetId ? { ...t, is_pinned: isNowPinned } : t
+          );
+
+          // RE-SORT: Pinned first, then Newest Timestamp
+          return updated.sort((a, b) => {
+            const pinA = Boolean(a.is_pinned);
+            const pinB = Boolean(b.is_pinned);
+            if (pinA !== pinB) return pinA ? -1 : 1;
+
+            return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
+          });
+        });
+      }
+    } catch (e) {
+      console.error("Failed to toggle pin", e);
     }
-  } catch (e) {
-    console.error("Failed to toggle pin", e);
-  }
-};
+  };
 
   const isMessagePinned = React.useCallback(
     (mid) => {
@@ -1877,9 +1877,9 @@ const handleTogglePinConversation = async () => {
           created_at: createdIso,
           _time: createdIso
             ? new Date(createdIso).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
+              hour: "2-digit",
+              minute: "2-digit",
+            })
             : "",
         });
       }
@@ -2178,45 +2178,45 @@ const handleTogglePinConversation = async () => {
   );
 
   React.useEffect(() => {
-  // No conversation → clear pins
-  if (!activeId) {
-    setPinned([]);
-    return;
-  }
-
-  let cancelled = false;
-
-  (async () => {
-    try {
-      const res = await apiFetch(
-        `${MESSAGING}/conversations/${activeId}/pinned-messages/`
-      );
-
-      if (!res.ok) {
-        if (!cancelled) setPinned([]);
-        return;
-      }
-
-      const json = await res.json();
-      const arr = Array.isArray(json?.results)
-        ? json.results
-        : Array.isArray(json)
-        ? json
-        : [];
-
-      if (!cancelled) {
-        setPinned(arr);
-      }
-    } catch (err) {
-      console.error("Failed to fetch pinned messages", err);
-      if (!cancelled) setPinned([]);
+    // No conversation → clear pins
+    if (!activeId) {
+      setPinned([]);
+      return;
     }
-  })();
 
-  return () => {
-    cancelled = true;
-  };
-}, [activeId]);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await apiFetch(
+          `${MESSAGING}/conversations/${activeId}/pinned-messages/`
+        );
+
+        if (!res.ok) {
+          if (!cancelled) setPinned([]);
+          return;
+        }
+
+        const json = await res.json();
+        const arr = Array.isArray(json?.results)
+          ? json.results
+          : Array.isArray(json)
+            ? json
+            : [];
+
+        if (!cancelled) {
+          setPinned(arr);
+        }
+      } catch (err) {
+        console.error("Failed to fetch pinned messages", err);
+        if (!cancelled) setPinned([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId]);
 
   // 🔹 Check if current user can send messages to the ACTIVE group
   // Uses: GET /api/groups/{id}/can-send/ → { ok, reason, message_mode }
@@ -2251,7 +2251,7 @@ const handleTogglePinConversation = async () => {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    
+
     // Resize Logic
     const MAX_WIDTH = 1280;
     const MAX_HEIGHT = 1280;
@@ -2274,7 +2274,7 @@ const handleTogglePinConversation = async () => {
     // Set canvas to new small size
     canvas.width = width;
     canvas.height = height;
-    
+
     const ctx = canvas.getContext("2d");
     // Draw image scaled down
     ctx.drawImage(video, 0, 0, width, height);
@@ -2282,16 +2282,16 @@ const handleTogglePinConversation = async () => {
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
-      
-      setDraftAttachments([file]); 
-      setCameraOpen(false);        
+
+      setDraftAttachments([file]);
+      setCameraOpen(false);
     }, "image/jpeg", 0.8); // 0.8 quality (80%)
   };
 
   // 🔹 NEW: Clear attachments
   const handleClearAttachments = () => {
     setDraftAttachments([]);
-    setDraft(""); 
+    setDraft("");
     setActivePreviewIndex(0); // Reset
   };
 
@@ -2348,7 +2348,7 @@ const handleTogglePinConversation = async () => {
     return () => { cancelled = true; };
   }, [activeId, resolveActiveGroup]);
 
-  
+
 
 
 
@@ -2494,7 +2494,7 @@ const handleTogglePinConversation = async () => {
             .sort((a, b) => {
               const pinA = Boolean(a.is_pinned);
               const pinB = Boolean(b.is_pinned);
-              
+
               // 1. Pinned items go to top
               if (pinA !== pinB) return pinA ? -1 : 1;
 
@@ -2533,7 +2533,7 @@ const handleTogglePinConversation = async () => {
             const mine = el.getAttribute("data-mine") === "1";
             const byme = el.getAttribute("data-readbyme") === "1";
             if (!mid || mine || byme) return;
-            
+
             markMessageRead(mid); // fire-and-forget
             el.setAttribute("data-readbyme", "1");
             io.unobserve(el);
@@ -2599,9 +2599,14 @@ const handleTogglePinConversation = async () => {
         byId.set(key, merged);
       }
     }
-    return [...byId.values()];
-  };
 
+    // 🔹 CHANGE: Sort array so "You" is always index 0
+    return [...byId.values()].sort((a, b) => {
+      if (a.is_you) return -1;
+      if (b.is_you) return 1;
+      return 0;
+    });
+  };
 
   const loadMembers = React.useCallback(async (cid) => {
     if (!cid) return;
@@ -2631,7 +2636,7 @@ const handleTogglePinConversation = async () => {
 
   const handleSend = async () => {
     const text = draft.trim();
-    
+
     // 1. Check if there is text OR an attachment
     if ((!text && draftAttachments.length === 0) || !activeId) return;
 
@@ -2660,11 +2665,11 @@ const handleTogglePinConversation = async () => {
     };
 
     setMessages((cur) => [...cur, localMsg]);
-    
+
     // 3. Clear inputs immediately (this closes the Preview Overlay)
-    const filesToSend = [...draftAttachments]; 
+    const filesToSend = [...draftAttachments];
     setDraft("");
-    setDraftAttachments([]); 
+    setDraftAttachments([]);
 
     requestAnimationFrame(() => {
       const el = document.getElementById("chat-scroll");
@@ -2676,7 +2681,7 @@ const handleTogglePinConversation = async () => {
       // For now, this sends the text and an empty attachment array to the backend
       const formData = new FormData();
       formData.append("body", text);
-      
+
       // Append each file. Key must be 'attachments' to match Django logic
       draftAttachments.forEach((file) => {
         formData.append("attachments", file);
@@ -2686,8 +2691,8 @@ const handleTogglePinConversation = async () => {
       // IMPORTANT: Remove 'Content-Type' header so browser sets multipart boundary
       const res = await apiFetch(ENDPOINTS.conversationMessages(activeId), {
         method: "POST",
-        headers: {}, 
-        body: formData, 
+        headers: {},
+        body: formData,
       });
 
       const saved = await res.json();
@@ -2708,11 +2713,11 @@ const handleTogglePinConversation = async () => {
       );
 
       const hasAttachments = filesToSend.length > 0;
-      const previewText = saved.body 
-        ? saved.body 
-        : (hasAttachments 
-            ? (filesToSend[0].type?.startsWith("image/") ? "📷 Photo" : "📎 Sent an attachment") 
-            : "Sent a message");
+      const previewText = saved.body
+        ? saved.body
+        : (hasAttachments
+          ? (filesToSend[0].type?.startsWith("image/") ? "📷 Photo" : "📎 Sent an attachment")
+          : "Sent a message");
 
       setThreads((cur) =>
         cur
@@ -2722,7 +2727,7 @@ const handleTogglePinConversation = async () => {
                 ...t,
                 // 🔹 UPDATE ALL FIELDS so the UI doesn't use old cached text
                 last_message: previewText,
-                last_message_text: previewText, 
+                last_message_text: previewText,
                 last_text: previewText,
 
                 // Update timestamps
@@ -2734,10 +2739,10 @@ const handleTogglePinConversation = async () => {
               : t
           )
           .sort((a, b) => {
-             const pinA = Boolean(a.is_pinned);
-             const pinB = Boolean(b.is_pinned);
-             if (pinA !== pinB) return pinA ? -1 : 1;
-             return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
+            const pinA = Boolean(a.is_pinned);
+            const pinB = Boolean(b.is_pinned);
+            if (pinA !== pinB) return pinA ? -1 : 1;
+            return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
           })
       );
 
@@ -2822,96 +2827,125 @@ const handleTogglePinConversation = async () => {
   }, [active, topMembers, rosterMap, me]);
 
   // 🔹 Reusable "details" content (Members + Attachments)
-  const renderDetailsContent = () => (
-    <Stack spacing={1.25}>
-      <Typography
-        variant="subtitle1"
-        sx={{
-          fontWeight: 800,
-          cursor: hasActiveGroup ? "pointer" : "default",
-          "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
-        }}
-        onClick={hasActiveGroup ? openActiveGroup : undefined}
-      >
-        {topTitle}
-      </Typography>
-      <Accordion disableGutters defaultExpanded sx={{ border: "none", boxShadow: "none" }}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            Members
-          </Typography>
-        </AccordionSummary>
-        <AccordionDetails sx={{ pt: 0 }}>
-          <Button
-            size="small"
-            startIcon={<PersonAddAltOutlinedIcon />}
-            sx={{ mb: 1, textTransform: "none" }}
-          >
-            Add Member
-          </Button>
-          <Stack spacing={1}>
-            {topMembers.map((p) => (
-              <Stack
-                key={p.id}
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                role="button"
-                tabIndex={0}
-                sx={{ cursor: "pointer" }}
-                onClick={() => { if (p.id) openUserProfile(p.id); }}
-                onKeyDown={(e) => { if (e.key === "Enter" && p.id) openUserProfile(p.id); }}
-                title="Open user profile"
+  const renderDetailsContent = () => {
+
+    // 1. Determine if this is a DM or Group
+    const isGroupChat = active && !isDmThread(active);
+
+    // 2. Find the current user's role in this chat
+    const myMemberProfile = topMembers.find((m) => m.is_you);
+
+    // 3. Define valid Admin roles based on your Backend models + Frontend normalization
+    // Backend (GroupMembership) returns: 'admin', 'moderator', 'member'
+    // Frontend (dedupeMembers) might map 'Host' for events.
+    const adminRoles = ["admin", "Admin", "owner", "Owner", "host", "Host"];
+
+    const isAdmin = myMemberProfile && adminRoles.includes(myMemberProfile.role);
+
+    // 4. Final condition: Must be a group AND user must be admin
+    const canAddMembers = isGroupChat && isAdmin;
+
+    return (
+      <Stack spacing={1.25}>
+        <Typography
+          variant="subtitle1"
+          sx={{
+            fontWeight: 800,
+            cursor: hasActiveGroup ? "pointer" : "default",
+            "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
+          }}
+          onClick={hasActiveGroup ? openActiveGroup : undefined}
+        >
+          {topTitle}
+        </Typography>
+        <Accordion disableGutters defaultExpanded sx={{ border: "none", boxShadow: "none" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              Members
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 0 }}>
+
+            {/* 🟢 CONDITIONAL RENDERING HERE */}
+            {canAddMembers && (
+              <Button
+                size="small"
+                startIcon={<PersonAddAltOutlinedIcon />}
+                sx={{ mb: 1, textTransform: "none" }}
+                onClick={() => {
+                  // logic to open add member dialog goes here
+                  console.log("Open Add Member Dialog");
+                }}
               >
-                <Avatar
-                  src={p.avatar}
-                  sx={{ width: 28, height: 28, cursor: "pointer" }}
-                  onClick={() => openUserProfile(p.id)}
-                />
-                <Typography
-                  variant="body2"
-                  sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
-                  onClick={() => openUserProfile(p.id)}
+                Add Member
+              </Button>
+            )}
+
+            <Stack spacing={1}>
+              {topMembers.map((p) => (
+                <Stack
+                  key={p.id}
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  role="button"
+                  tabIndex={0}
+                  sx={{ cursor: "pointer" }}
+                  onClick={() => { if (p.id) openUserProfile(p.id); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && p.id) openUserProfile(p.id); }}
+                  title="Open user profile"
                 >
-                  {p.name}
-                </Typography>
-                <Box sx={{ ml: "auto" }}>
-                  {p.is_you ? (
-                    <Chip size="small" color="primary" label="You" sx={CHIP_TINY_SX} />
-                  ) : p.role ? (
-                    <Chip size="small" variant="outlined" label={p.role} sx={CHIP_TINY_SX} />
-                  ) : null}
-                </Box>
-              </Stack>
-            ))}
-          </Stack>
-        </AccordionDetails>
-      </Accordion>
+                  <Avatar
+                    src={p.avatar}
+                    sx={{ width: 28, height: 28, cursor: "pointer" }}
+                    onClick={() => openUserProfile(p.id)}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                    onClick={() => openUserProfile(p.id)}
+                  >
+                    {/* Display "You" if it's the current user, otherwise the name */}
+                    {p.is_you ? "You" : p.name}
+                  </Typography>
+                  <Box sx={{ ml: "auto" }}>
+                    {/* 🔹 CHANGE: Only show role if it exists AND is NOT "Member" */}
+                    {p.role && p.role.toLowerCase() !== "member" ? (
+                      <Chip size="small" variant="outlined" label={p.role} sx={CHIP_TINY_SX} />
+                    ) : null}
+                  </Box>
+                </Stack>
+              ))}
+            </Stack>
 
-      <Accordion disableGutters defaultExpanded sx={{ border: "none", boxShadow: "none" }}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            Attachments
-          </Typography>
-        </AccordionSummary>
-        <AccordionDetails sx={{ pt: 0 }}>
-          <Stack spacing={1}>
-            {attachmentSummary.map((a) => (
-              <Stack key={a.key} direction="row" spacing={1} alignItems="center">
-                {a.icon}
-                <Typography variant="body2">{a.label}</Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
-                  {a.count} file{a.count === 1 ? "" : "s"}
-                </Typography>
-              </Stack>
-            ))}
-          </Stack>
-        </AccordionDetails>
-      </Accordion>
-    </Stack>
-  );
+          </AccordionDetails>
+        </Accordion>
 
-    const handleOpenMessageMenu = (event, message) => {
+        <Accordion disableGutters defaultExpanded sx={{ border: "none", boxShadow: "none" }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              Attachments
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 0 }}>
+            <Stack spacing={1}>
+              {attachmentSummary.map((a) => (
+                <Stack key={a.key} direction="row" spacing={1} alignItems="center">
+                  {a.icon}
+                  <Typography variant="body2">{a.label}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+                    {a.count} file{a.count === 1 ? "" : "s"}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+      </Stack>
+    );
+  };
+
+  const handleOpenMessageMenu = (event, message) => {
     if (!message) return;
 
     if (event && event.preventDefault) {
@@ -2952,10 +2986,10 @@ const handleTogglePinConversation = async () => {
       // Find my member object from the topMembers list to check role
       const meMember = topMembers.find((m) => m.is_you);
       const myRole = meMember?.role; // e.g., "Host", "Admin", "Moderator", "Member"
-      
+
       // Allow global pins only for these roles
       const canGlobalPin = ["Host", "Owner", "Admin", "Moderator"].includes(myRole);
-      
+
       pinScope = canGlobalPin ? 'global' : 'private';
     }
 
@@ -2963,7 +2997,7 @@ const handleTogglePinConversation = async () => {
       const res = await apiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message_id: menuMessage.id,
           scope: pinScope // 👈 Sending the scope to backend
         }),
@@ -2982,8 +3016,8 @@ const handleTogglePinConversation = async () => {
             const arr = Array.isArray(json?.results)
               ? json.results
               : Array.isArray(json)
-              ? json
-              : [];
+                ? json
+                : [];
             setPinned(arr);
           }
         } catch (e) {
@@ -2997,45 +3031,45 @@ const handleTogglePinConversation = async () => {
     }
   };
   const handleDeleteMessage = async () => {
-  if (!menuMessage || !activeId) {
-    handleCloseMessageMenu();
-    return;
-  }
-
-  try {
-    // 🔴 OLD (Caused 404): `${MESSAGING}/conversations/${activeId}/${menuMessage.id}/`
-    // 🟢 NEW (Correct): Added "/messages/"
-    const res = await apiFetch(
-      `${MESSAGING}/conversations/${activeId}/messages/${menuMessage.id}/`,
-      { method: "DELETE" }
-    );
-
-    if (!res.ok && res.status !== 204) {
-      console.error("Delete message failed", res.status);
-    } else {
-      // Remove from UI immediately
-      setMessages((curr) => curr.filter((m) => m.id !== menuMessage.id));
-
-      // Refresh pinned messages in case the deleted one was pinned
-      try {
-        const r = await apiFetch(
-          `${MESSAGING}/conversations/${activeId}/pinned-messages/`
-        );
-        if (r.ok) {
-          const json = await r.json();
-          const arr = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
-          setPinned(arr);
-        }
-      } catch (e) {
-        console.error("Failed to refresh pinned after delete", e);
-      }
+    if (!menuMessage || !activeId) {
+      handleCloseMessageMenu();
+      return;
     }
-  } catch (err) {
-    console.error("Delete message error", err);
-  } finally {
-    handleCloseMessageMenu();
-  }
-};
+
+    try {
+      // 🔴 OLD (Caused 404): `${MESSAGING}/conversations/${activeId}/${menuMessage.id}/`
+      // 🟢 NEW (Correct): Added "/messages/"
+      const res = await apiFetch(
+        `${MESSAGING}/conversations/${activeId}/messages/${menuMessage.id}/`,
+        { method: "DELETE" }
+      );
+
+      if (!res.ok && res.status !== 204) {
+        console.error("Delete message failed", res.status);
+      } else {
+        // Remove from UI immediately
+        setMessages((curr) => curr.filter((m) => m.id !== menuMessage.id));
+
+        // Refresh pinned messages in case the deleted one was pinned
+        try {
+          const r = await apiFetch(
+            `${MESSAGING}/conversations/${activeId}/pinned-messages/`
+          );
+          if (r.ok) {
+            const json = await r.json();
+            const arr = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
+            setPinned(arr);
+          }
+        } catch (e) {
+          console.error("Failed to refresh pinned after delete", e);
+        }
+      }
+    } catch (err) {
+      console.error("Delete message error", err);
+    } finally {
+      handleCloseMessageMenu();
+    }
+  };
 
 
 
@@ -3386,12 +3420,12 @@ const handleTogglePinConversation = async () => {
 
                   {/* Thumbnail Strip (Only if > 1 file) */}
                   {draftAttachments.length > 1 && (
-                    <Stack 
-                      direction="row" 
-                      spacing={1} 
-                      sx={{ 
-                        p: 1, 
-                        bgcolor: "rgba(255,255,255,0.5)", 
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{
+                        p: 1,
+                        bgcolor: "rgba(255,255,255,0.5)",
                         justifyContent: "center",
                         overflowX: "auto"
                       }}
@@ -3411,9 +3445,9 @@ const handleTogglePinConversation = async () => {
                           }}
                         >
                           {file.type.startsWith("image/") ? (
-                            <img 
-                              src={URL.createObjectURL(file)} 
-                              style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                            <img
+                              src={URL.createObjectURL(file)}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
                             />
                           ) : (
                             <Box sx={{ width: "100%", height: "100%", bgcolor: "white", display: "flex", justifyContent: "center", alignItems: "center" }}>
@@ -3426,10 +3460,10 @@ const handleTogglePinConversation = async () => {
                   )}
 
                   {/* Footer: Caption & Send */}
-                  <Stack 
-                    direction="row" 
-                    spacing={1} 
-                    alignItems="center" 
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
                     sx={{ p: 2, bgcolor: "#f0f2f5" }}
                   >
                     <TextField
@@ -3447,13 +3481,13 @@ const handleTogglePinConversation = async () => {
                         }
                       }}
                     />
-                    <IconButton 
+                    <IconButton
                       onClick={handleSend}
-                      sx={{ 
-                        bgcolor: "#00a884", 
-                        color: "white", 
-                        width: 45, height: 45, 
-                        "&:hover": { bgcolor: "#008f6f" } 
+                      sx={{
+                        bgcolor: "#00a884",
+                        color: "white",
+                        width: 45, height: 45,
+                        "&:hover": { bgcolor: "#008f6f" }
                       }}
                     >
                       <SendIcon sx={{ fontSize: 20, ml: 0.5 }} />
@@ -3477,7 +3511,7 @@ const handleTogglePinConversation = async () => {
                     sx={{
                       position: "sticky",
                       top: 0,
-                      zIndex: 2, 
+                      zIndex: 2,
                       mb: 1,
                       px: 1,
                       py: 0.75,
@@ -3488,14 +3522,14 @@ const handleTogglePinConversation = async () => {
                     }}
                   >
                     {/* Header Row: Always visible */}
-                    <Stack 
-                      direction="row" 
-                      alignItems="center" 
+                    <Stack
+                      direction="row"
+                      alignItems="center"
                       justifyContent="space-between"
                       onClick={() => {
                         if (pinnedMessages.length > 1) setPinsExpanded(!pinsExpanded);
                       }}
-                      sx={{ 
+                      sx={{
                         cursor: pinnedMessages.length > 1 ? "pointer" : "default",
                         userSelect: "none"
                       }}
@@ -3503,18 +3537,18 @@ const handleTogglePinConversation = async () => {
                       <Stack direction="row" alignItems="center" spacing={1} sx={{ overflow: "hidden", flex: 1 }}>
                         <Typography variant="caption" sx={{ fontSize: 13 }}>📌</Typography>
                         <Typography
-                            variant="body2"
-                            sx={{
-                              fontSize: 13,
-                              fontWeight: pinsExpanded ? 700 : 500,
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              color: "text.primary"
-                            }}
+                          variant="body2"
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: pinsExpanded ? 700 : 500,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            color: "text.primary"
+                          }}
                         >
-                          {pinsExpanded 
-                            ? "Pinned messages" 
+                          {pinsExpanded
+                            ? "Pinned messages"
                             : pinnedMessages[pinnedMessages.length - 1].body}
                         </Typography>
                       </Stack>
@@ -3522,24 +3556,24 @@ const handleTogglePinConversation = async () => {
                       {pinnedMessages.length > 1 && (
                         <Stack direction="row" alignItems="center" spacing={1} sx={{ pl: 1 }}>
                           {!pinsExpanded && (
-                            <Chip 
-                              label={`+${pinnedMessages.length - 1}`} 
-                              size="small" 
-                              sx={{ 
-                                height: 20, 
-                                fontSize: 10, 
-                                fontWeight: 700, 
-                                bgcolor: "primary.main", 
-                                color: "#fff" 
-                              }} 
+                            <Chip
+                              label={`+${pinnedMessages.length - 1}`}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                bgcolor: "primary.main",
+                                color: "#fff"
+                              }}
                             />
                           )}
-                          <ExpandMoreIcon 
-                            fontSize="small" 
-                            sx={{ 
+                          <ExpandMoreIcon
+                            fontSize="small"
+                            sx={{
                               transform: pinsExpanded ? "rotate(180deg)" : "rotate(0deg)",
                               transition: "transform 0.2s"
-                            }} 
+                            }}
                           />
                         </Stack>
                       )}
@@ -3561,7 +3595,7 @@ const handleTogglePinConversation = async () => {
                               "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
                             }}
                             onClick={(e) => {
-                              e.stopPropagation(); 
+                              e.stopPropagation();
                               const el = document.querySelector(`[data-mid="${m.id}"]`);
                               if (el) {
                                 el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -3569,9 +3603,9 @@ const handleTogglePinConversation = async () => {
                             }}
                           >
                             <Box sx={{ width: 24, display: 'flex', justifyContent: 'center' }}>
-                                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'text.secondary' }} />
+                              <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'text.secondary' }} />
                             </Box>
-                            
+
                             <Typography
                               variant="body2"
                               sx={{
@@ -3655,13 +3689,13 @@ const handleTogglePinConversation = async () => {
 
                   {/* 🔹 2. The Plus (+) Button */}
                   <Tooltip title="Attach">
-                    <IconButton 
+                    <IconButton
                       onClick={handleAttachClick}
                       size="small"
-                      sx={{ 
+                      sx={{
                         bgcolor: isAttachMenuOpen ? "rgba(0,0,0,0.08)" : "transparent",
                         transition: "transform 0.2s",
-                        transform: isAttachMenuOpen ? "rotate(45deg)" : "rotate(0deg)" 
+                        transform: isAttachMenuOpen ? "rotate(45deg)" : "rotate(0deg)"
                       }}
                     >
                       <AddRoundedIcon fontSize="medium" />
@@ -3675,12 +3709,12 @@ const handleTogglePinConversation = async () => {
                     onClose={handleAttachClose}
                     anchorOrigin={{ vertical: "top", horizontal: "left" }}
                     transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-                    sx={{ 
-                      "& .MuiPaper-root": { 
-                        borderRadius: 3, 
-                        mb: 1, 
-                        boxShadow: "0px 4px 20px rgba(0,0,0,0.15)" 
-                      } 
+                    sx={{
+                      "& .MuiPaper-root": {
+                        borderRadius: 3,
+                        mb: 1,
+                        boxShadow: "0px 4px 20px rgba(0,0,0,0.15)"
+                      }
                     }}
                   >
                     <MenuItem onClick={handleTriggerFileUpload} sx={{ py: 1.5, pr: 3 }}>
@@ -3823,22 +3857,22 @@ const handleTogglePinConversation = async () => {
           {/* Hidden canvas for capture logic */}
           <canvas ref={canvasRef} style={{ display: "none" }} />
         </DialogContent>
-        <Stack 
-          direction="row" 
-          justifyContent="center" 
-          spacing={2} 
+        <Stack
+          direction="row"
+          justifyContent="center"
+          spacing={2}
           sx={{ p: 2, bgcolor: "#000" }}
         >
           <IconButton onClick={handleCloseCamera} sx={{ color: "white" }}>
             <CloseRoundedIcon />
           </IconButton>
-          <IconButton 
+          <IconButton
             onClick={handleCapturePhoto}
-            sx={{ 
-              width: 60, 
-              height: 60, 
-              border: "4px solid white", 
-              color: "white" 
+            sx={{
+              width: 60,
+              height: 60,
+              border: "4px solid white",
+              color: "white"
             }}
           >
             <CameraAltRoundedIcon fontSize="large" />
