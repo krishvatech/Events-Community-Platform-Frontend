@@ -10,7 +10,7 @@ import {
   CardActions,
   CardContent,
   CardHeader,
-  Checkbox, // Added
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
@@ -24,7 +24,7 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  ListItemSecondaryAction, // Added
+  ListItemSecondaryAction,
   Stack,
   Tab,
   Tabs,
@@ -32,6 +32,7 @@ import {
   Tooltip,
   Typography,
   Popover,
+  Skeleton,
 } from "@mui/material";
 import {
   AddRounded as AddRoundedIcon,
@@ -303,7 +304,6 @@ function PostCard({
     (async () => {
       try {
         const urls = [
-          `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${post.id}&page_size=25`,
           `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${post.id}&page_size=25`,
         ];
         for (const url of urls) {
@@ -670,7 +670,6 @@ function LikesDialog({ open, postId, onClose }) {
     setLoading(true);
     (async () => {
       const endpoints = [
-        `${API_ROOT}/engagements/reactions/?target_type=activity_feed.feeditem&target_id=${postId}`,
         `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${postId}`,
       ];
       let foundData = false;
@@ -847,7 +846,11 @@ function SharesDialog({ open, postId, onClose }) {
           let u = r.user || r.actor || r.sharer;
           if (!u) u = { id: r.user_id ?? r.actor_id ?? r.id, username: r.user_username ?? r.username, first_name: r.user_first_name ?? r.first_name, last_name: r.user_last_name ?? r.last_name, user_image: r.user_image || r.user_avatar || r.avatar, headline: r.user_headline ?? r.headline };
           const p = u.profile || r.profile || {};
-          const first = u.first_name || u.firstName || ""; const last = u.last_name || u.lastName || ""; const displayName = u.name || u.full_name || (first || last ? `${first} ${last}` : u.username) || "User";
+          const first = u.first_name || u.firstName || ""; const last = u.last_name || u.lastName || ""; const displayName =
+            u.name ||
+            u.full_name ||
+            (first || last ? `${first} ${last}` : "").trim() ||
+            "User";
           const reactionId = r.reaction || r.reaction_type || null;
           const def =
             POST_REACTIONS.find((x) => x.id === reactionId) ||
@@ -865,7 +868,16 @@ function SharesDialog({ open, postId, onClose }) {
             reactionLabel: def.label,
           };
         }).filter(x => x.id);
-        setUsers(parsed);
+
+        // 🔹 De-duplicate by user id so A appears only once
+        const uniqueById = [];
+        const seen = new Set();
+        for (const u of parsed) {
+          if (seen.has(u.id)) continue;
+          seen.add(u.id);
+          uniqueById.push(u);
+        }
+        setUsers(uniqueById);
       }).catch(() => setUsers([])).finally(() => setLoading(false));
   }, [open, postId]);
   return (<Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"> <DialogTitle>Shared by</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : users.map(u => (<ListItem key={u.id}> <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar> <ListItemText primary={u.name} secondary={u.headline} /> </ListItem>))} {!loading && !users.length && <Typography p={2} color="text.secondary">No shares yet.</Typography>} </DialogContent> <DialogActions><Button onClick={onClose}>Close</Button></DialogActions> </Dialog>);
@@ -897,9 +909,16 @@ function ShareToFriendDialog({ open, onClose, postId }) {
               // Normalize friend object
               const u = r.friend || r.user || r;
               const img = u.avatar || u.user_image || u.user_image_url || "";
+              const first = u.first_name || u.firstName || "";
+              const last = u.last_name || u.lastName || "";
+              const displayName =
+                u.name ||
+                u.full_name ||
+                (first || last ? `${first} ${last}` : "").trim() ||
+                "Friend";
               return {
                 id: u.id,
-                name: u.name || u.full_name || u.username || "Friend",
+                name: displayName,
                 avatar: toAbsolute(img),
                 headline: u.headline || u.bio || ""
               }
@@ -961,7 +980,7 @@ function ShareToFriendDialog({ open, onClose, postId }) {
           <List sx={{ height: 300, overflow: 'auto' }}>
             {filtered.length === 0 && <Typography p={2} align="center" color="text.secondary">No friends found.</Typography>}
             {filtered.map(f => (
-              <ListItem key={f.id} button onClick={() => handleToggle(f.id)}>
+              <ListItem key={f.id} onClick={() => handleToggle(f.id)}>
                 <ListItemAvatar><Avatar src={f.avatar} /></ListItemAvatar>
                 <ListItemText primary={f.name} secondary={f.headline} />
                 <ListItemSecondaryAction>
@@ -1002,6 +1021,48 @@ function PostDeleteConfirm({ open, post, onClose, onDeleted }) { /* ... (unchang
   return <Dialog open={open} onClose={onClose}><DialogTitle>Delete Post?</DialogTitle><DialogContent>This cannot be undone.</DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button color="error" variant="contained" onClick={handleDelete} disabled={busy}>Delete</Button></DialogActions></Dialog>;
 }
 
+function PostSkeleton() {
+  return (
+    <Card
+      variant="outlined"
+      sx={{ borderRadius: 3, mb: 2 }}
+    >
+      {/* Header skeleton */}
+      <CardHeader
+        avatar={<Skeleton variant="circular" width={40} height={40} />}
+        title={<Skeleton variant="text" width="40%" />}
+        subheader={<Skeleton variant="text" width="20%" />}
+      />
+
+      {/* Body skeleton */}
+      <CardContent>
+        <Skeleton
+          variant="rectangular"
+          height={120}
+          sx={{ borderRadius: 2, mb: 1.5 }}
+        />
+        <Skeleton variant="text" width="90%" />
+        <Skeleton variant="text" width="80%" />
+        <Skeleton variant="text" width="50%" />
+      </CardContent>
+
+      {/* Footer skeleton (buttons) */}
+      <CardActions sx={{ px: 2, pb: 2 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          sx={{ width: "100%" }}
+        >
+          <Skeleton variant="rounded" width={60} height={30} />
+          <Skeleton variant="rounded" width={60} height={30} />
+          <Skeleton variant="rounded" width={60} height={30} />
+        </Stack>
+      </CardActions>
+    </Card>
+  );
+}
+
+
 // -----------------------------------------------------------------------------
 // 5. Main Page Component
 // -----------------------------------------------------------------------------
@@ -1017,6 +1078,10 @@ export default function MyPostsPage() {
   const [likesId, setLikesId] = React.useState(null);
   const [sharesId, setSharesId] = React.useState(null); // For VIEWING who shared
   const [shareActionPostId, setShareActionPostId] = React.useState(null); // NEW: For SHARING to friends
+
+  const [visibleCount, setVisibleCount] = React.useState(4);      // how many posts to show
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false); // skeleton while loading next batch
+  const observerTarget = React.useRef(null);                      // intersection trigger at bottom
 
   React.useEffect(() => {
     async function init() {
@@ -1175,6 +1240,48 @@ export default function MyPostsPage() {
     } catch { }
   };
 
+  React.useEffect(() => {
+    if (!observerTarget.current) return;
+
+    const target = observerTarget.current;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (
+          entry.isIntersecting &&
+          !loading &&
+          !isLoadingMore &&
+          posts.length > visibleCount
+        ) {
+          // Show skeleton while we "load" next 4 posts
+          setIsLoadingMore(true);
+
+          // Small delay just for visual effect (like API load)
+          setTimeout(() => {
+            setVisibleCount((prev) =>
+              Math.min(prev + 4, posts.length)
+            );
+            setIsLoadingMore(false);
+          }, 600);
+        }
+      },
+      { threshold: 0.5 } // trigger when ~50% visible
+    );
+
+    observer.observe(target);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [loading, isLoadingMore, posts.length, visibleCount]);
+
+  const visiblePosts = React.useMemo(
+    () => posts.slice(0, visibleCount),
+    [posts, visibleCount]
+  );
+
+
   return (
     <Box sx={{ width: "100%", p: { xs: 1, md: 3 } }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
@@ -1183,11 +1290,17 @@ export default function MyPostsPage() {
       </Stack>
 
       {loading && <LinearProgress sx={{ mb: 2 }} />}
-      {!loading && posts.length === 0 && <Box sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>You haven&apos;t posted anything yet.</Box>}
 
-      {posts.map((post) => (
+      {!loading && posts.length === 0 && (
+        <Box sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>
+          You haven&apos;t posted anything yet.
+        </Box>
+      )}
+
+      {visiblePosts.map((post) => (
         <PostCard
-          key={post.id} post={post}
+          key={post.id}
+          post={post}
           onReact={handleReact}
           onComment={setCommentId}
           onShareAction={setShareActionPostId} // Clicking "Share" icon triggers friend picker
@@ -1198,6 +1311,21 @@ export default function MyPostsPage() {
           onOpenLikes={setLikesId}
         />
       ))}
+
+      {/* Infinite-scroll trigger + bottom skeleton (like Live Feed) */}
+      {posts.length > visibleCount && (
+        <Box
+          ref={observerTarget}
+          sx={{ py: 2, textAlign: "center", width: "100%" }}
+        >
+          {isLoadingMore && (
+            <>
+              <PostSkeleton />
+              <PostSkeleton />
+            </>
+          )}
+        </Box>
+      )}
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Create Post</DialogTitle><DialogContent><PostComposer communityId={myCommunityId} onCreate={handleCreate} /></DialogContent>
