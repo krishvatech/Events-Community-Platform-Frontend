@@ -2,7 +2,7 @@
 import * as React from "react";
 import {
   Avatar, AvatarGroup, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
-  Paper, Stack, TextField, Typography, InputAdornment, Popover, Tooltip
+  Paper, Stack, TextField, Typography, InputAdornment, Popover, Tooltip, Skeleton
 } from "@mui/material";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -1196,8 +1196,12 @@ function CommentsDialog({
     });
   }
 
-  const CommentItem = ({ c, depth = 0 }) => {
-    // fetch the like count for this comment once when it renders
+  //
+  // MOVE THIS COMPONENT OUTSIDE of CommentsDialog
+  // It needs to receive 'myId' and 'isAdmin' as props now.
+
+  const CommentItem = ({ c, depth = 0, myId, isAdmin, onToggleLike, onReply, onDelete }) => {
+    const canDelete = c?.author_id === myId || isAdmin;
 
     return (
       <Box
@@ -1209,7 +1213,11 @@ function CommentsDialog({
         }}
       >
         <Stack direction="row" spacing={1} alignItems="center">
-          <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }}>
+          <Avatar
+            src={c.author?.avatar}
+            sx={{ width: 28, height: 28 }}
+            imgProps={{ loading: "lazy", decoding: "async" }} // Helps with blinking
+          >
             {(c.author?.name || "U").slice(0, 1)}
           </Avatar>
           <Typography variant="subtitle2">
@@ -1226,25 +1234,37 @@ function CommentsDialog({
           <Button
             size="small"
             startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
-            onClick={() => toggleCommentLike(c.id)}
+            onClick={() => onToggleLike(c.id)}
           >
             {c.like_count ?? 0}
           </Button>
-          <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
+          <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={() => onReply(c)}>
             Reply
           </Button>
-          {canDelete(c) && (
-            <Button size="small" color="error" onClick={() => deleteComment(c)}>
+          {canDelete && (
+            <Button size="small" color="error" onClick={() => onDelete(c)}>
               Delete
             </Button>
           )}
         </Stack>
 
+        {/* RECURSIVE CALL: Must pass all props down */}
         {!!c.children?.length && (
           <Stack spacing={1} sx={{ mt: 1 }}>
             {c.children
               .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0)))
-              .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+              .map(child => (
+                <CommentItem
+                  key={child.id}
+                  c={child}
+                  depth={depth + 1}
+                  myId={myId}
+                  isAdmin={isAdmin}
+                  onToggleLike={onToggleLike}
+                  onReply={onReply}
+                  onDelete={onDelete}
+                />
+              ))}
           </Stack>
         )}
       </Box>
@@ -1302,7 +1322,19 @@ function CommentsDialog({
             <Typography variant="caption" color="text.secondary">Be the first to comment.</Typography>
           ) : (
             <Stack spacing={1.25}>
-              {visibleRoots.map(c => <CommentItem key={c.id} c={c} />)}
+              {/* Inside CommentsDialog return statement */}
+              {visibleRoots.map(c => (
+                <CommentItem
+                  key={c.id}
+                  c={c}
+                  // Pass the missing data down:
+                  myId={myId}
+                  isAdmin={isAdmin}
+                  onToggleLike={toggleCommentLike}
+                  onReply={setReplyTo}
+                  onDelete={deleteComment}
+                />
+              ))}
             </Stack>
           )}
 
@@ -1670,7 +1702,6 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
     (async () => {
       try {
         const urls = [
-          toApiUrl(`engagements/reactions/?reaction=like&target_id=${target.id}${target.type ? `&target_type=${encodeURIComponent(target.type)}` : ""}&page_size=5`),
           toApiUrl(`engagements/reactions/who-liked/?${target.type ? `target_type=${encodeURIComponent(target.type)}&` : ""}target_id=${target.id}&page_size=5`),
         ];
         for (const url of urls) {
@@ -1992,6 +2023,44 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   );
 }
 
+function PostSkeleton() {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 2,
+        mb: 2,
+        borderRadius: 3,
+        borderColor: "#e2e8f0",
+        maxWidth: { xs: "100%", md: 720 },
+        mx: { xs: 0, md: "auto" },
+      }}
+    >
+      {/* Header Skeleton */}
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+        <Skeleton variant="circular" width={40} height={40} />
+        <Box sx={{ flex: 1 }}>
+          <Skeleton variant="text" width="40%" height={24} />
+          <Skeleton variant="text" width="20%" height={20} />
+        </Box>
+      </Stack>
+
+      {/* Body Skeleton */}
+      <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 2, mb: 1.5 }} />
+      <Skeleton variant="text" width="90%" />
+      <Skeleton variant="text" width="80%" />
+      <Skeleton variant="text" width="50%" />
+
+      {/* Footer Skeleton */}
+      <Stack direction="row" justifyContent="space-between" sx={{ mt: 2 }}>
+        <Skeleton variant="rounded" width={60} height={30} />
+        <Skeleton variant="rounded" width={60} height={30} />
+        <Skeleton variant="rounded" width={60} height={30} />
+      </Stack>
+    </Paper>
+  );
+}
+
 // ---- MAIN PAGE (All / My Groups + Search) ----
 export default function LiveFeedPage({
   posts: initialPosts,
@@ -2030,7 +2099,6 @@ export default function LiveFeedPage({
     })();
   }, []);
 
-
   // Feed data
   const [posts, setPosts] = React.useState(initialPosts ?? []);
   const [nextUrl, setNextUrl] = React.useState(null);
@@ -2057,6 +2125,29 @@ export default function LiveFeedPage({
 
   // 🔼 Show "scroll to top" button after user scrolls down
   const [showScrollTop, setShowScrollTop] = React.useState(false);
+
+  // Add a ref for the scroll trigger
+  const observerTarget = React.useRef(null);
+
+  // Add this useEffect to trigger 'handleLoadMore' automatically
+  React.useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.5 } // Trigger when 50% visible
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) observer.unobserve(observerTarget.current);
+    };
+  }, [hasMore, loading, nextUrl]);
 
   // 🔹 Multi-reaction handler (Like / Intriguing / Spot On / etc.)
   async function handleReact(postId, reactionId) {
@@ -2321,7 +2412,6 @@ export default function LiveFeedPage({
       // Try a few likely endpoints (handles FeedItem or typed targets)
       const urls = [
         type ? toApiUrl(`engagements/shares/?target_type=${encodeURIComponent(type)}&target_id=${id}&page_size=100`) : null,
-        toApiUrl(`engagements/shares/who-shared/?feed_item=${id}&page_size=100`),
         toApiUrl(`engagements/shares/?target_type=activity_feed.feeditem&target_id=${id}&page_size=100`),
       ].filter(Boolean);
 
@@ -2352,7 +2442,13 @@ export default function LiveFeedPage({
         return { id: id2, name, avatar };
       });
 
-      setSharesUsers(list);
+      // [FIX] Deduplicate users by ID using a Map
+      // This ensures if User A is found 3 times, we only keep them once.
+      const uniqueList = Array.from(
+        new Map(list.map((item) => [item.id, item])).values()
+      );
+
+      setSharesUsers(uniqueList); // <--- Use uniqueList instead of list
       setSharesLoading(false);
     })();
   }, [sharesOpen, sharesTarget]);
@@ -2736,47 +2832,51 @@ export default function LiveFeedPage({
 
           {/* Feed */}
           {loading && posts.length === 0 ? (
-            <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-              <Typography variant="body2" color="text.secondary">Loading…</Typography>
-            </Paper>
+            // [CHANGE 1] Show Skeletons on first load instead of "Loading..." text
+            // Ensure <PostSkeleton /> is defined or imported as shown in the previous step
+            <>
+              <PostSkeleton />
+              <PostSkeleton />
+              <PostSkeleton />
+            </>
           ) : displayPosts.length === 0 ? (
             <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
               <Typography variant="body2" color="text.secondary">No posts match your filters.</Typography>
             </Paper>
           ) : (
-            displayPosts.map((p, idx) => (
-              <React.Fragment key={p.id}>
-                <Box
-                  data-post-id={p.id}
-                  sx={{
-                    scrollMarginTop: 96,
-                    ...(focusPostId === p.id
-                      ? { outline: `2px solid ${BORDER}`, borderRadius: 3 }
-                      : null),
-                  }}
-                >
-                  <PostCard
-                    post={p}
-                    onReact={handleReact}
-                    onOpenEvent={onOpenEvent}
-                    onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
-                  />
+            <>
+              {displayPosts.map((p, idx) => (
+                <React.Fragment key={p.id}>
+                  <Box
+                    data-post-id={p.id}
+                    sx={{
+                      scrollMarginTop: 96,
+                      ...(focusPostId === p.id
+                        ? { outline: `2px solid ${BORDER}`, borderRadius: 3 }
+                        : null),
+                    }}
+                  >
+                    <PostCard
+                      post={p}
+                      onReact={handleReact}
+                      onOpenEvent={onOpenEvent}
+                      onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
+                    />
+                  </Box>
+                  {((idx + 1) % 4 === 0) && (
+                    <SuggestedConnections list={suggested} />
+                  )}
+                </React.Fragment>
+              ))}
+
+              {/* [CHANGE 2] Infinite Scroll Trigger & Bottom Loading State */}
+              {hasMore && (
+                <Box ref={observerTarget} sx={{ py: 2, textAlign: "center", width: "100%" }}>
+                  {/* Show a skeleton at the bottom while fetching the NEXT page */}
+                  {loading && <PostSkeleton />}
                 </Box>
-                {((idx + 1) % 4 === 0) && (
-                  <SuggestedConnections list={suggested} />
-                )}
-              </React.Fragment>
-            ))
-          )}
-
-
-          {/* Pagination / Load more */}
-          {hasMore && (
-            <Stack alignItems="center" sx={{ mt: 1 }}>
-              <Button variant="outlined" onClick={handleLoadMore} disabled={loading}>
-                {loading ? "Loading…" : "Load more"}
-              </Button>
-            </Stack>
+              )}
+            </>
           )}
         </Box>
         <Dialog
