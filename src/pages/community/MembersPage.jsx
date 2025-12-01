@@ -161,9 +161,9 @@ function getCountryFromUser(u) {
 // ✅ HELPER: Industry
 function getIndustryFromUser(u) {
   return (
-    u?.industry_from_experience || 
-    u?.profile?.industry || 
-    u?.industry || 
+    u?.industry_from_experience ||
+    u?.profile?.industry ||
+    u?.industry ||
     ""
   ).trim();
 }
@@ -171,9 +171,9 @@ function getIndustryFromUser(u) {
 // ✅ HELPER: Company Size
 function getCompanySizeFromUser(u) {
   return (
-    u?.number_of_employees_from_experience || 
-    u?.profile?.number_of_employees || 
-    u?.number_of_employees || 
+    u?.number_of_employees_from_experience ||
+    u?.profile?.number_of_employees ||
+    u?.number_of_employees ||
     ""
   ).trim();
 }
@@ -334,9 +334,24 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
     usernameFromEmail ||
     email;
 
-  const company = u?.company_from_experience ?? "—";
-  const title =
-    u?.position_from_experience || u?.profile?.job_title || u?.job_title || "—";
+  // --- NEW LOGIC START ---
+  // 1. Get raw values to check if they actually exist (ignoring defaults)
+  const rawCompany = (u?.company_from_experience || "").trim();
+  const rawTitle = (
+    u?.position_from_experience ||
+    u?.profile?.job_title ||
+    u?.job_title ||
+    ""
+  ).trim();
+
+  // 2. Check if we have data to show
+  const hasWorkInfo = rawCompany.length > 0 || rawTitle.length > 0;
+
+  // 3. Set display values (if hidden, these serve as placeholders to maintain height)
+  const displayCompany = rawCompany || "—";
+  const displayTitle = rawTitle || "—";
+  // --- NEW LOGIC END ---
+
   const status = (friendStatus || "").toLowerCase();
   const iso2 = resolveCountryCode(u);
   const flag = flagEmojiFromISO2(iso2);
@@ -391,9 +406,21 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
           <Typography variant="caption" color="text.secondary" noWrap>
             {email}
           </Typography>
-          <Typography variant="body2" sx={{ mt: 0.25 }} noWrap>
-            {company} • <span style={{ color: "#64748b" }}>{title}</span>
+
+          {/* --- UPDATED TYPOGRAPHY START --- */}
+          {/* We use visibility: hidden so the height remains the same even if data is missing */}
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              mt: 0.25,
+              visibility: hasWorkInfo ? "visible" : "hidden" 
+            }} 
+            noWrap
+          >
+            {displayCompany} • <span style={{ color: "#64748b" }}>{displayTitle}</span>
           </Typography>
+          {/* --- UPDATED TYPOGRAPHY END --- */}
+          
         </Box>
 
         <Stack direction="row" spacing={1} alignItems="center" flexShrink={0}>
@@ -434,7 +461,6 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
     </Card>
   );
 }
-
 
 function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
   const hasMarkers = markers && markers.length > 0;
@@ -681,7 +707,7 @@ export default function MembersPage() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        
+
         if (!alive) return;
 
         // Extract clean country names from location strings
@@ -997,7 +1023,7 @@ export default function MembersPage() {
   const resetView = () => setMapPos({ coordinates: [0, 0], zoom: MIN_ZOOM });
 
   /* -------------------------------- UI -------------------------------- */
-    /* -------------------------------- UI -------------------------------- */
+  /* -------------------------------- UI -------------------------------- */
   return (
     <>
       <Box
@@ -1339,7 +1365,7 @@ export default function MembersPage() {
                     >
                       <Typography>
                         {tabValue === 1 &&
-                        Object.keys(friendStatusByUser).length === 0
+                          Object.keys(friendStatusByUser).length === 0
                           ? "No friends found."
                           : "No members match your search."}
                       </Typography>
@@ -1359,9 +1385,9 @@ export default function MembersPage() {
                     {filtered.length === 0
                       ? "0"
                       : `${startIdx + 1}–${Math.min(
-                          startIdx + ROWS_PER_PAGE,
-                          filtered.length
-                        )} of ${filtered.length}`}
+                        startIdx + ROWS_PER_PAGE,
+                        filtered.length
+                      )} of ${filtered.length}`}
                   </Typography>
                   <Pagination
                     count={pageCount}
