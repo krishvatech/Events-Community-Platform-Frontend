@@ -3,8 +3,9 @@ import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Avatar, Badge, Box, Button, Chip, Grid, IconButton,
-  List, ListItem, ListItemAvatar, ListItemText, Paper, Stack,
-  TextField, Typography, Switch, FormControlLabel, MenuItem, Select,useMediaQuery, useTheme
+  List, ListItem, ListItemAvatar, Paper, Stack,
+  Typography, Switch, FormControlLabel, MenuItem, Select, useMediaQuery, useTheme,
+  Skeleton
 } from "@mui/material";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
@@ -14,7 +15,6 @@ import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffIcon from "@mui/icons-material/HighlightOff";
 import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
-import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import HourglassBottomRoundedIcon from "@mui/icons-material/HourglassBottomRounded";
@@ -23,9 +23,9 @@ import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 
 const BORDER = "#e2e8f0";
 
-
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
+
 const tokenHeader = () => {
   const t =
     localStorage.getItem("access_token") ||
@@ -46,6 +46,7 @@ const emitUnreadCount = (count) => {
 function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
 }
+
 function groupByDay(items) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
@@ -58,6 +59,7 @@ function groupByDay(items) {
   }
   return groups;
 }
+
 const KIND_LABEL = {
   mention: "Mentions",
   comment: "Comments",
@@ -68,8 +70,37 @@ const KIND_LABEL = {
   friend_request: "Requests",
   connection_request: "Requests",
 };
+
 function kindChip(kind) {
   return KIND_LABEL[kind] || "Other";
+}
+
+// ---------------------- SKELETON COMPONENT ----------------------
+function NotificationSkeleton() {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 1.25,
+        mb: 1,
+        width: "100%",
+        border: `1px solid ${BORDER}`,
+        borderRadius: 2,
+      }}
+    >
+      <Stack direction="row" spacing={1.25} alignItems="flex-start">
+        <Skeleton variant="circular" width={40} height={40} />
+        <Box sx={{ flex: 1 }}>
+          <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
+            <Skeleton variant="text" width={80} height={20} />
+            <Skeleton variant="text" width={120} height={20} />
+          </Stack>
+          <Skeleton variant="text" width="90%" height={16} />
+          <Skeleton variant="text" width="40%" height={16} sx={{ mt: 0.5 }} />
+        </Box>
+      </Stack>
+    </Paper>
+  );
 }
 
 function NotificationRow({
@@ -83,14 +114,10 @@ function NotificationRow({
   const navigate = useNavigate();
   const unread = !item.is_read;
   const theme = useTheme();
-
-  // CHANGE: Trigger this layout on screens below 600px (standard mobile width)
-  // distinct from the previous 400px limit.
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm")); 
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const ActionsByKind = () => {
-     // ... (Keep this section exactly as it is) ...
-     if (item.kind === "friend_request" || item.kind === "connection_request") {
+    if (item.kind === "friend_request" || item.kind === "connection_request") {
       if (item.state === "accepted") return null;
       if (item.state === "declined") return null;
       return (
@@ -169,7 +196,6 @@ function NotificationRow({
         </ListItemAvatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          {/* headline */}
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
               {item.actor?.name || "System"}
@@ -180,7 +206,6 @@ function NotificationRow({
             )}
           </Stack>
 
-          {/* description */}
           {item.description ? (
             <Typography
               variant="caption"
@@ -191,11 +216,6 @@ function NotificationRow({
             </Typography>
           ) : null}
 
-          {/* ----------------- UPDATED META BLOCK -----------------
-             Now checks 'isMobile' (max-width: 600px).
-             When < 600px, direction becomes 'column', forcing the Date 
-             to its own line (effectively 100% width relative to the content box).
-          */}
           <Stack
             direction={isMobile ? "column" : "row"}
             alignItems={isMobile ? "flex-start" : "center"}
@@ -207,12 +227,10 @@ function NotificationRow({
               {formatWhen(item.created_at)}
             </Typography>
           </Stack>
-          {/* ----------------------------------------------------- */}
 
           <ActionsByKind />
         </Box>
 
-        {/* general actions */}
         <Stack spacing={0.5} alignItems="flex-end">
           <Stack direction="row" spacing={0.5}>
             <IconButton
@@ -232,7 +250,6 @@ function NotificationRow({
             </IconButton>
           </Stack>
 
-          {/* status pill logic */}
           {(() => {
             const s = (item.state || "").toLowerCase();
             if (!s) return null;
@@ -250,46 +267,48 @@ function NotificationRow({
             };
 
             if (s === "accepted" || s === "approved") {
-              return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Accepted" sx={{...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 }}} />;
+              return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Accepted" sx={{ ...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 } }} />;
             }
             if (s === "declined" || s === "rejected") {
-              return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Declined" sx={{...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 }}} />;
+              return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Declined" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
             }
             if (s === "pending" || s === "requested" || s === "waiting" || s === "sent") {
-              return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label={s === "sent" ? "Sent" : "Pending"  } sx={{...common.sx, bgcolor: "#eef2f6", borderColor: "#eef2f6", color: "#374151", "& .MuiChip-icon": { color: "#374151", mr: 0.5 }}} />;
+              return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label={s === "sent" ? "Sent" : "Pending"} sx={{ ...common.sx, bgcolor: "#eef2f6", borderColor: "#eef2f6", color: "#374151", "& .MuiChip-icon": { color: "#374151", mr: 0.5 } }} />;
             }
-            return <Chip {...common} icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />} label={item.state} sx={{...common.sx, bgcolor: "#f3f4f6", borderColor: "#f3f4f6", color: "#111827", "& .MuiChip-icon": { color: "#6b7280", mr: 0.5 }}} />;
+            return <Chip {...common} icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />} label={item.state} sx={{ ...common.sx, bgcolor: "#f3f4f6", borderColor: "#f3f4f6", color: "#111827", "& .MuiChip-icon": { color: "#6b7280", mr: 0.5 } }} />;
           })()}
         </Stack>
       </Stack>
     </Paper>
   );
 }
+
 /* ------------------- main page component ------------------- */
 export default function NotificationsPage({
-  items: initialItems,
   // optional external callbacks if you wire up your API later:
   onOpen,
-  onMarkRead,
-  onMarkAllRead,
-  onRespondRequest, // (id, "accepted"|"declined")
-  onFollowBackUser, // (id)
-  user, stats, tags = [],
+  onFollowBackUser,
 }) {
   const navigate = useNavigate();
   const [items, setItems] = React.useState([]);
   const [showOnlyUnread, setShowOnlyUnread] = React.useState(false);
   const [kind, setKind] = React.useState("All");
 
-  // derived
+  // --- Pagination State ---
+  const [loading, setLoading] = React.useState(true);
+  const [hasMore, setHasMore] = React.useState(true);
+  // Initial URL includes ?page_size=10
+  const [nextUrl, setNextUrl] = React.useState(`${API_BASE}/notifications/?page_size=10`);
+  const observerTarget = React.useRef(null);
+
+  // Derived state (filters & counts)
   const unreadCount = React.useMemo(() => items.filter((i) => !i.is_read).length, [items]);
 
   const filtered = React.useMemo(() => {
     let arr = [...items];
     if (showOnlyUnread) arr = arr.filter((i) => !i.is_read);
     if (kind !== "All") {
-      const k = kind.toLowerCase(); // "Requests", "Follows" etc.
-      // normalize for mapping
+      const k = kind.toLowerCase();
       const norm = {
         requests: ["friend_request", "connection_request"],
         follows: ["follow"],
@@ -302,75 +321,120 @@ export default function NotificationsPage({
       const keys = norm[k] || [k.slice(0, -1)];
       arr = arr.filter((i) => keys.includes(i.kind));
     }
+    // Re-sort to ensure correct order after appending
     arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     return arr;
   }, [items, showOnlyUnread, kind]);
 
   const grouped = groupByDay(filtered);
 
-  React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const r = await fetch(`${API_BASE}/notifications/`, {
-          headers: { ...tokenHeader(), Accept: "application/json" },
-          credentials: "include",
-        });
-        const j = await r.json().catch(() => []);
-        const raw = Array.isArray(j) ? j : j?.results || [];
+  // --- Load Function ---
+  const loadNotifications = React.useCallback(async (url, isAppend = false) => {
+    if (!url) return;
+    setLoading(true);
 
-        const mapped = raw.map((n) => ({
-          id: n.id,
-          kind: n.kind,
-          state: n.state || "",
-          title: n.title || "",
-          description: n.description || "",
-          created_at: n.created_at,
-          is_read: !!n.is_read,
-          actor: {
-            id: n.actor?.id,
-            name: n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
-            avatar: n.actor?.avatar_url || "",   // ← use avatar_url now returned by API
-          },
-          context: {
-            friend_request_id: n.data?.friend_request_id,
-            profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
-          },
-        }));
+    try {
+      const r = await fetch(url, {
+        headers: { ...tokenHeader(), Accept: "application/json" },
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Failed");
 
-        if (!alive) return;
-        setItems(mapped);
+      const j = await r.json();
+      const raw = Array.isArray(j) ? j : j?.results || [];
+      const next = j?.next || null;
 
-        // 🔔 mark-all-read-on-open (optimistic)
-        const idsToMark = mapped.filter((i) => !i.is_read).map((i) => i.id);
-        if (idsToMark.length) {
-          setItems((curr) =>
-            curr.map((i) => (idsToMark.includes(i.id) ? { ...i, is_read: true } : i))
-          );
-          try {
-            await fetch(`${API_BASE}/notifications/mark-read/`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                ...tokenHeader(),
-                Accept: "application/json",
-              },
-              credentials: "include",
-              body: JSON.stringify({ ids: idsToMark }),
-            });
-          } catch { }
-        }
-        // sidebar bell → 0
-        emitUnreadCount(0);
-      } catch {
-        /* ignore */
+      const mapped = raw.map((n) => ({
+        id: n.id,
+        kind: n.kind,
+        state: n.state || "",
+        title: n.title || "",
+        description: n.description || "",
+        created_at: n.created_at,
+        is_read: !!n.is_read,
+        actor: {
+          id: n.actor?.id,
+          name: n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
+          avatar: n.actor?.avatar_url || "",
+        },
+        context: {
+          friend_request_id: n.data?.friend_request_id,
+          profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
+          eventId: n.data?.event_id || n.data?.eventId,
+          postId: n.data?.post_id || n.data?.postId,
+          groupSlug: n.data?.group_slug,
+        },
+      }));
+
+      // Update state
+      setItems(prev => {
+        const combined = isAppend ? [...prev, ...mapped] : mapped;
+        // Deduplicate by ID
+        const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+        return unique;
+      });
+
+      setNextUrl(next);
+      setHasMore(!!next);
+
+      // Optimistically mark fetched items as read
+      const idsToMark = mapped.filter((i) => !i.is_read).map((i) => i.id);
+      if (idsToMark.length) {
+        // We update local state to read immediately
+        setItems(curr => curr.map(i => idsToMark.includes(i.id) ? { ...i, is_read: true } : i));
+        
+        // Fire & forget the backend update
+        try {
+          await fetch(`${API_BASE}/notifications/mark-read/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...tokenHeader(),
+              Accept: "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({ ids: idsToMark }),
+          });
+        } catch { }
       }
-    })();
-    return () => {
-      alive = false;
-    };
+
+      emitUnreadCount(0); // Simple reset for now
+
+    } catch (e) {
+      console.error(e);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  // --- 1. Initial Load ---
+  React.useEffect(() => {
+    // Load first page (size=10)
+    loadNotifications(`${API_BASE}/notifications/?page_size=10`, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- 2. Infinite Scroll Observer ---
+  React.useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Trigger load only if target is visible, we have more pages, and not currently loading
+        if (entries[0].isIntersecting && hasMore && !loading && nextUrl) {
+          loadNotifications(nextUrl, true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (observerTarget.current) observer.observe(observerTarget.current);
+    
+    return () => {
+      if (observerTarget.current) observer.unobserve(observerTarget.current);
+    };
+  }, [hasMore, loading, nextUrl, loadNotifications]);
+
+
+  // --- Helper API Calls ---
   const apiMarkRead = async (ids = []) => {
     if (!ids.length) return;
     try {
@@ -383,14 +447,12 @@ export default function NotificationsPage({
     } catch { }
   };
 
-  /* ---------- actions: optimistic mock handlers ---------- */
   const handleToggleRead = async (id, nowRead) => {
     setItems((curr) => {
       const next = curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i));
       emitUnreadCount(next.filter((x) => !x.is_read).length);
       return next;
     });
-    // backend only supports "mark as read"
     if (nowRead) await apiMarkRead([id]);
   };
 
@@ -409,21 +471,16 @@ export default function NotificationsPage({
     if (onOpen) return onOpen(n);
     const ctx = n.context || {};
 
-    // Friend/connection requests → Open goes to sender's profile
     if (n.kind === "friend_request" || n.kind === "connection_request") {
       if (ctx.profile_user_id) return navigate(`/community/rich-profile/${ctx.profile_user_id}`);
       return;
     }
 
-    // All other notifications: Open should go to the target only (NOT profile)
     if (ctx.eventId) return navigate(`/events/${ctx.eventId}`);
     if (ctx.postId) return navigate(`/feed/post/${ctx.postId}`);
     if (ctx.groupSlug) return navigate(`/groups/${ctx.groupSlug}`);
-
-    // No profile fallback here—profile is opened ONLY via avatar click
     return;
   };
-
 
   const updateItem = (id, patch) =>
     setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
@@ -477,23 +534,18 @@ export default function NotificationsPage({
     onFollowBackUser?.(id);
   };
 
-
-
   return (
     <Grid container spacing={2}>
-      {/* center column */}
       <Grid item xs={12} sm={12} md={9} sx={{ width: '100%' }}>
-                {/* header */}
+        {/* Header */}
         <Paper
           sx={{
             p: 2,
             border: `1px solid ${BORDER}`,
             borderRadius: 3,
             mb: 2,
-            // ------------- FIX START -------------
-            width: "100%",           // Forces the header to fill the screen width
-            boxSizing: "border-box", // Ensures padding doesn't break the width
-            // ------------- FIX END ---------------
+            width: "100%",
+            boxSizing: "border-box",
           }}
         >
           <Box
@@ -584,36 +636,58 @@ export default function NotificationsPage({
             </Stack>
           </Box>
         </Paper>
-        {/* day groups */}
-        {["Today", "Yesterday", "Earlier"].map((section) =>
-          grouped[section]?.length ? (
-            <Box key={section} sx={{ mb: 2 }}>
-              <Typography variant="overline" sx={{ color: "text.secondary" }}>
-                {section}
-              </Typography>
-              <List sx={{ mt: 1 }}>
-                {grouped[section].map((it) => (
-                  <ListItem key={it.id} disableGutters sx={{ px: 0 }}>
-                    <NotificationRow
-                      item={it}
-                      onOpen={handleOpen}
-                      onToggleRead={handleToggleRead}
-                      onAcceptRequest={handleAcceptRequest}
-                      onDeclineRequest={handleDeclineRequest}
-                      onFollowBack={handleFollowBack}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          ) : null
+
+        {/* Initial Loading State */}
+        {loading && items.length === 0 ? (
+          <>
+            <NotificationSkeleton />
+            <NotificationSkeleton />
+            <NotificationSkeleton />
+          </>
+        ) : filtered.length === 0 ? (
+          <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">No notifications found.</Typography>
+          </Paper>
+        ) : (
+          <>
+            {/* Grouped Lists */}
+            {["Today", "Yesterday", "Earlier"].map((section) =>
+              grouped[section]?.length ? (
+                <Box key={section} sx={{ mb: 2 }}>
+                  <Typography variant="overline" sx={{ color: "text.secondary" }}>
+                    {section}
+                  </Typography>
+                  <List sx={{ mt: 1 }}>
+                    {grouped[section].map((it) => (
+                      <ListItem key={it.id} disableGutters sx={{ px: 0 }}>
+                        <NotificationRow
+                          item={it}
+                          onOpen={handleOpen}
+                          onToggleRead={handleToggleRead}
+                          onAcceptRequest={handleAcceptRequest}
+                          onDeclineRequest={handleDeclineRequest}
+                          onFollowBack={handleFollowBack}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              ) : null
+            )}
+
+            {/* Bottom Loader / Scroll Trigger */}
+            {hasMore && (
+              <Box ref={observerTarget} sx={{ py: 1, textAlign: "center", width: "100%" }}>
+                {loading && <NotificationSkeleton />}
+              </Box>
+            )}
+          </>
         )}
       </Grid>
     </Grid>
   );
 }
 
-/* ------------------- mock data + utils ------------------- */
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
