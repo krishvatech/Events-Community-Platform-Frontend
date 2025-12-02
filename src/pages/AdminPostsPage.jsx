@@ -22,9 +22,10 @@ import {
   CardActions,
   Snackbar,
   Alert,
-  Popover, // Added
-  Tab,     // Added
-  Tabs,    // Added
+  Popover,
+  Tab,
+  Tabs,
+  Skeleton,
 } from "@mui/material";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
@@ -679,7 +680,7 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
       const avatar =
         avatarFrom(u) ||
         absMedia(r.user_image || r.user_image_url || r.avatar || r.avatar_url || "");
-      
+
       const reactionId = r.reaction || r.reaction_type || r.kind || null;
       const def = POST_REACTIONS.find(x => x.id === reactionId) || POST_REACTIONS[0]; // fallback to like
 
@@ -716,7 +717,7 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
           const n = json?.next;
           next = n ? (/^https?:/i.test(n) ? n : `${API_ROOT}${n.startsWith("/") ? "" : "/"}${n}`) : null;
         }
-        if (collected.length) break; 
+        if (collected.length) break;
       } catch { }
     }
 
@@ -747,7 +748,7 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>Reactions</DialogTitle>
       <DialogContent dividers>
-         <Box sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}>
+        <Box sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}>
           <Tabs
             value={activeFilter}
             onChange={(_, v) => setActiveFilter(v)}
@@ -787,9 +788,9 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
                 <ListItemAvatar><Avatar src={u.avatar} alt={u.name} /></ListItemAvatar>
                 <ListItemText primary={u.name} />
                 {u.reactionEmoji && (
-                   <Tooltip title={u.reactionLabel || ""}>
-                     <Box sx={{ fontSize: 20 }}>{u.reactionEmoji}</Box>
-                   </Tooltip>
+                  <Tooltip title={u.reactionLabel || ""}>
+                    <Box sx={{ fontSize: 20 }}>{u.reactionEmoji}</Box>
+                  </Tooltip>
                 )}
               </ListItem>
             ))}
@@ -1484,10 +1485,10 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const target = React.useMemo(() => engageTargetOf(post), [post]);
   const [likeCount, setLikeCount] = React.useState(post.like_count ?? post.metrics?.likes ?? 0);
   const [commentCount, setCommentCount] = React.useState(post.comment_count ?? post.metrics?.comments ?? 0);
-  
+
   // Changed: Use reaction state instead of simple liked boolean
   const [myReaction, setMyReaction] = React.useState(post.my_reaction || post.user_reaction || (post.user_has_liked ? "like" : null));
-  
+
   const [likesOpen, setLikesOpen] = React.useState(false);
   const commentInputRef = React.useRef(null);
   const [shareCount, setShareCount] = React.useState(post.share_count ?? post.metrics?.shares ?? 0);
@@ -1495,7 +1496,7 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [likers, setLikers] = React.useState([]);
   const [sharePickerOpen, setSharePickerOpen] = React.useState(false);
-  
+
   // Popover state
   const [anchorEl, setAnchorEl] = React.useState(null);
   const pickerOpen = Boolean(anchorEl);
@@ -1532,12 +1533,14 @@ function PostSocialBar({ communityId, post, onCounts }) {
 
   const loadTopLikers = React.useCallback(async () => {
     const tgt = target?.id ? target : { id: post.id, type: null };
+
+
     const urls = [
       (tgt.type
-        ? `${API_ROOT}/engagements/reactions/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=5`
-        : `${API_ROOT}/engagements/reactions/?target_id=${tgt.id}&page_size=5`),
-      `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${tgt.id}&page_size=5`,
+        ? `${API_ROOT}/engagements/reactions/who-liked/?target_type=${encodeURIComponent(tgt.type)}&target_id=${tgt.id}&page_size=5`
+        : `${API_ROOT}/engagements/reactions/who-liked/?feed_item=${tgt.id}&page_size=5`),
     ];
+
     for (const url of urls) {
       try {
         const r = await fetch(url, { headers: { Accept: "application/json", ...authHeader() } });
@@ -1561,9 +1564,9 @@ function PostSocialBar({ communityId, post, onCounts }) {
     // set my reaction if provided by backend, else fallback to existing
     if (c.my_reaction !== undefined) setMyReaction(c.my_reaction);
     else if (c.user_has_liked !== undefined && c.my_reaction === undefined) {
-         // if API only gives us bool, assume "like" if true, null if false, 
-         // BUT if we already have a specific reaction locally, keep it unless it conflicts
-         setMyReaction(c.user_has_liked ? (myReaction || "like") : null);
+      // if API only gives us bool, assume "like" if true, null if false, 
+      // BUT if we already have a specific reaction locally, keep it unless it conflicts
+      setMyReaction(c.user_has_liked ? (myReaction || "like") : null);
     }
 
     onCounts?.({ likeCount: c.likes ?? 0, commentCount: c.comments ?? 0, shareCount: c.shares ?? 0 });
@@ -1575,40 +1578,40 @@ function PostSocialBar({ communityId, post, onCounts }) {
   const handleClosePicker = () => setAnchorEl(null);
 
   async function handleReact(reactionId) {
-     const prevReaction = myReaction;
-     const isSame = prevReaction === reactionId;
-     
-     // Optimistic Update
-     let delta = 0;
-     if (!prevReaction && reactionId) delta = 1;        
-     else if (prevReaction && !reactionId) delta = -1;  
-     else if (prevReaction && reactionId && isSame) delta = -1; // toggle off
-     // else switching (no total count change)
+    const prevReaction = myReaction;
+    const isSame = prevReaction === reactionId;
 
-     const newReaction = (isSame && reactionId) ? null : reactionId;
-     
-     setMyReaction(newReaction);
-     setLikeCount(n => Math.max(0, n + delta));
-     
-     // Send Request
-     try {
-       const body = target.type
+    // Optimistic Update
+    let delta = 0;
+    if (!prevReaction && reactionId) delta = 1;
+    else if (prevReaction && !reactionId) delta = -1;
+    else if (prevReaction && reactionId && isSame) delta = -1; // toggle off
+    // else switching (no total count change)
+
+    const newReaction = (isSame && reactionId) ? null : reactionId;
+
+    setMyReaction(newReaction);
+    setLikeCount(n => Math.max(0, n + delta));
+
+    // Send Request
+    try {
+      const body = target.type
         ? { target_type: target.type, target_id: target.id, reaction: reactionId }
         : { target_id: target.id, reaction: reactionId };
-        
-       // Use toggle endpoint (it usually handles switching reaction types intelligently)
-       const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify(body),
-       });
-       if (!res.ok) throw new Error();
-       await refreshCounts();
-     } catch {
-       // rollback
-       setMyReaction(prevReaction);
-       await refreshCounts();
-     }
+
+      // Use toggle endpoint (it usually handles switching reaction types intelligently)
+      const res = await fetch(toApiUrl(`engagements/reactions/toggle/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      await refreshCounts();
+    } catch {
+      // rollback
+      setMyReaction(prevReaction);
+      await refreshCounts();
+    }
   }
 
 
@@ -1639,10 +1642,10 @@ function PostSocialBar({ communityId, post, onCounts }) {
             <Typography variant="body2">
               {/* If we have specific names, show them, otherwise generic count */}
               {likers.length > 0 ? (
-                 <>
-                   {likers[0].name}
-                   {likeCount > 1 && ` and ${Math.max(0, likeCount - 1).toLocaleString()} others`}
-                 </>
+                <>
+                  {likers[0].name}
+                  {likeCount > 1 && ` and ${Math.max(0, likeCount - 1).toLocaleString()} others`}
+                </>
               ) : (
                 `${(likeCount || 0).toLocaleString()} reactions`
               )}
@@ -1671,9 +1674,9 @@ function PostSocialBar({ communityId, post, onCounts }) {
           size="small"
           onClick={handleOpenPicker}
           sx={{
-             textTransform: "none",
-             color: hasReaction ? "primary.main" : "text.secondary",
-             fontWeight: hasReaction ? 600 : 400,
+            textTransform: "none",
+            color: hasReaction ? "primary.main" : "text.secondary",
+            fontWeight: hasReaction ? 600 : 400,
           }}
           startIcon={<span style={{ fontSize: 18, lineHeight: 1 }}>{likeBtnEmoji}</span>}
         >
@@ -1689,43 +1692,43 @@ function PostSocialBar({ communityId, post, onCounts }) {
         </Button>
 
       </Stack>
-      
+
       {/* Reaction Popover */}
       <Popover
-          open={pickerOpen}
-          anchorEl={anchorEl}
-          onClose={handleClosePicker}
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
-          transformOrigin={{ vertical: "bottom", horizontal: "center" }}
-          disableRestoreFocus
+        open={pickerOpen}
+        anchorEl={anchorEl}
+        onClose={handleClosePicker}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+        disableRestoreFocus
       >
-         <Box sx={{ p: 1, display: "flex", gap: 1, px: 1.5 }}>
-            {POST_REACTIONS.map((r) => (
-              <Tooltip key={r.id} title={r.label}>
-                <Box
-                  onClick={() => {
-                    handleReact(r.id);
-                    handleClosePicker();
-                  }}
-                  sx={{
-                    cursor: "pointer",
-                    fontSize: 26,
-                    lineHeight: 1,
-                    px: 0.5,
-                    py: 0.25,
-                    borderRadius: "999px",
-                    transition: "transform 120ms ease, background 120ms ease",
-                    "&:hover": {
-                      bgcolor: "action.hover",
-                      transform: "translateY(-2px) scale(1.05)",
-                    },
-                  }}
-                >
-                  {r.emoji}
-                </Box>
-              </Tooltip>
-            ))}
-         </Box>
+        <Box sx={{ p: 1, display: "flex", gap: 1, px: 1.5 }}>
+          {POST_REACTIONS.map((r) => (
+            <Tooltip key={r.id} title={r.label}>
+              <Box
+                onClick={() => {
+                  handleReact(r.id);
+                  handleClosePicker();
+                }}
+                sx={{
+                  cursor: "pointer",
+                  fontSize: 26,
+                  lineHeight: 1,
+                  px: 0.5,
+                  py: 0.25,
+                  borderRadius: "999px",
+                  transition: "transform 120ms ease, background 120ms ease",
+                  "&:hover": {
+                    bgcolor: "action.hover",
+                    transform: "translateY(-2px) scale(1.05)",
+                  },
+                }}
+              >
+                {r.emoji}
+              </Box>
+            </Tooltip>
+          ))}
+        </Box>
       </Popover>
 
       <LikesDialog
@@ -2196,6 +2199,36 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
   );
 }
 
+function AdminPostSkeleton() {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 3, borderColor: "#e5e7eb", mb: 2 }}>
+      <CardContent>
+        {/* Header: Avatar + Name + Date */}
+        <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+          <Skeleton variant="circular" width={28} height={28} />
+          <Box sx={{ width: "60%" }}>
+            <Skeleton variant="text" width="40%" height={20} />
+            <Skeleton variant="text" width="20%" height={15} />
+          </Box>
+        </Stack>
+
+        {/* Content Body */}
+        <Skeleton variant="text" width="90%" />
+        <Skeleton variant="text" width="80%" />
+        <Skeleton variant="text" width="50%" sx={{ mb: 2 }} />
+
+        {/* Image/Media Placeholder */}
+        <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 2, mb: 1 }} />
+      </CardContent>
+
+      {/* Footer Actions */}
+      <CardActions sx={{ px: 2, pb: 2 }}>
+        <Skeleton variant="rounded" width={60} height={24} />
+      </CardActions>
+    </Card>
+  );
+}
+
 // ------- page -------
 export default function AdminPostsPage() {
   const { id: routeCommunityId } = useParams();
@@ -2205,20 +2238,40 @@ export default function AdminPostsPage() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [loadingErr, setLoadingErr] = React.useState("");
 
-  const PER_PAGE = 5;
-  const [page, setPage] = React.useState(1);
-  const totalPages = Math.max(1, Math.ceil(items.length / PER_PAGE));
-  const pageItems = React.useMemo(() => {
-    const start = (page - 1) * PER_PAGE;
-    return items.slice(start, start + PER_PAGE);
-  }, [items, page]);
 
-  // keep page in range when items change (e.g., after search/delete)
+  // --- ADD NEW INFINITE SCROLL STATE ---
+  const [visibleCount, setVisibleCount] = React.useState(4); // Start with 4
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const observerTarget = React.useRef(null);
+  const [initialLoading, setInitialLoading] = React.useState(true); // To show skeleton on first load
+
+  // Calculate visible items based on infinite scroll state
+  const visibleItems = React.useMemo(() => {
+    return items.slice(0, visibleCount);
+  }, [items, visibleCount]);
+
+  // --- INTERSECTION OBSERVER LOGIC ---
   React.useEffect(() => {
-    const pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
-    if (page > pages) setPage(pages);
-  }, [items]);
+    // If we have shown all items or are currently loading, do nothing
+    if (isLoadingMore || visibleCount >= items.length || !observerTarget.current) return;
 
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsLoadingMore(true);
+          // Fake network delay for smooth UX (optional)
+          setTimeout(() => {
+            setVisibleCount((prev) => prev + 4);
+            setIsLoadingMore(false);
+          }, 600);
+        }
+      },
+      { threshold: 0.1 } // Trigger when 10% of the target is visible
+    );
+
+    observer.observe(observerTarget.current);
+    return () => observer.disconnect();
+  }, [isLoadingMore, visibleCount, items.length]);
 
   React.useEffect(() => {
     if (routeCommunityId) {
@@ -2269,8 +2322,12 @@ export default function AdminPostsPage() {
 
   const load = React.useCallback(async () => {
     setLoadingErr("");
+    setInitialLoading(true);
     try {
-      if (!activeCommunityId) return;
+      if (!activeCommunityId) {
+        setInitialLoading(false); // <--- Stop if no ID
+        return;
+      }
 
       // ---- existing posts API (text/image/link) ----
       const postsUrl = new URL(`${API_ROOT}/communities/${activeCommunityId}/posts/`, API_ROOT);
@@ -2307,9 +2364,12 @@ export default function AdminPostsPage() {
       });
 
       setItems(merged);
+      setVisibleCount(4);
     } catch {
       setItems([]);
       setLoadingErr("Network error");
+    } finally {
+      setInitialLoading(false); // <--- 3. STOP LOADING
     }
   }, [search, activeCommunityId]);
 
@@ -2372,12 +2432,21 @@ export default function AdminPostsPage() {
         </Stack>
 
         <Box>
-          {items.length === 0 ? (
+          {/* 1. INITIAL LOADING STATE - Show Skeletons */}
+          {initialLoading ? (
+            <Stack spacing={2}>
+              <AdminPostSkeleton />
+              <AdminPostSkeleton />
+              <AdminPostSkeleton />
+            </Stack>
+          ) : items.length === 0 ? (
+
+            // 2. EMPTY STATE
             <Paper
               variant="outlined"
               sx={{
                 borderRadius: 3,
-                borderColor: BORDER,
+                borderColor: "#e5e7eb",
                 p: 4,
                 textAlign: "center",
                 color: loadingErr ? "error.main" : "text.secondary",
@@ -2386,9 +2455,12 @@ export default function AdminPostsPage() {
               {loadingErr ? loadingErr : "No posts yet."}
             </Paper>
           ) : (
+
+            // 3. POST LIST + INFINITE SCROLL
             <>
               <Stack spacing={2}>
-                {pageItems.map((it) => (
+                {/* Use visibleItems (Infinite Scroll) instead of pageItems */}
+                {visibleItems.map((it) => (
                   <PostShell
                     key={it.id || it.created_at}
                     item={it}
@@ -2401,16 +2473,17 @@ export default function AdminPostsPage() {
                 ))}
               </Stack>
 
-              <Stack direction="row" justifyContent="center" sx={{ mt: 1 }}>
-                <Pagination
-                  count={totalPages}
-                  page={page}
-                  onChange={(_, v) => setPage(v)}
-                  shape="rounded"
-                  size="small"
-                  siblingCount={0}
-                />
-              </Stack>
+              {/* 4. INFINITE SCROLL TRIGGER & BOTTOM SKELETON */}
+              {items.length > visibleCount && (
+                <Box ref={observerTarget} sx={{ py: 2, mt: 1, textAlign: 'center' }}>
+                  {isLoadingMore && (
+                    <Stack spacing={2}>
+                      <AdminPostSkeleton />
+                      <AdminPostSkeleton />
+                    </Stack>
+                  )}
+                </Box>
+              )}
             </>
           )}
         </Box>
