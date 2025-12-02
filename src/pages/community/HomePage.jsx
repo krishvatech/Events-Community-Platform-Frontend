@@ -40,6 +40,7 @@ import PlaceIcon from "@mui/icons-material/Place";
 import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
+import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
 
 // Countries Library
 import * as isoCountries from "i18n-iso-countries";
@@ -71,7 +72,7 @@ function mapExperience(item) {
   return {
     id: item.id,
     org: item.community_name || item.org || item.company || "",
-    logo: item.logo || "", // Assuming backend might store logo url
+    logo: item.logo || "",
     position: item.position || "",
     start: item.start_date || "",
     end: item.end_date || "",
@@ -85,7 +86,6 @@ function mapExperience(item) {
     location: item.location || "",
     description: item.description || "",
     exit_reason: item.exit_reason || "",
-    // These are now part of the experience record specifically
     sector: item.sector || "",
     industry: item.industry || "",
     number_of_employees: item.number_of_employees || "",
@@ -151,7 +151,6 @@ function parseSkills(value) {
   return v.split(/,|\n|;/).map((s) => s.trim()).filter(Boolean);
 }
 
-// Minimal JWT decoding to get user info before profile loads
 function decodeJwtPayload(token) {
   if (!token) return null;
   try {
@@ -169,6 +168,7 @@ function decodeJwtPayload(token) {
 const EMPTY_PROFILE = {
   id: null,
   first_name: "",
+  middle_name: "",
   last_name: "",
   email: "",
   job_title: "",
@@ -215,6 +215,7 @@ async function fetchProfileCore() {
   return {
     id: data.id ?? null,
     first_name: data.first_name || "",
+    middle_name: prof.middle_name || "",
     last_name: data.last_name || "",
     email: data.email || "",
     job_title: prof.job_title || "",
@@ -258,7 +259,6 @@ function CompanyAutocomplete({ value, onChange }) {
   const [loading, setLoading] = React.useState(false);
   const [inputValue, setInputValue] = React.useState("");
 
-  // Debounce the API call
   React.useEffect(() => {
     let active = true;
 
@@ -270,26 +270,17 @@ function CompanyAutocomplete({ value, onChange }) {
     const fetchCompanies = async () => {
       setLoading(true);
       try {
-        // Using Clearbit's free autocomplete API
         const response = await fetch(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${inputValue}`);
         const data = await response.json();
-
-        if (active) {
-          setOptions(data);
-        }
+        if (active) setOptions(data);
       } catch (error) {
         console.error("Error fetching companies:", error);
       } finally {
         if (active) setLoading(false);
       }
     };
-
     const timer = setTimeout(fetchCompanies, 400);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
+    return () => { active = false; clearTimeout(timer); };
   }, [inputValue, value]);
 
   return (
@@ -301,29 +292,22 @@ function CompanyAutocomplete({ value, onChange }) {
       onClose={() => setOpen(false)}
       isOptionEqualToValue={(option, value) => option.name === value.name}
       getOptionLabel={(option) => {
-        // Value can be a string (if user typed new company) or object (if selected)
         if (typeof option === 'string') return option;
         return option.name;
       }}
       options={options}
       loading={loading}
       value={value}
-      // Triggered when user selects an option OR hits enter on a new string
       onChange={(event, newValue) => {
         if (typeof newValue === 'string') {
-          // User typed a new name
           onChange({ name: newValue, logo: null, domain: null });
         } else if (newValue && newValue.inputValue) {
-          // Create new from dialog option (if using filterOptions)
           onChange({ name: newValue.inputValue, logo: null, domain: null });
         } else {
-          // Selected existing
           onChange(newValue);
         }
       }}
-      onInputChange={(event, newInputValue) => {
-        setInputValue(newInputValue);
-      }}
+      onInputChange={(event, newInputValue) => setInputValue(newInputValue)}
       renderOption={(props, option) => (
         <ListItem {...props} key={option.domain || option.name}>
           <ListItemAvatar>
@@ -359,11 +343,83 @@ function CompanyAutocomplete({ value, onChange }) {
   );
 }
 
+// -----------------------------------------------------------------------------
+// Name Change Request Dialog
+// -----------------------------------------------------------------------------
+function NameChangeDialog({ open, onClose, currentNames }) {
+  const [form, setForm] = React.useState({
+    new_first_name: "",
+    new_middle_name: "",
+    new_last_name: "",
+    reason: "",
+  });
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open) {
+      setForm({
+        new_first_name: currentNames.first || "",
+        new_middle_name: currentNames.middle || "",
+        new_last_name: currentNames.last || "",
+        reason: "",
+      });
+    }
+  }, [open, currentNames]);
+
+  const handleSubmit = async () => {
+    if (!form.new_first_name || !form.new_last_name || !form.reason) {
+      alert("First Name, Last Name, and Reason are required.");
+      return;
+    }
+    setLoading(true);
+    try {
+      // Correct endpoint (singular)
+      const res = await fetch(`${API_ROOT}/users/me/name-change-request/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.detail || JSON.stringify(json));
+      }
+      alert("Request submitted successfully! An admin will review it shortly.");
+      onClose();
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Request Name Change</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Legal names cannot be changed directly. Please submit a request with your valid reason (e.g., Marriage, Spelling Correction).
+        </Typography>
+        <Stack spacing={2}>
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <TextField label="First Name" fullWidth required value={form.new_first_name} onChange={(e) => setForm({ ...form, new_first_name: e.target.value })} />
+            <TextField label="Middle Name" fullWidth value={form.new_middle_name} onChange={(e) => setForm({ ...form, new_middle_name: e.target.value })} />
+            <TextField label="Last Name" fullWidth required value={form.new_last_name} onChange={(e) => setForm({ ...form, new_last_name: e.target.value })} />
+          </Box>
+          <TextField label="Reason for Change" fullWidth multiline minRows={2} required placeholder="e.g. Marriage, Legal change, Typos..." value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={loading}>{loading ? "Submitting..." : "Submit Request"}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 
 // -----------------------------------------------------------------------------
 // Main Component
 // -----------------------------------------------------------------------------
-
 export default function HomePage() {
   const [profile, setProfile] = React.useState(() => loadInitialProfile());
   const [friendCount, setFriendCount] = React.useState(0);
@@ -374,16 +430,18 @@ export default function HomePage() {
   const [avatarPreview, setAvatarPreview] = React.useState("");
   const [avatarSaving, setAvatarSaving] = React.useState(false);
 
+  // Dialog States
+  const [nameChangeOpen, setNameChangeOpen] = React.useState(false);
+  const [basicInfoOpen, setBasicInfoOpen] = React.useState(false); // Header edit dialog
+
   // --- Fetch Profile ---
   const fetchMyProfileFromMe = React.useCallback(async () => {
     try {
       const corePromise = fetchProfileCore();
       const extrasPromise = fetchProfileExtras().catch(() => ({ experiences: [], educations: [] }));
-
       const core = await corePromise;
       setProfile((prev) => ({ ...prev, ...core }));
       try { localStorage.setItem("profile_core", JSON.stringify(core)); } catch { }
-
       const extra = await extrasPromise;
       setProfile((prev) => ({ ...prev, experience: extra.experiences, education: extra.educations }));
     } catch (e) {
@@ -393,11 +451,7 @@ export default function HomePage() {
 
   // --- Fetch Friends ---
   const fetchMyFriends = React.useCallback(async () => {
-    const candidates = [
-      `${API_ROOT}/friends/`,
-      `${API_ROOT}/users/friends/`,
-      `${API_ROOT}/users/me/friends/`,
-    ];
+    const candidates = [`${API_ROOT}/friends/`, `${API_ROOT}/users/friends/`, `${API_ROOT}/users/me/friends/`];
     for (const url of candidates) {
       try {
         const res = await fetch(url, { headers: { ...authHeader(), accept: "application/json" } });
@@ -445,7 +499,15 @@ export default function HomePage() {
             </Box>
 
             <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
+                {/* --- EDIT BUTTON (Identity) --- */}
+                <Tooltip title="Identity Details">
+                  <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
+                    <EditRoundedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
               {profile.experience && profile.experience.length > 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   {profile.experience[0].position} – {profile.experience[0].org}
@@ -467,7 +529,10 @@ export default function HomePage() {
         </Card>
 
         {/* Profile Content Grid */}
-        <AboutTab profile={profile} onUpdate={handleUpdateProfile} />
+        <AboutTab
+          profile={profile}
+          onUpdate={handleUpdateProfile}
+        />
 
       </Box>
 
@@ -488,6 +553,28 @@ export default function HomePage() {
         }}
         setSaving={setAvatarSaving}
       />
+
+      {/* NEW: Identity Details Dialog (NO Job Title field) */}
+      <BasicInfoDialog
+        open={basicInfoOpen}
+        onClose={() => setBasicInfoOpen(false)}
+        profile={profile}
+        onRequestNameChange={() => {
+          setBasicInfoOpen(false); 
+          setNameChangeOpen(true); 
+        }}
+      />
+
+      {/* Name Change Request Dialog */}
+      <NameChangeDialog
+        open={nameChangeOpen}
+        onClose={() => setNameChangeOpen(false)}
+        currentNames={{
+          first: profile.first_name,
+          middle: profile.middle_name || "",
+          last: profile.last_name
+        }}
+      />
     </Box>
   );
 }
@@ -498,7 +585,6 @@ export default function HomePage() {
 function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, onClose, onSaved, setSaving }) {
   const inputRef = React.useRef(null);
   const handleChoose = () => inputRef.current?.click();
-
   const handleFileChange = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -506,7 +592,6 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
     reader.onload = (ev) => onPick(f, ev.target.result);
     reader.readAsDataURL(f);
   };
-
   async function uploadAvatarApi(theFile) {
     const candidates = [
       { url: `${API_ROOT}/users/me/avatar/`, method: "POST", field: "avatar" },
@@ -525,7 +610,6 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
         if (newUrl) return newUrl;
       } catch { }
     }
-    // fallback check
     try {
       const me = await fetch(`${API_ROOT}/users/me/`, { headers: { ...authHeader(), accept: "application/json" } });
       const d = await me.json();
@@ -533,7 +617,6 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
     } catch { }
     return null;
   }
-
   const handleSave = async () => {
     if (!file) return;
     setSaving(true);
@@ -542,7 +625,6 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
     if (!newUrl) { alert("Could not update photo."); return; }
     onSaved(`${newUrl}${newUrl.includes("?") ? "&" : "?"}_=${Date.now()}`);
   };
-
   return (
     <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>Update profile photo</DialogTitle>
@@ -557,6 +639,43 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" onClick={handleSave} disabled={!file || saving}>{saving ? "Saving…" : "Save"}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// NEW COMPONENT: Identity Dialog (Header Trigger) - NO JOB TITLE
+// -----------------------------------------------------------------------------
+function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
+  // Only displays locked info and the button to start the request flow.
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Identity Details</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Legal names are locked for security.
+          </Typography>
+          
+          {/* LOCKED NAMES */}
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <TextField label="First Name" fullWidth disabled value={profile?.first_name || ""}  />
+            <TextField label="Last Name" fullWidth disabled value={profile?.last_name || ""} />
+          </Box>
+
+          {/* REQUEST BUTTON */}
+          <Button
+            startIcon={<HistoryEduRoundedIcon />}
+            sx={{ alignSelf: 'start', textTransform: 'none' }}
+            onClick={onRequestNameChange}
+          >
+            Request Name Change
+          </Button>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
       </DialogActions>
     </Dialog>
   );
@@ -618,8 +737,7 @@ async function deleteEducationApi(id) {
 }
 
 async function createExperienceApi(payload) {
-  // Payload now includes sector, industry, number_of_employees
-  const r = await fetch(`${API_ROOT}/auth/me/experiences/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ community_name: payload.org, position: payload.position, location: payload.location || "", start_date: payload.start || null, end_date: payload.current ? null : (payload.end || null), currently_work_here: !!payload.current, description: payload.description || "", employment_type: payload.employment_type, work_schedule: payload.work_schedule, relationship_to_org: payload.relationship_to_org, career_stage: payload.career_stage, compensation_type: payload.compensation_type, work_arrangement: payload.work_arrangement, exit_reason: payload.exit_reason, sector: payload.sector, industry: payload.industry, number_of_employees: payload.number_of_employees }) });
+  const r = await fetch(`${API_ROOT}/auth/me/experiences/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ community_name: payload.org, position: payload.position, location: payload.location || "", start_date: payload.start || null, end_date: payload.end || null, currently_work_here: !!payload.current, description: payload.description || "", employment_type: payload.employment_type, work_schedule: payload.work_schedule, relationship_to_org: payload.relationship_to_org, career_stage: payload.career_stage, compensation_type: payload.compensation_type, work_arrangement: payload.work_arrangement, exit_reason: payload.exit_reason, sector: payload.sector, industry: payload.industry, number_of_employees: payload.number_of_employees }) });
   if (!r.ok) throw new Error("Failed to add experience");
 }
 
@@ -662,13 +780,11 @@ function AboutTab({ profile, onUpdate }) {
 
   const latestExp = React.useMemo(() => profile.experience?.[0], [profile.experience]);
 
-  // Sync Forms
   React.useEffect(() => {
     const fullLoc = profile.location || "";
     const [city, country] = fullLoc.includes(",") ? fullLoc.split(",").map(s => s.trim()) : ["", fullLoc];
-    setContactForm({ first_name: profile.first_name || "", last_name: profile.last_name || "", email: profile.email || "", city, location: country, linkedin: profile.links?.linkedin || "" });
+    setContactForm({ email: profile.email || "", city, location: country, linkedin: profile.links?.linkedin || "" });
     setAboutForm({ bio: profile.bio || "", skillsText: (profile.skills || []).join(", ") });
-    // Note: Work form was removed, as we now edit sector/industry inside the experience itself
   }, [profile, latestExp]);
 
   const reloadExtras = async () => {
@@ -676,7 +792,6 @@ function AboutTab({ profile, onUpdate }) {
     onUpdate?.(prev => ({ ...prev, experience: extra.experiences, education: extra.educations }));
   };
 
-  // Handlers
   const saveAbout = async () => {
     try {
       await saveProfileToMe({ ...profile, profile: { ...profile, bio: aboutForm.bio, skills: parseSkills(aboutForm.skillsText) } });
@@ -699,11 +814,9 @@ function AboutTab({ profile, onUpdate }) {
     setSavingExp(true);
     try {
       const loc = [expForm.city, expForm.location].filter(Boolean).join(", ");
-
-      // Payload construction now uses the form state for sector/industry/employees directly
       const payload = {
         ...expForm,
-        org: expForm.org, // This comes from the CompanyAutocomplete (name string)
+        org: expForm.org,
         position: expForm.position,
         location: loc,
         start: expForm.start || null,
@@ -730,9 +843,12 @@ function AboutTab({ profile, onUpdate }) {
     try {
       const loc = [contactForm.city, contactForm.location].filter(Boolean).join(", ");
       const links = { ...(profile.links || {}), linkedin: contactForm.linkedin };
-      const payload = { first_name: contactForm.first_name, last_name: contactForm.last_name, email: contactForm.email, profile: { ...profile, location: loc, links } };
+      const payload = {
+        email: contactForm.email,
+        profile: { ...profile, location: loc, links }
+      };
       await saveProfileToMe(payload);
-      onUpdate?.({ ...profile, first_name: payload.first_name, last_name: payload.last_name, email: payload.email, location: loc, links });
+      onUpdate?.({ ...profile, email: payload.email, location: loc, links });
       setContactOpen(false);
     } catch { }
   };
@@ -753,193 +869,83 @@ function AboutTab({ profile, onUpdate }) {
 
   return (
     <Box>
-      <Grid
-        container
-        spacing={2}
-        sx={{
-          flexWrap: { xs: "wrap", sm: "nowrap" },
-          alignItems: "flex-start",
-        }}
-      >
+      <Grid container spacing={2} sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, alignItems: "flex-start" }}>
         {/* LEFT: About / Skills / Experience / Education */}
-        <Grid
-          item
-          xs={12}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            flexBasis: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" },
-            maxWidth: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" },
-            flexShrink: 0,
-            "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" },
-          }}
-        >
-          {/* About */}
+        <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
+          
           <SectionCard title="About" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("description"); setAboutOpen(true); }}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>} sx={{ minHeight: 160, display: "flex", flexDirection: "column" }}>
             <Typography variant="body2">{profile.bio || <Box component="span" sx={{ color: "text.secondary" }}>List your major duties...</Box>}</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mt: "auto", alignSelf: "flex-end", display: "block", pt: 1 }}>{(profile.bio || "").length}/2000</Typography>
           </SectionCard>
 
-          {/* Skills */}
           <SectionCard title="Skills" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("skills"); setAboutOpen(true); }}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <SkillsChips skills={profile.skills} />
           </SectionCard>
 
-          {/* Experience */}
           <SectionCard title="Experience" action={<Tooltip title="Add"><IconButton size="small" onClick={openAddExp}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
               {profile.experience?.map(exp => (
-                <ListItem key={exp.id} disableGutters secondaryAction={
-                  <Box sx={{ display: "flex" }}>
-                    <IconButton size="small" onClick={() => setExpDeleteId(exp.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
-                    <IconButton size="small" onClick={() => openEditExp(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton>
-                  </Box>
-                }>
-                  <ListItemText
-                    primary={
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography variant="body2" fontWeight={600}>{exp.position}</Typography>
-                        <Typography variant="body2" color="text.secondary">— {exp.org}</Typography>
-                      </Stack>
-                    }
-                    secondary={
-                      <React.Fragment>
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {dateRange(exp.start, exp.end, exp.current)}
-                        </Typography>
-                        {/* Display basic company details here since we removed the "About work" section */}
-                        {(exp.industry || exp.number_of_employees) && (
-                          <Typography variant="caption" color="text.secondary">
-                            {exp.industry} {exp.industry && exp.number_of_employees ? "•" : ""} {exp.number_of_employees} employees
-                          </Typography>
-                        )}
-                      </React.Fragment>
-                    }
-                  />
+                <ListItem key={exp.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setExpDeleteId(exp.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => openEditExp(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton></Box>}>
+                  <ListItemText primary={<Stack direction="row" spacing={1} alignItems="center"><Typography variant="body2" fontWeight={600}>{exp.position}</Typography><Typography variant="body2" color="text.secondary">— {exp.org}</Typography></Stack>} secondary={<React.Fragment><Typography variant="caption" color="text.secondary" display="block">{dateRange(exp.start, exp.end, exp.current)}</Typography>{(exp.industry || exp.number_of_employees) && (<Typography variant="caption" color="text.secondary">{exp.industry} {exp.industry && exp.number_of_employees ? "•" : ""} {exp.number_of_employees} employees</Typography>)}</React.Fragment>} />
                 </ListItem>
               ))}
             </List>
           </SectionCard>
 
-          {/* Education */}
           <SectionCard title="Education" action={<Tooltip title="Add"><IconButton size="small" onClick={() => { setEditEduId(null); setEduForm({}); setEduOpen(true); }}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
               {profile.education?.map(edu => (
-                <ListItem key={edu.id} disableGutters secondaryAction={
-                  <Box sx={{ display: "flex" }}>
-                    <IconButton size="small" onClick={() => setEduDeleteId(edu.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
-                    <IconButton size="small" onClick={() => { setEditEduId(edu.id); setEduForm({ ...edu, start: (edu.start || "").slice(0, 4), end: (edu.end || "").slice(0, 4) }); setEduOpen(true); }}><EditRoundedIcon fontSize="small" /></IconButton>
-                  </Box>
-                }>
+                <ListItem key={edu.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setEduDeleteId(edu.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => { setEditEduId(edu.id); setEduForm({ ...edu, start: (edu.start || "").slice(0, 4), end: (edu.end || "").slice(0, 4) }); setEduOpen(true); }}><EditRoundedIcon fontSize="small" /></IconButton></Box>}>
                   <ListItemText primary={<Typography variant="body2" fontWeight={600}>{edu.degree} — {edu.school}</Typography>} secondary={<Typography variant="caption" color="text.secondary">{edu.start?.slice(0, 4)} - {edu.end?.slice(0, 4)}</Typography>} />
                 </ListItem>
               ))}
             </List>
           </SectionCard>
 
-          {/* NEW: Certifications & Licenses (Static Data) - Placed under Education */}
           <SectionCard title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
-              <ListItem disableGutters>
-                <ListItemText
-                  primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>}
-                  secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>}
-                />
-              </ListItem>
-              <ListItem disableGutters>
-                <ListItemText
-                  primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>}
-                  secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>}
-                />
-              </ListItem>
+              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>} secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>} /></ListItem>
+              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>} secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>} /></ListItem>
             </List>
           </SectionCard>
         </Grid>
 
         {/* RIGHT: Contact + New Sections */}
-        <Grid
-          item
-          xs={12}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            flexBasis: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" },
-            maxWidth: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" },
-            flexShrink: 0,
-            "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" },
-          }}
-        >
-          {/* Contact */}
+        <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
           <SectionCard title="Contact" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => setContactOpen(true)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <Typography variant="subtitle2" color="text.secondary">LinkedIn</Typography>
-            <Box sx={{ display: "flex", gap: 1, mb: 1 }}><LinkedInIcon fontSize="small" /><Typography variant="body2">{profile.links?.linkedin || "—"}</Typography></Box>
-            <Typography variant="subtitle2" color="text.secondary">Email</Typography>
-            <Box sx={{ display: "flex", gap: 1, mb: 1 }}><EmailIcon fontSize="small" /><Typography variant="body2">{profile.email || "—"}</Typography></Box>
-            <Typography variant="subtitle2" color="text.secondary">Location</Typography>
-            <Box sx={{ display: "flex", gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{profile.location || "—"}</Typography></Box>
+            <Typography variant="subtitle2" color="text.secondary">LinkedIn</Typography><Box sx={{ display: "flex", gap: 1, mb: 1 }}><LinkedInIcon fontSize="small" /><Typography variant="body2">{profile.links?.linkedin || "—"}</Typography></Box>
+            <Typography variant="subtitle2" color="text.secondary">Email</Typography><Box sx={{ display: "flex", gap: 1, mb: 1 }}><EmailIcon fontSize="small" /><Typography variant="body2">{profile.email || "—"}</Typography></Box>
+            <Typography variant="subtitle2" color="text.secondary">Location</Typography><Box sx={{ display: "flex", gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{profile.location || "—"}</Typography></Box>
           </SectionCard>
 
-          {/* NEW: Trainings & Executive Education (Static Data) */}
           <SectionCard title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
-              <ListItem disableGutters>
-                <ListItemText
-                  primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>}
-                  secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>}
-                />
-              </ListItem>
-              <ListItem disableGutters>
-                <ListItemText
-                  primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>}
-                  secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>}
-                />
-              </ListItem>
+              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>} secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>} /></ListItem>
+              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>} secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>} /></ListItem>
             </List>
           </SectionCard>
 
-          {/* NEW: Memberships (Static Data) */}
           <SectionCard title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
-              <ListItem disableGutters>
-                <ListItemText
-                  primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>}
-                  secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>}
-                />
-              </ListItem>
-              <ListItem disableGutters>
-                <ListItemText
-                  primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>}
-                  secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>}
-                />
-              </ListItem>
+              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>} secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>} /></ListItem>
+              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>} secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>} /></ListItem>
             </List>
           </SectionCard>
-
         </Grid>
       </Grid>
 
       {/* DIALOGS */}
-      {/* About */}
       <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{aboutMode === "skills" ? "Edit skills" : "Edit description"}</DialogTitle>
-        <DialogContent>
-          {aboutMode === "description" ? (
-            <TextField multiline minRows={4} fullWidth value={aboutForm.bio} onChange={(e) => setAboutForm(f => ({ ...f, bio: e.target.value }))} />
-          ) : (
-            <TextField fullWidth label="Skills (CSV)" value={aboutForm.skillsText} onChange={(e) => setAboutForm(f => ({ ...f, skillsText: e.target.value }))} />
-          )}
-        </DialogContent>
+        <DialogContent>{aboutMode === "description" ? (<TextField multiline minRows={4} fullWidth value={aboutForm.bio} onChange={(e) => setAboutForm(f => ({ ...f, bio: e.target.value }))} />) : (<TextField fullWidth label="Skills (CSV)" value={aboutForm.skillsText} onChange={(e) => setAboutForm(f => ({ ...f, skillsText: e.target.value }))} />)}</DialogContent>
         <DialogActions><Button onClick={() => setAboutOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAbout}>Save</Button></DialogActions>
       </Dialog>
 
-      {/* Contact */}
+      {/* CONTACT DIALOG (Cleaned up - No Names/Request Button) */}
       <Dialog open={contactOpen} onClose={() => setContactOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Edit Contact</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Box sx={{ display: "flex", gap: 2 }}><TextField label="First" fullWidth value={contactForm.first_name || ""} onChange={(e) => setContactForm({ ...contactForm, first_name: e.target.value })} /><TextField label="Last" fullWidth value={contactForm.last_name || ""} onChange={(e) => setContactForm({ ...contactForm, last_name: e.target.value })} /></Box>
             <TextField label="Email" fullWidth value={contactForm.email || ""} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} />
             <Autocomplete options={CITY_OPTIONS} value={contactForm.city || null} onChange={(_, v) => setContactForm({ ...contactForm, city: v || "" })} renderInput={(p) => <TextField {...p} label="City" />} />
             <Autocomplete options={COUNTRY_OPTIONS} value={getSelectedCountry({ location: contactForm.location })} getOptionLabel={(o) => o?.label || ""} onChange={(_, v) => setContactForm({ ...contactForm, location: v?.label || "" })} renderInput={(p) => <TextField {...p} label="Country" />} />
@@ -949,7 +955,6 @@ function AboutTab({ profile, onUpdate }) {
         <DialogActions><Button onClick={() => setContactOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveContact}>Save</Button></DialogActions>
       </Dialog>
 
-      {/* Education */}
       <Dialog open={eduOpen} onClose={() => setEduOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{editEduId ? "Edit" : "Add"} Education</DialogTitle>
         <DialogContent>
@@ -962,64 +967,10 @@ function AboutTab({ profile, onUpdate }) {
         </DialogContent>
         <DialogActions><Button onClick={() => setEduOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveEducation}>Save</Button></DialogActions>
       </Dialog>
-
-      {/* Experience Dialog - UPDATED with Company Search & Company Details */}
-      <Dialog open={expOpen} onClose={() => setExpOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editExpId ? "Edit" : "Add"} Experience</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-
-            {/* New Company Search */}
-            <CompanyAutocomplete
-              value={expForm.org ? { name: expForm.org } : null} // Simple value mapping
-              onChange={(newVal) => {
-                const name = typeof newVal === 'string' ? newVal : (newVal?.name || "");
-                setExpForm(prev => ({ ...prev, org: name }));
-              }}
-            />
-
-            <TextField label="Position" value={expForm.position || ""} onChange={(e) => setExpForm({ ...expForm, position: e.target.value })} />
-
-            {/* Moved Company Details Here */}
-            <TextField select label="Sector" fullWidth value={expForm.sector || ""} onChange={(e) => setExpForm({ ...expForm, sector: e.target.value })} >
-              {SECTOR_OPTIONS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
-            </TextField>
-
-            <TextField select label="Industry" fullWidth value={expForm.industry || ""} onChange={(e) => setExpForm({ ...expForm, industry: e.target.value })}>
-              {INDUSTRY_OPTIONS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
-            </TextField>
-
-            <TextField select label="Number of Employees" fullWidth value={expForm.number_of_employees || ""} onChange={(e) => setExpForm({ ...expForm, number_of_employees: e.target.value })}>
-              {EMPLOYEE_COUNT_OPTIONS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
-            </TextField>
-
-            <Autocomplete options={CITY_OPTIONS} value={expForm.city || null} onChange={(_, v) => setExpForm({ ...expForm, city: v || "" })} renderInput={(p) => <TextField {...p} label="City" />} />
-            <Autocomplete options={COUNTRY_OPTIONS} value={getSelectedCountry({ location: expForm.location })} getOptionLabel={(o) => o?.label || ""} onChange={(_, v) => setExpForm({ ...expForm, location: v?.label || "" })} renderInput={(p) => <TextField {...p} label="Country" />} />
-
-            <Box sx={{ display: "flex", gap: 2 }}>
-              <TextField label="Start" type="date" fullWidth InputLabelProps={{ shrink: true }} value={expForm.start || ""} onChange={(e) => setExpForm({ ...expForm, start: e.target.value })} />
-              <TextField label="End" type="date" fullWidth InputLabelProps={{ shrink: true }} disabled={expForm.current} value={expForm.end || ""} onChange={(e) => setExpForm({ ...expForm, end: e.target.value })} />
-            </Box>
-
-            <FormControlLabel control={<Checkbox checked={!!expForm.current} onChange={(e) => setExpForm({ ...expForm, current: e.target.checked })} />} label="Currently work here" />
-
-            {expForm.current && <FormControlLabel control={<Checkbox checked={syncProfileLocation} onChange={(e) => setSyncProfileLocation(e.target.checked)} />} label="Update profile location to match" />}
-
-            <TextField multiline minRows={3} label="Description" value={expForm.description || ""} onChange={(e) => setExpForm({ ...expForm, description: e.target.value })} />
-          </Stack>
-        </DialogContent>
-        <DialogActions><Button onClick={() => setExpOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveExperience}>Save</Button></DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialogs */}
-      <Dialog open={!!eduDeleteId} onClose={() => setEduDeleteId(null)}>
-        <DialogTitle>Delete Education?</DialogTitle>
-        <DialogActions><Button onClick={() => setEduDeleteId(null)}>Cancel</Button><Button color="error" onClick={async () => { await deleteEducationApi(eduDeleteId); await reloadExtras(); setEduDeleteId(null); }}>Delete</Button></DialogActions>
-      </Dialog>
-      <Dialog open={!!expDeleteId} onClose={() => setExpDeleteId(null)}>
-        <DialogTitle>Delete Experience?</DialogTitle>
-        <DialogActions><Button onClick={() => setExpDeleteId(null)}>Cancel</Button><Button color="error" onClick={async () => { await deleteExperienceApi(expDeleteId); await reloadExtras(); setExpDeleteId(null); }}>Delete</Button></DialogActions>
-      </Dialog>
+      
+      {/* Delete Dialogs */}
+      <Dialog open={!!eduDeleteId} onClose={() => setEduDeleteId(null)}><DialogTitle>Delete Education?</DialogTitle><DialogActions><Button onClick={() => setEduDeleteId(null)}>Cancel</Button><Button color="error" onClick={async () => { await deleteEducationApi(eduDeleteId); await reloadExtras(); setEduDeleteId(null); }}>Delete</Button></DialogActions></Dialog>
+      <Dialog open={!!expDeleteId} onClose={() => setExpDeleteId(null)}><DialogTitle>Delete Experience?</DialogTitle><DialogActions><Button onClick={() => setExpDeleteId(null)}>Cancel</Button><Button color="error" onClick={async () => { await deleteExperienceApi(expDeleteId); await reloadExtras(); setExpDeleteId(null); }}>Delete</Button></DialogActions></Dialog>
     </Box>
   );
 }

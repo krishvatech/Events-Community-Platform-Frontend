@@ -23,6 +23,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
 
 const TEAL = "#14b8b1";
 const TEXT = "#334155";
@@ -38,6 +39,7 @@ const defaultItems = [
   { key: "groups", label: "Groups", Icon: GroupsRoundedIcon },
   { key: "messages", label: "Messages", Icon: ChatBubbleOutlineRoundedIcon },
   { key: "carts", label: "Cart", Icon: ShoppingCartRoundedIcon },
+  { key: "name-requests", label: "Name Requests", Icon: BadgeOutlinedIcon },
   { key: "staff", label: "Staff", Icon: AdminPanelSettingsRoundedIcon },
   { key: "notifications", label: "Notifications", Icon: NotificationsNoneRoundedIcon },
   { key: "settings", label: "Settings", Icon: SettingsRoundedIcon },

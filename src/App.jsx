@@ -38,6 +38,7 @@ import AdminRecordingsPage from "./pages/AdminRecordingsPage.jsx";
 import AdminMessagesPage from "./pages/AdminMessagesPage.jsx";
 import EventManagePage from "./pages/EventManagePage.jsx";
 import AdminCarts from "./pages/AdminCarts.jsx";
+import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
 
 import { useParams } from "react-router-dom";
 
@@ -88,6 +89,7 @@ const AppShell = () => {
           <Route path="messages" element={<AdminMessagesPage />} />
           <Route path="notifications" element={<AdminNotificationsPage />} />
           <Route path="settings" element={<AdminSettings />} />
+          <Route path="name-requests" element={<AdminNameRequestsPage />} />
           <Route path="/admin/events/:eventId" element={<EventManagePage />} />
           {/* keep your recordings behavior same as before */}
           <Route path="recordings" element={<AdminRecordingsPage />} />

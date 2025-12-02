@@ -553,7 +553,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
                     <div style={{ fontWeight: 700 }}>{c.label}</div>
                     <div>
                       {c.total} people
-                      {c.friends ? ` • ${c.friends} friends` : ""}
+                      {c.friends ? ` • ${c.friends} My Contacts` : ""}
                     </div>
                     <div style={{ marginTop: 4, opacity: 0.9 }}>
                       {c.users.slice(0, 6).join(", ")}
@@ -586,7 +586,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
                   <Box sx={{ fontSize: 12 }}>
                     <div style={{ fontWeight: 600 }}>{m.userName}</div>
                     <div style={{ opacity: 0.85 }}>
-                      {m.isFriend ? "Friend" : "Member"}
+                      {m.isFriend ? "My Contact" : "Member"}
                     </div>
                   </Box>
                 </LeafletTooltip>
@@ -1366,7 +1366,7 @@ export default function MembersPage() {
                       <Typography>
                         {tabValue === 1 &&
                           Object.keys(friendStatusByUser).length === 0
-                          ? "No friends found."
+                          ? "No My Contacts found."
                           : "No members match your search."}
                       </Typography>
                     </Paper>
@@ -1433,7 +1433,7 @@ export default function MembersPage() {
                 spacing={1}
               >
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Where {tabValue === 1 ? "friends" : "members"} are from
+                  Where {tabValue === 1 ? "My Contacts" : "members"} are from
                 </Typography>
                 <Stack direction="row" alignItems="center" spacing={2}>
                   <FormControlLabel
@@ -1542,7 +1542,7 @@ export default function MembersPage() {
               spacing={1}
             >
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Where {tabValue === 1 ? "friends" : "members"} are from
+                Where {tabValue === 1 ? "My Contacts" : "members"} are from
               </Typography>
               <Stack direction="row" alignItems="center" spacing={2}>
                 <FormControlLabel
@@ -1587,7 +1587,7 @@ export default function MembersPage() {
                       border: "1px solid #fff",
                     }}
                   />
-                  <Typography variant="caption">Friends</Typography>
+                  <Typography variant="caption">My Contact</Typography>
                 </Stack>
               </Stack>
             </Stack>
