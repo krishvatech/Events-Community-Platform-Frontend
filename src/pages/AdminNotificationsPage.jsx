@@ -62,7 +62,8 @@ const ENDPOINTS = {
   pendingForGroup: (groupId) => `${API_ROOT}/groups/${groupId}/member-requests/`,
   approveJoin: (groupId, userId) => `${API_ROOT}/groups/${groupId}/member-requests/approve/${userId}/`,
   rejectJoin: (groupId, userId) => `${API_ROOT}/groups/${groupId}/member-requests/reject/${userId}/`,
-  nameRequestsList: () => `${API_ROOT}/auth/admin/name-requests/?status=pending`,
+  // CHANGED: Removed "?status=pending" to fetch ALL name requests (history)
+  nameRequestsList: () => `${API_ROOT}/auth/admin/name-requests/`,
   nameRequestDecide: (id) => `${API_ROOT}/auth/admin/name-requests/${id}/decide/`,
 };
 
@@ -77,7 +78,7 @@ async function loadNameChangeRequests() {
       id: req.id,
       _source: "name_request",
       type: "name_change",
-      status: req.status,
+      status: req.status, // 'pending', 'approved', or 'rejected'
       created_at: req.created_at,
       actor_name: req.username || req.user?.username || "User",
       actor_avatar: "", 
@@ -87,7 +88,8 @@ async function loadNameChangeRequests() {
         new_name: `${req.new_first_name} ${req.new_last_name}`,
         reason: req.reason
       },
-      read_at: null, // Pending requests count as unread
+      // CHANGED: If status is NOT pending, treat it as "read" (so it has white background)
+      read_at: req.status === 'pending' ? null : (req.updated_at || new Date().toISOString()),
     }));
     return { items, count: items.length };
   } catch (e) {
@@ -181,6 +183,8 @@ function groupHref(n) { return n?.group?.id ? `/community/groups/${n.group.id}` 
 
 // --- Sub-Component: Notification Row ---
 function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMarkRead }) {
+  // Logic: It's "read" if it has a read_at date AND it is not pending. 
+  // Pending items are always highlighted (teal background).
   const isRead = !!n.read_at && n.status !== 'pending';
   const isMobile = useMediaQuery("(max-width:600px)");
 
@@ -204,7 +208,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
         width: "100%",
         border: `1px solid ${BORDER}`,
         borderRadius: 2,
-        bgcolor: isRead ? "white" : "#f6fffe", // Light teal background for unread
+        bgcolor: isRead ? "white" : "#f6fffe", // Light teal background for unread/pending
         transition: 'all 0.2s',
         '&:hover': { borderColor: '#cbd5e1' }
       }}
@@ -256,7 +260,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
             </Typography>
           )}
 
-          {/* ACTION BUTTONS (Inside Content Area, matching Community UI) */}
+          {/* ACTION BUTTONS (Only if pending) */}
           {n.status === 'pending' && (n.type === "name_change" || n.type === "join_request") && (
             <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
               <Button
@@ -481,9 +485,14 @@ export default function AdminNotificationsPage() {
         body: JSON.stringify({ status: status }),
       });
       if (!res.ok) throw new Error("Failed");
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: status } : x)));
+      
+      // Update local state to reflect decision immediately
+      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: status, read_at: new Date().toISOString() } : x)));
+      
       setToast({ open: true, type: "success", msg: `Request ${status}.` });
-      setTimeout(fetchData, 1500); // refresh list to eventually remove processed
+      
+      // Refresh list to sync with server, but now since we fetch ALL, the approved item will stay.
+      setTimeout(fetchData, 1500); 
     } catch (e) { setToast({ open: true, type: "error", msg: "Error" }); } finally { setBusyId(null); }
   };
 
