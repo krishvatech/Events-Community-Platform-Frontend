@@ -517,7 +517,7 @@ export default function CommunityProfileCard({
 
         {/* Your friends */}
         <Paper elevation={0} sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-          <SectionHeader title="Your friends" onViewAll={handleOpenFriends} viewAllText="View all" />
+          <SectionHeader title="Your Contacts" onViewAll={handleOpenFriends} viewAllText="View all" />
 
           <Stack spacing={1.25} mt={1}>
             {(friendsPreview || []).map((f) => (

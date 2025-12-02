@@ -80,7 +80,7 @@ const NAV_ITEMS = [
   },
   {
     key: "friends",
-    label: "Friends",
+    label: "Contacts",
     icon: <PeopleAltOutlinedIcon fontSize="small" />,
   },
   {

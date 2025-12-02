@@ -20,7 +20,7 @@ import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import HourglassBottomRoundedIcon from "@mui/icons-material/HourglassBottomRounded";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
-
+import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
 
 const BORDER = "#e2e8f0";
 
@@ -70,10 +70,117 @@ const KIND_LABEL = {
   system: "System",
   friend_request: "Requests",
   connection_request: "Requests",
+  name_change: "Identity",
 };
 
 function kindChip(kind) {
   return KIND_LABEL[kind] || "Other";
+}
+
+// --- Local Storage Helpers for Identity Requests ---
+function getReadIdentityIds() {
+  try {
+    return JSON.parse(localStorage.getItem("read_identity_requests") || "[]");
+  } catch { return []; }
+}
+
+function markIdentityIdsAsRead(ids) {
+  const current = getReadIdentityIds();
+  const newSet = new Set([...current, ...ids]);
+  localStorage.setItem("read_identity_requests", JSON.stringify([...newSet]));
+}
+
+function markIdentityIdsAsUnread(ids) {
+  const current = getReadIdentityIds();
+  const newIds = current.filter(id => !ids.includes(id));
+  localStorage.setItem("read_identity_requests", JSON.stringify(newIds));
+}
+
+// ---------------------- DATA LOADERS ----------------------
+
+// 1. Standard Notifications
+async function fetchStandardNotifications(url) {
+  const r = await fetch(url, {
+    headers: { ...tokenHeader(), Accept: "application/json" },
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error("Failed");
+  const j = await r.json();
+  const raw = Array.isArray(j) ? j : j?.results || [];
+  
+  return {
+    items: raw.map((n) => ({
+      id: n.id,
+      source: 'api', // mark source
+      kind: n.kind,
+      state: n.state || n.data?.status || "",
+      title: n.title || "",
+      description: n.description || "",
+      created_at: n.created_at,
+      is_read: !!n.is_read,
+      actor: {
+        id: n.actor?.id,
+        name: n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
+        avatar: n.actor?.avatar_url || "",
+      },
+      context: {
+        friend_request_id: n.data?.friend_request_id,
+        profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
+        eventId: n.data?.event_id || n.data?.eventId,
+        postId: n.data?.post_id || n.data?.postId,
+        groupSlug: n.data?.group_slug,
+      },
+    })),
+    next: j?.next || null
+  };
+}
+
+// 2. Identity Requests (Direct Fetch)
+async function loadMyIdentityRequests() {
+  try {
+    const r = await fetch(`${API_BASE}/users/me/name-change-requests/`, {
+      headers: { ...tokenHeader(), Accept: "application/json" },
+    });
+    if (!r.ok) return [];
+    
+    const data = await r.json();
+    const rows = Array.isArray(data) ? data : data.results || [];
+    const readIds = getReadIdentityIds();
+
+    return rows.map(req => {
+      const fullId = `identity-${req.id}`;
+      // Logic: Pending -> Read (white). Processed -> Unread (highlighted) until marked read.
+      const isFinished = req.status === 'approved' || req.status === 'rejected';
+      const isRead = isFinished ? readIds.includes(fullId) : true; 
+      
+      const dateToUse = (isFinished && req.updated_at) ? req.updated_at : req.created_at;
+
+      return {
+        id: fullId,
+        source: 'identity',
+        kind: 'name_change',
+        state: req.status, 
+        title: req.status === 'pending' 
+          ? `Requesting name change to ${req.new_first_name} ${req.new_last_name}` 
+          : `Name change request ${req.status}`,
+        description: `Status: ${req.status.charAt(0).toUpperCase() + req.status.slice(1)}`,
+        created_at: dateToUse,
+        is_read: isRead,
+        actor: {
+          name: "System",
+          avatar: "",
+        },
+        context: {
+          old_name: `${req.old_first_name} ${req.old_last_name}`,
+          new_name: `${req.new_first_name} ${req.new_last_name}`,
+          reason: req.reason
+        }
+      };
+    });
+  } catch (e) {
+    console.warn("Could not load identity requests", e);
+    return [];
+  }
 }
 
 // ---------------------- SKELETON COMPONENT ----------------------
@@ -107,18 +214,62 @@ function NotificationSkeleton() {
 function NotificationRow({
   item,
   onOpen,
+  onAvatarClick, // New prop for avatar clicks
   onToggleRead,
   onAcceptRequest,
   onDeclineRequest,
   onFollowBack,
 }) {
-  const navigate = useNavigate();
   const unread = !item.is_read;
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-    const showDescription =
+  const showDescription =
     item.description &&
     !/^Post #\d+$/i.test(String(item.description).trim());
+
+  // --- Dynamic Content for Identity Requests ---
+  const renderContent = () => {
+    if (item.kind === 'name_change') {
+      const state = item.state || 'pending';
+      const newName = item.context?.new_name || "New Name";
+      if (state === 'approved') {
+        return (
+          <>
+            <Typography variant="body2">
+              Your name change to <b>{newName}</b> has been <span style={{color: '#1a7f37', fontWeight:600}}>approved</span>.
+            </Typography>
+          </>
+        );
+      } else if (state === 'rejected') {
+        return (
+          <>
+            <Typography variant="body2">
+              Your name change to <b>{newName}</b> was <span style={{color: '#b42318', fontWeight:600}}>rejected</span>.
+            </Typography>
+          </>
+        );
+      } else {
+        return (
+          <Typography variant="body2">
+            You requested to change your name to <b>{newName}</b>.
+          </Typography>
+        );
+      }
+    }
+
+    // Default Render
+    return (
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          {item.actor?.name || "System"}
+        </Typography>
+        <Typography variant="body2">{item.title}</Typography>
+        {item.context?.group && (
+          <Chip size="small" label={item.context.group} variant="outlined" />
+        )}
+      </Stack>
+    );
+  };
 
   const ActionsByKind = () => {
     if (item.kind === "friend_request" || item.kind === "connection_request") {
@@ -186,31 +337,27 @@ function NotificationRow({
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <ListItemAvatar sx={{ minWidth: 48 }}>
-          <Avatar
-            src={item.actor?.avatar}
-            alt={item.actor?.name}
-            onClick={() => {
-              const uid = item?.context?.profile_user_id || item?.actor?.id;
-              if (uid) navigate(`/community/rich-profile/${uid}`);
-            }}
-            sx={{ cursor: (item?.context?.profile_user_id || item?.actor?.id) ? "pointer" : "default" }}
-          >
-            {(item.actor?.name || "S").slice(0, 1).toUpperCase()}
-          </Avatar>
+          {item.kind === 'name_change' ? (
+             <Avatar sx={{ bgcolor: '#394d79', color: 'white' }}>
+               <BadgeRoundedIcon fontSize="small" />
+             </Avatar>
+          ) : (
+            <Avatar
+              src={item.actor?.avatar}
+              alt={item.actor?.name}
+              onClick={() => onAvatarClick?.(item)} // Use parent handler
+              sx={{ cursor: (item?.context?.profile_user_id || item?.actor?.id) ? "pointer" : "default" }}
+            >
+              {(item.actor?.name || "S").slice(0, 1).toUpperCase()}
+            </Avatar>
+          )}
         </ListItemAvatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {item.actor?.name || "System"}
-            </Typography>
-            <Typography variant="body2">{item.title}</Typography>
-            {item.context?.group && (
-              <Chip size="small" label={item.context.group} variant="outlined" />
-            )}
-          </Stack>
+          {renderContent()}
 
-          {showDescription ? (
+          {/* Show description only if it's not a generic auto-generated one */}
+          {showDescription && item.kind !== 'name_change' && (
             <Typography
               variant="caption"
               color="text.secondary"
@@ -218,7 +365,7 @@ function NotificationRow({
             >
               {item.description}
             </Typography>
-          ) : null}
+          )}
 
           <Stack
             direction={isMobile ? "column" : "row"}
@@ -249,9 +396,11 @@ function NotificationRow({
               )}
             </IconButton>
 
-            <IconButton size="small" title="Open" onClick={() => onOpen?.(item)}>
-              <OpenInNewOutlinedIcon fontSize="small" />
-            </IconButton>
+            {(item.context?.profile_user_id || item.context?.eventId || item.context?.postId || item.context?.groupSlug) && (
+              <IconButton size="small" title="Open" onClick={() => onOpen?.(item)}>
+                <OpenInNewOutlinedIcon fontSize="small" />
+              </IconButton>
+            )}
           </Stack>
 
           {(() => {
@@ -271,10 +420,10 @@ function NotificationRow({
             };
 
             if (s === "accepted" || s === "approved") {
-              return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Accepted" sx={{ ...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 } }} />;
+              return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Approved" sx={{ ...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 } }} />;
             }
             if (s === "declined" || s === "rejected") {
-              return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Declined" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
+              return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Rejected" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
             }
             if (s === "pending" || s === "requested" || s === "waiting" || s === "sent") {
               return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label={s === "sent" ? "Sent" : "Pending"} sx={{ ...common.sx, bgcolor: "#eef2f6", borderColor: "#eef2f6", color: "#374151", "& .MuiChip-icon": { color: "#374151", mr: 0.5 } }} />;
@@ -289,7 +438,7 @@ function NotificationRow({
 
 /* ------------------- main page component ------------------- */
 export default function NotificationsPage({
-  // optional external callbacks if you wire up your API later:
+  // optional external callbacks
   onOpen,
   onFollowBackUser,
 }) {
@@ -297,20 +446,15 @@ export default function NotificationsPage({
   const [items, setItems] = React.useState([]);
   const [showOnlyUnread, setShowOnlyUnread] = React.useState(false);
   const [kind, setKind] = React.useState("All");
-  React.useEffect(() => {
-    setVisibleCount(8);
-  }, [showOnlyUnread, kind]);
-
+  
   // --- Pagination State ---
   const [loading, setLoading] = React.useState(true);
   const [hasMore, setHasMore] = React.useState(true);
-  // Initial URL includes ?page_size=10
-  const [nextUrl, setNextUrl] = React.useState(`${API_BASE}/notifications/?page_size=8`);
+  const [nextUrl, setNextUrl] = React.useState(`${API_BASE}/notifications/?page_size=10`);
+  
   const observerTarget = React.useRef(null);
-
-  const [visibleCount, setVisibleCount] = React.useState(8);       // how many notifications to show
-  const [isLoadingMoreLocal, setIsLoadingMoreLocal] = React.useState(false); // local "load next 8"
-
+  const [visibleCount, setVisibleCount] = React.useState(10);
+  const [isLoadingMoreLocal, setIsLoadingMoreLocal] = React.useState(false);
   const [showScrollTop, setShowScrollTop] = React.useState(false);
 
   React.useEffect(() => {
@@ -318,7 +462,6 @@ export default function NotificationsPage({
       if (typeof window === "undefined") return;
       setShowScrollTop(window.scrollY > 300);
     };
-
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -328,8 +471,12 @@ export default function NotificationsPage({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Derived state (filters & counts)
+  // Derived state
   const unreadCount = React.useMemo(() => items.filter((i) => !i.is_read).length, [items]);
+
+  React.useEffect(() => {
+    emitUnreadCount(unreadCount);
+  }, [unreadCount]);
 
   const filtered = React.useMemo(() => {
     let arr = [...items];
@@ -344,11 +491,12 @@ export default function NotificationsPage({
         reactions: ["reaction"],
         events: ["event"],
         system: ["system"],
+        identity: ["name_change"],
       };
       const keys = norm[k] || [k.slice(0, -1)];
       arr = arr.filter((i) => keys.includes(i.kind));
     }
-    // Re-sort to ensure correct order after appending
+    // Re-sort by date (descending)
     arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     return arr;
   }, [items, showOnlyUnread, kind]);
@@ -358,77 +506,31 @@ export default function NotificationsPage({
     return groupByDay(sliced);
   }, [filtered, visibleCount]);
 
-  // --- Load Function ---
+  // --- Main Load Function ---
   const loadNotifications = React.useCallback(async (url, isAppend = false) => {
-    if (!url) return;
     setLoading(true);
-
     try {
-      const r = await fetch(url, {
-        headers: { ...tokenHeader(), Accept: "application/json" },
-        credentials: "include",
-      });
-      if (!r.ok) throw new Error("Failed");
-
-      const j = await r.json();
-      const raw = Array.isArray(j) ? j : j?.results || [];
-      const next = j?.next || null;
-
-      const mapped = raw.map((n) => ({
-        id: n.id,
-        kind: n.kind,
-        state: n.state || "",
-        title: n.title || "",
-        description: n.description || "",
-        created_at: n.created_at,
-        is_read: !!n.is_read,
-        actor: {
-          id: n.actor?.id,
-          name: n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
-          avatar: n.actor?.avatar_url || "",
-        },
-        context: {
-          friend_request_id: n.data?.friend_request_id,
-          profile_user_id: n.data?.from_user_id || n.data?.to_user_id,
-          eventId: n.data?.event_id || n.data?.eventId,
-          postId: n.data?.post_id || n.data?.postId,
-          groupSlug: n.data?.group_slug,
-        },
-      }));
-
-      // Update state
-      setItems(prev => {
-        const combined = isAppend ? [...prev, ...mapped] : mapped;
-        // Deduplicate by ID
-        const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-        return unique;
-      });
-
-      setNextUrl(next);
-      setHasMore(!!next);
-
-      // Optimistically mark fetched items as read
-      const idsToMark = mapped.filter((i) => !i.is_read).map((i) => i.id);
-      if (idsToMark.length) {
-        // We update local state to read immediately
-        setItems(curr => curr.map(i => idsToMark.includes(i.id) ? { ...i, is_read: true } : i));
-
-        // Fire & forget the backend update
-        try {
-          await fetch(`${API_BASE}/notifications/mark-read/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...tokenHeader(),
-              Accept: "application/json",
-            },
-            credentials: "include",
-            body: JSON.stringify({ ids: idsToMark }),
-          });
-        } catch { }
+      const promises = [fetchStandardNotifications(url || nextUrl)];
+      
+      const fetchingIdentity = !isAppend && (kind === 'All' || kind === 'Identity');
+      if (fetchingIdentity) {
+        promises.push(loadMyIdentityRequests());
       }
 
-      emitUnreadCount(0); // Simple reset for now
+      const [apiData, identityData] = await Promise.all(promises);
+      const newItems = [...apiData.items, ...(identityData || [])];
+
+      setItems(prev => {
+        const combined = isAppend ? [...prev, ...newItems] : newItems;
+        const uniqueMap = new Map();
+        combined.forEach(item => uniqueMap.set(item.id, item));
+        return Array.from(uniqueMap.values());
+      });
+
+      setNextUrl(apiData.next);
+      setHasMore(!!apiData.next);
+
+      // Removed auto-mark-read to keep unread count high until user interaction.
 
     } catch (e) {
       console.error(e);
@@ -436,35 +538,30 @@ export default function NotificationsPage({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [kind, nextUrl]);
 
-  // --- 1. Initial Load ---
+  // --- Initial Effect ---
   React.useEffect(() => {
-    // Load first page (size=10)
-    loadNotifications(`${API_BASE}/notifications/?page_size=8`, false);
+    loadNotifications(`${API_BASE}/notifications/?page_size=10`, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [kind]); 
 
-  // --- 2. Infinite Scroll Observer ---
+  // --- Infinite Scroll ---
   React.useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
         if (!entry.isIntersecting) return;
 
-        // 1) Local: show next 8 if we already have more items in memory
         if (filtered.length > visibleCount && !isLoadingMoreLocal) {
           setIsLoadingMoreLocal(true);
           setTimeout(() => {
-            setVisibleCount((prev) =>
-              Math.min(prev + 8, filtered.length)
-            );
+            setVisibleCount((prev) => Math.min(prev + 10, filtered.length));
             setIsLoadingMoreLocal(false);
-          }, 400); // small delay for skeleton feel
+          }, 400);
           return;
         }
 
-        // 2) Remote: if we've shown everything we have, ask backend for next page
         if (hasMore && !loading && nextUrl) {
           loadNotifications(nextUrl, true);
         }
@@ -473,302 +570,186 @@ export default function NotificationsPage({
     );
 
     if (observerTarget.current) observer.observe(observerTarget.current);
+    return () => { if (observerTarget.current) observer.unobserve(observerTarget.current); };
+  }, [filtered.length, visibleCount, isLoadingMoreLocal, hasMore, loading, nextUrl, loadNotifications]);
 
-    return () => {
-      if (observerTarget.current) observer.unobserve(observerTarget.current);
-    };
-  }, [
-    filtered.length,
-    visibleCount,
-    isLoadingMoreLocal,
-    hasMore,
-    loading,
-    nextUrl,
-    loadNotifications,
-  ]);
-
-
-
-  // --- Helper API Calls ---
-  const apiMarkRead = async (ids = []) => {
-    if (!ids.length) return;
-    try {
-      await fetch(`${API_BASE}/notifications/mark-read/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...tokenHeader(), Accept: "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ ids }),
-      });
-    } catch { }
-  };
-
+  // --- Handlers ---
   const handleToggleRead = async (id, nowRead) => {
-    setItems((curr) => {
-      const next = curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i));
-      emitUnreadCount(next.filter((x) => !x.is_read).length);
-      return next;
-    });
-    if (nowRead) await apiMarkRead([id]);
-  };
-
-  const handleMarkAllRead = async () => {
-    const ids = items.filter((i) => !i.is_read).map((i) => i.id);
-    if (!ids.length) return;
-    setItems((curr) => {
-      const next = curr.map((i) => ({ ...i, is_read: true }));
-      emitUnreadCount(0);
-      return next;
-    });
-    await apiMarkRead(ids);
-  };
-
-  const handleOpen = (n) => {
-    if (onOpen) return onOpen(n);
-    const ctx = n.context || {};
-
-    if (n.kind === "friend_request" || n.kind === "connection_request") {
-      if (ctx.profile_user_id) return navigate(`/community/rich-profile/${ctx.profile_user_id}`);
+    const item = items.find(i => i.id === id);
+    
+    // Identity Items Handler
+    if (item && item.source === 'identity') {
+      if (nowRead) markIdentityIdsAsRead([id]);
+      else markIdentityIdsAsUnread([id]);
+      setItems(curr => curr.map(i => i.id === id ? { ...i, is_read: nowRead } : i));
       return;
     }
 
-    if (ctx.eventId) return navigate(`/events/${ctx.eventId}`);
-    if (ctx.postId) return navigate(`/feed/post/${ctx.postId}`);
-    if (ctx.groupSlug) return navigate(`/groups/${ctx.groupSlug}`);
-    return;
+    // Standard Items Handler
+    setItems((curr) => {
+      const next = curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i));
+      return next;
+    });
+    if (nowRead) {
+      try {
+        await fetch(`${API_BASE}/notifications/mark-read/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...tokenHeader() },
+          body: JSON.stringify({ ids: [id] }),
+        });
+      } catch { }
+    }
   };
 
-  const updateItem = (id, patch) =>
-    setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  const handleMarkAllRead = async () => {
+    // 1. Identity Items
+    const identityIds = items.filter(i => !i.is_read && i.source === 'identity').map(i => i.id);
+    if (identityIds.length) markIdentityIdsAsRead(identityIds);
+
+    // 2. API Items
+    const apiIds = items.filter((i) => !i.is_read && i.source === 'api').map((i) => i.id);
+    
+    // Update State
+    setItems((curr) => curr.map((i) => ({ ...i, is_read: true })));
+    
+    // Send API req
+    if (apiIds.length) {
+      try {
+        await fetch(`${API_BASE}/notifications/mark-read/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...tokenHeader() },
+          body: JSON.stringify({ ids: apiIds }),
+        });
+      } catch { }
+    }
+  };
+
+  // Helper to mark read and then navigate
+  const markAndNavigate = (item, destination) => {
+    // Mark as read immediately if it's unread
+    if (!item.is_read) {
+      handleToggleRead(item.id, true);
+    }
+    // Navigate
+    if (destination) navigate(destination);
+  };
+
+  const handleOpen = (n) => {
+    if (onOpen) return onOpen(n); // Custom override
+    const ctx = n.context || {};
+    
+    let dest = null;
+    if (n.kind === "friend_request" || n.kind === "connection_request") {
+      if (ctx.profile_user_id) dest = `/community/rich-profile/${ctx.profile_user_id}`;
+    } else if (ctx.eventId) {
+      dest = `/events/${ctx.eventId}`;
+    } else if (ctx.postId) {
+      dest = `/feed/post/${ctx.postId}`;
+    } else if (ctx.groupSlug) {
+      dest = `/groups/${ctx.groupSlug}`;
+    }
+
+    // Only if there is a destination or logic, we mark read and go
+    if (dest) markAndNavigate(n, dest);
+  };
+
+  const handleAvatarClick = (item) => {
+    const uid = item?.context?.profile_user_id || item?.actor?.id;
+    if (uid) {
+      markAndNavigate(item, `/community/rich-profile/${uid}`);
+    }
+  };
+
+  const updateItem = (id, patch) => setItems((curr) => curr.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
   const handleAcceptRequest = async (id) => {
     const n = items.find((x) => x.id === id);
-    const frId = n?.context?.friend_request_id;
-    if (!frId) return;
+    if (!n?.context?.friend_request_id) return;
     updateItem(id, { _busy: true });
     try {
-      const r = await fetch(`${API_BASE}/friend-requests/${frId}/accept/`, {
-        method: "POST",
-        headers: { ...tokenHeader(), Accept: "application/json" },
-        credentials: "include",
-      });
-      updateItem(id, {
-        _busy: false,
-        is_read: true,
-        state: r.ok ? "accepted" : n.state,
-      });
-    } catch {
-      updateItem(id, { _busy: false });
-    }
+      const r = await fetch(`${API_BASE}/friend-requests/${n.context.friend_request_id}/accept/`, { method: "POST", headers: { ...tokenHeader(), Accept: "application/json" } });
+      updateItem(id, { _busy: false, is_read: true, state: r.ok ? "accepted" : n.state });
+    } catch { updateItem(id, { _busy: false }); }
   };
 
   const handleDeclineRequest = async (id) => {
     const n = items.find((x) => x.id === id);
-    const frId = n?.context?.friend_request_id;
-    if (!frId) return;
+    if (!n?.context?.friend_request_id) return;
     updateItem(id, { _busy: true });
     try {
-      const r = await fetch(`${API_BASE}/friend-requests/${frId}/decline/`, {
-        method: "POST",
-        headers: { ...tokenHeader(), Accept: "application/json" },
-        credentials: "include",
-      });
-      updateItem(id, {
-        _busy: false,
-        is_read: true,
-        state: r.ok ? "declined" : n.state,
-      });
-    } catch {
-      updateItem(id, { _busy: false });
-    }
+      const r = await fetch(`${API_BASE}/friend-requests/${n.context.friend_request_id}/decline/`, { method: "POST", headers: { ...tokenHeader(), Accept: "application/json" } });
+      updateItem(id, { _busy: false, is_read: true, state: r.ok ? "declined" : n.state });
+    } catch { updateItem(id, { _busy: false }); }
   };
 
   const handleFollowBack = async (id) => {
     updateItem(id, { _busy: true });
-    await sleep(350);
-    updateItem(id, { following_back: true, _busy: false, is_read: true });
-    onFollowBackUser?.(id);
+    setTimeout(() => { updateItem(id, { following_back: true, _busy: false, is_read: true }); onFollowBackUser?.(id); }, 350);
   };
 
   return (
     <Grid container spacing={2}>
       <Grid item xs={12} sm={12} md={9} sx={{ width: '100%' }}>
         {/* Header */}
-        <Paper
-          sx={{
-            p: 2,
-            border: `1px solid ${BORDER}`,
-            borderRadius: 3,
-            mb: 2,
-            width: "100%",
-            boxSizing: "border-box",
-          }}
-        >
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-              alignItems: "center",
-              columnGap: 1,
-              rowGap: 1,
-            }}
-          >
+        <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 2 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, alignItems: "center", gap: 1 }}>
             <Stack direction="row" spacing={1.25} alignItems="center">
-              <Badge badgeContent={unreadCount} color="primary">
-                <NotificationsNoneOutlinedIcon />
-              </Badge>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Notifications
-              </Typography>
+              <Badge badgeContent={unreadCount} color="primary"><NotificationsNoneOutlinedIcon /></Badge>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Notifications</Typography>
               <Chip size="small" label={`${unreadCount} unread`} />
             </Stack>
-
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={1}
-              alignItems={{ xs: "flex-start", sm: "center" }}
-              justifyContent={{ xs: "flex-start", sm: "flex-end" }}
-              sx={{ width: "100%" }}
-            >
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={showOnlyUnread}
-                    onChange={(e) => setShowOnlyUnread(e.target.checked)}
-                    size="small"
-                  />
-                }
-                label="Unread only"
-                sx={{
-                  m: 0,
-                  "& .MuiFormControlLabel-label": {
-                    fontSize: { xs: 12, sm: 14 },
-                  },
-                }}
-              />
-
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1}
-                sx={{ width: { xs: "100%", sm: "auto" } }}
-              >
-                <Select
-                  size="small"
-                  value={kind}
-                  onChange={(e) => setKind(e.target.value)}
-                  sx={{
-                    minWidth: { xs: "100%", sm: 140 },
-                  }}
-                >
-                  {[
-                    "All",
-                    "Requests",
-                    "Follows",
-                    "Mentions",
-                    "Comments",
-                    "Reactions",
-                    "Events",
-                    "System",
-                  ].map((k) => (
-                    <MenuItem key={k} value={k}>
-                      {k}
-                    </MenuItem>
-                  ))}
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent={{ xs: "flex-start", sm: "flex-end" }}>
+              <FormControlLabel control={<Switch checked={showOnlyUnread} onChange={(e) => setShowOnlyUnread(e.target.checked)} size="small" />} label="Unread only" sx={{ m: 0 }} />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
+                <Select size="small" value={kind} onChange={(e) => setKind(e.target.value)} sx={{ minWidth: 140 }}>
+                  {["All", "Requests", "Identity", "Follows", "Mentions", "Comments", "Reactions", "Events", "System"].map((k) => (<MenuItem key={k} value={k}>{k}</MenuItem>))}
                 </Select>
-
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<DoneAllIcon />}
-                  onClick={handleMarkAllRead}
-                  sx={{
-                    width: { xs: "100%", sm: "auto" },
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Mark all read
-                </Button>
+                <Button size="small" variant="outlined" startIcon={<DoneAllIcon />} onClick={handleMarkAllRead} sx={{ whiteSpace: "nowrap" }}>Mark all read</Button>
               </Stack>
             </Stack>
           </Box>
         </Paper>
 
-        {/* Initial Loading State */}
+        {/* Loading / Empty / Content */}
         {loading && items.length === 0 ? (
-          <>
-            <NotificationSkeleton />
-            <NotificationSkeleton />
-            <NotificationSkeleton />
-          </>
+          <><NotificationSkeleton /><NotificationSkeleton /><NotificationSkeleton /></>
         ) : filtered.length === 0 ? (
-          <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">No notifications found.</Typography>
-          </Paper>
+          <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, textAlign: 'center' }}><Typography variant="body2" color="text.secondary">No notifications found.</Typography></Paper>
         ) : (
           <>
-            {/* Grouped Lists */}
-            {["Today", "Yesterday", "Earlier"].map((section) =>
-              groupedLimited[section]?.length ? (
-                <Box key={section} sx={{ mb: 2 }}>
-                  <Typography variant="overline" sx={{ color: "text.secondary" }}>
-                    {section}
-                  </Typography>
-                  <List sx={{ mt: 1 }}>
-                    {groupedLimited[section].map((it) => (
-                      <ListItem key={it.id} disableGutters sx={{ px: 0 }}>
-                        <NotificationRow
-                          item={it}
-                          onOpen={handleOpen}
-                          onToggleRead={handleToggleRead}
-                          onAcceptRequest={handleAcceptRequest}
-                          onDeclineRequest={handleDeclineRequest}
-                          onFollowBack={handleFollowBack}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
-              ) : null
-            )}
-
-            {/* Bottom Loader / Scroll Trigger */}
-            {(hasMore || filtered.length > visibleCount) && (
-              <Box ref={observerTarget} sx={{ py: 1, textAlign: "center", width: "100%" }}>
-                {(loading || isLoadingMoreLocal) && <NotificationSkeleton />}
+            {["Today", "Yesterday", "Earlier"].map((section) => groupedLimited[section]?.length ? (
+              <Box key={section} sx={{ mb: 2 }}>
+                <Typography variant="overline" sx={{ color: "text.secondary" }}>{section}</Typography>
+                <List sx={{ mt: 1 }}>
+                  {groupedLimited[section].map((it) => (
+                    <ListItem key={it.id} disableGutters sx={{ px: 0 }}>
+                      <NotificationRow 
+                        item={it} 
+                        onOpen={handleOpen}
+                        onAvatarClick={handleAvatarClick} // Pass the handler
+                        onToggleRead={handleToggleRead} 
+                        onAcceptRequest={handleAcceptRequest} 
+                        onDeclineRequest={handleDeclineRequest} 
+                        onFollowBack={handleFollowBack} 
+                      />
+                    </ListItem>
+                  ))}
+                </List>
               </Box>
+            ) : null)}
+            {(hasMore || filtered.length > visibleCount) && (
+              <Box ref={observerTarget} sx={{ py: 1, textAlign: "center" }}>{(loading || isLoadingMoreLocal) && <NotificationSkeleton />}</Box>
             )}
           </>
         )}
       </Grid>
       {showScrollTop && (
-        <Box
-          sx={{
-            position: "fixed",
-            bottom: { xs: 72, md: 32 },
-            right: { xs: 16, md: 32 },
-            zIndex: 1300,
-          }}
-        >
-          <IconButton
-            onClick={handleScrollTop}
-            size="large"
-            sx={{
-              bgcolor: "primary.main",
-              color: "#fff",
-              boxShadow: 4,
-              borderRadius: "999px",
-              "&:hover": {
-                bgcolor: "primary.dark",
-              },
-            }}
-          >
-            <KeyboardArrowUpRoundedIcon />
-          </IconButton>
+        <Box sx={{ position: "fixed", bottom: { xs: 72, md: 32 }, right: { xs: 16, md: 32 }, zIndex: 1300 }}>
+          <IconButton onClick={handleScrollTop} size="large" sx={{ bgcolor: "primary.main", color: "#fff", boxShadow: 4, borderRadius: "999px", "&:hover": { bgcolor: "primary.dark" } }}><KeyboardArrowUpRoundedIcon /></IconButton>
         </Box>
       )}
     </Grid>
   );
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
