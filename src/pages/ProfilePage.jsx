@@ -21,6 +21,7 @@ import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 
 // -------------------- Constants for Dropdowns --------------------
 const SECTOR_OPTIONS = [
@@ -226,7 +227,7 @@ export default function ProfilePage() {
   const [expOpen, setExpOpen] = useState(false);
   const [editEduId, setEditEduId] = useState(null);
   const [editExpId, setEditExpId] = useState(null);
-  
+
   // Lists
   const [eduList, setEduList] = useState([]);
   const [expList, setExpList] = useState([]);
@@ -250,7 +251,7 @@ export default function ProfilePage() {
   const latestExp = useMemo(() => {
     if (!expList || expList.length === 0) return null;
     // Assuming API sorts by -currently_work_here, -end_date, -start_date
-    return expList[0]; 
+    return expList[0];
   }, [expList]);
 
   // Sync Work Form when latest experience changes
@@ -369,7 +370,7 @@ export default function ProfilePage() {
     }
     try {
       setSaving(true);
-      
+
       // We are sending JSON, not FormData, so correct Content-Type is essential.
       const payload = {
         // We only really need to send the fields we want to patch if using PATCH
@@ -537,7 +538,7 @@ export default function ProfilePage() {
   }
 
   async function createEducation() {
-      try {
+    try {
       setEduErrors({ start: "", end: "" });
       const startY = eduForm.start ? parseInt(eduForm.start, 10) : null;
       const endY = eduForm.end ? parseInt(eduForm.end, 10) : null;
@@ -593,9 +594,9 @@ export default function ProfilePage() {
         }),
       });
       if (!r.ok) throw new Error("Failed to save experience");
-      
+
       if (syncProfileLocation && expForm.location) {
-         try {
+        try {
           const locationString = buildLocationFromForm(expForm);
           const payload = {
             first_name: form.first_name, last_name: form.last_name, email: form.email,
@@ -609,7 +610,7 @@ export default function ProfilePage() {
           if (resp.ok) setForm(prev => ({ ...prev, location: locationString }));
         } catch (err) { console.error("Sync failed", err); }
       }
-      
+
       setSnack({ open: true, sev: "success", msg: editExpId ? "Experience updated" : "Experience added" });
       setExpOpen(false); setEditExpId(null); setExpForm(initialExpForm);
       await loadMeExtras();
@@ -748,6 +749,23 @@ export default function ProfilePage() {
                         </List>
                       ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'grey.200', mx: 'auto' }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>This section is empty</Typography><Box><Button variant="contained" color="success" size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
                     </SectionCard>
+                    {/* NEW: Certifications & Licenses */}
+                    <SectionCard sx={{ mt: 2 }} title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                      <List dense disablePadding>
+                        <ListItem disableGutters>
+                          <ListItemText
+                            primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>}
+                            secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>}
+                          />
+                        </ListItem>
+                        <ListItem disableGutters>
+                          <ListItemText
+                            primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>}
+                            secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>}
+                          />
+                        </ListItem>
+                      </List>
+                    </SectionCard>
                   </Grid>
 
                   {/* RIGHT COLUMN */}
@@ -771,27 +789,40 @@ export default function ProfilePage() {
                       {form.location ? <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{form.location}</Typography></Box> : <Box sx={{ height: 100, borderRadius: 1, bgcolor: 'grey.100', border: '1px solid', borderColor: 'divider' }} />}
                     </SectionCard>
 
-                    {/* --- UPDATED: About your work Card --- */}
-                    <SectionCard
-                      sx={{ mt: 2 }}
-                      title="About your work"
-                      action={
-                        <Tooltip title="Edit details">
-                          <IconButton size="small" onClick={() => setWorkOpen(true)}>
-                            <EditRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      }
-                    >
-                      <KV label="Job Title" value={latestExp ? latestExp.position : (form.job_title || '—')} />
-                      <Divider sx={{ my: 0.5 }} />
-                      <KV label="Company" value={latestExp ? (latestExp.community_name || latestExp.org) : (form.company || '—')} />
-                      <Divider sx={{ my: 0.5 }} />
-                      <KV label="Sector" value={latestExp ? (latestExp.sector || '—') : '—'} />
-                      <Divider sx={{ my: 0.5 }} />
-                      <KV label="Industry" value={latestExp ? (latestExp.industry || '—') : '—'} />
-                      <Divider sx={{ my: 0.5 }} />
-                      <KV label="Number of Employees" value={latestExp ? (latestExp.number_of_employees || '—') : '—'} />
+                    {/* NEW: Trainings & Executive Education */}
+                    <SectionCard sx={{ mt: 2 }} title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                      <List dense disablePadding>
+                        <ListItem disableGutters>
+                          <ListItemText
+                            primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>}
+                            secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>}
+                          />
+                        </ListItem>
+                        <ListItem disableGutters>
+                          <ListItemText
+                            primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>}
+                            secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>}
+                          />
+                        </ListItem>
+                      </List>
+                    </SectionCard>
+
+                    {/* NEW: Memberships */}
+                    <SectionCard sx={{ mt: 2 }} title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                      <List dense disablePadding>
+                        <ListItem disableGutters>
+                          <ListItemText
+                            primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>}
+                            secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>}
+                          />
+                        </ListItem>
+                        <ListItem disableGutters>
+                          <ListItemText
+                            primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>}
+                            secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>}
+                          />
+                        </ListItem>
+                      </List>
                     </SectionCard>
                   </Grid>
                 </Grid>

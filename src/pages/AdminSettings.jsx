@@ -50,6 +50,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
 import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 
 import { isOwnerUser } from "../utils/adminRole";
 
@@ -127,7 +128,7 @@ async function deleteAvatar() {
       headers: { ...authHeader() },
     });
     if (r.ok) return;
-  } catch (e) {}
+  } catch (e) { }
 
   const r2 = await fetch(`${API_ROOT}/users/me/`, {
     method: "PATCH",
@@ -153,8 +154,8 @@ const EMPLOYEE_COUNT_OPTIONS = [
 ];
 
 const CITY_OPTIONS = [
-  "Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Ahmedabad", "Chennai", "Kolkata", 
-  "Pune", "Surat", "Jaipur", "Lucknow", "Nagpur", "Indore", "Thane", "Bhopal", 
+  "Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Ahmedabad", "Chennai", "Kolkata",
+  "Pune", "Surat", "Jaipur", "Lucknow", "Nagpur", "Indore", "Thane", "Bhopal",
   "Vadodara", "Nashik", "Rajkot", "Visakhapatnam", "Patna",
 ];
 
@@ -362,11 +363,11 @@ export default function AdminSettings() {
   // If we have an experience, use that. Else fallback to profile job_title/company.
   const workLine = React.useMemo(() => {
     if (latestExp) {
-        const org = latestExp.community_name || latestExp.org || "";
-        return `${latestExp.position} ${org ? `– ${org}` : ""}`;
+      const org = latestExp.community_name || latestExp.org || "";
+      return `${latestExp.position} ${org ? `– ${org}` : ""}`;
     }
     if (profile.job_title || profile.company) {
-        return [profile.job_title, profile.company].filter(Boolean).join(" – ");
+      return [profile.job_title, profile.company].filter(Boolean).join(" – ");
     }
     return profile.headline || "";
   }, [latestExp, profile]);
@@ -841,6 +842,24 @@ export default function AdminSettings() {
                       <Box sx={{ textAlign: "center", py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", mx: "auto" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>This section is empty</Typography><Typography variant="caption" color="text.secondary">Add an education to your profile</Typography><Box><Button variant="contained" color="success" size="small" sx={{ mt: 1.5 }} onClick={() => setEduOpen(true)}>Create</Button></Box></Box>
                     )}
                   </SectionCard>
+
+                  {/* NEW: Certifications & Licenses (Static Data) */}
+                  <SectionCard sx={{ mt: 2 }} title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                    <List dense disablePadding>
+                      <ListItem disableGutters>
+                        <ListItemText
+                          primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>}
+                          secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>}
+                        />
+                      </ListItem>
+                      <ListItem disableGutters>
+                        <ListItemText
+                          primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>}
+                          secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>}
+                        />
+                      </ListItem>
+                    </List>
+                  </SectionCard>
                 </Grid>
 
                 {/* RIGHT COLUMN */}
@@ -864,27 +883,40 @@ export default function AdminSettings() {
                     {profile.location ? <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{profile.location}</Typography></Box> : <Box sx={{ height: 100, borderRadius: 1, bgcolor: "grey.100", border: "1px solid", borderColor: "divider" }} />}
                   </SectionCard>
 
-                  {/* About your work */}
-                  <SectionCard
-                    sx={{ mt: 2 }}
-                    title="About your work"
-                    action={
-                      <Tooltip title="Edit details">
-                        <IconButton size="small" onClick={() => setWorkOpen(true)}>
-                          <EditRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    }
-                  >
-                    <KV label="Job Title" value={latestExp ? latestExp.position : (profile.job_title || '—')} />
-                    <Divider sx={{ my: 0.5 }} />
-                    <KV label="Company" value={latestExp ? (latestExp.community_name || latestExp.org) : (profile.company || '—')} />
-                    <Divider sx={{ my: 0.5 }} />
-                    <KV label="Sector" value={latestExp ? (latestExp.sector || '—') : '—'} />
-                    <Divider sx={{ my: 0.5 }} />
-                    <KV label="Industry" value={latestExp ? (latestExp.industry || '—') : '—'} />
-                    <Divider sx={{ my: 0.5 }} />
-                    <KV label="Number of Employees" value={latestExp ? (latestExp.number_of_employees || '—') : '—'} />
+                  {/* NEW: Trainings & Executive Education (Static Data) */}
+                  <SectionCard sx={{ mt: 2 }} title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                    <List dense disablePadding>
+                      <ListItem disableGutters>
+                        <ListItemText
+                          primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>}
+                          secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>}
+                        />
+                      </ListItem>
+                      <ListItem disableGutters>
+                        <ListItemText
+                          primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>}
+                          secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>}
+                        />
+                      </ListItem>
+                    </List>
+                  </SectionCard>
+
+                  {/* NEW: Memberships (Static Data) */}
+                  <SectionCard sx={{ mt: 2 }} title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                    <List dense disablePadding>
+                      <ListItem disableGutters>
+                        <ListItemText
+                          primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>}
+                          secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>}
+                        />
+                      </ListItem>
+                      <ListItem disableGutters>
+                        <ListItemText
+                          primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>}
+                          secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>}
+                        />
+                      </ListItem>
+                    </List>
                   </SectionCard>
                 </Grid>
               </Grid>
