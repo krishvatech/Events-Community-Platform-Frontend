@@ -25,7 +25,9 @@ import {
   Checkbox,
   FormControlLabel,
   MenuItem,
-  Autocomplete
+  Autocomplete,
+  ListItemAvatar,
+  CircularProgress
 } from "@mui/material";
 
 // Icons
@@ -37,6 +39,7 @@ import LinkedInIcon from "@mui/icons-material/LinkedIn";
 import PlaceIcon from "@mui/icons-material/Place";
 import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
+import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
 
 // Countries Library
 import * as isoCountries from "i18n-iso-countries";
@@ -68,6 +71,7 @@ function mapExperience(item) {
   return {
     id: item.id,
     org: item.community_name || item.org || item.company || "",
+    logo: item.logo || "", // Assuming backend might store logo url
     position: item.position || "",
     start: item.start_date || "",
     end: item.end_date || "",
@@ -81,6 +85,7 @@ function mapExperience(item) {
     location: item.location || "",
     description: item.description || "",
     exit_reason: item.exit_reason || "",
+    // These are now part of the experience record specifically
     sector: item.sector || "",
     industry: item.industry || "",
     number_of_employees: item.number_of_employees || "",
@@ -215,9 +220,6 @@ async function fetchProfileCore() {
     job_title: prof.job_title || "",
     bio: prof.bio || "",
     location: prof.location || "",
-    sector: prof.sector || "",
-    industry: prof.industry || "",
-    number_of_employees: prof.number_of_employees || "",
     avatar: prof.user_image_url || prof.user_image || prof.avatar || data.avatar || "",
     skills: Array.isArray(prof.skills) ? prof.skills : parseSkills(prof.skills || ""),
     links: (prof.links && typeof prof.links === "object") ? prof.links : {},
@@ -246,6 +248,117 @@ async function fetchProfileExtras() {
   const experiences = e2?.ok ? (await e2.json()).map(mapExperience) : [];
   return { experiences, educations };
 }
+
+// -----------------------------------------------------------------------------
+// Company Autocomplete Component
+// -----------------------------------------------------------------------------
+function CompanyAutocomplete({ value, onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
+
+  // Debounce the API call
+  React.useEffect(() => {
+    let active = true;
+
+    if (inputValue === "") {
+      setOptions(value ? [value] : []);
+      return undefined;
+    }
+
+    const fetchCompanies = async () => {
+      setLoading(true);
+      try {
+        // Using Clearbit's free autocomplete API
+        const response = await fetch(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${inputValue}`);
+        const data = await response.json();
+
+        if (active) {
+          setOptions(data);
+        }
+      } catch (error) {
+        console.error("Error fetching companies:", error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const timer = setTimeout(fetchCompanies, 400);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [inputValue, value]);
+
+  return (
+    <Autocomplete
+      freeSolo
+      id="company-autocomplete"
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      isOptionEqualToValue={(option, value) => option.name === value.name}
+      getOptionLabel={(option) => {
+        // Value can be a string (if user typed new company) or object (if selected)
+        if (typeof option === 'string') return option;
+        return option.name;
+      }}
+      options={options}
+      loading={loading}
+      value={value}
+      // Triggered when user selects an option OR hits enter on a new string
+      onChange={(event, newValue) => {
+        if (typeof newValue === 'string') {
+          // User typed a new name
+          onChange({ name: newValue, logo: null, domain: null });
+        } else if (newValue && newValue.inputValue) {
+          // Create new from dialog option (if using filterOptions)
+          onChange({ name: newValue.inputValue, logo: null, domain: null });
+        } else {
+          // Selected existing
+          onChange(newValue);
+        }
+      }}
+      onInputChange={(event, newInputValue) => {
+        setInputValue(newInputValue);
+      }}
+      renderOption={(props, option) => (
+        <ListItem {...props} key={option.domain || option.name}>
+          <ListItemAvatar>
+            <Avatar src={option.logo} variant="rounded" sx={{ width: 24, height: 24 }}>
+              <BusinessRoundedIcon fontSize="small" />
+            </Avatar>
+          </ListItemAvatar>
+          <ListItemText
+            primary={option.name}
+            secondary={option.domain}
+            primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+            secondaryTypographyProps={{ variant: 'caption' }}
+          />
+        </ListItem>
+      )}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label="Company Name"
+          fullWidth
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <React.Fragment>
+                {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                {params.InputProps.endAdornment}
+              </React.Fragment>
+            ),
+          }}
+        />
+      )}
+    />
+  );
+}
+
 
 // -----------------------------------------------------------------------------
 // Main Component
@@ -311,9 +424,6 @@ export default function HomePage() {
 
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 0 }, py: 2 }}>
-      {/* CHANGED: Ensure max width handles full container width properly 
-         The parent Box has padding, this inner Box just needs to fill it.
-      */}
       <Box sx={{ width: "100%", mx: "auto" }}>
 
         {/* Header Card */}
@@ -508,6 +618,7 @@ async function deleteEducationApi(id) {
 }
 
 async function createExperienceApi(payload) {
+  // Payload now includes sector, industry, number_of_employees
   const r = await fetch(`${API_ROOT}/auth/me/experiences/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ community_name: payload.org, position: payload.position, location: payload.location || "", start_date: payload.start || null, end_date: payload.current ? null : (payload.end || null), currently_work_here: !!payload.current, description: payload.description || "", employment_type: payload.employment_type, work_schedule: payload.work_schedule, relationship_to_org: payload.relationship_to_org, career_stage: payload.career_stage, compensation_type: payload.compensation_type, work_arrangement: payload.work_arrangement, exit_reason: payload.exit_reason, sector: payload.sector, industry: payload.industry, number_of_employees: payload.number_of_employees }) });
   if (!r.ok) throw new Error("Failed to add experience");
 }
@@ -546,9 +657,6 @@ function AboutTab({ profile, onUpdate }) {
   const [savingExp, setSavingExp] = React.useState(false);
   const [syncProfileLocation, setSyncProfileLocation] = React.useState(false);
 
-  const [workOpen, setWorkOpen] = React.useState(false);
-  const [workForm, setWorkForm] = React.useState({});
-
   const [contactOpen, setContactOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState({});
 
@@ -560,7 +668,7 @@ function AboutTab({ profile, onUpdate }) {
     const [city, country] = fullLoc.includes(",") ? fullLoc.split(",").map(s => s.trim()) : ["", fullLoc];
     setContactForm({ first_name: profile.first_name || "", last_name: profile.last_name || "", email: profile.email || "", city, location: country, linkedin: profile.links?.linkedin || "" });
     setAboutForm({ bio: profile.bio || "", skillsText: (profile.skills || []).join(", ") });
-    setWorkForm({ sector: latestExp?.sector || "", industry: latestExp?.industry || "", employees: latestExp?.number_of_employees || "" });
+    // Note: Work form was removed, as we now edit sector/industry inside the experience itself
   }, [profile, latestExp]);
 
   const reloadExtras = async () => {
@@ -591,8 +699,20 @@ function AboutTab({ profile, onUpdate }) {
     setSavingExp(true);
     try {
       const loc = [expForm.city, expForm.location].filter(Boolean).join(", ");
-      const existing = editExpId ? (profile.experience.find(e => e.id === editExpId) || {}) : {};
-      const payload = { ...expForm, org: expForm.org, position: expForm.position, location: loc, start: expForm.start || null, end: expForm.current ? null : (expForm.end || null), current: expForm.current, sector: existing.sector || "", industry: existing.industry || "", number_of_employees: existing.number_of_employees || "" };
+
+      // Payload construction now uses the form state for sector/industry/employees directly
+      const payload = {
+        ...expForm,
+        org: expForm.org, // This comes from the CompanyAutocomplete (name string)
+        position: expForm.position,
+        location: loc,
+        start: expForm.start || null,
+        end: expForm.current ? null : (expForm.end || null),
+        current: expForm.current,
+        sector: expForm.sector || "",
+        industry: expForm.industry || "",
+        number_of_employees: expForm.number_of_employees || ""
+      };
 
       if (editExpId) await updateExperienceApi(editExpId, payload);
       else await createExperienceApi(payload);
@@ -604,14 +724,6 @@ function AboutTab({ profile, onUpdate }) {
       setExpOpen(false); setEditExpId(null); await reloadExtras();
     } catch { }
     setSavingExp(false);
-  };
-
-  const saveAboutWork = async () => {
-    if (!latestExp) return;
-    try {
-      await updateExperienceApi(latestExp.id, { ...latestExp, sector: workForm.sector, industry: workForm.industry, number_of_employees: workForm.employees });
-      await reloadExtras(); setWorkOpen(false);
-    } catch { }
   };
 
   const saveContact = async () => {
@@ -627,7 +739,7 @@ function AboutTab({ profile, onUpdate }) {
 
   const openAddExp = () => {
     setEditExpId(null);
-    setExpForm({ org: "", position: "", city: "", location: "", start: "", end: "", current: false, employment_type: "full_time" });
+    setExpForm({ org: "", position: "", city: "", location: "", start: "", end: "", current: false, employment_type: "full_time", sector: "", industry: "", number_of_employees: "" });
     setExpOpen(true);
   };
   const openEditExp = (id) => {
@@ -645,7 +757,6 @@ function AboutTab({ profile, onUpdate }) {
         container
         spacing={2}
         sx={{
-          // Stack on phones, side-by-side from sm (>= 600px)
           flexWrap: { xs: "wrap", sm: "nowrap" },
           alignItems: "flex-start",
         }}
@@ -658,28 +769,10 @@ function AboutTab({ profile, onUpdate }) {
             display: "flex",
             flexDirection: "column",
             gap: 2,
-
-            flexBasis: {
-              xs: "100%",
-              sm: "345px",
-              md: "540px",
-              lg: "540px",
-              xl: "540px",
-            },
-            maxWidth: {
-              xs: "100%",
-              sm: "345px",
-              md: "540px",
-              lg: "540px",
-              xl: "540px",
-            },
+            flexBasis: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" },
+            maxWidth: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" },
             flexShrink: 0,
-
-            // 🔹 Only for 1024px viewport
-            "@media (min-width:1024px) and (max-width:1024px)": {
-              flexBasis: "330px",
-              maxWidth: "330px",
-            },
+            "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" },
           }}
         >
           {/* About */}
@@ -703,7 +796,27 @@ function AboutTab({ profile, onUpdate }) {
                     <IconButton size="small" onClick={() => openEditExp(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton>
                   </Box>
                 }>
-                  <ListItemText primary={<Typography variant="body2" fontWeight={600}>{exp.position} — {exp.org}</Typography>} secondary={<Typography variant="caption" color="text.secondary">{dateRange(exp.start, exp.end, exp.current)}</Typography>} />
+                  <ListItemText
+                    primary={
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="body2" fontWeight={600}>{exp.position}</Typography>
+                        <Typography variant="body2" color="text.secondary">— {exp.org}</Typography>
+                      </Stack>
+                    }
+                    secondary={
+                      <React.Fragment>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {dateRange(exp.start, exp.end, exp.current)}
+                        </Typography>
+                        {/* Display basic company details here since we removed the "About work" section */}
+                        {(exp.industry || exp.number_of_employees) && (
+                          <Typography variant="caption" color="text.secondary">
+                            {exp.industry} {exp.industry && exp.number_of_employees ? "•" : ""} {exp.number_of_employees} employees
+                          </Typography>
+                        )}
+                      </React.Fragment>
+                    }
+                  />
                 </ListItem>
               ))}
             </List>
@@ -724,9 +837,27 @@ function AboutTab({ profile, onUpdate }) {
               ))}
             </List>
           </SectionCard>
+
+          {/* NEW: Certifications & Licenses (Static Data) - Placed under Education */}
+          <SectionCard title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+            <List dense disablePadding>
+              <ListItem disableGutters>
+                <ListItemText
+                  primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>}
+                  secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>}
+                />
+              </ListItem>
+              <ListItem disableGutters>
+                <ListItemText
+                  primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>}
+                  secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>}
+                />
+              </ListItem>
+            </List>
+          </SectionCard>
         </Grid>
 
-        {/* RIGHT: Contact / About your work */}
+        {/* RIGHT: Contact + New Sections */}
         <Grid
           item
           xs={12}
@@ -734,28 +865,10 @@ function AboutTab({ profile, onUpdate }) {
             display: "flex",
             flexDirection: "column",
             gap: 2,
-
-            flexBasis: {
-              xs: "100%",
-              sm: "345px",
-              md: "320px",
-              lg: "540px",
-              xl: "540px",
-            },
-            maxWidth: {
-              xs: "100%",
-              sm: "345px",
-              md: "320px",
-              lg: "540px",
-              xl: "540px",
-            },
+            flexBasis: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" },
+            maxWidth: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" },
             flexShrink: 0,
-
-            // 🔹 Only for 1024px viewport
-            "@media (min-width:1024px) and (max-width:1024px)": {
-              flexBasis: "330px",
-              maxWidth: "330px",
-            },
+            "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" },
           }}
         >
           {/* Contact */}
@@ -768,33 +881,42 @@ function AboutTab({ profile, onUpdate }) {
             <Box sx={{ display: "flex", gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{profile.location || "—"}</Typography></Box>
           </SectionCard>
 
-          {/* About Work */}
-          <SectionCard title="About your work" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => setWorkOpen(true)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <Box sx={{ display: "flex", py: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 140, flexShrink: 0 }}>Job Title</Typography>
-              <Typography variant="body2">{latestExp?.position || "—"}</Typography>
-            </Box>
-            <Divider />
-            <Box sx={{ display: "flex", py: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 140, flexShrink: 0 }}>Company</Typography>
-              <Typography variant="body2">{latestExp?.org || "—"}</Typography>
-            </Box>
-            <Divider />
-            <Box sx={{ display: "flex", py: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 140, flexShrink: 0 }}>Sector</Typography>
-              <Typography variant="body2">{latestExp?.sector || "—"}</Typography>
-            </Box>
-            <Divider />
-            <Box sx={{ display: "flex", py: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 140, flexShrink: 0 }}>Industry</Typography>
-              <Typography variant="body2">{latestExp?.industry || "—"}</Typography>
-            </Box>
-            <Divider />
-            <Box sx={{ display: "flex", py: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 140, flexShrink: 0 }}>Number of Employees</Typography>
-              <Typography variant="body2">{latestExp?.number_of_employees || "—"}</Typography>
-            </Box>
+          {/* NEW: Trainings & Executive Education (Static Data) */}
+          <SectionCard title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+            <List dense disablePadding>
+              <ListItem disableGutters>
+                <ListItemText
+                  primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>}
+                  secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>}
+                />
+              </ListItem>
+              <ListItem disableGutters>
+                <ListItemText
+                  primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>}
+                  secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>}
+                />
+              </ListItem>
+            </List>
           </SectionCard>
+
+          {/* NEW: Memberships (Static Data) */}
+          <SectionCard title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+            <List dense disablePadding>
+              <ListItem disableGutters>
+                <ListItemText
+                  primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>}
+                  secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>}
+                />
+              </ListItem>
+              <ListItem disableGutters>
+                <ListItemText
+                  primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>}
+                  secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>}
+                />
+              </ListItem>
+            </List>
+          </SectionCard>
+
         </Grid>
       </Grid>
 
@@ -812,24 +934,6 @@ function AboutTab({ profile, onUpdate }) {
         <DialogActions><Button onClick={() => setAboutOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAbout}>Save</Button></DialogActions>
       </Dialog>
 
-      {/* Work */}
-      <Dialog open={workOpen} onClose={() => setWorkOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Work Details</DialogTitle>
-        <DialogContent dividers>
-          <Box sx={{ p: 2, bgcolor: "action.hover", mb: 2, borderRadius: 1 }}><Typography variant="body2">Updating details for: <b>{latestExp?.org || "No Experience Found"}</b></Typography></Box>
-          <TextField select label="Sector" fullWidth value={workForm.sector || ""} onChange={(e) => setWorkForm({ ...workForm, sector: e.target.value })} sx={{ mb: 2 }} disabled={!latestExp}>
-            {SECTOR_OPTIONS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
-          </TextField>
-          <TextField select label="Industry" fullWidth value={workForm.industry || ""} onChange={(e) => setWorkForm({ ...workForm, industry: e.target.value })} sx={{ mb: 2 }} disabled={!latestExp}>
-            {INDUSTRY_OPTIONS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
-          </TextField>
-          <TextField select label="Employees" fullWidth value={workForm.employees || ""} onChange={(e) => setWorkForm({ ...workForm, employees: e.target.value })} disabled={!latestExp}>
-            {EMPLOYEE_COUNT_OPTIONS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
-          </TextField>
-        </DialogContent>
-        <DialogActions><Button onClick={() => setWorkOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAboutWork} disabled={!latestExp}>Save</Button></DialogActions>
-      </Dialog>
-
       {/* Contact */}
       <Dialog open={contactOpen} onClose={() => setContactOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Edit Contact</DialogTitle>
@@ -845,7 +949,7 @@ function AboutTab({ profile, onUpdate }) {
         <DialogActions><Button onClick={() => setContactOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveContact}>Save</Button></DialogActions>
       </Dialog>
 
-      {/* Education & Experience Modals simplified for brevity but functional */}
+      {/* Education */}
       <Dialog open={eduOpen} onClose={() => setEduOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{editEduId ? "Edit" : "Add"} Education</DialogTitle>
         <DialogContent>
@@ -859,20 +963,48 @@ function AboutTab({ profile, onUpdate }) {
         <DialogActions><Button onClick={() => setEduOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveEducation}>Save</Button></DialogActions>
       </Dialog>
 
+      {/* Experience Dialog - UPDATED with Company Search & Company Details */}
       <Dialog open={expOpen} onClose={() => setExpOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{editExpId ? "Edit" : "Add"} Experience</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Company" value={expForm.org || ""} onChange={(e) => setExpForm({ ...expForm, org: e.target.value })} />
+
+            {/* New Company Search */}
+            <CompanyAutocomplete
+              value={expForm.org ? { name: expForm.org } : null} // Simple value mapping
+              onChange={(newVal) => {
+                const name = typeof newVal === 'string' ? newVal : (newVal?.name || "");
+                setExpForm(prev => ({ ...prev, org: name }));
+              }}
+            />
+
             <TextField label="Position" value={expForm.position || ""} onChange={(e) => setExpForm({ ...expForm, position: e.target.value })} />
+
+            {/* Moved Company Details Here */}
+            <TextField select label="Sector" fullWidth value={expForm.sector || ""} onChange={(e) => setExpForm({ ...expForm, sector: e.target.value })} >
+              {SECTOR_OPTIONS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+            </TextField>
+
+            <TextField select label="Industry" fullWidth value={expForm.industry || ""} onChange={(e) => setExpForm({ ...expForm, industry: e.target.value })}>
+              {INDUSTRY_OPTIONS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+            </TextField>
+
+            <TextField select label="Number of Employees" fullWidth value={expForm.number_of_employees || ""} onChange={(e) => setExpForm({ ...expForm, number_of_employees: e.target.value })}>
+              {EMPLOYEE_COUNT_OPTIONS.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+            </TextField>
+
             <Autocomplete options={CITY_OPTIONS} value={expForm.city || null} onChange={(_, v) => setExpForm({ ...expForm, city: v || "" })} renderInput={(p) => <TextField {...p} label="City" />} />
             <Autocomplete options={COUNTRY_OPTIONS} value={getSelectedCountry({ location: expForm.location })} getOptionLabel={(o) => o?.label || ""} onChange={(_, v) => setExpForm({ ...expForm, location: v?.label || "" })} renderInput={(p) => <TextField {...p} label="Country" />} />
+
             <Box sx={{ display: "flex", gap: 2 }}>
               <TextField label="Start" type="date" fullWidth InputLabelProps={{ shrink: true }} value={expForm.start || ""} onChange={(e) => setExpForm({ ...expForm, start: e.target.value })} />
               <TextField label="End" type="date" fullWidth InputLabelProps={{ shrink: true }} disabled={expForm.current} value={expForm.end || ""} onChange={(e) => setExpForm({ ...expForm, end: e.target.value })} />
             </Box>
+
             <FormControlLabel control={<Checkbox checked={!!expForm.current} onChange={(e) => setExpForm({ ...expForm, current: e.target.checked })} />} label="Currently work here" />
+
             {expForm.current && <FormControlLabel control={<Checkbox checked={syncProfileLocation} onChange={(e) => setSyncProfileLocation(e.target.checked)} />} label="Update profile location to match" />}
+
             <TextField multiline minRows={3} label="Description" value={expForm.description || ""} onChange={(e) => setExpForm({ ...expForm, description: e.target.value })} />
           </Stack>
         </DialogContent>
