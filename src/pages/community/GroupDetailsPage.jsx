@@ -1094,56 +1094,6 @@ function PostsTab({ groupId }) {
   );
 }
 
-function ChatTab({ groupId }) {
-  const [messages, setMessages] = React.useState([]);
-  const [text, setText] = React.useState("");
-
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch(toApiUrl(`groups/${groupId}/chat/messages/`), { headers: { Accept: "application/json", ...authHeaders() } });
-        const d = r.ok ? await r.json() : [];
-        setMessages(Array.isArray(d?.results) ? d.results : (Array.isArray(d) ? d : []));
-      } catch { }
-    })();
-  }, [groupId]);
-
-  const send = async () => {
-    if (!text.trim()) return;
-    try {
-      await fetch(toApiUrl(`groups/${groupId}/chat/messages/`), {
-        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ text })
-      });
-      setText("");
-      const r = await fetch(toApiUrl(`groups/${groupId}/chat/messages/`), { headers: { Accept: "application/json", ...authHeaders() } });
-      const d = await r.json();
-      setMessages(Array.isArray(d?.results) ? d.results : d);
-    } catch { }
-  };
-
-  return (
-    <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
-      <Box sx={{ height: 400, overflowY: "auto", p: 2 }}>
-        {messages.map(m => (
-          <Stack key={m.id} direction="row" spacing={1} sx={{ mb: 2 }}>
-            <Avatar src={toMediaUrl(m.user?.avatar)} sx={{ width: 32, height: 32 }} />
-            <Box>
-              <Typography variant="subtitle2">{m.user?.name || "User"}</Typography>
-              <Typography variant="body2">{m.text}</Typography>
-            </Box>
-          </Stack>
-        ))}
-      </Box>
-      <Divider />
-      <Box sx={{ p: 2, display: "flex", gap: 1 }}>
-        <TextField fullWidth size="small" value={text} onChange={e => setText(e.target.value)} placeholder="Type a message..." />
-        <Button variant="contained" onClick={send}><SendRoundedIcon /></Button>
-      </Box>
-    </Card>
-  );
-}
-
 function MembersTab({ groupId }) {
   const [members, setMembers] = React.useState([]);
   React.useEffect(() => {
@@ -1281,14 +1231,24 @@ export default function GroupDetailsPage() {
         } catch { }
       }
 
-      setListUsers(rows.map(row => {
+      // ⬇️ CHANGED: Use a Map to ensure distinct users (Deduplication)
+      const uniqueMap = new Map();
+
+      rows.forEach(row => {
         const u = row.user || row.actor || row.profile || row.from_user || row;
-        return {
-          id: u.id,
-          name: u.name || u.full_name || u.username || "User",
-          avatar: toMediaUrl(u.avatar || u.user_image),
-        };
-      }));
+        const uid = u.id || u.user_id;
+
+        // Only add if we haven't seen this User ID yet
+        if (uid && !uniqueMap.has(String(uid))) {
+          uniqueMap.set(String(uid), {
+            id: uid,
+            name: u.name || u.full_name || u.username || "User",
+            avatar: toMediaUrl(u.avatar || u.user_image),
+          });
+        }
+      });
+
+      setListUsers(Array.from(uniqueMap.values()));
       setListLoading(false);
     })();
   }, [sharesTarget]);
@@ -1377,9 +1337,9 @@ export default function GroupDetailsPage() {
                 </Box>
               </Stack>
               <Button
-                variant="contained"
+                variant="outlined"
                 startIcon={<ChatBubbleOutlineRoundedIcon />}
-                onClick={() => setTab(3)}
+                onClick={() => navigate(`/community?view=messages`)} // Example route
               >
                 Message
               </Button>
@@ -1408,18 +1368,14 @@ export default function GroupDetailsPage() {
                   iconPosition="start"
                   label="OVERVIEW"
                 />
-                <Tab
-                  icon={<ChatBubbleOutlineRoundedIcon />}
-                  iconPosition="start"
-                  label="CHAT"
-                />
+                {/* Chat Tab Removed Here */}
               </Tabs>
             </Box>
             <CardContent sx={{ p: 3 }}>
               {tab === 0 && <PostsTab groupId={groupId} />}
               {tab === 1 && <MembersTab groupId={groupId} />}
               {tab === 2 && <OverviewTab group={group} />}
-              {tab === 3 && <ChatTab groupId={groupId} />}
+              {/* Chat Content Removed Here */}
             </CardContent>
           </Card>
         </Box>
