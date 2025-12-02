@@ -18,6 +18,7 @@ function resolveActiveKey(pathname) {
   if (pathname.startsWith("/admin/messages")) return "messages";
   if (pathname.startsWith("/admin/settings")) return "settings";
   if (pathname.startsWith("/admin/staff")) return "staff";
+  if (pathname.startsWith("/admin/name-requests")) return "name-requests";
   return "resources";
 }
 
@@ -47,6 +48,7 @@ export default function AdminLayout() {
       messages: "/admin/messages",
       settings: "/admin/settings",
       staff: "/admin/staff",
+      "name-requests": "/admin/name-requests",
     };
 
     navigate(map[key] ?? `/admin/${key}`);

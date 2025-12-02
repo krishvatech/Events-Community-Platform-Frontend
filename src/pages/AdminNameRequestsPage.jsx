@@ -45,7 +45,7 @@ export default function AdminNameRequestsPage() {
   const [userInitial, setUserInitial] = useState("A");
 
   // Filter States
-  const [tabValue, setTabValue] = useState("pending");
+  const [tabValue, setTabValue] = useState("all");
   const [searchText, setSearchText] = useState("");
   const [sortOrder, setSortOrder] = useState("newest");
   const [page, setPage] = useState(1);
