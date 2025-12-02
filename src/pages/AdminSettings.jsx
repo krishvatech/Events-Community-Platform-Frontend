@@ -54,6 +54,7 @@ import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
+import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded'; // Added import
 
 import { isOwnerUser } from "../utils/adminRole";
 
@@ -386,6 +387,111 @@ function CompanyAutocomplete({ value, onChange }) {
   );
 }
 
+// -----------------------------------------------------------------------------
+// Basic Info Dialog (Header Trigger) - Identity & Name Change Entry
+// -----------------------------------------------------------------------------
+function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Identity Details</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Legal names are locked for security.
+          </Typography>
+
+          {/* LOCKED NAMES */}
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <TextField label="First Name" fullWidth disabled value={profile?.first_name || ""} />
+            <TextField label="Last Name" fullWidth disabled value={profile?.last_name || ""} />
+          </Box>
+
+          {/* REQUEST BUTTON */}
+          <Button
+            startIcon={<HistoryEduRoundedIcon />}
+            sx={{ alignSelf: 'start', textTransform: 'none' }}
+            onClick={onRequestNameChange}
+          >
+            Request Name Change
+          </Button>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Name Change Request Dialog
+// -----------------------------------------------------------------------------
+function NameChangeDialog({ open, onClose, currentNames }) {
+  const [form, setForm] = React.useState({
+    new_first_name: "", new_middle_name: "", new_last_name: "", reason: "",
+  });
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open) {
+      setForm({
+        new_first_name: currentNames.first || "",
+        new_middle_name: currentNames.middle || "",
+        new_last_name: currentNames.last || "",
+        reason: "",
+      });
+    }
+  }, [open, currentNames]);
+
+  const handleSubmit = async () => {
+    if (!form.new_first_name || !form.new_last_name || !form.reason) {
+      alert("First Name, Last Name, and Reason are required.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_ROOT}/users/me/name-change-request/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.detail || JSON.stringify(json));
+      }
+      alert("Request submitted successfully! An admin will review it shortly.");
+      onClose();
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Request Name Change</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Legal names cannot be changed directly. Please submit a request with your valid reason (e.g., Marriage, Spelling Correction).
+        </Typography>
+        <Stack spacing={2}>
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <TextField label="First Name" fullWidth required value={form.new_first_name} onChange={(e) => setForm({ ...form, new_first_name: e.target.value })} />
+            <TextField label="Middle Name" fullWidth value={form.new_middle_name} onChange={(e) => setForm({ ...form, new_middle_name: e.target.value })} />
+            <TextField label="Last Name" fullWidth required value={form.new_last_name} onChange={(e) => setForm({ ...form, new_last_name: e.target.value })} />
+          </Box>
+          <TextField label="Reason for Change" fullWidth multiline minRows={2} required placeholder="e.g. Marriage, Legal change, Typos..." value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={loading}>{loading ? "Submitting..." : "Submit Request"}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 
 // -------------------- Component --------------------
 
@@ -440,6 +546,10 @@ export default function AdminSettings() {
   const [eduForm, setEduForm] = React.useState(EMPTY_EDU_FORM);
   const [eduErrors, setEduErrors] = React.useState({ start: "", end: "" });
 
+  // Name Change Request State
+  const [nameChangeOpen, setNameChangeOpen] = React.useState(false);
+  const [basicInfoOpen, setBasicInfoOpen] = React.useState(false);
+
   const emptyExpForm = {
     org: "", position: "", city: "", location: "", start: "", end: "", current: false,
     employment_type: "full_time", work_schedule: "", relationship_to_org: "",
@@ -463,7 +573,6 @@ export default function AdminSettings() {
   }, [expList]);
 
   // --- Work Line (Displayed under name) ---
-  // If we have an experience, use that. Else fallback to profile job_title/company.
   const workLine = React.useMemo(() => {
     if (latestExp) {
       const org = latestExp.community_name || latestExp.org || "";
@@ -512,7 +621,7 @@ export default function AdminSettings() {
   const [avatarPreview, setAvatarPreview] = React.useState("");
   const [avatarMode, setAvatarMode] = React.useState(null);
 
-  // --- SAVE HANDLERS ---
+  // ---------- HANDLERS ----------
 
   const saveAboutWork = async () => {
     if (!latestExp) {
@@ -889,6 +998,14 @@ export default function AdminSettings() {
                     {/* Display latest experience under name */}
                     {workLine && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }} noWrap>{workLine}</Typography>}
                   </Box>
+                  {/* Edit Identity Trigger */}
+                  <Box sx={{ ml: "auto" }}>
+                    <Tooltip title="Identity Details">
+                      <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
+                        <EditRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 </Box>
               </Card>
 
@@ -1096,7 +1213,7 @@ export default function AdminSettings() {
         <DialogTitle>Edit Contact</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Box sx={{ display: "flex", gap: 2 }}><TextField label="First name" fullWidth value={contactForm.first_name} onChange={(e) => setContactForm((f) => ({ ...f, first_name: e.target.value }))} /><TextField label="Last name" fullWidth value={contactForm.last_name} onChange={(e) => setContactForm((f) => ({ ...f, last_name: e.target.value }))} /></Box>
+            <Box sx={{ display: "flex", gap: 2 }}></Box>
             <TextField label="Email" type="email" fullWidth value={contactForm.email} onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))} />
             <Autocomplete fullWidth size="small" options={CITY_OPTIONS} value={contactForm.city || null} onChange={(_, value) => setContactForm((f) => ({ ...f, city: value || "" }))} renderInput={(params) => <TextField {...params} label="City" placeholder="Select city" />} />
             <Autocomplete fullWidth size="small" options={COUNTRY_OPTIONS} autoHighlight getOptionLabel={(option) => option.label} value={getSelectedCountry({ location: contactForm.location })} onChange={(_, value) => setContactForm((f) => ({ ...f, location: value?.label || "" }))} renderOption={(props, option) => (<Box component="li" sx={{ display: "flex", gap: 1 }} {...props}><span>{flagEmoji(option.code)}</span><span>{option.label}</span></Box>)} renderInput={(params) => <TextField {...params} label="Country" placeholder="Select country" />} />
@@ -1255,6 +1372,28 @@ export default function AdminSettings() {
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}><Button onClick={() => setAboutOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAbout} disabled={saving}>{saving ? "Saving…" : "Save"}</Button></DialogActions>
       </Dialog>
+
+      {/* --- NEW DIALOG: Identity (Header Trigger) --- */}
+      <BasicInfoDialog
+        open={basicInfoOpen}
+        onClose={() => setBasicInfoOpen(false)}
+        profile={profile}
+        onRequestNameChange={() => {
+          setBasicInfoOpen(false);
+          setNameChangeOpen(true);
+        }}
+      />
+
+      {/* Name Change Request Dialog */}
+      <NameChangeDialog
+        open={nameChangeOpen}
+        onClose={() => setNameChangeOpen(false)}
+        currentNames={{
+          first: profile.first_name,
+          middle: "", // Adjust if middle name is available
+          last: profile.last_name
+        }}
+      />
 
       <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast((t) => ({ ...t, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
         <Alert variant="filled" severity={toast.type === "error" ? "error" : "success"} onClose={() => setToast((t) => ({ ...t, open: false }))}>{toast.msg}</Alert>
