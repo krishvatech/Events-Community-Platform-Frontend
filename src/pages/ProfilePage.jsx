@@ -26,6 +26,9 @@ import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
 import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
 import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import CloseIcon from '@mui/icons-material/Close';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 
 // -------------------- Constants for Dropdowns --------------------
 const SECTOR_OPTIONS = [
@@ -53,6 +56,28 @@ const tokenHeader = () => {
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
+
+async function uploadEducationDocApi(educationId, file) {
+  const fd = new FormData();
+  fd.append("education", educationId);
+  fd.append("file", file);
+  // Uses API_BASE defined in your file
+  const r = await fetch(`${API_BASE}/auth/me/education-documents/`, {
+    method: "POST",
+    headers: tokenHeader(), // Let browser set Content-Type for FormData
+    body: fd
+  });
+  if (!r.ok) throw new Error("Failed to upload document");
+  return await r.json();
+}
+
+async function deleteEducationDocApi(docId) {
+  const r = await fetch(`${API_BASE}/auth/me/education-documents/${docId}/`, {
+    method: "DELETE",
+    headers: tokenHeader()
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
+}
 
 function parseSkills(value) {
   const v = (value ?? "").toString().trim();
@@ -413,7 +438,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: "", sev: "success" });
-  
+
   // New helper for consistent toast notifications
   const showNotification = (type, msg) => {
     setSnack({ open: true, sev: type, msg });
@@ -440,6 +465,7 @@ export default function ProfilePage() {
   // Name Change Request State
   const [nameChangeOpen, setNameChangeOpen] = useState(false);
   const [basicInfoOpen, setBasicInfoOpen] = useState(false); // Header Identity Dialog
+  const [eduFiles, setEduFiles] = useState([]); // <--- Add this line
 
   // Lists & Forms
   const [eduList, setEduList] = useState([]);
@@ -696,10 +722,26 @@ export default function ProfilePage() {
       const url = editEduId ? `${API_BASE}/auth/me/educations/${editEduId}/` : `${API_BASE}/auth/me/educations/`;
       const payload = { school: (eduForm.school || "").trim(), degree: (eduForm.degree || "").trim(), field_of_study: (eduForm.field || "").trim(), start_date: normalizeYear(eduForm.start), end_date: normalizeYear(eduForm.end), grade: (eduForm.grade || "").trim() };
       if (!payload.school || !payload.degree) { showNotification("error", "Please fill School and Degree."); return; }
+
+      // 1. Save Education Data
       const r = await fetch(url, { method: editEduId ? "PATCH" : "POST", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Failed to save education");
+
+      const savedEdu = await r.json(); // Get the saved object (needed for ID)
+      const activeId = editEduId || savedEdu.id;
+
+      // 2. Upload Files (if any)
+      if (eduFiles.length > 0 && activeId) {
+        for (const file of eduFiles) {
+          await uploadEducationDocApi(activeId, file);
+        }
+      }
+
       showNotification("success", editEduId ? "Education updated" : "Education added");
-      setEduOpen(false); setEditEduId(null); setEduForm(EMPTY_EDU_FORM);
+      setEduOpen(false);
+      setEditEduId(null);
+      setEduForm(EMPTY_EDU_FORM);
+      setEduFiles([]); // <--- Clear files
       await loadMeExtras();
     } catch (e) { showNotification("error", e?.message || "Save failed"); }
   }
@@ -767,8 +809,9 @@ export default function ProfilePage() {
     setEditEduId(item.id);
     const startYear = (item.start || item.start_date || "").slice(0, 4);
     const endYear = (item.end || item.end_date || "").slice(0, 4);
-    setEduForm({ school: item.school || "", degree: item.degree || "", field: item.field_of_study || "", start: startYear || "", end: endYear || "", grade: item.grade || "" });
+    setEduForm({ school: item.school || "", degree: item.degree || "", field: item.field_of_study || "", start: startYear || "", end: endYear || "", grade: item.grade || "", documents: item.documents || [] });
     setEduErrors({ start: "", end: "" });
+    setEduFiles([]);
     setEduOpen(true);
   }
 
@@ -861,7 +904,7 @@ export default function ProfilePage() {
                     <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" } }}>
                       <Typography variant="subtitle2">
                         <Box component="span" sx={{ fontWeight: 600 }}>0</Box> Posts&nbsp;|&nbsp;
-                        <Box component="span" sx={{ fontWeight: 600 }}>{friendCount}</Box> Friends
+                        <Box component="span" sx={{ fontWeight: 600 }}>{friendCount}</Box> Contacts
                       </Typography>
                     </Box>
                   </Stack>
@@ -919,7 +962,35 @@ export default function ProfilePage() {
                                 <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteEducation(e.id, `${e.school} — ${e.degree}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
                               </Box>
                             }>
-                              <ListItemText primary={<Typography variant="body2" fontWeight={500}>{e.degree || "Degree"} — {e.school || "School"}</Typography>} secondary={<Typography variant="body2" color="text.secondary">{[(e.start_date || "").slice(0, 4), (e.end_date || "").slice(0, 4)].filter(Boolean).join(" - ")}{e.field_of_study ? ` · ${e.field_of_study}` : ""}{e.grade ? ` · Grade: ${e.grade}` : ""}</Typography>} />
+                              <ListItemText
+                                primary={<Typography variant="body2" fontWeight={500}>{e.degree || "Degree"} — {e.school || "School"}</Typography>}
+                                secondary={
+                                  <Stack component="span" spacing={0.5}>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {[(e.start_date || "").slice(0, 4), (e.end_date || "").slice(0, 4)].filter(Boolean).join(" - ")}
+                                      {e.field_of_study ? ` · ${e.field_of_study}` : ""}
+                                      {e.grade ? ` · Grade: ${e.grade}` : ""}
+                                    </Typography>
+
+                                    {/* --- NEW: Display Document Chips --- */}
+                                    {e.documents && e.documents.length > 0 && (
+                                      <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>
+                                        {e.documents.map((doc) => (
+                                          <Chip
+                                            key={doc.id}
+                                            icon={<InsertDriveFileIcon style={{ fontSize: 14 }} />}
+                                            label={doc.filename}
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => window.open(doc.file, '_blank')}
+                                            sx={{ cursor: 'pointer', height: 24, fontSize: '0.75rem' }}
+                                          />
+                                        ))}
+                                      </Stack>
+                                    )}
+                                  </Stack>
+                                }
+                              />
                             </ListItem>
                           ))}
                         </List>
@@ -1074,10 +1145,64 @@ export default function ProfilePage() {
             <TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm((f) => ({ ...f, end: e.target.value }))} fullWidth sx={{ flex: 1 }} inputProps={{ min: 1900, max: new Date().getFullYear() + 10 }} error={!!eduErrors.end} helperText={eduErrors.end || ""} />
           </Box>
           <TextField label="Grade (optional)" value={eduForm.grade} onChange={(e) => setEduForm((f) => ({ ...f, grade: e.target.value }))} fullWidth />
+          {/* --- NEW: File Upload Section --- */}
+          <Box sx={{ mt: 2, borderTop: '1px dashed', borderColor: 'divider', pt: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Transcripts / Certificates</Typography>
+
+            {/* 1. Existing Files (Edit Mode) */}
+            {editEduId && eduForm.documents && eduForm.documents.length > 0 && (
+              <List dense disablePadding>
+                {eduForm.documents.map((doc) => (
+                  <ListItem key={doc.id} disableGutters
+                    secondaryAction={
+                      <IconButton edge="end" size="small" onClick={async () => {
+                        if (!window.confirm("Delete this file?")) return;
+                        try {
+                          await deleteEducationDocApi(doc.id);
+                          // Update local state immediately
+                          setEduForm(prev => ({
+                            ...prev,
+                            documents: prev.documents.filter(d => d.id !== doc.id)
+                          }));
+                          showNotification("success", "File deleted");
+                          await loadMeExtras(); // Background refresh
+                        } catch (e) { showNotification("error", "Failed to delete"); }
+                      }}>
+                        <DeleteOutlineIcon fontSize="small" color="error" />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemAvatar sx={{ minWidth: 32 }}><InsertDriveFileIcon fontSize="small" color="action" /></ListItemAvatar>
+                    <ListItemText primary={doc.filename} primaryTypographyProps={{ variant: 'caption', noWrap: true, maxWidth: 200 }} />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+
+            {/* 2. File Selection */}
+            <Button component="label" variant="outlined" size="small" startIcon={<AttachFileIcon />} sx={{ mt: 1, textTransform: 'none' }}>
+              Attach Files
+              <input type="file" multiple hidden onChange={(e) => {
+                if (e.target.files) {
+                  setEduFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                }
+              }}
+              />
+            </Button>
+
+            {/* 3. Pending Files List */}
+            {eduFiles.length > 0 && (
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                {eduFiles.map((f, i) => (
+                  <Chip key={i} label={f.name} onDelete={() => setEduFiles(prev => prev.filter((_, idx) => idx !== i))} size="small" variant="outlined" />
+                ))}
+              </Stack>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions>
           {editEduId && <Button color="error" onClick={() => askDeleteEducation(editEduId, `${eduForm.school || ""} — ${eduForm.degree || ""}`)}>Delete</Button>}
-          <Button onClick={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); setEduForm(EMPTY_EDU_FORM); }}>Cancel</Button>
+          <Button onClick={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); setEduForm(EMPTY_EDU_FORM); setEduFiles([]); }}>Cancel</Button>
           <Button variant="contained" onClick={createEducation}>{editEduId ? "Save changes" : "Save"}</Button>
         </DialogActions>
       </Dialog>
