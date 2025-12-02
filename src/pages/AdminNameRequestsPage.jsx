@@ -1,5 +1,5 @@
 // src/pages/AdminNameRequestsPage.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Box,
   Paper,
@@ -12,7 +12,6 @@ import {
   TableRow,
   Button,
   Stack,
-  LinearProgress,
   Tabs,
   Tab,
   TextField,
@@ -20,14 +19,12 @@ import {
   MenuItem,
   Select,
   FormControl,
-  Pagination,
   Chip,
-  IconButton,
   Avatar,
-  Container // ✅ Added Container
+  Container,
+  Skeleton
 } from "@mui/material";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
 // Helpers
@@ -38,9 +35,34 @@ function getToken() {
 
 const TEAL = "#14b8b1";
 
+// --- Skeleton Component (Table Row) ---
+function NameRequestSkeleton() {
+  return (
+    <TableRow>
+      <TableCell>
+        <Stack spacing={0.5}>
+          <Skeleton variant="text" width={100} height={20} />
+          <Skeleton variant="text" width={140} height={16} />
+        </Stack>
+      </TableCell>
+      <TableCell><Skeleton variant="text" width={120} /></TableCell>
+      <TableCell><Skeleton variant="text" width={120} /></TableCell>
+      <TableCell><Skeleton variant="text" width={150} /></TableCell>
+      <TableCell><Skeleton variant="text" width={80} /></TableCell>
+      <TableCell><Skeleton variant="rounded" width={70} height={24} sx={{ borderRadius: 4 }} /></TableCell>
+      <TableCell align="right">
+        <Stack direction="row" spacing={1} justifyContent="flex-end">
+          <Skeleton variant="rounded" width={60} height={30} />
+          <Skeleton variant="rounded" width={80} height={30} />
+        </Stack>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export default function AdminNameRequestsPage() {
   const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [userInitial, setUserInitial] = useState("A");
 
@@ -48,8 +70,15 @@ export default function AdminNameRequestsPage() {
   const [tabValue, setTabValue] = useState("all");
   const [searchText, setSearchText] = useState("");
   const [sortOrder, setSortOrder] = useState("newest");
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+
+  // Infinite Scroll State
+  const [visibleCount, setVisibleCount] = useState(15);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const observerTarget = useRef(null);
+
+  const visibleItems = useMemo(() => {
+    return requests.slice(0, visibleCount);
+  }, [requests, visibleCount]);
 
   // 1. Fetch Current User
   useEffect(() => {
@@ -63,16 +92,14 @@ export default function AdminNameRequestsPage() {
           const name = data.first_name || data.username || "Admin";
           setUserInitial(name.charAt(0).toUpperCase());
         }
-      } catch (e) {
-        // Silent fail
-      }
+      } catch (e) { }
     };
     fetchMe();
   }, []);
 
   // 2. Fetch Requests
-  const fetchRequests = async (currentPage = 1) => {
-    setLoading(true);
+  const fetchRequests = async () => {
+    setInitialLoading(true);
     try {
       const params = new URLSearchParams();
       
@@ -85,48 +112,62 @@ export default function AdminNameRequestsPage() {
         params.append("ordering", "created_at");
       }
 
-      params.append("page", currentPage);
+      // Fetch a larger batch for infinite scroll list feel
+      params.append("page_size", 100);
 
-      // Make sure this URL matches your urls.py registry
       const res = await fetch(`${API_BASE}/auth/admin/name-requests/?${params.toString()}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
 
       if (res.ok) {
         const data = await res.json();
-        if (data.results) {
-            setRequests(data.results);
-            const count = data.count || 0;
-            const pageSize = 10; 
-            setTotalPages(Math.ceil(count / pageSize) || 1);
-        } else if (Array.isArray(data)) {
-            setRequests(data);
-            setTotalPages(1);
-        }
+        const list = data.results || (Array.isArray(data) ? data : []);
+        setRequests(list);
+        setVisibleCount(15); // Reset scroll position on new fetch
       } else {
-        // Fallback for empty/error state
         setRequests([]); 
       }
     } catch (e) {
       console.error(e);
       setRequests([]);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   };
 
   useEffect(() => {
-    setPage(1);
-    fetchRequests(1);
+    fetchRequests();
   }, [tabValue, sortOrder]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-        setPage(1); 
-        fetchRequests(1);
+        fetchRequests();
     }, 500); 
     return () => clearTimeout(timer);
   }, [searchText]);
+
+  // --- Intersection Observer ---
+  useEffect(() => {
+    if (isLoadingMore || visibleCount >= requests.length || !observerTarget.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsLoadingMore(true);
+          // Fake delay for smooth UX
+          setTimeout(() => {
+            setVisibleCount((prev) => prev + 10);
+            setIsLoadingMore(false);
+          }, 500);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(observerTarget.current);
+    return () => observer.disconnect();
+  }, [isLoadingMore, visibleCount, requests.length]);
+
 
   const handleDecide = async (id, status) => {
     if (processingId) return;
@@ -143,7 +184,8 @@ export default function AdminNameRequestsPage() {
       });
 
       if (res.ok) {
-        fetchRequests(page); 
+        // Optimistic update locally
+        setRequests(prev => prev.map(r => r.id === id ? { ...r, status: status } : r));
       } else {
         const json = await res.json();
         alert(json.detail || "Failed to update status");
@@ -244,13 +286,38 @@ export default function AdminNameRequestsPage() {
       </Stack>
 
       {/* TABLE CONTENT */}
-      {loading ? (
-        <LinearProgress sx={{ color: TEAL }} />
+      {initialLoading ? (
+        // 1. SKELETON LOADING STATE
+        <TableContainer component={Paper} elevation={0} className="rounded-2xl border border-slate-200">
+           <Table sx={{ minWidth: 650 }}>
+              <TableHead sx={{ bgcolor: "#f8fafc" }}>
+                <TableRow>
+                    <TableCell sx={{ fontWeight: 600, color: '#475569', py: 2 }}>User Details</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#475569', py: 2 }}>Current Name</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#475569', py: 2 }}>Requested Name</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#475569', py: 2 }}>Reason</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#475569', py: 2 }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#475569', py: 2 }}>Status</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, color: '#475569', py: 2 }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <NameRequestSkeleton />
+                <NameRequestSkeleton />
+                <NameRequestSkeleton />
+                <NameRequestSkeleton />
+                <NameRequestSkeleton />
+              </TableBody>
+           </Table>
+        </TableContainer>
+
       ) : requests.length === 0 ? (
+        // 2. EMPTY STATE
         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-8 text-center">
           <Typography color="text.secondary" fontWeight={500}>No requests found.</Typography>
         </Paper>
       ) : (
+        // 3. TABLE DATA + INFINITE SCROLL
         <TableContainer component={Paper} elevation={0} className="rounded-2xl border border-slate-200">
           <Table sx={{ minWidth: 650 }}>
             <TableHead sx={{ bgcolor: "#f8fafc" }}>
@@ -265,7 +332,7 @@ export default function AdminNameRequestsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {requests.map((row) => (
+              {visibleItems.map((row) => (
                 <TableRow key={row.id} hover sx={{ '& td': { py: 2 } }}>
                   <TableCell>
                     <Stack>
@@ -328,20 +395,21 @@ export default function AdminNameRequestsPage() {
                   </TableCell>
                 </TableRow>
               ))}
+
+              {/* 4. INFINITE SCROLL TRIGGER (Inside Tbody) */}
+              {requests.length > visibleCount && (
+                <TableRow ref={observerTarget}>
+                  <TableCell colSpan={7} sx={{ border: 0, p: 2 }}>
+                    {isLoadingMore && (
+                        <Stack alignItems="center">
+                           <Skeleton variant="text" width="40%" height={30} />
+                        </Stack>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
-          
-          {/* Pagination */}
-          <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', borderTop: '1px solid #e2e8f0' }}>
-            <Pagination 
-                count={totalPages} 
-                page={page} 
-                onChange={(_, v) => { setPage(v); fetchRequests(v); }}
-                color="primary" 
-                shape="rounded"
-                sx={{ '& .Mui-selected': { bgcolor: TEAL + ' !important', color: 'white' } }}
-            />
-          </Box>
         </TableContainer>
       )}
     </Container>

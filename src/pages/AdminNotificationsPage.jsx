@@ -1,3 +1,4 @@
+// src/pages/AdminNotificationsPage.jsx
 import * as React from "react";
 import {
   Box,
@@ -8,13 +9,10 @@ import {
   Chip,
   Button,
   IconButton,
-  Tooltip,
   Divider,
   FormControlLabel,
-  LinearProgress,
   Snackbar,
   Alert,
-  Pagination,
   useMediaQuery,
   MenuItem,
   Switch,
@@ -23,8 +21,7 @@ import {
   Container,
   Skeleton
 } from "@mui/material";
-import { Link, useNavigate } from "react-router-dom";
-import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import { Link } from "react-router-dom";
 import DoneAllRoundedIcon from "@mui/icons-material/DoneAllRounded";
 import MarkEmailReadOutlinedIcon from "@mui/icons-material/MarkEmailReadOutlined";
 import MarkEmailUnreadOutlinedIcon from "@mui/icons-material/MarkEmailUnreadOutlined";
@@ -305,22 +302,54 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
   );
 }
 
+// --- Skeleton Component ---
+function AdminNotificationSkeleton() {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 1.5,
+        mb: 1.5,
+        width: "100%",
+        border: `1px solid ${BORDER}`,
+        borderRadius: 2,
+      }}
+    >
+      <Stack direction="row" spacing={1.5} alignItems="flex-start">
+        <Skeleton variant="circular" width={44} height={44} />
+        <Box sx={{ flex: 1 }}>
+          <Skeleton variant="text" width="60%" height={24} />
+          <Skeleton variant="text" width="30%" height={16} sx={{ mt: 0.5 }} />
+          <Skeleton variant="rounded" width={140} height={32} sx={{ mt: 1.5 }} />
+        </Box>
+      </Stack>
+    </Paper>
+  );
+}
+
 // --- MAIN COMPONENT ---
 export default function AdminNotificationsPage() {
   const isMobile = useMediaQuery("(max-width:600px)");
   const [tab, setTab] = React.useState("all");
   const [onlyUnread, setOnlyUnread] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
   const [items, setItems] = React.useState([]);
   const [count, setCount] = React.useState(0);
   const [unreadCount, setUnreadCount] = React.useState(0);
-  const [page, setPage] = React.useState(1);
-  const pageSize = 8; // Matched community page size
-  const start = (page - 1) * pageSize;
-  const pageItems = items.slice(start, start + pageSize);
+  
+  // -- Loading & Infinite Scroll State --
+  const [initialLoading, setInitialLoading] = React.useState(true);
+  const [visibleCount, setVisibleCount] = React.useState(8);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const observerTarget = React.useRef(null);
+  
   const [busyId, setBusyId] = React.useState(null);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
   const [userInitial, setUserInitial] = React.useState("A");
+
+  // Calculate visible items based on infinite scroll state
+  const visibleItems = React.useMemo(() => {
+    return items.slice(0, visibleCount);
+  }, [items, visibleCount]);
 
   React.useEffect(() => {
     const fetchMe = async () => {
@@ -336,8 +365,32 @@ export default function AdminNotificationsPage() {
     fetchMe();
   }, []);
 
+  // --- Intersection Observer Logic ---
+  React.useEffect(() => {
+    // If we have shown all items or are currently loading, do nothing
+    if (isLoadingMore || visibleCount >= items.length || !observerTarget.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsLoadingMore(true);
+          // Fake network delay for smooth UX
+          setTimeout(() => {
+            setVisibleCount((prev) => prev + 5);
+            setIsLoadingMore(false);
+          }, 500);
+        }
+      },
+      { threshold: 0.1 } 
+    );
+
+    observer.observe(observerTarget.current);
+    return () => observer.disconnect();
+  }, [isLoadingMore, visibleCount, items.length]);
+
+
   const fetchData = React.useCallback(async () => {
-    setLoading(true);
+    setInitialLoading(true);
     try {
       let out = { items: [], count: 0 };
       if (tab === "name_change") out = await loadNameChangeRequests();
@@ -362,14 +415,13 @@ export default function AdminNotificationsPage() {
       setUnreadCount(unread);
       setItems(out.items);
       setCount(out.count);
+      setVisibleCount(8); // Reset scroll on new filter
     } catch (e) {
       setItems([]); setCount(0);
-    } finally { setLoading(false); }
+    } finally { setInitialLoading(false); }
   }, [tab, onlyUnread]);
 
-  React.useEffect(() => { setPage(1); fetchData(); }, [fetchData]);
-
-  const totalPages = Math.max(1, Math.ceil(count / pageSize));
+  React.useEffect(() => { fetchData(); }, [fetchData]);
 
   // --- Handlers ---
   const markRead = async (n) => { 
@@ -455,7 +507,7 @@ export default function AdminNotificationsPage() {
             variant="outlined" 
             startIcon={<DoneAllRoundedIcon />} 
             onClick={handleMarkAllRead} 
-            disabled={loading || unreadCount === 0} 
+            disabled={initialLoading || unreadCount === 0} 
             sx={{ borderRadius: 99, textTransform: "uppercase", fontSize: 12, px: 2.5, borderColor: TEAL, color: TEAL, '&:hover': { bgcolor: '#f0fdfa', borderColor: TEAL } }}
           >
             Mark all read
@@ -485,31 +537,51 @@ export default function AdminNotificationsPage() {
       </Stack>
 
       {/* List */}
-      <Stack spacing={1}>
-        {loading && items.length === 0 && <LinearProgress sx={{ borderRadius: 2, color: TEAL }} />}
-        
-        {!loading && items.length === 0 && (
+      <Box>
+        {/* 1. INITIAL LOADING STATE - Show Skeletons */}
+        {initialLoading ? (
+          <Stack spacing={1}>
+            <AdminNotificationSkeleton />
+            <AdminNotificationSkeleton />
+            <AdminNotificationSkeleton />
+            <AdminNotificationSkeleton />
+          </Stack>
+        ) : items.length === 0 ? (
+          // 2. EMPTY STATE
           <Paper variant="outlined" sx={{ p: 4, textAlign: "center", borderRadius: 3, bgcolor: '#f8fafc', borderStyle: 'dashed' }}>
             <Typography color="text.secondary" fontWeight={500}>No notifications found.</Typography>
           </Paper>
+        ) : (
+          // 3. LIST + INFINITE SCROLL
+          <>
+            <Stack spacing={1}>
+              {visibleItems.map((n) => (
+                <AdminNotificationRow 
+                  key={n.id} 
+                  n={n} 
+                  busy={busyId === n.id} 
+                  onApprove={approveJoin} 
+                  onReject={rejectJoin} 
+                  onDecideName={decideNameChange} 
+                  onMarkRead={markRead} 
+                />
+              ))}
+            </Stack>
+
+            {/* 4. INFINITE SCROLL TRIGGER & BOTTOM SKELETON */}
+            {items.length > visibleCount && (
+              <Box ref={observerTarget} sx={{ py: 2, mt: 1, textAlign: 'center' }}>
+                {isLoadingMore && (
+                  <Stack spacing={1}>
+                    <AdminNotificationSkeleton />
+                    <AdminNotificationSkeleton />
+                  </Stack>
+                )}
+              </Box>
+            )}
+          </>
         )}
-
-        {pageItems.map((n) => (
-          <AdminNotificationRow 
-            key={n.id} 
-            n={n} 
-            busy={busyId === n.id} 
-            onApprove={approveJoin} 
-            onReject={rejectJoin} 
-            onDecideName={decideNameChange} 
-            onMarkRead={markRead} 
-          />
-        ))}
-      </Stack>
-
-      <Stack direction="row" justifyContent="center" sx={{ mt: 4 }}>
-        <Pagination page={page} count={totalPages} onChange={(e, v) => setPage(v)} color="primary" shape="rounded" sx={{ '& .Mui-selected': { bgcolor: TEAL + ' !important', color: 'white' } }} />
-      </Stack>
+      </Box>
 
       <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast((t) => ({ ...t, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
         <Alert variant="filled" severity={toast.type === "error" ? "error" : "success"} onClose={() => setToast((t) => ({ ...t, open: false }))}>{toast.msg}</Alert>
