@@ -501,12 +501,6 @@ export default function HomePage() {
             <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
               <Stack direction="row" alignItems="center" spacing={1}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
-                {/* --- EDIT BUTTON (Identity) --- */}
-                <Tooltip title="Identity Details">
-                  <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
-                    <EditRoundedIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
               </Stack>
               {profile.experience && profile.experience.length > 0 ? (
                 <Typography variant="body2" color="text.secondary">
@@ -517,7 +511,20 @@ export default function HomePage() {
               )}
             </Box>
 
-            <Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" }, mx: 2 }} />
+            {/* --- EDIT BUTTON (Identity) moved to end, before divider --- */}
+            <Box sx={{ ml: "auto", display: "flex", alignItems: "center" }}>
+              <Tooltip title="Identity Details">
+                <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
+                  <EditRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+
+            <Divider
+              orientation="vertical"
+              flexItem
+              sx={{ display: { xs: "none", sm: "block" }, mx: 2 }}
+            />
 
             <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" } }}>
               <Typography variant="subtitle2">
@@ -560,8 +567,8 @@ export default function HomePage() {
         onClose={() => setBasicInfoOpen(false)}
         profile={profile}
         onRequestNameChange={() => {
-          setBasicInfoOpen(false); 
-          setNameChangeOpen(true); 
+          setBasicInfoOpen(false);
+          setNameChangeOpen(true);
         }}
       />
 
@@ -657,10 +664,10 @@ function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
           <Typography variant="body2" color="text.secondary">
             Legal names are locked for security.
           </Typography>
-          
+
           {/* LOCKED NAMES */}
           <Box sx={{ display: "flex", gap: 2 }}>
-            <TextField label="First Name" fullWidth disabled value={profile?.first_name || ""}  />
+            <TextField label="First Name" fullWidth disabled value={profile?.first_name || ""} />
             <TextField label="Last Name" fullWidth disabled value={profile?.last_name || ""} />
           </Box>
 
@@ -778,6 +785,12 @@ function AboutTab({ profile, onUpdate }) {
   const [contactOpen, setContactOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState({});
 
+  const [savingAbout, setSavingAbout] = React.useState(false);
+  const [savingEdu, setSavingEdu] = React.useState(false);
+  const [savingContact, setSavingContact] = React.useState(false);
+  const [deletingEdu, setDeletingEdu] = React.useState(false);
+  const [deletingExp, setDeletingExp] = React.useState(false);
+
   const latestExp = React.useMemo(() => profile.experience?.[0], [profile.experience]);
 
   React.useEffect(() => {
@@ -793,25 +806,61 @@ function AboutTab({ profile, onUpdate }) {
   };
 
   const saveAbout = async () => {
+    if (savingAbout) return;                // avoid double trigger
+    setSavingAbout(true);
     try {
-      await saveProfileToMe({ ...profile, profile: { ...profile, bio: aboutForm.bio, skills: parseSkills(aboutForm.skillsText) } });
-      onUpdate?.({ ...profile, bio: aboutForm.bio, skills: parseSkills(aboutForm.skillsText) });
+      await saveProfileToMe({
+        ...profile,
+        profile: {
+          ...profile,
+          bio: aboutForm.bio,
+          skills: parseSkills(aboutForm.skillsText),
+        },
+      });
+      onUpdate?.({
+        ...profile,
+        bio: aboutForm.bio,
+        skills: parseSkills(aboutForm.skillsText),
+      });
       setAboutOpen(false);
-    } catch { }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingAbout(false);
+    }
   };
 
   const saveEducation = async () => {
-    const payload = { ...eduForm, start: eduForm.start ? `${eduForm.start}-01-01` : null, end: eduForm.end ? `${eduForm.end}-01-01` : null };
+    if (savingEdu) return;
+    setSavingEdu(true);
+
+    const payload = {
+      ...eduForm,
+      start: eduForm.start ? `${eduForm.start}-01-01` : null,
+      end: eduForm.end ? `${eduForm.end}-01-01` : null,
+    };
+
     try {
-      if (editEduId) await updateEducationApi(editEduId, payload);
-      else await createEducationApi(payload);
-      setEduOpen(false); setEditEduId(null); await reloadExtras();
-    } catch { }
+      if (editEduId) {
+        await updateEducationApi(editEduId, payload);
+      } else {
+        await createEducationApi(payload);
+      }
+      setEduOpen(false);
+      setEditEduId(null);
+      await reloadExtras();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingEdu(false);
+    }
   };
+
 
   const saveExperience = async () => {
     if (savingExp) return;
     setSavingExp(true);
+
     try {
       const loc = [expForm.city, expForm.location].filter(Boolean).join(", ");
       const payload = {
@@ -824,38 +873,81 @@ function AboutTab({ profile, onUpdate }) {
         current: expForm.current,
         sector: expForm.sector || "",
         industry: expForm.industry || "",
-        number_of_employees: expForm.number_of_employees || ""
+        number_of_employees: expForm.number_of_employees || "",
       };
 
       if (editExpId) await updateExperienceApi(editExpId, payload);
       else await createExperienceApi(payload);
 
       if (expForm.current && syncProfileLocation && loc) {
-        await saveProfileToMe({ ...profile, profile: { ...profile, location: loc } });
+        await saveProfileToMe({
+          ...profile,
+          profile: { ...profile, location: loc },
+        });
         onUpdate?.({ ...profile, location: loc });
       }
-      setExpOpen(false); setEditExpId(null); await reloadExtras();
-    } catch { }
-    setSavingExp(false);
+
+      setExpOpen(false);
+      setEditExpId(null);
+      await reloadExtras();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingExp(false);
+    }
   };
 
+
   const saveContact = async () => {
+    if (savingContact) return;
+    setSavingContact(true);
+
     try {
-      const loc = [contactForm.city, contactForm.location].filter(Boolean).join(", ");
+      const loc = [contactForm.city, contactForm.location]
+        .filter(Boolean)
+        .join(", ");
       const links = { ...(profile.links || {}), linkedin: contactForm.linkedin };
       const payload = {
         email: contactForm.email,
-        profile: { ...profile, location: loc, links }
+        profile: { ...profile, location: loc, links },
       };
       await saveProfileToMe(payload);
-      onUpdate?.({ ...profile, email: payload.email, location: loc, links });
+      onUpdate?.({
+        ...profile,
+        email: payload.email,
+        location: loc,
+        links,
+      });
       setContactOpen(false);
-    } catch { }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingContact(false);
+    }
   };
+
 
   const openAddExp = () => {
     setEditExpId(null);
-    setExpForm({ org: "", position: "", city: "", location: "", start: "", end: "", current: false, employment_type: "full_time", sector: "", industry: "", number_of_employees: "" });
+    setExpForm({
+      org: "",
+      position: "",
+      city: "",
+      location: "",
+      start: "",
+      end: "",
+      current: false,
+      employment_type: "full_time",
+      work_schedule: "",
+      relationship_to_org: "",
+      career_stage: "",
+      work_arrangement: "",
+      description: "",
+      exit_reason: "",
+      sector: "",
+      industry: "",
+      number_of_employees: "",
+    });
     setExpOpen(true);
   };
   const openEditExp = (id) => {
@@ -872,7 +964,7 @@ function AboutTab({ profile, onUpdate }) {
       <Grid container spacing={2} sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, alignItems: "flex-start" }}>
         {/* LEFT: About / Skills / Experience / Education */}
         <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
-          
+
           <SectionCard title="About" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("description"); setAboutOpen(true); }}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>} sx={{ minHeight: 160, display: "flex", flexDirection: "column" }}>
             <Typography variant="body2">{profile.bio || <Box component="span" sx={{ color: "text.secondary" }}>List your major duties...</Box>}</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mt: "auto", alignSelf: "flex-end", display: "block", pt: 1 }}>{(profile.bio || "").length}/2000</Typography>
@@ -886,7 +978,53 @@ function AboutTab({ profile, onUpdate }) {
             <List dense disablePadding>
               {profile.experience?.map(exp => (
                 <ListItem key={exp.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setExpDeleteId(exp.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => openEditExp(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton></Box>}>
-                  <ListItemText primary={<Stack direction="row" spacing={1} alignItems="center"><Typography variant="body2" fontWeight={600}>{exp.position}</Typography><Typography variant="body2" color="text.secondary">— {exp.org}</Typography></Stack>} secondary={<React.Fragment><Typography variant="caption" color="text.secondary" display="block">{dateRange(exp.start, exp.end, exp.current)}</Typography>{(exp.industry || exp.number_of_employees) && (<Typography variant="caption" color="text.secondary">{exp.industry} {exp.industry && exp.number_of_employees ? "•" : ""} {exp.number_of_employees} employees</Typography>)}</React.Fragment>} />
+                  <ListItemText
+                    primary={
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {exp.position || "Role not specified"}
+                          {exp.org ? ` · ${exp.org}` : ""}
+                        </Typography>
+                      </Box>
+                    }
+                    secondary={
+                      <React.Fragment>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                        >
+                          {dateRange(exp.start, exp.end, exp.current)}
+                          {exp.location ? ` · ${exp.location}` : ""}
+                        </Typography>
+
+                        {(exp.industry || exp.number_of_employees) && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {exp.industry}
+                            {exp.industry && exp.number_of_employees ? " • " : ""}
+                            {exp.number_of_employees} employees
+                          </Typography>
+                        )}
+
+                        {exp.description && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              mt: 0.5,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              whiteSpace: "normal",
+                            }}
+                          >
+                            {exp.description}
+                          </Typography>
+                        )}
+                      </React.Fragment>
+                    }
+                  />
                 </ListItem>
               ))}
             </List>
@@ -938,7 +1076,16 @@ function AboutTab({ profile, onUpdate }) {
       <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{aboutMode === "skills" ? "Edit skills" : "Edit description"}</DialogTitle>
         <DialogContent>{aboutMode === "description" ? (<TextField multiline minRows={4} fullWidth value={aboutForm.bio} onChange={(e) => setAboutForm(f => ({ ...f, bio: e.target.value }))} />) : (<TextField fullWidth label="Skills (CSV)" value={aboutForm.skillsText} onChange={(e) => setAboutForm(f => ({ ...f, skillsText: e.target.value }))} />)}</DialogContent>
-        <DialogActions><Button onClick={() => setAboutOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAbout}>Save</Button></DialogActions>
+        <DialogActions>
+          <Button onClick={() => setAboutOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={saveAbout}
+            disabled={savingAbout}
+          >
+            {savingAbout ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* CONTACT DIALOG (Cleaned up - No Names/Request Button) */}
@@ -952,7 +1099,16 @@ function AboutTab({ profile, onUpdate }) {
             <TextField label="LinkedIn" fullWidth value={contactForm.linkedin || ""} onChange={(e) => setContactForm({ ...contactForm, linkedin: e.target.value })} />
           </Stack>
         </DialogContent>
-        <DialogActions><Button onClick={() => setContactOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveContact}>Save</Button></DialogActions>
+        <DialogActions>
+          <Button onClick={() => setContactOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={saveContact}
+            disabled={savingContact}
+          >
+            {savingContact ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Dialog open={eduOpen} onClose={() => setEduOpen(false)} fullWidth maxWidth="sm">
@@ -965,12 +1121,380 @@ function AboutTab({ profile, onUpdate }) {
             <Box sx={{ display: "flex", gap: 2 }}><TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm({ ...eduForm, start: e.target.value })} /><TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm({ ...eduForm, end: e.target.value })} /></Box>
           </Stack>
         </DialogContent>
-        <DialogActions><Button onClick={() => setEduOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveEducation}>Save</Button></DialogActions>
+        <DialogActions>
+          <Button onClick={() => setEduOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={saveEducation}
+            disabled={savingEdu}
+          >
+            {savingEdu ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
       </Dialog>
-      
+
+      {/* EXPERIENCE DIALOG */}
+      <Dialog open={expOpen} onClose={() => setExpOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>
+          {editExpId ? "Edit Experience" : "Add Experience"}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {/* 1. Company / Organization (same Clearbit autocomplete as ProfilePage) */}
+            <CompanyAutocomplete
+              value={expForm.org ? { name: expForm.org } : null}
+              onChange={(company) =>
+                setExpForm((prev) => ({
+                  ...prev,
+                  org: company?.name || "",
+                }))
+              }
+            />
+
+            {/* 2. Position / Title */}
+            <TextField
+              label="Position / Title"
+              fullWidth
+              value={expForm.position || ""}
+              onChange={(e) =>
+                setExpForm((prev) => ({ ...prev, position: e.target.value }))
+              }
+            />
+
+            {/* 3. Sector – same order as ProfilePage */}
+            <TextField
+              select
+              label="Sector"
+              fullWidth
+              value={expForm.sector || ""}
+              onChange={(e) =>
+                setExpForm((prev) => ({ ...prev, sector: e.target.value }))
+              }
+            >
+              {SECTOR_OPTIONS.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {/* 4. Industry */}
+            <TextField
+              select
+              label="Industry"
+              fullWidth
+              value={expForm.industry || ""}
+              onChange={(e) =>
+                setExpForm((prev) => ({ ...prev, industry: e.target.value }))
+              }
+            >
+              {INDUSTRY_OPTIONS.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {/* 5. Number of employees */}
+            <TextField
+              select
+              label="Number of employees"
+              fullWidth
+              value={expForm.number_of_employees || ""}
+              onChange={(e) =>
+                setExpForm((prev) => ({
+                  ...prev,
+                  number_of_employees: e.target.value,
+                }))
+              }
+            >
+              {EMPLOYEE_COUNT_OPTIONS.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {/* 6. Location: City + Country (same pattern you already use) */}
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <Autocomplete
+                options={CITY_OPTIONS}
+                value={expForm.city || ""}
+                onChange={(_, v) =>
+                  setExpForm((prev) => ({ ...prev, city: v || "" }))
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="City" />
+                )}
+                sx={{ flex: 1, minWidth: 150 }}
+              />
+
+              <Autocomplete
+                options={COUNTRY_OPTIONS}
+                value={getSelectedCountry({ location: expForm.location })}
+                getOptionLabel={(o) => o?.label || ""}
+                onChange={(_, v) =>
+                  setExpForm((prev) => ({
+                    ...prev,
+                    location: v?.label || "",
+                  }))
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="Country" />
+                )}
+                sx={{ flex: 1, minWidth: 150 }}
+              />
+            </Box>
+
+            {/* 7. Employment type / schedule / stage / arrangement – SAME as Profile page */}
+            <TextField
+              select
+              label="Employment type *"
+              fullWidth
+              value={expForm.relationship_to_org || ""}
+              onChange={(e) =>
+                setExpForm((prev) => ({
+                  ...prev,
+                  relationship_to_org: e.target.value,
+                }))
+              }
+            >
+              <MenuItem value="employee">Employee (on payroll)</MenuItem>
+              <MenuItem value="independent">
+                Independent (self-employed / contractor / freelance)
+              </MenuItem>
+              <MenuItem value="third_party">
+                Third-party (Agency / Consultancy / Temp)
+              </MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              label="Work schedule"
+              fullWidth
+              value={expForm.work_schedule || ""}
+              onChange={(e) =>
+                setExpForm((prev) => ({
+                  ...prev,
+                  work_schedule: e.target.value,
+                }))
+              }
+            >
+              <MenuItem value="full_time">Full-time</MenuItem>
+              <MenuItem value="part_time">Part-time</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              fullWidth
+              label="Career stage"
+              value={expForm.career_stage || ""}
+              onChange={(e) =>
+                setExpForm((prev) => ({
+                  ...prev,
+                  career_stage: e.target.value,
+                }))
+              }
+            >
+              <MenuItem value="internship">Internship</MenuItem>
+              <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
+              <MenuItem value="trainee">Trainee</MenuItem>
+              <MenuItem value="entry">Entry level</MenuItem>
+              <MenuItem value="mid">Mid level</MenuItem>
+              <MenuItem value="senior">Senior level</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              label="Work arrangement"
+              fullWidth
+              value={expForm.work_arrangement || ""}
+              onChange={(e) =>
+                setExpForm((prev) => ({
+                  ...prev,
+                  work_arrangement: e.target.value,
+                }))
+              }
+            >
+              <MenuItem value="onsite">On-site</MenuItem>
+              <MenuItem value="hybrid">Hybrid</MenuItem>
+              <MenuItem value="remote">Remote</MenuItem>
+            </TextField>
+
+            {/* 8. Dates */}
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <TextField
+                label="Start Date"
+                type="date"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                value={expForm.start || ""}
+                onChange={(e) =>
+                  setExpForm((prev) => ({ ...prev, start: e.target.value }))
+                }
+              />
+              <TextField
+                label="End Date"
+                type="date"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                disabled={!!expForm.current}
+                value={expForm.end || ""}
+                onChange={(e) =>
+                  setExpForm((prev) => ({ ...prev, end: e.target.value }))
+                }
+              />
+            </Box>
+
+            {/* 9. Current + sync profile location (only when current) */}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!expForm.current}
+                  onChange={(e) => {
+                    const current = e.target.checked;
+                    setExpForm((prev) => ({
+                      ...prev,
+                      current,
+                      end: current ? "" : prev.end,
+                    }));
+                  }}
+                />
+              }
+              label="I currently work here"
+            />
+
+            {expForm.current && (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={!!syncProfileLocation}
+                    onChange={(e) => setSyncProfileLocation(e.target.checked)}
+                  />
+                }
+                label="Make this location my profile’s work location"
+              />
+            )}
+
+            {/* 10. Description + counter + Rewrite button */}
+            <Box sx={{ mt: 1 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{ mb: 0.5 }}
+              >
+                Description
+              </Typography>
+              <TextField
+                placeholder="List your major duties..."
+                multiline
+                minRows={4}
+                fullWidth
+                value={expForm.description || ""}
+                onChange={(e) =>
+                  setExpForm((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+              />
+              <Box
+                sx={{
+                  mt: 0.5,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Review before saving.
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {(expForm.description?.length || 0)}/2000
+                </Typography>
+              </Box>
+              <Box sx={{ mt: 1 }}>
+                <Button variant="outlined" size="small">
+                  Rewrite with AI
+                </Button>
+              </Box>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExpOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={saveExperience}
+            disabled={savingExp}
+          >
+            {savingExp ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Delete Dialogs */}
-      <Dialog open={!!eduDeleteId} onClose={() => setEduDeleteId(null)}><DialogTitle>Delete Education?</DialogTitle><DialogActions><Button onClick={() => setEduDeleteId(null)}>Cancel</Button><Button color="error" onClick={async () => { await deleteEducationApi(eduDeleteId); await reloadExtras(); setEduDeleteId(null); }}>Delete</Button></DialogActions></Dialog>
-      <Dialog open={!!expDeleteId} onClose={() => setExpDeleteId(null)}><DialogTitle>Delete Experience?</DialogTitle><DialogActions><Button onClick={() => setExpDeleteId(null)}>Cancel</Button><Button color="error" onClick={async () => { await deleteExperienceApi(expDeleteId); await reloadExtras(); setExpDeleteId(null); }}>Delete</Button></DialogActions></Dialog>
+      <Dialog open={!!eduDeleteId} onClose={() => setEduDeleteId(null)}>
+        <DialogTitle>Delete Education?</DialogTitle>
+        <DialogActions>
+          <Button
+            onClick={() => setEduDeleteId(null)}
+            disabled={deletingEdu}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            disabled={deletingEdu}
+            onClick={async () => {
+              if (deletingEdu) return;
+              setDeletingEdu(true);
+              try {
+                await deleteEducationApi(eduDeleteId);
+                await reloadExtras();
+                setEduDeleteId(null);
+              } catch (e) {
+                console.error(e);
+              } finally {
+                setDeletingEdu(false);
+              }
+            }}
+          >
+            {deletingEdu ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={!!expDeleteId} onClose={() => setExpDeleteId(null)}>
+        <DialogTitle>Delete Experience?</DialogTitle>
+        <DialogActions>
+          <Button
+            onClick={() => setExpDeleteId(null)}
+            disabled={deletingExp}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            disabled={deletingExp}
+            onClick={async () => {
+              if (deletingExp) return;
+              setDeletingExp(true);
+              try {
+                await deleteExperienceApi(expDeleteId);
+                await reloadExtras();
+                setExpDeleteId(null);
+              } catch (e) {
+                console.error(e);
+              } finally {
+                setDeletingExp(false);
+              }
+            }}
+          >
+            {deletingExp ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 }

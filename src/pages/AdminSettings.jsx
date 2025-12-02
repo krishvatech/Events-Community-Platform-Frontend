@@ -34,6 +34,8 @@ import {
   useMediaQuery,
   useTheme,
   MenuItem,
+  CircularProgress,
+  ListItemAvatar,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
@@ -51,6 +53,7 @@ import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
 import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
 
 import { isOwnerUser } from "../utils/adminRole";
 
@@ -286,6 +289,104 @@ const rangeLinkedIn = (s, e, cur) => {
   return start || end ? `${start} - ${end || ""}` : "";
 };
 
+
+// -----------------------------------------------------------------------------
+// Company Autocomplete Component
+// -----------------------------------------------------------------------------
+function CompanyAutocomplete({ value, onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
+
+  React.useEffect(() => {
+    let active = true;
+
+    if (inputValue === "") {
+      setOptions(value ? [{ name: value }] : []);
+      return undefined;
+    }
+
+    const fetchCompanies = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${inputValue}`);
+        const data = await response.json();
+        if (active) setOptions(data);
+      } catch (error) {
+        console.error("Error fetching companies:", error);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    const timer = setTimeout(fetchCompanies, 400);
+    return () => { active = false; clearTimeout(timer); };
+  }, [inputValue, value]);
+
+  return (
+    <Autocomplete
+      freeSolo
+      id="company-autocomplete"
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      isOptionEqualToValue={(option, value) => option.name === value.name}
+      getOptionLabel={(option) => {
+        if (typeof option === 'string') return option;
+        return option.name;
+      }}
+      options={options}
+      loading={loading}
+      value={value ? { name: value } : null}
+      onChange={(event, newValue) => {
+        if (typeof newValue === 'string') {
+          onChange(newValue);
+        } else if (newValue && newValue.inputValue) {
+          onChange(newValue.inputValue);
+        } else if (newValue && newValue.name) {
+          onChange(newValue.name);
+        } else {
+          onChange("");
+        }
+      }}
+      onInputChange={(event, newInputValue) => setInputValue(newInputValue)}
+      renderOption={(props, option) => (
+        <ListItem {...props} key={option.domain || option.name}>
+          <ListItemAvatar>
+            <Avatar src={option.logo} variant="rounded" sx={{ width: 24, height: 24 }}>
+              <BusinessRoundedIcon fontSize="small" />
+            </Avatar>
+          </ListItemAvatar>
+          <ListItemText
+            primary={option.name}
+            secondary={option.domain}
+            primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+            secondaryTypographyProps={{ variant: 'caption' }}
+          />
+        </ListItem>
+      )}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label="Company Name *"
+          fullWidth
+          sx={{ mb: 2 }}
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <React.Fragment>
+                {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                {params.InputProps.endAdornment}
+              </React.Fragment>
+            ),
+          }}
+        />
+      )}
+    />
+  );
+}
+
+
 // -------------------- Component --------------------
 
 export default function AdminSettings() {
@@ -343,7 +444,9 @@ export default function AdminSettings() {
     org: "", position: "", city: "", location: "", start: "", end: "", current: false,
     employment_type: "full_time", work_schedule: "", relationship_to_org: "",
     career_stage: "", work_arrangement: "", description: "", exit_reason: "",
-    compensation_type: "",
+    compensation_type: "", sector: "",
+    industry: "",
+    number_of_employees: "",
   };
 
   const [expForm, setExpForm] = React.useState(emptyExpForm);
@@ -526,6 +629,9 @@ export default function AdminSettings() {
       relationship_to_org: item.relationship_to_org || "", career_stage: item.career_stage || "",
       work_arrangement: item.work_arrangement || "", description: item.description || "",
       exit_reason: item.exit_reason || "", compensation_type: item.compensation_type || "",
+      sector: item.sector || "",
+      industry: item.industry || "",
+      number_of_employees: item.number_of_employees || "",
     });
     setSyncProfileLocation(false);
     setExpOpen(true);
@@ -677,6 +783,9 @@ export default function AdminSettings() {
           description: expForm.description || "", exit_reason: expForm.exit_reason || "", employment_type: expForm.employment_type || "full_time",
           work_schedule: expForm.work_schedule || "", relationship_to_org: expForm.relationship_to_org || "", career_stage: expForm.career_stage || "",
           compensation_type: expForm.compensation_type || "", work_arrangement: expForm.work_arrangement || "",
+          sector: expForm.sector || "",
+          industry: expForm.industry || "",
+          number_of_employees: expForm.number_of_employees || "",
         }),
       });
       if (!r.ok) throw new Error("Failed to save experience");
@@ -1023,8 +1132,65 @@ export default function AdminSettings() {
         <DialogTitle sx={{ fontWeight: 700 }}>{editExpId ? "Edit experience" : "Create experience"}</DialogTitle>
         <DialogContent dividers>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>*Required fields are marked with an asterisk</Typography>
-          <TextField label="Company name *" value={expForm.org} onChange={(e) => setExpForm((f) => ({ ...f, org: e.target.value }))} fullWidth sx={{ mb: 2 }} />
+          <CompanyAutocomplete
+            value={expForm.org}
+            onChange={(val) => setExpForm((f) => ({ ...f, org: val }))}
+          />
           <TextField label="Position *" value={expForm.position} onChange={(e) => setExpForm((f) => ({ ...f, position: e.target.value }))} fullWidth sx={{ mb: 2 }} />
+          {/* Sector / Industry / Employees – full-width fields */}
+          <TextField
+            select
+            label="Sector"
+            value={expForm.sector || ""}
+            onChange={(e) =>
+              setExpForm((f) => ({ ...f, sector: e.target.value }))
+            }
+            fullWidth
+            sx={{ mb: 2 }}
+          >
+            {SECTOR_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            label="Industry"
+            value={expForm.industry || ""}
+            onChange={(e) =>
+              setExpForm((f) => ({ ...f, industry: e.target.value }))
+            }
+            fullWidth
+            sx={{ mb: 2 }}
+          >
+            {INDUSTRY_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            label="Number of employees"
+            value={expForm.number_of_employees || ""}
+            onChange={(e) =>
+              setExpForm((f) => ({
+                ...f,
+                number_of_employees: e.target.value,
+              }))
+            }
+            fullWidth
+            sx={{ mb: 2 }}
+          >
+            {EMPLOYEE_COUNT_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </TextField>
           <Autocomplete fullWidth size="small" options={CITY_OPTIONS} value={CITY_OPTIONS.find((c) => c === expForm.city) || null} onChange={(_, value) => setExpForm((prev) => ({ ...prev, city: value || "" }))} renderInput={(params) => <TextField {...params} label="City" placeholder="Enter city (optional)" fullWidth sx={{ mb: 2 }} />} />
           <Autocomplete fullWidth size="small" options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: expForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setExpForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country *" placeholder="Select country" fullWidth inputProps={{ ...params.inputProps, autoComplete: "new-password" }} sx={{ mb: 2 }} />} />
           <TextField select label="Employment type *" value={expForm.relationship_to_org} onChange={(e) => setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))} fullWidth sx={{ mb: 2 }}>
