@@ -30,6 +30,7 @@ import Grid from "@mui/material/Grid";
 import dayjs from "dayjs";
 import AdminGroups from "./AdminGroups.jsx";
 import AdminResources from "./AdminResources.jsx";
+import AdminNameRequestsPage from "./AdminNameRequestsPage.jsx";
 import EmojiEmotionsRoundedIcon from '@mui/icons-material/EmojiEmotionsRounded';
 import InsertPhotoRoundedIcon from '@mui/icons-material/InsertPhotoRounded';
 import { LocalizationProvider, TimePicker } from "@mui/x-date-pickers";
@@ -1961,8 +1962,26 @@ export default function DashbAdminEventsoard() {
   const [mobileOpen, setMobileOpen] = React.useState(false); // optional for mobile
   React.useEffect(() => {
     const q = new URLSearchParams(location.search);
-    setActive(q.get("admin_tab") || "events");
-  }, [location.search]);
+    const tab = q.get("admin_tab");
+    
+    if (tab) {
+      setActive(tab);
+    } else if (location.pathname.includes("name-requests")) {
+      setActive("name-requests"); // ✅ Fixes Sidebar Highlight
+    } else if (location.pathname.includes("resources")) {
+      setActive("resources");
+    } else if (location.pathname.includes("posts")) {
+      setActive("posts");
+    } else if (location.pathname.includes("groups")) {
+      setActive("groups");
+    } else if (location.pathname.includes("notifications")) {
+      setActive("notifications");
+    } else if (location.pathname.includes("settings")) {
+      setActive("settings");
+    } else {
+      setActive("events");
+    }
+  }, [location.search, location.pathname]);
 
   return (
     <Box className="min-h-screen bg-slate-50">
@@ -1996,8 +2015,10 @@ export default function DashbAdminEventsoard() {
               <AdminNotificationsPage />
             ) : active === "settings" ? (
               <AdminSettings />
+            ) : active === "name-requests" ? ( 
+               <AdminNameRequestsPage />
             ) : (
-              <AdminResources />   // fallback unchanged
+              <AdminResources />
             )}
           </Grid>
         </Grid>

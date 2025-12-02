@@ -39,7 +39,7 @@ const defaultItems = [
   { key: "groups", label: "Groups", Icon: GroupsRoundedIcon },
   { key: "messages", label: "Messages", Icon: ChatBubbleOutlineRoundedIcon },
   { key: "carts", label: "Cart", Icon: ShoppingCartRoundedIcon },
-  { key: "name-requests", label: "Name Requests", Icon: BadgeOutlinedIcon },
+  { key: "name-requests", label: "Identity Verification", Icon: BadgeOutlinedIcon },
   { key: "staff", label: "Staff", Icon: AdminPanelSettingsRoundedIcon },
   { key: "notifications", label: "Notifications", Icon: NotificationsNoneRoundedIcon },
   { key: "settings", label: "Settings", Icon: SettingsRoundedIcon },
