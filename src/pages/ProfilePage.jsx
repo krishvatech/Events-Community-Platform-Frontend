@@ -338,9 +338,9 @@ function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
 }
 
 // -----------------------------------------------------------------------------
-// Name Change Request Dialog
+// Name Change Request Dialog (Updated to use showToast)
 // -----------------------------------------------------------------------------
-function NameChangeDialog({ open, onClose, currentNames }) {
+function NameChangeDialog({ open, onClose, currentNames, showToast }) {
   const [form, setForm] = React.useState({
     new_first_name: "", new_middle_name: "", new_last_name: "", reason: "",
   });
@@ -359,7 +359,7 @@ function NameChangeDialog({ open, onClose, currentNames }) {
 
   const handleSubmit = async () => {
     if (!form.new_first_name || !form.new_last_name || !form.reason) {
-      alert("First Name, Last Name, and Reason are required.");
+      showToast("error", "First Name, Last Name, and Reason are required.");
       return;
     }
     setLoading(true);
@@ -373,10 +373,10 @@ function NameChangeDialog({ open, onClose, currentNames }) {
         const json = await res.json();
         throw new Error(json.detail || JSON.stringify(json));
       }
-      alert("Request submitted successfully! An admin will review it shortly.");
+      showToast("success", "Request submitted successfully! An admin will review it shortly.");
       onClose();
     } catch (e) {
-      alert(`Error: ${e.message}`);
+      showToast("error", `Error: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -413,6 +413,12 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: "", sev: "success" });
+  
+  // New helper for consistent toast notifications
+  const showNotification = (type, msg) => {
+    setSnack({ open: true, sev: type, msg });
+  };
+
   const [mode, setMode] = useState("preview");
   const [friendCount, setFriendCount] = useState(0);
 
@@ -538,7 +544,7 @@ export default function ProfilePage() {
         });
       } catch (e) {
         if (e?.name === "AbortError") return;
-        setSnack({ open: true, sev: "error", msg: e?.message || "Failed to load profile" });
+        showNotification("error", e?.message || "Failed to load profile");
       } finally {
         if (!alive) return;
         setLoading(false);
@@ -566,16 +572,16 @@ export default function ProfilePage() {
 
   // --- Handlers ---
   const saveAboutWork = async () => {
-    if (!latestExp) { alert("Please add an experience entry first."); return; }
+    if (!latestExp) { showNotification("error", "Please add an experience entry first."); return; }
     try {
       setSaving(true);
       const payload = { sector: workForm.sector, industry: workForm.industry, number_of_employees: workForm.employees };
       const r = await fetch(`${API_BASE}/auth/me/experiences/${latestExp.id}/`, { method: "PATCH", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Failed to update work details");
-      setSnack({ open: true, sev: "success", msg: "Work details updated" });
+      showNotification("success", "Work details updated");
       setWorkOpen(false);
       await loadMeExtras();
-    } catch (e) { setSnack({ open: true, sev: "error", msg: e.message || "Save failed" }); } finally { setSaving(false); }
+    } catch (e) { showNotification("error", e.message || "Save failed"); } finally { setSaving(false); }
   };
 
   const openEditAbout = (mode = "description") => {
@@ -618,11 +624,11 @@ export default function ProfilePage() {
       const url = type === "edu" ? `${API_BASE}/auth/me/educations/${id}/` : `${API_BASE}/auth/me/experiences/${id}/`;
       const r = await fetch(url, { method: "DELETE", headers: tokenHeader() });
       if (!r.ok && r.status !== 204) throw new Error("Delete failed");
-      setSnack({ open: true, sev: "success", msg: type === "edu" ? "Education deleted" : "Experience deleted" });
+      showNotification("success", type === "edu" ? "Education deleted" : "Experience deleted");
       setEduOpen(false); setExpOpen(false); setEditEduId(null); setEditExpId(null);
       closeConfirm();
       await loadMeExtras();
-    } catch (e) { setSnack({ open: true, sev: "error", msg: e?.message || "Delete failed" }); closeConfirm(); }
+    } catch (e) { showNotification("error", e?.message || "Delete failed"); closeConfirm(); }
   }
 
   async function saveAbout() {
@@ -639,9 +645,9 @@ export default function ProfilePage() {
       const r = await fetch(`${API_BASE}/users/me/`, { method: "PUT", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Save failed");
       setForm(f => ({ ...f, bio: aboutForm.bio, skillsText: aboutForm.skillsText }));
-      setSnack({ open: true, sev: "success", msg: "About updated" });
+      showNotification("success", "About updated");
       setAboutOpen(false);
-    } catch (e) { setSnack({ open: true, sev: "error", msg: e?.message || "Save failed" }); } finally { setSaving(false); }
+    } catch (e) { showNotification("error", e?.message || "Save failed"); } finally { setSaving(false); }
   }
 
   async function saveContact() {
@@ -667,9 +673,9 @@ export default function ProfilePage() {
       const r = await fetch(`${API_BASE}/users/me/`, { method: "PUT", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Save failed");
       setForm(prev => ({ ...prev, first_name: firstName, last_name: lastName, email: email || "", location: locationString, linksText: Object.keys(newLinks).length > 0 ? JSON.stringify(newLinks) : "" }));
-      setSnack({ open: true, sev: "success", msg: "Contact updated" });
+      showNotification("success", "Contact updated");
       setContactOpen(false);
-    } catch (e) { setSnack({ open: true, sev: "error", msg: e?.message || "Save failed" }); } finally { setSaving(false); }
+    } catch (e) { showNotification("error", e?.message || "Save failed"); } finally { setSaving(false); }
   }
 
   async function createEducation() {
@@ -689,13 +695,13 @@ export default function ProfilePage() {
       };
       const url = editEduId ? `${API_BASE}/auth/me/educations/${editEduId}/` : `${API_BASE}/auth/me/educations/`;
       const payload = { school: (eduForm.school || "").trim(), degree: (eduForm.degree || "").trim(), field_of_study: (eduForm.field || "").trim(), start_date: normalizeYear(eduForm.start), end_date: normalizeYear(eduForm.end), grade: (eduForm.grade || "").trim() };
-      if (!payload.school || !payload.degree) { setSnack({ open: true, sev: "error", msg: "Please fill School and Degree." }); return; }
+      if (!payload.school || !payload.degree) { showNotification("error", "Please fill School and Degree."); return; }
       const r = await fetch(url, { method: editEduId ? "PATCH" : "POST", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Failed to save education");
-      setSnack({ open: true, sev: "success", msg: editEduId ? "Education updated" : "Education added" });
+      showNotification("success", editEduId ? "Education updated" : "Education added");
       setEduOpen(false); setEditEduId(null); setEduForm(EMPTY_EDU_FORM);
       await loadMeExtras();
-    } catch (e) { setSnack({ open: true, sev: "error", msg: e?.message || "Save failed" }); }
+    } catch (e) { showNotification("error", e?.message || "Save failed"); }
   }
 
   async function createExperience() {
@@ -731,10 +737,10 @@ export default function ProfilePage() {
           if (resp.ok) setForm(prev => ({ ...prev, location: locationString }));
         } catch (err) { console.error("Sync failed", err); }
       }
-      setSnack({ open: true, sev: "success", msg: editExpId ? "Experience updated" : "Experience added" });
+      showNotification("success", editExpId ? "Experience updated" : "Experience added");
       setExpOpen(false); setEditExpId(null); setExpForm(initialExpForm);
       await loadMeExtras();
-    } catch (e) { setSnack({ open: true, sev: "error", msg: e?.message || "Save failed" }); }
+    } catch (e) { showNotification("error", e?.message || "Save failed"); }
   }
 
   async function loadMeExtras() {
@@ -1039,7 +1045,13 @@ export default function ProfilePage() {
       <Dialog open={contactOpen} onClose={() => setContactOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 700 }}>Edit contact</DialogTitle>
         <DialogContent dividers>
-         
+          <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, mb: 2 }}>
+            <TextField label="First name" fullWidth disabled value={contactForm.first_name} />
+            <TextField label="Last name" fullWidth disabled value={contactForm.last_name} />
+          </Box>
+          <Box sx={{ mb: 2 }}>
+            <Button startIcon={<HistoryEduRoundedIcon />} sx={{ textTransform: 'none' }} onClick={() => { setContactOpen(false); setNameChangeOpen(true); }}>Request Name Change</Button>
+          </Box>
           <TextField label="Email" type="email" fullWidth sx={{ mb: 2 }} value={contactForm.email} onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))} />
           <TextField label="LinkedIn URL" fullWidth sx={{ mb: 2 }} placeholder="https://www.linkedin.com/in/username" value={contactForm.linkedin} onChange={(e) => setContactForm((f) => ({ ...f, linkedin: e.target.value }))} />
           <Autocomplete fullWidth size="small" options={CITY_OPTIONS} value={CITY_OPTIONS.find((c) => c === contactForm.city) || null} onChange={(_, value) => setContactForm((prev) => ({ ...prev, city: value || "" }))} renderInput={(params) => <TextField {...params} label="City" placeholder="Select city" sx={{ mb: 2 }} />} />
@@ -1143,6 +1155,7 @@ export default function ProfilePage() {
         open={nameChangeOpen}
         onClose={() => setNameChangeOpen(false)}
         currentNames={{ first: form.first_name, middle: "", last: form.last_name }}
+        showToast={showNotification}
       />
 
       <Snackbar open={snack.open} autoHideDuration={3500} onClose={() => setSnack({ ...snack, open: false })}>

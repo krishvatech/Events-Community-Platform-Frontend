@@ -46,15 +46,13 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import LinkedInIcon from "@mui/icons-material/LinkedIn";
 import EmailIcon from "@mui/icons-material/Email";
 import PlaceIcon from "@mui/icons-material/Place";
-import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
 import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
-import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded'; // Added import
+import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
 
 import { isOwnerUser } from "../utils/adminRole";
 
@@ -259,24 +257,6 @@ const Label = ({ children, sx }) => (
   </Typography>
 );
 
-const KV = ({ label, value }) => (
-  <Box sx={{ display: "flex", alignItems: "center", py: 0.75 }}>
-    <Typography
-      variant="subtitle2"
-      sx={{
-        width: { xs: 110, sm: 150, md: 170 },
-        minWidth: { xs: 110, sm: 150, md: 170 },
-        color: "text.secondary",
-      }}
-    >
-      {label}:
-    </Typography>
-    <Typography variant="body2" sx={{ flex: 1, wordBreak: "break-word" }}>
-      {value || "—"}
-    </Typography>
-  </Box>
-);
-
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const toMonthYear = (d) => {
   if (!d) return "";
@@ -388,7 +368,7 @@ function CompanyAutocomplete({ value, onChange }) {
 }
 
 // -----------------------------------------------------------------------------
-// Basic Info Dialog (Header Trigger) - Identity & Name Change Entry
+// Basic Info Dialog (Identity)
 // -----------------------------------------------------------------------------
 function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
   return (
@@ -399,14 +379,10 @@ function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
           <Typography variant="body2" color="text.secondary">
             Legal names are locked for security.
           </Typography>
-
-          {/* LOCKED NAMES */}
           <Box sx={{ display: "flex", gap: 2 }}>
             <TextField label="First Name" fullWidth disabled value={profile?.first_name || ""} />
             <TextField label="Last Name" fullWidth disabled value={profile?.last_name || ""} />
           </Box>
-
-          {/* REQUEST BUTTON */}
           <Button
             startIcon={<HistoryEduRoundedIcon />}
             sx={{ alignSelf: 'start', textTransform: 'none' }}
@@ -424,9 +400,9 @@ function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
 }
 
 // -----------------------------------------------------------------------------
-// Name Change Request Dialog
+// Name Change Request Dialog (Updated to use showToast instead of alert)
 // -----------------------------------------------------------------------------
-function NameChangeDialog({ open, onClose, currentNames }) {
+function NameChangeDialog({ open, onClose, currentNames, showToast }) {
   const [form, setForm] = React.useState({
     new_first_name: "", new_middle_name: "", new_last_name: "", reason: "",
   });
@@ -445,7 +421,7 @@ function NameChangeDialog({ open, onClose, currentNames }) {
 
   const handleSubmit = async () => {
     if (!form.new_first_name || !form.new_last_name || !form.reason) {
-      alert("First Name, Last Name, and Reason are required.");
+      showToast("error", "First Name, Last Name, and Reason are required.");
       return;
     }
     setLoading(true);
@@ -459,10 +435,10 @@ function NameChangeDialog({ open, onClose, currentNames }) {
         const json = await res.json();
         throw new Error(json.detail || JSON.stringify(json));
       }
-      alert("Request submitted successfully! An admin will review it shortly.");
+      showToast("success", "Request submitted successfully! An admin will review it shortly.");
       onClose();
     } catch (e) {
-      alert(`Error: ${e.message}`);
+      showToast("error", `Error: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -503,6 +479,10 @@ export default function AdminSettings() {
     type: "success",
     msg: "",
   });
+
+  const showNotification = (type, msg) => {
+    setToast({ open: true, type, msg });
+  };
 
   const [profile, setProfile] = React.useState({
     first_name: "", last_name: "", full_name: "", bio: "", headline: "",
@@ -625,7 +605,7 @@ export default function AdminSettings() {
 
   const saveAboutWork = async () => {
     if (!latestExp) {
-      setToast({ open: true, type: "error", msg: "Please add an experience entry first." });
+      showNotification("error", "Please add an experience entry first.");
       return;
     }
     try {
@@ -644,11 +624,11 @@ export default function AdminSettings() {
 
       if (!r.ok) throw new Error("Failed to update work details");
 
-      setToast({ open: true, type: "success", msg: "Work details updated" });
+      showNotification("success", "Work details updated");
       setWorkOpen(false);
-      await loadExtras(); // Refresh to update UI
+      await loadExtras();
     } catch (e) {
-      setToast({ open: true, type: "error", msg: e.message || "Save failed" });
+      showNotification("error", e.message || "Save failed");
     } finally {
       setSaving(false);
     }
@@ -693,9 +673,9 @@ export default function AdminSettings() {
         location: profilePayload.location, links, linksText: JSON.stringify(links),
       }));
       setContactOpen(false);
-      setToast({ open: true, severity: "success", message: "Contact updated" });
+      showNotification("success", "Contact updated");
     } catch (err) {
-      setToast({ open: true, severity: "error", message: "Failed to update contact" });
+      showNotification("error", "Failed to update contact");
     } finally { setSaving(false); }
   };
 
@@ -705,10 +685,10 @@ export default function AdminSettings() {
       const payload = { bio: aboutForm.bio, skills: parseSkills(aboutForm.skillsText), links: parseLinks(profile.linksText) };
       await updateAdminProfile(payload);
       setProfile((p) => ({ ...p, bio: aboutForm.bio, skillsText: aboutForm.skillsText }));
-      setToast({ open: true, type: "success", msg: "About updated" });
+      showNotification("success", "About updated");
       setAboutOpen(false);
     } catch (e) {
-      setToast({ open: true, type: "error", msg: e?.message || "Save failed" });
+      showNotification("error", e?.message || "Save failed");
     } finally { setSaving(false); }
   };
 
@@ -768,11 +748,11 @@ export default function AdminSettings() {
       const url = type === "edu" ? `${API_ROOT}/auth/me/educations/${id}/` : `${API_ROOT}/auth/me/experiences/${id}/`;
       const r = await fetch(url, { method: "DELETE", headers: { ...authHeader() } });
       if (!r.ok && r.status !== 204) throw new Error("Delete failed");
-      setToast({ open: true, type: "success", msg: type === "edu" ? "Education deleted" : "Experience deleted" });
+      showNotification("success", type === "edu" ? "Education deleted" : "Experience deleted");
       closeConfirm();
       await loadExtras();
     } catch (e) {
-      setToast({ open: true, type: "error", msg: e?.message || "Delete failed" });
+      showNotification("error", e?.message || "Delete failed");
       closeConfirm();
     }
   };
@@ -800,14 +780,14 @@ export default function AdminSettings() {
       if (avatarMode === "upload" && avatarFile) {
         const res = await uploadAvatar(avatarFile);
         setProfile((p) => ({ ...p, user_image_url: res.user_image_url || p.user_image_url }));
-        setToast({ open: true, type: "success", msg: "Profile image updated" });
+        showNotification("success", "Profile image updated");
       } else if (avatarMode === "remove") {
         await deleteAvatar();
         setProfile((p) => ({ ...p, user_image_url: "" }));
-        setToast({ open: true, type: "success", msg: "Profile image removed" });
+        showNotification("success", "Profile image removed");
       }
       closeAvatarDialog();
-    } catch (err) { setToast({ open: true, type: "error", msg: err?.message || "Failed to update profile photo" }); } finally { setSaving(false); }
+    } catch (err) { showNotification("error", err?.message || "Failed to update profile photo"); } finally { setSaving(false); }
   };
 
   // ---------- LOADERS ----------
@@ -823,7 +803,7 @@ export default function AdminSettings() {
         skillsText: Array.isArray(prof.skills) ? prof.skills.join(", ") : typeof prof.skills === "string" ? prof.skills : "",
         linksText: prof.links ? JSON.stringify(prof.links) : "",
       });
-    } catch (e) { setToast({ open: true, type: "error", msg: e?.message || "Load failed" }); } finally { setLoading(false); }
+    } catch (e) { showNotification("error", e?.message || "Load failed"); } finally { setLoading(false); }
   }, []);
 
   const loadExtras = React.useCallback(async () => {
@@ -870,13 +850,13 @@ export default function AdminSettings() {
         school: (eduForm.school || "").trim(), degree: (eduForm.degree || "").trim(), field_of_study: (eduForm.field || "").trim(),
         start_date: normalizeYear(eduForm.start), end_date: normalizeYear(eduForm.end), grade: (eduForm.grade || "").trim(),
       };
-      if (!payload.school || !payload.degree) { setToast({ open: true, type: "error", msg: "Please fill School and Degree." }); return; }
+      if (!payload.school || !payload.degree) { showNotification("error", "Please fill School and Degree."); return; }
       const r = await fetch(url, { method: editEduId ? "PATCH" : "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Failed to save education");
-      setToast({ open: true, type: "success", msg: editEduId ? "Education updated" : "Education added" });
+      showNotification("success", editEduId ? "Education updated" : "Education added");
       setEduOpen(false); setEditEduId(null); setEduForm(EMPTY_EDU_FORM);
       await loadExtras();
-    } catch (e) { setToast({ open: true, type: "error", msg: e?.message || "Save failed" }); }
+    } catch (e) { showNotification("error", e?.message || "Save failed"); }
   };
 
   const createExperience = async () => {
@@ -904,10 +884,10 @@ export default function AdminSettings() {
           setProfile((prev) => ({ ...prev, location: locationString }));
         } catch (err) { console.error("Failed to sync profile location", err); }
       }
-      setToast({ open: true, type: "success", msg: editExpId ? "Experience updated" : "Experience added" });
+      showNotification("success", editExpId ? "Experience updated" : "Experience added");
       setExpOpen(false); setEditExpId(null); setExpForm(emptyExpForm);
       await loadExtras();
-    } catch (e) { setToast({ open: true, type: "error", msg: e?.message || "Save failed" }); }
+    } catch (e) { showNotification("error", e?.message || "Save failed"); }
   };
 
   const onPickFile = () => fileRef.current?.click();
@@ -918,8 +898,8 @@ export default function AdminSettings() {
     try {
       const res = await uploadAvatar(f);
       setProfile((p) => ({ ...p, user_image_url: res.user_image_url || p.user_image_url }));
-      setToast({ open: true, type: "success", msg: "Profile image updated" });
-    } catch (err) { setToast({ open: true, type: "error", msg: err?.message || "Avatar upload failed" }); } finally {
+      showNotification("success", "Profile image updated");
+    } catch (err) { showNotification("error", err?.message || "Avatar upload failed"); } finally {
       setSaving(false);
       if (fileRef.current) fileRef.current.value = "";
     }
@@ -931,8 +911,8 @@ export default function AdminSettings() {
       const payload = { full_name: profile.full_name?.trim(), bio: profile.bio?.trim(), headline: profile.headline?.trim(), location: profile.location?.trim() };
       await updateAdminProfile(payload);
       await load();
-      setToast({ open: true, type: "success", msg: "Profile updated" });
-    } catch (err) { setToast({ open: true, type: "error", msg: err?.message || "Update failed" }); } finally { setSaving(false); }
+      showNotification("success", "Profile updated");
+    } catch (err) { showNotification("error", err?.message || "Update failed"); } finally { setSaving(false); }
   };
 
   const displayNameRaw = profile.full_name || `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
@@ -1213,7 +1193,7 @@ export default function AdminSettings() {
         <DialogTitle>Edit Contact</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Box sx={{ display: "flex", gap: 2 }}></Box>
+            <Box sx={{ display: "flex", gap: 2 }}><TextField label="First name" fullWidth value={contactForm.first_name} onChange={(e) => setContactForm((f) => ({ ...f, first_name: e.target.value }))} /><TextField label="Last name" fullWidth value={contactForm.last_name} onChange={(e) => setContactForm((f) => ({ ...f, last_name: e.target.value }))} /></Box>
             <TextField label="Email" type="email" fullWidth value={contactForm.email} onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))} />
             <Autocomplete fullWidth size="small" options={CITY_OPTIONS} value={contactForm.city || null} onChange={(_, value) => setContactForm((f) => ({ ...f, city: value || "" }))} renderInput={(params) => <TextField {...params} label="City" placeholder="Select city" />} />
             <Autocomplete fullWidth size="small" options={COUNTRY_OPTIONS} autoHighlight getOptionLabel={(option) => option.label} value={getSelectedCountry({ location: contactForm.location })} onChange={(_, value) => setContactForm((f) => ({ ...f, location: value?.label || "" }))} renderOption={(props, option) => (<Box component="li" sx={{ display: "flex", gap: 1 }} {...props}><span>{flagEmoji(option.code)}</span><span>{option.label}</span></Box>)} renderInput={(params) => <TextField {...params} label="Country" placeholder="Select country" />} />
@@ -1393,6 +1373,7 @@ export default function AdminSettings() {
           middle: "", // Adjust if middle name is available
           last: profile.last_name
         }}
+        showToast={showNotification}
       />
 
       <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast((t) => ({ ...t, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>

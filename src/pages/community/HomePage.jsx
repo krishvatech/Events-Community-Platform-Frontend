@@ -27,7 +27,9 @@ import {
   MenuItem,
   Autocomplete,
   ListItemAvatar,
-  CircularProgress
+  CircularProgress,
+  Snackbar,
+  Alert
 } from "@mui/material";
 
 // Icons
@@ -41,6 +43,7 @@ import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
 import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 
 // Countries Library
 import * as isoCountries from "i18n-iso-countries";
@@ -149,6 +152,23 @@ function parseSkills(value) {
     if (Array.isArray(j)) return j.map((s) => String(s).trim()).filter(Boolean);
   } catch { }
   return v.split(/,|\n|;/).map((s) => s.trim()).filter(Boolean);
+}
+
+function parseLinks(value) {
+  const v = (value ?? "").toString().trim();
+  if (!v) return {};
+  try {
+    const j = JSON.parse(v);
+    if (j && typeof j === "object" && !Array.isArray(j)) return j;
+  } catch { }
+  const out = {};
+  v.split(/\n|,|;/).forEach((part) => {
+    const [k, ...rest] = part.split("=");
+    const key = (k || "").trim();
+    const val = rest.join("=").trim();
+    if (key && val) out[key] = val;
+  });
+  return out;
 }
 
 function decodeJwtPayload(token) {
@@ -344,9 +364,9 @@ function CompanyAutocomplete({ value, onChange }) {
 }
 
 // -----------------------------------------------------------------------------
-// Name Change Request Dialog
+// Name Change Request Dialog (Updated with showToast)
 // -----------------------------------------------------------------------------
-function NameChangeDialog({ open, onClose, currentNames }) {
+function NameChangeDialog({ open, onClose, currentNames, showToast }) {
   const [form, setForm] = React.useState({
     new_first_name: "",
     new_middle_name: "",
@@ -368,12 +388,11 @@ function NameChangeDialog({ open, onClose, currentNames }) {
 
   const handleSubmit = async () => {
     if (!form.new_first_name || !form.new_last_name || !form.reason) {
-      alert("First Name, Last Name, and Reason are required.");
+      showToast("error", "First Name, Last Name, and Reason are required.");
       return;
     }
     setLoading(true);
     try {
-      // Correct endpoint (singular)
       const res = await fetch(`${API_ROOT}/users/me/name-change-request/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
@@ -383,10 +402,10 @@ function NameChangeDialog({ open, onClose, currentNames }) {
         const json = await res.json();
         throw new Error(json.detail || JSON.stringify(json));
       }
-      alert("Request submitted successfully! An admin will review it shortly.");
+      showToast("success", "Request submitted successfully! An admin will review it shortly.");
       onClose();
     } catch (e) {
-      alert(`Error: ${e.message}`);
+      showToast("error", `Error: ${e.message}`);
     } finally {
       setLoading(false);
     }
@@ -432,7 +451,14 @@ export default function HomePage() {
 
   // Dialog States
   const [nameChangeOpen, setNameChangeOpen] = React.useState(false);
-  const [basicInfoOpen, setBasicInfoOpen] = React.useState(false); // Header edit dialog
+  const [basicInfoOpen, setBasicInfoOpen] = React.useState(false); // Header Identity Dialog
+
+  // Toast State
+  const [snack, setSnack] = React.useState({ open: false, msg: "", sev: "success" });
+
+  const showNotification = (type, msg) => {
+    setSnack({ open: true, sev: type, msg });
+  };
 
   // --- Fetch Profile ---
   const fetchMyProfileFromMe = React.useCallback(async () => {
@@ -539,6 +565,7 @@ export default function HomePage() {
         <AboutTab
           profile={profile}
           onUpdate={handleUpdateProfile}
+          showToast={showNotification}
         />
 
       </Box>
@@ -557,11 +584,12 @@ export default function HomePage() {
           setAvatarDialogOpen(false);
           setAvatarFile(null);
           setAvatarPreview("");
+          showNotification("success", "Profile photo updated successfully.");
         }}
         setSaving={setAvatarSaving}
       />
 
-      {/* NEW: Identity Details Dialog (NO Job Title field) */}
+      {/* NEW: Identity Details Dialog */}
       <BasicInfoDialog
         open={basicInfoOpen}
         onClose={() => setBasicInfoOpen(false)}
@@ -581,7 +609,19 @@ export default function HomePage() {
           middle: profile.middle_name || "",
           last: profile.last_name
         }}
+        showToast={showNotification}
       />
+
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={3500}
+        onClose={() => setSnack({ ...snack, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert onClose={() => setSnack({ ...snack, open: false })} severity={snack.sev} variant="filled" sx={{ width: "100%" }}>
+          {snack.msg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
@@ -765,7 +805,7 @@ const SECTOR_OPTIONS = ["Private Sector", "Public Sector", "Non-Profit", "Govern
 const INDUSTRY_OPTIONS = ["Technology", "Finance", "Healthcare", "Education", "Manufacturing", "Retail", "Media", "Real Estate", "Transportation", "Energy"];
 const EMPLOYEE_COUNT_OPTIONS = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000-5000", "5000+"];
 
-function AboutTab({ profile, onUpdate }) {
+function AboutTab({ profile, onUpdate, showToast }) {
   const [aboutOpen, setAboutOpen] = React.useState(false);
   const [aboutMode, setAboutMode] = React.useState("description");
   const [aboutForm, setAboutForm] = React.useState({ bio: "", skillsText: "" });
@@ -806,7 +846,7 @@ function AboutTab({ profile, onUpdate }) {
   };
 
   const saveAbout = async () => {
-    if (savingAbout) return;                // avoid double trigger
+    if (savingAbout) return;
     setSavingAbout(true);
     try {
       await saveProfileToMe({
@@ -822,9 +862,11 @@ function AboutTab({ profile, onUpdate }) {
         bio: aboutForm.bio,
         skills: parseSkills(aboutForm.skillsText),
       });
+      showToast?.("success", "About section updated.");
       setAboutOpen(false);
     } catch (e) {
       console.error(e);
+      showToast?.("error", "Failed to save about section.");
     } finally {
       setSavingAbout(false);
     }
@@ -846,11 +888,13 @@ function AboutTab({ profile, onUpdate }) {
       } else {
         await createEducationApi(payload);
       }
+      showToast?.("success", editEduId ? "Education updated." : "Education added.");
       setEduOpen(false);
       setEditEduId(null);
       await reloadExtras();
     } catch (e) {
       console.error(e);
+      showToast?.("error", "Failed to save education.");
     } finally {
       setSavingEdu(false);
     }
@@ -887,11 +931,13 @@ function AboutTab({ profile, onUpdate }) {
         onUpdate?.({ ...profile, location: loc });
       }
 
+      showToast?.("success", editExpId ? "Experience updated." : "Experience added.");
       setExpOpen(false);
       setEditExpId(null);
       await reloadExtras();
     } catch (e) {
       console.error(e);
+      showToast?.("error", "Failed to save experience.");
     } finally {
       setSavingExp(false);
     }
@@ -918,9 +964,11 @@ function AboutTab({ profile, onUpdate }) {
         location: loc,
         links,
       });
+      showToast?.("success", "Contact info updated.");
       setContactOpen(false);
     } catch (e) {
       console.error(e);
+      showToast?.("error", "Failed to save contact info.");
     } finally {
       setSavingContact(false);
     }
@@ -965,19 +1013,19 @@ function AboutTab({ profile, onUpdate }) {
         {/* LEFT: About / Skills / Experience / Education */}
         <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
 
-          <SectionCard title="About" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("description"); setAboutOpen(true); }}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>} sx={{ minHeight: 160, display: "flex", flexDirection: "column" }}>
+          <SectionCard title="About" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("description"); setAboutOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>} sx={{ minHeight: 160, display: "flex", flexDirection: "column" }}>
             <Typography variant="body2">{profile.bio || <Box component="span" sx={{ color: "text.secondary" }}>List your major duties...</Box>}</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mt: "auto", alignSelf: "flex-end", display: "block", pt: 1 }}>{(profile.bio || "").length}/2000</Typography>
           </SectionCard>
 
-          <SectionCard title="Skills" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("skills"); setAboutOpen(true); }}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+          <SectionCard title="Skills" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("skills"); setAboutOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
             <SkillsChips skills={profile.skills} />
           </SectionCard>
 
           <SectionCard title="Experience" action={<Tooltip title="Add"><IconButton size="small" onClick={openAddExp}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
               {profile.experience?.map(exp => (
-                <ListItem key={exp.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setExpDeleteId(exp.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => openEditExp(exp.id)}><EditRoundedIcon fontSize="small" /></IconButton></Box>}>
+                <ListItem key={exp.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setExpDeleteId(exp.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => openEditExp(exp.id)}><EditOutlinedIcon fontSize="small" /></IconButton></Box>}>
                   <ListItemText
                     primary={
                       <Box>
@@ -1033,7 +1081,7 @@ function AboutTab({ profile, onUpdate }) {
           <SectionCard title="Education" action={<Tooltip title="Add"><IconButton size="small" onClick={() => { setEditEduId(null); setEduForm({}); setEduOpen(true); }}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
               {profile.education?.map(edu => (
-                <ListItem key={edu.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setEduDeleteId(edu.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => { setEditEduId(edu.id); setEduForm({ ...edu, start: (edu.start || "").slice(0, 4), end: (edu.end || "").slice(0, 4) }); setEduOpen(true); }}><EditRoundedIcon fontSize="small" /></IconButton></Box>}>
+                <ListItem key={edu.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setEduDeleteId(edu.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => { setEditEduId(edu.id); setEduForm({ ...edu, start: (edu.start || "").slice(0, 4), end: (edu.end || "").slice(0, 4) }); setEduOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Box>}>
                   <ListItemText primary={<Typography variant="body2" fontWeight={600}>{edu.degree} — {edu.school}</Typography>} secondary={<Typography variant="caption" color="text.secondary">{edu.start?.slice(0, 4)} - {edu.end?.slice(0, 4)}</Typography>} />
                 </ListItem>
               ))}
@@ -1050,7 +1098,7 @@ function AboutTab({ profile, onUpdate }) {
 
         {/* RIGHT: Contact + New Sections */}
         <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
-          <SectionCard title="Contact" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => setContactOpen(true)}><EditRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+          <SectionCard title="Contact" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => setContactOpen(true)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
             <Typography variant="subtitle2" color="text.secondary">LinkedIn</Typography><Box sx={{ display: "flex", gap: 1, mb: 1 }}><LinkedInIcon fontSize="small" /><Typography variant="body2">{profile.links?.linkedin || "—"}</Typography></Box>
             <Typography variant="subtitle2" color="text.secondary">Email</Typography><Box sx={{ display: "flex", gap: 1, mb: 1 }}><EmailIcon fontSize="small" /><Typography variant="body2">{profile.email || "—"}</Typography></Box>
             <Typography variant="subtitle2" color="text.secondary">Location</Typography><Box sx={{ display: "flex", gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{profile.location || "—"}</Typography></Box>
@@ -1452,9 +1500,11 @@ function AboutTab({ profile, onUpdate }) {
               try {
                 await deleteEducationApi(eduDeleteId);
                 await reloadExtras();
+                showNotification("success", "Education deleted.");
                 setEduDeleteId(null);
               } catch (e) {
                 console.error(e);
+                showNotification("error", "Failed to delete education.");
               } finally {
                 setDeletingEdu(false);
               }
@@ -1482,9 +1532,11 @@ function AboutTab({ profile, onUpdate }) {
               try {
                 await deleteExperienceApi(expDeleteId);
                 await reloadExtras();
+                showNotification("success", "Experience deleted.");
                 setExpDeleteId(null);
               } catch (e) {
                 console.error(e);
+                showNotification("error", "Failed to delete experience.");
               } finally {
                 setDeletingExp(false);
               }
