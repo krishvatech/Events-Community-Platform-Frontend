@@ -44,6 +44,9 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
 import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import CloseIcon from '@mui/icons-material/Close';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 
 // Countries Library
 import * as isoCountries from "i18n-iso-countries";
@@ -104,6 +107,7 @@ function mapEducation(item) {
     start: item.start_date || "",
     end: item.end_date || "",
     grade: item.grade || "",
+    documents: item.documents || [],
   };
 }
 
@@ -183,6 +187,30 @@ function decodeJwtPayload(token) {
   } catch (e) {
     return null;
   }
+}
+
+async function uploadEducationDocApi(educationId, file) {
+  const fd = new FormData();
+  fd.append("education", educationId);
+  fd.append("file", file);
+
+  // CHANGED: /users/ -> /auth/
+  const r = await fetch(`${API_ROOT}/auth/me/education-documents/`, { 
+    method: "POST",
+    headers: { ...authHeader() }, 
+    body: fd
+  });
+  if (!r.ok) throw new Error("Failed to upload document");
+  return await r.json();
+}
+
+async function deleteEducationDocApi(docId) {
+  // CHANGED: /users/ -> /auth/
+  const r = await fetch(`${API_ROOT}/auth/me/education-documents/${docId}/`, { 
+    method: "DELETE",
+    headers: { ...authHeader() } 
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
 }
 
 const EMPTY_PROFILE = {
@@ -555,7 +583,7 @@ export default function HomePage() {
             <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" } }}>
               <Typography variant="subtitle2">
                 <Box component="span" sx={{ fontWeight: 600 }}>0</Box> Posts&nbsp;|&nbsp;
-                <Box component="span" sx={{ fontWeight: 600 }}>{friendCount}</Box> Friends
+                <Box component="span" sx={{ fontWeight: 600 }}>{friendCount}</Box> Contacts
               </Typography>
             </Box>
           </Stack>
@@ -830,7 +858,7 @@ function AboutTab({ profile, onUpdate, showToast }) {
   const [savingContact, setSavingContact] = React.useState(false);
   const [deletingEdu, setDeletingEdu] = React.useState(false);
   const [deletingExp, setDeletingExp] = React.useState(false);
-
+  const [eduFiles, setEduFiles] = React.useState([]);
   const latestExp = React.useMemo(() => profile.experience?.[0], [profile.experience]);
 
   React.useEffect(() => {
@@ -883,14 +911,35 @@ function AboutTab({ profile, onUpdate, showToast }) {
     };
 
     try {
-      if (editEduId) {
-        await updateEducationApi(editEduId, payload);
+      let activeId = editEduId;
+
+      // 1. Create or Update the Education entry
+      if (activeId) {
+        await updateEducationApi(activeId, payload);
       } else {
-        await createEducationApi(payload);
+        // We need createEducationApi to return the ID of the new object
+        // NOTE: You might need to update createEducationApi to return the response JSON
+        const r = await fetch(`${API_ROOT}/auth/me/educations/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify(payload)
+        });
+        if (!r.ok) throw new Error("Failed to add education");
+        const newEdu = await r.json();
+        activeId = newEdu.id;
       }
+
+      // 2. Upload new files if any
+      if (eduFiles.length > 0 && activeId) {
+        for (const file of eduFiles) {
+          await uploadEducationDocApi(activeId, file);
+        }
+      }
+
       showToast?.("success", editEduId ? "Education updated." : "Education added.");
       setEduOpen(false);
       setEditEduId(null);
+      setEduFiles([]); // Clear files
       await reloadExtras();
     } catch (e) {
       console.error(e);
@@ -1078,11 +1127,38 @@ function AboutTab({ profile, onUpdate, showToast }) {
             </List>
           </SectionCard>
 
-          <SectionCard title="Education" action={<Tooltip title="Add"><IconButton size="small" onClick={() => { setEditEduId(null); setEduForm({}); setEduOpen(true); }}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+          <SectionCard title="Education" action={<Tooltip title="Add"><IconButton size="small" onClick={() => { setEditEduId(null); setEduForm({}); setEduFiles([]); setEduOpen(true); }}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
               {profile.education?.map(edu => (
-                <ListItem key={edu.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setEduDeleteId(edu.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => { setEditEduId(edu.id); setEduForm({ ...edu, start: (edu.start || "").slice(0, 4), end: (edu.end || "").slice(0, 4) }); setEduOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Box>}>
-                  <ListItemText primary={<Typography variant="body2" fontWeight={600}>{edu.degree} — {edu.school}</Typography>} secondary={<Typography variant="caption" color="text.secondary">{edu.start?.slice(0, 4)} - {edu.end?.slice(0, 4)}</Typography>} />
+                <ListItem key={edu.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setEduDeleteId(edu.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => { setEditEduId(edu.id); setEduForm({ ...edu, start: (edu.start || "").slice(0, 4), end: (edu.end || "").slice(0, 4), documents: edu.documents || [] }); setEduOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Box>}>
+                  <ListItemText
+                    primary={<Typography variant="body2" fontWeight={600}>{edu.degree} — {edu.school}</Typography>}
+                    secondary={
+                      <Stack component="span" spacing={0.5}>
+                        <Typography variant="caption" color="text.secondary">
+                          {edu.start?.slice(0, 4)} - {edu.end?.slice(0, 4)}
+                        </Typography>
+
+                        {/* --- NEW: Display Documents Chips --- */}
+                        {edu.documents && edu.documents.length > 0 && (
+                          <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>
+                            {edu.documents.map((doc) => (
+                              <Chip
+                                key={doc.id}
+                                icon={<InsertDriveFileIcon style={{ fontSize: 14 }} />}
+                                label={doc.filename}
+                                size="small"
+                                variant="outlined"
+                                onClick={() => window.open(doc.file, '_blank')}
+                                sx={{ cursor: "pointer", height: 24, fontSize: "0.75rem" }}
+                              />
+                            ))}
+                          </Stack>
+                        )}
+                        {/* ---------------------------------- */}
+                      </Stack>
+                    }
+                  />
                 </ListItem>
               ))}
             </List>
@@ -1167,6 +1243,82 @@ function AboutTab({ profile, onUpdate, showToast }) {
             <TextField label="Degree" value={eduForm.degree} onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })} />
             <Autocomplete freeSolo options={FIELD_OF_STUDY_OPTIONS} value={eduForm.field} onChange={(_, v) => setEduForm({ ...eduForm, field: v || "" })} renderInput={(p) => <TextField {...p} label="Field" />} />
             <Box sx={{ display: "flex", gap: 2 }}><TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm({ ...eduForm, start: e.target.value })} /><TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm({ ...eduForm, end: e.target.value })} /></Box>
+            {/* --- NEW: File Upload Section --- */}
+            <Box sx={{ mt: 2, borderTop: '1px dashed', borderColor: 'divider', pt: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Transcripts / Certificates</Typography>
+
+              {/* 1. Existing Files (Edit Mode) */}
+              {editEduId && eduForm.documents && eduForm.documents.length > 0 && (
+                <List dense disablePadding>
+                  {eduForm.documents.map((doc) => (
+                    <ListItem key={doc.id} disableGutters
+                      secondaryAction={
+                        <IconButton edge="end" size="small" onClick={async () => {
+                          if (!window.confirm("Delete this file?")) return;
+                          try {
+                            await deleteEducationDocApi(doc.id);
+                            // Remove from local state immediately
+                            setEduForm(prev => ({
+                              ...prev,
+                              documents: prev.documents.filter(d => d.id !== doc.id)
+                            }));
+                            showToast("success", "File deleted");
+                            reloadExtras(); // Background refresh
+                          } catch (e) { showToast("error", "Failed to delete"); }
+                        }}>
+                          <DeleteOutlineRoundedIcon fontSize="small" color="error" />
+                        </IconButton>
+                      }
+                    >
+                      <ListItemAvatar sx={{ minWidth: 32 }}>
+                        <InsertDriveFileIcon fontSize="small" color="action" />
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={doc.filename}
+                        primaryTypographyProps={{ variant: 'caption', noWrap: true, maxWidth: 200 }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+
+              {/* 2. New File Selection */}
+              <Button
+                component="label"
+                variant="outlined"
+                size="small"
+                startIcon={<AttachFileIcon />}
+                sx={{ mt: 1, textTransform: 'none' }}
+              >
+                Attach Files
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setEduFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                    }
+                  }}
+                />
+              </Button>
+
+              {/* 3. Pending Files List */}
+              {eduFiles.length > 0 && (
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  {eduFiles.map((f, i) => (
+                    <Chip
+                      key={i}
+                      label={f.name}
+                      onDelete={() => setEduFiles(prev => prev.filter((_, idx) => idx !== i))}
+                      size="small"
+                      variant="outlined"
+                    />
+                  ))}
+                </Stack>
+              )}
+            </Box>
+            {/* --------------------------------- */}
           </Stack>
         </DialogContent>
         <DialogActions>
