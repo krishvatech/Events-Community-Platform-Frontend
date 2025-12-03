@@ -153,6 +153,123 @@ const CITY_OPTIONS = [
   "Visakhapatnam", "Warsaw", "Washington", "Wellington", "Zurich",
 ];
 
+function UniversityAutocomplete({ value, onChange, label = "University" }) {
+  const [inputValue, setInputValue] = React.useState(value || "");
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+
+  // sync external value → input
+  React.useEffect(() => {
+    setInputValue(value || "");
+  }, [value]);
+
+  React.useEffect(() => {
+    const query = (inputValue || "").trim();
+
+    if (!query || query.length < 2) {
+      setOptions([]);
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    const fetchOrgs = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `https://api.ror.org/v2/organizations?query=${encodeURIComponent(
+            query
+          )}&filter=types:education`,
+          { signal: controller.signal }
+        );
+
+        if (!res.ok) {
+          console.error("ROR API error", res.status);
+          return;
+        }
+
+        const data = await res.json();
+        if (!active) return;
+
+        const items = (data.items || [])
+          .map((org) => {
+            const primaryName =
+              org.names?.find((n) => n.types?.includes("ror_display"))?.value ||
+              org.names?.[0]?.value ||
+              "";
+
+            return { id: org.id, name: primaryName };
+          })
+          .filter((o) => o.name);
+
+        setOptions(items);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("ROR fetch failed", err);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const timeout = setTimeout(fetchOrgs, 400);
+
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [inputValue]);
+
+  return (
+    <Autocomplete
+      freeSolo
+      options={options}
+      filterOptions={(x) => x} // keep server results as-is
+      value={value || ""}
+      getOptionLabel={(option) =>
+        typeof option === "string" ? option : option?.name || ""
+      }
+      onChange={(_, newValue) => {
+        if (typeof newValue === "string") {
+          onChange?.(newValue);
+        } else if (newValue && typeof newValue === "object") {
+          onChange?.(newValue.name || "");
+        } else {
+          onChange?.("");
+        }
+      }}
+      inputValue={inputValue}
+      onInputChange={(_, newInputValue, reason) => {
+        if (reason === "input") {
+          setInputValue(newInputValue);
+          onChange?.(newInputValue);
+        }
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={label}
+          required
+          fullWidth
+          margin="normal"
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress size={16} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+    />
+  );
+}
+
+
 // -------------------- Small UI helpers --------------------
 function SectionCard({ title, action, children, sx }) {
   return (
@@ -439,6 +556,10 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: "", sev: "success" });
 
+  const [eduSaving, setEduSaving] = useState(false);
+  const [expSaving, setExpSaving] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   // New helper for consistent toast notifications
   const showNotification = (type, msg) => {
     setSnack({ open: true, sev: type, msg });
@@ -482,6 +603,12 @@ export default function ProfilePage() {
   });
 
   const [confirm, setConfirm] = useState({ open: false, type: null, id: null, label: "" });
+
+  const [deleteDocDialog, setDeleteDocDialog] = useState({
+    open: false,
+    doc: null,
+  });
+  const [deletingDoc, setDeletingDoc] = useState(false);
 
   const EMPTY_EDU_FORM = { school: "", degree: "", field: "", start: "", end: "", grade: "" };
   const initialExpForm = {
@@ -645,17 +772,77 @@ export default function ProfilePage() {
 
   async function doConfirmDelete() {
     const { type, id } = confirm;
-    if (!type || !id) return;
+    if (!type || !id || deleteLoading) return; // 🔒 already deleting
+
     try {
-      const url = type === "edu" ? `${API_BASE}/auth/me/educations/${id}/` : `${API_BASE}/auth/me/experiences/${id}/`;
-      const r = await fetch(url, { method: "DELETE", headers: tokenHeader() });
+      setDeleteLoading(true);
+
+      const url =
+        type === "edu"
+          ? `${API_BASE}/auth/me/educations/${id}/`
+          : `${API_BASE}/auth/me/experiences/${id}/`;
+
+      const r = await fetch(url, {
+        method: "DELETE",
+        headers: tokenHeader(),
+      });
+
       if (!r.ok && r.status !== 204) throw new Error("Delete failed");
-      showNotification("success", type === "edu" ? "Education deleted" : "Experience deleted");
-      setEduOpen(false); setExpOpen(false); setEditEduId(null); setEditExpId(null);
+
+      showNotification(
+        "success",
+        type === "edu" ? "Education deleted" : "Experience deleted"
+      );
+      setEduOpen(false);
+      setExpOpen(false);
+      setEditEduId(null);
+      setEditExpId(null);
       closeConfirm();
       await loadMeExtras();
-    } catch (e) { showNotification("error", e?.message || "Delete failed"); closeConfirm(); }
+    } catch (e) {
+      showNotification("error", e?.message || "Delete failed");
+      closeConfirm();
+    } finally {
+      setDeleteLoading(false);
+    }
   }
+
+  // --- Education document delete handlers ---
+  function handleAskDeleteDoc(doc) {
+    setDeleteDocDialog({ open: true, doc });
+  }
+
+  function handleCloseDeleteDoc() {
+    if (deletingDoc) return;
+    setDeleteDocDialog({ open: false, doc: null });
+  }
+
+  async function handleConfirmDeleteDoc() {
+    const doc = deleteDocDialog.doc;
+    if (!doc || deletingDoc) return;
+
+    try {
+      setDeletingDoc(true);
+
+      await deleteEducationDocApi(doc.id);
+
+      // Update local eduForm state so the list refreshes immediately
+      setEduForm((prev) => ({
+        ...prev,
+        documents: (prev.documents || []).filter((d) => d.id !== doc.id),
+      }));
+
+      showNotification("success", "File deleted");
+      await loadMeExtras(); // background refresh
+    } catch (e) {
+      console.error(e);
+      showNotification("error", "Failed to delete");
+    } finally {
+      setDeletingDoc(false);
+      setDeleteDocDialog({ open: false, doc: null });
+    }
+  }
+
 
   async function saveAbout() {
     try {
@@ -705,13 +892,27 @@ export default function ProfilePage() {
   }
 
   async function createEducation() {
+    // 🔒 if already saving, ignore extra clicks
+    if (eduSaving) return;
+
+    setEduErrors({ start: "", end: "" });
+
     try {
-      setEduErrors({ start: "", end: "" });
+      setEduSaving(true);
+
       const startY = eduForm.start ? parseInt(eduForm.start, 10) : null;
       const endY = eduForm.end ? parseInt(eduForm.end, 10) : null;
       const currentYear = new Date().getFullYear();
-      if (startY && startY > currentYear) { setEduErrors(p => ({ ...p, start: "Start year cannot be in the future" })); return; }
-      if (startY && endY && endY < startY) { setEduErrors(p => ({ ...p, end: "End year cannot be before start year" })); return; }
+
+      if (startY && startY > currentYear) {
+        setEduErrors((p) => ({ ...p, start: "Start year cannot be in the future" }));
+        return;
+      }
+      if (startY && endY && endY < startY) {
+        setEduErrors((p) => ({ ...p, end: "End year cannot be before start year" }));
+        return;
+      }
+
       const normalizeYear = (val) => {
         const y = String(val || "").trim();
         if (!y) return null;
@@ -719,15 +920,34 @@ export default function ProfilePage() {
         if (!year || year < 1900 || year > 2100) return null;
         return `${year}-01-01`;
       };
-      const url = editEduId ? `${API_BASE}/auth/me/educations/${editEduId}/` : `${API_BASE}/auth/me/educations/`;
-      const payload = { school: (eduForm.school || "").trim(), degree: (eduForm.degree || "").trim(), field_of_study: (eduForm.field || "").trim(), start_date: normalizeYear(eduForm.start), end_date: normalizeYear(eduForm.end), grade: (eduForm.grade || "").trim() };
-      if (!payload.school || !payload.degree) { showNotification("error", "Please fill School and Degree."); return; }
+
+      const url = editEduId
+        ? `${API_BASE}/auth/me/educations/${editEduId}/`
+        : `${API_BASE}/auth/me/educations/`;
+
+      const payload = {
+        school: (eduForm.school || "").trim(),
+        degree: (eduForm.degree || "").trim(),
+        field_of_study: (eduForm.field || "").trim(),
+        start_date: normalizeYear(eduForm.start),
+        end_date: normalizeYear(eduForm.end),
+        grade: (eduForm.grade || "").trim(),
+      };
+
+      if (!payload.school || !payload.degree) {
+        showNotification("error", "Please fill School and Degree.");
+        return;
+      }
 
       // 1. Save Education Data
-      const r = await fetch(url, { method: editEduId ? "PATCH" : "POST", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
+      const r = await fetch(url, {
+        method: editEduId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        body: JSON.stringify(payload),
+      });
       if (!r.ok) throw new Error("Failed to save education");
 
-      const savedEdu = await r.json(); // Get the saved object (needed for ID)
+      const savedEdu = await r.json();
       const activeId = editEduId || savedEdu.id;
 
       // 2. Upload Files (if any)
@@ -737,52 +957,103 @@ export default function ProfilePage() {
         }
       }
 
-      showNotification("success", editEduId ? "Education updated" : "Education added");
+      showNotification(
+        "success",
+        editEduId ? "Education updated" : "Education added"
+      );
       setEduOpen(false);
       setEditEduId(null);
       setEduForm(EMPTY_EDU_FORM);
-      setEduFiles([]); // <--- Clear files
+      setEduFiles([]);
       await loadMeExtras();
-    } catch (e) { showNotification("error", e?.message || "Save failed"); }
+    } catch (e) {
+      showNotification("error", e?.message || "Save failed");
+    } finally {
+      setEduSaving(false);
+    }
   }
 
+
   async function createExperience() {
+    // 🔒 ignore double-clicks
+    if (expSaving) return;
+
     try {
-      const url = editExpId ? `${API_BASE}/auth/me/experiences/${editExpId}/` : `${API_BASE}/auth/me/experiences/`;
+      setExpSaving(true);
+
+      const url = editExpId
+        ? `${API_BASE}/auth/me/experiences/${editExpId}/`
+        : `${API_BASE}/auth/me/experiences/`;
+
       const r = await fetch(url, {
         method: editExpId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json", ...tokenHeader() },
         body: JSON.stringify({
-          community_name: expForm.org, position: expForm.position, location: buildLocationFromForm(expForm),
-          start_date: expForm.start || null, end_date: expForm.current ? null : (expForm.end || null),
-          currently_work_here: !!expForm.current, description: expForm.description || "",
-          exit_reason: expForm.exit_reason || "", employment_type: expForm.employment_type || "full_time",
-          work_schedule: expForm.work_schedule || "", relationship_to_org: expForm.relationship_to_org || "",
-          career_stage: expForm.career_stage || "", compensation_type: expForm.compensation_type || "",
+          community_name: expForm.org,
+          position: expForm.position,
+          location: buildLocationFromForm(expForm),
+          start_date: expForm.start || null,
+          end_date: expForm.current ? null : expForm.end || null,
+          currently_work_here: !!expForm.current,
+          description: expForm.description || "",
+          exit_reason: expForm.exit_reason || "",
+          employment_type: expForm.employment_type || "full_time",
+          work_schedule: expForm.work_schedule || "",
+          relationship_to_org: expForm.relationship_to_org || "",
+          career_stage: expForm.career_stage || "",
+          compensation_type: expForm.compensation_type || "",
           work_arrangement: expForm.work_arrangement || "",
         }),
       });
       if (!r.ok) throw new Error("Failed to save experience");
+
       if (syncProfileLocation && expForm.location) {
         try {
           const locationString = buildLocationFromForm(expForm);
           const payload = {
-            first_name: form.first_name, last_name: form.last_name, email: form.email,
+            first_name: form.first_name,
+            last_name: form.last_name,
+            email: form.email,
             profile: {
-              full_name: form.full_name, timezone: form.timezone, bio: form.bio, headline: form.headline,
-              job_title: form.job_title, company: form.company, location: locationString,
-              skills: parseSkills(form.skillsText), links: parseLinks(form.linksText),
+              full_name: form.full_name,
+              timezone: form.timezone,
+              bio: form.bio,
+              headline: form.headline,
+              job_title: form.job_title,
+              company: form.company,
+              location: locationString,
+              skills: parseSkills(form.skillsText),
+              links: parseLinks(form.linksText),
             },
           };
-          const resp = await fetch(`${API_BASE}/users/me/`, { method: "PUT", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
-          if (resp.ok) setForm(prev => ({ ...prev, location: locationString }));
-        } catch (err) { console.error("Sync failed", err); }
+          const resp = await fetch(`${API_BASE}/users/me/`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", ...tokenHeader() },
+            body: JSON.stringify(payload),
+          });
+          if (resp.ok) {
+            setForm((prev) => ({ ...prev, location: locationString }));
+          }
+        } catch (err) {
+          console.error("Sync failed", err);
+        }
       }
-      showNotification("success", editExpId ? "Experience updated" : "Experience added");
-      setExpOpen(false); setEditExpId(null); setExpForm(initialExpForm);
+
+      showNotification(
+        "success",
+        editExpId ? "Experience updated" : "Experience added"
+      );
+      setExpOpen(false);
+      setEditExpId(null);
+      setExpForm(initialExpForm);
       await loadMeExtras();
-    } catch (e) { showNotification("error", e?.message || "Save failed"); }
+    } catch (e) {
+      showNotification("error", e?.message || "Save failed");
+    } finally {
+      setExpSaving(false);
+    }
   }
+
 
   async function loadMeExtras() {
     try {
@@ -1181,7 +1452,7 @@ export default function ProfilePage() {
                 <Typography variant="body2" color="text.secondary">No experience found. Add an experience entry to populate this.</Typography>
               )}
             </Box>
-            </Stack>
+          </Stack>
         </DialogContent>
         <DialogActions><Button onClick={() => setWorkOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAboutWork} disabled={saving || !latestExp}>Save</Button></DialogActions>
       </Dialog>
@@ -1204,7 +1475,15 @@ export default function ProfilePage() {
       <Dialog open={eduOpen} onClose={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); }} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editEduId ? "Edit education" : "Add education"}</DialogTitle>
         <DialogContent dividers>
-          <Autocomplete freeSolo options={SCHOOL_OPTIONS} value={eduForm.school} onChange={(_, newValue) => setEduForm((f) => ({ ...f, school: newValue || "" }))} onInputChange={(event, newInput) => { if (event && event.type === "change") setEduForm((f) => ({ ...f, school: newInput })); }} renderInput={(params) => <TextField {...params} label="School *" fullWidth sx={{ mb: 2 }} />} />
+          <UniversityAutocomplete
+            value={eduForm.school || ""}
+            onChange={(newValue) =>
+              setEduForm((prev) => ({
+                ...prev,
+                school: newValue || "",
+              }))
+            }
+          />
           <TextField label="Degree *" value={eduForm.degree} onChange={(e) => setEduForm((f) => ({ ...f, degree: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <Autocomplete freeSolo options={[...FIELD_OF_STUDY_OPTIONS, "Other"]} value={eduForm.field} onChange={(_, newValue) => setEduForm((f) => ({ ...f, field: newValue || "" }))} onInputChange={(event, newInput) => { if (event && event.type === "change") setEduForm((f) => ({ ...f, field: newInput })); }} renderInput={(params) => <TextField {...params} label="Field of Study *" fullWidth sx={{ mb: 2 }} helperText="Pick from list or type your own (Other)." />} />
           <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, mb: 2 }}>
@@ -1222,19 +1501,11 @@ export default function ProfilePage() {
                 {eduForm.documents.map((doc) => (
                   <ListItem key={doc.id} disableGutters
                     secondaryAction={
-                      <IconButton edge="end" size="small" onClick={async () => {
-                        if (!window.confirm("Delete this file?")) return;
-                        try {
-                          await deleteEducationDocApi(doc.id);
-                          // Update local state immediately
-                          setEduForm(prev => ({
-                            ...prev,
-                            documents: prev.documents.filter(d => d.id !== doc.id)
-                          }));
-                          showNotification("success", "File deleted");
-                          await loadMeExtras(); // Background refresh
-                        } catch (e) { showNotification("error", "Failed to delete"); }
-                      }}>
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        onClick={() => handleAskDeleteDoc(doc)}
+                      >
                         <DeleteOutlineIcon fontSize="small" color="error" />
                       </IconButton>
                     }
@@ -1268,9 +1539,81 @@ export default function ProfilePage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          {editEduId && <Button color="error" onClick={() => askDeleteEducation(editEduId, `${eduForm.school || ""} — ${eduForm.degree || ""}`)}>Delete</Button>}
-          <Button onClick={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); setEduForm(EMPTY_EDU_FORM); setEduFiles([]); }}>Cancel</Button>
-          <Button variant="contained" onClick={createEducation}>{editEduId ? "Save changes" : "Save"}</Button>
+          {editEduId && (
+            <Button
+              color="error"
+              onClick={() =>
+                askDeleteEducation(
+                  editEduId,
+                  `${eduForm.school || ""} — ${eduForm.degree || ""}`
+                )
+              }
+              disabled={eduSaving} // 🔒 optional, avoid delete while saving
+            >
+              Delete
+            </Button>
+          )}
+          <Button
+            onClick={() => {
+              setEduOpen(false);
+              setEditEduId(null);
+              setEduErrors({ start: "", end: "" });
+              setEduForm(EMPTY_EDU_FORM);
+              setEduFiles([]);
+            }}
+            disabled={eduSaving} // 🔒 avoid closing mid-save
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={createEducation}
+            disabled={eduSaving} // 🔒 main protection
+          >
+            {eduSaving
+              ? "Saving…"
+              : editEduId
+                ? "Save changes"
+                : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* --- Delete Education Document – Modern Confirmation Dialog --- */}
+      <Dialog
+        open={deleteDocDialog.open}
+        onClose={handleCloseDeleteDoc}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <DeleteOutlineIcon color="error" fontSize="small" />
+          Delete document?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText sx={{ mb: 0.5 }}>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 600 }}>
+              {deleteDocDialog.doc?.filename}
+            </Box>{" "}
+            from this education entry.
+          </DialogContentText>
+          <DialogContentText>
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCloseDeleteDoc} disabled={deletingDoc}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleConfirmDeleteDoc}
+            disabled={deletingDoc}
+          >
+            {deletingDoc ? "Deleting…" : "Delete"}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -1307,16 +1650,57 @@ export default function ProfilePage() {
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          {!!editExpId && <Button color="error" onClick={() => askDeleteExperience(editExpId, `${expForm.org} — ${expForm.position}`)}>Delete</Button>}
-          <Button variant="outlined" onClick={() => { setExpOpen(false); setEditExpId(null); }}>Cancel</Button>
-          <Button variant="contained" onClick={createExperience}>{editExpId ? "Save changes" : "Save"}</Button>
+          {!!editExpId && (
+            <Button
+              color="error"
+              onClick={() =>
+                askDeleteExperience(editExpId, `${expForm.org} — ${expForm.position}`)
+              }
+              disabled={expSaving} // 🔒 optional
+            >
+              Delete
+            </Button>
+          )}
+          <Button
+            variant="outlined"
+            onClick={() => {
+              setExpOpen(false);
+              setEditExpId(null);
+            }}
+            disabled={expSaving} // 🔒 avoid closing mid-save
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={createExperience}
+            disabled={expSaving} // 🔒 main protection
+          >
+            {expSaving
+              ? "Saving…"
+              : editExpId
+                ? "Save changes"
+                : "Save"}
+          </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={confirm.open} onClose={closeConfirm} fullWidth maxWidth="xs">
         <DialogTitle>Delete {confirm.type === "edu" ? "education" : "experience"}?</DialogTitle>
         <DialogContent>{confirm.label && <DialogContentText sx={{ mb: 1 }}>{confirm.label}</DialogContentText>}<DialogContentText>This action cannot be undone.</DialogContentText></DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}><Button onClick={closeConfirm}>Cancel</Button><Button color="error" variant="contained" onClick={doConfirmDelete}>Delete</Button></DialogActions>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={closeConfirm} disabled={deleteLoading}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={doConfirmDelete}
+            disabled={deleteLoading} // 🔒 lock double delete
+          >
+            {deleteLoading ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>

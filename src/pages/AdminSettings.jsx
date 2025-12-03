@@ -228,6 +228,123 @@ const FIELD_OF_STUDY_OPTIONS = [
   "Marketing", "Economics", "Psychology", "Law", "Medicine", "Pharmacy", "Design", "Data Science",
 ];
 
+function UniversityAutocomplete({ value, onChange, label = "University" }) {
+  const [inputValue, setInputValue] = React.useState(value || "");
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+
+  // sync external value → input
+  React.useEffect(() => {
+    setInputValue(value || "");
+  }, [value]);
+
+  React.useEffect(() => {
+    const query = (inputValue || "").trim();
+
+    if (!query || query.length < 2) {
+      setOptions([]);
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    const fetchOrgs = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `https://api.ror.org/v2/organizations?query=${encodeURIComponent(
+            query
+          )}&filter=types:education`,
+          { signal: controller.signal }
+        );
+
+        if (!res.ok) {
+          console.error("ROR API error", res.status);
+          return;
+        }
+
+        const data = await res.json();
+        if (!active) return;
+
+        const items = (data.items || [])
+          .map((org) => {
+            const primaryName =
+              org.names?.find((n) => n.types?.includes("ror_display"))?.value ||
+              org.names?.[0]?.value ||
+              "";
+
+            return { id: org.id, name: primaryName };
+          })
+          .filter((o) => o.name);
+
+        setOptions(items);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("ROR fetch failed", err);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const timeout = setTimeout(fetchOrgs, 400);
+
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [inputValue]);
+
+  return (
+    <Autocomplete
+      freeSolo
+      options={options}
+      filterOptions={(x) => x} // keep server results as-is
+      value={value || ""}
+      getOptionLabel={(option) =>
+        typeof option === "string" ? option : option?.name || ""
+      }
+      onChange={(_, newValue) => {
+        if (typeof newValue === "string") {
+          onChange?.(newValue);
+        } else if (newValue && typeof newValue === "object") {
+          onChange?.(newValue.name || "");
+        } else {
+          onChange?.("");
+        }
+      }}
+      inputValue={inputValue}
+      onInputChange={(_, newInputValue, reason) => {
+        if (reason === "input") {
+          setInputValue(newInputValue);
+          onChange?.(newInputValue);
+        }
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={label}
+          required
+          fullWidth
+          margin="normal"
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress size={16} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+    />
+  );
+}
+
+
 function parseSkills(value) {
   const v = (value ?? "").toString().trim();
   if (!v) return [];
@@ -562,6 +679,48 @@ export default function AdminSettings() {
   // Name Change Request State
   const [nameChangeOpen, setNameChangeOpen] = React.useState(false);
   const [basicInfoOpen, setBasicInfoOpen] = React.useState(false);
+
+  // NEW: education document delete dialog state
+  const [deleteDocDialog, setDeleteDocDialog] = React.useState({
+    open: false,
+    doc: null,
+  });
+  const [deletingDoc, setDeletingDoc] = React.useState(false);
+
+  const handleAskDeleteDoc = (doc) => {
+    setDeleteDocDialog({ open: true, doc });
+  };
+
+  const handleCloseDeleteDoc = () => {
+    if (deletingDoc) return;
+    setDeleteDocDialog({ open: false, doc: null });
+  };
+
+  const handleConfirmDeleteDoc = async () => {
+    const doc = deleteDocDialog.doc;
+    if (!doc) return;
+
+    setDeletingDoc(true);
+    try {
+      await deleteEducationDocApi(doc.id);
+
+      // Remove from current eduForm state
+      setEduForm((prev) => ({
+        ...prev,
+        documents: (prev.documents || []).filter((d) => d.id !== doc.id),
+      }));
+
+      showNotification("success", "File deleted");
+      await loadExtras(); // refresh list
+    } catch (e) {
+      console.error(e);
+      showNotification("error", "Failed to delete file");
+    } finally {
+      setDeletingDoc(false);
+      setDeleteDocDialog({ open: false, doc: null });
+    }
+  };
+
 
   const emptyExpForm = {
     org: "", position: "", city: "", location: "", start: "", end: "", current: false,
@@ -970,7 +1129,7 @@ export default function AdminSettings() {
           description: expForm.description || "", exit_reason: expForm.exit_reason || "", employment_type: expForm.employment_type || "full_time",
           work_schedule: expForm.work_schedule || "", relationship_to_org: expForm.relationship_to_org || "", career_stage: expForm.career_stage || "",
           compensation_type: expForm.compensation_type || "", work_arrangement: expForm.work_arrangement || "",
-        
+
         }),
       });
       if (!r.ok) throw new Error("Failed to save experience");
@@ -1403,7 +1562,15 @@ export default function AdminSettings() {
         <DialogTitle sx={{ fontWeight: 700 }}>{editEduId ? "Edit education" : "Add education"}</DialogTitle>
         <DialogContent dividers>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>*Required fields are marked with an asterisk</Typography>
-          <Autocomplete freeSolo options={SCHOOL_OPTIONS} value={eduForm.school} onChange={(_, value) => setEduForm((f) => ({ ...f, school: value || "" }))} onInputChange={(event, newInput) => { if (event && event.type === "change") setEduForm((f) => ({ ...f, school: newInput })); }} renderInput={(params) => <TextField {...params} label="School *" fullWidth sx={{ mb: 2 }} />} />
+          <UniversityAutocomplete
+            value={eduForm.school || ""}
+            onChange={(newValue) =>
+              setEduForm((prev) => ({
+                ...prev,
+                school: newValue || "",
+              }))
+            }
+          />
           <TextField label="Degree *" value={eduForm.degree} onChange={(e) => setEduForm((f) => ({ ...f, degree: e.target.value }))} fullWidth sx={{ mb: 2 }} />
           <Autocomplete freeSolo options={[...FIELD_OF_STUDY_OPTIONS, "Other"]} value={eduForm.field} onChange={(_, value) => setEduForm((f) => ({ ...f, field: value || "" }))} onInputChange={(event, newInput) => { if (event && event.type === "change") setEduForm((f) => ({ ...f, field: newInput })); }} renderInput={(params) => <TextField {...params} label="Field of Study *" fullWidth sx={{ mb: 2 }} helperText="Pick from list or type your own (Other)." />} />
           <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, mb: 2 }}>
@@ -1427,18 +1594,11 @@ export default function AdminSettings() {
                 {eduForm.documents.map((doc) => (
                   <ListItem key={doc.id} disableGutters
                     secondaryAction={
-                      <IconButton edge="end" size="small" onClick={async () => {
-                        if (!window.confirm("Delete this file?")) return;
-                        try {
-                          await deleteEducationDocApi(doc.id);
-                          setEduForm(prev => ({
-                            ...prev,
-                            documents: prev.documents.filter(d => d.id !== doc.id)
-                          }));
-                          showNotification("success", "File deleted");
-                          await loadExtras();
-                        } catch (e) { showNotification("error", "Failed to delete"); }
-                      }}>
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        onClick={() => handleAskDeleteDoc(doc)}
+                      >
                         <DeleteOutlineIcon fontSize="small" color="error" />
                       </IconButton>
                     }
@@ -1477,6 +1637,43 @@ export default function AdminSettings() {
           <Button variant="contained" onClick={createEducation} disabled={saving}>{editEduId ? "Save changes" : "Save"}</Button>
         </DialogActions>
       </Dialog>
+
+      {/* --- Delete education document confirmation dialog --- */}
+      <Dialog
+        open={deleteDocDialog.open}
+        onClose={handleCloseDeleteDoc}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <DeleteOutlineIcon color="error" fontSize="small" />
+          Delete document?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText sx={{ mb: 0.5 }}>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 600 }}>
+              {deleteDocDialog.doc?.filename}
+            </Box>{" "}
+            from this education entry.
+          </DialogContentText>
+          <DialogContentText>This action cannot be undone.</DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCloseDeleteDoc} disabled={deletingDoc}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleConfirmDeleteDoc}
+            disabled={deletingDoc}
+          >
+            {deletingDoc ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
 
       {/* --- Experience Dialog --- */}
       <Dialog open={expOpen} onClose={() => { setExpOpen(false); setEditExpId(null); }} fullWidth maxWidth="sm" fullScreen={isMobile}>

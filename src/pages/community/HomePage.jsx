@@ -797,9 +797,27 @@ async function saveProfileToMe(payload) {
 }
 
 async function createEducationApi(payload) {
-  const r = await fetch(`${API_ROOT}/auth/me/educations/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ school: payload.school, degree: payload.degree, field_of_study: payload.field, start_date: payload.start || null, end_date: payload.end || null, grade: payload.grade || "" }) });
+  const r = await fetch(`${API_ROOT}/auth/me/educations/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader(),
+    },
+    body: JSON.stringify({
+      school: payload.school,
+      degree: payload.degree,
+      field_of_study: payload.field,
+      start_date: payload.start || null,
+      end_date: payload.end || null,
+      grade: payload.grade || "",
+    }),
+  });
+
   if (!r.ok) throw new Error("Failed to add education");
+  // IMPORTANT: return created education so we can get its id
+  return await r.json();
 }
+
 
 async function updateEducationApi(id, payload) {
   const r = await fetch(`${API_ROOT}/auth/me/educations/${id}/`, { method: "PATCH", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ school: payload.school, degree: payload.degree, field_of_study: payload.field, start_date: payload.start || null, end_date: payload.end || null, grade: payload.grade || "" }) });
@@ -833,6 +851,124 @@ const SECTOR_OPTIONS = ["Private Sector", "Public Sector", "Non-Profit", "Govern
 const INDUSTRY_OPTIONS = ["Technology", "Finance", "Healthcare", "Education", "Manufacturing", "Retail", "Media", "Real Estate", "Transportation", "Energy"];
 const EMPLOYEE_COUNT_OPTIONS = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000-5000", "5000+"];
 
+function UniversityAutocomplete({ value, onChange, label = "University" }) {
+  const [inputValue, setInputValue] = React.useState(value || "");
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+
+  // sync external value → input
+  React.useEffect(() => {
+    setInputValue(value || "");
+  }, [value]);
+
+  React.useEffect(() => {
+    const query = (inputValue || "").trim();
+
+    if (!query || query.length < 2) {
+      setOptions([]);
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    const fetchOrgs = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `https://api.ror.org/v2/organizations?query=${encodeURIComponent(
+            query
+          )}&filter=types:education`,
+          { signal: controller.signal }
+        );
+
+        if (!res.ok) {
+          console.error("ROR API error", res.status);
+          return;
+        }
+
+        const data = await res.json();
+        if (!active) return;
+
+        const items = (data.items || [])
+          .map((org) => {
+            const primaryName =
+              org.names?.find((n) => n.types?.includes("ror_display"))?.value ||
+              org.names?.[0]?.value ||
+              "";
+
+            return { id: org.id, name: primaryName };
+          })
+          .filter((o) => o.name);
+
+        setOptions(items);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("ROR fetch failed", err);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const timeout = setTimeout(fetchOrgs, 400);
+
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [inputValue]);
+
+  return (
+    <Autocomplete
+      freeSolo
+      options={options}
+      filterOptions={(x) => x} // keep server results as-is
+      value={value || ""}
+      getOptionLabel={(option) =>
+        typeof option === "string" ? option : option?.name || ""
+      }
+      onChange={(_, newValue) => {
+        if (typeof newValue === "string") {
+          onChange?.(newValue);
+        } else if (newValue && typeof newValue === "object") {
+          onChange?.(newValue.name || "");
+        } else {
+          onChange?.("");
+        }
+      }}
+      inputValue={inputValue}
+      onInputChange={(_, newInputValue, reason) => {
+        if (reason === "input") {
+          setInputValue(newInputValue);
+          onChange?.(newInputValue);
+        }
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={label}
+          required
+          fullWidth
+          margin="normal"
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress size={16} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+    />
+  );
+}
+
+
+
 function AboutTab({ profile, onUpdate, showToast }) {
   const [aboutOpen, setAboutOpen] = React.useState(false);
   const [aboutMode, setAboutMode] = React.useState("description");
@@ -860,6 +996,46 @@ function AboutTab({ profile, onUpdate, showToast }) {
   const [deletingExp, setDeletingExp] = React.useState(false);
   const [eduFiles, setEduFiles] = React.useState([]);
   const latestExp = React.useMemo(() => profile.experience?.[0], [profile.experience]);
+
+  // For modern delete confirmation when removing an education document
+  const [deleteDocDialog, setDeleteDocDialog] = React.useState({
+    open: false,
+    doc: null,
+  });
+
+  const handleAskDeleteDoc = (doc) => {
+    setDeleteDocDialog({ open: true, doc });
+  };
+
+  const handleCloseDeleteDoc = () => {
+    setDeleteDocDialog({ open: false, doc: null });
+  };
+
+  const handleConfirmDeleteDoc = async () => {
+    const doc = deleteDocDialog.doc;
+    if (!doc) return;
+
+    // you already have deletingEdu state
+    setDeletingEdu(true);
+    try {
+      await deleteEducationDocApi(doc.id);
+
+      // Remove from local state
+      setEduForm((prev) => ({
+        ...prev,
+        documents: (prev.documents || []).filter((d) => d.id !== doc.id),
+      }));
+
+      showToast?.("success", "File deleted");
+      await reloadExtras(); // refresh list in background
+    } catch (e) {
+      console.error(e);
+      showToast?.("error", "Failed to delete file.");
+    } finally {
+      setDeletingEdu(false);
+      setDeleteDocDialog({ open: false, doc: null });
+    }
+  };
 
   React.useEffect(() => {
     const fullLoc = profile.location || "";
@@ -913,19 +1089,10 @@ function AboutTab({ profile, onUpdate, showToast }) {
     try {
       let activeId = editEduId;
 
-      // 1. Create or Update the Education entry
       if (activeId) {
         await updateEducationApi(activeId, payload);
       } else {
-        // We need createEducationApi to return the ID of the new object
-        // NOTE: You might need to update createEducationApi to return the response JSON
-        const r = await fetch(`${API_ROOT}/auth/me/educations/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify(payload)
-        });
-        if (!r.ok) throw new Error("Failed to add education");
-        const newEdu = await r.json();
+        const newEdu = await createEducationApi(payload);  // uses start_date/end_date
         activeId = newEdu.id;
       }
 
@@ -1287,7 +1454,15 @@ function AboutTab({ profile, onUpdate, showToast }) {
         <DialogTitle>{editEduId ? "Edit" : "Add"} Education</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Autocomplete freeSolo options={SCHOOL_OPTIONS} value={eduForm.school} onChange={(_, v) => setEduForm({ ...eduForm, school: v || "" })} renderInput={(p) => <TextField {...p} label="School" />} />
+            <UniversityAutocomplete
+              value={eduForm.school || ""}
+              onChange={(newValue) =>
+                setEduForm((prev) => ({
+                  ...prev,
+                  school: newValue || "",
+                }))
+              }
+            />
             <TextField label="Degree" value={eduForm.degree} onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })} />
             <Autocomplete freeSolo options={FIELD_OF_STUDY_OPTIONS} value={eduForm.field} onChange={(_, v) => setEduForm({ ...eduForm, field: v || "" })} renderInput={(p) => <TextField {...p} label="Field" />} />
             <Box sx={{ display: "flex", gap: 2 }}><TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm({ ...eduForm, start: e.target.value })} /><TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm({ ...eduForm, end: e.target.value })} /></Box>
@@ -1308,19 +1483,11 @@ function AboutTab({ profile, onUpdate, showToast }) {
                   {eduForm.documents.map((doc) => (
                     <ListItem key={doc.id} disableGutters
                       secondaryAction={
-                        <IconButton edge="end" size="small" onClick={async () => {
-                          if (!window.confirm("Delete this file?")) return;
-                          try {
-                            await deleteEducationDocApi(doc.id);
-                            // Remove from local state immediately
-                            setEduForm(prev => ({
-                              ...prev,
-                              documents: prev.documents.filter(d => d.id !== doc.id)
-                            }));
-                            showToast("success", "File deleted");
-                            reloadExtras(); // Background refresh
-                          } catch (e) { showToast("error", "Failed to delete"); }
-                        }}>
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={() => handleAskDeleteDoc(doc)}
+                        >
                           <DeleteOutlineRoundedIcon fontSize="small" color="error" />
                         </IconButton>
                       }
@@ -1634,6 +1801,42 @@ function AboutTab({ profile, onUpdate, showToast }) {
         </DialogActions>
       </Dialog>
 
+      {/* Delete Education Document – Modern Confirmation Dialog */}
+      <Dialog
+        open={deleteDocDialog.open}
+        onClose={deletingEdu ? undefined : handleCloseDeleteDoc}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <DeleteOutlineRoundedIcon color="error" fontSize="small" />
+          Delete document?
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary">
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 600 }}>
+              {deleteDocDialog.doc?.filename}
+            </Box>{" "}
+            from this education entry.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDoc} disabled={deletingEdu}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmDeleteDoc}
+            disabled={deletingEdu}
+          >
+            {deletingEdu ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+
       {/* Delete Dialogs */}
       <Dialog open={!!eduDeleteId} onClose={() => setEduDeleteId(null)}>
         <DialogTitle>Delete Education?</DialogTitle>
@@ -1649,12 +1852,13 @@ function AboutTab({ profile, onUpdate, showToast }) {
             disabled={deletingEdu}
             onClick={async () => {
               if (deletingEdu) return;
+              const idToDelete = eduDeleteId;   // keep a copy
+              setEduDeleteId(null);             // close dialog immediately
               setDeletingEdu(true);
               try {
-                await deleteEducationApi(eduDeleteId);
+                await deleteEducationApi(idToDelete);
                 await reloadExtras();
                 showNotification("success", "Education deleted.");
-                setEduDeleteId(null);
               } catch (e) {
                 console.error(e);
                 showNotification("error", "Failed to delete education.");
