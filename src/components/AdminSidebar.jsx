@@ -64,10 +64,13 @@ export default function AdminSidebar({
     listItems = listItems.filter((item) => item.key !== "carts");
   }
   if (staffOnly) {
-    listItems = listItems.filter(
-      (item) => !["staff", "posts"].includes(item.key)
-    );
+    listItems = listItems
+      .filter((item) => !["staff", "posts", "name-requests"].includes(item.key))
+      .map((item) =>
+        item.key === "settings" ? { ...item, label: "Profile" } : item
+      );
   }
+
 
 
   const ListUI = (

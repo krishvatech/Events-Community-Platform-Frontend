@@ -4,6 +4,7 @@ import { Box, Container, IconButton, Typography } from "@mui/material";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import AdminSidebar from "../AdminSidebar";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import { isStaffUser } from "../../utils/adminRole.js";
 
 function resolveActiveKey(pathname) {
   if (pathname === "/admin" || pathname === "/admin/") return "resources"; // default tab for /admin
@@ -13,7 +14,7 @@ function resolveActiveKey(pathname) {
   if (pathname.startsWith("/admin/community/groups")) return "groups";
   if (pathname.startsWith("/admin/groups")) return "groups";
   if (pathname.startsWith("/admin/posts")) return "posts";
-  if (pathname.startsWith("/admin/carts")) return "carts";            
+  if (pathname.startsWith("/admin/carts")) return "carts";
   if (pathname.startsWith("/admin/notifications")) return "notifications";
   if (pathname.startsWith("/admin/messages")) return "messages";
   if (pathname.startsWith("/admin/settings")) return "settings";
@@ -23,6 +24,9 @@ function resolveActiveKey(pathname) {
 }
 
 export default function AdminLayout() {
+  const staff = isStaffUser();
+  const sidebarTitle = staff ? "Staff" : "Admin";
+
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -72,7 +76,7 @@ export default function AdminLayout() {
           }}
         >
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Admin
+            {sidebarTitle}
           </Typography>
           <IconButton
             edge="start"
@@ -95,7 +99,7 @@ export default function AdminLayout() {
             <AdminSidebar
               active={active}
               onSelect={handleSelect}
-              title="Admin"
+              title={sidebarTitle}
             />
           </Box>
 
@@ -111,7 +115,7 @@ export default function AdminLayout() {
           <AdminSidebar
             active={active}
             onSelect={handleSelect}
-            title="Admin"
+            title={sidebarTitle}
             mobileOpen={mobileOpen}
             onMobileClose={handleCloseMobileSidebar}
           />
