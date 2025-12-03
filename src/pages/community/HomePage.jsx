@@ -195,9 +195,9 @@ async function uploadEducationDocApi(educationId, file) {
   fd.append("file", file);
 
   // CHANGED: /users/ -> /auth/
-  const r = await fetch(`${API_ROOT}/auth/me/education-documents/`, { 
+  const r = await fetch(`${API_ROOT}/auth/me/education-documents/`, {
     method: "POST",
-    headers: { ...authHeader() }, 
+    headers: { ...authHeader() },
     body: fd
   });
   if (!r.ok) throw new Error("Failed to upload document");
@@ -206,9 +206,9 @@ async function uploadEducationDocApi(educationId, file) {
 
 async function deleteEducationDocApi(docId) {
   // CHANGED: /users/ -> /auth/
-  const r = await fetch(`${API_ROOT}/auth/me/education-documents/${docId}/`, { 
+  const r = await fetch(`${API_ROOT}/auth/me/education-documents/${docId}/`, {
     method: "DELETE",
-    headers: { ...authHeader() } 
+    headers: { ...authHeader() }
   });
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
 }
@@ -964,9 +964,6 @@ function AboutTab({ profile, onUpdate, showToast }) {
         start: expForm.start || null,
         end: expForm.current ? null : (expForm.end || null),
         current: expForm.current,
-        sector: expForm.sector || "",
-        industry: expForm.industry || "",
-        number_of_employees: expForm.number_of_employees || "",
       };
 
       if (editExpId) await updateExperienceApi(editExpId, payload);
@@ -1095,13 +1092,7 @@ function AboutTab({ profile, onUpdate, showToast }) {
                           {exp.location ? ` · ${exp.location}` : ""}
                         </Typography>
 
-                        {(exp.industry || exp.number_of_employees) && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            {exp.industry}
-                            {exp.industry && exp.number_of_employees ? " • " : ""}
-                            {exp.number_of_employees} employees
-                          </Typography>
-                        )}
+
 
                         {exp.description && (
                           <Typography
@@ -1164,10 +1155,29 @@ function AboutTab({ profile, onUpdate, showToast }) {
             </List>
           </SectionCard>
 
-          <SectionCard title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+          <SectionCard title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small" onClick={() => showToast("info", "Add coming soon")}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
-              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>} secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>} /></ListItem>
-              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>} secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>} /></ListItem>
+              <ListItem disableGutters
+                secondaryAction={
+                  <Box sx={{ display: "flex" }}>
+                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                  </Box>
+                }
+              >
+                <ListItemText primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>} secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>} />
+              </ListItem>
+
+              <ListItem disableGutters
+                secondaryAction={
+                  <Box sx={{ display: "flex" }}>
+                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                  </Box>
+                }
+              >
+                <ListItemText primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>} secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>} />
+              </ListItem>
             </List>
           </SectionCard>
         </Grid>
@@ -1180,17 +1190,55 @@ function AboutTab({ profile, onUpdate, showToast }) {
             <Typography variant="subtitle2" color="text.secondary">Location</Typography><Box sx={{ display: "flex", gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{profile.location || "—"}</Typography></Box>
           </SectionCard>
 
-          <SectionCard title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+          <SectionCard title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small" onClick={() => showToast("info", "Add coming soon")}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
-              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>} secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>} /></ListItem>
-              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>} secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>} /></ListItem>
+              <ListItem disableGutters
+                secondaryAction={
+                  <Box sx={{ display: "flex" }}>
+                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                  </Box>
+                }
+              >
+                <ListItemText primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>} secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>} />
+              </ListItem>
+
+              <ListItem disableGutters
+                secondaryAction={
+                  <Box sx={{ display: "flex" }}>
+                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                  </Box>
+                }
+              >
+                <ListItemText primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>} secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>} />
+              </ListItem>
             </List>
           </SectionCard>
 
-          <SectionCard title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+          <SectionCard title="Memberships" action={<Tooltip title="Add"><IconButton size="small" onClick={() => showToast("info", "Add coming soon")}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
             <List dense disablePadding>
-              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>} secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>} /></ListItem>
-              <ListItem disableGutters><ListItemText primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>} secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>} /></ListItem>
+              <ListItem disableGutters
+                secondaryAction={
+                  <Box sx={{ display: "flex" }}>
+                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                  </Box>
+                }
+              >
+                <ListItemText primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>} secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>} />
+              </ListItem>
+
+              <ListItem disableGutters
+                secondaryAction={
+                  <Box sx={{ display: "flex" }}>
+                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                  </Box>
+                }
+              >
+                <ListItemText primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>} secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>} />
+              </ListItem>
             </List>
           </SectionCard>
         </Grid>
@@ -1243,6 +1291,13 @@ function AboutTab({ profile, onUpdate, showToast }) {
             <TextField label="Degree" value={eduForm.degree} onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })} />
             <Autocomplete freeSolo options={FIELD_OF_STUDY_OPTIONS} value={eduForm.field} onChange={(_, v) => setEduForm({ ...eduForm, field: v || "" })} renderInput={(p) => <TextField {...p} label="Field" />} />
             <Box sx={{ display: "flex", gap: 2 }}><TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm({ ...eduForm, start: e.target.value })} /><TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm({ ...eduForm, end: e.target.value })} /></Box>
+            <TextField
+              label="Grade (optional)"
+              value={eduForm.grade || ""}
+              onChange={(e) => setEduForm({ ...eduForm, grade: e.target.value })}
+              fullWidth
+              sx={{ mt: 2 }}
+            />
             {/* --- NEW: File Upload Section --- */}
             <Box sx={{ mt: 2, borderTop: '1px dashed', borderColor: 'divider', pt: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>Transcripts / Certificates</Typography>
@@ -1360,60 +1415,6 @@ function AboutTab({ profile, onUpdate, showToast }) {
                 setExpForm((prev) => ({ ...prev, position: e.target.value }))
               }
             />
-
-            {/* 3. Sector – same order as ProfilePage */}
-            <TextField
-              select
-              label="Sector"
-              fullWidth
-              value={expForm.sector || ""}
-              onChange={(e) =>
-                setExpForm((prev) => ({ ...prev, sector: e.target.value }))
-              }
-            >
-              {SECTOR_OPTIONS.map((opt) => (
-                <MenuItem key={opt} value={opt}>
-                  {opt}
-                </MenuItem>
-              ))}
-            </TextField>
-
-            {/* 4. Industry */}
-            <TextField
-              select
-              label="Industry"
-              fullWidth
-              value={expForm.industry || ""}
-              onChange={(e) =>
-                setExpForm((prev) => ({ ...prev, industry: e.target.value }))
-              }
-            >
-              {INDUSTRY_OPTIONS.map((opt) => (
-                <MenuItem key={opt} value={opt}>
-                  {opt}
-                </MenuItem>
-              ))}
-            </TextField>
-
-            {/* 5. Number of employees */}
-            <TextField
-              select
-              label="Number of employees"
-              fullWidth
-              value={expForm.number_of_employees || ""}
-              onChange={(e) =>
-                setExpForm((prev) => ({
-                  ...prev,
-                  number_of_employees: e.target.value,
-                }))
-              }
-            >
-              {EMPLOYEE_COUNT_OPTIONS.map((opt) => (
-                <MenuItem key={opt} value={opt}>
-                  {opt}
-                </MenuItem>
-              ))}
-            </TextField>
 
             {/* 6. Location: City + Country (same pattern you already use) */}
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>

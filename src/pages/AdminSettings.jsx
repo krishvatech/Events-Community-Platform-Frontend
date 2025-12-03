@@ -768,7 +768,7 @@ export default function AdminSettings() {
       field: item.field_of_study || "",
       start: toYear(item.start_date),
       end: toYear(item.end_date),
-      // Removed grade here
+      grade: item.grade || "",
       documents: item.documents || [] // Add this
     });
     setEduFiles([]); // Add this
@@ -921,6 +921,7 @@ export default function AdminSettings() {
         field_of_study: (eduForm.field || "").trim(),
         start_date: normalizeYear(eduForm.start),
         end_date: normalizeYear(eduForm.end),
+        grade: (eduForm.grade || "").trim(),
       };
 
       if (!payload.school || !payload.degree) {
@@ -969,9 +970,7 @@ export default function AdminSettings() {
           description: expForm.description || "", exit_reason: expForm.exit_reason || "", employment_type: expForm.employment_type || "full_time",
           work_schedule: expForm.work_schedule || "", relationship_to_org: expForm.relationship_to_org || "", career_stage: expForm.career_stage || "",
           compensation_type: expForm.compensation_type || "", work_arrangement: expForm.work_arrangement || "",
-          sector: expForm.sector || "",
-          industry: expForm.industry || "",
-          number_of_employees: expForm.number_of_employees || "",
+        
         }),
       });
       if (!r.ok) throw new Error("Failed to save experience");
@@ -1173,7 +1172,6 @@ export default function AdminSettings() {
                                 <Stack component="span" spacing={0.5}>
                                   <Typography variant="body2" color="text.secondary">
                                     {rangeLinkedIn(e.start_date, e.end_date, false)}
-                                    {/* Removed Grade Display here */}
                                   </Typography>
                                   {/* --- NEW: Display Document Chips --- */}
                                   {e.documents && e.documents.length > 0 && (
@@ -1362,19 +1360,6 @@ export default function AdminSettings() {
                 <Typography variant="body2" color="text.secondary">No experience found. Add an experience entry to populate this.</Typography>
               )}
             </Box>
-
-            {/* Dropdowns - Disabled if no latest experience */}
-            <TextField select label="Sector" value={workForm.sector} onChange={(e) => setWorkForm({ ...workForm, sector: e.target.value })} fullWidth disabled={!latestExp}>
-              {SECTOR_OPTIONS.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
-            </TextField>
-
-            <TextField select label="Industry" value={workForm.industry} onChange={(e) => setWorkForm({ ...workForm, industry: e.target.value })} fullWidth disabled={!latestExp}>
-              {INDUSTRY_OPTIONS.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
-            </TextField>
-
-            <TextField select label="Number of Employees" value={workForm.employees} onChange={(e) => setWorkForm({ ...workForm, employees: e.target.value })} fullWidth disabled={!latestExp}>
-              {EMPLOYEE_COUNT_OPTIONS.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
-            </TextField>
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -1404,7 +1389,6 @@ export default function AdminSettings() {
         <DialogTitle>Edit Contact</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <Box sx={{ display: "flex", gap: 2 }}><TextField label="First name" fullWidth value={contactForm.first_name} onChange={(e) => setContactForm((f) => ({ ...f, first_name: e.target.value }))} /><TextField label="Last name" fullWidth value={contactForm.last_name} onChange={(e) => setContactForm((f) => ({ ...f, last_name: e.target.value }))} /></Box>
             <TextField label="Email" type="email" fullWidth value={contactForm.email} onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))} />
             <Autocomplete fullWidth size="small" options={CITY_OPTIONS} value={contactForm.city || null} onChange={(_, value) => setContactForm((f) => ({ ...f, city: value || "" }))} renderInput={(params) => <TextField {...params} label="City" placeholder="Select city" />} />
             <Autocomplete fullWidth size="small" options={COUNTRY_OPTIONS} autoHighlight getOptionLabel={(option) => option.label} value={getSelectedCountry({ location: contactForm.location })} onChange={(_, value) => setContactForm((f) => ({ ...f, location: value?.label || "" }))} renderOption={(props, option) => (<Box component="li" sx={{ display: "flex", gap: 1 }} {...props}><span>{flagEmoji(option.code)}</span><span>{option.label}</span></Box>)} renderInput={(params) => <TextField {...params} label="Country" placeholder="Select country" />} />
@@ -1426,6 +1410,13 @@ export default function AdminSettings() {
             <TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm((f) => ({ ...f, start: e.target.value }))} fullWidth sx={{ flex: 1 }} inputProps={{ min: 1900, max: new Date().getFullYear() }} error={!!eduErrors.start} helperText={eduErrors.start || ""} />
             <TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm((f) => ({ ...f, end: e.target.value }))} fullWidth sx={{ flex: 1 }} inputProps={{ min: 1900, max: new Date().getFullYear() + 10 }} error={!!eduErrors.end} helperText={eduErrors.end || ""} />
           </Box>
+          {/* ADD THIS TEXTFIELD HERE */}
+          <TextField
+            label="Grade (optional)"
+            value={eduForm.grade}
+            onChange={(e) => setEduForm((f) => ({ ...f, grade: e.target.value }))}
+            fullWidth
+          />
           {/* --- NEW: File Upload Section --- */}
           <Box sx={{ mt: 2, borderTop: '1px dashed', borderColor: 'divider', pt: 2 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>Transcripts / Certificates</Typography>

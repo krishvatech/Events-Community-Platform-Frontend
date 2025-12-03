@@ -759,8 +759,7 @@ export default function ProfilePage() {
           exit_reason: expForm.exit_reason || "", employment_type: expForm.employment_type || "full_time",
           work_schedule: expForm.work_schedule || "", relationship_to_org: expForm.relationship_to_org || "",
           career_stage: expForm.career_stage || "", compensation_type: expForm.compensation_type || "",
-          work_arrangement: expForm.work_arrangement || "", sector: expForm.sector || "",
-          industry: expForm.industry || "", number_of_employees: expForm.number_of_employees || ""
+          work_arrangement: expForm.work_arrangement || "",
         }),
       });
       if (!r.ok) throw new Error("Failed to save experience");
@@ -914,12 +913,31 @@ export default function ProfilePage() {
                 <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
                   {/* LEFT COLUMN */}
                   <Grid item xs={12} lg={6}>
-                    <SectionCard title="About" action={<Button size="small" startIcon={<EditOutlinedIcon fontSize="small" />} onClick={() => openEditAbout("description")}>Edit</Button>}>
+                    <SectionCard
+                      title="About"
+                      action={
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => openEditAbout("description")}>
+                            <EditRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      }
+                    >
                       <Label>Summary</Label>
                       <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>{form.bio?.trim() ? form.bio : "Add a short description about your role, focus areas, and what you're working on."}</Typography>
                     </SectionCard>
 
-                    <SectionCard sx={{ mt: 2 }} title="Skills" action={<Button size="small" startIcon={<EditOutlinedIcon fontSize="small" />} onClick={() => openEditAbout("skills")}>Edit</Button>}>
+                    <SectionCard
+                      sx={{ mt: 2 }}
+                      title="Skills"
+                      action={
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => openEditAbout("skills")}>
+                            <EditRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      }
+                    >
                       {parseSkills(form.skillsText).length ? (
                         <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
                           {parseSkills(form.skillsText).map((s, i) => (<Chip key={i} size="small" label={s} sx={{ maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }} />))}
@@ -927,7 +945,17 @@ export default function ProfilePage() {
                       ) : <Typography variant="body2" color="text.secondary">Add your top skills.</Typography>}
                     </SectionCard>
 
-                    <SectionCard sx={{ mt: 2 }} title="Experience" action={<Button size="small" variant="outlined" onClick={openAddExperience}>Add more</Button>}>
+                    <SectionCard
+                      sx={{ mt: 2 }}
+                      title="Experience"
+                      action={
+                        <Tooltip title="Add">
+                          <IconButton size="small" onClick={openAddExperience}>
+                            <AddRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      }
+                    >
                       {expList.length ? (
                         <List dense disablePadding>
                           {expList.map((x) => (
@@ -952,7 +980,17 @@ export default function ProfilePage() {
                       )}
                     </SectionCard>
 
-                    <SectionCard sx={{ mt: 2 }} title="Education" action={<Button size="small" variant="outlined" onClick={() => setEduOpen(true)}>Add more</Button>}>
+                    <SectionCard
+                      sx={{ mt: 2 }}
+                      title="Education"
+                      action={
+                        <Tooltip title="Add">
+                          <IconButton size="small" onClick={() => setEduOpen(true)}>
+                            <AddRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      }
+                    >
                       {eduList.length ? (
                         <List dense disablePadding>
                           {eduList.map((e) => (
@@ -998,10 +1036,20 @@ export default function ProfilePage() {
                     </SectionCard>
                     <SectionCard sx={{ mt: 2 }} title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
                       <List dense disablePadding>
-                        <ListItem disableGutters>
+                        <ListItem disableGutters secondaryAction={
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                          </Box>
+                        }>
                           <ListItemText primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>} secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>} />
                         </ListItem>
-                        <ListItem disableGutters>
+                        <ListItem disableGutters secondaryAction={
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                          </Box>
+                        }>
                           <ListItemText primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>} secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>} />
                         </ListItem>
                       </List>
@@ -1010,7 +1058,16 @@ export default function ProfilePage() {
 
                   {/* RIGHT COLUMN */}
                   <Grid item xs={12} lg={6}>
-                    <SectionCard title="Contact" action={<Button size="small" startIcon={<EditOutlinedIcon fontSize="small" />} onClick={openEditContact}>Edit</Button>}>
+                    <SectionCard
+                      title="Contact"
+                      action={
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={openEditContact}>
+                            <EditRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      }
+                    >
                       <Label>Social Media Links</Label>
                       <List dense disablePadding>
                         <ListItem sx={{ px: 0 }}>
@@ -1031,10 +1088,20 @@ export default function ProfilePage() {
 
                     <SectionCard sx={{ mt: 2 }} title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
                       <List dense disablePadding>
-                        <ListItem disableGutters>
+                        <ListItem disableGutters secondaryAction={
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                          </Box>
+                        }>
                           <ListItemText primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>} secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>} />
                         </ListItem>
-                        <ListItem disableGutters>
+                        <ListItem disableGutters secondaryAction={
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                          </Box>
+                        }>
                           <ListItemText primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>} secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>} />
                         </ListItem>
                       </List>
@@ -1042,10 +1109,20 @@ export default function ProfilePage() {
 
                     <SectionCard sx={{ mt: 2 }} title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
                       <List dense disablePadding>
-                        <ListItem disableGutters>
+                        <ListItem disableGutters secondaryAction={
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                          </Box>
+                        }>
                           <ListItemText primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>} secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>} />
                         </ListItem>
-                        <ListItem disableGutters>
+                        <ListItem disableGutters secondaryAction={
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                          </Box>
+                        }>
                           <ListItemText primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>} secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>} />
                         </ListItem>
                       </List>
@@ -1104,10 +1181,7 @@ export default function ProfilePage() {
                 <Typography variant="body2" color="text.secondary">No experience found. Add an experience entry to populate this.</Typography>
               )}
             </Box>
-            <TextField select label="Sector" value={workForm.sector} onChange={(e) => setWorkForm({ ...workForm, sector: e.target.value })} fullWidth disabled={!latestExp}>{SECTOR_OPTIONS.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}</TextField>
-            <TextField select label="Industry" value={workForm.industry} onChange={(e) => setWorkForm({ ...workForm, industry: e.target.value })} fullWidth disabled={!latestExp}>{INDUSTRY_OPTIONS.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}</TextField>
-            <TextField select label="Number of Employees" value={workForm.employees} onChange={(e) => setWorkForm({ ...workForm, employees: e.target.value })} fullWidth disabled={!latestExp}>{EMPLOYEE_COUNT_OPTIONS.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}</TextField>
-          </Stack>
+            </Stack>
         </DialogContent>
         <DialogActions><Button onClick={() => setWorkOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAboutWork} disabled={saving || !latestExp}>Save</Button></DialogActions>
       </Dialog>
@@ -1116,14 +1190,7 @@ export default function ProfilePage() {
       <Dialog open={contactOpen} onClose={() => setContactOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 700 }}>Edit contact</DialogTitle>
         <DialogContent dividers>
-          <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, mb: 2 }}>
-            <TextField label="First name" fullWidth disabled value={contactForm.first_name} />
-            <TextField label="Last name" fullWidth disabled value={contactForm.last_name} />
-          </Box>
-          <Box sx={{ mb: 2 }}>
-            <Button startIcon={<HistoryEduRoundedIcon />} sx={{ textTransform: 'none' }} onClick={() => { setContactOpen(false); setNameChangeOpen(true); }}>Request Name Change</Button>
-          </Box>
-          <TextField label="Email" type="email" fullWidth sx={{ mb: 2 }} value={contactForm.email} onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))} />
+          <TextField label="Email" type="email" fullWidth sx={{ mt: 1, mb: 2 }} value={contactForm.email} onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))} />
           <TextField label="LinkedIn URL" fullWidth sx={{ mb: 2 }} placeholder="https://www.linkedin.com/in/username" value={contactForm.linkedin} onChange={(e) => setContactForm((f) => ({ ...f, linkedin: e.target.value }))} />
           <Autocomplete fullWidth size="small" options={CITY_OPTIONS} value={CITY_OPTIONS.find((c) => c === contactForm.city) || null} onChange={(_, value) => setContactForm((prev) => ({ ...prev, city: value || "" }))} renderInput={(params) => <TextField {...params} label="City" placeholder="Select city" sx={{ mb: 2 }} />} />
           <Autocomplete size="small" fullWidth options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: contactForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setContactForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country" placeholder="Select country" fullWidth />} />
