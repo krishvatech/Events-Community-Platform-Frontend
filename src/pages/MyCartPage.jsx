@@ -27,6 +27,11 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
 } from "@mui/material";
 import AccountSidebar from "../components/AccountSidebar.jsx";
 // Icons
@@ -46,6 +51,7 @@ import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNone
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { API_BASE, getToken } from "../utils/api.js";
+
 const navItems = [
   { key: "activity", label: "Activity", icon: <TimelineOutlinedIcon /> },
   { key: "events", label: "Courses", icon: <SchoolOutlinedIcon /> },
@@ -62,20 +68,21 @@ const navItems = [
   { key: "settings", label: "Settings", icon: <SettingsOutlinedIcon /> },
 ];
 
-
 const API_ORIGIN = API_BASE.replace(/\/api$/, "");
 const toAbs = (u) => {
   if (!u) return u;
-  // already absolute?
   if (/^https?:\/\//i.test(u)) return u;
-  // ensure leading slash then join to origin
   const p = u.startsWith("/") ? u : `/${u}`;
   return `${API_ORIGIN}${p}`;
 };
 
-
 // ---------------- Success Toast (centered, animated) ----------------
-function SuccessToast({ open, onClose, title = "Payment successful", subtitle = "Your order has been placed." }) {
+function SuccessToast({
+  open,
+  onClose,
+  title = "Payment successful",
+  subtitle = "Your order has been placed.",
+}) {
   return (
     <Backdrop
       open={open}
@@ -110,8 +117,7 @@ function SuccessToast({ open, onClose, title = "Payment successful", subtitle = 
               borderRadius: "50%",
               display: "grid",
               placeItems: "center",
-              backgroundColor: "rgba(16,185,129,0.12)", // emerald-500/12
-              // pulse ring
+              backgroundColor: "rgba(16,185,129,0.12)",
               "&::after": {
                 content: '""',
                 position: "absolute",
@@ -153,14 +159,18 @@ function SuccessToast({ open, onClose, title = "Payment successful", subtitle = 
   );
 }
 
-
 const authHeaders = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
 const fmt = (n) =>
-  new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n || 0);
+  new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(n || 0);
+
 export default function MyCartPage() {
   const navigate = useNavigate();
   const storedUser = useMemo(() => {
@@ -172,15 +182,25 @@ export default function MyCartPage() {
   }, []);
   const fullName = storedUser?.name || storedUser?.full_name || "Member";
   const first = (fullName || "Member").split(" ")[0];
+
   const [leftActive, setLeftActive] = useState("orders"); // matches the screenshot selection
   const [tab, setTab] = useState(0); // Cart | Orders | Addresses | Account details
-  const [cart, setCart] = useState([]);        // API: Order.items (OrderItem[])
-  const [couponCode, setCouponCode] = useState("");   // optional: wire later to backend
+
+  const [cart, setCart] = useState([]);
+  const [couponCode, setCouponCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [subtotal, setSubtotal] = useState(0);
   const [total, setTotal] = useState(0);
   const [showPaid, setShowPaid] = useState(false);
 
+  // NEW: state for previous orders + popup
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+
+  // CART: load current cart items
   useEffect(() => {
     (async () => {
       try {
@@ -190,17 +210,21 @@ export default function MyCartPage() {
         setCart(Array.isArray(data?.items) ? data.items : []);
         setSubtotal(Number(data?.subtotal ?? 0));
         setTotal(Number(data?.total ?? 0));
-        // update header badge
-        const count = (data?.items || []).reduce((s, it) => s + (it.quantity || 0), 0);
+        const count = (data?.items || []).reduce(
+          (s, it) => s + (it.quantity || 0),
+          0
+        );
         localStorage.setItem("cart_count", String(count));
         window.dispatchEvent(new Event("cart:update"));
       } catch (e) {
-        setCart([]); setSubtotal(0); setTotal(0);
+        setCart([]);
+        setSubtotal(0);
+        setTotal(0);
       }
     })();
   }, []);
 
-  // normalize server items to the view you already render
+  // Normalize cart items for view
   const viewItems = useMemo(() => {
     return (cart || []).map((it) => ({
       id: it.id,
@@ -209,12 +233,75 @@ export default function MyCartPage() {
       slug: it.event?.slug,
       price: Number(it.unit_price ?? it.event?.price ?? 0),
       qty: Number(it.quantity ?? 1),
-      image: it.event?.preview_image || it.event?.image_preview || it.event?.thumbnail || it.event?.image || null,
+      image:
+        it.event?.preview_image ||
+        it.event?.image_preview ||
+        it.event?.thumbnail ||
+        it.event?.image ||
+        null,
     }));
   }, [cart]);
 
+  // NEW: load previous orders when Orders tab is opened
+  const loadOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      setOrdersError("");
+      const res = await fetch(`${API_BASE}/orders/`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      // supports both plain array and {results: []}
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.results)
+          ? data.results
+          : [];
+      setOrders(list);
+    } catch (err) {
+      console.error("Failed to load orders", err);
+      setOrdersError("Could not load your orders. Please try again.");
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 1 && !orders.length && !ordersLoading) {
+      loadOrders();
+    }
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // NEW: normalized view for orders
+  const viewOrders = useMemo(() => {
+    return (orders || []).map((o) => {
+      const rawItems = o.items || o.order_items || [];
+      return {
+        id: o.id,
+        number: o.order_number || o.reference || o.code || o.id,
+        created: o.created || o.created_at || o.ordered_at,
+        status: o.status || o.payment_status || "paid",
+        total: Number(o.total || o.total_amount || o.amount || 0),
+        items: rawItems.map((oi) => ({
+          id: oi.id,
+          title: oi.event?.title || oi.product_name || oi.name || "Item",
+          qty: Number(oi.quantity || 1),
+          price: Number(oi.unit_price || oi.price || 0),
+          image:
+            oi.event?.preview_image ||
+            oi.event?.image_preview ||
+            oi.event?.thumbnail ||
+            oi.event?.image ||
+            oi.image ||
+            null,
+        })),
+      };
+    });
+  }, [orders]);
+
   const applyCoupon = () => {
-    // demo rules: IMAA10 => 10% | SAVE200 => $200 off
     let d = 0;
     if (couponCode.trim().toUpperCase() === "IMAA10") d = subtotal * 0.1;
     if (couponCode.trim().toUpperCase() === "SAVE200") d = 200;
@@ -222,13 +309,17 @@ export default function MyCartPage() {
     localStorage.setItem("cart_discount", String(d));
     localStorage.setItem("cart_coupon_code", couponCode.trim());
   };
+
   async function refreshCart() {
     const res = await fetch(`${API_BASE}/cart/`, { headers: authHeaders() });
     const data = await res.json();
     setCart(Array.isArray(data?.items) ? data.items : []);
     setSubtotal(Number(data?.subtotal ?? 0));
     setTotal(Number(data?.total ?? 0));
-    const count = (data?.items || []).reduce((s, it) => s + (it.quantity || 0), 0);
+    const count = (data?.items || []).reduce(
+      (s, it) => s + (it.quantity || 0),
+      0
+    );
     localStorage.setItem("cart_count", String(count));
     window.dispatchEvent(new Event("cart:update"));
   }
@@ -250,15 +341,14 @@ export default function MyCartPage() {
     });
     await refreshCart();
   };
+
   const proceedCheckout = async () => {
     if (!viewItems.length) return;
 
-    // unique event ids from cart
-    const eventIds = [...new Set(viewItems.map(i => i.eventId).filter(Boolean))];
+    const eventIds = [...new Set(viewItems.map((i) => i.eventId).filter(Boolean))];
     if (!eventIds.length) return;
 
     try {
-      // 1) create EventRegistration rows
       const res = await fetch(`${API_BASE}/events/register-bulk/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -267,30 +357,35 @@ export default function MyCartPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await res.json();
 
-      // 2) (optional) clear the cart on server if you have an endpoint; ignore errors
       try {
-        await fetch(`${API_BASE}/cart/clear/`, { method: "POST", headers: authHeaders() });
+        await fetch(`${API_BASE}/cart/clear/`, {
+          method: "POST",
+          headers: authHeaders(),
+        });
       } catch { }
 
       setShowPaid(true);
       setTimeout(() => {
         setShowPaid(false);
-        // Example: clear locally (comment out if you don't want to clear)
-        // setCart([]); setSubtotal(0); setTotal(0);
-        // localStorage.setItem("cart_count", "0");
-        // window.dispatchEvent(new Event("cart:update"));
-        // navigate("/account/events"); // or stay on cart
       }, 2000);
 
-      // 3) refresh cart UI + badge
       await refreshCart();
-
-
     } catch (err) {
       console.error(err);
-      // TODO: show a toast/snackbar error for the user
     }
   };
+
+  // NEW: handlers for order popup
+  const handleOrderClick = (order) => {
+    setSelectedOrder(order);
+    setOrderDialogOpen(true);
+  };
+
+  const handleCloseOrderDialog = () => {
+    setOrderDialogOpen(false);
+    setSelectedOrder(null);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" className="py-6 sm:py-8">
@@ -298,10 +393,14 @@ export default function MyCartPage() {
           <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar />
           </aside>
+
           {/* MAIN */}
           <main className="col-span-12 lg:col-span-9">
             {/* Tabs row (Cart | Orders | Addresses | Account details) */}
-            <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
+            <Paper
+              elevation={0}
+              className="rounded-2xl border border-slate-200 mb-4"
+            >
               <Tabs
                 value={tab}
                 onChange={(_, v) => setTab(v)}
@@ -310,7 +409,10 @@ export default function MyCartPage() {
                 sx={{
                   px: 1,
                   "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
-                  "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
+                  "& .Mui-selected": {
+                    color: "#0ea5a4 !important",
+                    fontWeight: 700,
+                  },
                   "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
                 }}
               >
@@ -320,160 +422,345 @@ export default function MyCartPage() {
                 <Tab label="Account details" />
               </Tabs>
             </Paper>
-            {/* CART CONTENT */}
-            <div className="grid grid-cols-12 gap-6">
-              {/* Table + coupon */}
-              <div className="col-span-12 lg:col-span-8">
-                <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
-                  {viewItems.length === 0 ? (
-                    <Box className="p-8 text-center">
-                      <h3 className="text-xl font-semibold text-slate-700">Your cart is empty</h3>
-                      <p className="text-slate-500 mt-2">Browse events and add tickets to your cart.</p>
-                      <Button
-                        component={Link}
-                        to="/events"
-                        className="mt-4 rounded-xl"
-                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                        variant="contained"
-                      >
-                        Explore events
-                      </Button>
-                    </Box>
-                  ) : (
-                    <>
-                      {/* 👇 Scroll container so Subtotal is always visible on laptop/desktop & mobile */}
-                      <Box sx={{ width: "100%", overflowX: "auto" }}>
-                        <Table sx={{ minWidth: 700 }} size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell />
-                              <TableCell className="font-semibold text-slate-600">Product</TableCell>
-                              <TableCell className="font-semibold text-slate-600">Price</TableCell>
-                              <TableCell className="font-semibold text-slate-600">Quantity</TableCell>
-                              <TableCell className="font-semibold text-slate-600">Subtotal</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {viewItems.map((it) => (
-                              <TableRow key={it.id}>
-                                <TableCell width={44}>
-                                  <IconButton size="small" onClick={() => removeItem(it.id)} aria-label="remove">
-                                    <CloseOutlinedIcon />
-                                  </IconButton>
+
+            {/* TAB 0: CART CONTENT */}
+            {tab === 0 && (
+              <div className="grid grid-cols-12 gap-6">
+                {/* Table + coupon */}
+                <div className="col-span-12 lg:col-span-8">
+                  <Paper
+                    elevation={0}
+                    className="rounded-2xl border border-slate-200 overflow-hidden"
+                  >
+                    {viewItems.length === 0 ? (
+                      <Box className="p-8 text-center">
+                        <h3 className="text-xl font-semibold text-slate-700">
+                          Your cart is empty
+                        </h3>
+                        <p className="text-slate-500 mt-2">
+                          Browse events and add tickets to your cart.
+                        </p>
+                        <Button
+                          component={Link}
+                          to="/events"
+                          className="mt-4 rounded-xl"
+                          sx={{
+                            textTransform: "none",
+                            backgroundColor: "#10b8a6",
+                            "&:hover": { backgroundColor: "#0ea5a4" },
+                          }}
+                          variant="contained"
+                        >
+                          Explore events
+                        </Button>
+                      </Box>
+                    ) : (
+                      <>
+                        <Box sx={{ width: "100%", overflowX: "auto" }}>
+                          <Table sx={{ minWidth: 700 }} size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell />
+                                <TableCell className="font-semibold text-slate-600">
+                                  Product
                                 </TableCell>
-                                <TableCell>
-                                  <Box className="flex items-center gap-3">
-                                    {it.image ? (
-                                      <img
-                                        src={toAbs(it.image)}
-                                        alt={it.title}
-                                        className="w-12 h-12 rounded-md object-cover border border-slate-200"
-                                        loading="lazy"
-                                      />
-                                    ) : (
-                                      <div className="w-12 h-12 rounded-md bg-slate-200" />
-                                    )}
-                                    <div className="min-w-0">
-                                      <Link
-                                        to={it.slug ? `/events/${it.slug}` : "#"}
-                                        className="text-slate-800 font-medium hover:text-teal-700 line-clamp-2"
-                                      >
-                                        {it.title}
-                                      </Link>
-                                    </div>
-                                  </Box>
+                                <TableCell className="font-semibold text-slate-600">
+                                  Price
                                 </TableCell>
-                                <TableCell>{fmt(Number(it.price) || 0)}</TableCell>
-                                <TableCell width={120}>
-                                  <TextField
-                                    type="number"
-                                    size="small"
-                                    value={it.qty}
-                                    onChange={(e) => updateQty(it.id, e.target.value)}
-                                    inputProps={{ min: 1 }}
-                                  />
+                                <TableCell className="font-semibold text-slate-600">
+                                  Quantity
                                 </TableCell>
-                                <TableCell className="font-semibold">
-                                  {fmt((Number(it.price) || 0) * (it.qty || 1))}
+                                <TableCell className="font-semibold text-slate-600">
+                                  Subtotal
                                 </TableCell>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </Box>
-                      <Divider />
-                      <Box className="p-4 sm:p-5 flex flex-col sm:flex-row gap-3 sm:items-center">
-                        <TextField
-                          label="Coupon code"
-                          size="small"
-                          value={couponCode}
-                          onChange={(e) => setCouponCode(e.target.value)}
-                          sx={{ maxWidth: 260 }}
-                        />
-                        <Button
-                          onClick={applyCoupon}
-                          variant="outlined"
-                          sx={{ textTransform: "none" }}
-                          className="rounded-xl"
-                        >
-                          APPLY COUPON
-                        </Button>
-                        <div className="flex-1" />
-                        <Button
-                          onClick={() => setCart([...cart])} // persist already handled by useEffect
-                          variant="outlined"
-                          sx={{ textTransform: "none" }}
-                          className="rounded-xl"
-                        >
-                          UPDATE CART
-                        </Button>
-                      </Box>
-                    </>
-                  )}
-                </Paper>
-              </div>
-              {/* Totals */}
-              <div className="col-span-12 lg:col-span-4 lg:sticky lg:top-24">
-                <Paper elevation={0} className="rounded-2xl border border-slate-200">
-                  <Box className="p-5">
-                    <h3 className="text-2xl font-extrabold text-slate-800 mb-3">Cart totals</h3>
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                        <span className="text-slate-600">Subtotal</span>
-                        <span className="font-semibold">{fmt(subtotal)}</span>
-                      </div>
-                      {discount > 0 && (
+                            </TableHead>
+                            <TableBody>
+                              {viewItems.map((it) => (
+                                <TableRow key={it.id}>
+                                  <TableCell width={44}>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => removeItem(it.id)}
+                                      aria-label="remove"
+                                    >
+                                      <CloseOutlinedIcon />
+                                    </IconButton>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Box className="flex items-center gap-3">
+                                      {it.image ? (
+                                        <img
+                                          src={toAbs(it.image)}
+                                          alt={it.title}
+                                          className="w-12 h-12 rounded-md object-cover border border-slate-200"
+                                          loading="lazy"
+                                        />
+                                      ) : (
+                                        <div className="w-12 h-12 rounded-md bg-slate-200" />
+                                      )}
+                                      <div className="min-w-0">
+                                        <Link
+                                          to={
+                                            it.slug
+                                              ? `/events/${it.slug}`
+                                              : "#"
+                                          }
+                                          className="text-slate-800 font-medium hover:text-teal-700 line-clamp-2"
+                                        >
+                                          {it.title}
+                                        </Link>
+                                      </div>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell>
+                                    {fmt(Number(it.price) || 0)}
+                                  </TableCell>
+                                  <TableCell width={120}>
+                                    <TextField
+                                      type="number"
+                                      size="small"
+                                      value={it.qty}
+                                      onChange={(e) =>
+                                        updateQty(it.id, e.target.value)
+                                      }
+                                      inputProps={{ min: 1 }}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-semibold">
+                                    {fmt(
+                                      (Number(it.price) || 0) *
+                                      (it.qty || 1)
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </Box>
+                        <Divider />
+                        <Box className="p-4 sm:p-5 flex flex-col sm:flex-row gap-3 sm:items-center">
+                          <TextField
+                            label="Coupon code"
+                            size="small"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value)}
+                            sx={{ maxWidth: 260 }}
+                          />
+                          <Button
+                            onClick={applyCoupon}
+                            variant="outlined"
+                            sx={{ textTransform: "none" }}
+                            className="rounded-xl"
+                          >
+                            APPLY COUPON
+                          </Button>
+                          <div className="flex-1" />
+                          <Button
+                            onClick={() => setCart([...cart])}
+                            variant="outlined"
+                            sx={{ textTransform: "none" }}
+                            className="rounded-xl"
+                          >
+                            UPDATE CART
+                          </Button>
+                        </Box>
+                      </>
+                    )}
+                  </Paper>
+                </div>
+
+                {/* Totals */}
+                <div className="col-span-12 lg:col-span-4 lg:sticky lg:top-24">
+                  <Paper
+                    elevation={0}
+                    className="rounded-2xl border border-slate-200"
+                  >
+                    <Box className="p-5">
+                      <h3 className="text-2xl font-extrabold text-slate-800 mb-3">
+                        Cart totals
+                      </h3>
+                      <div className="border border-slate-200 rounded-xl overflow-hidden">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                          <span className="text-slate-600 flex items-center gap-2">
-                            Discount <Chip label={couponCode.toUpperCase()} size="small" />
+                          <span className="text-slate-600">Subtotal</span>
+                          <span className="font-semibold">
+                            {fmt(subtotal)}
                           </span>
-                          <span className="font-semibold text-teal-700">−{fmt(discount)}</span>
                         </div>
-                      )}
-                      <div className="flex items-center justify-between px-4 py-3">
-                        <span className="text-slate-800 font-semibold">Total</span>
-                        <span className="text-slate-900 font-extrabold">{fmt(total)}</span>
+                        {discount > 0 && (
+                          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+                            <span className="text-slate-600 flex items-center gap-2">
+                              Discount{" "}
+                              <Chip
+                                label={couponCode.toUpperCase()}
+                                size="small"
+                              />
+                            </span>
+                            <span className="font-semibold text-teal-700">
+                              −{fmt(discount)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <span className="text-slate-800 font-semibold">
+                            Total
+                          </span>
+                          <span className="text-slate-900 font-extrabold">
+                            {fmt(total)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <Button
-                      onClick={proceedCheckout}
-                      disabled={cart.length === 0}
-                      fullWidth
-                      className="mt-4 rounded-xl"
-                      sx={{ textTransform: "none", py: 1.25, backgroundColor: "teal-500", "&:hover": { backgroundColor: "teal-400" } }}
-                      variant="contained"
-                    >
-                      Proceed to checkout
-                    </Button>
-                  </Box>
-                </Paper>
+                      <Button
+                        onClick={proceedCheckout}
+                        disabled={cart.length === 0}
+                        fullWidth
+                        className="mt-4 rounded-xl"
+                        sx={{
+                          textTransform: "none",
+                          py: 1.25,
+                          backgroundColor: "teal-500",
+                          "&:hover": { backgroundColor: "teal-400" },
+                        }}
+                        variant="contained"
+                      >
+                        Proceed to checkout
+                      </Button>
+                    </Box>
+                  </Paper>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* TAB 1: PREVIOUS ORDERS */}
+            {tab === 1 && (
+              <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-600">
+                Orders section coming soon.
+              </Box>
+            )}
+
+            {/* TAB 2 & 3: simple placeholders for now */}
+            {tab === 2 && (
+              <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-600">
+                Addresses section coming soon.
+              </Box>
+            )}
+
+            {tab === 3 && (
+              <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-600">
+                Account details section coming soon.
+              </Box>
+            )}
           </main>
         </div>
       </Container>
+
       {/* Centered animated toast */}
       <SuccessToast open={showPaid} onClose={() => setShowPaid(false)} />
+
+      {/* ORDER ITEMS POPUP */}
+      <Dialog
+        open={orderDialogOpen && !!selectedOrder}
+        onClose={handleCloseOrderDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          Order #{selectedOrder?.number ?? selectedOrder?.id}
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedOrder && (
+            <Box className="space-y-3">
+              <Box className="flex flex-wrap justify-between gap-2 mb-2">
+                <Typography variant="body2" color="text.secondary">
+                  Placed on{" "}
+                  {selectedOrder.created
+                    ? new Date(
+                      selectedOrder.created
+                    ).toLocaleString()
+                    : "-"}
+                </Typography>
+                <Chip
+                  label={String(
+                    selectedOrder.status || "paid"
+                  ).toUpperCase()}
+                  size="small"
+                  color={
+                    selectedOrder.status === "cancelled"
+                      ? "default"
+                      : selectedOrder.status === "pending"
+                        ? "warning"
+                        : "success"
+                  }
+                  variant="outlined"
+                />
+              </Box>
+
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  className="mb-1"
+                  sx={{ fontWeight: 600 }}
+                >
+                  Items
+                </Typography>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Item</TableCell>
+                      <TableCell align="right">Qty</TableCell>
+                      <TableCell align="right">Price</TableCell>
+                      <TableCell align="right">Total</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(selectedOrder.items || []).map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <Box className="flex items-center gap-2">
+                            {item.image ? (
+                              <img
+                                src={toAbs(item.image)}
+                                alt={item.title}
+                                className="w-10 h-10 rounded-md object-cover border border-slate-200"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-md bg-slate-200" />
+                            )}
+                            <Typography className="text-sm font-medium">
+                              {item.title}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell align="right">{item.qty}</TableCell>
+                        <TableCell align="right">
+                          {fmt(item.price)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {fmt(item.price * item.qty)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+
+              <Box className="flex justify-end mt-2">
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Order total: {fmt(selectedOrder.total)}
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleCloseOrderDialog}
+            sx={{ textTransform: "none" }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
