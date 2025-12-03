@@ -1685,60 +1685,6 @@ export default function AdminSettings() {
             onChange={(val) => setExpForm((f) => ({ ...f, org: val }))}
           />
           <TextField label="Position *" value={expForm.position} onChange={(e) => setExpForm((f) => ({ ...f, position: e.target.value }))} fullWidth sx={{ mb: 2 }} />
-          {/* Sector / Industry / Employees – full-width fields */}
-          <TextField
-            select
-            label="Sector"
-            value={expForm.sector || ""}
-            onChange={(e) =>
-              setExpForm((f) => ({ ...f, sector: e.target.value }))
-            }
-            fullWidth
-            sx={{ mb: 2 }}
-          >
-            {SECTOR_OPTIONS.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <TextField
-            select
-            label="Industry"
-            value={expForm.industry || ""}
-            onChange={(e) =>
-              setExpForm((f) => ({ ...f, industry: e.target.value }))
-            }
-            fullWidth
-            sx={{ mb: 2 }}
-          >
-            {INDUSTRY_OPTIONS.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <TextField
-            select
-            label="Number of employees"
-            value={expForm.number_of_employees || ""}
-            onChange={(e) =>
-              setExpForm((f) => ({
-                ...f,
-                number_of_employees: e.target.value,
-              }))
-            }
-            fullWidth
-            sx={{ mb: 2 }}
-          >
-            {EMPLOYEE_COUNT_OPTIONS.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
           <Autocomplete fullWidth size="small" options={CITY_OPTIONS} value={CITY_OPTIONS.find((c) => c === expForm.city) || null} onChange={(_, value) => setExpForm((prev) => ({ ...prev, city: value || "" }))} renderInput={(params) => <TextField {...params} label="City" placeholder="Enter city (optional)" fullWidth sx={{ mb: 2 }} />} />
           <Autocomplete fullWidth size="small" options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: expForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setExpForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country *" placeholder="Select country" fullWidth inputProps={{ ...params.inputProps, autoComplete: "new-password" }} sx={{ mb: 2 }} />} />
           <TextField select label="Employment type *" value={expForm.relationship_to_org} onChange={(e) => setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))} fullWidth sx={{ mb: 2 }}>
