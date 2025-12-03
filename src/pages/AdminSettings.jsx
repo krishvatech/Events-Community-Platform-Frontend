@@ -53,6 +53,8 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
 import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 
 import { isOwnerUser } from "../utils/adminRole";
 
@@ -71,6 +73,29 @@ const authHeader = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
+
+
+async function uploadEducationDocApi(educationId, file) {
+  const fd = new FormData();
+  fd.append("education", educationId);
+  fd.append("file", file);
+  // Uses API_ROOT defined in this file
+  const r = await fetch(`${API_ROOT}/auth/me/education-documents/`, {
+    method: "POST",
+    headers: authHeader(), // Let browser set Content-Type for FormData
+    body: fd
+  });
+  if (!r.ok) throw new Error("Failed to upload document");
+  return await r.json();
+}
+
+async function deleteEducationDocApi(docId) {
+  const r = await fetch(`${API_ROOT}/auth/me/education-documents/${docId}/`, {
+    method: "DELETE",
+    headers: authHeader()
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
+}
 
 /**
  * BACKEND HOOKS
@@ -520,11 +545,19 @@ export default function AdminSettings() {
 
   const [eduOpen, setEduOpen] = React.useState(false);
   const [expOpen, setExpOpen] = React.useState(false);
+
+  const [certOpen, setCertOpen] = React.useState(false);
+  const [trainOpen, setTrainOpen] = React.useState(false);
+
+  const [certForm, setCertForm] = React.useState({ name: "", issuer: "", date: "" });
+  const [trainForm, setTrainForm] = React.useState({ name: "", institution: "", year: "" });
+
   const [editEduId, setEditEduId] = React.useState(null);
   const [editExpId, setEditExpId] = React.useState(null);
 
   const [eduForm, setEduForm] = React.useState(EMPTY_EDU_FORM);
   const [eduErrors, setEduErrors] = React.useState({ start: "", end: "" });
+  const [eduFiles, setEduFiles] = React.useState([]);
 
   // Name Change Request State
   const [nameChangeOpen, setNameChangeOpen] = React.useState(false);
@@ -730,9 +763,15 @@ export default function AdminSettings() {
     const toYear = (d) => (d ? String(d).slice(0, 4) : "");
     setEditEduId(item.id);
     setEduForm({
-      school: item.school || "", degree: item.degree || "", field: item.field_of_study || "",
-      start: toYear(item.start_date), end: toYear(item.end_date), grade: item.grade || "",
+      school: item.school || "",
+      degree: item.degree || "",
+      field: item.field_of_study || "",
+      start: toYear(item.start_date),
+      end: toYear(item.end_date),
+      // Removed grade here
+      documents: item.documents || [] // Add this
     });
+    setEduFiles([]); // Add this
     setEduErrors({ start: "", end: "" });
     setEduOpen(true);
   };
@@ -743,7 +782,8 @@ export default function AdminSettings() {
 
   const doConfirmDelete = async () => {
     const { type, id } = confirm;
-    if (!type || !id) return;
+    if (!type || !id || saving) return;
+    setSaving(true);
     try {
       const url = type === "edu" ? `${API_ROOT}/auth/me/educations/${id}/` : `${API_ROOT}/auth/me/experiences/${id}/`;
       const r = await fetch(url, { method: "DELETE", headers: { ...authHeader() } });
@@ -753,8 +793,32 @@ export default function AdminSettings() {
       await loadExtras();
     } catch (e) {
       showNotification("error", e?.message || "Delete failed");
+    } finally {
+      setSaving(false);
       closeConfirm();
     }
+  };
+
+  const saveCertification = async () => {
+    setSaving(true);
+    // Mimicking API call
+    setTimeout(() => {
+      showNotification("success", "Certification added (Frontend Only)");
+      setCertOpen(false);
+      setCertForm({ name: "", issuer: "", date: "" });
+      setSaving(false);
+    }, 800);
+  };
+
+  const saveTraining = async () => {
+    setSaving(true);
+    // Mimicking API call
+    setTimeout(() => {
+      showNotification("success", "Training added (Frontend Only)");
+      setTrainOpen(false);
+      setTrainForm({ name: "", institution: "", year: "" });
+      setSaving(false);
+    }, 800);
   };
 
   const openAvatarDialog = () => { setAvatarMode(null); setAvatarFile(null); setAvatarPreview(avatarUrl || ""); setAvatarDialogOpen(true); };
@@ -831,13 +895,16 @@ export default function AdminSettings() {
 
   // ---------- CREATE / UPDATE EXTRAS ----------
   const createEducation = async () => {
+    if (saving) return; // Prevent double click
+    setSaving(true); // Lock buttons
     try {
       setEduErrors({ start: "", end: "" });
       const startY = eduForm.start ? parseInt(eduForm.start, 10) : null;
       const endY = eduForm.end ? parseInt(eduForm.end, 10) : null;
       const currentYear = new Date().getFullYear();
-      if (startY && startY > currentYear) { setEduErrors((prev) => ({ ...prev, start: "Start year cannot be in the future" })); return; }
-      if (startY && endY && endY < startY) { setEduErrors((prev) => ({ ...prev, end: "End year cannot be before start year" })); return; }
+      if (startY && startY > currentYear) { setEduErrors((prev) => ({ ...prev, start: "Start year cannot be in the future" })); setSaving(false); return; }
+      if (startY && endY && endY < startY) { setEduErrors((prev) => ({ ...prev, end: "End year cannot be before start year" })); setSaving(false); return; }
+
       const normalizeYear = (val) => {
         const y = String(val || "").trim();
         if (!y) return null;
@@ -845,21 +912,51 @@ export default function AdminSettings() {
         if (!year || year < 1900 || year > 2100) return null;
         return `${year}-01-01`;
       };
+
       const url = editEduId ? `${API_ROOT}/auth/me/educations/${editEduId}/` : `${API_ROOT}/auth/me/educations/`;
+
       const payload = {
-        school: (eduForm.school || "").trim(), degree: (eduForm.degree || "").trim(), field_of_study: (eduForm.field || "").trim(),
-        start_date: normalizeYear(eduForm.start), end_date: normalizeYear(eduForm.end), grade: (eduForm.grade || "").trim(),
+        school: (eduForm.school || "").trim(),
+        degree: (eduForm.degree || "").trim(),
+        field_of_study: (eduForm.field || "").trim(),
+        start_date: normalizeYear(eduForm.start),
+        end_date: normalizeYear(eduForm.end),
       };
-      if (!payload.school || !payload.degree) { showNotification("error", "Please fill School and Degree."); return; }
+
+      if (!payload.school || !payload.degree) {
+        showNotification("error", "Please fill School and Degree.");
+        setSaving(false);
+        return;
+      }
+
       const r = await fetch(url, { method: editEduId ? "PATCH" : "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Failed to save education");
+
+      const savedEdu = await r.json();
+      const activeId = editEduId || savedEdu.id;
+
+      if (eduFiles.length > 0 && activeId) {
+        for (const file of eduFiles) {
+          await uploadEducationDocApi(activeId, file);
+        }
+      }
+
       showNotification("success", editEduId ? "Education updated" : "Education added");
-      setEduOpen(false); setEditEduId(null); setEduForm(EMPTY_EDU_FORM);
+      setEduOpen(false);
+      setEditEduId(null);
+      setEduForm(EMPTY_EDU_FORM);
+      setEduFiles([]);
       await loadExtras();
-    } catch (e) { showNotification("error", e?.message || "Save failed"); }
+    } catch (e) {
+      showNotification("error", e?.message || "Save failed");
+    } finally {
+      setSaving(false); // Unlock buttons
+    }
   };
 
   const createExperience = async () => {
+    if (saving) return;
+    setSaving(true);
     try {
       const url = editExpId ? `${API_ROOT}/auth/me/experiences/${editExpId}/` : `${API_ROOT}/auth/me/experiences/`;
       const locationString = buildLocationFromForm(expForm);
@@ -878,16 +975,22 @@ export default function AdminSettings() {
         }),
       });
       if (!r.ok) throw new Error("Failed to save experience");
+
       if (syncProfileLocation && locationString) {
         try {
           await updateAdminProfile({ location: locationString });
           setProfile((prev) => ({ ...prev, location: locationString }));
         } catch (err) { console.error("Failed to sync profile location", err); }
       }
+
       showNotification("success", editExpId ? "Experience updated" : "Experience added");
       setExpOpen(false); setEditExpId(null); setExpForm(emptyExpForm);
       await loadExtras();
-    } catch (e) { showNotification("error", e?.message || "Save failed"); }
+    } catch (e) {
+      showNotification("error", e?.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const onPickFile = () => fileRef.current?.click();
@@ -992,12 +1095,24 @@ export default function AdminSettings() {
               <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
                 {/* LEFT COLUMN */}
                 <Grid item xs={12} lg={6}>
-                  <SectionCard title="About" action={<Button size="small" onClick={() => openAbout("description")}>Edit</Button>}>
+                  <SectionCard title="About" action={
+                    <Tooltip title="Edit About">
+                      <IconButton size="small" onClick={() => openAbout("description")}>
+                        <EditRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  }>
                     <Label>Summary</Label>
                     <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>{profile.bio?.trim() ? profile.bio : "Add a short description about your role, focus areas, and what you're working on."}</Typography>
                   </SectionCard>
 
-                  <SectionCard sx={{ mt: 2 }} title="Skills" action={<Button size="small" onClick={() => openAbout("skills")}>Edit</Button>}>
+                  <SectionCard sx={{ mt: 2 }} title="Skills" action={
+                    <Tooltip title="Edit Skills">
+                      <IconButton size="small" onClick={() => openAbout("skills")}>
+                        <EditRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  }>
                     {parseSkills(profile.skillsText).length ? (
                       <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
                         {parseSkills(profile.skillsText).map((s, i) => (<Chip key={i} size="small" label={s} sx={{ maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }} />))}
@@ -1005,7 +1120,13 @@ export default function AdminSettings() {
                     ) : <Typography variant="body2" color="text.secondary">Add your top skills.</Typography>}
                   </SectionCard>
 
-                  <SectionCard sx={{ mt: 2 }} title="Experience" action={<Button size="small" variant="outlined" onClick={openAddExperience}>Add more</Button>}>
+                  <SectionCard sx={{ mt: 2 }} title="Experience" action={
+                    <Tooltip title="Add Experience">
+                      <IconButton size="small" onClick={openAddExperience}>
+                        <AddRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  }>
                     {expList.length ? (
                       <List dense disablePadding>
                         {expList.map((x) => (
@@ -1030,7 +1151,13 @@ export default function AdminSettings() {
                     )}
                   </SectionCard>
 
-                  <SectionCard sx={{ mt: 2 }} title="Education" action={<Button size="small" variant="outlined" onClick={() => setEduOpen(true)}>Add more</Button>}>
+                  <SectionCard sx={{ mt: 2 }} title="Education" action={
+                    <Tooltip title="Add Education">
+                      <IconButton size="small" onClick={() => setEduOpen(true)}>
+                        <AddRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  }>
                     {eduList.length ? (
                       <List dense disablePadding>
                         {eduList.map((e) => (
@@ -1040,7 +1167,33 @@ export default function AdminSettings() {
                               <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteEducation(e.id, `${e.school} — ${e.degree}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
                             </Box>
                           }>
-                            <ListItemText primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{e.degree} - {e.school}</Typography>} secondary={<Typography variant="caption" color="text.secondary">{rangeLinkedIn(e.start_date, e.end_date, false)}</Typography>} />
+                            <ListItemText
+                              primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{e.degree} - {e.school}</Typography>}
+                              secondary={
+                                <Stack component="span" spacing={0.5}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {rangeLinkedIn(e.start_date, e.end_date, false)}
+                                    {/* Removed Grade Display here */}
+                                  </Typography>
+                                  {/* --- NEW: Display Document Chips --- */}
+                                  {e.documents && e.documents.length > 0 && (
+                                    <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>
+                                      {e.documents.map((doc) => (
+                                        <Chip
+                                          key={doc.id}
+                                          icon={<InsertDriveFileIcon style={{ fontSize: 14 }} />}
+                                          label={doc.filename}
+                                          size="small"
+                                          variant="outlined"
+                                          onClick={() => window.open(doc.file, '_blank')}
+                                          sx={{ cursor: 'pointer', height: 24, fontSize: '0.75rem' }}
+                                        />
+                                      ))}
+                                    </Stack>
+                                  )}
+                                </Stack>
+                              }
+                            />
                           </ListItem>
                         ))}
                       </List>
@@ -1050,15 +1203,32 @@ export default function AdminSettings() {
                   </SectionCard>
 
                   {/* NEW: Certifications & Licenses (Static Data) */}
-                  <SectionCard sx={{ mt: 2 }} title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                  <SectionCard sx={{ mt: 2 }} title="Certifications & Licenses"
+                    action={
+                      <Tooltip title="Add">
+                        <IconButton size="small" onClick={() => showNotification("info", "Add Certification functionality coming soon")}>
+                          <AddRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    }>
                     <List dense disablePadding>
-                      <ListItem disableGutters>
+                      <ListItem disableGutters secondaryAction={
+                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                          <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                          <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                        </Box>
+                      }>
                         <ListItemText
                           primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>}
                           secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>}
                         />
                       </ListItem>
-                      <ListItem disableGutters>
+                      <ListItem disableGutters secondaryAction={
+                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                          <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                          <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                        </Box>
+                      }>
                         <ListItemText
                           primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>}
                           secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>}
@@ -1070,7 +1240,13 @@ export default function AdminSettings() {
 
                 {/* RIGHT COLUMN */}
                 <Grid item xs={12} lg={6}>
-                  <SectionCard title="Contact" action={<Button size="small" onClick={openContact}>Edit</Button>}>
+                  <SectionCard title="Contact" action={
+                    <Tooltip title="Edit Contact">
+                      <IconButton size="small" onClick={openContact}>
+                        <EditRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  }>
                     <Label>Social Media Links</Label>
                     <List dense disablePadding>
                       <ListItem sx={{ px: 0 }}>
@@ -1090,15 +1266,32 @@ export default function AdminSettings() {
                   </SectionCard>
 
                   {/* NEW: Trainings & Executive Education (Static Data) */}
-                  <SectionCard sx={{ mt: 2 }} title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                  <SectionCard sx={{ mt: 2 }} title="Trainings & Executive Education"
+                    action={
+                      <Tooltip title="Add">
+                        <IconButton size="small" onClick={() => showNotification("info", "Add Trainings & Executive Education functionality coming soon")}>
+                          <AddRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    }>
                     <List dense disablePadding>
-                      <ListItem disableGutters>
+                      <ListItem disableGutters secondaryAction={
+                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                          <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                          <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                        </Box>
+                      }>
                         <ListItemText
                           primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>}
                           secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>}
                         />
                       </ListItem>
-                      <ListItem disableGutters>
+                      <ListItem disableGutters secondaryAction={
+                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                          <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                          <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                        </Box>
+                      }>
                         <ListItemText
                           primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>}
                           secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>}
@@ -1108,15 +1301,32 @@ export default function AdminSettings() {
                   </SectionCard>
 
                   {/* NEW: Memberships (Static Data) */}
-                  <SectionCard sx={{ mt: 2 }} title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                  <SectionCard sx={{ mt: 2 }} title="Memberships"
+                    action={
+                      <Tooltip title="Add">
+                        <IconButton size="small" onClick={() => showNotification("info", "Add Membership functionality coming soon")}>
+                          <AddRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    }>
                     <List dense disablePadding>
-                      <ListItem disableGutters>
+                      <ListItem disableGutters secondaryAction={
+                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                          <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                          <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                        </Box>
+                      }>
                         <ListItemText
                           primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>}
                           secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>}
                         />
                       </ListItem>
-                      <ListItem disableGutters>
+                      <ListItem disableGutters secondaryAction={
+                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                          <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                          <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                        </Box>
+                      }>
                         <ListItemText
                           primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>}
                           secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>}
@@ -1129,7 +1339,8 @@ export default function AdminSettings() {
             </>
           )}
         </Container>
-      )}
+      )
+      }
 
       {/* --- NEW DIALOG: Edit About Work --- */}
       <Dialog open={workOpen} onClose={() => setWorkOpen(false)} fullWidth maxWidth="sm">
@@ -1215,12 +1426,64 @@ export default function AdminSettings() {
             <TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm((f) => ({ ...f, start: e.target.value }))} fullWidth sx={{ flex: 1 }} inputProps={{ min: 1900, max: new Date().getFullYear() }} error={!!eduErrors.start} helperText={eduErrors.start || ""} />
             <TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm((f) => ({ ...f, end: e.target.value }))} fullWidth sx={{ flex: 1 }} inputProps={{ min: 1900, max: new Date().getFullYear() + 10 }} error={!!eduErrors.end} helperText={eduErrors.end || ""} />
           </Box>
-          <TextField label="Grade (optional)" value={eduForm.grade} onChange={(e) => setEduForm((f) => ({ ...f, grade: e.target.value }))} fullWidth />
+          {/* --- NEW: File Upload Section --- */}
+          <Box sx={{ mt: 2, borderTop: '1px dashed', borderColor: 'divider', pt: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Transcripts / Certificates</Typography>
+
+            {/* 1. Existing Files (Edit Mode) */}
+            {editEduId && eduForm.documents && eduForm.documents.length > 0 && (
+              <List dense disablePadding>
+                {eduForm.documents.map((doc) => (
+                  <ListItem key={doc.id} disableGutters
+                    secondaryAction={
+                      <IconButton edge="end" size="small" onClick={async () => {
+                        if (!window.confirm("Delete this file?")) return;
+                        try {
+                          await deleteEducationDocApi(doc.id);
+                          setEduForm(prev => ({
+                            ...prev,
+                            documents: prev.documents.filter(d => d.id !== doc.id)
+                          }));
+                          showNotification("success", "File deleted");
+                          await loadExtras();
+                        } catch (e) { showNotification("error", "Failed to delete"); }
+                      }}>
+                        <DeleteOutlineIcon fontSize="small" color="error" />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemAvatar sx={{ minWidth: 32 }}><InsertDriveFileIcon fontSize="small" color="action" /></ListItemAvatar>
+                    <ListItemText primary={doc.filename} primaryTypographyProps={{ variant: 'caption', noWrap: true, maxWidth: 200 }} />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+
+            {/* 2. File Selection */}
+            <Button component="label" variant="outlined" size="small" startIcon={<AttachFileIcon />} sx={{ mt: 1, textTransform: 'none' }}>
+              Attach Files
+              <input type="file" multiple hidden onChange={(e) => {
+                if (e.target.files) {
+                  setEduFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                }
+              }}
+              />
+            </Button>
+
+            {/* 3. Pending Files List */}
+            {eduFiles.length > 0 && (
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                {eduFiles.map((f, i) => (
+                  <Chip key={i} label={f.name} onDelete={() => setEduFiles(prev => prev.filter((_, idx) => idx !== i))} size="small" variant="outlined" />
+                ))}
+              </Stack>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          {editEduId && <Button color="error" onClick={() => askDeleteEducation(editEduId, `${eduForm.school} — ${eduForm.degree}`)}>Delete</Button>}
-          <Button variant="outlined" onClick={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); setEduForm(EMPTY_EDU_FORM); }}>Cancel</Button>
-          <Button variant="contained" onClick={createEducation}>{editEduId ? "Save changes" : "Save"}</Button>
+          {editEduId && <Button color="error" onClick={() => askDeleteEducation(editEduId, `${eduForm.school} — ${eduForm.degree}`)} disabled={saving}>Delete</Button>}
+          <Button variant="outlined" onClick={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); setEduForm(EMPTY_EDU_FORM); }} disabled={saving}>Cancel</Button>
+          <Button variant="contained" onClick={createEducation} disabled={saving}>{editEduId ? "Save changes" : "Save"}</Button>
         </DialogActions>
       </Dialog>
 
@@ -1317,9 +1580,9 @@ export default function AdminSettings() {
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          {!!editExpId && <Button color="error" onClick={() => askDeleteExperience(editExpId, `${expForm.org} — ${expForm.position}`)}>Delete</Button>}
-          <Button variant="outlined" onClick={() => { setExpOpen(false); setEditExpId(null); }}>Cancel</Button>
-          <Button variant="contained" onClick={createExperience}>{editExpId ? "Save changes" : "Save"}</Button>
+          {!!editExpId && <Button color="error" onClick={() => askDeleteExperience(editExpId, `${expForm.org} — ${expForm.position}`)} disabled={saving}>Delete</Button>}
+          <Button variant="outlined" onClick={() => { setExpOpen(false); setEditExpId(null); }} disabled={saving}>Cancel</Button>
+          <Button variant="contained" onClick={createExperience} disabled={saving}>{editExpId ? "Save changes" : "Save"}</Button>
         </DialogActions>
       </Dialog>
 
@@ -1327,7 +1590,10 @@ export default function AdminSettings() {
       <Dialog open={confirm.open} onClose={closeConfirm} fullWidth maxWidth="xs">
         <DialogTitle>Delete {confirm.type === "edu" ? "education" : "experience"}?</DialogTitle>
         <DialogContent>{confirm.label && <DialogContentText sx={{ mb: 1 }}>{confirm.label}</DialogContentText>}<DialogContentText>This action cannot be undone.</DialogContentText></DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}><Button onClick={closeConfirm}>Cancel</Button><Button color="error" variant="contained" onClick={doConfirmDelete}>Delete</Button></DialogActions>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={closeConfirm} disabled={saving}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={doConfirmDelete} disabled={saving}>Delete</Button>
+        </DialogActions>
       </Dialog>
 
       {/* --- Edit About dialog --- */}
@@ -1379,6 +1645,6 @@ export default function AdminSettings() {
       <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast((t) => ({ ...t, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
         <Alert variant="filled" severity={toast.type === "error" ? "error" : "success"} onClose={() => setToast((t) => ({ ...t, open: false }))}>{toast.msg}</Alert>
       </Snackbar>
-    </Box>
+    </Box >
   );
 }
