@@ -15,16 +15,16 @@ import {
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 
 // Icons
-import TimelineOutlinedIcon from "@mui/icons-material/TimelineOutlined";
-import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
-import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
-import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
-import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
-import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
-import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
-import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
-import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import LibraryBooksRoundedIcon from "@mui/icons-material/LibraryBooksRounded";
+import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
+import PersonIcon from "@mui/icons-material/Person";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import ForumIcon from "@mui/icons-material/Forum";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
+import AutorenewIcon from "@mui/icons-material/Autorenew";
+import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
+import SettingsIcon from "@mui/icons-material/Settings";
 
 // --- Harmonized styling (same vibe as CommunitySideBar) ---
 const BORDER = "#e2e8f0";
@@ -36,59 +36,60 @@ const NAV_ITEMS = [
   {
     key: "resources",
     label: "My Resources",
-    icon: <TimelineOutlinedIcon fontSize="small" />,
+    icon: <LibraryBooksRoundedIcon fontSize="small" />,
     to: "/account/resources",
   },
   {
     key: "events",
     label: "My Events",
-    icon: <SchoolOutlinedIcon fontSize="small" />,
+    icon: <EventNoteRoundedIcon fontSize="small" />,
     to: "/account/events",
   },
   {
     key: "profile",
     label: "Profile",
-    icon: <PersonOutlineOutlinedIcon fontSize="small" />,
+    icon: <PersonIcon fontSize="small" />,
     to: "/account/profile",
   },
   {
     key: "elibrary",
     label: "My Recordings",
-    icon: <MenuBookOutlinedIcon fontSize="small" />,
+    icon: <MenuBookIcon fontSize="small" />,
     to: "/account/recordings",
   },
   {
     key: "forums",
     label: "Forums",
-    icon: <ForumOutlinedIcon fontSize="small" />,
+    icon: <ForumIcon fontSize="small" />,
   },
   {
     key: "orders",
     label: "Orders",
-    icon: <ReceiptLongOutlinedIcon fontSize="small" />,
+    icon: <ReceiptLongIcon fontSize="small" />,
     to: "/account/cart",
   },
   {
     key: "memberships",
     label: "Memberships",
-    icon: <WorkspacePremiumOutlinedIcon fontSize="small" />,
+    icon: <WorkspacePremiumIcon fontSize="small" />,
   },
   {
     key: "subscriptions",
     label: "Subscriptions",
-    icon: <AutorenewOutlinedIcon fontSize="small" />,
+    icon: <AutorenewIcon fontSize="small" />,
   },
   {
     key: "friends",
     label: "Contacts",
-    icon: <PeopleAltOutlinedIcon fontSize="small" />,
+    icon: <PeopleAltIcon fontSize="small" />,
   },
   {
     key: "settings",
     label: "Settings",
-    icon: <SettingsOutlinedIcon fontSize="small" />,
+    icon: <SettingsIcon fontSize="small" />,
   },
 ];
+
 
 export default function AccountSidebar({ stickyTop = 96 }) {
   const { pathname } = useLocation();

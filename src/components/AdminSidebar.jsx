@@ -17,13 +17,14 @@ import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import LibraryBooksRoundedIcon from "@mui/icons-material/LibraryBooksRounded";
 import OndemandVideoRoundedIcon from "@mui/icons-material/OndemandVideoRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
-import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
-import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
-import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
-import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
+import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
+import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
+import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
+import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
+
 
 const TEAL = "#14b8b1";
 const TEXT = "#334155";
@@ -33,15 +34,15 @@ const CARD_BORDER = "#e5e7eb";
 
 const defaultItems = [
   { key: "events", label: "My Events", Icon: EventNoteRoundedIcon },
-  { key: "posts", label: "Posts", Icon: ArticleOutlinedIcon },
+  { key: "posts", label: "Posts", Icon: ArticleRoundedIcon },
   { key: "resources", label: "My Resources", Icon: LibraryBooksRoundedIcon },
   { key: "recordings", label: "My Recordings", Icon: OndemandVideoRoundedIcon },
   { key: "groups", label: "Groups", Icon: GroupsRoundedIcon },
-  { key: "messages", label: "Messages", Icon: ChatBubbleOutlineRoundedIcon },
+  { key: "messages", label: "Messages", Icon: ChatBubbleRoundedIcon },
   { key: "carts", label: "Cart", Icon: ShoppingCartRoundedIcon },
-  { key: "name-requests", label: "Identity Verification", Icon: BadgeOutlinedIcon },
+  { key: "name-requests", label: "Identity Verification", Icon: BadgeRoundedIcon },
   { key: "staff", label: "Staff", Icon: AdminPanelSettingsRoundedIcon },
-  { key: "notifications", label: "Notifications", Icon: NotificationsNoneRoundedIcon },
+  { key: "notifications", label: "Notifications", Icon: NotificationsRoundedIcon },
   { key: "settings", label: "Settings", Icon: SettingsRoundedIcon },
 ];
 
@@ -56,7 +57,7 @@ export default function AdminSidebar({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-   let listItems = items ?? defaultItems;
+  let listItems = items ?? defaultItems;
   const owner = isOwnerUser();
   const staffOnly = !owner && isStaffUser();
   if (owner) {
@@ -94,7 +95,7 @@ export default function AdminSidebar({
                 m: "4px 8px",
                 borderRadius: 2,
                 color: selected ? TEAL : TEXT,
-                "& .MuiListItemIcon-root": { minWidth: 40, color: selected ? TEAL : "#525252" },
+                "& .MuiListItemIcon-root": { minWidth: 40, color: selected ? TEAL : "#6b7280" },
                 "&.Mui-selected": { bgcolor: "rgba(20,184,177,0.08)" },
                 "&.Mui-selected:hover": { bgcolor: HOVER_BG },
                 "&:hover": { bgcolor: HOVER_BG },
