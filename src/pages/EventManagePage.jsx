@@ -34,7 +34,8 @@ import {
   Pagination,
   IconButton,
 } from "@mui/material";
-
+import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import { EditEventDialog } from "./AdminEvents.jsx";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
@@ -128,6 +129,7 @@ const fmtDateRange = (start, end) => {
 
 // ---- Tabs / pagination ----
 const EVENT_TAB_LABELS = ["Overview", "Members", "Resources"];
+const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 const MEMBERS_PER_PAGE = 5;
 const RESOURCES_PER_PAGE = 5;
 
@@ -141,6 +143,8 @@ export default function EventManagePage() {
   const [event, setEvent] = useState(initialEvent);
   const [eventLoading, setEventLoading] = useState(!initialEvent);
   const [eventError, setEventError] = useState("");
+
+  const [editOpen, setEditOpen] = useState(false);
 
   const [registrations, setRegistrations] = useState([]);
   const [registrationsLoading, setRegistrationsLoading] = useState(false);
@@ -160,6 +164,7 @@ export default function EventManagePage() {
 
   const isOwner = isOwnerUser();
   const resources = event?.resources || [];
+  const tabLabels = isOwner ? EVENT_TAB_LABELS : STAFF_EVENT_TAB_LABELS;
 
   // ---- load event ----
   useEffect(() => {
@@ -1061,7 +1066,7 @@ export default function EventManagePage() {
                 variant="h5"
                 sx={{ fontWeight: 800, lineHeight: 1.2 }}
               >
-                Event Details
+                {event?.title || "Event Details"}
               </Typography>
               <Typography
                 variant="body2"
@@ -1072,19 +1077,40 @@ export default function EventManagePage() {
             </Box>
           </Stack>
 
-          <Button
-            variant="contained"
-            startIcon={<ArrowBackIosNewRoundedIcon fontSize="small" />}
-            onClick={() => navigate(-1)}
-            sx={{
-              borderRadius: 999,
-              textTransform: "none",
-              px: 2.5,
-              alignSelf: { xs: "stretch", sm: "center" },
-            }}
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
           >
-            Back to events
-          </Button>
+            {isOwner && (
+              <Button
+                variant="outlined"
+                startIcon={<EditNoteRoundedIcon fontSize="small" />}
+                onClick={() => setEditOpen(true)}
+                sx={{
+                  borderRadius: 999,
+                  textTransform: "none",
+                  px: 2.5,
+                }}
+              >
+                Edit
+              </Button>
+            )}
+
+            <Button
+              variant="contained"
+              startIcon={<ArrowBackIosNewRoundedIcon fontSize="small" />}
+              onClick={() => navigate(-1)}
+              sx={{
+                borderRadius: 999,
+                textTransform: "none",
+                px: 2.5,
+                flexGrow: { xs: 1, sm: 0 },
+              }}
+            >
+              Back to events
+            </Button>
+          </Stack>
         </Box>
 
         {/* Loading / not found */}
@@ -1141,7 +1167,7 @@ export default function EventManagePage() {
                 variant="scrollable"
                 scrollButtons="auto"
               >
-                {EVENT_TAB_LABELS.map((label, idx) => (
+                {tabLabels.map((label, idx) => (
                   <Tab
                     key={label}
                     label={label.toUpperCase()}
@@ -1174,15 +1200,24 @@ export default function EventManagePage() {
                   borderRadius: 999,
                 }}
               >
-                {EVENT_TAB_LABELS[tab]}
+                {tabLabels[tab]}
               </Button>
             </Box>
 
             {/* Tabs content – full width aligned with header */}
             <Box sx={{ mb: 4 }}>
-              {tab === 0 && renderOverview()}
-              {tab === 1 && renderMembers()}
-              {tab === 2 && renderResources()}
+              {isOwner ? (
+                <>
+                  {tab === 0 && renderOverview()}
+                  {tab === 1 && renderMembers()}
+                  {tab === 2 && renderResources()}
+                </>
+              ) : (
+                <>
+                  {tab === 0 && renderOverview()}
+                  {tab === 1 && renderResources()}
+                </>
+              )}
             </Box>
 
             {/* mobile tabs drawer */}
@@ -1198,7 +1233,7 @@ export default function EventManagePage() {
                 >
                   Sections
                 </Typography>
-                {EVENT_TAB_LABELS.map((label, idx) => (
+                {tabLabels.map((label, idx) => (
                   <Button
                     key={label}
                     fullWidth
@@ -1211,8 +1246,7 @@ export default function EventManagePage() {
                       textTransform: "none",
                       borderRadius: 2,
                       mb: 1,
-                      bgcolor:
-                        tab === idx ? "grey.100" : "transparent",
+                      bgcolor: tab === idx ? "grey.100" : "transparent",
                     }}
                   >
                     {label}
@@ -1221,6 +1255,18 @@ export default function EventManagePage() {
               </Box>
             </Drawer>
           </>
+        )}
+
+        {isOwner && event && (
+          <EditEventDialog
+            open={editOpen}
+            onClose={() => setEditOpen(false)}
+            event={event}
+            onUpdated={(updated) => {
+              setEvent(updated);
+              setEditOpen(false);
+            }}
+          />
         )}
 
         {/* global error snackbar for event load */}

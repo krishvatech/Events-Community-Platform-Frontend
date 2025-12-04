@@ -8,7 +8,6 @@ import {
   Button,
   Chip,
   Container,
-  LinearProgress,
   Paper,
   TextField,
   Typography,
@@ -25,6 +24,7 @@ import {
   FormControlLabel, Switch,
   Tab,
   Tabs,
+  Skeleton,             // ✅ NEW: skeletons
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import dayjs from "dayjs";
@@ -864,7 +864,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
 
 // Edit EditEventDialog
-function EditEventDialog({ open, onClose, event, onUpdated }) {
+export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const token = getToken();
 
   // --- local state from existing event ---
@@ -1244,6 +1244,7 @@ function AdminEventCard({
   onJoinLive,
   isJoining,
   isOwner,
+  onEdit,
 }) {
   const navigate = useNavigate();
 
@@ -1295,6 +1296,29 @@ function AdminEventCard({
               background: "#E5E7EB",
             }}
           />
+        )}
+
+        {isOwner && (
+          <IconButton
+            size="small"
+            aria-label="Edit event"
+            onClick={(e) => {
+              e.stopPropagation();     // don’t open details
+              onEdit?.(ev);
+            }}
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              bgcolor: "rgba(15,23,42,0.75)",
+              color: "common.white",
+              "&:hover": {
+                bgcolor: "rgba(15,23,42,0.95)",
+              },
+            }}
+          >
+            <EditNoteRoundedIcon fontSize="small" />
+          </IconButton>
         )}
       </Box>
 
@@ -1599,6 +1623,9 @@ function EventsPage() {
   // NEW: create dialog state
   const [createOpen, setCreateOpen] = useState(false);
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+
   // Fetch events:
   // - Owner: see ALL events
   // - Staff: see only purchased / registered events (same logic as MyEventsPage)
@@ -1780,6 +1807,18 @@ function EventsPage() {
     }
   };
 
+  const handleEditEvent = (ev) => {
+    setEditingEvent(ev);
+    setEditOpen(true);
+  };
+
+  const handleEventUpdated = (updated) => {
+    if (!updated) return;
+    setEvents((prev) =>
+      prev.map((e) => (e.id === updated.id ? { ...e, ...updated } : e))
+    );
+  };
+
 
   // When a new event is created from the dialog, show it immediately at the top
   const onCreated = (ev) => {
@@ -1875,12 +1914,65 @@ function EventsPage() {
 
       {/* Grid */}
       {loading ? (
-        <Box className="flex items-center justify-center py-16">
-          <div className="w-64">
-            <LinearProgress />
-            <p className="text-center text-slate-500 mt-3">Loading events…</p>
-          </div>
-        </Box>
+        <>
+          <Box sx={{ flexGrow: 1 }}>
+            <Grid
+              container
+              spacing={{ xs: 2, md: 3 }}
+              columns={{ xs: 4, sm: 12, md: 12 }}
+            >
+              {Array.from({ length: PAGE_SIZE }).map((_, idx) => (
+                <Grid
+                  key={idx}
+                  size={{ xs: 4, sm: 4, md: 4 }}
+                >
+                  <Paper
+                    elevation={0}
+                    className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+                  >
+                    {/* Image skeleton */}
+                    <Box
+                      sx={{
+                        position: "relative",
+                        width: "100%",
+                        paddingTop: "56.25%",
+                      }}
+                    >
+                      <Skeleton
+                        variant="rectangular"
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                        }}
+                      />
+                    </Box>
+
+                    {/* Content skeleton */}
+                    <Box className="p-4 flex flex-col gap-2 flex-1">
+                      {/* status/category */}
+                      <Box className="flex items-center justify-between gap-2">
+                        <Skeleton variant="rounded" width={72} height={24} />
+                        <Skeleton variant="text" width={60} height={18} />
+                      </Box>
+
+                      {/* title */}
+                      <Skeleton variant="text" width="80%" height={28} />
+
+                      {/* date/location */}
+                      <Skeleton variant="text" width="60%" height={20} />
+
+                      {/* button */}
+                      <Box className="mt-auto pt-1">
+                        <Skeleton variant="rounded" height={40} />
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+          {/* ⚠️ No pagination while loading – we keep real pagination for actual data */}
+        </>
       ) : filtered.length === 0 ? (
         <Paper elevation={0} className="rounded-2xl border border-slate-200">
           <Box className="p-8 text-center">
@@ -1926,6 +2018,7 @@ function EventsPage() {
                     onJoinLive={handleJoinLive}
                     isJoining={joiningId === (ev.id ?? null)}
                     isOwner={isOwner}
+                    onEdit={handleEditEvent}
                   />
                 </Grid>
               ))}
@@ -1948,10 +2041,26 @@ function EventsPage() {
       </Snackbar>
 
       {/* Create Event Dialog */}
-      <CreateEventDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={onCreated} />
+      <CreateEventDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={onCreated}
+      />
+
+      {/* Edit Event Dialog (owner only) */}
+      <EditEventDialog
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        event={editingEvent}
+        onUpdated={(updated) => {
+          handleEventUpdated(updated);
+          setEditOpen(false);
+        }}
+      />
     </Container>
   );
 }
+
 
 export default function DashbAdminEventsoard() {
   const navigate = useNavigate();
@@ -1963,7 +2072,7 @@ export default function DashbAdminEventsoard() {
   React.useEffect(() => {
     const q = new URLSearchParams(location.search);
     const tab = q.get("admin_tab");
-    
+
     if (tab) {
       setActive(tab);
     } else if (location.pathname.includes("name-requests")) {
@@ -2015,8 +2124,8 @@ export default function DashbAdminEventsoard() {
               <AdminNotificationsPage />
             ) : active === "settings" ? (
               <AdminSettings />
-            ) : active === "name-requests" ? ( 
-               <AdminNameRequestsPage />
+            ) : active === "name-requests" ? (
+              <AdminNameRequestsPage />
             ) : (
               <AdminResources />
             )}
