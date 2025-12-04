@@ -4,6 +4,7 @@ import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toolbar } from "@mui/material";
 import { isOwnerUser, isStaffUser } from "./utils/adminRole";
+import KYCNotification from "./components/KYCNotification";
 import Header from "./components/Header.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
@@ -71,6 +72,8 @@ const AppShell = () => {
           <Toolbar />
         </>
       )}
+
+      <KYCNotification />
 
       <Routes>
         <Route path="/" element={<HomePage />} />

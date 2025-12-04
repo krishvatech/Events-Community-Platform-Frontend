@@ -105,3 +105,68 @@ export const patchStaff = (id, is_staff) =>
 
 export const bulkSetStaff = (ids, is_staff) =>
   apiClient.post(`${ADMIN_USERS_BASE}/bulk-set-staff/`, { ids, is_staff }).then((r) => r.data);
+
+
+
+// ======================= KYC - DIDIT =============================
+
+/**
+ * Start Initial KYC Session
+ * Calls POST /users/me/start-kyc/
+ */
+export async function startKYC() {
+  const res = await fetch(`${API_BASE}/users/me/start-kyc/`, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      ...authConfig().headers 
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Failed to start verification");
+  }
+  
+  return res.json(); // Returns { session_id, url }
+}
+
+/**
+ * Submit Name Change Request
+ * Calls POST /users/me/name-change-request/
+ */
+export async function submitNameChangeRequest(data) {
+  const res = await fetch(`${API_BASE}/users/me/name-change-request/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authConfig().headers 
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Failed to submit request");
+  }
+
+  return res.json(); // Returns request object + { kyc_url }
+}
+
+
+// ===================== Admin • Name Requests =====================
+const ADMIN_NAME_REQUESTS_BASE = "/auth/admin/name-requests";
+
+/**
+ * List all name change requests.
+ * Supports filtering: { status: 'pending' }
+ */
+export const getAdminNameRequests = (params = {}) =>
+  apiClient.get(`${ADMIN_NAME_REQUESTS_BASE}/`, { params }).then((r) => r.data);
+
+/**
+ * Approve or Reject a request.
+ * Payload: { status: 'approved' | 'rejected', admin_note: "..." }
+ */
+export const decideNameRequest = (id, status, admin_note = "") =>
+  apiClient.post(`${ADMIN_NAME_REQUESTS_BASE}/${id}/decide/`, { status, admin_note }).then((r) => r.data);

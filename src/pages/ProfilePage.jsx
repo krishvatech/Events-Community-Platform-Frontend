@@ -29,6 +29,8 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import { startKYC, submitNameChangeRequest } from "../utils/api";
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 
 // -------------------- Constants for Dropdowns --------------------
 const SECTOR_OPTIONS = [
@@ -446,15 +448,31 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
 // -----------------------------------------------------------------------------
 // Basic Info Dialog (Header Trigger) - Identity & Name Change Entry
 // -----------------------------------------------------------------------------
-function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
+function BasicInfoDialog({ open, onClose, profile, onRequestNameChange, onStartKYC }) {
+  // Determine status from profile
+  const kycStatus = profile?.kyc_status || "not_started";
+  const isVerified = kycStatus === "approved";
+  const isPending = kycStatus === "pending" || kycStatus === "review";
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Identity Details</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            Legal names are locked for security.
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Typography variant="body2" color="text.secondary">
+              {profile?.legal_name_locked
+                ? "Legal names are verified and locked."
+                : "Verify your identity to lock your legal name."}
+            </Typography>
+
+            {/* Status Chip */}
+            <Chip
+              label={kycStatus.replace("_", " ").toUpperCase()}
+              color={isVerified ? "success" : isPending ? "warning" : "default"}
+              size="small"
+            />
+          </Box>
 
           {/* LOCKED NAMES */}
           <Box sx={{ display: "flex", gap: 2 }}>
@@ -462,14 +480,30 @@ function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
             <TextField label="Last Name" fullWidth disabled value={profile?.last_name || ""} />
           </Box>
 
-          {/* REQUEST BUTTON */}
-          <Button
-            startIcon={<HistoryEduRoundedIcon />}
-            sx={{ alignSelf: 'start', textTransform: 'none' }}
-            onClick={onRequestNameChange}
-          >
-            Request Name Change
-          </Button>
+          {/* ACTIONS */}
+          <Box sx={{ display: 'flex', gap: 2, pt: 1 }}>
+            {/* Show "Verify Identity" if not verified yet */}
+            {!isVerified && !isPending && (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={onStartKYC}
+              >
+                Verify Identity
+              </Button>
+            )}
+
+            {/* Show "Request Name Change" ONLY if verified/locked */}
+            {isVerified && (
+              <Button
+                variant="outlined"
+                startIcon={<HistoryEduRoundedIcon />}
+                onClick={onRequestNameChange}
+              >
+                Request Name Change
+              </Button>
+            )}
+          </Box>
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -478,6 +512,7 @@ function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
     </Dialog>
   );
 }
+
 
 // -----------------------------------------------------------------------------
 // Name Change Request Dialog (Updated to use showToast)
@@ -506,17 +541,20 @@ function NameChangeDialog({ open, onClose, currentNames, showToast }) {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/users/me/name-change-request/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...tokenHeader() },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.detail || JSON.stringify(json));
+      // CHANGED: Use the new API function
+      const data = await submitNameChangeRequest(form);
+
+      showToast("success", "Request submitted.");
+
+      // Check if backend returned a KYC URL (Phase B2 of flow)
+      if (data.kyc_url) {
+        showToast("success", "Redirecting to verification...");
+        setTimeout(() => {
+          window.location.href = data.kyc_url;
+        }, 1500);
+      } else {
+        onClose();
       }
-      showToast("success", "Request submitted successfully! An admin will review it shortly.");
-      onClose();
     } catch (e) {
       showToast("error", `Error: ${e.message}`);
     } finally {
@@ -599,7 +637,8 @@ export default function ProfilePage() {
   const [form, setForm] = useState({
     first_name: "", last_name: "", email: "", full_name: "", timezone: "",
     bio: "", headline: "", job_title: "", company: "", location: "",
-    skillsText: "", linksText: "", avatar: ""
+    skillsText: "", linksText: "", avatar: "", kyc_status: "not_started",
+    legal_name_locked: false,
   });
 
   const [confirm, setConfirm] = useState({ open: false, type: null, id: null, label: "" });
@@ -694,6 +733,8 @@ export default function ProfilePage() {
           avatar: prof.user_image_url || prof.avatar || data.avatar || "",
           skillsText: Array.isArray(prof.skills) ? prof.skills.join(", ") : typeof prof.skills === "string" ? prof.skills : "",
           linksText: prof.links ? JSON.stringify(prof.links) : "",
+          kyc_status: prof.kyc_status || "not_started",
+          legal_name_locked: prof.legal_name_locked || false,
         });
       } catch (e) {
         if (e?.name === "AbortError") return;
@@ -707,6 +748,22 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => { loadMeExtras(); fetchMyFriends(); }, []);
+
+  const handleStartKYC = async () => {
+    try {
+      // Use global loading or a specific button loading state
+      showNotification("info", "Initiating verification...");
+      const data = await startKYC();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        showNotification("error", "Could not start verification. Please try again.");
+      }
+    } catch (error) {
+      showNotification("error", error.message);
+    }
+  };
 
   async function fetchMyFriends() {
     const candidates = [`${API_BASE}/friends/`, `${API_BASE}/users/friends/`, `${API_BASE}/users/me/friends/`];
@@ -1148,9 +1205,18 @@ export default function ProfilePage() {
                     </Box>
 
                     <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
-                      </Stack>
+<Stack direction="row" alignItems="center" spacing={1}>
+  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+    {fullName}
+  </Typography>
+  
+  {/* Verified Badge */}
+  {form.kyc_status === 'approved' && (
+    <Tooltip title="Identity Verified">
+      <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
+    </Tooltip>
+  )}
+</Stack>
                       {latestExp ? (
                         <Typography variant="body2" color="text.secondary">
                           {latestExp.position} – {latestExp.community_name || latestExp.org}
@@ -1433,6 +1499,7 @@ export default function ProfilePage() {
           setBasicInfoOpen(false);
           setNameChangeOpen(true);
         }}
+        onStartKYC={handleStartKYC}
       />
 
       {/* --- NEW DIALOG: Edit About Work --- */}

@@ -47,7 +47,8 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
+import { startKYC, submitNameChangeRequest } from "../../utils/api"
 // Countries Library
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -421,17 +422,20 @@ function NameChangeDialog({ open, onClose, currentNames, showToast }) {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API_ROOT}/users/me/name-change-request/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.detail || JSON.stringify(json));
+      // Call API
+      const data = await submitNameChangeRequest(form);
+
+      showToast("success", "Request submitted.");
+
+      // Check if backend returned a KYC URL (Phase B2 of flow)
+      if (data.kyc_url) {
+        showToast("success", "Redirecting to verification...");
+        setTimeout(() => {
+          window.location.href = data.kyc_url;
+        }, 1500);
+      } else {
+        onClose();
       }
-      showToast("success", "Request submitted successfully! An admin will review it shortly.");
-      onClose();
     } catch (e) {
       showToast("error", `Error: ${e.message}`);
     } finally {
@@ -528,6 +532,22 @@ export default function HomePage() {
     setProfile((prev) => typeof updater === "function" ? updater(prev) : updater);
   };
 
+  const handleStartKYC = async () => {
+    try {
+      showNotification("info", "Initiating verification...");
+      const data = await startKYC();
+
+      if (data.url) {
+        // Redirect user to Didit
+        window.location.href = data.url;
+      } else {
+        showNotification("error", "Could not start verification. Please try again.");
+      }
+    } catch (error) {
+      showNotification("error", error.message);
+    }
+  };
+
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User";
 
   return (
@@ -554,8 +574,15 @@ export default function HomePage() {
 
             <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
               <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
-              </Stack>
+  <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
+  
+  {/* Verified Badge */}
+  {profile.kyc_status === 'approved' && (
+    <Tooltip title="Identity Verified">
+      <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
+    </Tooltip>
+  )}
+</Stack>
               {profile.experience && profile.experience.length > 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   {profile.experience[0].position} – {profile.experience[0].org}
@@ -626,6 +653,7 @@ export default function HomePage() {
           setBasicInfoOpen(false);
           setNameChangeOpen(true);
         }}
+        onStartKYC={handleStartKYC}
       />
 
       {/* Name Change Request Dialog */}
@@ -722,16 +750,31 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
 // -----------------------------------------------------------------------------
 // NEW COMPONENT: Identity Dialog (Header Trigger) - NO JOB TITLE
 // -----------------------------------------------------------------------------
-function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
-  // Only displays locked info and the button to start the request flow.
+function BasicInfoDialog({ open, onClose, profile, onRequestNameChange, onStartKYC }) {
+  // Determine status
+  const kycStatus = profile?.kyc_status || "not_started";
+  const isVerified = kycStatus === "approved";
+  const isPending = kycStatus === "pending" || kycStatus === "review";
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Identity Details</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            Legal names are locked for security.
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Typography variant="body2" color="text.secondary">
+              {profile?.legal_name_locked
+                ? "Legal names are verified and locked."
+                : "Verify your identity to lock your legal name."}
+            </Typography>
+
+            {/* Status Chip */}
+            <Chip
+              label={kycStatus.replace("_", " ").toUpperCase()}
+              color={isVerified ? "success" : isPending ? "warning" : "default"}
+              size="small"
+            />
+          </Box>
 
           {/* LOCKED NAMES */}
           <Box sx={{ display: "flex", gap: 2 }}>
@@ -739,14 +782,30 @@ function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
             <TextField label="Last Name" fullWidth disabled value={profile?.last_name || ""} />
           </Box>
 
-          {/* REQUEST BUTTON */}
-          <Button
-            startIcon={<HistoryEduRoundedIcon />}
-            sx={{ alignSelf: 'start', textTransform: 'none' }}
-            onClick={onRequestNameChange}
-          >
-            Request Name Change
-          </Button>
+          {/* ACTIONS */}
+          <Box sx={{ display: 'flex', gap: 2, pt: 1 }}>
+            {/* Show "Verify Identity" if not verified yet */}
+            {!isVerified && !isPending && (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={onStartKYC}
+              >
+                Verify Identity
+              </Button>
+            )}
+
+            {/* Show "Request Name Change" ONLY if verified/locked */}
+            {isVerified && (
+              <Button
+                variant="outlined"
+                startIcon={<HistoryEduRoundedIcon />}
+                onClick={onRequestNameChange}
+              >
+                Request Name Change
+              </Button>
+            )}
+          </Box>
         </Stack>
       </DialogContent>
       <DialogActions>
