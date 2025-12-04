@@ -18,6 +18,18 @@ import {
   Typography,
   Backdrop,
   Grow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
+  Tabs,
+  Tab,
+  Skeleton,
+  Avatar,
+  ListItemAvatar,
 } from "@mui/material";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -161,6 +173,14 @@ export default function AdminCarts() {
   const [discount, setDiscount] = useState(0);
   const [showPaid, setShowPaid] = useState(false);
 
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+
+  const [tab, setTab] = useState(0);
+
   // load cart for the current staff user (same API as MyCartPage)
   useEffect(() => {
     (async () => {
@@ -189,6 +209,10 @@ export default function AdminCarts() {
     })();
   }, []);
 
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
   const viewItems = useMemo(() => {
     return (cart || []).map((it) => ({
       id: it.id,
@@ -198,6 +222,28 @@ export default function AdminCarts() {
       qty: Number(it.quantity ?? 1),
     }));
   }, [cart]);
+
+  const viewOrders = useMemo(() => {
+    return (orders || []).map((o) => ({
+      id: o.id,
+      number: String(o.id).padStart(4, "0"),
+      total: Number(o.total ?? o.subtotal ?? 0),
+      status: o.status,
+      created: o.created_at || o.createdAt || null,
+      items: (o.items || []).map((it) => ({
+        id: it.id,
+        title: it.event?.title || "Event",
+        price: Number(it.unit_price ?? it.event?.price ?? 0),
+        qty: Number(it.quantity ?? 1),
+        image:
+          it.event?.poster ||
+          it.event?.thumbnail ||
+          it.event?.banner ||
+          it.event?.image ||
+          null,
+      })),
+    }));
+  }, [orders]);
 
   const applyCoupon = () => {
     let d = 0;
@@ -222,6 +268,25 @@ export default function AdminCarts() {
     window.dispatchEvent(new Event("cart:update"));
   }
 
+  async function loadOrders() {
+    setOrdersLoading(true);
+    setOrdersError("");
+    try {
+      const res = await fetch(`${API_BASE}/orders/`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error("Failed to load orders:", e);
+      setOrders([]);
+      setOrdersError("Failed to load orders.");
+    } finally {
+      setOrdersLoading(false);
+    }
+  }
+
   const updateQty = async (orderItemId, qty) => {
     const q = Math.max(1, Number(qty) || 1);
     await fetch(`${API_BASE}/cart/items/${orderItemId}/`, {
@@ -243,15 +308,15 @@ export default function AdminCarts() {
     await refreshCart();
   };
 
-    const proceedCheckout = async () => {
+  const proceedCheckout = async () => {
     if (!viewItems.length) return;
 
-    // ✅ unique event ids from cart
+    // unique event ids from cart
     const eventIds = [...new Set(viewItems.map((i) => i.eventId).filter(Boolean))];
     if (!eventIds.length) return;
 
     try {
-      // 1) create EventRegistration rows (same as MyCartPage)
+      // 1) create EventRegistration rows
       const res = await fetch(`${API_BASE}/events/register-bulk/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -260,158 +325,294 @@ export default function AdminCarts() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await res.json();
 
-      // 2) clear cart on server (if this endpoint exists)
-      try {
-        await fetch(`${API_BASE}/cart/clear/`, {
-          method: "POST",
-          headers: authHeaders(),
-        });
-      } catch (e) {
-        console.warn("Failed to clear cart:", e);
-      }
+      // 2) finalize current cart as a "paid" order (keeps items attached)
+      const checkoutRes = await fetch(`${API_BASE}/orders/checkout/`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      if (!checkoutRes.ok) throw new Error(`Checkout HTTP ${checkoutRes.status}`);
+      await checkoutRes.json();
 
-      // 3) show success toast + refresh cart
+      // 3) toast + refresh cart + reload previous orders
       setShowPaid(true);
       setTimeout(() => {
         setShowPaid(false);
       }, 2000);
 
       await refreshCart();
+      await loadOrders();
     } catch (err) {
       console.error("Bulk register failed:", err);
-      // TODO: you can add a snackbar/toast here if you want
     }
+  };
+
+  const handleOrderClick = (order) => {
+    setSelectedOrder(order);
+    setOrderDialogOpen(true);
+  };
+
+  const closeOrderDialog = () => {
+    setOrderDialogOpen(false);
+    setSelectedOrder(null);
   };
 
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 800 }}>
-          Staff Cart
-        </Typography>
-        <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
-          View and manage your cart from the admin area (staff-only).
-        </Typography>
+      <Box
+        sx={{
+          mb: 3,
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+        }}
+      >
+        <Avatar
+          sx={{
+            bgcolor: "#14b8a6",      // teal circle like your screenshot
+            width: 40,
+            height: 40,
+            fontWeight: 700,
+          }}
+        >
+          C
+        </Avatar>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>
+            Staff Cart
+          </Typography>
+          <Typography sx={{ color: "text.secondary", mt: 0.25 }}>
+            View and manage your cart from the admin area (staff-only).
+          </Typography>
+        </Box>
       </Box>
 
-      <Grid container spacing={3}>
-        {/* LEFT: table */}
-        <Grid item xs={12} md={8}>
-          <Paper
-            elevation={0}
-            sx={{
-              borderRadius: 3,
-              border: "1px solid #e5e7eb",
-              overflow: "hidden",
-            }}
-          >
-            {viewItems.length === 0 ? (
-              <Box sx={{ p: 6, textAlign: "center" }}>
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: 600, color: "text.primary" }}
-                >
-                  Your cart is empty
-                </Typography>
-                <Typography sx={{ mt: 1, color: "text.secondary" }}>
-                  Add items from the events section to see them here.
-                </Typography>
-              </Box>
-            ) : (
-              <>
-                <Box sx={{ width: "100%", overflowX: "auto" }}>
-                  <Table sx={{ minWidth: 600 }} size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell />
-                        <TableCell sx={{ fontWeight: 600 }}>
-                          Product
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>
-                          Price
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>
-                          Quantity
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>
-                          Subtotal
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {viewItems.map((it) => (
-                        <TableRow key={it.id}>
-                          <TableCell width={44}>
-                            <IconButton
-                              size="small"
-                              onClick={() => removeItem(it.id)}
-                              aria-label="remove"
-                            >
-                              <CloseOutlinedIcon />
-                            </IconButton>
-                          </TableCell>
-                          <TableCell>{it.title}</TableCell>
-                          <TableCell>{fmt(it.price)}</TableCell>
-                          <TableCell width={120}>
-                            <TextField
-                              type="number"
-                              size="small"
-                              value={it.qty}
-                              onChange={(e) =>
-                                updateQty(it.id, e.target.value)
-                              }
-                              inputProps={{ min: 1 }}
-                            />
+
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          sx={{
+            ".MuiTab-root": { textTransform: "none", fontWeight: 600 },
+          }}
+        >
+          <Tab label="Cart" />
+          <Tab label="Orders" />
+        </Tabs>
+      </Box>
+
+      {tab === 0 && (
+        <Grid container spacing={3}>
+          {/* LEFT: table */}
+          <Grid item xs={12} md={viewItems.length === 0 ? 12 : 8}>
+            <Paper
+              elevation={0}
+              sx={{
+                borderRadius: 3,
+                border: "1px solid #e5e7eb",
+                overflow: "hidden",
+              }}
+            >
+              {viewItems.length === 0 ? (
+                <Box sx={{ p: 6, textAlign: "center" }}>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 600, color: "text.primary" }}
+                  >
+                    Your cart is empty
+                  </Typography>
+                  <Typography sx={{ mt: 1, color: "text.secondary" }}>
+                    Add items from the events section to see them here.
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <Box sx={{ width: "100%", overflowX: "auto" }}>
+                    <Table sx={{ minWidth: 600 }} size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell />
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            Product
                           </TableCell>
                           <TableCell sx={{ fontWeight: 600 }}>
-                            {fmt((Number(it.price) || 0) * (it.qty || 1))}
+                            Price
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            Quantity
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>
+                            Subtotal
                           </TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Box>
-                <Divider />
+                      </TableHead>
+                      <TableBody>
+                        {viewItems.map((it) => (
+                          <TableRow key={it.id}>
+                            <TableCell width={44}>
+                              <IconButton
+                                size="small"
+                                onClick={() => removeItem(it.id)}
+                                aria-label="remove"
+                              >
+                                <CloseOutlinedIcon />
+                              </IconButton>
+                            </TableCell>
+                            <TableCell>{it.title}</TableCell>
+                            <TableCell>{fmt(it.price)}</TableCell>
+                            <TableCell width={120}>
+                              <TextField
+                                type="number"
+                                size="small"
+                                value={it.qty}
+                                onChange={(e) =>
+                                  updateQty(it.id, e.target.value)
+                                }
+                                inputProps={{ min: 1 }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              {fmt((Number(it.price) || 0) * (it.qty || 1))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                  <Divider />
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 1.5,
+                      alignItems: "center",
+                    }}
+                  >
+                    <TextField
+                      label="Coupon code"
+                      size="small"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      sx={{ maxWidth: 260 }}
+                    />
+                    <Button
+                      onClick={applyCoupon}
+                      variant="outlined"
+                      sx={{ textTransform: "none" }}
+                    >
+                      Apply
+                    </Button>
+                    <Box sx={{ flex: 1 }} />
+                    <Button
+                      onClick={refreshCart}
+                      variant="outlined"
+                      sx={{ textTransform: "none" }}
+                    >
+                      Refresh cart
+                    </Button>
+                  </Box>
+                </>
+              )}
+            </Paper>
+          </Grid>
+
+          {/* RIGHT: totals */}
+          {viewItems.length > 0 && (
+            <Grid item xs={12} md={4}>
+              <Paper
+                elevation={0}
+                sx={{
+                  borderRadius: 3,
+                  border: "1px solid #e5e7eb",
+                  p: 3,
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}
+                >
+                  Cart totals
+                </Typography>
                 <Box
                   sx={{
-                    p: 2.5,
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 1.5,
-                    alignItems: "center",
+                    borderRadius: 2,
+                    border: "1px solid #e5e7eb",
+                    overflow: "hidden",
                   }}
                 >
-                  <TextField
-                    label="Coupon code"
-                    size="small"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    sx={{ maxWidth: 260 }}
-                  />
-                  <Button
-                    onClick={applyCoupon}
-                    variant="outlined"
-                    sx={{ textTransform: "none" }}
+                  <Box
+                    sx={{
+                      px: 2.5,
+                      py: 1.5,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      borderBottom: "1px solid #e5e7eb",
+                    }}
                   >
-                    Apply
-                  </Button>
-                  <Box sx={{ flex: 1 }} />
-                  <Button
-                    onClick={refreshCart}
-                    variant="outlined"
-                    sx={{ textTransform: "none" }}
-                  >
-                    Refresh cart
-                  </Button>
-                </Box>
-              </>
-            )}
-          </Paper>
-        </Grid>
+                    <span>Subtotal</span>
+                    <span style={{ fontWeight: 600 }}>{fmt(subtotal)}</span>
+                  </Box>
 
-        {/* RIGHT: totals */}
-        <Grid item xs={12} md={4}>
+                  {discount > 0 && (
+                    <Box
+                      sx={{
+                        px: 2.5,
+                        py: 1.5,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderBottom: "1px solid #e5e7eb",
+                      }}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>Discount</span>{" "}
+                        <Chip label={couponCode.toUpperCase()} size="small" />
+                      </span>
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color: "#0f766e",
+                        }}
+                      >
+                        −{fmt(discount)}
+                      </span>
+                    </Box>
+                  )}
+
+                  <Box
+                    sx={{
+                      px: 2.5,
+                      py: 1.5,
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>Total</span>
+                    <span style={{ fontWeight: 800 }}>{fmt(total)}</span>
+                  </Box>
+                </Box>
+
+                <Button
+                  onClick={proceedCheckout}
+                  disabled={cart.length === 0}
+                  fullWidth
+                  sx={{
+                    mt: 2.5,
+                    textTransform: "none",
+                    py: 1.1,
+                  }}
+                  variant="contained"
+                >
+                  Proceed to checkout
+                </Button>
+              </Paper>
+            </Grid>
+          )}
+        </Grid>
+      )}
+
+      {tab === 1 && (
+        <Box sx={{ mt: 1 }}>
           <Paper
             elevation={0}
             sx={{
@@ -420,86 +621,186 @@ export default function AdminCarts() {
               p: 3,
             }}
           >
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 800, mb: 2, color: "text.primary" }}
-            >
-              Cart totals
-            </Typography>
             <Box
               sx={{
-                borderRadius: 2,
-                border: "1px solid #e5e7eb",
-                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                mb: 2,
               }}
             >
-              <Box
-                sx={{
-                  px: 2.5,
-                  py: 1.5,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderBottom: "1px solid #e5e7eb",
-                }}
-              >
-                <span>Subtotal</span>
-                <span style={{ fontWeight: 600 }}>{fmt(subtotal)}</span>
-              </Box>
-
-              {discount > 0 && (
-                <Box
-                  sx={{
-                    px: 2.5,
-                    py: 1.5,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    borderBottom: "1px solid #e5e7eb",
-                  }}
-                >
-                  <span className="flex items-center gap-2">
-                    <span>Discount</span>{" "}
-                    <Chip label={couponCode.toUpperCase()} size="small" />
-                  </span>
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      color: "#0f766e",
-                    }}
-                  >
-                    −{fmt(discount)}
-                  </span>
-                </Box>
-              )}
-
-              <Box
-                sx={{
-                  px: 2.5,
-                  py: 1.5,
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span style={{ fontWeight: 600 }}>Total</span>
-                <span style={{ fontWeight: 800 }}>{fmt(total)}</span>
-              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Previous orders
+              </Typography>
+              <Chip label="Paid only" size="small" variant="outlined" />
             </Box>
 
-            <Button
-              onClick={proceedCheckout}
-              disabled={cart.length === 0}
-              fullWidth
-              sx={{
-                mt: 2.5,
-                textTransform: "none",
-                py: 1.1,
-              }}
-              variant="contained"
-            >
-              Proceed to checkout
-            </Button>
+            {ordersLoading && (
+              <Box sx={{ width: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 600 }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Order</TableCell>
+                      <TableCell>Date</TableCell>
+                      <TableCell align="right">Items</TableCell>
+                      <TableCell align="right">Total</TableCell>
+                      <TableCell align="right">Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {[1, 2, 3].map((i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <Skeleton width={80} />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton width={140} />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Skeleton width={40} />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Skeleton width={70} />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Skeleton width={90} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            )}
+
+            {!ordersLoading && ordersError && (
+              <Typography variant="body2" color="error">
+                {ordersError}
+              </Typography>
+            )}
+
+            {!ordersLoading && !ordersError && viewOrders.length === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                No paid orders yet.
+              </Typography>
+            )}
+
+            {!ordersLoading && !ordersError && viewOrders.length > 0 && (
+              <Box sx={{ width: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 600 }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Order</TableCell>
+                      <TableCell>Date</TableCell>
+                      <TableCell align="right">Items</TableCell>
+                      <TableCell align="right">Total</TableCell>
+                      <TableCell align="right">Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {viewOrders.map((o) => (
+                      <TableRow
+                        key={o.id}
+                        hover
+                        sx={{ cursor: "pointer" }}
+                        onClick={() => handleOrderClick(o)}
+                      >
+                        <TableCell>#{o.number}</TableCell>
+                        <TableCell>
+                          {o.created
+                            ? new Date(o.created).toLocaleString()
+                            : "-"}
+                        </TableCell>
+                        <TableCell align="right">
+                          {o.items?.length || 0}
+                        </TableCell>
+                        <TableCell align="right">
+                          {fmt(o.total)}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Chip
+                            label={String(o.status || "paid").toUpperCase()}
+                            size="small"
+                            variant="outlined"
+                            color={
+                              o.status === "cancelled"
+                                ? "default"
+                                : o.status === "pending"
+                                  ? "warning"
+                                  : "success"
+                            }
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            )}
           </Paper>
-        </Grid>
-      </Grid>
+        </Box>
+      )}
+      <Dialog
+        open={orderDialogOpen && !!selectedOrder}
+        onClose={closeOrderDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {selectedOrder ? `Order #${selectedOrder.number}` : "Order details"}
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedOrder?.created && (
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mb: 2 }}
+            >
+              {new Date(selectedOrder.created).toLocaleString()}
+            </Typography>
+          )}
+
+          <List dense>
+            {selectedOrder?.items?.map((it) => (
+              <ListItem
+                key={it.id}
+                disableGutters
+                secondaryAction={
+                  <Typography sx={{ fontWeight: 600 }}>
+                    {fmt((it.price || 0) * (it.qty || 1))}
+                  </Typography>
+                }
+              >
+                <ListItemAvatar>
+                  <Avatar
+                    variant="rounded"
+                    src={it.image || undefined}
+                    alt={it.title}
+                    sx={{ width: 40, height: 40, mr: 1 }}
+                  >
+                    {it.title?.charAt(0)?.toUpperCase() || "E"}
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={it.title}
+                  secondary={`Qty: ${it.qty} • ${fmt(it.price)}`}
+                />
+              </ListItem>
+            ))}
+          </List>
+
+          <Divider sx={{ my: 2 }} />
+
+          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+            <Typography sx={{ fontWeight: 600 }}>Total</Typography>
+            <Typography sx={{ fontWeight: 800 }}>
+              {fmt(selectedOrder?.total)}
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeOrderDialog}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       <SuccessToast
         open={showPaid}
