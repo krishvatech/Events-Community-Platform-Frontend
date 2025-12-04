@@ -32,6 +32,7 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  Skeleton,
 } from "@mui/material";
 import AccountSidebar from "../components/AccountSidebar.jsx";
 // Icons
@@ -269,10 +270,10 @@ export default function MyCartPage() {
   };
 
   useEffect(() => {
-    if (tab === 1 && !orders.length && !ordersLoading) {
+    if (tab === 1) {
       loadOrders();
     }
-  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   // NEW: normalized view for orders
   const viewOrders = useMemo(() => {
@@ -349,6 +350,7 @@ export default function MyCartPage() {
     if (!eventIds.length) return;
 
     try {
+      // 1) Register events (existing behaviour)
       const res = await fetch(`${API_BASE}/events/register-bulk/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -357,19 +359,27 @@ export default function MyCartPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await res.json();
 
-      try {
-        await fetch(`${API_BASE}/cart/clear/`, {
-          method: "POST",
-          headers: authHeaders(),
-        });
-      } catch { }
-
+      // 2) Finalize current cart as "paid" order
+      const checkoutRes = await fetch(`${API_BASE}/orders/checkout/`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      if (!checkoutRes.ok) {
+        throw new Error(`Checkout HTTP ${checkoutRes.status}`);
+      }
+      const newOrder = await checkoutRes.json();
+      await loadOrders();
+      // 3) Show success toast
       setShowPaid(true);
       setTimeout(() => {
         setShowPaid(false);
       }, 2000);
 
+      // 4) Refresh cart (this will create a fresh empty cart on the backend)
       await refreshCart();
+
+      // (Optional) auto-switch to Orders tab after payment:
+      // setTab(1);
     } catch (err) {
       console.error(err);
     }
@@ -633,8 +643,112 @@ export default function MyCartPage() {
 
             {/* TAB 1: PREVIOUS ORDERS */}
             {tab === 1 && (
-              <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-600">
-                Orders section coming soon.
+              <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-700">
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+                  Your orders
+                </Typography>
+
+                {ordersLoading && (
+                  <Box sx={{ width: "100%", overflowX: "auto", mt: 1 }}>
+                    <Table size="small" sx={{ minWidth: 600 }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Order</TableCell>
+                          <TableCell>Date</TableCell>
+                          <TableCell align="right">Items</TableCell>
+                          <TableCell align="right">Total</TableCell>
+                          <TableCell align="right">Status</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {[1, 2, 3].map((i) => (
+                          <TableRow key={i}>
+                            <TableCell>
+                              <Skeleton width={80} />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton width={140} />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Skeleton width={40} />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Skeleton width={70} />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Skeleton width={90} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                )}
+
+                {!ordersLoading && ordersError && (
+                  <Typography variant="body2" color="error">
+                    {ordersError}
+                  </Typography>
+                )}
+
+                {!ordersLoading && !ordersError && viewOrders.length === 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    You don’t have any orders yet.
+                  </Typography>
+                )}
+
+                {!ordersLoading && !ordersError && viewOrders.length > 0 && (
+                  <Box sx={{ width: "100%", overflowX: "auto", mt: 1 }}>
+                    <Table size="small" sx={{ minWidth: 600 }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Order</TableCell>
+                          <TableCell>Date</TableCell>
+                          <TableCell align="right">Items</TableCell>
+                          <TableCell align="right">Total</TableCell>
+                          <TableCell align="right">Status</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {viewOrders.map((o) => (
+                          <TableRow
+                            key={o.id}
+                            hover
+                            sx={{ cursor: "pointer" }}
+                            onClick={() => handleOrderClick(o)} // ⬅️ open popup
+                          >
+                            <TableCell>#{o.number}</TableCell>
+                            <TableCell>
+                              {o.created
+                                ? new Date(o.created).toLocaleString()
+                                : "-"}
+                            </TableCell>
+                            <TableCell align="right">
+                              {o.items?.length || 0}
+                            </TableCell>
+                            <TableCell align="right">
+                              {fmt(o.total)}
+                            </TableCell>
+                            <TableCell align="right">
+                              <Chip
+                                label={String(o.status || "paid").toUpperCase()}
+                                size="small"
+                                variant="outlined"
+                                color={
+                                  o.status === "cancelled"
+                                    ? "default"
+                                    : o.status === "pending"
+                                      ? "warning"
+                                      : "success"
+                                }
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                )}
               </Box>
             )}
 
