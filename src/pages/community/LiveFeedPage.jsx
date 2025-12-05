@@ -20,8 +20,7 @@ import {
 } from "@mui/material";
 import { Checkbox, ListItemButton } from "@mui/material";
 import { Tabs, Tab, ListItemSecondaryAction } from "@mui/material";
-
-
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 
 const BORDER = "#e2e8f0";
 // LinkedIn-style reactions 
@@ -538,6 +537,15 @@ function mapFeedItem(item) {
     (typeof item?.community === "object" ? item.community?.id : item?.community) ??
     null;
 
+  const authorKycStatus =
+    m.author_kyc_status ||
+    m.kyc_status ||
+    (typeof m.author === "object" ? (m.author.kyc_status || m.author.kycStatus) : null) ||
+    (typeof item.actor === "object" ? (item.actor.kyc_status || item.actor.kycStatus) : null) ||
+    item.kyc_status ||
+    item.kycStatus ||
+    null;
+
   const base = {
     id: item.id,
     created_at: item.created_at,
@@ -546,6 +554,7 @@ function mapFeedItem(item) {
       id: authorId,      // NEW
       name: displayName,
       avatar: toMediaUrl(item.actor_avatar || m.author_avatar || ""),
+      kyc_status: authorKycStatus,   // 👈 so PostCard can show the badge
     },
     community_id: community_id ? Number(community_id) : null,
     community_avatar: m.community_cover_url || "",
@@ -1797,9 +1806,24 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
             {headingTitle}
           </Typography>
 
-          <Typography variant="caption" color="text.secondary" noWrap>
-            {post.author?.name} · {formatWhen(post.created_at)}
-          </Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {post.author?.name}
+            </Typography>
+
+            {post.author?.kyc_status === "approved" && (
+              <Tooltip title="Identity Verified">
+                <VerifiedRoundedIcon
+                  color="primary"
+                  sx={{ fontSize: 16 }}
+                />
+              </Tooltip>
+            )}
+
+            <Typography variant="caption" color="text.secondary" noWrap>
+              · {formatWhen(post.created_at)}
+            </Typography>
+          </Stack>
         </Box>
         {post.type === "event" && <Chip size="small" color="primary" label="Event" variant="outlined" />}
         {post.type === "poll" && <Chip size="small" label="Poll" variant="outlined" />}

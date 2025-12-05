@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
   MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Pagination, Dialog,
-  DialogTitle, DialogContent, DialogActions, Popper  // <-- ADD THIS
+  DialogTitle, DialogContent, DialogActions, Popper, Skeleton, Container
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
@@ -622,6 +622,47 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
   );
 }
 
+function GroupCardSkeleton() {
+  return (
+    <Paper
+      elevation={0}
+      className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+    >
+      {/* Image */}
+      <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
+        <Skeleton
+          variant="rectangular"
+          sx={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        />
+      </Box>
+
+      <Box className="p-4 flex flex-col gap-2 flex-1">
+        {/* Chips + member count */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Skeleton variant="rounded" width={60} height={22} />
+            <Skeleton variant="rounded" width={70} height={22} />
+          </div>
+          <Skeleton variant="text" width={70} />
+        </div>
+
+        {/* Title */}
+        <Skeleton variant="text" width="70%" height={28} />
+
+        {/* Description */}
+        <Skeleton variant="text" width="95%" />
+        <Skeleton variant="text" width="85%" />
+
+        {/* Buttons */}
+        <Box className="mt-auto flex items-center gap-1.5 pt-1">
+          <Skeleton variant="rounded" width={80} height={36} />
+          <Skeleton variant="rounded" width={70} height={36} />
+        </Box>
+      </Box>
+    </Paper>
+  );
+}
+
 // ---- Group Card ----
 function GroupCard({ g, onOpen, onEdit, canEdit }) {
   return (
@@ -840,11 +881,14 @@ export default function AdminGroups() {
     if (!id) return;
     navigate(`/groups/${id}`);
   };
-
   return (
-    <div className="max-w-screen-lg mx-auto py-6 sm:py-8">
+    <Container
+      maxWidth="lg"
+      disableGutters
+      className="py-6 sm:py-8"
+    >
       {/* Header */}
-      <Box className="flex items-center gap-3 mb-4">
+      < Box className="flex items-center gap-3 mb-4" >
         <Avatar sx={{ bgcolor: "#0ea5a4" }}>{(user?.first_name || "A")[0].toUpperCase()}</Avatar>
         <div className="flex-1">
           <Typography variant="h5" className="font-extrabold">
@@ -853,22 +897,25 @@ export default function AdminGroups() {
           <Typography className="text-slate-500">Create and manage your groups.</Typography>
         </div>
 
-        {isOwnerUser() && (
-          <Button
-            onClick={() => setCreateOpen(true)}
-            startIcon={<AddRoundedIcon />}
-            variant="contained"
-            className="rounded-xl"
-            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-          >
-            Create Group
-          </Button>
-        )}
-      </Box>
+        {
+          isOwnerUser() && (
+            <Button
+              onClick={() => setCreateOpen(true)}
+              startIcon={<AddRoundedIcon />}
+              variant="contained"
+              className="rounded-xl"
+              sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+            >
+              Create Group
+            </Button>
+          )
+        }
+      </Box >
 
       {/* Search */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
+      < Stack
+        direction={{ xs: "column", sm: "row" }
+        }
         spacing={2}
         alignItems={{ xs: "stretch", sm: "center" }}
         className="mb-5"
@@ -882,69 +929,74 @@ export default function AdminGroups() {
           sx={{ width: { xs: "100%", sm: 360 } }}
         />
         <Box sx={{ flex: 1 }} />
-      </Stack>
+      </Stack >
 
       {/* Grid */}
-      {loading ? (
-        <Box className="flex items-center justify-center py-16">
-          <div className="w-64">
-            <LinearProgress />
-            <p className="text-center text-slate-500 mt-3">Loading groups…</p>
-          </div>
-        </Box>
-      ) : filtered.length === 0 ? (
-        <Paper elevation={0} className="rounded-2xl border border-slate-200">
-          <Box className="p-8 text-center">
-            <Typography variant="h6" className="font-semibold text-slate-700">
-              No groups found
-            </Typography>
-            <p className="text-slate-500 mt-1">Try a different search or create a new group.</p>
-            {isOwnerUser() && (
-              <Button
-                onClick={() => setCreateOpen(true)}
-                className="mt-4 rounded-xl"
-                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                variant="contained"
-              >
-                Create Group
-              </Button>
-            )}
+      {
+        loading ? (
+          <Box sx={{ flexGrow: 1 }}>
+            <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-2 md:gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="col-span-4">
+                  <GroupCardSkeleton />
+                </div>
+              ))}
+            </div>
           </Box>
-        </Paper>
+        ) : filtered.length === 0 ? (
+          <Paper elevation={0} className="rounded-2xl border border-slate-200">
+            <Box className="p-8 text-center">
+              <Typography variant="h6" className="font-semibold text-slate-700">
+                No groups found
+              </Typography>
+              <p className="text-slate-500 mt-1">Try a different search or create a new group.</p>
+              {isOwnerUser() && (
+                <Button
+                  onClick={() => setCreateOpen(true)}
+                  className="mt-4 rounded-xl"
+                  sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                  variant="contained"
+                >
+                  Create Group
+                </Button>
+              )}
+            </Box>
+          </Paper>
 
-      ) : (
-        <Box sx={{ flexGrow: 1 }}>
-          <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-2 md:gap-3">
-            {pageItems.map((g) => (
-              <div key={g.id || g.slug} className="col-span-4">
-                <GroupCard
-                  g={g}
-                  onOpen={onOpen}
-                  canEdit={owner} // only true for real admin/owner
-                  onEdit={
-                    owner
-                      ? (grp) => {
-                        setEditing(grp);
-                        setEditOpen(true);
-                      }
-                      : undefined
-                  }
-                />
-              </div>
-            ))}
+        ) : (
+          <Box sx={{ flexGrow: 1 }}>
+            <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-2 md:gap-3">
+              {pageItems.map((g) => (
+                <div key={g.id || g.slug} className="col-span-4">
+                  <GroupCard
+                    g={g}
+                    onOpen={onOpen}
+                    canEdit={owner} // only true for real admin/owner
+                    onEdit={
+                      owner
+                        ? (grp) => {
+                          setEditing(grp);
+                          setEditOpen(true);
+                        }
+                        : undefined
+                    }
+                  />
+                </div>
+              ))}
 
-          </div>
-          <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={(_, v) => setPage(v)}
-              shape="rounded"
-              size="medium"
-            />
-          </Stack>
-        </Box>
-      )}
+            </div>
+            <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={(_, v) => setPage(v)}
+                shape="rounded"
+                size="medium"
+              />
+            </Stack>
+          </Box>
+        )
+      }
 
       {/* Create Group Dialog */}
       <CreateGroupDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={onCreated} />
@@ -957,6 +1009,6 @@ export default function AdminGroups() {
         onClose={() => { setEditOpen(false); setEditing(null); }}
         onUpdated={onUpdated}
       />
-    </div>
+    </Container >
   );
 }

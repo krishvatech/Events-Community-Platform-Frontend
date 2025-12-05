@@ -33,7 +33,7 @@ import MapRoundedIcon from "@mui/icons-material/MapRounded";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { geoCentroid } from "d3-geo";
-
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import { feature as topoFeature } from "topojson-client";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -334,6 +334,16 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
     usernameFromEmail ||
     email;
 
+  const rawKycStatus = (
+    u?.profile?.kyc_status ||
+    u?.kyc_status ||
+    ""
+  )
+    .toString()
+    .toLowerCase();
+
+  const isVerified =
+    rawKycStatus === "approved" || rawKycStatus === "verified";
   // --- NEW LOGIC START ---
   // 1. Get raw values to check if they actually exist (ignoring defaults)
   const rawCompany = (u?.company_from_experience || "").trim();
@@ -394,6 +404,15 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
             >
               {name}
             </Typography>
+
+            {isVerified && (
+              <Tooltip title="KYC verified">
+                <VerifiedRoundedIcon
+                  sx={{ fontSize: 18, color: "success.main", flexShrink: 0 }}
+                />
+              </Tooltip>
+            )}
+
             {!!country && (
               <Chip
                 size="small"
@@ -409,18 +428,18 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
 
           {/* --- UPDATED TYPOGRAPHY START --- */}
           {/* We use visibility: hidden so the height remains the same even if data is missing */}
-          <Typography 
-            variant="body2" 
-            sx={{ 
+          <Typography
+            variant="body2"
+            sx={{
               mt: 0.25,
-              visibility: hasWorkInfo ? "visible" : "hidden" 
-            }} 
+              visibility: hasWorkInfo ? "visible" : "hidden"
+            }}
             noWrap
           >
             {displayCompany} • <span style={{ color: "#64748b" }}>{displayTitle}</span>
           </Typography>
           {/* --- UPDATED TYPOGRAPHY END --- */}
-          
+
         </Box>
 
         <Stack direction="row" spacing={1} alignItems="center" flexShrink={0}>

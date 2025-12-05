@@ -2381,7 +2381,7 @@ export default function AdminPostsPage() {
 
   return (
     <Box sx={{ py: 3 }}>
-      <Container maxWidth="lg">
+      <Container maxWidth="lg" disableGutters>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           alignItems={{ xs: "flex-start", sm: "center" }}
@@ -2405,7 +2405,12 @@ export default function AdminPostsPage() {
               variant="contained"
               startIcon={<AddRoundedIcon />}
               onClick={() => setCreateOpen(true)}
-              sx={{ borderRadius: 2 }}
+              className="rounded-xl"
+              sx={{
+                textTransform: "none",
+                backgroundColor: "#10b8a6",
+                "&:hover": { backgroundColor: "#0ea5a4" },
+              }}
               disabled={!activeCommunityId}   // ← guard
             >
               Create Post

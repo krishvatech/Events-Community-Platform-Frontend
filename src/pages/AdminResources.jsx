@@ -8,7 +8,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Tooltip, Typography, FormControlLabel, Paper,
   Select, Pagination, Switch, FormControl, useMediaQuery,
-  Menu, ListItemIcon, ListItemText,
+  Menu, ListItemIcon, ListItemText, Avatar, Container,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -729,21 +729,31 @@ export default function MyResourcesAdmin() {
   }
 
   return (
-    <Box sx={{ p: 4 }}>
-      {/* Header: title + Upload button aligned */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        alignItems={{ xs: "flex-start", sm: "center" }}
-        justifyContent="space-between"
-        spacing={2}
-        sx={{ mb: 3 }}
+    <Container
+      maxWidth="lg"
+      disableGutters
+      sx={{ py: 4 }}
+    >
+      {/* Header */}
+      <Box
+        className="mb-4"
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: { xs: "flex-start", sm: "center" },
+          gap: 2,
+        }}
       >
-        <Box>
-          <Typography variant="h4" sx={{ mb: 0.5 }}>
-            My Resources
+        <Avatar sx={{ bgcolor: "#0ea5a4" }}>
+          {(currentUser?.first_name || "R")[0].toUpperCase()}
+        </Avatar>
+
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="h5" className="font-extrabold">
+            Resources
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage resources for your events
+          <Typography className="text-slate-500">
+            Manage resources for your events. Upload files, links, and videos.
           </Typography>
         </Box>
 
@@ -757,14 +767,18 @@ export default function MyResourcesAdmin() {
                 setEditing(null);
                 setDialogOpen(true);
               }}
-              sx={{ whiteSpace: "nowrap" }}
+              className="rounded-xl"
+              sx={{
+                textTransform: "none",
+                backgroundColor: "#10b8a6",
+                "&:hover": { backgroundColor: "#0ea5a4" },
+              }}
             >
               Upload Resource
             </Button>
           </Box>
         )}
-
-      </Stack>
+      </Box>
 
       {/* Filter bar – only for Resources now */}
       <Stack
@@ -1195,6 +1209,6 @@ export default function MyResourcesAdmin() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Container>
   );
 }

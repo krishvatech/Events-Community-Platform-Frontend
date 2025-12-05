@@ -1,6 +1,4 @@
 // src/pages/AdminRecordingsPage.jsx
-// Host/Admin view: shows events created by the logged-in admin (ended/past or with recording_url)
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -10,7 +8,7 @@ import {
   Divider,
   Card as MUICard,
   CardContent,
-  LinearProgress,
+  Skeleton,
   Paper,
   Typography,
   TextField,
@@ -20,6 +18,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Avatar,
+  Container,
 } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
@@ -88,6 +88,27 @@ const handleDownload = async (recordingUrl) => {
     alert(`Failed to download recording: ${err.message}`);
   }
 };
+
+const RecordingCardSkeleton = () => (
+  <MUICard
+    elevation={0}
+    className="rounded-2xl border border-slate-200 overflow-hidden flex flex-col w-full"
+  >
+    <Skeleton variant="rectangular" height={180} />
+
+    <CardContent className="flex-1 flex flex-col">
+      <Skeleton width="70%" />
+      <Skeleton width="45%" />
+
+      <Divider className="my-3" />
+
+      <Box className="flex items-center gap-1.5 flex-wrap mt-auto">
+        <Skeleton variant="rounded" width={80} height={32} />
+        <Skeleton variant="rounded" width={110} height={32} />
+      </Box>
+    </CardContent>
+  </MUICard>
+);
 
 export default function AdminRecordingsPage() {
   const navigate = useNavigate();
@@ -267,24 +288,33 @@ export default function AdminRecordingsPage() {
   );
 
   return (
-    <div className="max-w-screen-lg mx-auto py-6 sm:py-8">
-      {/* Header (same style as AdminGroups) */}
-      <Box className="flex items-center justify-between mb-4">
-        <div>
-          <Typography
-            variant="h5"
-            className="font-extrabold tracking-tight"
-          >
-            My Recordings
+    <Container
+      maxWidth="lg"
+      disableGutters
+      className="pt-6 pb-6 sm:pt-6 sm:pb-8"
+    >
+      {/* Header */}
+      <Box
+        className="mb-4"
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: { xs: "flex-start", sm: "center" },
+          gap: 2,
+        }}
+      >
+        <Avatar sx={{ bgcolor: "#0ea5a4" }}>
+          {((me?.first_name || "R")[0] || "R").toUpperCase()}
+        </Avatar>
+
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="h5" className="font-extrabold tracking-tight">
+            Recordings
           </Typography>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            className="text-slate-500"
-          >
-            Watch or download recordings from your past hosted events.
+          <Typography className="text-slate-500">
+            Manage recordings from your past hosted events. Watch or download in one click.
           </Typography>
-        </div>
+        </Box>
       </Box>
 
       {/* Filters card */}
@@ -328,9 +358,13 @@ export default function AdminRecordingsPage() {
       </Paper>
 
       {loading && (
-        <Box className="mt-1">
-          <LinearProgress />
-        </Box>
+        <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-12 gap-2 md:gap-3 mt-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={`rec-skel-${i}`} className="col-span-4 flex">
+              <RecordingCardSkeleton />
+            </div>
+          ))}
+        </div>
       )}
 
       {!loading && error && (
@@ -486,6 +520,6 @@ export default function AdminRecordingsPage() {
           </Typography>
         </Paper>
       )}
-    </div>
+    </Container>
   );
 }

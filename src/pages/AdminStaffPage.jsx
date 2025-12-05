@@ -4,7 +4,7 @@ import {
     Box, Container, Typography, TextField, InputAdornment,
     Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
     Paper, Switch, Chip, IconButton, Tooltip, Button, Stack,
-    CircularProgress, Pagination          // ✅ add Pagination
+    CircularProgress, Pagination, Avatar, Skeleton
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -89,70 +89,46 @@ export default function AdminStaffPage() {
     const paginatedRows = rows.slice(startIndex, startIndex + rowsPerPage);
 
     return (
-        <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Container maxWidth="lg" disableGutters sx={{ py: 3 }}>
             <Box className="grid grid-cols-12 gap-6">
                 <Box
-                    className="col-span-12 md:col-span-9"
+                    className="col-span-12"
                     sx={{
                         width: "100%",
-                        maxWidth: { xs: "100%", sm: "100%", md: 760 },
-                        mx: { xs: 0, md: "auto" },
+                        maxWidth: "100%",   // ✅ let the table span like Resources
                     }}
                 >
-                    {/* header + search + table */}
+                    {/* Header – same style as Admin Events page */}
                     <Box
+                        className="mb-4"
                         sx={{
-                            mb: 2,
                             display: "flex",
-                            flexDirection: { xs: "column", sm: "row" },
-                            justifyContent: "space-between",
+                            flexWrap: "wrap",
                             alignItems: { xs: "flex-start", sm: "center" },
                             gap: 2,
                         }}
                     >
-                        {/* Left: page title like other admin pages */}
-                        <Box>
-                            <Typography
-                                variant="overline"
-                                sx={{
-                                    color: "text.secondary",
-                                    letterSpacing: 1,
-                                    fontWeight: 600,
-                                    textTransform: "uppercase",
-                                }}
-                            >
-                                Admin
+                        <Avatar sx={{ bgcolor: "#0ea5a4" }}>
+                            {("A")[0].toUpperCase()}
+                        </Avatar>
+
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="h5" className="font-extrabold">
+                                Staff Management
                             </Typography>
-
-                            <Stack direction="row" spacing={1} alignItems="center">
-                                <AdminPanelSettingsRoundedIcon
-                                    sx={{ fontSize: 24, color: "primary.main" }}
-                                />
-                                <Typography
-                                    variant="h5"
-                                    sx={{ fontWeight: 700 }}
-                                >
-                                    Staff Management
-                                </Typography>
-                            </Stack>
-
-                            <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{ mt: 0.5 }}
-                            >
+                            <Typography className="text-slate-500">
                                 Grant or remove staff access for your community members.
                             </Typography>
                         </Box>
 
-                        {/* Right: actions */}
-                        <Stack
-                            direction="row"
-                            spacing={1}
+                        {/* Right side – bulk actions, like Events “Create Event” button */}
+                        <Box
                             sx={{
+                                width: { xs: "100%", sm: "auto" },
+                                display: "flex",
                                 flexWrap: "wrap",
                                 justifyContent: { xs: "flex-start", sm: "flex-end" },
-                                rowGap: 1,
+                                gap: 1,
                             }}
                         >
                             <Button
@@ -185,7 +161,7 @@ export default function AdminStaffPage() {
                             >
                                 Remove staff
                             </Button>
-                        </Stack>
+                        </Box>
                     </Box>
 
                     <TextField
@@ -204,7 +180,106 @@ export default function AdminStaffPage() {
                     />
 
                     {loading ? (
-                        <Box py={8} textAlign="center"><CircularProgress /></Box>
+                        <>
+                            <TableContainer component={Paper} variant="outlined">
+                                <Table>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell
+                                                width={40}
+                                                sx={{ display: { xs: "none", lg: "table-cell" } }}
+                                            />
+                                            <TableCell>User</TableCell>
+                                            <TableCell
+                                                sx={{
+                                                    display: {
+                                                        xs: "table-cell !important",
+                                                        sm: "table-cell !important",
+                                                    },
+                                                }}
+                                            >
+                                                Name
+                                            </TableCell>
+                                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                                                Email
+                                            </TableCell>
+                                            <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                                                Last Login
+                                            </TableCell>
+                                            <TableCell align="center">Staff</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {Array.from({ length: rowsPerPage }).map((_, idx) => (
+                                            <TableRow key={idx}>
+                                                {/* Checkbox column */}
+                                                <TableCell
+                                                    sx={{ display: { xs: "none", lg: "table-cell" } }}
+                                                >
+                                                    <Skeleton variant="rounded" width={18} height={18} />
+                                                </TableCell>
+
+                                                {/* User */}
+                                                <TableCell>
+                                                    <Stack direction="row" spacing={1} alignItems="center">
+                                                        <Skeleton
+                                                            variant="rounded"
+                                                            width={80}
+                                                            height={24}
+                                                        />
+                                                        <Skeleton
+                                                            variant="rounded"
+                                                            width={70}
+                                                            height={24}
+                                                        />
+                                                    </Stack>
+                                                </TableCell>
+
+                                                {/* Name */}
+                                                <TableCell>
+                                                    <Skeleton
+                                                        variant="text"
+                                                        width="80%"
+                                                        height={20}
+                                                    />
+                                                </TableCell>
+
+                                                {/* Email */}
+                                                <TableCell
+                                                    sx={{ display: { xs: "none", sm: "table-cell" } }}
+                                                >
+                                                    <Skeleton
+                                                        variant="text"
+                                                        width="80%"
+                                                        height={20}
+                                                    />
+                                                </TableCell>
+
+                                                {/* Last login */}
+                                                <TableCell
+                                                    sx={{ display: { xs: "none", lg: "table-cell" } }}
+                                                >
+                                                    <Skeleton
+                                                        variant="text"
+                                                        width="60%"
+                                                        height={20}
+                                                    />
+                                                </TableCell>
+
+                                                {/* Staff switch */}
+                                                <TableCell align="center">
+                                                    <Skeleton
+                                                        variant="rounded"
+                                                        width={36}
+                                                        height={20}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </>
                     ) : (
                         <>
                             <TableContainer component={Paper} variant="outlined">
