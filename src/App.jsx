@@ -40,7 +40,7 @@ import AdminMessagesPage from "./pages/AdminMessagesPage.jsx";
 import EventManagePage from "./pages/EventManagePage.jsx";
 import AdminCarts from "./pages/AdminCarts.jsx";
 import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
-
+import KYCCallbackPage from "./pages/KYCCallbackPage.jsx";
 import { useParams } from "react-router-dom";
 
 function RedirectGroupToAdmin() {
@@ -127,6 +127,7 @@ const AppShell = () => {
         <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
         <Route path="/community/groups/:groupId" element={<RequireAuth><RedirectGroupDetailsToAdmin /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/kyc/callback" element={<KYCCallbackPage />} />
       </Routes>
 
       {!hideChrome && typeof Footer !== "undefined" && <Footer />}
