@@ -1205,18 +1205,18 @@ export default function ProfilePage() {
                     </Box>
 
                     <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
-<Stack direction="row" alignItems="center" spacing={1}>
-  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-    {fullName}
-  </Typography>
-  
-  {/* Verified Badge */}
-  {form.kyc_status === 'approved' && (
-    <Tooltip title="Identity Verified">
-      <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
-    </Tooltip>
-  )}
-</Stack>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {fullName}
+                        </Typography>
+
+                        {/* Verified Badge */}
+                        {form.kyc_status === 'approved' && (
+                          <Tooltip title="Identity Verified">
+                            <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
+                          </Tooltip>
+                        )}
+                      </Stack>
                       {latestExp ? (
                         <Typography variant="body2" color="text.secondary">
                           {latestExp.position} – {latestExp.community_name || latestExp.org}

@@ -55,7 +55,8 @@ import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
 import HistoryEduRoundedIcon from '@mui/icons-material/HistoryEduRounded';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
-
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
+import { startKYC, submitNameChangeRequest } from "../utils/api";
 import { isOwnerUser } from "../utils/adminRole";
 
 // --- API helpers ---
@@ -512,26 +513,122 @@ function CompanyAutocomplete({ value, onChange }) {
 // -----------------------------------------------------------------------------
 // Basic Info Dialog (Identity)
 // -----------------------------------------------------------------------------
-function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
+function BasicInfoDialog({
+  open,
+  onClose,
+  profile,
+  onRequestNameChange,
+  onStartKYC,
+}) {
+  const fullName =
+    profile?.full_name ||
+    `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim();
+  const initial = fullName ? fullName[0].toUpperCase() : "?";
+
+  const kycStatus = profile?.kyc_status || "not_started";
+  const isVerified = kycStatus === "approved";
+  const isPending = kycStatus === "pending" || kycStatus === "review";
+
+  const statusLabel =
+    kycStatus === "approved"
+      ? "Verified"
+      : kycStatus === "pending" || kycStatus === "review"
+        ? "Verification in progress"
+        : "Not verified";
+
+  const statusColor =
+    kycStatus === "approved"
+      ? "success"
+      : kycStatus === "pending" || kycStatus === "review"
+        ? "warning"
+        : "default";
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Identity Details</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            Legal names are locked for security.
-          </Typography>
+          {/* Avatar + name + verified chip */}
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Avatar
+              sx={{ width: 48, height: 48, bgcolor: "primary.main" }}
+            >
+              {initial}
+            </Avatar>
+            <Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  {fullName || "Your legal name"}
+                </Typography>
+                {isVerified && (
+                  <Chip
+                    size="small"
+                    color="success"
+                    icon={<VerifiedRoundedIcon sx={{ fontSize: 18 }} />}
+                    label="Verified"
+                  />
+                )}
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                {profile?.legal_name_locked
+                  ? "Your legal name is locked. To change it, submit a Name Change Request."
+                  : "Verify your identity once. After verification, your legal name will be locked."}
+              </Typography>
+            </Box>
+          </Stack>
+
+          {/* Name fields (read-only) */}
           <Box sx={{ display: "flex", gap: 2 }}>
-            <TextField label="First Name" fullWidth disabled value={profile?.first_name || ""} />
-            <TextField label="Last Name" fullWidth disabled value={profile?.last_name || ""} />
+            <TextField
+              label="First Name"
+              fullWidth
+              size="small"
+              value={profile?.first_name || ""}
+              disabled
+            />
+            <TextField
+              label="Last Name"
+              fullWidth
+              size="small"
+              value={profile?.last_name || ""}
+              disabled
+            />
           </Box>
-          <Button
-            startIcon={<HistoryEduRoundedIcon />}
-            sx={{ alignSelf: 'start', textTransform: 'none' }}
-            onClick={onRequestNameChange}
+
+          {/* KYC status + actions */}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              mt: 1,
+            }}
           >
-            Request Name Change
-          </Button>
+            <Chip
+              size="small"
+              label={statusLabel}
+              color={statusColor}
+              variant={statusColor === "default" ? "outlined" : "filled"}
+            />
+
+            <Box sx={{ display: "flex", gap: 1.5 }}>
+              {!isVerified && !isPending && (
+                <Button variant="contained" onClick={onStartKYC}>
+                  Verify Identity
+                </Button>
+              )}
+
+              {isVerified && (
+                <Button
+                  variant="outlined"
+                  startIcon={<HistoryEduRoundedIcon />}
+                  onClick={onRequestNameChange}
+                >
+                  Request Name Change
+                </Button>
+              )}
+            </Box>
+          </Box>
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -540,6 +637,8 @@ function BasicInfoDialog({ open, onClose, profile, onRequestNameChange }) {
     </Dialog>
   );
 }
+
+
 
 // -----------------------------------------------------------------------------
 // Name Change Request Dialog (Updated to use showToast instead of alert)
@@ -563,28 +662,37 @@ function NameChangeDialog({ open, onClose, currentNames, showToast }) {
 
   const handleSubmit = async () => {
     if (!form.new_first_name || !form.new_last_name || !form.reason) {
-      showToast("error", "First Name, Last Name, and Reason are required.");
+      showToast(
+        "error",
+        "First Name, Last Name, and Reason are required."
+      );
       return;
     }
+
     setLoading(true);
     try {
-      const res = await fetch(`${API_ROOT}/users/me/name-change-request/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.detail || JSON.stringify(json));
+      const data = await submitNameChangeRequest(form);
+
+      showToast("success", "Request submitted.");
+
+      if (data?.kyc_url) {
+        showToast("success", "Redirecting to verification…");
+        setTimeout(() => {
+          window.location.href = data.kyc_url;
+        }, 1200);
+      } else {
+        onClose();
       }
-      showToast("success", "Request submitted successfully! An admin will review it shortly.");
-      onClose();
     } catch (e) {
-      showToast("error", `Error: ${e.message}`);
+      showToast(
+        "error",
+        e?.message || "Failed to submit name change request."
+      );
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -627,10 +735,22 @@ export default function AdminSettings() {
   };
 
   const [profile, setProfile] = React.useState({
-    first_name: "", last_name: "", full_name: "", bio: "", headline: "",
-    location: "", user_image_url: "", email: "", job_title: "", company: "",
-    skillsText: "", linksText: "",
+    first_name: "",
+    last_name: "",
+    full_name: "",
+    bio: "",
+    headline: "",
+    location: "",
+    user_image_url: "",
+    email: "",
+    job_title: "",
+    company: "",
+    skillsText: "",
+    linksText: "",
+    kyc_status: "not_started",
+    legal_name_locked: false,
   });
+
 
   const [contactOpen, setContactOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState({
@@ -1020,11 +1140,24 @@ export default function AdminSettings() {
       const data = await fetchAdminProfile();
       const prof = data?.profile || {};
       setProfile({
-        first_name: data?.first_name || "", last_name: data?.last_name || "", full_name: prof.full_name || data?.full_name || "",
-        bio: prof.bio || "", headline: prof.headline || "", location: prof.location || "", user_image_url: prof.user_image_url || "",
-        email: data?.email || "", job_title: prof.job_title || "", company: prof.company || "",
-        skillsText: Array.isArray(prof.skills) ? prof.skills.join(", ") : typeof prof.skills === "string" ? prof.skills : "",
+        first_name: data?.first_name || "",
+        last_name: data?.last_name || "",
+        full_name: prof.full_name || data?.full_name || "",
+        bio: prof.bio || "",
+        headline: prof.headline || "",
+        location: prof.location || "",
+        user_image_url: prof.user_image_url || "",
+        email: data?.email || "",
+        job_title: prof.job_title || "",
+        company: prof.company || "",
+        skillsText: Array.isArray(prof.skills)
+          ? prof.skills.join(", ")
+          : typeof prof.skills === "string"
+            ? prof.skills
+            : "",
         linksText: prof.links ? JSON.stringify(prof.links) : "",
+        kyc_status: prof.kyc_status || "not_started",
+        legal_name_locked: !!prof.legal_name_locked,
       });
     } catch (e) { showNotification("error", e?.message || "Load failed"); } finally { setLoading(false); }
   }, []);
@@ -1166,6 +1299,29 @@ export default function AdminSettings() {
     }
   };
 
+  const handleStartKYC = async () => {
+    try {
+      showNotification("info", "Initiating verification…");
+      const data = await startKYC();
+
+      // In ProfilePage it uses `data.url` – mirror that behaviour
+      if (data?.url) {
+        window.location.href = data.url;
+      } else if (data?.kyc_url) {
+        // just in case backend sends kyc_url
+        window.location.href = data.kyc_url;
+      } else {
+        showNotification(
+          "error",
+          "Could not start verification. Please try again."
+        );
+      }
+    } catch (error) {
+      showNotification("error", error?.message || "Failed to start KYC.");
+    }
+  };
+
+
   const onSave = async () => {
     setSaving(true);
     try {
@@ -1235,9 +1391,26 @@ export default function AdminSettings() {
                     </IconButton>
                   </Box>
                   <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{displayName}</Typography>
-                    {/* Display latest experience under name */}
-                    {workLine && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }} noWrap>{workLine}</Typography>}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                        {displayName}
+                      </Typography>
+                      {profile.kyc_status === "approved" && (
+                        <Tooltip title="KYC verified">
+                          <VerifiedRoundedIcon sx={{ fontSize: 18, color: "success.main" }} />
+                        </Tooltip>
+                      )}
+                    </Box>
+                    {workLine && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 0.25 }}
+                        noWrap
+                      >
+                        {workLine}
+                      </Typography>
+                    )}
                   </Box>
                   {/* Edit Identity Trigger */}
                   <Box sx={{ ml: "auto" }}>
@@ -1762,6 +1935,7 @@ export default function AdminSettings() {
           setBasicInfoOpen(false);
           setNameChangeOpen(true);
         }}
+        onStartKYC={handleStartKYC}
       />
 
       {/* Name Change Request Dialog */}

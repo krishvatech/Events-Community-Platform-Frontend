@@ -574,15 +574,15 @@ export default function HomePage() {
 
             <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
               <Stack direction="row" alignItems="center" spacing={1}>
-  <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
-  
-  {/* Verified Badge */}
-  {profile.kyc_status === 'approved' && (
-    <Tooltip title="Identity Verified">
-      <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
-    </Tooltip>
-  )}
-</Stack>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
+
+                {/* Verified Badge */}
+                {profile.kyc_status === 'approved' && (
+                  <Tooltip title="Identity Verified">
+                    <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
+                  </Tooltip>
+                )}
+              </Stack>
               {profile.experience && profile.experience.length > 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   {profile.experience[0].position} – {profile.experience[0].org}

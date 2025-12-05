@@ -26,18 +26,18 @@ export default function KYCNotification() {
       try {
         const res = await apiClient.get("/users/me/");
         const userData = res.data;
-        
+
         // 1. Check if user is Superuser (Admin)
         // If TRUE: We return immediately, so they DO NOT see the banner.
         if (userData?.is_superuser) {
           setIsSuperUser(true);
-          return; 
+          return;
         }
-        
+
         // 2. Staff and Normal Users pass through here.
         // We check their KYC status.
         const kyc = userData?.profile?.kyc_status;
-        
+
         // Show banner if NOT approved
         if (kyc && kyc !== "approved") {
           setStatus(kyc);
@@ -76,21 +76,21 @@ export default function KYCNotification() {
 
   // --- Configuration ---
   const isPending = status === "pending" || status === "review";
-  
-  // Style Config: Orange/Red for Action Required, Blue for Info
-  const themeStyles = isPending 
-    ? { bg: "#E3F2FD", color: "#01579B", icon: <InfoOutlinedIcon fontSize="small" /> }
-    : { bg: "#FFF3E0", color: "#E65100", icon: <WarningAmberRoundedIcon fontSize="small" /> };
 
-  const message = isPending 
-    ? "Your identity verification is currently under review." 
+  // Style Config: Orange/Red for Action Required, Blue for Info
+  const themeStyles = isPending
+    ? { bg: "#ffffffff", color: "#239191ff", icon: <InfoOutlinedIcon fontSize="small" /> }
+    : { bg: "#ffffffff", color: "#239191ff", icon: <WarningAmberRoundedIcon fontSize="small" /> };
+
+  const message = isPending
+    ? "Your identity verification is currently under review."
     : (status === "declined" ? "Identity verification failed." : "Your identity is not verified.");
 
   return (
-    <Box 
-      sx={{ 
-        width: "100%", 
-        bgcolor: themeStyles.bg, 
+    <Box
+      sx={{
+        width: "100%",
+        bgcolor: themeStyles.bg,
         color: themeStyles.color,
         borderBottom: "1px solid",
         borderColor: "rgba(0,0,0,0.05)",
@@ -102,7 +102,7 @@ export default function KYCNotification() {
       <Container maxWidth="xl">
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
           {themeStyles.icon}
-          
+
           <Typography variant="body2" fontWeight={600}>
             {message}
           </Typography>
@@ -114,17 +114,17 @@ export default function KYCNotification() {
               size="small"
               onClick={handleVerifyClick}
               disabled={loading}
-              sx={{ 
-                textTransform: "none", 
-                textDecoration: "underline", 
+              sx={{
+                textTransform: "none",
+                textDecoration: "underline",
                 fontWeight: "bold",
                 color: "inherit",
                 minWidth: "auto",
                 p: 0,
                 ml: 0.5,
-                "&:hover": { 
-                  textDecoration: "underline", 
-                  backgroundColor: "transparent" 
+                "&:hover": {
+                  textDecoration: "underline",
+                  backgroundColor: "transparent"
                 }
               }}
             >
