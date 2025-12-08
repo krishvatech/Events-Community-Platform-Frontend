@@ -44,6 +44,7 @@ import {
   CircleMarker,
   Tooltip as LeafletTooltip,
   useMap,
+  AttributionControl
 } from "react-leaflet";
 import L from "leaflet";
 
@@ -545,6 +546,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
           style={{ width: "100%", height: "100%" }}
           scrollWheelZoom
           worldCopyJump
+          attributionControl={false}
         >
           {/* Auto-adjust view when search/filter changes */}
           <AutoZoom markers={markers} />

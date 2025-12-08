@@ -7,7 +7,8 @@ import {
   List, ListItem, ListItemIcon, ListItemText,
   Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Chip,
   FormControlLabel, Checkbox, InputAdornment, Collapse, IconButton, Tooltip,
-  useMediaQuery, useTheme, MenuItem, Stack, ListItemAvatar, CircularProgress
+  useMediaQuery, useTheme, MenuItem, Stack, ListItemAvatar, CircularProgress,
+  Slider
 } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -33,18 +34,22 @@ import { startKYC, submitNameChangeRequest } from "../utils/api";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 
 // -------------------- Constants for Dropdowns --------------------
-const SECTOR_OPTIONS = [
-  "Private Sector", "Public Sector", "Non-Profit", "Government", "Education",
+const CEFR_OPTIONS = [
+  { value: "A1", label: "Beginner (A1)", desc: "Understands and produces basic phrases and introduces themselves." },
+  { value: "A2", label: "Elementary (A2)", desc: "Simple communication and frequently used expressions." },
+  { value: "B1", label: "Limited Working (B1)", desc: "Handles routine tasks and produces simple text in familiar matters." },
+  { value: "B2", label: "Professional Working (B2)", desc: "Effective operational use; comfortable handling most professional topics." },
+  { value: "C1", label: "Full Professional (C1)", desc: "Fluency on complex, professional, and academic subjects." },
+  { value: "C2", label: "Native/Bilingual (C2)", desc: "Mastery level; effortlessly expresses and comprehends virtually any topic." },
 ];
 
-const INDUSTRY_OPTIONS = [
-  "Technology", "Finance", "Healthcare", "Education", "Manufacturing", "Retail",
-  "Media", "Real Estate", "Transportation", "Energy",
+const ACQUISITION_OPTIONS = [
+  { value: "mother_tongue", label: "Mother Tongue" },
+  { value: "formal_education", label: "Formal Education" },
+  { value: "professional_immersion", label: "Professional Immersion" },
+  { value: "self_taught", label: "Self-Taught" },
 ];
 
-const EMPLOYEE_COUNT_OPTIONS = [
-  "1-10", "11-50", "51-200", "201-500", "501-1000", "1000-5000", "5000+",
-];
 
 // -------------------- API helpers --------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -108,6 +113,24 @@ function parseLinks(value) {
   return out;
 }
 
+const PROFICIENCY_LABELS = {
+  1: "Beginner",
+  2: "Basic",
+  3: "Intermediate",
+  4: "Advanced",
+  5: "Expert",
+};
+
+function formatSkillLabel(skill) {
+  if (!skill) return "";
+  const base = skill.label || "";
+  const lvl = skill.proficiency_level;
+  if (!lvl) return base;
+  const suffix = PROFICIENCY_LABELS[lvl] || "";
+  return suffix ? `${base} · ${suffix}` : base;
+}
+
+
 isoCountries.registerLocale(enLocale);
 
 const flagEmoji = (code) =>
@@ -125,14 +148,6 @@ const getSelectedCountry = (profile) => {
     (o) => (o.label || "").toLowerCase() === String(profile.location).toLowerCase()
   ) || null;
 };
-
-// ---- Education dropdown options ----
-const SCHOOL_OPTIONS = [
-  "Harvard University", "Stanford University", "Indian Institute of Technology Bombay",
-  "Indian Institute of Management Ahmedabad", "University of Oxford", "University of Cambridge",
-  "Massachusetts Institute of Technology (MIT)", "National University of Singapore",
-  "University of Mumbai", "University of Delhi",
-];
 
 const FIELD_OF_STUDY_OPTIONS = [
   "Computer Science", "Information Technology", "Electronics & Communication Engineering",
@@ -586,6 +601,98 @@ function NameChangeDialog({ open, onClose, currentNames, showToast }) {
   );
 }
 
+function IsoLanguageAutocomplete({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    if (inputValue.length < 2) {
+      setOptions(value ? [value] : []);
+      return undefined;
+    }
+
+    const fetchLanguages = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_BASE}/auth/languages/search/?q=${inputValue}`, {
+          headers: tokenHeader()
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (active) setOptions(data.results || []);
+        }
+      } catch (err) {
+        console.error("Language search failed", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const timer = setTimeout(fetchLanguages, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [inputValue, value]);
+
+  return (
+    <Autocomplete
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      isOptionEqualToValue={(option, val) => option.iso_639_1 === val.iso_639_1}
+      getOptionLabel={(option) => option.label || option.english_name || ""}
+      options={options}
+      loading={loading}
+      value={value}
+      onChange={(event, newValue) => onChange(newValue)}
+      onInputChange={(_, newInputValue) => setInputValue(newInputValue)}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label="Language *"
+          placeholder="Type to search (e.g. English, Hindi)"
+          fullWidth
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+    />
+  );
+}
+
+async function handleDeleteCertificate(certId) {
+  if (!window.confirm("Are you sure you want to delete this certificate?")) return;
+
+  try {
+    const r = await fetch(`${API_BASE}/auth/me/language-certificates/${certId}/`, {
+      method: "DELETE",
+      headers: tokenHeader(),
+    });
+
+    if (r.ok) {
+      showNotification("success", "Certificate deleted");
+
+      // Remove it from the local UI state immediately
+      setExistingCertificates((prev) => prev.filter((c) => c.id !== certId));
+
+      // Refresh the main list in the background to keep everything in sync
+      loadLanguages();
+    } else {
+      throw new Error("Failed to delete certificate");
+    }
+  } catch (e) {
+    showNotification("error", e.message);
+  }
+}
+
 // -------------------- Page --------------------
 export default function ProfilePage() {
   const theme = useTheme();
@@ -634,12 +741,173 @@ export default function ProfilePage() {
   const [workOpen, setWorkOpen] = useState(false);
   const [workForm, setWorkForm] = useState({ sector: "", industry: "", employees: "" });
 
+  // Structured ESCO skills for this user
+  const [userSkills, setUserSkills] = useState([]);
+  // each item: { id, uri, label, proficiency_level }
+
+  // For ESCO search autocomplete
+  const [skillOptions, setSkillOptions] = useState([]);   // [{ uri, label }]
+  const [skillSearch, setSkillSearch] = useState("");
+  const skillSearchTimeout = useRef(null);
+
+  // For editing skills in About dialog
+  const [aboutSkills, setAboutSkills] = useState([]); // mirror of userSkills while dialog open
+
+  // --- Languages State ---
+  const [langList, setLangList] = useState([]);
+  const [langOpen, setLangOpen] = useState(false);
+  const [langSaving, setLangSaving] = useState(false);
+  const [editLangId, setEditLangId] = useState(null);
+  const [langCertFiles, setLangCertFiles] = useState([]); // For file uploads
+  const [existingCertificates, setExistingCertificates] = useState([]);
+
+  // Initial form state matches your UserLanguage model
+  const EMPTY_LANG_FORM = {
+    iso_obj: null, // Stores the full object from autocomplete
+    primary_dialect: "",
+    proficiency_cefr: "B2",
+    acquisition_context: "",
+    notes: ""
+  };
+  const [langForm, setLangForm] = useState(EMPTY_LANG_FORM);
+
   const [form, setForm] = useState({
     first_name: "", last_name: "", email: "", full_name: "", timezone: "",
     bio: "", headline: "", job_title: "", company: "", location: "",
     skillsText: "", linksText: "", avatar: "", kyc_status: "not_started",
-    legal_name_locked: false,
+    legal_name_locked: false, kyc_decline_reason: "",
   });
+
+  // 1. Load Languages
+  async function loadLanguages() {
+    try {
+      const r = await fetch(`${API_BASE}/auth/me/languages/`, { headers: tokenHeader() });
+      if (r.ok) {
+        const data = await r.json();
+        // Check if data is an array or a paginated object
+        const list = Array.isArray(data) ? data : (data.results || []);
+        setLangList(list);
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  // Add this to your existing useEffect that loads profile data
+  useEffect(() => {
+    // ... existing calls ...
+    loadLanguages();
+  }, []);
+
+  // 2. Save Language (Create/Update)
+  async function saveLanguage() {
+    if (!langForm.iso_obj) {
+      showNotification("error", "Please select a language");
+      return;
+    }
+    setLangSaving(true);
+    try {
+      const payload = {
+        iso_639_1: langForm.iso_obj.iso_639_1,
+        english_name: langForm.iso_obj.label || langForm.iso_obj.english_name, // Handle both search result and existing format
+        primary_dialect: langForm.primary_dialect,
+        proficiency_cefr: langForm.proficiency_cefr,
+        acquisition_context: langForm.acquisition_context,
+      };
+
+      const url = editLangId
+        ? `${API_BASE}/auth/me/languages/${editLangId}/`
+        : `${API_BASE}/auth/me/languages/`;
+
+      const method = editLangId ? "PATCH" : "POST";
+
+      const r = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        body: JSON.stringify(payload),
+      });
+
+      if (!r.ok) throw new Error("Failed to save language");
+
+      const savedLang = await r.json();
+
+      // 3. Upload Certificates if any
+      if (langCertFiles.length > 0) {
+        const langId = editLangId || savedLang.id;
+        for (const file of langCertFiles) {
+          const fd = new FormData();
+          fd.append("user_language", langId);
+          fd.append("file", file);
+          await fetch(`${API_BASE}/auth/me/language-certificates/`, {
+            method: "POST",
+            headers: tokenHeader(),
+            body: fd
+          });
+        }
+      }
+
+      showNotification("success", "Language saved successfully");
+      setLangOpen(false);
+      loadLanguages();
+    } catch (e) {
+      showNotification("error", e.message);
+    } finally {
+      setLangSaving(false);
+    }
+  }
+
+  // 4. Delete Language
+  async function deleteLanguage(id) {
+    if (!window.confirm("Are you sure you want to delete this language?")) return;
+    try {
+      const r = await fetch(`${API_BASE}/auth/me/languages/${id}/`, {
+        method: "DELETE",
+        headers: tokenHeader()
+      });
+      if (r.ok) {
+        showNotification("success", "Language deleted");
+        loadLanguages();
+      }
+    } catch (e) { showNotification("error", "Delete failed"); }
+  }
+
+  // 5. Open Dialog Helpers
+  function openAddLanguage() {
+    setEditLangId(null);
+    setLangForm(EMPTY_LANG_FORM);
+    setLangCertFiles([]);
+    setExistingCertificates([]); // <--- Clear existing certs
+    setLangOpen(true);
+  }
+
+  // Populate existing certs when editing
+  function onEditLanguage(item) {
+    setEditLangId(item.id);
+    setLangForm({
+      iso_obj: {
+        iso_639_1: item.language.iso_639_1,
+        label: item.language.english_name
+      },
+      primary_dialect: item.primary_dialect || "",
+      proficiency_cefr: item.proficiency_cefr || "B2",
+      acquisition_context: item.acquisition_context || "",
+      notes: item.notes || ""
+    });
+    setLangCertFiles([]); // Reset new files
+    setExistingCertificates(item.certificates || []); // <--- Load from API data
+    setLangOpen(true);
+  }
+
+  useEffect(() => {
+    if (
+      form.kyc_status === "declined" &&
+      form.kyc_decline_reason === "name_mismatch"
+    ) {
+      showNotification(
+        "error",
+        "KYC declined: your sign-up name does not match your document. Please raise a Name Change Request."
+      );
+    }
+  }, [form.kyc_status, form.kyc_decline_reason]);
+
 
   const [confirm, setConfirm] = useState({ open: false, type: null, id: null, label: "" });
 
@@ -735,6 +1003,7 @@ export default function ProfilePage() {
           linksText: prof.links ? JSON.stringify(prof.links) : "",
           kyc_status: prof.kyc_status || "not_started",
           legal_name_locked: prof.legal_name_locked || false,
+          kyc_decline_reason: prof.kyc_decline_reason || "",
         });
       } catch (e) {
         if (e?.name === "AbortError") return;
@@ -747,7 +1016,108 @@ export default function ProfilePage() {
     return () => { alive = false; ctrl.abort(); };
   }, []);
 
-  useEffect(() => { loadMeExtras(); fetchMyFriends(); }, []);
+  async function syncUserSkillsWithBackend(selectedSkills) {
+    // selectedSkills: [{ uri, label, proficiency_level? }, ...]
+    try {
+      // 1. Load current skills
+      const resp = await fetch(`${API_BASE}/auth/me/skills/`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...tokenHeader(),
+        },
+      });
+
+      if (!resp.ok) {
+        console.error("Failed to fetch existing user skills");
+        return;
+      }
+
+      const current = await resp.json(); // [{ id, skill: { uri, ... }, ... }]
+
+      const selectedByUri = new Map(
+        (selectedSkills || []).map((s) => [s.uri, s])
+      );
+
+      // 2. Delete skills that are no longer selected
+      const deletions = current.filter(
+        (item) => !selectedByUri.has(item.skill?.uri)
+      );
+
+      await Promise.all(
+        deletions.map((item) =>
+          fetch(`${API_BASE}/auth/me/skills/${item.id}/`, {
+            method: "DELETE",
+            headers: {
+              ...tokenHeader(),
+            },
+          })
+        )
+      );
+
+      // 3. Upsert each selected skill (backend uses update_or_create)
+      await Promise.all(
+        (selectedSkills || []).map((s) =>
+          fetch(`${API_BASE}/auth/me/skills/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...tokenHeader(),
+            },
+            body: JSON.stringify({
+              skill_uri: s.uri,
+              preferred_label: s.label,
+              proficiency_level: s.proficiency_level ?? 3,
+              assessment_type: "self",
+              notes: "",
+            }),
+          })
+        )
+      );
+
+      setUserSkills(selectedSkills || []);
+    } catch (err) {
+      console.error("Error syncing user skills", err);
+    }
+  }
+
+  async function loadUserSkills() {
+    try {
+      const r = await fetch(`${API_BASE}/auth/me/skills/`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...tokenHeader(),
+        },
+      });
+
+      if (!r.ok) {
+        console.error("Failed to load user skills", r.status);
+        return;
+      }
+
+      const data = await r.json();
+
+      const mapped = (Array.isArray(data) ? data : [])
+        .map((item) => ({
+          id: item.id,
+          uri: item.skill?.uri,
+          label: item.skill?.preferred_label || "",
+          proficiency_level: item.proficiency_level ?? 3,
+        }))
+        .filter((s) => s.uri && s.label);
+
+      setUserSkills(mapped);
+
+      // Keep the legacy text field in sync (for chips display)
+      setForm((prev) => ({
+        ...prev,
+        skillsText: mapped.map((s) => s.label).join(", "),
+      }));
+    } catch (e) {
+      console.error("Error loading user skills", e);
+    }
+  }
+
+  useEffect(() => { loadMeExtras(); fetchMyFriends(); loadUserSkills(); loadUserSkills(); }, []);
 
   const handleStartKYC = async () => {
     try {
@@ -764,6 +1134,68 @@ export default function ProfilePage() {
       showNotification("error", error.message);
     }
   };
+
+  async function fetchSkillOptions(query) {
+    const q = (query || "").trim();
+    if (!q) {
+      setSkillOptions([]);
+      return;
+    }
+
+    try {
+      const resp = await fetch(
+        `${API_BASE}/auth/skills/search/?q=${encodeURIComponent(q)}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...tokenHeader(),
+          },
+        }
+      );
+
+      if (!resp.ok) {
+        console.error("Skill search failed", resp.status);
+        return;
+      }
+
+      const data = await resp.json();
+      // Backend returns: { results: [{ uri, label }, ...] }
+      const cleaned = (data.results || []).map((item) => {
+        const lbl = item.label;
+        let label = "";
+        if (typeof lbl === "string") label = lbl;
+        else if (lbl && typeof lbl === "object") {
+          label = lbl["en-us"] || lbl["en"] || Object.values(lbl)[0] || "";
+        }
+        return { uri: item.uri, label };
+      }).filter((x) => x.label);
+      setSkillOptions(cleaned);
+    } catch (e) {
+      console.error("Error searching skills", e);
+    }
+  }
+
+  useEffect(() => {
+    if (skillSearchTimeout.current) {
+      clearTimeout(skillSearchTimeout.current);
+    }
+
+    const q = (skillSearch || "").trim();
+    if (!q) {
+      setSkillOptions([]);
+      return;
+    }
+
+    skillSearchTimeout.current = setTimeout(() => {
+      fetchSkillOptions(q);
+    }, 300);
+
+    return () => {
+      if (skillSearchTimeout.current) {
+        clearTimeout(skillSearchTimeout.current);
+      }
+    };
+  }, [skillSearch]);
 
   async function fetchMyFriends() {
     const candidates = [`${API_BASE}/friends/`, `${API_BASE}/users/friends/`, `${API_BASE}/users/me/friends/`];
@@ -796,7 +1228,21 @@ export default function ProfilePage() {
 
   const openEditAbout = (mode = "description") => {
     setAboutMode(mode);
-    setAboutForm({ bio: form.bio || "", skillsText: form.skillsText || "" });
+
+    if (mode === "skills") {
+      setAboutForm({
+        bio: form.bio || "",
+        skillsText: form.skillsText || "",
+      });
+      // Copy current structured skills into dialog state
+      setAboutSkills(userSkills || []);
+    } else {
+      setAboutForm({
+        bio: form.bio || "",
+        skillsText: form.skillsText || "",
+      });
+    }
+
     setAboutOpen(true);
   };
 
@@ -900,24 +1346,74 @@ export default function ProfilePage() {
     }
   }
 
+  const handleSkillLevelChange = (uri, level) => {
+    const numeric = Array.isArray(level) ? level[0] : level;
+    setAboutSkills((prev) =>
+      prev.map((s) =>
+        s.uri === uri ? { ...s, proficiency_level: numeric } : s
+      )
+    );
+  };
+
+
 
   async function saveAbout() {
     try {
       setSaving(true);
+
+      // Build label list from selected ESCO skills
+      const skillLabels =
+        aboutSkills && aboutSkills.length
+          ? aboutSkills.map((s) => s.label)
+          : parseSkills(aboutForm.skillsText); // fallback, just in case
+
       const payload = {
-        first_name: form.first_name, last_name: form.last_name, email: form.email,
+        first_name: form.first_name,
+        last_name: form.last_name,
+        email: form.email,
         profile: {
-          full_name: form.full_name, timezone: form.timezone, bio: aboutForm.bio,
-          headline: form.headline, job_title: form.job_title, company: form.company,
-          location: form.location, skills: parseSkills(aboutForm.skillsText), links: parseLinks(form.linksText),
+          full_name: form.full_name,
+          timezone: form.timezone,
+          bio: aboutForm.bio,
+          headline: form.headline,
+          job_title: form.job_title,
+          company: form.company,
+          location: form.location,
+          // Legacy skills field removed: skills are now stored only in structured tables (UserSkill & EscoSkill)
+          links: parseLinks(form.linksText),
         },
       };
-      const r = await fetch(`${API_BASE}/users/me/`, { method: "PUT", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
+
+      const r = await fetch(`${API_BASE}/users/me/`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...tokenHeader(),
+        },
+        body: JSON.stringify(payload),
+      });
+
       if (!r.ok) throw new Error("Save failed");
-      setForm(f => ({ ...f, bio: aboutForm.bio, skillsText: aboutForm.skillsText }));
+
+      // Only sync structured table if we actually opened skills with ESCO data
+      if (aboutSkills && aboutSkills.length) {
+        await syncUserSkillsWithBackend(aboutSkills);
+      }
+
+      // Update local form so chips redraw correctly
+      setForm((f) => ({
+        ...f,
+        bio: aboutForm.bio,
+        skillsText: skillLabels.join(", "),
+      }));
+
       showNotification("success", "About updated");
       setAboutOpen(false);
-    } catch (e) { showNotification("error", e?.message || "Save failed"); } finally { setSaving(false); }
+    } catch (e) {
+      showNotification("error", e?.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function saveContact() {
@@ -937,7 +1433,8 @@ export default function ProfilePage() {
         profile: {
           full_name: form.full_name, timezone: form.timezone, bio: form.bio, headline: form.headline,
           job_title: form.job_title, company: form.company, location: locationString,
-          skills: parseSkills(form.skillsText), links: newLinks,
+          // Removed legacy skills update; skills are stored in structured tables. Links preserved.
+          links: newLinks,
         },
       };
       const r = await fetch(`${API_BASE}/users/me/`, { method: "PUT", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
@@ -1079,7 +1576,7 @@ export default function ProfilePage() {
               job_title: form.job_title,
               company: form.company,
               location: locationString,
-              skills: parseSkills(form.skillsText),
+              // Removed legacy skills update; skills are stored in structured tables.
               links: parseLinks(form.linksText),
             },
           };
@@ -1111,6 +1608,55 @@ export default function ProfilePage() {
     }
   }
 
+  async function loadUserSkills() {
+    try {
+      const r = await fetch(`${API_BASE}/auth/me/skills/`, {
+        headers: tokenHeader(),
+      });
+      if (!r.ok) return;
+      const data = await r.json(); // list of UserSkillSerializer
+      const mapped = (data || []).map((item) => ({
+        id: item.id,
+        uri: item.skill?.uri,
+        label: item.skill?.preferred_label || "",
+        proficiency_level: item.proficiency_level ?? 3,
+      }));
+      setUserSkills(mapped);
+    } catch (e) {
+      console.error("Failed to load user skills", e);
+    }
+  }
+
+  function searchSkillsDebounced(query) {
+    const q = (query || "").trim();
+    setSkillSearch(q);
+
+    if (skillSearchTimeout.current) {
+      clearTimeout(skillSearchTimeout.current);
+    }
+
+    // Don’t call API for empty/very short input
+    if (!q || q.length < 2) {
+      setSkillOptions([]);
+      return;
+    }
+
+    skillSearchTimeout.current = setTimeout(async () => {
+      try {
+        const r = await fetch(
+          `${API_BASE}/auth/skills/search/?q=${encodeURIComponent(q)}`,
+          { headers: tokenHeader() }
+        );
+        if (!r.ok) return;
+        const data = await r.json();
+        const results = Array.isArray(data.results) ? data.results : [];
+        // Backend returns { results: [{ uri, label }] }
+        setSkillOptions(results);
+      } catch (e) {
+        console.error("Skill search failed", e);
+      }
+    }, 300);
+  }
 
   async function loadMeExtras() {
     try {
@@ -1275,11 +1821,36 @@ export default function ProfilePage() {
                         </Tooltip>
                       }
                     >
-                      {parseSkills(form.skillsText).length ? (
+                      {userSkills.length ? (
                         <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-                          {parseSkills(form.skillsText).map((s, i) => (<Chip key={i} size="small" label={s} sx={{ maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }} />))}
+                          {userSkills.map((s) => (
+                            <Chip
+                              key={s.uri || s.id}
+                              size="small"
+                              label={formatSkillLabel(s)}
+                              sx={{
+                                maxWidth: "100%",
+                                "& .MuiChip-label": {
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                },
+                              }}
+                            />
+                          ))}
                         </Box>
-                      ) : <Typography variant="body2" color="text.secondary">Add your top skills.</Typography>}
+                      ) : parseSkills(form.skillsText).length ? (
+                        // Fallback for old data with no structured skills
+                        <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          {parseSkills(form.skillsText).map((s, i) => (
+                            <Chip key={i} size="small" label={s} />
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          Add your top skills.
+                        </Typography>
+                      )}
                     </SectionCard>
 
                     <SectionCard
@@ -1391,6 +1962,8 @@ export default function ProfilePage() {
                         </ListItem>
                       </List>
                     </SectionCard>
+
+
                   </Grid>
 
                   {/* RIGHT COLUMN */}
@@ -1464,6 +2037,73 @@ export default function ProfilePage() {
                         </ListItem>
                       </List>
                     </SectionCard>
+                    {/* --- LANGUAGES SECTION --- */}
+                    <SectionCard
+                      sx={{ mt: 2 }}
+                      title="Languages"
+                      action={
+                        <Tooltip title="Add Language">
+                          <IconButton size="small" onClick={openAddLanguage}>
+                            <AddRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      }
+                    >
+                      {langList.length > 0 ? (
+                        <List dense disablePadding>
+                          {langList.map((l) => (
+                            <ListItem
+                              key={l.id}
+                              disableGutters
+                              secondaryAction={
+                                <Box sx={{ display: "flex", gap: 1 }}>
+                                  <IconButton size="small" onClick={() => onEditLanguage(l)}>
+                                    <EditOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton size="small" onClick={() => deleteLanguage(l.id)}>
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              }
+                            >
+                              <ListItemText
+                                primary={
+                                  <Box component="span" sx={{ fontWeight: 600 }}>
+                                    {l.language.english_name}
+                                    {l.primary_dialect && <Typography component="span" variant="caption" color="text.secondary"> ({l.primary_dialect})</Typography>}
+                                  </Box>
+                                }
+                                secondary={
+                                  <>
+                                    <Typography variant="body2" component="span" display="block">
+                                      {CEFR_OPTIONS.find(c => c.value === l.proficiency_cefr)?.label || l.proficiency_cefr}
+                                    </Typography>
+                                    {/* Show certificates if any exist */}
+                                    {l.certificates && l.certificates.length > 0 && (
+                                      <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                                        {l.certificates.map(c => (
+                                          <Chip
+                                            key={c.id}
+                                            label="Certificate"
+                                            size="small"
+                                            icon={<VerifiedRoundedIcon />}
+                                            variant="outlined"
+                                            color={c.verified ? "success" : "default"}
+                                            onClick={() => window.open(c.file, '_blank')}
+                                          />
+                                        ))}
+                                      </Stack>
+                                    )}
+                                  </>
+                                }
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">Add languages you know.</Typography>
+                      )}
+                    </SectionCard>
                   </Grid>
                 </Grid>
               </Box>
@@ -1536,6 +2176,145 @@ export default function ProfilePage() {
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setContactOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={saveContact} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* --- Language Dialog --- */}
+      <Dialog open={langOpen} onClose={() => setLangOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editLangId ? "Edit Language" : "Add Language"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+
+            {/* 1. Language Search */}
+            <IsoLanguageAutocomplete
+              value={langForm.iso_obj}
+              onChange={(val) => setLangForm({ ...langForm, iso_obj: val })}
+            />
+
+            {/* 2. Primary Dialect */}
+            <TextField
+              label="Primary Dialect (Optional)"
+              placeholder="e.g. Mexican Spanish, Quebec French"
+              value={langForm.primary_dialect}
+              onChange={(e) => setLangForm({ ...langForm, primary_dialect: e.target.value })}
+              fullWidth
+              helperText="If the language has a specific dialect you speak."
+            />
+
+            {/* 3. CEFR Proficiency */}
+            <TextField
+              select
+              label="Proficiency (CEFR)"
+              value={langForm.proficiency_cefr}
+              onChange={(e) => setLangForm({ ...langForm, proficiency_cefr: e.target.value })}
+              fullWidth
+              helperText={
+                CEFR_OPTIONS.find((c) => c.value === langForm.proficiency_cefr)?.desc ||
+                "Select your proficiency level."
+              }
+            >
+              {CEFR_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>{opt.label}</Typography>
+                  </Box>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {/* 4. Acquisition Context */}
+            <TextField
+              select
+              label="Where did you learn this?"
+              value={langForm.acquisition_context}
+              onChange={(e) => setLangForm({ ...langForm, acquisition_context: e.target.value })}
+              fullWidth
+            >
+              {ACQUISITION_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </TextField>
+
+            {/* 5. Certificate Upload Section */}
+            <Box sx={{ border: '1px dashed', borderColor: 'divider', p: 2, borderRadius: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                <VerifiedRoundedIcon fontSize="inherit" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                Certificates & Proof
+              </Typography>
+
+              {/* Button to add NEW files */}
+              <Button
+                component="label"
+                variant="outlined"
+                size="small"
+                startIcon={<CloudUploadRoundedIcon />}
+              >
+                Upload Certificate
+                <input
+                  type="file"
+                  hidden
+                  multiple
+                  accept=".pdf,.jpg,.png"
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      // Add new files to the existing array
+                      setLangCertFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                    }
+                  }}
+                />
+              </Button>
+
+              {/* LIST 1: Existing Saved Certificates (with API Delete) */}
+              {existingCertificates.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                    Saved Certificates:
+                  </Typography>
+                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                    {existingCertificates.map((cert) => (
+                      <Chip
+                        key={cert.id}
+                        label={cert.filename || "Certificate"}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        // Clicking opens the file
+                        onClick={() => window.open(cert.file, '_blank')}
+                        // Deleting calls the API
+                        onDelete={() => handleDeleteCertificate(cert.id)}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+
+              {/* LIST 2: New Pending Files (Local Delete only) */}
+              {langCertFiles.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                    To be uploaded:
+                  </Typography>
+                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                    {langCertFiles.map((file, i) => (
+                      <Chip
+                        key={i}
+                        label={file.name}
+                        size="small"
+                        // Deleting just removes from array before upload
+                        onDelete={() => setLangCertFiles(prev => prev.filter((_, idx) => idx !== i))}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLangOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveLanguage} disabled={langSaving}>
+            {langSaving ? "Saving..." : "Save"}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -1780,10 +2559,114 @@ export default function ProfilePage() {
           )}
           {aboutMode === "skills" && (
             <Box>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Skills</Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>We recommend adding your top 5 used skills.</Typography>
-              <TextField label="Skills (CSV or JSON array)" value={aboutForm.skillsText} onChange={(e) => setAboutForm((f) => ({ ...f, skillsText: e.target.value }))} fullWidth helperText="Saved as a list of strings" />
-              <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>{parseSkills(aboutForm.skillsText).length ? parseSkills(aboutForm.skillsText).map((skill, idx) => (<Chip key={idx} size="small" label={skill} />)) : null}</Box>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
+                Skills
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1 }}
+              >
+                We recommend adding your top 5 used skills.
+              </Typography>
+
+              <Autocomplete
+                multiple
+                options={skillOptions}
+                value={aboutSkills}
+                onChange={(_, newValue) => {
+                  setAboutSkills((prev) => {
+                    const merged = (newValue || []).map((skill) => {
+                      const existing = prev.find((s) => s.uri === skill.uri);
+                      return existing
+                        ? existing // keep old proficiency_level
+                        : { ...skill, proficiency_level: 3 }; // default Intermediate
+                    });
+
+                    const labels = merged.map((s) => s.label);
+                    setAboutForm((f) => ({
+                      ...f,
+                      skillsText: labels.join(", "),
+                    }));
+
+                    return merged;
+                  });
+                }}
+                inputValue={skillSearch}
+                onInputChange={(_, newInputValue) => {
+                  setSkillSearch(newInputValue);
+                }}
+                getOptionLabel={(option) => {
+                  if (!option) return "";
+                  const lbl = option.label;
+                  if (typeof lbl === "string") return lbl;
+                  if (lbl && typeof lbl === "object") {
+                    return (
+                      lbl["en-us"] ||
+                      lbl["en"] ||
+                      Object.values(lbl)[0] || ""
+                    );
+                  }
+                  return "";
+                }}
+                isOptionEqualToValue={(option, value) => option.uri === value.uri}
+                filterSelectedOptions
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Search skills"
+                    placeholder="Start typing to search ESCO skills…"
+                    fullWidth
+                  />
+                )}
+              />
+
+              {aboutSkills.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography
+                    variant="subtitle2"
+                    color="text.secondary"
+                    sx={{ mb: 1 }}
+                  >
+                    Rate your level for each skill
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {aboutSkills.map((skill) => {
+                      const lvl = skill.proficiency_level || 3;
+                      return (
+                        <Box
+                          key={skill.uri}
+                          sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{ minWidth: 140, fontWeight: 500 }}
+                          >
+                            {skill.label}
+                          </Typography>
+                          <Slider
+                            value={lvl}
+                            min={1}
+                            max={5}
+                            step={1}
+                            marks
+                            sx={{ flex: 1 }}
+                            onChange={(_, value) =>
+                              handleSkillLevelChange(skill.uri, value)
+                            }
+                          />
+                          <Typography
+                            variant="caption"
+                            sx={{ width: 80, textAlign: "right" }}
+                          >
+                            {PROFICIENCY_LABELS[lvl] || ""}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              )}
             </Box>
           )}
         </DialogContent>

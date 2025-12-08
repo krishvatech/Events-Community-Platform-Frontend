@@ -75,6 +75,22 @@ function authHeader() {
 // -----------------------------------------------------------------------------
 // Data Mappers
 // -----------------------------------------------------------------------------
+const CEFR_OPTIONS = [
+  { value: "A1", label: "Beginner (A1)", desc: "Understands and produces basic phrases and introduces themselves." },
+  { value: "A2", label: "Elementary (A2)", desc: "Simple communication and frequently used expressions." },
+  { value: "B1", label: "Limited Working (B1)", desc: "Handles routine tasks and produces simple text in familiar matters." },
+  { value: "B2", label: "Professional Working (B2)", desc: "Effective operational use; comfortable handling most professional topics." },
+  { value: "C1", label: "Full Professional (C1)", desc: "Fluency on complex, professional, and academic subjects." },
+  { value: "C2", label: "Native/Bilingual (C2)", desc: "Mastery level; effortlessly expresses and comprehends virtually any topic." },
+];
+
+const ACQUISITION_OPTIONS = [
+  { value: "mother_tongue", label: "Mother Tongue" },
+  { value: "formal_education", label: "Formal Education" },
+  { value: "professional_immersion", label: "Professional Immersion" },
+  { value: "self_taught", label: "Self-Taught" },
+];
+
 function mapExperience(item) {
   return {
     id: item.id,
@@ -228,6 +244,9 @@ const EMPTY_PROFILE = {
   links: {},
   experience: [],
   education: [],
+  kyc_status: "not_started",
+  legal_name_locked: false,
+  kyc_decline_reason: "",
 };
 
 function loadInitialProfile() {
@@ -257,10 +276,15 @@ function loadInitialProfile() {
 // Profile Fetchers
 // -----------------------------------------------------------------------------
 async function fetchProfileCore() {
-  const r = await fetch(`${API_ROOT}/users/me/`, { headers: { ...authHeader(), accept: "application/json" } });
+  const r = await fetch(`${API_ROOT}/users/me/`, {
+    headers: { ...authHeader(), accept: "application/json" },
+  });
   if (!r.ok) throw new Error("Failed to load /users/me/");
   const data = await r.json();
   const prof = data.profile || {};
+
+  const rawStatus = (prof.kyc_status || "not_started").toLowerCase();
+
   return {
     id: data.id ?? null,
     first_name: data.first_name || "",
@@ -270,13 +294,30 @@ async function fetchProfileCore() {
     job_title: prof.job_title || "",
     bio: prof.bio || "",
     location: prof.location || "",
-    avatar: prof.user_image_url || prof.user_image || prof.avatar || data.avatar || "",
-    skills: Array.isArray(prof.skills) ? prof.skills : parseSkills(prof.skills || ""),
-    links: (prof.links && typeof prof.links === "object") ? prof.links : {},
+    avatar:
+      prof.user_image_url ||
+      prof.user_image ||
+      prof.avatar ||
+      data.avatar ||
+      "",
+    skills: Array.isArray(prof.skills)
+      ? prof.skills
+      : parseSkills(prof.skills || ""),
+    links:
+      prof.links && typeof prof.links === "object"
+        ? prof.links
+        : {},
+
+    // ✅ KYC fields from backend
+    kyc_status: rawStatus,                    // "approved" / "declined" / "pending" / "review" / "not_started"
+    legal_name_locked: !!prof.legal_name_locked,
+    kyc_decline_reason: prof.kyc_decline_reason || "",
+
     experience: [],
     education: [],
   };
 }
+
 
 async function fetchProfileExtras() {
   try {
@@ -492,6 +533,21 @@ export default function HomePage() {
     setSnack({ open: true, sev: type, msg });
   };
 
+  React.useEffect(() => {
+    if (
+      profile?.kyc_status === "declined" &&
+      profile?.kyc_decline_reason === "name_mismatch"
+    ) {
+      showNotification(
+        "error",
+        "Your KYC was rejected because your sign-up name does not match your ID. Please submit a Name Change Request using your document name."
+      );
+
+      // Optionally auto-open Name Change dialog
+      setNameChangeOpen(true);
+    }
+  }, [profile?.kyc_status, profile?.kyc_decline_reason]); // runs when KYC status/reason updates
+
   // --- Fetch Profile ---
   const fetchMyProfileFromMe = React.useCallback(async () => {
     try {
@@ -506,6 +562,154 @@ export default function HomePage() {
       console.error("Failed to load profile:", e);
     }
   }, []);
+
+  // --- Languages State ---
+  const [langList, setLangList] = React.useState([]);
+  const [langOpen, setLangOpen] = React.useState(false);
+  const [langSaving, setLangSaving] = React.useState(false);
+  const [editLangId, setEditLangId] = React.useState(null);
+  const [langCertFiles, setLangCertFiles] = React.useState([]);
+  const [existingCertificates, setExistingCertificates] = React.useState([]);
+
+  const EMPTY_LANG_FORM = {
+    iso_obj: null,
+    primary_dialect: "",
+    proficiency_cefr: "B2",
+    acquisition_context: "",
+    notes: ""
+  };
+  const [langForm, setLangForm] = React.useState(EMPTY_LANG_FORM);
+
+  // Load Languages
+  const loadLanguages = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${API_ROOT}/auth/me/languages/`, { headers: authHeader() });
+      if (r.ok) {
+        const data = await r.json();
+        // Handle pagination vs array
+        const list = Array.isArray(data) ? data : (data.results || []);
+        setLangList(list);
+      }
+    } catch (e) { console.error(e); }
+  }, []);
+
+  React.useEffect(() => {
+    loadLanguages();
+  }, [loadLanguages]);
+
+  async function saveLanguage() {
+    if (!langForm.iso_obj) {
+      showNotification("error", "Please select a language");
+      return;
+    }
+    setLangSaving(true);
+    try {
+      const payload = {
+        iso_639_1: langForm.iso_obj.iso_639_1,
+        english_name: langForm.iso_obj.label || langForm.iso_obj.english_name,
+        primary_dialect: langForm.primary_dialect,
+        proficiency_cefr: langForm.proficiency_cefr,
+        acquisition_context: langForm.acquisition_context,
+      };
+
+      const url = editLangId
+        ? `${API_ROOT}/auth/me/languages/${editLangId}/`
+        : `${API_ROOT}/auth/me/languages/`;
+
+      const method = editLangId ? "PATCH" : "POST";
+
+      const r = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(payload),
+      });
+
+      if (!r.ok) throw new Error("Failed to save language");
+
+      const savedLang = await r.json();
+
+      // Upload Certificates
+      if (langCertFiles.length > 0) {
+        const langId = editLangId || savedLang.id;
+        for (const file of langCertFiles) {
+          const fd = new FormData();
+          fd.append("user_language", langId);
+          fd.append("file", file);
+          await fetch(`${API_ROOT}/auth/me/language-certificates/`, {
+            method: "POST",
+            headers: authHeader(),
+            body: fd
+          });
+        }
+      }
+
+      showNotification("success", "Language saved successfully");
+      setLangOpen(false);
+      loadLanguages();
+    } catch (e) {
+      showNotification("error", e.message);
+    } finally {
+      setLangSaving(false);
+    }
+  }
+
+  async function deleteLanguage(id) {
+    if (!window.confirm("Are you sure you want to delete this language?")) return;
+    try {
+      const r = await fetch(`${API_ROOT}/auth/me/languages/${id}/`, {
+        method: "DELETE",
+        headers: authHeader()
+      });
+      if (r.ok) {
+        showNotification("success", "Language deleted");
+        loadLanguages();
+      }
+    } catch (e) { showNotification("error", "Delete failed"); }
+  }
+
+  async function handleDeleteCertificate(certId) {
+    if (!window.confirm("Are you sure you want to delete this certificate?")) return;
+    try {
+      const r = await fetch(`${API_ROOT}/auth/me/language-certificates/${certId}/`, {
+        method: "DELETE",
+        headers: authHeader(),
+      });
+      if (r.ok) {
+        showNotification("success", "Certificate deleted");
+        setExistingCertificates((prev) => prev.filter((c) => c.id !== certId));
+        loadLanguages();
+      } else {
+        throw new Error("Failed to delete certificate");
+      }
+    } catch (e) {
+      showNotification("error", e.message);
+    }
+  }
+
+  function openAddLanguage() {
+    setEditLangId(null);
+    setLangForm(EMPTY_LANG_FORM);
+    setLangCertFiles([]);
+    setExistingCertificates([]);
+    setLangOpen(true);
+  }
+
+  function onEditLanguage(item) {
+    setEditLangId(item.id);
+    setLangForm({
+      iso_obj: {
+        iso_639_1: item.language.iso_639_1,
+        label: item.language.english_name
+      },
+      primary_dialect: item.primary_dialect || "",
+      proficiency_cefr: item.proficiency_cefr || "B2",
+      acquisition_context: item.acquisition_context || "",
+      notes: item.notes || ""
+    });
+    setLangCertFiles([]);
+    setExistingCertificates(item.certificates || []);
+    setLangOpen(true);
+  }
 
   // --- Fetch Friends ---
   const fetchMyFriends = React.useCallback(async () => {
@@ -621,6 +825,26 @@ export default function HomePage() {
           profile={profile}
           onUpdate={handleUpdateProfile}
           showToast={showNotification}
+
+          // ✅ Languages
+          langList={langList}
+          langOpen={langOpen}
+          langSaving={langSaving}
+          editLangId={editLangId}
+          langCertFiles={langCertFiles}
+          existingCertificates={existingCertificates}
+          langForm={langForm}
+
+          setLangOpen={setLangOpen}
+          setLangForm={setLangForm}
+          setLangCertFiles={setLangCertFiles}
+          setExistingCertificates={setExistingCertificates}
+
+          openAddLanguage={openAddLanguage}
+          onEditLanguage={onEditLanguage}
+          saveLanguage={saveLanguage}
+          deleteLanguage={deleteLanguage}
+          handleDeleteCertificate={handleDeleteCertificate}
         />
 
       </Box>
@@ -910,6 +1134,73 @@ const SECTOR_OPTIONS = ["Private Sector", "Public Sector", "Non-Profit", "Govern
 const INDUSTRY_OPTIONS = ["Technology", "Finance", "Healthcare", "Education", "Manufacturing", "Retail", "Media", "Real Estate", "Transportation", "Energy"];
 const EMPLOYEE_COUNT_OPTIONS = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000-5000", "5000+"];
 
+function IsoLanguageAutocomplete({ value, onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
+
+  React.useEffect(() => {
+    let active = true;
+    if (inputValue.length < 2) {
+      setOptions(value ? [value] : []);
+      return undefined;
+    }
+
+    const fetchLanguages = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_ROOT}/auth/languages/search/?q=${inputValue}`, {
+          headers: authHeader()
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (active) setOptions(data.results || []);
+        }
+      } catch (err) {
+        console.error("Language search failed", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const timer = setTimeout(fetchLanguages, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [inputValue, value]);
+
+  return (
+    <Autocomplete
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      isOptionEqualToValue={(option, val) => option.iso_639_1 === val.iso_639_1}
+      getOptionLabel={(option) => option.label || option.english_name || ""}
+      options={options}
+      loading={loading}
+      value={value}
+      onChange={(event, newValue) => onChange(newValue)}
+      onInputChange={(_, newInputValue) => setInputValue(newInputValue)}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label="Language *"
+          placeholder="Type to search (e.g. English, Hindi)"
+          fullWidth
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+    />
+  );
+}
+
 function UniversityAutocomplete({ value, onChange, label = "University" }) {
   const [inputValue, setInputValue] = React.useState(value || "");
   const [options, setOptions] = React.useState([]);
@@ -1028,7 +1319,32 @@ function UniversityAutocomplete({ value, onChange, label = "University" }) {
 
 
 
-function AboutTab({ profile, onUpdate, showToast }) {
+function AboutTab({
+  profile,
+  onUpdate,
+  showToast,
+
+  // ✅ Languages props
+  langList,
+  langOpen,
+  langSaving,
+  editLangId,
+  langCertFiles,
+  existingCertificates,
+  langForm,
+
+  setLangOpen,
+  setLangForm,
+  setLangCertFiles,
+  setExistingCertificates,
+
+  openAddLanguage,
+  onEditLanguage,
+  saveLanguage,
+  deleteLanguage,
+  handleDeleteCertificate,
+}) {
+
   const [aboutOpen, setAboutOpen] = React.useState(false);
   const [aboutMode, setAboutMode] = React.useState("description");
   const [aboutForm, setAboutForm] = React.useState({ bio: "", skillsText: "" });
@@ -1467,6 +1783,72 @@ function AboutTab({ profile, onUpdate, showToast }) {
               </ListItem>
             </List>
           </SectionCard>
+
+          <SectionCard
+            title="Languages"
+            action={
+              <Tooltip title="Add Language">
+                <IconButton size="small" onClick={openAddLanguage}>
+                  <AddRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            }
+          >
+            {langList.length > 0 ? (
+              <List dense disablePadding>
+                {langList.map((l) => (
+                  <ListItem
+                    key={l.id}
+                    disableGutters
+                    secondaryAction={
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        <IconButton size="small" onClick={() => onEditLanguage(l)}>
+                          <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => deleteLanguage(l.id)}>
+                          <DeleteOutlineRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    }
+                  >
+                    <ListItemText
+                      primary={
+                        <Box component="span" sx={{ fontWeight: 600 }}>
+                          {l.language.english_name}
+                          {l.primary_dialect && <Typography component="span" variant="caption" color="text.secondary"> ({l.primary_dialect})</Typography>}
+                        </Box>
+                      }
+                      secondary={
+                        <React.Fragment>
+                          <Typography variant="body2" component="span" display="block">
+                            {CEFR_OPTIONS.find(c => c.value === l.proficiency_cefr)?.label || l.proficiency_cefr}
+                          </Typography>
+                          {l.certificates && l.certificates.length > 0 && (
+                            <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                              {l.certificates.map(c => (
+                                <Chip
+                                  key={c.id}
+                                  label="Certificate"
+                                  size="small"
+                                  icon={<VerifiedRoundedIcon />}
+                                  variant="outlined"
+                                  color={c.verified ? "success" : "default"}
+                                  onClick={() => window.open(c.file, '_blank')}
+                                  sx={{ cursor: 'pointer' }}
+                                />
+                              ))}
+                            </Stack>
+                          )}
+                        </React.Fragment>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="text.secondary">Add languages you know.</Typography>
+            )}
+          </SectionCard>
         </Grid>
       </Grid>
 
@@ -1505,6 +1887,124 @@ function AboutTab({ profile, onUpdate, showToast }) {
             disabled={savingContact}
           >
             {savingContact ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Language Dialog */}
+      <Dialog open={langOpen} onClose={() => setLangOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editLangId ? "Edit Language" : "Add Language"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+
+            <IsoLanguageAutocomplete
+              value={langForm.iso_obj}
+              onChange={(val) => setLangForm({ ...langForm, iso_obj: val })}
+            />
+
+            <TextField
+              label="Primary Dialect (Optional)"
+              placeholder="e.g. Mexican Spanish, Quebec French"
+              value={langForm.primary_dialect}
+              onChange={(e) => setLangForm({ ...langForm, primary_dialect: e.target.value })}
+              fullWidth
+              helperText="If the language has a specific dialect you speak."
+            />
+
+            <TextField
+              select
+              label="Proficiency (CEFR)"
+              value={langForm.proficiency_cefr}
+              onChange={(e) => setLangForm({ ...langForm, proficiency_cefr: e.target.value })}
+              fullWidth
+              helperText={
+                CEFR_OPTIONS.find((c) => c.value === langForm.proficiency_cefr)?.desc ||
+                "Select your proficiency level."
+              }
+            >
+              {CEFR_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>{opt.label}</Typography>
+                  </Box>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              label="Where did you learn this?"
+              value={langForm.acquisition_context}
+              onChange={(e) => setLangForm({ ...langForm, acquisition_context: e.target.value })}
+              fullWidth
+            >
+              {ACQUISITION_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </TextField>
+
+            <Box sx={{ border: '1px dashed', borderColor: 'divider', p: 2, borderRadius: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                <VerifiedRoundedIcon fontSize="inherit" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                Certificates & Proof
+              </Typography>
+              <Button
+                component="label"
+                variant="outlined"
+                size="small"
+                startIcon={<CloudUploadRoundedIcon />}
+              >
+                Upload Certificate
+                <input
+                  type="file"
+                  hidden
+                  multiple
+                  accept=".pdf,.jpg,.png"
+                  onChange={(e) => {
+                    if (e.target.files) setLangCertFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                  }}
+                />
+              </Button>
+
+              {/* Existing Certs */}
+              {existingCertificates.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>Saved Certificates:</Typography>
+                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                    {existingCertificates.map((cert) => (
+                      <Chip
+                        key={cert.id}
+                        label={cert.filename || "Certificate"}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        onClick={() => window.open(cert.file, '_blank')}
+                        onDelete={() => handleDeleteCertificate(cert.id)}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+
+              {/* New Certs */}
+              {langCertFiles.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>To be uploaded:</Typography>
+                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                    {langCertFiles.map((f, i) => (
+                      <Chip key={i} label={f.name} size="small" onDelete={() => setLangCertFiles(prev => prev.filter((_, idx) => idx !== i))} sx={{ mr: 1 }} />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Box>
+
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLangOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveLanguage} disabled={langSaving}>
+            {langSaving ? "Saving..." : "Save"}
           </Button>
         </DialogActions>
       </Dialog>
