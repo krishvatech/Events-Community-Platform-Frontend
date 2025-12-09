@@ -589,6 +589,10 @@ export default function HomePage() {
   const [editLangId, setEditLangId] = React.useState(null);
   const [langCertFiles, setLangCertFiles] = React.useState([]);
   const [existingCertificates, setExistingCertificates] = React.useState([]);
+  const [deleteLangDialog, setDeleteLangDialog] = React.useState({ open: false, id: null, name: "" });
+  const [deleteCertDialog, setDeleteCertDialog] = React.useState({ open: false, id: null, name: "" });
+  const [deletingLang, setDeletingLang] = React.useState(false);
+  const [deletingCert, setDeletingCert] = React.useState(false);
 
   const EMPTY_LANG_FORM = {
     iso_obj: null,
@@ -672,36 +676,78 @@ export default function HomePage() {
     }
   }
 
-  async function deleteLanguage(id) {
-    if (!window.confirm("Are you sure you want to delete this language?")) return;
+  // 1. LANGUAGE: Open Dialog
+  function deleteLanguage(id) {
+    const lang = langList.find((l) => l.id === id);
+    const name = lang ? lang.language.english_name : "this language";
+    setDeleteLangDialog({ open: true, id, name });
+  }
+
+  // 2. LANGUAGE: Perform Delete
+  async function confirmDeleteLanguage() {
+    if (!deleteLangDialog.id) return;
+    setDeletingLang(true);
     try {
-      const r = await fetch(`${API_ROOT}/auth/me/languages/${id}/`, {
+      const r = await fetch(`${API_ROOT}/auth/me/languages/${deleteLangDialog.id}/`, {
         method: "DELETE",
-        headers: authHeader()
+        headers: authHeader(),
       });
       if (r.ok) {
         showNotification("success", "Language deleted");
         loadLanguages();
+      } else {
+        throw new Error("Failed to delete");
       }
-    } catch (e) { showNotification("error", "Delete failed"); }
+    } catch (e) {
+      showNotification("error", "Delete failed");
+    } finally {
+      setDeletingLang(false);
+      setDeleteLangDialog({ open: false, id: null, name: "" });
+    }
   }
 
-  async function handleDeleteCertificate(certId) {
-    if (!window.confirm("Are you sure you want to delete this certificate?")) return;
+  // 3. CERTIFICATE: Open Dialog
+  function handleDeleteCertificate(certId) {
+    // Find the cert name for display (searching inside all languages)
+    let certName = "this certificate";
+    for (const lang of langList) {
+      const found = lang.certificates?.find((c) => c.id === certId);
+      if (found) {
+        certName = found.filename || "Certificate";
+        break;
+      }
+    }
+    // Also check "existingCertificates" state if currently editing a language
+    if (certName === "this certificate") {
+      const foundInEdit = existingCertificates.find(c => c.id === certId);
+      if (foundInEdit) certName = foundInEdit.filename;
+    }
+
+    setDeleteCertDialog({ open: true, id: certId, name: certName });
+  }
+
+  // 4. CERTIFICATE: Perform Delete
+  async function confirmDeleteCertificate() {
+    if (!deleteCertDialog.id) return;
+    setDeletingCert(true);
     try {
-      const r = await fetch(`${API_ROOT}/auth/me/language-certificates/${certId}/`, {
+      const r = await fetch(`${API_ROOT}/auth/me/language-certificates/${deleteCertDialog.id}/`, {
         method: "DELETE",
         headers: authHeader(),
       });
       if (r.ok) {
         showNotification("success", "Certificate deleted");
-        setExistingCertificates((prev) => prev.filter((c) => c.id !== certId));
+        // Update both the main list and the edit-form list
+        setExistingCertificates((prev) => prev.filter((c) => c.id !== deleteCertDialog.id));
         loadLanguages();
       } else {
         throw new Error("Failed to delete certificate");
       }
     } catch (e) {
       showNotification("error", e.message);
+    } finally {
+      setDeletingCert(false);
+      setDeleteCertDialog({ open: false, id: null, name: "" });
     }
   }
 
@@ -910,6 +956,85 @@ export default function HomePage() {
         }}
         showToast={showNotification}
       />
+      {/* ------------------------------------------------------- */}
+      {/* NEW: Modern Delete Dialog for Language                  */}
+      {/* ------------------------------------------------------- */}
+      <Dialog
+        open={deleteLangDialog.open}
+        onClose={() => !deletingLang && setDeleteLangDialog({ ...deleteLangDialog, open: false })}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <DeleteOutlineRoundedIcon color="error" />
+          Delete Language?
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary">
+            Are you sure you want to remove{" "}
+            <Box component="span" sx={{ fontWeight: 600, color: "text.primary" }}>
+              {deleteLangDialog.name}
+            </Box>
+            ? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteLangDialog({ ...deleteLangDialog, open: false })}
+            disabled={deletingLang}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmDeleteLanguage}
+            disabled={deletingLang}
+          >
+            {deletingLang ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ------------------------------------------------------- */}
+      {/* NEW: Modern Delete Dialog for Certificate               */}
+      {/* ------------------------------------------------------- */}
+      <Dialog
+        open={deleteCertDialog.open}
+        onClose={() => !deletingCert && setDeleteCertDialog({ ...deleteCertDialog, open: false })}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <DeleteOutlineRoundedIcon color="error" />
+          Delete Certificate?
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary">
+            This will permanently delete the file{" "}
+            <Box component="span" sx={{ fontWeight: 600, color: "text.primary" }}>
+              {deleteCertDialog.name}
+            </Box>
+            .
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteCertDialog({ ...deleteCertDialog, open: false })}
+            disabled={deletingCert}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmDeleteCertificate}
+            disabled={deletingCert}
+          >
+            {deletingCert ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snack.open}
