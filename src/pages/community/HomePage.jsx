@@ -29,7 +29,8 @@ import {
   ListItemAvatar,
   CircularProgress,
   Snackbar,
-  Alert
+  Alert,
+  Slider
 } from "@mui/material";
 
 // Icons
@@ -90,6 +91,24 @@ const ACQUISITION_OPTIONS = [
   { value: "professional_immersion", label: "Professional Immersion" },
   { value: "self_taught", label: "Self-Taught" },
 ];
+
+// 2. Add Proficiency Labels Constant (place this near CEFR_OPTIONS)
+const PROFICIENCY_LABELS = {
+  1: "Beginner",
+  2: "Basic",
+  3: "Intermediate",
+  4: "Advanced",
+  5: "Expert",
+};
+
+function formatSkillLabel(skill) {
+  if (!skill) return "";
+  const base = skill.label || "";
+  const lvl = skill.proficiency_level;
+  if (!lvl) return base;
+  const suffix = PROFICIENCY_LABELS[lvl] || "";
+  return suffix ? `${base} · ${suffix}` : base;
+}
 
 function mapExperience(item) {
   return {
@@ -1378,6 +1397,164 @@ function AboutTab({
     doc: null,
   });
 
+  // --- NEW SKILLS STATE ---
+  const [userSkills, setUserSkills] = React.useState([]);
+  const [skillOptions, setSkillOptions] = React.useState([]);
+  const [skillSearch, setSkillSearch] = React.useState("");
+  const [aboutSkills, setAboutSkills] = React.useState([]); // For the edit dialog
+  const [skillsDialogOpen, setSkillsDialogOpen] = React.useState(false); // For "See all"
+  const skillSearchTimeout = React.useRef(null);
+
+  // --- API FUNCTIONS FOR SKILLS ---
+
+  // 1. Load User Skills
+  const loadUserSkills = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${API_ROOT}/auth/me/skills/`, {
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      const items = Array.isArray(data) ? data : data.results || [];
+
+      const mapped = items
+        .map((item) => ({
+          id: item.id,
+          uri: item.skill?.uri,
+          label: item.skill?.preferred_label || "",
+          proficiency_level: item.proficiency_level ?? 3,
+        }))
+        .filter((s) => s.uri && s.label);
+
+      setUserSkills(mapped);
+    } catch (e) {
+      console.error("Error loading skills", e);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadUserSkills();
+  }, [loadUserSkills]);
+
+  // 2. Fetch Options (Debounced)
+  async function fetchSkillOptions(query) {
+    const q = (query || "").trim();
+    if (!q) { setSkillOptions([]); return; }
+    try {
+      const resp = await fetch(`${API_ROOT}/auth/skills/search?q=${encodeURIComponent(q)}`, {
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const cleaned = (data.results || []).map((item) => {
+        const lbl = item.label;
+        let label = "";
+        if (typeof lbl === "string") label = lbl;
+        else if (lbl && typeof lbl === "object") label = lbl["en-us"] || lbl["en"] || Object.values(lbl)[0] || "";
+        return { uri: item.uri, label };
+      }).filter((x) => x.label);
+      setSkillOptions(cleaned);
+    } catch (e) { console.error(e); }
+  }
+
+  React.useEffect(() => {
+    if (skillSearchTimeout.current) clearTimeout(skillSearchTimeout.current);
+    const q = (skillSearch || "").trim();
+    if (!q) { setSkillOptions([]); return; }
+    skillSearchTimeout.current = setTimeout(() => { fetchSkillOptions(q); }, 300);
+    return () => { if (skillSearchTimeout.current) clearTimeout(skillSearchTimeout.current); };
+  }, [skillSearch]);
+
+  // 3. Sync Logic (Called on Save)
+  async function syncUserSkillsWithBackend(selectedSkills) {
+    try {
+      // Get current from backend to diff
+      const resp = await fetch(`${API_ROOT}/auth/me/skills/`, { headers: authHeader() });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const current = Array.isArray(data) ? data : data.results || [];
+      const selectedByUri = new Map((selectedSkills || []).map((s) => [s.uri, s]));
+
+      // Delete removed
+      const deletions = current.filter((item) => !selectedByUri.has(item.skill?.uri));
+      await Promise.all(deletions.map((item) =>
+        fetch(`${API_ROOT}/auth/me/skills/${item.id}/`, { method: "DELETE", headers: authHeader() })
+      ));
+
+      // Create/Update
+      await Promise.all((selectedSkills || []).map((s) =>
+        fetch(`${API_ROOT}/auth/me/skills/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({
+            skill_uri: s.uri,
+            preferred_label: s.label,
+            proficiency_level: s.proficiency_level ?? 3,
+            assessment_type: "self",
+            notes: "",
+          }),
+        })
+      ));
+
+      // Update local state WITH SORTING
+      const sortedSkills = [...(selectedSkills || [])].sort((a, b) => {
+        // Sort by Proficiency Descending (5 -> 1)
+        return (b.proficiency_level || 0) - (a.proficiency_level || 0);
+      });
+
+      setUserSkills(sortedSkills);
+    } catch (err) { console.error(err); }
+  }
+
+  // 4. Handle Slider Change
+  const handleSkillLevelChange = (uri, level) => {
+    const numeric = Array.isArray(level) ? level[0] : level;
+    setAboutSkills((prev) => prev.map((s) => s.uri === uri ? { ...s, proficiency_level: numeric } : s));
+  };
+
+  // --- MODIFIED SAVE FUNCTION ---
+  const saveAbout = async () => {
+    if (savingAbout) return;
+    setSavingAbout(true);
+    try {
+      // 1. Save Basic Profile (Bio)
+      await saveProfileToMe({
+        ...profile,
+        profile: {
+          ...profile,
+          bio: aboutForm.bio,
+          // We don't save skills to 'profile.skills' legacy array anymore, 
+          // but we can sync it for backward compatibility if you wish.
+          // For now, we rely on the relational table.
+        },
+      });
+      onUpdate?.({ ...profile, bio: aboutForm.bio });
+
+      // 2. Save Skills (if in skills mode)
+      if (aboutMode === "skills" && aboutSkills) {
+        await syncUserSkillsWithBackend(aboutSkills);
+      }
+
+      showToast?.("success", "Section updated.");
+      setAboutOpen(false);
+    } catch (e) {
+      console.error(e);
+      showToast?.("error", "Failed to save section.");
+    } finally {
+      setSavingAbout(false);
+    }
+  };
+
+  // --- MODIFIED OPEN FUNCTION ---
+  const handleOpenAbout = (mode) => {
+    setAboutMode(mode);
+    if (mode === "skills") {
+      setAboutSkills(userSkills || []); // Pre-fill with current structured skills
+    }
+    setAboutForm({ bio: profile.bio || "", skillsText: "" }); // Reset legacy text
+    setAboutOpen(true);
+  };
+
   const handleAskDeleteDoc = (doc) => {
     setDeleteDocDialog({ open: true, doc });
   };
@@ -1422,33 +1599,6 @@ function AboutTab({
   const reloadExtras = async () => {
     const extra = await fetchProfileExtras();
     onUpdate?.(prev => ({ ...prev, experience: extra.experiences, education: extra.educations }));
-  };
-
-  const saveAbout = async () => {
-    if (savingAbout) return;
-    setSavingAbout(true);
-    try {
-      await saveProfileToMe({
-        ...profile,
-        profile: {
-          ...profile,
-          bio: aboutForm.bio,
-          skills: parseSkills(aboutForm.skillsText),
-        },
-      });
-      onUpdate?.({
-        ...profile,
-        bio: aboutForm.bio,
-        skills: parseSkills(aboutForm.skillsText),
-      });
-      showToast?.("success", "About section updated.");
-      setAboutOpen(false);
-    } catch (e) {
-      console.error(e);
-      showToast?.("error", "Failed to save about section.");
-    } finally {
-      setSavingAbout(false);
-    }
   };
 
   const saveEducation = async () => {
@@ -1606,8 +1756,57 @@ function AboutTab({
             <Typography variant="caption" color="text.secondary" sx={{ mt: "auto", alignSelf: "flex-end", display: "block", pt: 1 }}>{(profile.bio || "").length}/2000</Typography>
           </SectionCard>
 
-          <SectionCard title="Skills" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("skills"); setAboutOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <SkillsChips skills={profile.skills} />
+          <SectionCard
+            title="Skills"
+            action={
+              <Tooltip title="Edit">
+                <IconButton size="small" onClick={() => handleOpenAbout("skills")}>
+                  <EditOutlinedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            }
+          >
+            {userSkills.length > 0 ? (
+              <>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                  {userSkills.slice(0, 5).map((s) => (
+                    <Chip
+                      key={s.uri || s.id}
+                      size="small"
+                      label={formatSkillLabel(s)}
+                      sx={{ maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }}
+                    />
+                  ))}
+                  {userSkills.length > 5 && (
+                    <Chip
+                      size="small"
+                      label={`+${userSkills.length - 5} more`}
+                      onClick={() => setSkillsDialogOpen(true)}
+                      sx={{ cursor: "pointer" }}
+                    />
+                  )}
+                </Box>
+                {/* See All Dialog */}
+                <Dialog open={skillsDialogOpen} onClose={() => setSkillsDialogOpen(false)} fullWidth maxWidth="sm">
+                  <DialogTitle>Skills</DialogTitle>
+                  <DialogContent dividers>
+                    <List>
+                      {userSkills.map((s) => (
+                        <ListItem key={s.uri || s.id} disableGutters>
+                          <ListItemText
+                            primary={s.label}
+                            secondary={PROFICIENCY_LABELS[s.proficiency_level] || ""}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </DialogContent>
+                  <DialogActions><Button onClick={() => setSkillsDialogOpen(false)}>Close</Button></DialogActions>
+                </Dialog>
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary">Add your top skills.</Typography>
+            )}
           </SectionCard>
 
           <SectionCard title="Experience" action={<Tooltip title="Add"><IconButton size="small" onClick={openAddExp}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
@@ -1852,21 +2051,82 @@ function AboutTab({
         </Grid>
       </Grid>
 
-      {/* DIALOGS */}
       <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>{aboutMode === "skills" ? "Edit skills" : "Edit description"}</DialogTitle>
-        <DialogContent>{aboutMode === "description" ? (<TextField multiline minRows={4} fullWidth value={aboutForm.bio} onChange={(e) => setAboutForm(f => ({ ...f, bio: e.target.value }))} />) : (<TextField fullWidth label="Skills (CSV)" value={aboutForm.skillsText} onChange={(e) => setAboutForm(f => ({ ...f, skillsText: e.target.value }))} />)}</DialogContent>
+        <DialogContent dividers>
+          {aboutMode === "description" ? (
+            <TextField multiline minRows={4} fullWidth value={aboutForm.bio} onChange={(e) => setAboutForm(f => ({ ...f, bio: e.target.value }))} />
+          ) : (
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                We recommend adding your top 5 used skills and rating your proficiency.
+              </Typography>
+
+              <Autocomplete
+                multiple
+                options={skillOptions}
+                value={aboutSkills}
+                onChange={(_, newValue) => {
+                  setAboutSkills((prev) => {
+                    const merged = (newValue || []).map((skill) => {
+                      const existing = prev.find((s) => s.uri === skill.uri);
+                      return existing ? existing : { ...skill, proficiency_level: 3 };
+                    });
+                    return merged;
+                  });
+                }}
+                inputValue={skillSearch}
+                onInputChange={(_, newInputValue) => setSkillSearch(newInputValue)}
+                getOptionLabel={(option) => {
+                  if (!option) return "";
+                  const lbl = option.label;
+                  if (typeof lbl === "string") return lbl;
+                  if (lbl && typeof lbl === "object") return lbl["en-us"] || lbl["en"] || Object.values(lbl)[0] || "";
+                  return "";
+                }}
+                isOptionEqualToValue={(option, value) => option.uri === value.uri}
+                filterSelectedOptions
+                renderInput={(params) => (
+                  <TextField {...params} label="Search skills" placeholder="Type to search ESCO skills..." fullWidth />
+                )}
+              />
+
+              {aboutSkills.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Rate your level</Typography>
+                  <Stack spacing={2}>
+                    {aboutSkills.map((skill) => {
+                      const lvl = skill.proficiency_level || 3;
+                      return (
+                        <Box key={skill.uri} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                          <Typography variant="body2" sx={{ minWidth: 140, fontWeight: 500 }}>{skill.label}</Typography>
+                          <Slider
+                            value={lvl}
+                            min={1} max={5} step={1} marks
+                            sx={{ flex: 1 }}
+                            onChange={(_, value) => handleSkillLevelChange(skill.uri, value)}
+                          />
+                          <Typography variant="caption" sx={{ width: 80, textAlign: "right", fontWeight: 600 }}>
+                            {PROFICIENCY_LABELS[lvl] || ""}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
         <DialogActions>
           <Button onClick={() => setAboutOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={saveAbout}
-            disabled={savingAbout}
-          >
+          <Button variant="contained" onClick={saveAbout} disabled={savingAbout}>
             {savingAbout ? "Saving…" : "Save"}
           </Button>
         </DialogActions>
       </Dialog>
+
+
 
       {/* CONTACT DIALOG (Cleaned up - No Names/Request Button) */}
       <Dialog open={contactOpen} onClose={() => setContactOpen(false)} fullWidth maxWidth="sm">

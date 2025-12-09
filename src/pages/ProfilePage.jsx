@@ -728,6 +728,7 @@ export default function ProfilePage() {
   const [aboutMode, setAboutMode] = useState("description");
   const [contactOpen, setContactOpen] = useState(false);
 
+
   // Name Change Request State
   const [nameChangeOpen, setNameChangeOpen] = useState(false);
   const [basicInfoOpen, setBasicInfoOpen] = useState(false); // Header Identity Dialog
@@ -743,6 +744,8 @@ export default function ProfilePage() {
 
   // Structured ESCO skills for this user
   const [userSkills, setUserSkills] = useState([]);
+  // Control visibility of "More" skills dialog
+  const [skillsDialogOpen, setSkillsDialogOpen] = useState(false);
   // each item: { id, uri, label, proficiency_level }
 
   // For ESCO search autocomplete
@@ -1019,7 +1022,7 @@ export default function ProfilePage() {
   async function syncUserSkillsWithBackend(selectedSkills) {
     // selectedSkills: [{ uri, label, proficiency_level? }, ...]
     try {
-      // 1. Load current skills
+      // 1. Load current skills from backend to compare (for deletions)
       const resp = await fetch(`${API_BASE}/auth/me/skills/`, {
         headers: {
           "Content-Type": "application/json",
@@ -1032,7 +1035,15 @@ export default function ProfilePage() {
         return;
       }
 
-      const current = await resp.json(); // [{ id, skill: { uri, ... }, ... }]
+      const data = await resp.json();
+
+      // Handle both shapes: Array or Paginated
+      const current = Array.isArray(data) ? data : data.results || [];
+
+      if (!Array.isArray(current)) {
+        console.error("Unexpected skills payload when syncing", data);
+        return;
+      }
 
       const selectedByUri = new Map(
         (selectedSkills || []).map((s) => [s.uri, s])
@@ -1054,7 +1065,7 @@ export default function ProfilePage() {
         )
       );
 
-      // 3. Upsert each selected skill (backend uses update_or_create)
+      // 3. Upsert each selected skill
       await Promise.all(
         (selectedSkills || []).map((s) =>
           fetch(`${API_BASE}/auth/me/skills/`, {
@@ -1066,7 +1077,7 @@ export default function ProfilePage() {
             body: JSON.stringify({
               skill_uri: s.uri,
               preferred_label: s.label,
-              proficiency_level: s.proficiency_level ?? 3,
+              proficiency_level: s.proficiency_level ?? 3, // Default to 3 if not set
               assessment_type: "self",
               notes: "",
             }),
@@ -1074,7 +1085,14 @@ export default function ProfilePage() {
         )
       );
 
-      setUserSkills(selectedSkills || []);
+      // 4. Update local state WITH SORTING (Fixes the "Expert on top" issue)
+      const sortedSkills = [...(selectedSkills || [])].sort((a, b) => {
+        // Sort by Proficiency Descending (5 -> 1)
+        return (b.proficiency_level || 0) - (a.proficiency_level || 0);
+      });
+
+      setUserSkills(sortedSkills);
+
     } catch (err) {
       console.error("Error syncing user skills", err);
     }
@@ -1096,7 +1114,17 @@ export default function ProfilePage() {
 
       const data = await r.json();
 
-      const mapped = (Array.isArray(data) ? data : [])
+      // ✅ Handle both:
+      // 1) Plain array:   [ { ... }, { ... } ]
+      // 2) Paginated:     { count, next, previous, results: [ ... ] }
+      const items = Array.isArray(data) ? data : data.results || [];
+
+      if (!Array.isArray(items)) {
+        console.error("Unexpected skills payload", data);
+        return;
+      }
+
+      const mapped = items
         .map((item) => ({
           id: item.id,
           uri: item.skill?.uri,
@@ -1117,7 +1145,7 @@ export default function ProfilePage() {
     }
   }
 
-  useEffect(() => { loadMeExtras(); fetchMyFriends(); loadUserSkills(); loadUserSkills(); }, []);
+  useEffect(() => { loadMeExtras(); fetchMyFriends(); loadUserSkills(); }, []);
 
   const handleStartKYC = async () => {
     try {
@@ -1136,15 +1164,15 @@ export default function ProfilePage() {
   };
 
   async function fetchSkillOptions(query) {
-    const q = (query || "").trim();
-    if (!q) {
-      setSkillOptions([]);
-      return;
-    }
+    // REMOVED: The check that returns early if !q
+    // const q = (query || "").trim();
+    // if (!q) { setSkillOptions([]); return; }
+
+    const q = (query || "").trim(); // Allow empty string
 
     try {
       const resp = await fetch(
-        `${API_BASE}/auth/skills/search/?q=${encodeURIComponent(q)}`,
+        `${API_BASE}/auth/skills/search?q=${encodeURIComponent(q)}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -1159,7 +1187,7 @@ export default function ProfilePage() {
       }
 
       const data = await resp.json();
-      // Backend returns: { results: [{ uri, label }, ...] }
+
       const cleaned = (data.results || []).map((item) => {
         const lbl = item.label;
         let label = "";
@@ -1169,11 +1197,41 @@ export default function ProfilePage() {
         }
         return { uri: item.uri, label };
       }).filter((x) => x.label);
+
       setSkillOptions(cleaned);
     } catch (e) {
       console.error("Error searching skills", e);
     }
   }
+
+  // ------------------------------------------------------
+  // 2. Update useEffect to fetch defaults on mount/empty
+  // ------------------------------------------------------
+  useEffect(() => {
+    if (skillSearchTimeout.current) {
+      clearTimeout(skillSearchTimeout.current);
+    }
+
+    const q = (skillSearch || "").trim();
+
+    // REMOVED: if (!q) { setSkillOptions([]); return; }
+
+    // If empty, fetch immediately (local DB). 
+    // If typing, debounce the API call.
+    if (!q) {
+      fetchSkillOptions("");
+    } else {
+      skillSearchTimeout.current = setTimeout(() => {
+        fetchSkillOptions(q);
+      }, 100);
+    }
+
+    return () => {
+      if (skillSearchTimeout.current) {
+        clearTimeout(skillSearchTimeout.current);
+      }
+    };
+  }, [skillSearch]);
 
   useEffect(() => {
     if (skillSearchTimeout.current) {
@@ -1269,21 +1327,29 @@ export default function ProfilePage() {
     setContactOpen(true);
   };
 
+  function askDeleteLanguage(id, label) {
+    setConfirm({ open: true, type: "language", id, label });
+  }
+
+  function askDeleteCertificate(id, label) {
+    setConfirm({ open: true, type: "certificate", id, label });
+  }
   function askDeleteEducation(id, label = "") { setConfirm({ open: true, type: "edu", id, label }); }
   function askDeleteExperience(id, label = "") { setConfirm({ open: true, type: "exp", id, label }); }
   function closeConfirm() { setConfirm({ open: false, type: null, id: null, label: "" }); }
 
+  // --- Updated Delete Logic ---
   async function doConfirmDelete() {
     const { type, id } = confirm;
-    if (!type || !id || deleteLoading) return; // 🔒 already deleting
+    if (!type || !id || deleteLoading) return;
 
+    setDeleteLoading(true);
     try {
-      setDeleteLoading(true);
-
-      const url =
-        type === "edu"
-          ? `${API_BASE}/auth/me/educations/${id}/`
-          : `${API_BASE}/auth/me/experiences/${id}/`;
+      let url = "";
+      if (type === "edu") url = `${API_BASE}/auth/me/educations/${id}/`;
+      else if (type === "exp") url = `${API_BASE}/auth/me/experiences/${id}/`;
+      else if (type === "language") url = `${API_BASE}/auth/me/languages/${id}/`;
+      else if (type === "certificate") url = `${API_BASE}/auth/me/language-certificates/${id}/`;
 
       const r = await fetch(url, {
         method: "DELETE",
@@ -1292,21 +1358,31 @@ export default function ProfilePage() {
 
       if (!r.ok && r.status !== 204) throw new Error("Delete failed");
 
-      showNotification(
-        "success",
-        type === "edu" ? "Education deleted" : "Experience deleted"
-      );
-      setEduOpen(false);
-      setExpOpen(false);
-      setEditEduId(null);
-      setEditExpId(null);
-      closeConfirm();
-      await loadMeExtras();
+      // --- Success UI Updates ---
+      if (type === "language") {
+        showNotification("success", "Language deleted");
+        loadLanguages(); // Refresh list
+      }
+      else if (type === "certificate") {
+        showNotification("success", "Certificate deleted");
+        // Remove from local state immediately
+        setExistingCertificates((prev) => prev.filter((c) => c.id !== id));
+        loadLanguages(); // Background sync
+      }
+      else {
+        // Existing Edu/Exp handling
+        showNotification("success", type === "edu" ? "Education deleted" : "Experience deleted");
+        setEduOpen(false);
+        setExpOpen(false);
+        setEditEduId(null);
+        setEditExpId(null);
+        await loadMeExtras();
+      }
     } catch (e) {
       showNotification("error", e?.message || "Delete failed");
-      closeConfirm();
     } finally {
       setDeleteLoading(false);
+      closeConfirm();
     }
   }
 
@@ -1608,56 +1684,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function loadUserSkills() {
-    try {
-      const r = await fetch(`${API_BASE}/auth/me/skills/`, {
-        headers: tokenHeader(),
-      });
-      if (!r.ok) return;
-      const data = await r.json(); // list of UserSkillSerializer
-      const mapped = (data || []).map((item) => ({
-        id: item.id,
-        uri: item.skill?.uri,
-        label: item.skill?.preferred_label || "",
-        proficiency_level: item.proficiency_level ?? 3,
-      }));
-      setUserSkills(mapped);
-    } catch (e) {
-      console.error("Failed to load user skills", e);
-    }
-  }
-
-  function searchSkillsDebounced(query) {
-    const q = (query || "").trim();
-    setSkillSearch(q);
-
-    if (skillSearchTimeout.current) {
-      clearTimeout(skillSearchTimeout.current);
-    }
-
-    // Don’t call API for empty/very short input
-    if (!q || q.length < 2) {
-      setSkillOptions([]);
-      return;
-    }
-
-    skillSearchTimeout.current = setTimeout(async () => {
-      try {
-        const r = await fetch(
-          `${API_BASE}/auth/skills/search/?q=${encodeURIComponent(q)}`,
-          { headers: tokenHeader() }
-        );
-        if (!r.ok) return;
-        const data = await r.json();
-        const results = Array.isArray(data.results) ? data.results : [];
-        // Backend returns { results: [{ uri, label }] }
-        setSkillOptions(results);
-      } catch (e) {
-        console.error("Skill search failed", e);
-      }
-    }, 300);
-  }
-
   async function loadMeExtras() {
     try {
       const r = await fetch(`${API_BASE}/auth/me/profile/`, { headers: tokenHeader() });
@@ -1822,23 +1848,56 @@ export default function ProfilePage() {
                       }
                     >
                       {userSkills.length ? (
-                        <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-                          {userSkills.map((s) => (
-                            <Chip
-                              key={s.uri || s.id}
-                              size="small"
-                              label={formatSkillLabel(s)}
-                              sx={{
-                                maxWidth: "100%",
-                                "& .MuiChip-label": {
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                },
-                              }}
-                            />
-                          ))}
-                        </Box>
+                        <>
+                          <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                            {userSkills.slice(0, 5).map((s) => (
+                              <Chip
+                                key={s.uri || s.id}
+                                size="small"
+                                label={formatSkillLabel(s)}
+                                sx={{
+                                  maxWidth: "100%",
+                                  "& .MuiChip-label": {
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  },
+                                }}
+                              />
+                            ))}
+                            {userSkills.length > 5 && (
+                              <Chip
+                                size="small"
+                                label={`+${userSkills.length - 5} more`}
+                                onClick={() => setSkillsDialogOpen(true)}
+                                sx={{ cursor: "pointer" }}
+                              />
+                            )}
+                          </Box>
+                          <Dialog
+                            open={skillsDialogOpen}
+                            onClose={() => setSkillsDialogOpen(false)}
+                            fullWidth
+                            maxWidth="sm"
+                          >
+                            <DialogTitle>Skills</DialogTitle>
+                            <DialogContent dividers>
+                              <List>
+                                {userSkills.map((s) => (
+                                  <ListItem key={s.uri || s.id} disableGutters>
+                                    <ListItemText
+                                      primary={s.label || s.skill?.preferred_label || ""}
+                                      secondary={PROFICIENCY_LABELS[s.proficiency_level] || ""}
+                                    />
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </DialogContent>
+                            <DialogActions>
+                              <Button onClick={() => setSkillsDialogOpen(false)}>Close</Button>
+                            </DialogActions>
+                          </Dialog>
+                        </>
                       ) : parseSkills(form.skillsText).length ? (
                         // Fallback for old data with no structured skills
                         <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
@@ -2060,9 +2119,14 @@ export default function ProfilePage() {
                                   <IconButton size="small" onClick={() => onEditLanguage(l)}>
                                     <EditOutlinedIcon fontSize="small" />
                                   </IconButton>
-                                  <IconButton size="small" onClick={() => deleteLanguage(l.id)}>
-                                    <DeleteOutlineIcon fontSize="small" />
-                                  </IconButton>
+                                  <Tooltip title="Delete">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => askDeleteLanguage(l.id, l.language.english_name)}
+                                    >
+                                      <DeleteOutlineIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
                                 </Box>
                               }
                             >
@@ -2281,7 +2345,7 @@ export default function ProfilePage() {
                         // Clicking opens the file
                         onClick={() => window.open(cert.file, '_blank')}
                         // Deleting calls the API
-                        onDelete={() => handleDeleteCertificate(cert.id)}
+                        onDelete={() => askDeleteCertificate(cert.id, cert.filename)}
                       />
                     ))}
                   </Stack>
@@ -2528,20 +2592,43 @@ export default function ProfilePage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={confirm.open} onClose={closeConfirm} fullWidth maxWidth="xs">
-        <DialogTitle>Delete {confirm.type === "edu" ? "education" : "experience"}?</DialogTitle>
-        <DialogContent>{confirm.label && <DialogContentText sx={{ mb: 1 }}>{confirm.label}</DialogContentText>}<DialogContentText>This action cannot be undone.</DialogContentText></DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={closeConfirm} disabled={deleteLoading}>
+      {/* --- Modern Generic Delete Confirmation --- */}
+      <Dialog
+        open={confirm.open}
+        onClose={closeConfirm}
+        fullWidth
+        maxWidth="xs"
+        // Ensure it sits on top of other dialogs (like Edit Language)
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 10 }}
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineIcon color="error" />
+          Delete {confirm.type === "certificate" ? "Certificate" : confirm.type === "language" ? "Language" : "Item"}?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText sx={{ color: "text.primary", mb: 1 }}>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {confirm.label || "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText variant="body2" color="text.secondary">
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={closeConfirm} disabled={deleteLoading} variant="outlined" color="inherit">
             Cancel
           </Button>
           <Button
-            color="error"
-            variant="contained"
             onClick={doConfirmDelete}
-            disabled={deleteLoading} // 🔒 lock double delete
+            disabled={deleteLoading}
+            variant="contained"
+            color="error"
+            startIcon={deleteLoading ? <CircularProgress size={20} color="inherit" /> : null}
           >
-            {deleteLoading ? "Deleting…" : "Delete"}
+            {deleteLoading ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>

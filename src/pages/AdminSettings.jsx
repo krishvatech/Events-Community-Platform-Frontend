@@ -36,6 +36,7 @@ import {
   MenuItem,
   CircularProgress,
   ListItemAvatar,
+  Slider
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
@@ -58,6 +59,8 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import { startKYC, submitNameChangeRequest } from "../utils/api";
 import { isOwnerUser } from "../utils/adminRole";
+import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
+import CloseIcon from '@mui/icons-material/Close'; // Used in chips
 
 // --- API helpers ---
 const API_ROOT = (
@@ -75,6 +78,98 @@ const authHeader = () => {
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
 
+// --- Language Constants ---
+const CEFR_OPTIONS = [
+  { value: "A1", label: "Beginner (A1)", desc: "Understands and produces basic phrases." },
+  { value: "A2", label: "Elementary (A2)", desc: "Simple communication and frequently used expressions." },
+  { value: "B1", label: "Limited Working (B1)", desc: "Handles routine tasks." },
+  { value: "B2", label: "Professional Working (B2)", desc: "Effective operational use." },
+  { value: "C1", label: "Full Professional (C1)", desc: "Fluency on complex subjects." },
+  { value: "C2", label: "Native/Bilingual (C2)", desc: "Mastery level." },
+];
+
+const ACQUISITION_OPTIONS = [
+  { value: "mother_tongue", label: "Mother Tongue" },
+  { value: "formal_education", label: "Formal Education" },
+  { value: "professional_immersion", label: "Professional Immersion" },
+  { value: "self_taught", label: "Self-Taught" },
+];
+
+const EMPTY_LANG_FORM = {
+  iso_obj: null,
+  primary_dialect: "",
+  proficiency_cefr: "B2",
+  acquisition_context: "",
+  notes: ""
+};
+
+// --- Language Autocomplete Component ---
+function IsoLanguageAutocomplete({ value, onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
+
+  React.useEffect(() => {
+    let active = true;
+    if (inputValue.length < 2) {
+      setOptions(value ? [value] : []);
+      return undefined;
+    }
+
+    const fetchLanguages = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_ROOT}/auth/languages/search/?q=${inputValue}`, {
+          headers: authHeader()
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (active) setOptions(data.results || []);
+        }
+      } catch (err) {
+        console.error("Language search failed", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const timer = setTimeout(fetchLanguages, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [inputValue, value]);
+
+  return (
+    <Autocomplete
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      isOptionEqualToValue={(option, val) => option.iso_639_1 === val.iso_639_1}
+      getOptionLabel={(option) => option.label || option.english_name || ""}
+      options={options}
+      loading={loading}
+      value={value}
+      onChange={(event, newValue) => onChange(newValue)}
+      onInputChange={(_, newInputValue) => setInputValue(newInputValue)}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label="Language *"
+          placeholder="Type to search (e.g. English, Hindi)"
+          fullWidth
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+    />
+  );
+}
 
 async function uploadEducationDocApi(educationId, file) {
   const fd = new FormData();
@@ -751,6 +846,149 @@ export default function AdminSettings() {
     legal_name_locked: false,
   });
 
+  // --- Languages State ---
+  const [langList, setLangList] = React.useState([]);
+  const [langOpen, setLangOpen] = React.useState(false);
+  const [langSaving, setLangSaving] = React.useState(false);
+  const [editLangId, setEditLangId] = React.useState(null);
+  const [langCertFiles, setLangCertFiles] = React.useState([]);
+  const [existingCertificates, setExistingCertificates] = React.useState([]);
+  const [langForm, setLangForm] = React.useState(EMPTY_LANG_FORM);
+
+  // 1. Load Languages
+  async function loadLanguages() {
+    try {
+      const r = await fetch(`${API_ROOT}/auth/me/languages/`, { headers: authHeader() });
+      if (r.ok) {
+        const data = await r.json();
+        const list = Array.isArray(data) ? data : (data.results || []);
+        setLangList(list);
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  // 2. Open Add Dialog
+  function openAddLanguage() {
+    setEditLangId(null);
+    setLangForm(EMPTY_LANG_FORM);
+    setLangCertFiles([]);
+    setExistingCertificates([]);
+    setLangOpen(true);
+  }
+
+  // 3. Open Edit Dialog
+  function onEditLanguage(item) {
+    setEditLangId(item.id);
+    setLangForm({
+      iso_obj: {
+        iso_639_1: item.language.iso_639_1,
+        label: item.language.english_name
+      },
+      primary_dialect: item.primary_dialect || "",
+      proficiency_cefr: item.proficiency_cefr || "B2",
+      acquisition_context: item.acquisition_context || "",
+      notes: item.notes || ""
+    });
+    setLangCertFiles([]);
+    setExistingCertificates(item.certificates || []);
+    setLangOpen(true);
+  }
+
+  // 4. Save Language
+  async function saveLanguage() {
+    if (!langForm.iso_obj) {
+      showNotification("error", "Please select a language");
+      return;
+    }
+    setLangSaving(true);
+    try {
+      const payload = {
+        iso_639_1: langForm.iso_obj.iso_639_1,
+        english_name: langForm.iso_obj.label || langForm.iso_obj.english_name,
+        primary_dialect: langForm.primary_dialect,
+        proficiency_cefr: langForm.proficiency_cefr,
+        acquisition_context: langForm.acquisition_context,
+      };
+
+      const url = editLangId
+        ? `${API_ROOT}/auth/me/languages/${editLangId}/`
+        : `${API_ROOT}/auth/me/languages/`;
+
+      const method = editLangId ? "PATCH" : "POST";
+
+      const r = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(payload),
+      });
+
+      if (!r.ok) throw new Error("Failed to save language");
+      const savedLang = await r.json();
+
+      // Upload Certificates if any
+      if (langCertFiles.length > 0) {
+        const langId = editLangId || savedLang.id;
+        for (const file of langCertFiles) {
+          const fd = new FormData();
+          fd.append("user_language", langId);
+          fd.append("file", file);
+          await fetch(`${API_ROOT}/auth/me/language-certificates/`, {
+            method: "POST",
+            headers: authHeader(),
+            body: fd
+          });
+        }
+      }
+
+      showNotification("success", "Language saved successfully");
+      setLangOpen(false);
+      loadLanguages();
+    } catch (e) {
+      showNotification("error", e.message);
+    } finally {
+      setLangSaving(false);
+    }
+  }
+
+  // 5. Delete Language
+  async function deleteLanguage(id) {
+    if (!window.confirm("Are you sure you want to delete this language?")) return;
+    try {
+      const r = await fetch(`${API_ROOT}/auth/me/languages/${id}/`, {
+        method: "DELETE",
+        headers: authHeader()
+      });
+      if (r.ok) {
+        showNotification("success", "Language deleted");
+        loadLanguages();
+      }
+    } catch (e) { showNotification("error", "Delete failed"); }
+  }
+
+  // 6. Delete Certificate (Single file)
+  async function handleDeleteCertificate(certId) {
+    if (!window.confirm("Delete this certificate?")) return;
+    try {
+      const r = await fetch(`${API_ROOT}/auth/me/language-certificates/${certId}/`, {
+        method: "DELETE",
+        headers: authHeader(),
+      });
+      if (r.ok) {
+        showNotification("success", "Certificate deleted");
+        setExistingCertificates((prev) => prev.filter((c) => c.id !== certId));
+        loadLanguages(); // background refresh
+      } else {
+        throw new Error("Failed to delete");
+      }
+    } catch (e) {
+      showNotification("error", e.message);
+    }
+  }
+
+  // 7. Load on mount
+  React.useEffect(() => {
+    loadLanguages();
+  }, []);
 
   const [contactOpen, setContactOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState({
@@ -800,6 +1038,13 @@ export default function AdminSettings() {
   const [nameChangeOpen, setNameChangeOpen] = React.useState(false);
   const [basicInfoOpen, setBasicInfoOpen] = React.useState(false);
 
+  const [userSkills, setUserSkills] = React.useState([]);
+  const [skillOptions, setSkillOptions] = React.useState([]); // Autocomplete options
+  const [skillSearch, setSkillSearch] = React.useState("");   // Search input
+  const skillSearchTimeout = React.useRef(null);              // Debounce timer
+  const [aboutSkills, setAboutSkills] = React.useState([]);   // Temporary state for Dialog
+  const [skillsDialogOpen, setSkillsDialogOpen] = React.useState(false); // "See more" dialog
+
   // NEW: education document delete dialog state
   const [deleteDocDialog, setDeleteDocDialog] = React.useState({
     open: false,
@@ -840,6 +1085,150 @@ export default function AdminSettings() {
       setDeleteDocDialog({ open: false, doc: null });
     }
   };
+
+  // --- Skills API Helpers ---
+
+  const PROFICIENCY_LABELS = {
+    1: "Beginner",
+    2: "Basic",
+    3: "Intermediate",
+    4: "Advanced",
+    5: "Expert",
+  };
+
+  // 1. Load User Skills
+  async function loadUserSkills() {
+    try {
+      const r = await fetch(`${API_ROOT}/auth/me/skills/`, {
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      const items = Array.isArray(data) ? data : data.results || [];
+
+      const mapped = items
+        .map((item) => ({
+          id: item.id,
+          uri: item.skill?.uri,
+          label: item.skill?.preferred_label || "",
+          proficiency_level: item.proficiency_level ?? 3,
+        }))
+        .filter((s) => s.uri && s.label)
+        .sort((a, b) => (b.proficiency_level || 0) - (a.proficiency_level || 0));
+
+      setUserSkills(mapped);
+
+      // Sync legacy text field just in case
+      setProfile((prev) => ({
+        ...prev,
+        skillsText: mapped.map((s) => s.label).join(", "),
+      }));
+    } catch (e) {
+      console.error("Error loading skills", e);
+    }
+  }
+
+  // 2. Fetch ESCO Options (Autocomplete)
+  async function fetchSkillOptions(query) {
+    const q = (query || "").trim();
+    try {
+      const r = await fetch(
+        `${API_ROOT}/auth/skills/search?q=${encodeURIComponent(q)}`,
+        { headers: { "Content-Type": "application/json", ...authHeader() } }
+      );
+      if (!r.ok) return;
+      const data = await r.json();
+
+      const cleaned = (data.results || []).map((item) => {
+        const lbl = item.label;
+        let label = "";
+        if (typeof lbl === "string") label = lbl;
+        else if (lbl && typeof lbl === "object") {
+          label = lbl["en-us"] || lbl["en"] || Object.values(lbl)[0] || "";
+        }
+        return { uri: item.uri, label };
+      }).filter((x) => x.label);
+
+      setSkillOptions(cleaned);
+    } catch (e) {
+      console.error("Error searching skills", e);
+    }
+  }
+
+  // 3. Sync Logic (Save)
+  async function syncUserSkillsWithBackend(selectedSkills) {
+    try {
+      // A. Get current backend skills to find deletions
+      const r = await fetch(`${API_ROOT}/auth/me/skills/`, {
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      const current = Array.isArray(data) ? data : data.results || [];
+
+      const selectedByUri = new Map((selectedSkills || []).map((s) => [s.uri, s]));
+
+      // B. Delete removed skills
+      const deletions = current.filter((item) => !selectedByUri.has(item.skill?.uri));
+      await Promise.all(
+        deletions.map((item) =>
+          fetch(`${API_ROOT}/auth/me/skills/${item.id}/`, {
+            method: "DELETE",
+            headers: authHeader(),
+          })
+        )
+      );
+
+      // C. Create/Update selected skills
+      await Promise.all(
+        (selectedSkills || []).map((s) =>
+          fetch(`${API_ROOT}/auth/me/skills/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeader() },
+            body: JSON.stringify({
+              skill_uri: s.uri,
+              preferred_label: s.label,
+              proficiency_level: s.proficiency_level ?? 3,
+              assessment_type: "self",
+            }),
+          })
+        )
+      );
+
+      // Reload to refresh UI
+      await loadUserSkills();
+    } catch (err) {
+      console.error("Error syncing skills", err);
+    }
+  }
+
+  // Helper for slider change
+  const handleSkillLevelChange = (uri, level) => {
+    const numeric = Array.isArray(level) ? level[0] : level;
+    setAboutSkills((prev) =>
+      prev.map((s) => (s.uri === uri ? { ...s, proficiency_level: numeric } : s))
+    );
+  };
+
+  // Load skills on mount
+  React.useEffect(() => {
+    loadUserSkills();
+  }, []);
+
+  // Handle search debounce
+  React.useEffect(() => {
+    if (skillSearchTimeout.current) clearTimeout(skillSearchTimeout.current);
+
+    const q = (skillSearch || "").trim();
+    if (!q) {
+      fetchSkillOptions(""); // Load defaults if empty
+    } else {
+      skillSearchTimeout.current = setTimeout(() => {
+        fetchSkillOptions(q);
+      }, 300);
+    }
+    return () => { if (skillSearchTimeout.current) clearTimeout(skillSearchTimeout.current); };
+  }, [skillSearch]);
 
 
   const emptyExpForm = {
@@ -949,7 +1338,14 @@ export default function AdminSettings() {
   const openAbout = (mode = "description") => {
     if (!profile) return;
     setAboutMode(mode);
-    setAboutForm({ bio: profile.bio || "", skillsText: profile.skillsText || "" });
+
+    if (mode === "skills") {
+      setAboutForm({ bio: profile.bio || "", skillsText: profile.skillsText || "" });
+      // Load current skills into the dialog editing state
+      setAboutSkills([...userSkills]);
+    } else {
+      setAboutForm({ bio: profile.bio || "", skillsText: profile.skillsText || "" });
+    }
     setAboutOpen(true);
   };
 
@@ -994,14 +1390,31 @@ export default function AdminSettings() {
   const saveAbout = async () => {
     try {
       setSaving(true);
-      const payload = { bio: aboutForm.bio, skills: parseSkills(aboutForm.skillsText), links: parseLinks(profile.linksText) };
+
+      // 1. Save standard profile fields (Bio, etc)
+      // Note: We remove 'skills' from here as it's now handled via syncUserSkillsWithBackend
+      const payload = {
+        bio: aboutForm.bio,
+        links: parseLinks(profile.linksText)
+      };
       await updateAdminProfile(payload);
-      setProfile((p) => ({ ...p, bio: aboutForm.bio, skillsText: aboutForm.skillsText }));
-      showNotification("success", "About updated");
+      setProfile((p) => ({ ...p, bio: aboutForm.bio }));
+
+      // 2. If we were editing skills, sync them specifically
+      if (aboutMode === "skills") {
+        await syncUserSkillsWithBackend(aboutSkills);
+        // Update the local text representation for fallback
+        const labels = aboutSkills.map(s => s.label).join(", ");
+        setProfile(p => ({ ...p, skillsText: labels }));
+      }
+
+      showNotification("success", "Updated successfully");
       setAboutOpen(false);
     } catch (e) {
       showNotification("error", e?.message || "Save failed");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openAddExperience = () => { setEditExpId(null); setExpForm(emptyExpForm); setSyncProfileLocation(false); setExpOpen(true); };
@@ -1054,22 +1467,53 @@ export default function AdminSettings() {
     setEduErrors({ start: "", end: "" });
     setEduOpen(true);
   };
+  const askDeleteLanguage = (id, label) => {
+    setConfirm({ open: true, type: "language", id, label });
+  };
 
+  const askDeleteCertificate = (id, label) => {
+    setConfirm({ open: true, type: "certificate", id, label });
+  };
   const askDeleteEducation = (id, label = "") => { setConfirm({ open: true, type: "edu", id, label }); };
   const askDeleteExperience = (id, label = "") => { setConfirm({ open: true, type: "exp", id, label }); };
   const closeConfirm = () => { setConfirm({ open: false, type: null, id: null, label: "" }); };
 
+  // --- Updated Delete Logic ---
   const doConfirmDelete = async () => {
     const { type, id } = confirm;
     if (!type || !id || saving) return;
+
     setSaving(true);
     try {
-      const url = type === "edu" ? `${API_ROOT}/auth/me/educations/${id}/` : `${API_ROOT}/auth/me/experiences/${id}/`;
-      const r = await fetch(url, { method: "DELETE", headers: { ...authHeader() } });
+      let url = "";
+      if (type === "edu") url = `${API_ROOT}/auth/me/educations/${id}/`;
+      else if (type === "exp") url = `${API_ROOT}/auth/me/experiences/${id}/`;
+      else if (type === "language") url = `${API_ROOT}/auth/me/languages/${id}/`;
+      else if (type === "certificate") url = `${API_ROOT}/auth/me/language-certificates/${id}/`;
+
+      const r = await fetch(url, {
+        method: "DELETE",
+        headers: authHeader(),
+      });
+
       if (!r.ok && r.status !== 204) throw new Error("Delete failed");
-      showNotification("success", type === "edu" ? "Education deleted" : "Experience deleted");
-      closeConfirm();
-      await loadExtras();
+
+      // --- Success UI Updates ---
+      if (type === "language") {
+        showNotification("success", "Language deleted");
+        loadLanguages(); // Refresh language list
+      }
+      else if (type === "certificate") {
+        showNotification("success", "Certificate deleted");
+        // Remove from local state immediately so user sees it gone
+        setExistingCertificates((prev) => prev.filter((c) => c.id !== id));
+        loadLanguages(); // Refresh background list
+      }
+      else {
+        // Existing Edu/Exp handling
+        showNotification("success", type === "edu" ? "Education deleted" : "Experience deleted");
+        await loadExtras();
+      }
     } catch (e) {
       showNotification("error", e?.message || "Delete failed");
     } finally {
@@ -1444,11 +1888,55 @@ export default function AdminSettings() {
                       </IconButton>
                     </Tooltip>
                   }>
-                    {parseSkills(profile.skillsText).length ? (
-                      <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-                        {parseSkills(profile.skillsText).map((s, i) => (<Chip key={i} size="small" label={s} sx={{ maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }} />))}
-                      </Box>
-                    ) : <Typography variant="body2" color="text.secondary">Add your top skills.</Typography>}
+                    {userSkills.length > 0 ? (
+                      <>
+                        <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                          {userSkills.slice(0, 5).map((s) => {
+                            // Format label: "React · Expert"
+                            const suffix = PROFICIENCY_LABELS[s.proficiency_level] || "";
+                            const label = suffix ? `${s.label} · ${suffix}` : s.label;
+                            return (
+                              <Chip
+                                key={s.uri || s.id}
+                                size="small"
+                                label={label}
+                                sx={{ maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }}
+                              />
+                            );
+                          })}
+                          {userSkills.length > 5 && (
+                            <Chip
+                              size="small"
+                              label={`+${userSkills.length - 5} more`}
+                              onClick={() => setSkillsDialogOpen(true)}
+                              sx={{ cursor: "pointer" }}
+                            />
+                          )}
+                        </Box>
+
+                        {/* "See More" Dialog for skills */}
+                        <Dialog open={skillsDialogOpen} onClose={() => setSkillsDialogOpen(false)} fullWidth maxWidth="sm">
+                          <DialogTitle>Skills</DialogTitle>
+                          <DialogContent dividers>
+                            <List>
+                              {userSkills.map((s) => (
+                                <ListItem key={s.uri || s.id} disableGutters>
+                                  <ListItemText
+                                    primary={s.label}
+                                    secondary={PROFICIENCY_LABELS[s.proficiency_level] || ""}
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </DialogContent>
+                          <DialogActions>
+                            <Button onClick={() => setSkillsDialogOpen(false)}>Close</Button>
+                          </DialogActions>
+                        </Dialog>
+                      </>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">Add your top skills.</Typography>
+                    )}
                   </SectionCard>
 
                   <SectionCard sx={{ mt: 2 }} title="Experience" action={
@@ -1664,6 +2152,82 @@ export default function AdminSettings() {
                       </ListItem>
                     </List>
                   </SectionCard>
+
+                  <SectionCard
+                    sx={{ mt: 2 }}
+                    title="Languages"
+                    action={
+                      <Tooltip title="Add Language">
+                        <IconButton size="small" onClick={openAddLanguage}>
+                          <AddRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    }
+                  >
+                    {langList.length > 0 ? (
+                      <List dense disablePadding>
+                        {langList.map((l) => (
+                          <ListItem
+                            key={l.id}
+                            disableGutters
+                            secondaryAction={
+                              <Box sx={{ display: "flex", gap: 1 }}>
+                                <Tooltip title="Edit">
+                                  <IconButton size="small" onClick={() => onEditLanguage(l)}>
+                                    <EditOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                {/* Inside the map loop for languages */}
+                                <Tooltip title="Delete">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => askDeleteLanguage(l.id, l.language.english_name)} // <--- Updated
+                                  >
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            }
+                          >
+                            <ListItemText
+                              primary={
+                                <Box component="span" sx={{ fontWeight: 600 }}>
+                                  {l.language.english_name}
+                                  {l.primary_dialect && <Typography component="span" variant="caption" color="text.secondary"> ({l.primary_dialect})</Typography>}
+                                </Box>
+                              }
+                              secondary={
+                                <>
+                                  <Typography variant="body2" component="span" display="block">
+                                    {CEFR_OPTIONS.find(c => c.value === l.proficiency_cefr)?.label || l.proficiency_cefr}
+                                  </Typography>
+                                  {/* Show certificates if any exist */}
+                                  {l.certificates && l.certificates.length > 0 && (
+                                    <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                                      {l.certificates.map(c => (
+                                        <Chip
+                                          key={c.id}
+                                          label="Certificate"
+                                          size="small"
+                                          icon={<VerifiedRoundedIcon />}
+                                          variant="outlined"
+                                          color={c.verified ? "success" : "default"}
+                                          onClick={() => window.open(c.file, '_blank')}
+                                          sx={{ cursor: 'pointer' }}
+                                        />
+                                      ))}
+                                    </Stack>
+                                  )}
+                                </>
+                              }
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">Add languages you know.</Typography>
+                    )}
+                  </SectionCard>
                 </Grid>
               </Grid>
             </>
@@ -1672,6 +2236,135 @@ export default function AdminSettings() {
       )
       }
 
+      {/* --- Language Dialog --- */}
+      <Dialog open={langOpen} onClose={() => setLangOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editLangId ? "Edit Language" : "Add Language"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+            {/* 1. Language Search */}
+            <IsoLanguageAutocomplete
+              value={langForm.iso_obj}
+              onChange={(val) => setLangForm({ ...langForm, iso_obj: val })}
+            />
+
+            {/* 2. Primary Dialect */}
+            <TextField
+              label="Primary Dialect (Optional)"
+              placeholder="e.g. Mexican Spanish, Quebec French"
+              value={langForm.primary_dialect}
+              onChange={(e) => setLangForm({ ...langForm, primary_dialect: e.target.value })}
+              fullWidth
+              helperText="If the language has a specific dialect you speak."
+            />
+
+            {/* 3. CEFR Proficiency */}
+            <TextField
+              select
+              label="Proficiency (CEFR)"
+              value={langForm.proficiency_cefr}
+              onChange={(e) => setLangForm({ ...langForm, proficiency_cefr: e.target.value })}
+              fullWidth
+            >
+              {CEFR_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>{opt.label}</Typography>
+                    <Typography variant="caption" color="text.secondary">{opt.desc}</Typography>
+                  </Box>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {/* 4. Acquisition Context */}
+            <TextField
+              select
+              label="Where did you learn this?"
+              value={langForm.acquisition_context}
+              onChange={(e) => setLangForm({ ...langForm, acquisition_context: e.target.value })}
+              fullWidth
+            >
+              {ACQUISITION_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </TextField>
+
+            {/* 5. Certificate Upload Section */}
+            <Box sx={{ border: '1px dashed', borderColor: 'divider', p: 2, borderRadius: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                <VerifiedRoundedIcon fontSize="inherit" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                Certificates & Proof
+              </Typography>
+
+              <Button
+                component="label"
+                variant="outlined"
+                size="small"
+                startIcon={<CloudUploadRoundedIcon />}
+              >
+                Upload Certificate
+                <input
+                  type="file"
+                  hidden
+                  multiple
+                  accept=".pdf,.jpg,.png"
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setLangCertFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                    }
+                  }}
+                />
+              </Button>
+
+              {/* Existing Saved Certificates */}
+              {existingCertificates.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                    Saved Certificates:
+                  </Typography>
+                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                    {existingCertificates.map((cert) => (
+                      <Chip
+                        key={cert.id}
+                        label={cert.filename || "Certificate"}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        onClick={() => window.open(cert.file, '_blank')}
+                        onDelete={() => askDeleteCertificate(cert.id, cert.filename)}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+
+              {/* New Pending Files */}
+              {langCertFiles.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                    To be uploaded:
+                  </Typography>
+                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                    {langCertFiles.map((file, i) => (
+                      <Chip
+                        key={i}
+                        label={file.name}
+                        size="small"
+                        onDelete={() => setLangCertFiles(prev => prev.filter((_, idx) => idx !== i))}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLangOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveLanguage} disabled={langSaving}>
+            {langSaving ? "Saving..." : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
       {/* --- NEW DIALOG: Edit About Work --- */}
       <Dialog open={workOpen} onClose={() => setWorkOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Edit About your work</DialogTitle>
@@ -1893,13 +2586,44 @@ export default function AdminSettings() {
         </DialogActions>
       </Dialog>
 
-      {/* --- Delete confirmation dialog for edu/exp --- */}
-      <Dialog open={confirm.open} onClose={closeConfirm} fullWidth maxWidth="xs">
-        <DialogTitle>Delete {confirm.type === "edu" ? "education" : "experience"}?</DialogTitle>
-        <DialogContent>{confirm.label && <DialogContentText sx={{ mb: 1 }}>{confirm.label}</DialogContentText>}<DialogContentText>This action cannot be undone.</DialogContentText></DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={closeConfirm} disabled={saving}>Cancel</Button>
-          <Button color="error" variant="contained" onClick={doConfirmDelete} disabled={saving}>Delete</Button>
+      {/* --- Modern Generic Delete Confirmation --- */}
+      <Dialog
+        open={confirm.open}
+        onClose={closeConfirm}
+        fullWidth
+        maxWidth="xs"
+        // Ensure it sits on top of other dialogs (like Edit Language)
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 10 }}
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineIcon color="error" />
+          Delete {confirm.type === "certificate" ? "Certificate" : confirm.type === "language" ? "Language" : "Item"}?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText sx={{ color: "text.primary", mb: 1 }}>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {confirm.label || "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText variant="body2" color="text.secondary">
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={closeConfirm} disabled={saving} variant="outlined" color="inherit">
+            Cancel
+          </Button>
+          <Button
+            onClick={doConfirmDelete}
+            disabled={saving}
+            variant="contained"
+            color="error"
+            startIcon={saving ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {saving ? "Deleting..." : "Delete"}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -1916,9 +2640,75 @@ export default function AdminSettings() {
               </>
             ) : (
               <>
-                <Typography variant="body2" color="text.secondary">Add skills separated by commas. We’ll store them as a list.</Typography>
-                <TextField multiline minRows={3} value={aboutForm.skillsText} onChange={(e) => setAboutForm((f) => ({ ...f, skillsText: e.target.value }))} placeholder='e.g. Event strategy, Sponsorships, Community building' fullWidth helperText='Example: "Community building, Partnerships" or ["Community building","Partnerships"]' />
-                {parseSkills(aboutForm.skillsText).length > 0 && (<Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>{parseSkills(aboutForm.skillsText).map((s, i) => (<Chip key={i} label={s} size="small" />))}</Box>)}
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>Skills</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                    Search for skills and set your proficiency level.
+                  </Typography>
+
+                  <Autocomplete
+                    multiple
+                    options={skillOptions}
+                    value={aboutSkills}
+                    onChange={(_, newValue) => {
+                      setAboutSkills((prev) => {
+                        const merged = (newValue || []).map((skill) => {
+                          const existing = prev.find((s) => s.uri === skill.uri);
+                          return existing ? existing : { ...skill, proficiency_level: 3 }; // Default Intermediate
+                        });
+                        return merged;
+                      });
+                    }}
+                    inputValue={skillSearch}
+                    onInputChange={(_, newInputValue) => setSkillSearch(newInputValue)}
+                    getOptionLabel={(option) => {
+                      if (!option) return "";
+                      return option.label || "";
+                    }}
+                    isOptionEqualToValue={(option, value) => option.uri === value.uri}
+                    filterSelectedOptions
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Search skills"
+                        placeholder="Start typing to search ESCO skills…"
+                        fullWidth
+                      />
+                    )}
+                  />
+
+                  {aboutSkills.length > 0 && (
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Rate your level for each skill
+                      </Typography>
+                      <Stack spacing={2}>
+                        {aboutSkills.map((skill) => {
+                          const lvl = skill.proficiency_level || 3;
+                          return (
+                            <Box key={skill.uri} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                              <Typography variant="body2" sx={{ minWidth: 140, fontWeight: 500 }}>
+                                {skill.label}
+                              </Typography>
+                              <Slider
+                                value={lvl}
+                                min={1}
+                                max={5}
+                                step={1}
+                                marks
+                                sx={{ flex: 1 }}
+                                onChange={(_, value) => handleSkillLevelChange(skill.uri, value)}
+                              />
+                              <Typography variant="caption" sx={{ width: 80, textAlign: "right" }}>
+                                {PROFICIENCY_LABELS[lvl] || ""}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  )}
+                </Box>
               </>
             )}
           </Stack>
