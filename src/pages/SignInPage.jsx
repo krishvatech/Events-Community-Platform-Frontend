@@ -43,7 +43,7 @@ const hasRoleName = (arr, names) =>
   });
 
 /** Deep check: does object contain any /staff flags anywhere */
-const deepHasFlag = (obj, keys = ["is_staff","isSuperuser","is_superuser","is_admin","staff","admin","isStaff"]) => {
+const deepHasFlag = (obj, keys = ["is_staff", "isSuperuser", "is_superuser", "is_admin", "staff", "admin", "isStaff"]) => {
   const seen = new Set();
   const stack = [obj];
   while (stack.length) {
@@ -55,7 +55,7 @@ const deepHasFlag = (obj, keys = ["is_staff","isSuperuser","is_superuser","is_ad
         // key-based truthy
         if (keys.includes(k) && truthy(v)) return true;
         // array roles/groups/permissions
-        if (["roles","groups","permissions"].includes(k) && hasRoleName(v, ["admin","staff"])) return true;
+        if (["roles", "groups", "permissions"].includes(k) && hasRoleName(v, ["admin", "staff"])) return true;
         // nested
         if (v && typeof v === "object") stack.push(v);
       }
@@ -75,9 +75,9 @@ const isStaffUser = (u) =>
     (u?.role && String(u.role).toLowerCase() === "admin") ||
     truthy(u?.user?.is_staff) ||
     truthy(u?.user?.is_superuser) ||
-    hasRoleName(u?.groups, ["admin","staff"]) ||
-    hasRoleName(u?.roles, ["admin","staff"]) ||
-    hasRoleName(u?.permissions, ["admin","staff"]) ||
+    hasRoleName(u?.groups, ["admin", "staff"]) ||
+    hasRoleName(u?.roles, ["admin", "staff"]) ||
+    hasRoleName(u?.permissions, ["admin", "staff"]) ||
     deepHasFlag(u) // ← deep fallback
   );
 
@@ -99,8 +99,8 @@ const fetchJSON = async (url, headers = {}) => {
 const fetchWithManyAuthStyles = async (url, access) => {
   const headerSets = [
     { Authorization: `Bearer ${access}`, Accept: "application/json" },
-    { Authorization: `JWT ${access}`,    Accept: "application/json" },
-    { Authorization: `Token ${access}`,  Accept: "application/json" },
+    { Authorization: `JWT ${access}`, Accept: "application/json" },
+    { Authorization: `Token ${access}`, Accept: "application/json" },
   ];
   for (const h of headerSets) {
     const obj = await fetchJSON(url, h);
@@ -319,7 +319,7 @@ const SignInPage = () => {
 
               {/* Form */}
               <Box component="form" noValidate onSubmit={handleSubmit}>
-                <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490 ,fontSize:13}}>
+                <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
                   Email Address
                 </Typography>
                 <TextField
@@ -347,7 +347,7 @@ const SignInPage = () => {
                   }}
                 />
 
-                <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490 ,fontSize:13}}>
+                <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
                   Password
                 </Typography>
                 <TextField
@@ -390,8 +390,12 @@ const SignInPage = () => {
                     type="button"
                     variant="body2"
                     underline="none"
-                    sx={{ fontSize: 14, color: '#155dfc' ,fontWeight:600}}
-                    onClick={() => toast.info('Password recovery is not implemented yet.')}
+                    sx={{ fontSize: 14, color: '#155dfc', fontWeight: 600 }}
+                    onClick={() =>
+                      navigate('/forgot-password', {
+                        state: { email: formData.email },
+                      })
+                    }
                   >
                     Forgot password?
                   </Link>
@@ -403,7 +407,7 @@ const SignInPage = () => {
                   size="large"
                   variant="contained"
                   disabled={loading}
-                  sx={{ py: 1, fontWeight: 600, borderRadius: 1 ,bgcolor: '#2c6af0ff','&:hover': { bgcolor: '#165DFF' },color:'white',fontSize:12}}
+                  sx={{ py: 1, fontWeight: 600, borderRadius: 1, bgcolor: '#2c6af0ff', '&:hover': { bgcolor: '#165DFF' }, color: 'white', fontSize: 12 }}
                 >
                   {loading ? 'Signing in...' : 'Sign Into Your Account'}
                 </Button>

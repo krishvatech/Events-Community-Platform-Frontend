@@ -42,7 +42,8 @@ import AdminCarts from "./pages/AdminCarts.jsx";
 import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
 import KYCCallbackPage from "./pages/KYCCallbackPage.jsx";
 import { useParams } from "react-router-dom";
-
+import ForgotPassword from "./pages/ForgotPassword.jsx";
+import ResetPassword from './pages/ResetPassword';
 function RedirectGroupToAdmin() {
   const { idOrSlug } = useParams();
   return <Navigate to={`/admin/groups/${idOrSlug}`} replace />;
@@ -60,6 +61,8 @@ const AppShell = () => {
   const hideChrome =
     location.pathname === "/signin" ||
     location.pathname === "/signup" ||
+    location.pathname === "/forgot-password" ||
+    location.pathname === "/reset-password" ||
     location.pathname === "/live" ||
     location.pathname.startsWith("/live/");
 
@@ -79,6 +82,8 @@ const AppShell = () => {
         <Route path="/" element={<HomePage />} />
         <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
         <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
+        <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
         {/* Admin area driven by AdminSidebar */}
         <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
