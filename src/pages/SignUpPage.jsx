@@ -72,11 +72,11 @@ const SignUpPage = () => {
     if (!/^[A-Za-z0-9]{3,20}$/.test(formData.username || "")) {
       next.username = "3–20 letters/numbers, no spaces";
     }
-    if (!/^[A-Za-z]{3,}$/.test(formData.firstName || "")) {
-      next.firstName = "First name must be at least 3 letters";
+    if (!/^[A-Za-z]{2,}$/.test(formData.firstName || "")) {
+      next.firstName = "First name must be at least 2 letters";
     }
-    if (!/^[A-Za-z]{3,}$/.test(formData.lastName || "")) {
-      next.lastName = "Last name must be at least 3 letters";
+    if (!/^[A-Za-z]{2,}$/.test(formData.lastName || "")) {
+      next.lastName = "Last name must be at least 2 letters";
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email || "")) {

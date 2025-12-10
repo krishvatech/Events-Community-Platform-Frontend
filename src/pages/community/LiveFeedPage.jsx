@@ -209,6 +209,9 @@ function SuggestedConnections({ list = [] }) {
         borderColor: BORDER,
         borderRadius: 3,
         bgcolor: "background.paper",
+        // ✅ match PostCard width & centering
+        maxWidth: { xs: "100%", md: 720 },
+        mx: { xs: 0, md: "auto" },
       }}
     >
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
