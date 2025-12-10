@@ -1332,7 +1332,7 @@ export default function GroupDetailsPage() {
                     {group?.name || "Loading..."}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {group?.member_count || 0} members
+                    {group?.member_count || 0} Members
                   </Typography>
                 </Box>
               </Stack>
@@ -1378,24 +1378,6 @@ export default function GroupDetailsPage() {
               {/* Chat Content Removed Here */}
             </CardContent>
           </Card>
-        </Box>
-        {/* RIGHT: Sidebar – same style as GroupsPage */}
-        <Box
-          sx={{
-            width: 150,
-            display: "none",
-            "@media (min-width:1440px)": {
-              display: "block",
-            },
-            position: "sticky",
-            top: 88,
-            height: "fit-content",
-            flexShrink: 0,
-          }}
-        >
-          <Stack spacing={2}>
-            <CommunityProfileCard user={me} />
-          </Stack>
         </Box>
       </Box>
       {/* REACTION DIALOG (Tabbed) */}

@@ -3194,7 +3194,7 @@ export default function MessagesPage() {
         <Grid
           item
           xs={12}
-          md={6}
+          md={9}
           sx={{
             display: {
               xs: mobileView === "chat" ? "block" : "none",
@@ -3209,7 +3209,7 @@ export default function MessagesPage() {
               flexDirection: "column",
               minHeight: 0,
               // 🔹 full width on mobile / tablet
-              width: { xs: "105%", sm: "185%", md: "100%" },
+              width: { xs: "105%", sm: "185%", md: "180%" },
               maxWidth: "none",  // no cap on tablet/mobile
             }}
           >
@@ -3290,14 +3290,12 @@ export default function MessagesPage() {
                 {/* Right actions */}
                 <Stack direction="row" alignItems="center" spacing={1.25}>
                   {/* ℹ️ Details icon – opens members/attachments popup */}
-                  {(isMobileOrTablet || isLaptop) && (
-                    <IconButton
-                      size="small"
-                      onClick={() => setDetailsOpen(true)}
-                    >
-                      <InfoOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  )}
+                  <IconButton
+                    size="small"
+                    onClick={() => setDetailsOpen(true)}
+                  >
+                    <InfoOutlinedIcon fontSize="small" />
+                  </IconButton>
                 </Stack>
               </Stack>
             </Paper>
@@ -3761,7 +3759,7 @@ export default function MessagesPage() {
         </Grid>
 
         {/* RIGHT: Members + Attachments (Desktop only) */}
-        <Grid
+        {/* <Grid
           item
           xs={12}
           md={3}
@@ -3782,7 +3780,7 @@ export default function MessagesPage() {
           >
             {renderDetailsContent()}
           </Paper>
-        </Grid>
+        </Grid> */}
       </Grid>
       {/* 🔹 Details popup for mobile / tablet / laptop */}
       <Dialog

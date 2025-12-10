@@ -484,6 +484,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
 
 function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
   const hasMarkers = markers && markers.length > 0;
+  const SHOW_INDIVIDUAL_DOTS = false;
   function AutoZoom({ markers }) {
     const map = useMap();
 
@@ -559,14 +560,25 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
           {/* Country-level circles with counts (big soft markers) */}
           {countryAgg.map((c) => {
             const [lng, lat] = c.center;
+
+            // 🔥 1) Radius grows with number of people
+            const baseRadius = 8;                    // minimum size
+            const extra = Math.min(24, c.total * 1.5); // more members → bigger
+            const radius = baseRadius + extra;
+
+            // 🔥 2) Intensity 0–1 based on count
+            const intensity = Math.min(1, c.total / 20); // 0..1
+
             return (
               <CircleMarker
                 key={c.code}
-                center={[lat, lng]} // Leaflet uses [lat, lng]
-                radius={10}
+                center={[lat, lng]}
+                radius={radius}
                 pathOptions={{
-                  color: "transparent",
-                  fillOpacity: 0,
+                  color: "rgba(239, 68, 68, 0.85)",     // border glow (tailwind red-500 style)
+                  weight: 1.5,
+                  fillColor: "rgba(239, 68, 68, 0.35)", // inside heat color
+                  fillOpacity: 0.3 + intensity * 0.5,   // more people → stronger
                 }}
               >
                 <LeafletTooltip direction="top" offset={[0, -4]}>

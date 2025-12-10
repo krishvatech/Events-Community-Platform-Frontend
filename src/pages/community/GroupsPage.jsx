@@ -655,25 +655,6 @@ export default function GroupsPage({ onJoinGroup = async () => {}, user }) {
             onJoin={handleJoin}
           />
         </Box>
-
-        {/* RIGHT: Sidebar - sticky */}
-        <Box
-          sx={{
-            width: 150,
-            display: "none",
-            "@media (min-width:1440px)": {
-              display: "block",
-            },
-            position: "sticky",
-            top: 88,
-            height: "fit-content",
-            flexShrink: 0,
-          }}
-        >
-          <Stack spacing={2}>
-            <CommunityProfileCard user={user} />
-          </Stack>
-        </Box>
       </Box>
     </Box>
   );

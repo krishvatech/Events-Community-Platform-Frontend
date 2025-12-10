@@ -295,23 +295,6 @@ export default function CommunitySideBar({
           );
         })}
       </List>
-
-      <Divider sx={{ my: 2 }} />
-
-      <Typography
-        variant="subtitle2"
-        sx={{ fontWeight: 700, color: SLATE_700, mb: 1 }}
-      >
-        Topics
-      </Typography>
-      <Stack spacing={1}>
-        {TOPICS.map((t) => (
-          <Chip key={t} label={t} variant="outlined" sx={{ width: "100%" }} />
-        ))}
-        <Button size="small" variant="text">
-          … MORE
-        </Button>
-      </Stack>
     </Paper>
   );
 }
