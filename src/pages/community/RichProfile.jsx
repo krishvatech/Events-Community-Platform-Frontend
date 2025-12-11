@@ -29,11 +29,12 @@ import {
   Chip,
   Tabs,
   Tab,
-  CircularProgress,   // 👈 NEW
-  Checkbox,           // 👈 NEW
-  Popover,   // 👈 add this
+  CircularProgress,
+  Checkbox,
+  Popover,
   Tooltip,
-  ListItemButton,     // 👈 NEW
+  ListItemButton,
+  Skeleton,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -858,6 +859,32 @@ function RichPostCard({
   );
 }
 
+function RichPostSkeleton() {
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 2 }}>
+      <CardHeader
+        avatar={
+          <Skeleton variant="circular" width={40} height={40} />
+        }
+        title={<Skeleton width="40%" />}
+        subheader={<Skeleton width="25%" />}
+        sx={{ pb: 0.5 }}
+      />
+      <CardContent sx={{ pt: 1.5 }}>
+        <Stack spacing={1}>
+          <Skeleton variant="text" width="90%" />
+          <Skeleton variant="text" width="80%" />
+          <Skeleton
+            variant="rectangular"
+            height={160}
+            sx={{ borderRadius: 2, mt: 1 }}
+          />
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
 function pickBestExperience(exps = []) {
   if (!Array.isArray(exps) || !exps.length) return null;
   const current = exps.find((e) => e?.currently_work_here);
@@ -1107,7 +1134,7 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
       const replyPromises = rootsRaw.map(async (root) => {
         try {
           const r = await fetch(
-            `${API_BASE}/engagements/comments/?parent=${root.id}&page_size=200`, 
+            `${API_BASE}/engagements/comments/?parent=${root.id}&page_size=200`,
             {
               headers: { Accept: "application/json", ...tokenHeader() },
               credentials: "include",
@@ -1212,42 +1239,42 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
 
   // -------- Create / reply comment (POST) --------
   async function createComment(body, parentId = null) {
-  const trimmed = (body || "").trim();
-  if (!trimmed || !postId) return;
+    const trimmed = (body || "").trim();
+    if (!trimmed || !postId) return;
 
-  setSubmitting(true);
-  try {
-    // always send target_id for this post
-    const payload = {
-      text: trimmed,
-      target_id: Number(postId),
-      ...(parentId ? { parent: parentId } : {}),
-    };
+    setSubmitting(true);
+    try {
+      // always send target_id for this post
+      const payload = {
+        text: trimmed,
+        target_id: Number(postId),
+        ...(parentId ? { parent: parentId } : {}),
+      };
 
-    const res = await fetch(`${API_BASE}/engagements/comments/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...tokenHeader(),
-      },
-      credentials: "include",
-      body: JSON.stringify(payload),
-    });
+      const res = await fetch(`${API_BASE}/engagements/comments/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...tokenHeader(),
+        },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
 
-    if (res.ok) {
-      setText("");
-      setReplyTo(null);
-      // reload full list (roots + replies)
-      await load();
-    } else {
-      console.error("Comment POST failed:", res.status);
+      if (res.ok) {
+        setText("");
+        setReplyTo(null);
+        // reload full list (roots + replies)
+        await load();
+      } else {
+        console.error("Comment POST failed:", res.status);
+      }
+    } catch (e) {
+      console.error("Failed to post comment:", e);
+    } finally {
+      setSubmitting(false);
     }
-  } catch (e) {
-    console.error("Failed to post comment:", e);
-  } finally {
-    setSubmitting(false);
   }
-}
   // -------- Delete comment (and its replies) --------
   function handleDelete(c) {
     // just open the modern dialog
@@ -1999,6 +2026,51 @@ export default function RichProfile() {
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(true);
 
+  const [visiblePostCount, setVisiblePostCount] = useState(4);
+  const [isLoadingMorePosts, setIsLoadingMorePosts] = useState(false);
+  const postsObserverRef = React.useRef(null);
+
+  const visiblePosts = useMemo(
+    () => posts.slice(0, visiblePostCount),
+    [posts, visiblePostCount]
+  );
+
+  // Infinite scroll for profile posts: load 4 at a time
+  useEffect(() => {
+    if (!postsObserverRef.current) return;
+
+    const el = postsObserverRef.current;
+
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      if (
+        entry.isIntersecting &&
+        !postsLoading &&
+        !isLoadingMorePosts &&
+        posts.length > visiblePostCount
+      ) {
+        setIsLoadingMorePosts(true);
+
+        // Small delay for smoother UX (similar feel to MyPostsPage)
+        setTimeout(() => {
+          setVisiblePostCount((prev) =>
+            Math.min(prev + 4, posts.length)
+          );
+          setIsLoadingMorePosts(false);
+        }, 600);
+      }
+    }, { threshold: 0.5 });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [postsLoading, isLoadingMorePosts, posts.length, visiblePostCount]);
+
+  useEffect(() => {
+    if (!postsLoading) {
+      setVisiblePostCount(4);
+    }
+  }, [postsLoading]);
+
   function normalizePost(row = {}) {
     // unwrap + metadata (your API enriches feed rows here)
     const src =
@@ -2363,11 +2435,13 @@ export default function RichProfile() {
   const [connQ, setConnQ] = useState("");
 
   const displayName = (u) =>
-    u?.username ||
+    u?.full_name ||                             // like shares list
+    u?.name ||                                  // like shares list
     u?.profile?.full_name ||
-    `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
+    [u?.first_name, u?.last_name].filter(Boolean).join(" ").trim() ||
+    u?.username ||
     u?.email ||
-    `User ${u?.id || ""}`.trim();
+    (u?.id ? `User #${u.id}` : "User");
 
   async function startChat(recipientId) {
     try {
@@ -2381,7 +2455,7 @@ export default function RichProfile() {
       if (!r.ok) throw new Error(data?.detail || "Failed to start conversation");
       const id = data?.id || data?.conversation?.id || data?.pk;
       if (id) localStorage.setItem(`conv_read_${id}`, new Date().toISOString());
-      navigate(`/account/messages/${id}`);
+      navigate(`/community?view=messages`);
     } catch (e) {
       alert(e?.message || "Failed to start conversation");
     }
@@ -2395,9 +2469,12 @@ export default function RichProfile() {
       email: u?.email ?? x?.email ?? "",
       first_name: u?.first_name ?? x?.first_name ?? "",
       last_name: u?.last_name ?? x?.last_name ?? "",
+      full_name: u?.full_name ?? x?.full_name ?? "",
+      name: u?.name ?? x?.name ?? "",
       profile: u?.profile ?? x?.profile ?? null,
     };
   }
+
 
   // Try a few likely endpoints; adjust to your backend path if needed.
   async function fetchFriendList(targetUserId) {
@@ -2528,14 +2605,6 @@ export default function RichProfile() {
                         )}
                         {!friendLoading && friendStatus === "friends" && (
                           <>
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              disabled
-                              sx={{ textTransform: "none", borderRadius: 2 }}
-                            >
-                              Your Friend
-                            </Button>
                             {!!mutualCount && (
                               <Chip
                                 label={`${mutualCount} mutual`}
@@ -2571,7 +2640,7 @@ export default function RichProfile() {
                             disabled={friendSubmitting}
                             sx={{ textTransform: "none", borderRadius: 2 }}
                           >
-                            {friendSubmitting ? "Sending…" : "Add Friend"}
+                            {friendSubmitting ? "Sending…" : "Add Contact"}
                           </Button>
                         )}
                       </Box>
@@ -2619,25 +2688,48 @@ export default function RichProfile() {
                           )}
                         </Box>
                       ) : postsLoading ? (
-                        <LinearProgress />
-                      ) : posts.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary">No posts yet.</Typography>
-                      ) : (
+                        // Skeletons while posts are loading
                         <Stack spacing={2}>
-                          {posts.map((post) => (
-                            <RichPostCard
-                              key={post.id}
-                              post={post}
-                              fullName={fullName}
-                              avatarUrl={pickAvatarUrl(userItem)}
-                              mutualCount={mutualCount}
-                              friendStatus={friendStatus}
-                              friendSubmitting={friendSubmitting}
-                              handleAddFriend={sendFriendRequest}
-                              authorId={userId}
-                            />
-                          ))}
+                          <RichPostSkeleton />
+                          <RichPostSkeleton />
+                          <RichPostSkeleton />
                         </Stack>
+                      ) : posts.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          No posts yet.
+                        </Typography>
+                      ) : (
+                        <>
+                          <Stack spacing={2}>
+                            {visiblePosts.map((post) => (
+                              <RichPostCard
+                                key={post.id}
+                                post={post}
+                                fullName={fullName}
+                                avatarUrl={pickAvatarUrl(userItem)}
+                                mutualCount={mutualCount}
+                                friendStatus={friendStatus}
+                                friendSubmitting={friendSubmitting}
+                                handleAddFriend={sendFriendRequest}
+                                authorId={userId}
+                              />
+                            ))}
+                          </Stack>
+
+                          {posts.length > visiblePostCount && (
+                            <Box
+                              ref={postsObserverRef}
+                              sx={{ py: 2, textAlign: "center", width: "100%" }}
+                            >
+                              {isLoadingMorePosts && (
+                                <Stack spacing={2}>
+                                  <RichPostSkeleton />
+                                  <RichPostSkeleton />
+                                </Stack>
+                              )}
+                            </Box>
+                          )}
+                        </>
                       )}
                     </CardContent>
                   )}
