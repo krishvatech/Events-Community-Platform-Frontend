@@ -47,6 +47,7 @@ import {
   AttributionControl
 } from "react-leaflet";
 import L from "leaflet";
+import "leaflet.heat";
 
 
 
@@ -484,7 +485,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
 
 function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
   const hasMarkers = markers && markers.length > 0;
-  const SHOW_INDIVIDUAL_DOTS = false;
+  const SHOW_INDIVIDUAL_DOTS = true;
   function AutoZoom({ markers }) {
     const map = useMap();
 
@@ -510,6 +511,45 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
         maxZoom: 4, // more zoom than before, but not too tight
       });
     }, [markers, map]);
+
+    return null;
+  }
+
+  // 🔥 Heatmap layer using leaflet.heat
+  function MembersHeatLayer({ markers }) {
+    const map = useMap();
+
+    React.useEffect(() => {
+      if (!map || !markers || markers.length === 0) return;
+
+      // Convert your markers -> [lat, lng, intensity]
+      const points = markers.map((m) => {
+        const [lng, lat] = m.coordinates;
+        // base intensity: friends slightly “hotter”
+        const base = m.isFriend ? 0.9 : 0.6;
+        return [lat, lng, base];
+      });
+
+      const heat = L.heatLayer(points, {
+        radius: 38,      // size of each hotspot
+        blur: 32,        // softness of edges
+        maxZoom: 7,
+        minOpacity: 0.25,
+        // Snapchat-style gradient: green → yellow → orange → red
+        gradient: {
+          0.2: "#4ade80", // light green
+          0.4: "#a3e635", // yellow-green
+          0.6: "#facc15", // yellow
+          0.8: "#f97316", // orange
+          1.0: "#dc2626", // red
+        },
+      }).addTo(map);
+
+      // cleanup when markers change / component unmounts
+      return () => {
+        map.removeLayer(heat);
+      };
+    }, [map, markers]);
 
     return null;
   }
@@ -556,6 +596,8 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           />
 
+          {/* 🔥 Snapchat-style heatmap zone */}
+          <MembersHeatLayer markers={markers} />
 
           {/* Country-level circles with counts (big soft markers) */}
           {countryAgg.map((c) => {
@@ -575,10 +617,10 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
                 center={[lat, lng]}
                 radius={radius}
                 pathOptions={{
-                  color: "rgba(239, 68, 68, 0.85)",     // border glow (tailwind red-500 style)
-                  weight: 1.5,
-                  fillColor: "rgba(239, 68, 68, 0.35)", // inside heat color
-                  fillOpacity: 0.3 + intensity * 0.5,   // more people → stronger
+                  color: "transparent",
+                  weight: 0,
+                  fillColor: "transparent",
+                  fillOpacity: 0,
                 }}
               >
                 <LeafletTooltip direction="top" offset={[0, -4]}>
@@ -598,34 +640,35 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
             );
           })}
 
-          {/* Individual member dots */}
-          {markers.map((m, i) => {
-            const [lng, lat] = m.coordinates;
-            return (
-              <CircleMarker
-                key={i}
-                center={[lat, lng]}
-                radius={3}
-                pathOptions={{
-                  color: "#ffffff",
-                  weight: 1,
-                  fillColor: m.isFriend
-                    ? CURRENT_MAP_THEME.friendDot
-                    : CURRENT_MAP_THEME.memberDot,
-                  fillOpacity: 1,
-                }}
-              >
-                <LeafletTooltip direction="top" offset={[0, -4]}>
-                  <Box sx={{ fontSize: 12 }}>
-                    <div style={{ fontWeight: 600 }}>{m.userName}</div>
-                    <div style={{ opacity: 0.85 }}>
-                      {m.isFriend ? "My Contact" : "Member"}
-                    </div>
-                  </Box>
-                </LeafletTooltip>
-              </CircleMarker>
-            );
-          })}
+          {/* Individual member dots (disabled for Snapchat-style heatmap) */}
+          {SHOW_INDIVIDUAL_DOTS &&
+            markers.map((m, i) => {
+              const [lng, lat] = m.coordinates;
+              return (
+                <CircleMarker
+                  key={i}
+                  center={[lat, lng]}
+                  radius={3}
+                  pathOptions={{
+                    color: "#ffffff",
+                    weight: 1,
+                    fillColor: m.isFriend
+                      ? CURRENT_MAP_THEME.friendDot
+                      : CURRENT_MAP_THEME.memberDot,
+                    fillOpacity: 1,
+                  }}
+                >
+                  <LeafletTooltip direction="top" offset={[0, -4]}>
+                    <Box sx={{ fontSize: 12 }}>
+                      <div style={{ fontWeight: 600 }}>{m.userName}</div>
+                      <div style={{ opacity: 0.85 }}>
+                        {m.isFriend ? "My Contact" : "Member"}
+                      </div>
+                    </Box>
+                  </LeafletTooltip>
+                </CircleMarker>
+              );
+            })}
         </MapContainer>
       ) : (
         <Stack

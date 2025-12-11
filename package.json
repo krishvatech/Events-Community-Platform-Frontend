@@ -23,6 +23,7 @@
     "framer-motion": "^12.23.22",
     "i18n-iso-countries": "^7.14.0",
     "leaflet": "^1.9.4",
+    "leaflet.heat": "^0.2.0",
     "lucide-react": "^0.545.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
