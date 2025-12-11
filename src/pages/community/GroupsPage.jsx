@@ -12,7 +12,6 @@ import {
   Card,
   CardContent,
   CardActions,
-  LinearProgress,
   Alert,
   Avatar,
   Pagination,
@@ -23,6 +22,7 @@ import {
   Tab,
   Tabs,
 } from "@mui/material";
+import Skeleton from "@mui/material/Skeleton";
 import SearchIcon from "@mui/icons-material/Search";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
@@ -55,9 +55,8 @@ const toAbsolute = (u) =>
   !u
     ? ""
     : /^https?:\/\//i.test(u)
-    ? u
-    : `${import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN}${
-        u.startsWith("/") ? "" : "/"
+      ? u
+      : `${import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN}${u.startsWith("/") ? "" : "/"
       }${u}`;
 
 function authHeader() {
@@ -84,10 +83,10 @@ function GroupGridCard({ g, onJoin, onOpen, hideJoin }) {
   const ctaText = joined
     ? "Joined"
     : pending
-    ? "Request pending"
-    : isApproval
-    ? "Request"
-    : "Join";
+      ? "Request pending"
+      : isApproval
+        ? "Request"
+        : "Join";
 
   return (
     <Card
@@ -178,6 +177,59 @@ function GroupGridCard({ g, onJoin, onOpen, hideJoin }) {
   );
 }
 
+function GroupGridCardSkeleton() {
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        width: "100%",
+        borderRadius: 3,
+        overflow: "hidden",
+        borderColor: BORDER,
+        height: 280,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Cover skeleton */}
+      <Box
+        sx={{
+          width: "100%",
+          height: 130,
+          bgcolor: "#f8fafc",
+          borderBottom: `1px solid ${BORDER}`,
+        }}
+      >
+        <Skeleton variant="rectangular" width="100%" height="100%" />
+      </Box>
+
+      {/* Content skeleton */}
+      <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ mb: 1 }}
+        >
+          <Skeleton variant="text" width={80} height={16} />
+          <Skeleton variant="text" width={60} height={16} />
+        </Stack>
+
+        <Skeleton variant="text" width="70%" height={24} />
+        <Skeleton variant="text" width="90%" height={18} />
+      </CardContent>
+
+      {/* Buttons skeleton */}
+      <CardActions sx={{ pt: 0, pb: 1, px: 1 }}>
+        <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
+          <Skeleton variant="rectangular" width="50%" height={32} sx={{ borderRadius: 2 }} />
+          <Skeleton variant="rectangular" width="50%" height={32} sx={{ borderRadius: 2 }} />
+        </Stack>
+      </CardActions>
+    </Card>
+  );
+}
+
 /* ---------- Header with title + overlapping avatars ---------- */
 function TopicHeader({ title, previews = [], extraCount = 0 }) {
   return (
@@ -248,10 +300,10 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
   const ctaText = joined
     ? "Joined"
     : pending
-    ? "Request pending"
-    : isApproval
-    ? "Request to join"
-    : "Join";
+      ? "Request pending"
+      : isApproval
+        ? "Request to join"
+        : "Join";
 
   return (
     <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -330,7 +382,7 @@ function normalizeMyGroup(row) {
 }
 
 
-export default function GroupsPage({ onJoinGroup = async () => {}, user }) {
+export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
   const navigate = useNavigate();
   const { search } = useLocation();
   const params = new URLSearchParams(search);
@@ -471,9 +523,8 @@ export default function GroupsPage({ onJoinGroup = async () => {}, user }) {
     const t = q.trim().toLowerCase();
     return activeList.filter((g) => {
       if (t) {
-        const hay = `${g.name || ""} ${g.description || ""} ${
-          g.slug || ""
-        }`.toLowerCase();
+        const hay = `${g.name || ""} ${g.description || ""} ${g.slug || ""
+          }`.toLowerCase();
         if (!hay.includes(t)) return false;
       }
       return true;
@@ -565,13 +616,6 @@ export default function GroupsPage({ onJoinGroup = async () => {}, user }) {
           </Paper>
 
           {/* Loading / error */}
-          {loading && (
-            <Paper
-              sx={{ p: 1.5, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}
-            >
-              <LinearProgress />
-            </Paper>
-          )}
           {!loading && error && tabIndex === 0 && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
@@ -579,7 +623,26 @@ export default function GroupsPage({ onJoinGroup = async () => {}, user }) {
           )}
 
           {/* === GROUP GRID: exactly 3 cards per row on md+ === */}
-          {paginatedGroups.length > 0 ? (
+          {loading ? (
+            // 🔹 Skeleton loading state (keep layout same as real grid)
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  md: "repeat(3, minmax(0, 1fr))",
+                },
+                gap: 2,
+              }}
+            >
+              {Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
+                <Box key={i}>
+                  <GroupGridCardSkeleton />
+                </Box>
+              ))}
+            </Box>
+          ) : paginatedGroups.length > 0 ? (
             <Box
               sx={{
                 display: "grid",
@@ -596,7 +659,6 @@ export default function GroupsPage({ onJoinGroup = async () => {}, user }) {
                   (g.membership_status || "").toLowerCase() === "joined" ||
                   !!g.is_member;
 
-                // NEW: logic for Details click
                 const handleOpen = (group) => {
                   // If joined (in any tab) → go to details page
                   if (joined || tabIndex === 1) {
@@ -620,19 +682,15 @@ export default function GroupsPage({ onJoinGroup = async () => {}, user }) {
               })}
             </Box>
           ) : (
-            !loading && (
-              <Paper
-                sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  {tabIndex === 0
-                    ? "No groups found."
-                    : "You haven't joined any groups yet."}
-                </Typography>
-              </Paper>
-            )
+            <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                {tabIndex === 0
+                  ? "No groups found."
+                  : "You haven't joined any groups yet."}
+              </Typography>
+            </Paper>
           )}
-
+          
           {/* Pagination */}
           {!loading && totalPages > 1 && (
             <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
