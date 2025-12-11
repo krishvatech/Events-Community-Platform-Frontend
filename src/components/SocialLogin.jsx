@@ -3,41 +3,50 @@ import { FaGoogle, FaLinkedinIn } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { Box, Divider, Typography, Button } from '@mui/material';
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
+
 const SocialLogin = () => {
-  const handleGoogle = () => toast.info('🔐 Google login is not implemented yet.');
-  const handleLinkedIn = () => toast.info('🔐 LinkedIn login is not implemented yet.');
+  const handleGoogle = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/google/url/`);
+      if (!res.ok) throw new Error('Failed to start Google login');
+      const data = await res.json();
+      if (!data.authorization_url) throw new Error('No authorization_url from backend');
+      // Redirect browser to Google
+      window.location.href = data.authorization_url;
+    } catch (err) {
+      console.error(err);
+      toast.error('❌ Could not start Google login. Please try again.');
+    }
+  };
+
+  const handleLinkedIn = () =>
+    toast.info('🔐 LinkedIn login is not implemented yet.');
 
   return (
-    <Box sx={{ mt: 2}}>
+    <Box sx={{ mt: 2 }}>
       {/* Just the text */}
       <Box sx={{ my: 2, textAlign: 'center' }}>
         <Typography
           variant="caption"
-          sx={{
-            fontSize: 13,
-            color: 'text.secondary',
-            fontWeight: 300,
-          }}
+          sx={{ color: 'text.secondary', fontSize: 12 }}
         >
           OR CONTINUE WITH
         </Typography>
       </Box>
 
-
-      {/* Buttons */}
-      <Box width="50%"  sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' },mx: 'auto',  justifyContent: 'center'}}>
+      {/* Buttons row */}
+      <Box sx={{ display: 'flex', gap: 1 }}>
         <Button
-          onClick={handleGoogle}
-          variant="outlined"
           fullWidth
-          startIcon={<FaGoogle style={{ color: '#070707ff' }} />}
+          variant="outlined"
+          startIcon={<FaGoogle />}
+          onClick={handleGoogle}
           sx={{
             textTransform: 'none',
-            fontSize: 14,
-            fontWeight: 500,
             bgcolor: '#fff',
+            color: 'black',
             borderColor: 'divider',
-            color:'black',
             '&:hover': { bgcolor: 'grey.50' },
           }}
         >
@@ -45,16 +54,14 @@ const SocialLogin = () => {
         </Button>
 
         <Button
-          onClick={handleLinkedIn}
-          variant="outlined"
           fullWidth
-          startIcon={<FaLinkedinIn style={{ color: '#070707ff' }} />}
+          variant="outlined"
+          startIcon={<FaLinkedinIn />}
+          onClick={handleLinkedIn}
           sx={{
             textTransform: 'none',
-            fontSize: 14,
-            fontWeight: 500,
             bgcolor: '#fff',
-            color:'black',
+            color: 'black',
             borderColor: 'divider',
             '&:hover': { bgcolor: 'grey.50' },
           }}
