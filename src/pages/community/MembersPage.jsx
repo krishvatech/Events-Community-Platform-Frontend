@@ -6,7 +6,6 @@ import {
   Box,
   Grid,
   InputAdornment,
-  LinearProgress,
   Pagination,
   Paper,
   Stack,
@@ -25,6 +24,7 @@ import {
   Checkbox,
   MenuItem,
   ListItemText,
+  Skeleton
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
@@ -1392,8 +1392,65 @@ export default function MembersPage() {
               </Stack>
             </Paper>
 
-            {loading && <LinearProgress />}
+            {/* 🔄 Loading state with skeletons */}
+            {loading && (
+              <>
+                {/* Skeleton list */}
+                <Stack
+                  spacing={1.25}
+                  alignItems="stretch"
+                  sx={{
+                    mt: 2,
+                    flex: 1,
+                    width: "100%",
+                    "& > *": {
+                      width: "100% !important",
+                      maxWidth: "100% !important",
+                    },
+                  }}
+                >
+                  {Array.from({ length: ROWS_PER_PAGE }).map((_, idx) => (
+                    <Paper
+                      key={idx}
+                      sx={{
+                        borderRadius: 3,
+                        border: `1px solid ${BORDER}`,
+                        p: 1.5,
+                      }}
+                    >
+                      <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Skeleton variant="circular" width={44} height={44} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Skeleton width="40%" height={20} />
+                          <Skeleton width="60%" height={16} sx={{ mt: 0.5 }} />
+                          <Skeleton width="55%" height={16} sx={{ mt: 0.5 }} />
+                        </Box>
+                        <Skeleton
+                          variant="rectangular"
+                          width={120}
+                          height={32}
+                          sx={{ borderRadius: 2 }}
+                        />
+                      </Stack>
+                    </Paper>
+                  ))}
+                </Stack>
 
+                {/* Skeleton for pagination row */}
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  justifyContent="space-between"
+                  spacing={1}
+                  sx={{ mt: 2 }}
+                >
+                  <Skeleton width={160} height={20} />
+                  <Skeleton width={220} height={32} />
+                </Stack>
+              </>
+            )}
+
+            {/* ❌ Error state */}
             {!loading && error && (
               <Paper
                 sx={{
@@ -1406,6 +1463,7 @@ export default function MembersPage() {
               </Paper>
             )}
 
+            {/* ✅ Loaded state (existing logic unchanged) */}
             {!loading && !error && (
               <>
                 <Stack
