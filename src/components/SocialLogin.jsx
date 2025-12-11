@@ -23,22 +23,29 @@ const SocialLogin = () => {
     }
   };
 
-  const handleLinkedIn = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/linkedin/url/`, {
-        method: 'GET',
-        credentials: 'include', // <-- important
-      });
-      if (!res.ok) throw new Error('Failed to start LinkedIn login');
-      const data = await res.json();
-      if (!data.authorization_url) throw new Error('No authorization_url from backend');
+  // const handleLinkedIn = async () => {
+  //   try {
+  //     const res = await fetch(`${API_BASE}/auth/linkedin/url/`, {
+  //       method: 'GET',
+  //       credentials: 'include', // <-- important
+  //     });
+  //     if (!res.ok) throw new Error('Failed to start LinkedIn login');
+  //     const data = await res.json();
+  //     if (!data.authorization_url) throw new Error('No authorization_url from backend');
 
-      // Redirect browser to LinkedIn consent page
-      window.location.href = data.authorization_url;
-    } catch (err) {
-      console.error(err);
-      toast.error('❌ Could not start LinkedIn login. Please try again.');
-    }
+  //     // Redirect browser to LinkedIn consent page
+  //     window.location.href = data.authorization_url;
+  //   } catch (err) {
+  //     console.error(err);
+  //     toast.error('❌ Could not start LinkedIn login. Please try again.');
+  //   }
+  // };
+
+  const handleLinkedIn = () => {
+    // Temporarily disabled for this release
+    toast.info('Sign in with LinkedIn is coming soon', {
+      autoClose: 2500,
+    });
   };
 
   return (

@@ -25,6 +25,13 @@ import { Visibility, VisibilityOff } from '@mui/icons-material';
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
+/* 🔔 Simple helper for “Coming Soon” toasts */
+const showComingSoon = (feature) => {
+  toast.info(`${feature} is coming soon`, {
+    autoClose: 2500,
+  });
+};
+
 /* ───────────────────────── helpers (no CSS changes) ───────────────────────── */
 
 const truthy = (v) => {
@@ -384,7 +391,7 @@ const SignInPage = () => {
                   }}
                 />
 
-                <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
+                {/* <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
                   <Link
                     component="button"
                     type="button"
@@ -399,8 +406,21 @@ const SignInPage = () => {
                   >
                     Forgot password?
                   </Link>
-                </Box>
+                </Box> */}
 
+                <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
+                  <Link
+                    component="button"
+                    type="button"
+                    variant="body2"
+                    underline="none"
+                    sx={{ fontSize: 14, color: '#155dfc', fontWeight: 600 }}
+                    onClick={() => showComingSoon('Forgot password')}
+                  >
+                    Forgot password?
+                  </Link>
+                </Box>
+                
                 <Button
                   type="submit"
                   fullWidth
