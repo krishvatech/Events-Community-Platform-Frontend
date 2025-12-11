@@ -30,7 +30,8 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
-  Slider
+  Slider,
+  Skeleton
 } from "@mui/material";
 
 // Icons
@@ -534,6 +535,7 @@ function NameChangeDialog({ open, onClose, currentNames, showToast }) {
 export default function HomePage() {
   const [profile, setProfile] = React.useState(() => loadInitialProfile());
   const [friendCount, setFriendCount] = React.useState(0);
+  const [loading, setLoading] = React.useState(true);
 
   // UI States
   const [avatarDialogOpen, setAvatarDialogOpen] = React.useState(false);
@@ -569,6 +571,7 @@ export default function HomePage() {
 
   // --- Fetch Profile ---
   const fetchMyProfileFromMe = React.useCallback(async () => {
+    setLoading(true);
     try {
       const corePromise = fetchProfileCore();
       const extrasPromise = fetchProfileExtras().catch(() => ({ experiences: [], educations: [] }));
@@ -579,8 +582,10 @@ export default function HomePage() {
       setProfile((prev) => ({ ...prev, experience: extra.experiences, education: extra.educations }));
     } catch (e) {
       console.error("Failed to load profile:", e);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [setLoading]);
 
   // --- Languages State ---
   const [langList, setLangList] = React.useState([]);
@@ -824,93 +829,197 @@ export default function HomePage() {
       <Box sx={{ width: "100%", mx: "auto" }}>
 
         {/* Header Card */}
-        <Card variant="outlined" sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
-            <Box sx={{ position: "relative", mr: { sm: 2 }, width: 72, height: 72 }}>
-              <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72 }}>
-                {(fullName[0] || "").toUpperCase()}
-              </Avatar>
-              <Tooltip title="Change photo">
-                <IconButton
-                  size="small"
-                  onClick={() => { setAvatarPreview(profile.avatar || ""); setAvatarDialogOpen(true); }}
-                  sx={{ position: "absolute", right: -6, bottom: -6, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", boxShadow: 1 }}
-                >
-                  <PhotoCameraRoundedIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Box>
+        {loading ? (
+          <Card
+            variant="outlined"
+            sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}
+          >
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              sx={{ width: "100%" }}
+            >
+              <Box sx={{ mr: { sm: 2 }, width: 72, height: 72 }}>
+                <Skeleton variant="circular" width={72} height={72} />
+              </Box>
+              <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
+                <Skeleton variant="text" width="40%" height={28} />
+                <Skeleton variant="text" width="60%" />
+              </Box>
+              <Box sx={{ ml: "auto", display: "flex", alignItems: "center" }}>
+                <Skeleton variant="circular" width={32} height={32} />
+              </Box>
+              <Divider
+                orientation="vertical"
+                flexItem
+                sx={{ display: { xs: "none", sm: "block" }, mx: 2 }}
+              />
+              <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" } }}>
+                <Skeleton variant="text" width={120} />
+              </Box>
+            </Stack>
+          </Card>
+        ) : (
+          <Card variant="outlined" sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
+              <Box sx={{ position: "relative", mr: { sm: 2 }, width: 72, height: 72 }}>
+                <Avatar src={profile.avatar || ""} sx={{ width: 72, height: 72 }}>
+                  {(fullName[0] || "").toUpperCase()}
+                </Avatar>
+                <Tooltip title="Change photo">
+                  <IconButton
+                    size="small"
+                    onClick={() => { setAvatarPreview(profile.avatar || ""); setAvatarDialogOpen(true); }}
+                    sx={{ position: "absolute", right: -6, bottom: -6, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", boxShadow: 1 }}
+                  >
+                    <PhotoCameraRoundedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
 
-            <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
-
-                {/* Verified Badge */}
-                {profile.kyc_status === 'approved' && (
-                  <Tooltip title="Identity Verified">
-                    <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
-                  </Tooltip>
+              <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>{fullName}</Typography>
+                  {profile.kyc_status === 'approved' && (
+                    <Tooltip title="Identity Verified">
+                      <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
+                    </Tooltip>
+                  )}
+                </Stack>
+                {profile.experience && profile.experience.length > 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    {profile.experience[0].position} – {profile.experience[0].org}
+                  </Typography>
+                ) : (
+                  profile.job_title && <Typography variant="body2" color="text.secondary">{profile.job_title}</Typography>
                 )}
-              </Stack>
-              {profile.experience && profile.experience.length > 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  {profile.experience[0].position} – {profile.experience[0].org}
+              </Box>
+
+              <Box sx={{ ml: "auto", display: "flex", alignItems: "center" }}>
+                <Tooltip title="Identity Details">
+                  <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
+                    <EditRoundedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+
+              <Divider
+                orientation="vertical"
+                flexItem
+                sx={{ display: { xs: "none", sm: "block" }, mx: 2 }}
+              />
+
+              <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" } }}>
+                <Typography variant="subtitle2">
+                  <Box component="span" sx={{ fontWeight: 600 }}>0</Box> Posts&nbsp;|&nbsp;
+                  <Box component="span" sx={{ fontWeight: 600 }}>{friendCount}</Box> Contacts
                 </Typography>
-              ) : (
-                profile.job_title && <Typography variant="body2" color="text.secondary">{profile.job_title}</Typography>
-              )}
-            </Box>
+              </Box>
+            </Stack>
+          </Card>
+        )}
 
-            {/* --- EDIT BUTTON (Identity) moved to end, before divider --- */}
-            <Box sx={{ ml: "auto", display: "flex", alignItems: "center" }}>
-              <Tooltip title="Identity Details">
-                <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
-                  <EditRoundedIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Box>
+        {loading ? (
+          <Box>
+            <Grid
+              container
+              spacing={2}
+              sx={{
+                flexWrap: { xs: "wrap", sm: "nowrap" },
+                alignItems: "flex-start",
+              }}
+            >
+              {/* LEFT skeleton column */}
+              <Grid
+                item
+                xs={12}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  flexBasis: {
+                    xs: "100%",
+                    sm: "345px",
+                    md: "540px",
+                    lg: "540px",
+                    xl: "540px",
+                  },
+                  maxWidth: {
+                    xs: "100%",
+                    sm: "345px",
+                    md: "540px",
+                    lg: "540px",
+                    xl: "540px",
+                  },
+                  flexShrink: 0,
+                }}
+              >
+                <SectionSkeleton minHeight={160} lines={3} />
+                <SectionSkeleton minHeight={140} lines={2} />
+                <SectionSkeleton minHeight={180} lines={3} />
+                <SectionSkeleton minHeight={180} lines={3} />
+              </Grid>
 
-            <Divider
-              orientation="vertical"
-              flexItem
-              sx={{ display: { xs: "none", sm: "block" }, mx: 2 }}
-            />
+              {/* RIGHT skeleton column */}
+              <Grid
+                item
+                xs={12}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  flexBasis: {
+                    xs: "100%",
+                    sm: "345px",
+                    md: "320px",
+                    lg: "540px",
+                    xl: "540px",
+                  },
+                  maxWidth: {
+                    xs: "100%",
+                    sm: "345px",
+                    md: "320px",
+                    lg: "540px",
+                    xl: "540px",
+                  },
+                  flexShrink: 0,
+                }}
+              >
+                <SectionSkeleton minHeight={140} lines={3} />
+                <SectionSkeleton minHeight={140} lines={2} />
+                <SectionSkeleton minHeight={140} lines={2} />
+                <SectionSkeleton minHeight={140} lines={2} />
+              </Grid>
+            </Grid>
+          </Box>
+        ) : (
+          <AboutTab
+            profile={profile}
+            onUpdate={handleUpdateProfile}
+            showToast={showNotification}
 
-            <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" } }}>
-              <Typography variant="subtitle2">
-                <Box component="span" sx={{ fontWeight: 600 }}>0</Box> Posts&nbsp;|&nbsp;
-                <Box component="span" sx={{ fontWeight: 600 }}>{friendCount}</Box> Contacts
-              </Typography>
-            </Box>
-          </Stack>
-        </Card>
+            // ✅ Languages
+            langList={langList}
+            langOpen={langOpen}
+            langSaving={langSaving}
+            editLangId={editLangId}
+            langCertFiles={langCertFiles}
+            existingCertificates={existingCertificates}
+            langForm={langForm}
 
-        {/* Profile Content Grid */}
-        <AboutTab
-          profile={profile}
-          onUpdate={handleUpdateProfile}
-          showToast={showNotification}
+            setLangOpen={setLangOpen}
+            setLangForm={setLangForm}
+            setLangCertFiles={setLangCertFiles}
+            setExistingCertificates={setExistingCertificates}
 
-          // ✅ Languages
-          langList={langList}
-          langOpen={langOpen}
-          langSaving={langSaving}
-          editLangId={editLangId}
-          langCertFiles={langCertFiles}
-          existingCertificates={existingCertificates}
-          langForm={langForm}
-
-          setLangOpen={setLangOpen}
-          setLangForm={setLangForm}
-          setLangCertFiles={setLangCertFiles}
-          setExistingCertificates={setExistingCertificates}
-
-          openAddLanguage={openAddLanguage}
-          onEditLanguage={onEditLanguage}
-          saveLanguage={saveLanguage}
-          deleteLanguage={deleteLanguage}
-          handleDeleteCertificate={handleDeleteCertificate}
-        />
+            openAddLanguage={openAddLanguage}
+            onEditLanguage={onEditLanguage}
+            saveLanguage={saveLanguage}
+            deleteLanguage={deleteLanguage}
+            handleDeleteCertificate={handleDeleteCertificate}
+          />
+        )}
 
       </Box>
 
@@ -1200,6 +1309,27 @@ function SectionCard({ title, action, children, sx }) {
     <Card variant="outlined" sx={{ borderRadius: 3, width: "100%", ...sx }}>
       <CardHeader title={<Typography variant="h6" sx={{ fontWeight: 600 }}>{title}</Typography>} action={action} sx={{ pb: 0.5 }} />
       <CardContent sx={{ pt: 1.5 }}>{children}</CardContent>
+    </Card>
+  );
+}
+
+function SectionSkeleton({ minHeight = 140, lines = 3 }) {
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        borderRadius: 3,
+        width: "100%",
+        minHeight,
+        display: "flex",
+        flexDirection: "column",
+        p: 2,
+      }}
+    >
+      <Skeleton variant="text" width="40%" height={28} sx={{ mb: 1 }} />
+      {Array.from({ length: lines }).map((_, idx) => (
+        <Skeleton key={idx} variant="text" width={`${70 - idx * 10}%`} />
+      ))}
     </Card>
   );
 }
