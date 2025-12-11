@@ -8,7 +8,10 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/ap
 const SocialLogin = () => {
   const handleGoogle = async () => {
     try {
-      const res = await fetch(`${API_BASE}/auth/google/url/`);
+      const res = await fetch(`${API_BASE}/auth/google/url/`, {
+        method: 'GET',
+        credentials: 'include', // <-- important
+      });
       if (!res.ok) throw new Error('Failed to start Google login');
       const data = await res.json();
       if (!data.authorization_url) throw new Error('No authorization_url from backend');
@@ -20,8 +23,23 @@ const SocialLogin = () => {
     }
   };
 
-  const handleLinkedIn = () =>
-    toast.info('🔐 LinkedIn login is not implemented yet.');
+  const handleLinkedIn = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/linkedin/url/`, {
+        method: 'GET',
+        credentials: 'include', // <-- important
+      });
+      if (!res.ok) throw new Error('Failed to start LinkedIn login');
+      const data = await res.json();
+      if (!data.authorization_url) throw new Error('No authorization_url from backend');
+
+      // Redirect browser to LinkedIn consent page
+      window.location.href = data.authorization_url;
+    } catch (err) {
+      console.error(err);
+      toast.error('❌ Could not start LinkedIn login. Please try again.');
+    }
+  };
 
   return (
     <Box sx={{ mt: 2 }}>
