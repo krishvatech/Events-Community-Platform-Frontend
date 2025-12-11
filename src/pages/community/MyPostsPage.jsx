@@ -1077,13 +1077,22 @@ export default function MyPostsPage() {
   const [deleteObj, setDeleteObj] = React.useState(null);
   const [commentId, setCommentId] = React.useState(null);
   const [likesId, setLikesId] = React.useState(null);
-  const [sharesId, setSharesId] = React.useState(null); // For VIEWING who shared
-  const [shareActionPostId, setShareActionPostId] = React.useState(null); // NEW: For SHARING to friends
+  const [sharesId, setSharesId] = React.useState(null);
+  const [shareActionPostId, setShareActionPostId] = React.useState(null);
 
-  const [visibleCount, setVisibleCount] = React.useState(4);      // how many posts to show
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false); // skeleton while loading next batch
+  const [visibleCount, setVisibleCount] = React.useState(4);  
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false); 
   const observerTarget = React.useRef(null);                      // intersection trigger at bottom
   const [showScrollTop, setShowScrollTop] = React.useState(false);
+
+  React.useEffect(() => {
+    // Whenever posts list updates (first load / refresh),
+    // ensure we start from first 4
+    if (posts.length > 0) {
+      setVisibleCount(4);
+    }
+  }, [posts.length]);
+
 
 
   React.useEffect(() => {
@@ -1308,28 +1317,38 @@ export default function MyPostsPage() {
         <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreateOpen(true)}>Create Post</Button>
       </Stack>
 
-      {loading && <LinearProgress sx={{ mb: 2 }} />}
+      {loading ? (
+        // 🔹 Initial loading → show 4 skeleton cards instead of spinner
+        <>
+          <PostSkeleton />
+          <PostSkeleton />
+          <PostSkeleton />
+          <PostSkeleton />
+        </>
+      ) : (
+        <>
+          {posts.length === 0 && (
+            <Box sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>
+              You haven&apos;t posted anything yet.
+            </Box>
+          )}
 
-      {!loading && posts.length === 0 && (
-        <Box sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>
-          You haven&apos;t posted anything yet.
-        </Box>
+          {visiblePosts.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              onReact={handleReact}
+              onComment={setCommentId}
+              onShareAction={setShareActionPostId}
+              onViewShares={setSharesId}
+              onEdit={setEditObj}
+              onDelete={setDeleteObj}
+              onVote={handleVote}
+              onOpenLikes={setLikesId}
+            />
+          ))}
+        </>
       )}
-
-      {visiblePosts.map((post) => (
-        <PostCard
-          key={post.id}
-          post={post}
-          onReact={handleReact}
-          onComment={setCommentId}
-          onShareAction={setShareActionPostId} // Clicking "Share" icon triggers friend picker
-          onViewShares={setSharesId}           // Clicking "X Shares" text triggers list view
-          onEdit={setEditObj}
-          onDelete={setDeleteObj}
-          onVote={handleVote}
-          onOpenLikes={setLikesId}
-        />
-      ))}
 
       {/* Infinite-scroll trigger + bottom skeleton (like Live Feed) */}
       {posts.length > visibleCount && (
