@@ -36,7 +36,8 @@ import {
   MenuItem,
   CircularProgress,
   ListItemAvatar,
-  Slider
+  Slider,
+  Skeleton,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
@@ -485,6 +486,35 @@ function SectionCard({ title, action, children, sx }) {
         sx={{ pb: 0.5, "& .MuiCardHeader-action": { alignSelf: "center" } }}
       />
       <CardContent sx={{ pt: 1.5 }}>{children}</CardContent>
+    </Card>
+  );
+}
+
+function SectionSkeleton({ minHeight = 140, lines = 3 }) {
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        borderRadius: 2,
+        width: "100%",
+        minHeight,
+        display: "flex",
+        flexDirection: "column",
+        p: 2,
+      }}
+    >
+      {/* Title line */}
+      <Skeleton variant="text" width="40%" height={26} sx={{ mb: 1 }} />
+
+      {/* Body lines */}
+      {Array.from({ length: lines }).map((_, idx) => (
+        <Skeleton
+          key={idx}
+          variant="text"
+          width={`${70 - idx * 10}%`}
+          sx={{ mb: 0.5 }}
+        />
+      ))}
     </Card>
   );
 }
@@ -1784,48 +1814,107 @@ export default function AdminSettings() {
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
       {isOwner ? (
         <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 } }}>
-          {/* ... (Owner view unchanged) ... */}
-          <Stack spacing={3}>
-            <Box><Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: 0.2 }}>Admin Settings</Typography><Typography variant="body2" sx={{ color: "text.secondary" }}>Update how you appear as an admin across the community.</Typography></Box>
-            <Card variant="outlined" sx={{ borderRadius: 3, borderColor: "divider", boxShadow: { xs: "none", md: "0 18px 45px rgba(15,23,42,0.08)" } }}>
-              <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-                <Grid container spacing={{ xs: 3, md: 4 }} alignItems="flex-start">
-                  <Grid item xs={12} md={4}>
-                    <Stack spacing={2} alignItems="center" sx={{ width: "100%" }}>
-                      <Box sx={{ position: "relative", width: 112, height: 112, borderRadius: "50%", border: "3px solid", borderColor: "primary.light", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "grey.50" }}>
-                        <Avatar src={avatarUrl || undefined} sx={{ width: 104, height: 104, fontSize: 34, bgcolor: "primary.main" }}>{(profile.full_name || "A").charAt(0).toUpperCase()}</Avatar>
-                      </Box>
-                      <input ref={fileRef} hidden type="file" accept="image/*" onChange={onFileChange} />
-                      <Button size="small" variant="outlined" fullWidth startIcon={<UploadRoundedIcon />} onClick={onPickFile} disabled={loading || saving} sx={{ borderRadius: 999, textTransform: "none" }}>Change photo</Button>
-                      <Typography variant="caption" sx={{ color: "text.secondary", textAlign: "center" }}>Recommended: square image, at least 400×400px.</Typography>
-                    </Stack>
-                  </Grid>
-                  <Grid item xs={12} md={8}>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12}><TextField label="Full name" fullWidth size="small" value={profile.full_name} onChange={(e) => setProfile((p) => ({ ...p, full_name: e.target.value }))} /></Grid>
-                      <Grid item xs={12}><TextField label="Headline" placeholder="e.g., Community manager at ABC" fullWidth size="small" value={profile.headline} onChange={(e) => setProfile((p) => ({ ...p, headline: e.target.value }))} /></Grid>
-                      <Grid item xs={12}><TextField label="Location" placeholder="City, Country" fullWidth size="small" value={profile.location} onChange={(e) => setProfile((p) => ({ ...p, location: e.target.value }))} /></Grid>
-                      <Grid item xs={12}><TextField label="Bio" placeholder="Tell people a bit about yourself…" fullWidth multiline minRows={4} size="small" value={profile.bio} onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))} /></Grid>
+          {loading ? (
+            // 🔹 OWNER SKELETON
+            <Stack spacing={3}>
+              {/* Title skeleton */}
+              <Skeleton variant="text" width="55%" height={32} />
+
+              {/* Main profile card skeleton */}
+              <SectionSkeleton minHeight={260} lines={3} />
+
+              {/* Extra sections skeleton (About, Contact, etc.) */}
+              <Grid container spacing={{ xs: 2, md: 3 }}>
+                <Grid item xs={12} md={6}>
+                  <SectionSkeleton minHeight={180} lines={3} />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <SectionSkeleton minHeight={180} lines={3} />
+                </Grid>
+              </Grid>
+            </Stack>
+          ) : (
+            <Stack spacing={3}>
+              <Box><Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: 0.2 }}>Admin Settings</Typography><Typography variant="body2" sx={{ color: "text.secondary" }}>Update how you appear as an admin across the community.</Typography></Box>
+              <Card variant="outlined" sx={{ borderRadius: 3, borderColor: "divider", boxShadow: { xs: "none", md: "0 18px 45px rgba(15,23,42,0.08)" } }}>
+                <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+                  <Grid container spacing={{ xs: 3, md: 4 }} alignItems="flex-start">
+                    <Grid item xs={12} md={4}>
+                      <Stack spacing={2} alignItems="center" sx={{ width: "100%" }}>
+                        <Box sx={{ position: "relative", width: 112, height: 112, borderRadius: "50%", border: "3px solid", borderColor: "primary.light", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "grey.50" }}>
+                          <Avatar src={avatarUrl || undefined} sx={{ width: 104, height: 104, fontSize: 34, bgcolor: "primary.main" }}>{(profile.full_name || "A").charAt(0).toUpperCase()}</Avatar>
+                        </Box>
+                        <input ref={fileRef} hidden type="file" accept="image/*" onChange={onFileChange} />
+                        <Button size="small" variant="outlined" fullWidth startIcon={<UploadRoundedIcon />} onClick={onPickFile} disabled={loading || saving} sx={{ borderRadius: 999, textTransform: "none" }}>Change photo</Button>
+                        <Typography variant="caption" sx={{ color: "text.secondary", textAlign: "center" }}>Recommended: square image, at least 400×400px.</Typography>
+                      </Stack>
+                    </Grid>
+                    <Grid item xs={12} md={8}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}><TextField label="Full name" fullWidth size="small" value={profile.full_name} onChange={(e) => setProfile((p) => ({ ...p, full_name: e.target.value }))} /></Grid>
+                        <Grid item xs={12}><TextField label="Headline" placeholder="e.g., Community manager at ABC" fullWidth size="small" value={profile.headline} onChange={(e) => setProfile((p) => ({ ...p, headline: e.target.value }))} /></Grid>
+                        <Grid item xs={12}><TextField label="Location" placeholder="City, Country" fullWidth size="small" value={profile.location} onChange={(e) => setProfile((p) => ({ ...p, location: e.target.value }))} /></Grid>
+                        <Grid item xs={12}><TextField label="Bio" placeholder="Tell people a bit about yourself…" fullWidth multiline minRows={4} size="small" value={profile.bio} onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))} /></Grid>
+                      </Grid>
                     </Grid>
                   </Grid>
-                </Grid>
-                <Divider sx={{ my: 3 }} />
-                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end" spacing={1.5}>
-                  <Button variant="text" startIcon={<RefreshRoundedIcon />} onClick={load} disabled={loading || saving} sx={{ textTransform: "none" }}>Reset</Button>
-                  <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={onSave} disabled={saving || loading} sx={{ textTransform: "none", minWidth: 140 }}>Save changes</Button>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Stack>
+                  <Divider sx={{ my: 3 }} />
+                  <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end" spacing={1.5}>
+                    <Button variant="text" startIcon={<RefreshRoundedIcon />} onClick={load} disabled={loading || saving} sx={{ textTransform: "none" }}>Reset</Button>
+                    <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={onSave} disabled={saving || loading} sx={{ textTransform: "none", minWidth: 140 }}>Save changes</Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Stack>
+          )}
         </Container>
       ) : (
         // STAFF VIEW
         <Container maxWidth="lg" sx={{ py: 4 }}>
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Profile</Typography>
-          {loading && <LinearProgress />}
-          {!loading && (
+
+          {loading ? (
+            // 🔹 STAFF SKELETON
+            <Stack spacing={2.5}>
+              {/* Top strip skeleton */}
+              <Card variant="outlined" sx={{ mb: 1.5, borderRadius: 3 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    px: { xs: 2, md: 3 },
+                    py: { xs: 1.5, md: 2 },
+                  }}
+                >
+                  {/* Avatar circle */}
+                  <Skeleton variant="circular" width={56} height={56} />
+
+                  {/* Name + role */}
+                  <Box sx={{ ml: 2, flex: 1 }}>
+                    <Skeleton variant="text" width="35%" height={24} />
+                    <Skeleton variant="text" width="45%" height={18} />
+                  </Box>
+
+                  {/* Right side badge / status */}
+                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
+                    <Skeleton variant="text" width={80} height={18} />
+                    <Skeleton variant="text" width={60} height={16} />
+                  </Box>
+                </Box>
+              </Card>
+
+              {/* 2-column skeleton for detail sections */}
+              <Grid container spacing={2.5}>
+                <Grid item xs={12} md={6}>
+                  <SectionSkeleton minHeight={160} lines={3} />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <SectionSkeleton minHeight={160} lines={3} />
+                </Grid>
+              </Grid>
+            </Stack>
+          ) : (
             <>
-              {/* Top profile strip */}
               <Card variant="outlined" sx={{ mb: 2.5, borderRadius: 3 }}>
                 <Box sx={{ display: "flex", alignItems: "center", px: { xs: 2, md: 3 }, py: { xs: 1.5, md: 2 } }}>
                   <Box sx={{ position: "relative", display: "inline-flex", mr: 2 }}>
