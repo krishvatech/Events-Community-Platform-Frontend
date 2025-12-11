@@ -8,7 +8,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Chip,
   FormControlLabel, Checkbox, InputAdornment, Collapse, IconButton, Tooltip,
   useMediaQuery, useTheme, MenuItem, Stack, ListItemAvatar, CircularProgress,
-  Slider
+  Slider, Skeleton
 } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -300,6 +300,31 @@ function SectionCard({ title, action, children, sx }) {
         sx={{ pb: 0.5, '& .MuiCardHeader-action': { alignSelf: 'center' } }}
       />
       <CardContent sx={{ pt: 1.5 }}>{children}</CardContent>
+    </Card>
+  );
+}
+
+function SectionSkeleton({ minHeight = 140, lines = 3 }) {
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        borderRadius: 2,
+        width: "100%",
+        minHeight,
+        display: "flex",
+        flexDirection: "column",
+        p: 2,
+      }}
+    >
+      <Skeleton variant="text" width="40%" height={28} sx={{ mb: 1 }} />
+      {Array.from({ length: lines }).map((_, idx) => (
+        <Skeleton
+          key={idx}
+          variant="text"
+          width={`${70 - idx * 10}%`}
+        />
+      ))}
     </Card>
   );
 }
@@ -1755,422 +1780,531 @@ export default function ProfilePage() {
           </aside>
 
           <main className="col-span-12 lg:col-span-9">
-            {loading && <LinearProgress />}
-            {!loading && mode === 'preview' && (
-              <Box>
-                {/* --- HEADER CARD (Matching HomePage) --- */}
-                <Card variant="outlined" sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}>
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
-                    <Box sx={{ position: "relative", mr: { sm: 2 }, width: 72, height: 72 }}>
-                      <Avatar src={form.avatar || ""} sx={{ width: 72, height: 72 }}>
-                        {(fullName[0] || "").toUpperCase()}
-                      </Avatar>
-                      <Tooltip title="Change photo">
-                        <IconButton
-                          size="small"
-                          onClick={() => { setAvatarPreview(form.avatar || ""); setAvatarDialogOpen(true); }}
-                          sx={{ position: "absolute", right: -6, bottom: -6, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", boxShadow: 1 }}
-                        >
-                          <PhotoCameraRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-
-                    <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                          {fullName}
-                        </Typography>
-
-                        {/* Verified Badge */}
-                        {form.kyc_status === 'approved' && (
-                          <Tooltip title="Identity Verified">
-                            <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
-                          </Tooltip>
-                        )}
-                      </Stack>
-                      {latestExp ? (
-                        <Typography variant="body2" color="text.secondary">
-                          {latestExp.position} – {latestExp.community_name || latestExp.org}
-                        </Typography>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">{form.headline || form.job_title || ""}</Typography>
-                      )}
-                    </Box>
-
-                    {/* --- EDIT BUTTON (Identity) --- */}
-                    <Box sx={{ ml: "auto", display: "flex", alignItems: "center" }}>
-                      <Tooltip title="Identity Details">
-                        <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
-                          <EditRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-
-                    <Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" }, mx: 2 }} />
-
-                    <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" } }}>
-                      <Typography variant="subtitle2">
-                        <Box component="span" sx={{ fontWeight: 600 }}>0</Box> Posts&nbsp;|&nbsp;
-                        <Box component="span" sx={{ fontWeight: 600 }}>{friendCount}</Box> Contacts
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Card>
-
-                {/* --- CONTENT GRID --- */}
-                <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
-                  {/* LEFT COLUMN */}
-                  <Grid item xs={12} lg={6}>
-                    <SectionCard
-                      title="About"
-                      action={
-                        <Tooltip title="Edit">
-                          <IconButton size="small" onClick={() => openEditAbout("description")}>
-                            <EditRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      }
+            {mode === "preview" && (
+              loading ? (
+                // ================= SKELETON VIEW (LIKE HOME PAGE) ================
+                <Box>
+                  {/* Header Skeleton */}
+                  <Card
+                    variant="outlined"
+                    sx={{
+                      borderRadius: 3,
+                      p: 2,
+                      mb: 2,
+                    }}
+                  >
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={2}
+                      alignItems="center"
                     >
-                      <Label>Summary</Label>
-                      <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>{form.bio?.trim() ? form.bio : "Add a short description about your role, focus areas, and what you're working on."}</Typography>
-                    </SectionCard>
+                      <Skeleton variant="circular" width={64} height={64} />
 
-                    <SectionCard
-                      sx={{ mt: 2 }}
-                      title="Skills"
-                      action={
-                        <Tooltip title="Edit">
-                          <IconButton size="small" onClick={() => openEditAbout("skills")}>
-                            <EditRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      }
+                      <Box sx={{ flex: 1, width: "100%" }}>
+                        <Skeleton variant="text" width="40%" height={28} sx={{ mb: 1 }} />
+                        <Skeleton variant="text" width="60%" />
+                      </Box>
+
+                      <Box
+                        sx={{
+                          minWidth: { sm: 160 },
+                          textAlign: { xs: "left", sm: "center" },
+                        }}
+                      >
+                        <Skeleton variant="text" width={120} />
+                      </Box>
+                    </Stack>
+                  </Card>
+
+                  {/* Sections Skeleton Grid – same layout idea as HomePage */}
+                  <Grid
+                    container
+                    spacing={2}
+                    sx={{
+                      flexWrap: { xs: "wrap", sm: "nowrap" },
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    {/* LEFT skeleton column */}
+                    <Grid
+                      item
+                      xs={12}
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                        flexBasis: {
+                          xs: "100%",
+                          sm: "345px",
+                          md: "540px",
+                          lg: "540px",
+                          xl: "540px",
+                        },
+                        maxWidth: {
+                          xs: "100%",
+                          sm: "345px",
+                          md: "540px",
+                          lg: "540px",
+                          xl: "540px",
+                        },
+                        flexShrink: 0,
+                      }}
                     >
-                      {userSkills.length ? (
-                        <>
-                          <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-                            {userSkills.slice(0, 5).map((s) => (
-                              <Chip
-                                key={s.uri || s.id}
-                                size="small"
-                                label={formatSkillLabel(s)}
-                                sx={{
-                                  maxWidth: "100%",
-                                  "& .MuiChip-label": {
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  },
-                                }}
-                              />
-                            ))}
-                            {userSkills.length > 5 && (
-                              <Chip
-                                size="small"
-                                label={`+${userSkills.length - 5} more`}
-                                onClick={() => setSkillsDialogOpen(true)}
-                                sx={{ cursor: "pointer" }}
-                              />
-                            )}
-                          </Box>
-                          <Dialog
-                            open={skillsDialogOpen}
-                            onClose={() => setSkillsDialogOpen(false)}
-                            fullWidth
-                            maxWidth="sm"
-                          >
-                            <DialogTitle>Skills</DialogTitle>
-                            <DialogContent dividers>
-                              <List>
-                                {userSkills.map((s) => (
-                                  <ListItem key={s.uri || s.id} disableGutters>
-                                    <ListItemText
-                                      primary={s.label || s.skill?.preferred_label || ""}
-                                      secondary={PROFICIENCY_LABELS[s.proficiency_level] || ""}
-                                    />
-                                  </ListItem>
-                                ))}
-                              </List>
-                            </DialogContent>
-                            <DialogActions>
-                              <Button onClick={() => setSkillsDialogOpen(false)}>Close</Button>
-                            </DialogActions>
-                          </Dialog>
-                        </>
-                      ) : parseSkills(form.skillsText).length ? (
-                        // Fallback for old data with no structured skills
-                        <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-                          {parseSkills(form.skillsText).map((s, i) => (
-                            <Chip key={i} size="small" label={s} />
-                          ))}
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          Add your top skills.
-                        </Typography>
-                      )}
-                    </SectionCard>
+                      <SectionSkeleton minHeight={160} lines={3} />
+                      <SectionSkeleton minHeight={140} lines={2} />
+                      <SectionSkeleton minHeight={180} lines={3} />
+                      <SectionSkeleton minHeight={180} lines={3} />
+                    </Grid>
 
-                    <SectionCard
-                      sx={{ mt: 2 }}
-                      title="Experience"
-                      action={
-                        <Tooltip title="Add">
-                          <IconButton size="small" onClick={openAddExperience}>
-                            <AddRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      }
+                    {/* RIGHT skeleton column */}
+                    <Grid
+                      item
+                      xs={12}
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                        flexBasis: {
+                          xs: "100%",
+                          sm: "345px",
+                          md: "320px",
+                          lg: "540px",
+                          xl: "540px",
+                        },
+                        maxWidth: {
+                          xs: "100%",
+                          sm: "345px",
+                          md: "320px",
+                          lg: "540px",
+                          xl: "540px",
+                        },
+                        flexShrink: 0,
+                      }}
                     >
-                      {expList.length ? (
-                        <List dense disablePadding>
-                          {expList.map((x) => (
-                            <ListItem key={x.id} disableGutters sx={{ py: 0.5, pr: { xs: 0, md: 9 } }} secondaryAction={
-                              <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                                <Tooltip title="Edit"><IconButton size="small" onClick={() => onEditExperience(x)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                                <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteExperience(x.id, `${x.community_name || x.org || ""} — ${x.position || ""}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                              </Box>
-                            }>
-                              <ListItemText disableTypography primary={
-                                <Box>
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{x.position || "Role not specified"}{x.community_name || x.org ? ` · ${x.community_name || x.org}` : ""}</Typography>
-                                  <Typography variant="caption" color="text.secondary">{rangeLinkedIn(x.start_date || x.start, x.end_date || x.end, x.currently_work_here ?? x.current)}{x.location ? ` · ${x.location}` : ""}</Typography>
-                                  {x.description && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal" }}>{x.description}</Typography>}
-                                </Box>
-                              } />
-                            </ListItem>
-                          ))}
-                        </List>
-                      ) : (
-                        <Box sx={{ textAlign: "center", py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", color: "grey.600", mb: 1 }}><WorkOutlineIcon /></Avatar><Typography variant="body2" color="text.secondary">Add your work experience.</Typography></Box>
-                      )}
-                    </SectionCard>
-
-                    <SectionCard
-                      sx={{ mt: 2 }}
-                      title="Education"
-                      action={
-                        <Tooltip title="Add">
-                          <IconButton size="small" onClick={() => setEduOpen(true)}>
-                            <AddRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      }
-                    >
-                      {eduList.length ? (
-                        <List dense disablePadding>
-                          {eduList.map((e) => (
-                            <ListItem key={e.id} disableGutters sx={{ py: 0.5, pr: { xs: 0, md: 9 } }} secondaryAction={
-                              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
-                                <Tooltip title="Edit"><IconButton size="small" onClick={() => onEditEducation(e)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                                <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteEducation(e.id, `${e.school} — ${e.degree}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                              </Box>
-                            }>
-                              <ListItemText
-                                primary={<Typography variant="body2" fontWeight={500}>{e.degree || "Degree"} — {e.school || "School"}</Typography>}
-                                secondary={
-                                  <Stack component="span" spacing={0.5}>
-                                    <Typography variant="body2" color="text.secondary">
-                                      {[(e.start_date || "").slice(0, 4), (e.end_date || "").slice(0, 4)].filter(Boolean).join(" - ")}
-                                      {e.field_of_study ? ` · ${e.field_of_study}` : ""}
-                                      {e.grade ? ` · Grade: ${e.grade}` : ""}
-                                    </Typography>
-
-                                    {/* --- NEW: Display Document Chips --- */}
-                                    {e.documents && e.documents.length > 0 && (
-                                      <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>
-                                        {e.documents.map((doc) => (
-                                          <Chip
-                                            key={doc.id}
-                                            icon={<InsertDriveFileIcon style={{ fontSize: 14 }} />}
-                                            label={doc.filename}
-                                            size="small"
-                                            variant="outlined"
-                                            onClick={() => window.open(doc.file, '_blank')}
-                                            sx={{ cursor: 'pointer', height: 24, fontSize: '0.75rem' }}
-                                          />
-                                        ))}
-                                      </Stack>
-                                    )}
-                                  </Stack>
-                                }
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'grey.200', mx: 'auto' }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>This section is empty</Typography><Box><Button variant="contained" color="success" size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
-                    </SectionCard>
-                    <SectionCard sx={{ mt: 2 }} title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-                      <List dense disablePadding>
-                        <ListItem disableGutters secondaryAction={
-                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                          </Box>
-                        }>
-                          <ListItemText primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>} secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>} />
-                        </ListItem>
-                        <ListItem disableGutters secondaryAction={
-                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                          </Box>
-                        }>
-                          <ListItemText primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>} secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>} />
-                        </ListItem>
-                      </List>
-                    </SectionCard>
-
-
+                      <SectionSkeleton minHeight={140} lines={3} />
+                      <SectionSkeleton minHeight={140} lines={2} />
+                      <SectionSkeleton minHeight={140} lines={2} />
+                      <SectionSkeleton minHeight={140} lines={2} />
+                    </Grid>
                   </Grid>
+                </Box>
+              ) : (
+                // ================= NORMAL VIEW (YOUR EXISTING PREVIEW UI) ============
+                <Box>
+                  {/* --- HEADER CARD (Matching HomePage) --- */}
+                  <Card variant="outlined" sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
+                      <Box sx={{ position: "relative", mr: { sm: 2 }, width: 72, height: 72 }}>
+                        <Avatar src={form.avatar || ""} sx={{ width: 72, height: 72 }}>
+                          {(fullName[0] || "").toUpperCase()}
+                        </Avatar>
+                        <Tooltip title="Change photo">
+                          <IconButton
+                            size="small"
+                            onClick={() => { setAvatarPreview(form.avatar || ""); setAvatarDialogOpen(true); }}
+                            sx={{ position: "absolute", right: -6, bottom: -6, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", boxShadow: 1 }}
+                          >
+                            <PhotoCameraRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
 
-                  {/* RIGHT COLUMN */}
-                  <Grid item xs={12} lg={6}>
-                    <SectionCard
-                      title="Contact"
-                      action={
-                        <Tooltip title="Edit">
-                          <IconButton size="small" onClick={openEditContact}>
+                      <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                            {fullName}
+                          </Typography>
+
+                          {/* Verified Badge */}
+                          {form.kyc_status === 'approved' && (
+                            <Tooltip title="Identity Verified">
+                              <VerifiedRoundedIcon color="primary" sx={{ fontSize: 20 }} />
+                            </Tooltip>
+                          )}
+                        </Stack>
+                        {latestExp ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {latestExp.position} – {latestExp.community_name || latestExp.org}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">{form.headline || form.job_title || ""}</Typography>
+                        )}
+                      </Box>
+
+                      {/* --- EDIT BUTTON (Identity) --- */}
+                      <Box sx={{ ml: "auto", display: "flex", alignItems: "center" }}>
+                        <Tooltip title="Identity Details">
+                          <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
                             <EditRoundedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                      }
-                    >
-                      <Label>Social Media Links</Label>
-                      <List dense disablePadding>
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 34, mr: 0.5 }}><LinkedInIcon fontSize="small" /></ListItemIcon>
-                          <ListItemText primary={<Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{parseLinks(form.linksText).linkedin || '—'}</Typography>} />
-                        </ListItem>
-                      </List>
-                      <Label sx={{ mt: 2 }}>Emails</Label>
-                      <List dense disablePadding>
-                        <ListItem sx={{ px: 0 }}>
-                          <ListItemIcon sx={{ minWidth: 34 }}><EmailIcon fontSize="small" /></ListItemIcon>
-                          <ListItemText primary={<Typography variant="body2">{form.email || '—'}</Typography>} secondary={<Typography variant="caption" color="text.secondary" display="block">Private field.</Typography>} />
-                        </ListItem>
-                      </List>
-                      <Label sx={{ mt: 2, mb: 1 }}>Live Location</Label>
-                      {form.location ? <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{form.location}</Typography></Box> : <Box sx={{ height: 100, borderRadius: 1, bgcolor: 'grey.100', border: '1px solid', borderColor: 'divider' }} />}
-                    </SectionCard>
+                      </Box>
 
-                    <SectionCard sx={{ mt: 2 }} title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-                      <List dense disablePadding>
-                        <ListItem disableGutters secondaryAction={
-                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                          </Box>
-                        }>
-                          <ListItemText primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>} secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>} />
-                        </ListItem>
-                        <ListItem disableGutters secondaryAction={
-                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                          </Box>
-                        }>
-                          <ListItemText primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>} secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>} />
-                        </ListItem>
-                      </List>
-                    </SectionCard>
+                      <Divider orientation="vertical" flexItem sx={{ display: { xs: "none", sm: "block" }, mx: 2 }} />
 
-                    <SectionCard sx={{ mt: 2 }} title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-                      <List dense disablePadding>
-                        <ListItem disableGutters secondaryAction={
-                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                          </Box>
-                        }>
-                          <ListItemText primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>} secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>} />
-                        </ListItem>
-                        <ListItem disableGutters secondaryAction={
-                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                            <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                            <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                          </Box>
-                        }>
-                          <ListItemText primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>} secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>} />
-                        </ListItem>
-                      </List>
-                    </SectionCard>
-                    {/* --- LANGUAGES SECTION --- */}
-                    <SectionCard
-                      sx={{ mt: 2 }}
-                      title="Languages"
-                      action={
-                        <Tooltip title="Add Language">
-                          <IconButton size="small" onClick={openAddLanguage}>
-                            <AddRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      }
-                    >
-                      {langList.length > 0 ? (
-                        <List dense disablePadding>
-                          {langList.map((l) => (
-                            <ListItem
-                              key={l.id}
-                              disableGutters
-                              secondaryAction={
-                                <Box sx={{ display: "flex", gap: 1 }}>
-                                  <IconButton size="small" onClick={() => onEditLanguage(l)}>
-                                    <EditOutlinedIcon fontSize="small" />
-                                  </IconButton>
-                                  <Tooltip title="Delete">
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => askDeleteLanguage(l.id, l.language.english_name)}
-                                    >
-                                      <DeleteOutlineIcon fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                </Box>
-                              }
+                      <Box sx={{ minWidth: { sm: 160 }, textAlign: { xs: "left", sm: "center" } }}>
+                        <Typography variant="subtitle2">
+                          <Box component="span" sx={{ fontWeight: 600 }}>0</Box> Posts&nbsp;|&nbsp;
+                          <Box component="span" sx={{ fontWeight: 600 }}>{friendCount}</Box> Contacts
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Card>
+
+                  {/* --- CONTENT GRID --- */}
+                  <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
+                    {/* LEFT COLUMN */}
+                    <Grid item xs={12} lg={6}>
+                      <SectionCard
+                        title="About"
+                        action={
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => openEditAbout("description")}>
+                              <EditRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        <Label>Summary</Label>
+                        <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>{form.bio?.trim() ? form.bio : "Add a short description about your role, focus areas, and what you're working on."}</Typography>
+                      </SectionCard>
+
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Skills"
+                        action={
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => openEditAbout("skills")}>
+                              <EditRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        {userSkills.length ? (
+                          <>
+                            <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                              {userSkills.slice(0, 5).map((s) => (
+                                <Chip
+                                  key={s.uri || s.id}
+                                  size="small"
+                                  label={formatSkillLabel(s)}
+                                  sx={{
+                                    maxWidth: "100%",
+                                    "& .MuiChip-label": {
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    },
+                                  }}
+                                />
+                              ))}
+                              {userSkills.length > 5 && (
+                                <Chip
+                                  size="small"
+                                  label={`+${userSkills.length - 5} more`}
+                                  onClick={() => setSkillsDialogOpen(true)}
+                                  sx={{ cursor: "pointer" }}
+                                />
+                              )}
+                            </Box>
+                            <Dialog
+                              open={skillsDialogOpen}
+                              onClose={() => setSkillsDialogOpen(false)}
+                              fullWidth
+                              maxWidth="sm"
                             >
-                              <ListItemText
-                                primary={
-                                  <Box component="span" sx={{ fontWeight: 600 }}>
-                                    {l.language.english_name}
-                                    {l.primary_dialect && <Typography component="span" variant="caption" color="text.secondary"> ({l.primary_dialect})</Typography>}
+                              <DialogTitle>Skills</DialogTitle>
+                              <DialogContent dividers>
+                                <List>
+                                  {userSkills.map((s) => (
+                                    <ListItem key={s.uri || s.id} disableGutters>
+                                      <ListItemText
+                                        primary={s.label || s.skill?.preferred_label || ""}
+                                        secondary={PROFICIENCY_LABELS[s.proficiency_level] || ""}
+                                      />
+                                    </ListItem>
+                                  ))}
+                                </List>
+                              </DialogContent>
+                              <DialogActions>
+                                <Button onClick={() => setSkillsDialogOpen(false)}>Close</Button>
+                              </DialogActions>
+                            </Dialog>
+                          </>
+                        ) : parseSkills(form.skillsText).length ? (
+                          // Fallback for old data with no structured skills
+                          <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                            {parseSkills(form.skillsText).map((s, i) => (
+                              <Chip key={i} size="small" label={s} />
+                            ))}
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Add your top skills.
+                          </Typography>
+                        )}
+                      </SectionCard>
+
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Experience"
+                        action={
+                          <Tooltip title="Add">
+                            <IconButton size="small" onClick={openAddExperience}>
+                              <AddRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        {expList.length ? (
+                          <List dense disablePadding>
+                            {expList.map((x) => (
+                              <ListItem key={x.id} disableGutters sx={{ py: 0.5, pr: { xs: 0, md: 9 } }} secondaryAction={
+                                <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                                  <Tooltip title="Edit"><IconButton size="small" onClick={() => onEditExperience(x)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                                  <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteExperience(x.id, `${x.community_name || x.org || ""} — ${x.position || ""}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                                </Box>
+                              }>
+                                <ListItemText disableTypography primary={
+                                  <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{x.position || "Role not specified"}{x.community_name || x.org ? ` · ${x.community_name || x.org}` : ""}</Typography>
+                                    <Typography variant="caption" color="text.secondary">{rangeLinkedIn(x.start_date || x.start, x.end_date || x.end, x.currently_work_here ?? x.current)}{x.location ? ` · ${x.location}` : ""}</Typography>
+                                    {x.description && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal" }}>{x.description}</Typography>}
+                                  </Box>
+                                } />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Box sx={{ textAlign: "center", py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", color: "grey.600", mb: 1 }}><WorkOutlineIcon /></Avatar><Typography variant="body2" color="text.secondary">Add your work experience.</Typography></Box>
+                        )}
+                      </SectionCard>
+
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Education"
+                        action={
+                          <Tooltip title="Add">
+                            <IconButton size="small" onClick={() => setEduOpen(true)}>
+                              <AddRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        {eduList.length ? (
+                          <List dense disablePadding>
+                            {eduList.map((e) => (
+                              <ListItem key={e.id} disableGutters sx={{ py: 0.5, pr: { xs: 0, md: 9 } }} secondaryAction={
+                                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5 }}>
+                                  <Tooltip title="Edit"><IconButton size="small" onClick={() => onEditEducation(e)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                                  <Tooltip title="Delete"><IconButton size="small" onClick={() => askDeleteEducation(e.id, `${e.school} — ${e.degree}`)}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                                </Box>
+                              }>
+                                <ListItemText
+                                  primary={<Typography variant="body2" fontWeight={500}>{e.degree || "Degree"} — {e.school || "School"}</Typography>}
+                                  secondary={
+                                    <Stack component="span" spacing={0.5}>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {[(e.start_date || "").slice(0, 4), (e.end_date || "").slice(0, 4)].filter(Boolean).join(" - ")}
+                                        {e.field_of_study ? ` · ${e.field_of_study}` : ""}
+                                        {e.grade ? ` · Grade: ${e.grade}` : ""}
+                                      </Typography>
+
+                                      {/* --- NEW: Display Document Chips --- */}
+                                      {e.documents && e.documents.length > 0 && (
+                                        <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>
+                                          {e.documents.map((doc) => (
+                                            <Chip
+                                              key={doc.id}
+                                              icon={<InsertDriveFileIcon style={{ fontSize: 14 }} />}
+                                              label={doc.filename}
+                                              size="small"
+                                              variant="outlined"
+                                              onClick={() => window.open(doc.file, '_blank')}
+                                              sx={{ cursor: 'pointer', height: 24, fontSize: '0.75rem' }}
+                                            />
+                                          ))}
+                                        </Stack>
+                                      )}
+                                    </Stack>
+                                  }
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'grey.200', mx: 'auto' }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>This section is empty</Typography><Box><Button variant="contained" color="success" size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
+                      </SectionCard>
+                      <SectionCard sx={{ mt: 2 }} title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                        <List dense disablePadding>
+                          <ListItem disableGutters secondaryAction={
+                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                            </Box>
+                          }>
+                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>} secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>} />
+                          </ListItem>
+                          <ListItem disableGutters secondaryAction={
+                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                            </Box>
+                          }>
+                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>} secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>} />
+                          </ListItem>
+                        </List>
+                      </SectionCard>
+
+
+                    </Grid>
+
+                    {/* RIGHT COLUMN */}
+                    <Grid item xs={12} lg={6}>
+                      <SectionCard
+                        title="Contact"
+                        action={
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={openEditContact}>
+                              <EditRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        <Label>Social Media Links</Label>
+                        <List dense disablePadding>
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 34, mr: 0.5 }}><LinkedInIcon fontSize="small" /></ListItemIcon>
+                            <ListItemText primary={<Typography variant="body2" sx={{ wordBreak: 'break-word' }}>{parseLinks(form.linksText).linkedin || '—'}</Typography>} />
+                          </ListItem>
+                        </List>
+                        <Label sx={{ mt: 2 }}>Emails</Label>
+                        <List dense disablePadding>
+                          <ListItem sx={{ px: 0 }}>
+                            <ListItemIcon sx={{ minWidth: 34 }}><EmailIcon fontSize="small" /></ListItemIcon>
+                            <ListItemText primary={<Typography variant="body2">{form.email || '—'}</Typography>} secondary={<Typography variant="caption" color="text.secondary" display="block">Private field.</Typography>} />
+                          </ListItem>
+                        </List>
+                        <Label sx={{ mt: 2, mb: 1 }}>Live Location</Label>
+                        {form.location ? <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{form.location}</Typography></Box> : <Box sx={{ height: 100, borderRadius: 1, bgcolor: 'grey.100', border: '1px solid', borderColor: 'divider' }} />}
+                      </SectionCard>
+
+                      <SectionCard sx={{ mt: 2 }} title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                        <List dense disablePadding>
+                          <ListItem disableGutters secondaryAction={
+                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                            </Box>
+                          }>
+                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>} secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>} />
+                          </ListItem>
+                          <ListItem disableGutters secondaryAction={
+                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                            </Box>
+                          }>
+                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>} secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>} />
+                          </ListItem>
+                        </List>
+                      </SectionCard>
+
+                      <SectionCard sx={{ mt: 2 }} title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
+                        <List dense disablePadding>
+                          <ListItem disableGutters secondaryAction={
+                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                            </Box>
+                          }>
+                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>} secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>} />
+                          </ListItem>
+                          <ListItem disableGutters secondaryAction={
+                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
+                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
+                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
+                            </Box>
+                          }>
+                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>} secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>} />
+                          </ListItem>
+                        </List>
+                      </SectionCard>
+                      {/* --- LANGUAGES SECTION --- */}
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Languages"
+                        action={
+                          <Tooltip title="Add Language">
+                            <IconButton size="small" onClick={openAddLanguage}>
+                              <AddRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        {langList.length > 0 ? (
+                          <List dense disablePadding>
+                            {langList.map((l) => (
+                              <ListItem
+                                key={l.id}
+                                disableGutters
+                                secondaryAction={
+                                  <Box sx={{ display: "flex", gap: 1 }}>
+                                    <IconButton size="small" onClick={() => onEditLanguage(l)}>
+                                      <EditOutlinedIcon fontSize="small" />
+                                    </IconButton>
+                                    <Tooltip title="Delete">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => askDeleteLanguage(l.id, l.language.english_name)}
+                                      >
+                                        <DeleteOutlineIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
                                   </Box>
                                 }
-                                secondary={
-                                  <>
-                                    <Typography variant="body2" component="span" display="block">
-                                      {CEFR_OPTIONS.find(c => c.value === l.proficiency_cefr)?.label || l.proficiency_cefr}
-                                    </Typography>
-                                    {/* Show certificates if any exist */}
-                                    {l.certificates && l.certificates.length > 0 && (
-                                      <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-                                        {l.certificates.map(c => (
-                                          <Chip
-                                            key={c.id}
-                                            label="Certificate"
-                                            size="small"
-                                            icon={<VerifiedRoundedIcon />}
-                                            variant="outlined"
-                                            color={c.verified ? "success" : "default"}
-                                            onClick={() => window.open(c.file, '_blank')}
-                                          />
-                                        ))}
-                                      </Stack>
-                                    )}
-                                  </>
-                                }
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">Add languages you know.</Typography>
-                      )}
-                    </SectionCard>
+                              >
+                                <ListItemText
+                                  primary={
+                                    <Box component="span" sx={{ fontWeight: 600 }}>
+                                      {l.language.english_name}
+                                      {l.primary_dialect && <Typography component="span" variant="caption" color="text.secondary"> ({l.primary_dialect})</Typography>}
+                                    </Box>
+                                  }
+                                  secondary={
+                                    <>
+                                      <Typography variant="body2" component="span" display="block">
+                                        {CEFR_OPTIONS.find(c => c.value === l.proficiency_cefr)?.label || l.proficiency_cefr}
+                                      </Typography>
+                                      {/* Show certificates if any exist */}
+                                      {l.certificates && l.certificates.length > 0 && (
+                                        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                                          {l.certificates.map(c => (
+                                            <Chip
+                                              key={c.id}
+                                              label="Certificate"
+                                              size="small"
+                                              icon={<VerifiedRoundedIcon />}
+                                              variant="outlined"
+                                              color={c.verified ? "success" : "default"}
+                                              onClick={() => window.open(c.file, '_blank')}
+                                            />
+                                          ))}
+                                        </Stack>
+                                      )}
+                                    </>
+                                  }
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">Add languages you know.</Typography>
+                        )}
+                      </SectionCard>
+                    </Grid>
                   </Grid>
-                </Grid>
-              </Box>
+                </Box>
+              )
             )}
           </main>
         </div>
