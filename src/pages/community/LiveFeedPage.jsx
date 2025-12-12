@@ -1,5 +1,6 @@
 // src/pages/community/LiveFeedPage.jsx
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Avatar, AvatarGroup, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
   Paper, Stack, TextField, Typography, InputAdornment, Popover, Tooltip, Skeleton
@@ -32,6 +33,9 @@ const POST_REACTIONS = [
   { id: "debatable", emoji: "🤷", label: "Debatable" },
 ];
 
+
+
+const NOOP = () => {};
 
 function SuggestedConnections({ list = [] }) {
   const [connected, setConnected] = React.useState(() => new Set());
@@ -1960,7 +1964,18 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         )}
 
         {post.type === "event" && (
-          <EventBlock post={post} onOpen={() => onOpenEvent?.(post.event?.id || post.id)} />
+          <EventBlock
+            post={post}
+            onOpen={() => {
+              const eventId =
+                post?.engage?.id ??
+                post?.event?.id ??
+                post?.event_id ??
+                post?.eventId ??
+                post?.id;
+              onOpenEvent?.(eventId);
+            }}
+          />
         )}
       </Box>
 
@@ -2159,7 +2174,7 @@ function PostSkeleton() {
 export default function LiveFeedPage({
   posts: initialPosts,
   onOpenPost = () => { },
-  onOpenEvent = () => { },
+  onOpenEvent = NOOP,
   onCreatePost = () => { },
   onReact = () => { },
   websocketUrl,
@@ -2176,6 +2191,97 @@ export default function LiveFeedPage({
   // Search
   const [query, setQuery] = React.useState("");
   const dq = useDebounced(query, 400);
+
+  const navigate = useNavigate();
+
+  // Smart routing for "View Event" inside Live Feed:
+  // - if user has registered/purchased the event -> /account/events
+  // - else -> /events
+  const myRegisteredEventIdsRef = React.useRef(new Set());
+  const [myRegisteredLoaded, setMyRegisteredLoaded] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const headers = authHeaders?.() || {};
+        const hasAuth = Boolean(headers.Authorization || headers.authorization);
+        if (!hasAuth) {
+          if (!cancelled) setMyRegisteredLoaded(true);
+          return;
+        }
+
+        const candidatePaths = [
+          "events/my-registrations/?page_size=1000",
+          "events/registrations/mine/?page_size=1000",
+          "event-registrations/mine/?page_size=1000",
+          "events/registered/?page_size=1000",
+        ];
+
+        for (const path of candidatePaths) {
+          try {
+            const res = await fetch(toApiUrl(path), {
+              headers: { Accept: "application/json", ...headers },
+            });
+            if (!res.ok) continue;
+
+            const j = await res.json();
+            const rows = Array.isArray(j) ? j : (j.results || j.data || []);
+
+            const ids = [];
+            for (const row of rows) {
+              let id =
+                row?.event_id ??
+                row?.eventId ??
+                row?.event;
+
+              if (row?.event && typeof row.event === "object") id = row.event?.id;
+
+              // Some APIs might return the event objects directly
+              if (id == null && row?.id != null) id = row.id;
+
+              if (id != null) ids.push(id);
+            }
+
+            if (ids.length) {
+              myRegisteredEventIdsRef.current = new Set(
+                ids.map((x) => {
+                  const n = Number(x);
+                  return Number.isNaN(n) ? x : n;
+                }),
+              );
+            }
+            break;
+          } catch {
+            // try next endpoint
+          }
+        }
+      } finally {
+        if (!cancelled) setMyRegisteredLoaded(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  const smartOpenEvent = React.useCallback((eventId) => {
+    const n = Number(eventId);
+    const key = Number.isNaN(n) ? eventId : n;
+
+    // If we don't know yet, safest is public events page
+    if (!myRegisteredLoaded || key == null) {
+      navigate("/events");
+      return;
+    }
+
+    const isRegistered = myRegisteredEventIdsRef.current.has(key);
+    navigate(isRegistered ? "/account/events" : "/events");
+  }, [navigate, myRegisteredLoaded]);
+
+  // If parent passes a handler, keep it. Otherwise use smart routing.
+  const openEvent = onOpenEvent === NOOP ? smartOpenEvent : onOpenEvent;
+
 
   // Suggested connections (fetched once)
   const [suggested, setSuggested] = React.useState([]);
@@ -2953,7 +3059,7 @@ export default function LiveFeedPage({
                     <PostCard
                       post={p}
                       onReact={handleReact}
-                      onOpenEvent={onOpenEvent}
+                      onOpenEvent={openEvent}
                       onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
                     />
                   </Box>
