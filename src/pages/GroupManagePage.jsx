@@ -114,6 +114,59 @@ const cleanPollOptions = (arr) => {
     return out;
 };
 
+function ClampedText({ text = "", lines = 5, sx = {} }) {
+    const [expanded, setExpanded] = React.useState(false);
+    const [showToggle, setShowToggle] = React.useState(false);
+    const ref = React.useRef(null);
+
+    React.useLayoutEffect(() => {
+        if (!ref.current || expanded) return;
+
+        // Wait a frame so line-clamp styles apply before measuring
+        const id = requestAnimationFrame(() => {
+            const el = ref.current;
+            const overflow = el.scrollHeight > el.clientHeight + 1;
+            setShowToggle(overflow);
+        });
+
+        return () => cancelAnimationFrame(id);
+    }, [text, lines, expanded]);
+
+    if (!text) return null;
+
+    return (
+        <Box sx={{ ...sx }}>
+            <Box
+                ref={ref}
+                sx={{
+                    whiteSpace: "pre-wrap",   // ✅ keeps \n exactly like LinkedIn
+                    wordBreak: "break-word",  // ✅ prevents long URL overflow
+                    ...(expanded
+                        ? {}
+                        : {
+                            display: "-webkit-box",
+                            WebkitLineClamp: lines,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                        }),
+                }}
+            >
+                {text}
+            </Box>
+
+            {showToggle && (
+                <Button
+                    size="small"
+                    onClick={() => setExpanded((v) => !v)}
+                    sx={{ textTransform: "none", px: 0, mt: 0.5, color: "#0ea5a4" }}
+                >
+                    {expanded ? "See less" : "See more"}
+                </Button>
+            )}
+        </Box>
+    );
+}
+
 
 function mapFeedPollToPost(row) {
     const m = row?.metadata || {};
@@ -1026,13 +1079,13 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
             // Support various user shapes (liker, actor, user, etc.)
             const u = r.user || r.actor || r.liker || r.owner || r.created_by || r;
             const id = u?.id ?? r.user_id ?? r.id;
-            
+
             const name = u.name || u.full_name || u.username || (u.first_name ? `${u.first_name} ${u.last_name || ""}` : `User #${id}`);
             const avatar = toAbs(u.avatar || u.photo || u.photo_url || u.image || null);
 
             // Determine reaction type
-            const reactionId = r.reaction || r.reaction_type || r.kind || "like"; 
-            const def = POST_REACTIONS.find(x => x.id === reactionId) || POST_REACTIONS[0]; 
+            const reactionId = r.reaction || r.reaction_type || r.kind || "like";
+            const def = POST_REACTIONS.find(x => x.id === reactionId) || POST_REACTIONS[0];
 
             return id ? { id, name, avatar, reactionId, reactionEmoji: def.emoji, reactionLabel: def.label } : null;
         }).filter(Boolean);
@@ -1595,7 +1648,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
         comments: post.comment_count ?? post.metrics?.comments ?? 0,
     });
     const [shareCount, setShareCount] = React.useState(post.share_count ?? post.metrics?.shares ?? 0);
-    
+
     // "myReaction" holds the string ID (e.g., 'like', 'spot_on') or null
     const [myReaction, setMyReaction] = React.useState(
         post.my_reaction || post.user_reaction || (post.user_has_liked ? "like" : null)
@@ -1622,21 +1675,21 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
             const token = getToken?.();
             const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
             const url = `${API_ROOT}/engagements/metrics/?target_type=activity_feed.feeditem&ids=${fid}`;
-            
+
             const res = await fetch(url, { headers });
             if (!res.ok) return;
 
             const j = await res.json().catch(() => ({}));
             // Handle various response shapes
-            const rows = Array.isArray(j?.results) ? j.results : 
-                         (j && typeof j === "object" && j[fid]) ? [j[fid]] : [];
-            
+            const rows = Array.isArray(j?.results) ? j.results :
+                (j && typeof j === "object" && j[fid]) ? [j[fid]] : [];
+
             const row = rows?.[0] || {};
             const m = row.metrics || row;
 
-            setCounts({ 
-                likes: m.likes ?? m.like_count ?? 0, 
-                comments: m.comments ?? m.comment_count ?? 0 
+            setCounts({
+                likes: m.likes ?? m.like_count ?? 0,
+                comments: m.comments ?? m.comment_count ?? 0
             });
             setShareCount(m.shares ?? m.share_count ?? 0);
 
@@ -1654,7 +1707,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
     // Initial Load
     React.useEffect(() => {
         fetchCounts();
-        
+
         // Fetch liker preview
         (async () => {
             try {
@@ -1673,7 +1726,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                         };
                     }));
                 }
-            } catch {}
+            } catch { }
         })();
     }, [fid, fetchCounts]);
 
@@ -1690,7 +1743,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
         // else switching (no total count change)
 
         const newReaction = (isSame && reactionId) ? null : reactionId;
-        
+
         setMyReaction(newReaction);
         setCounts(c => ({ ...c, likes: Math.max(0, c.likes + delta) }));
 
@@ -1700,9 +1753,9 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
             const res = await fetch(`${API_ROOT}/engagements/reactions/toggle/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify({ 
-                    target_type: "activity_feed.feeditem", 
-                    target_id: fid, 
+                body: JSON.stringify({
+                    target_type: "activity_feed.feeditem",
+                    target_id: fid,
                     reaction: reactionId // Send specific reaction ID
                 }),
             });
@@ -1731,7 +1784,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
             const others = Math.max(0, counts.likes - 2);
             likeLine = others > 0 ? `${likeNames[0]} and ${others} others` : `${likeNames[0]} and ${likeNames[1]}`;
         } else {
-             likeLine = `${counts.likes} reactions`;
+            likeLine = `${counts.likes} reactions`;
         }
     }
 
@@ -1770,19 +1823,19 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
 
             {/* BOTTOM ROW — actions (REACTION / COMMENT / SHARE) */}
             <Stack direction="row" spacing={1.5} alignItems="center" sx={{ px: 1, pb: 1 }}>
-                
+
                 {/* REACTION BUTTON */}
                 <Button
                     size="small"
                     onClick={handleOpenPicker}
                     sx={{
-                         textTransform: "uppercase",
-                         color: hasReaction ? "#10b8a6" : "inherit", // Teal if active
-                         fontWeight: hasReaction ? 700 : 400,
+                        textTransform: "uppercase",
+                        color: hasReaction ? "#10b8a6" : "inherit", // Teal if active
+                        fontWeight: hasReaction ? 700 : 400,
                     }}
                     // Show Emoji if specific reaction, else Heart icon fallback
-                    startIcon={hasReaction 
-                        ? <span style={{ fontSize: 18, lineHeight: 1, marginRight: 4 }}>{likeBtnEmoji}</span> 
+                    startIcon={hasReaction
+                        ? <span style={{ fontSize: 18, lineHeight: 1, marginRight: 4 }}>{likeBtnEmoji}</span>
                         : <FavoriteBorderRoundedIcon />
                     }
                 >
@@ -3190,7 +3243,7 @@ export default function GroupManagePage() {
             if (postType === "image") {
                 const fd = new FormData();
                 fd.append("type", "image");
-                if (postText) fd.append("text", postText.trim());
+                if (postText.trim()) fd.append("text", postText);
                 if (postImageFile) fd.append("image", postImageFile, postImageFile.name);
                 const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
                     method: "POST",
@@ -3202,7 +3255,7 @@ export default function GroupManagePage() {
                     throw new Error(j?.detail || `HTTP ${res.status}`);
                 }
             } else if (postType === "link") {
-                const payload = { type: "link", url: postLinkUrl.trim(), text: postText.trim() };
+                const payload = { type: "link", url: postLinkUrl.trim(), text: postText };
                 const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -3234,7 +3287,7 @@ export default function GroupManagePage() {
                     title: eventTitle.trim(),
                     starts_at: eventStart ? new Date(eventStart).toISOString() : null,
                     ends_at: eventEnd ? new Date(eventEnd).toISOString() : null,
-                    text: postText.trim() || undefined,
+                    text: postText || undefined,
                 };
                 const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
                     method: "POST",
@@ -3247,7 +3300,7 @@ export default function GroupManagePage() {
                 }
             } else {
                 // text
-                const payload = { type: "text", text: postText.trim() };
+                const payload = { type: "text", text: postText };
                 const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -4029,6 +4082,8 @@ export default function GroupManagePage() {
                                                                 <TextField
                                                                     label="Caption (optional)"
                                                                     fullWidth
+                                                                    multiline
+                                                                    minRows={2}
                                                                     value={postText}
                                                                     onChange={(e) => setPostText(e.target.value)}
                                                                 />
@@ -4064,6 +4119,8 @@ export default function GroupManagePage() {
                                                                 <TextField
                                                                     label="Comment (optional)"
                                                                     fullWidth
+                                                                    multiline
+                                                                    minRows={2}
                                                                     value={postText}
                                                                     onChange={(e) => setPostText(e.target.value)}
                                                                 />
@@ -4170,7 +4227,7 @@ export default function GroupManagePage() {
 
                                                             {p.type === "image" ? (
                                                                 <>
-                                                                    {p.text && <Typography className="mb-2">{p.text}</Typography>}
+                                                                    {p.text && <ClampedText text={p.text} sx={{ mb: 1 }} />}
                                                                     {p.image && (
                                                                         <img
                                                                             alt="post"
@@ -4181,9 +4238,14 @@ export default function GroupManagePage() {
                                                                 </>
                                                             ) : p.type === "link" ? (
                                                                 <>
-                                                                    {p.text && <Typography className="mb-1">{p.text}</Typography>}
+                                                                    {p.text && <ClampedText text={p.text} sx={{ mb: 0.5 }} />}
                                                                     {p.url && (
-                                                                        <a href={toAbs(p.url)} target="_blank" rel="noreferrer" style={{ color: "#0ea5a4" }}>
+                                                                        <a
+                                                                            href={toAbs(p.url)}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            style={{ color: "#0ea5a4", wordBreak: "break-word" }}
+                                                                        >
                                                                             <LinkRoundedIcon fontSize="small" /> {p.url}
                                                                         </a>
                                                                     )}
@@ -4206,10 +4268,10 @@ export default function GroupManagePage() {
                                                                     <Typography variant="caption" className="text-slate-600">
                                                                         {p.starts_at ? new Date(p.starts_at).toLocaleString() : ""} — {p.ends_at ? new Date(p.ends_at).toLocaleString() : ""}
                                                                     </Typography>
-                                                                    {p.text && <Typography className="mt-1">{p.text}</Typography>}
+                                                                    {p.text && <ClampedText text={p.text} sx={{ mt: 1 }} />}
                                                                 </>
                                                             ) : (
-                                                                <Typography>{p.text}</Typography>
+                                                                <ClampedText text={p.text || ""} />
                                                             )}
                                                             <GroupPostSocialBar
                                                                 groupIdOrSlug={idOrSlug}
