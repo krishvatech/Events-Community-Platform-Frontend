@@ -1,12 +1,11 @@
 // src/pages/MyRecordingsPage.jsx
 // Attendee view: shows recordings for events the logged-in user registered for.
-
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box, Button, Chip, Container, Divider, Grid,
   Card as MUICard, CardContent, LinearProgress, Paper,
   Typography, TextField, InputAdornment, Pagination,
-  Select, MenuItem, FormControl, InputLabel,
+  Select, MenuItem, FormControl, InputLabel, Skeleton
 } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
@@ -66,6 +65,69 @@ const handleDownload = async (recordingUrl) => {
     alert(`Failed to download recording: ${err.message}`);
   }
 };
+
+function RecordingCardSkeleton() {
+  return (
+    <MUICard
+      elevation={0}
+      className="rounded-2xl border border-slate-200 overflow-hidden"
+      sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+    >
+      <Box
+        sx={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: "16/9",
+          background: "#E5E7EB",
+        }}
+      >
+        <Skeleton
+          variant="rectangular"
+          sx={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        />
+      </Box>
+
+      <CardContent sx={{ display: "flex", flexDirection: "column", flexGrow: 1 }}>
+        <Skeleton variant="text" height={26} width="85%" />
+        <Skeleton variant="text" height={18} width="65%" />
+        <Skeleton variant="text" height={18} width="55%" />
+
+        <Divider className="my-3" />
+
+        <Box
+          sx={{
+            mt: 1.5,
+            display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
+            gap: 1.5,
+            alignItems: { xs: "stretch", sm: "center" },
+          }}
+        >
+          <Skeleton variant="rounded" height={32} sx={{ borderRadius: 2, width: { xs: "100%", sm: 110 } }} />
+          <Skeleton variant="rounded" height={32} sx={{ borderRadius: 2, width: { xs: "100%", sm: 120 } }} />
+        </Box>
+      </CardContent>
+    </MUICard>
+  );
+}
+
+function RecordingsGridSkeleton({ count = 6 }) {
+  return (
+    <>
+      <Grid container spacing={{ xs: 2, sm: 2.5, md: 3 }} sx={{ alignItems: "stretch" }}>
+        {Array.from({ length: count }).map((_, idx) => (
+          <Grid key={idx} item xs={12} sm={4} md={4} lg={4}>
+            <RecordingCardSkeleton />
+          </Grid>
+        ))}
+      </Grid>
+
+      <Box className="mt-4 flex justify-center">
+        <Skeleton variant="rounded" width={240} height={40} sx={{ borderRadius: 2 }} />
+      </Box>
+    </>
+  );
+}
 
 export default function MyRecordingsPage() {
   const [loading, setLoading] = useState(true);
@@ -180,7 +242,7 @@ export default function MyRecordingsPage() {
               </div>
             </Paper>
 
-            {loading && <LinearProgress />}
+            {loading && <RecordingsGridSkeleton count={PER_PAGE} />}
 
             {!loading && error && (
               <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
