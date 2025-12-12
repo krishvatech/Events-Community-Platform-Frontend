@@ -15,6 +15,7 @@ import {
   Card as MUICard,
   CardContent,
   Pagination,
+  Skeleton
 } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
@@ -517,6 +518,49 @@ function EventRow({ ev }) {
   );
 }
 
+function EventCardSkeleton() {
+  return (
+    <MUICard className="rounded-3xl border border-slate-200 overflow-hidden">
+      <Skeleton variant="rectangular" height={200} />
+      <CardContent sx={{ p: 3 }}>
+        <Skeleton variant="text" height={30} width="85%" />
+        <Box sx={{ mt: 1 }}>
+          <Skeleton variant="text" width="65%" />
+          <Skeleton variant="text" width="75%" />
+          <Skeleton variant="text" width="55%" />
+        </Box>
+
+        <Box sx={{ mt: 2 }}>
+          <Skeleton variant="rounded" height={44} />
+        </Box>
+      </CardContent>
+    </MUICard>
+  );
+}
+
+function EventRowSkeleton() {
+  return (
+    <MUICard className="rounded-3xl border border-slate-200 overflow-hidden">
+      <div className="flex flex-col md:flex-row">
+        <Box sx={{ width: { xs: "100%", md: 260 }, flexShrink: 0 }}>
+          <Skeleton variant="rectangular" height={170} />
+        </Box>
+
+        <CardContent sx={{ flex: 1 }}>
+          <Skeleton variant="text" height={28} width="70%" />
+          <Skeleton variant="text" width="90%" />
+          <Skeleton variant="text" width="80%" />
+          <Skeleton variant="text" width="60%" />
+        </CardContent>
+
+        <Box className="p-4 md:p-6 md:pl-0 shrink-0 w-full md:w-[240px]">
+          <Skeleton variant="text" height={28} width="40%" />
+          <Skeleton variant="rounded" height={44} />
+        </Box>
+      </div>
+    </MUICard>
+  );
+}
 
 // ————————————————————————————————————————
 // Page
@@ -527,6 +571,10 @@ export default function EventsPage() {
   // raw events payload coming from the server (we'll enrich it with the "registered" flag)
   const [rawEvents, setRawEvents] = useState([]);
   const PAGE_SIZE = 9; // 9 items per page
+  const skeletonItems = useMemo(
+    () => Array.from({ length: PAGE_SIZE }, (_, i) => i),
+    [PAGE_SIZE]
+  );
   const [page, setPage] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [view, setView] = useState("grid"); // 'grid' | 'list'
@@ -1387,7 +1435,11 @@ export default function EventsPage() {
             <div className="w-full">
               <h2 className="text-3xl font-bold">Upcoming Events</h2>
               <p className="text-neutral-600 mt-1">
-                {loading ? "Loading…" : `${total} events found`}
+                {loading ? (
+                  <Skeleton variant="text" width={140} sx={{ display: "inline-block" }} />
+                ) : (
+                  `${total} events found`
+                )}
               </p>
               {error && (
                 <p className="mt-2 text-red-600 text-sm">
@@ -1410,19 +1462,31 @@ export default function EventsPage() {
                   },
                 }}
               >
-                {events.map((ev) => (
-                  <Box key={ev.id}>
-                    <EventCard ev={ev} />
-                  </Box>
-                ))}
+                {loading
+                  ? skeletonItems.map((i) => (
+                    <Box key={`sk-grid-${i}`}>
+                      <EventCardSkeleton />
+                    </Box>
+                  ))
+                  : events.map((ev) => (
+                    <Box key={ev.id}>
+                      <EventCard ev={ev} />
+                    </Box>
+                  ))}
               </Box>
             ) : (
               <Grid container spacing={3} direction="column">
-                {events.map((ev) => (
-                  <Grid item key={ev.id} xs={12}>
-                    <EventRow ev={ev} />
-                  </Grid>
-                ))}
+                {loading
+                  ? skeletonItems.map((i) => (
+                    <Grid item key={`sk-list-${i}`} xs={12}>
+                      <EventRowSkeleton />
+                    </Grid>
+                  ))
+                  : events.map((ev) => (
+                    <Grid item key={ev.id} xs={12}>
+                      <EventRow ev={ev} />
+                    </Grid>
+                  ))}
               </Grid>
             )}
           </Grid>
@@ -1640,7 +1704,10 @@ export default function EventsPage() {
         )}
 
         {/* Pagination */}
-        <Box className="mt-8 flex items-center justify-center">
+        <Box
+          className="mt-8 flex items-center justify-center"
+          sx={{ opacity: loading ? 0.6 : 1, pointerEvents: loading ? "none" : "auto" }}
+        >
           <Pagination
             count={pageCount}
             page={page}
