@@ -22,6 +22,7 @@ import {
 import { Checkbox, ListItemButton } from "@mui/material";
 import { Tabs, Tab, ListItemSecondaryAction } from "@mui/material";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
+import { isOwnerUser, isStaffUser } from "../../utils/adminRole.js";
 
 const BORDER = "#e2e8f0";
 // LinkedIn-style reactions 
@@ -35,7 +36,7 @@ const POST_REACTIONS = [
 
 
 
-const NOOP = () => {};
+const NOOP = () => { };
 
 function SuggestedConnections({ list = [] }) {
   const [connected, setConnected] = React.useState(() => new Set());
@@ -2269,14 +2270,21 @@ export default function LiveFeedPage({
     const n = Number(eventId);
     const key = Number.isNaN(n) ? eventId : n;
 
-    // If we don't know yet, safest is public events page
     if (!myRegisteredLoaded || key == null) {
       navigate("/events");
       return;
     }
 
     const isRegistered = myRegisteredEventIdsRef.current.has(key);
-    navigate(isRegistered ? "/account/events" : "/events");
+
+    // ✅ staff OR superuser -> admin/events if registered
+    const adminSide = isOwnerUser() || isStaffUser();
+
+    if (isRegistered) {
+      navigate(adminSide ? "/admin/events" : "/account/events");
+    } else {
+      navigate("/events");
+    }
   }, [navigate, myRegisteredLoaded]);
 
   // If parent passes a handler, keep it. Otherwise use smart routing.
