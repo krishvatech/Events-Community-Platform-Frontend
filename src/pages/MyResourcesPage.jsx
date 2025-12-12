@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import {
   Box, Container, Divider, TextField,
   List, ListItem, ListItemIcon, ListItemText, Chip, Paper,
-  Typography, InputAdornment, Stack, Pagination, CircularProgress,
+  Typography, InputAdornment, Stack, Pagination, Skeleton,
   IconButton, FormControl, Select, MenuItem, Button, useTheme, useMediaQuery, Menu,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +25,46 @@ import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
 const API_URL = API.endsWith("/api") ? API : `${API}/api`;
 
+function ResourcesListSkeleton({ rows = 10, isMobile }) {
+  return (
+    <List>
+      {Array.from({ length: rows }).map((_, idx) => (
+        <React.Fragment key={idx}>
+          {idx > 0 && <Divider />}
+          <ListItem
+            secondaryAction={
+              isMobile ? (
+                <Skeleton variant="circular" width={32} height={32} />
+              ) : (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Skeleton variant="rounded" width={56} height={22} />
+                  <Skeleton variant="circular" width={32} height={32} />
+                  <Skeleton variant="circular" width={32} height={32} />
+                  <Skeleton variant="circular" width={32} height={32} />
+                </Stack>
+              )
+            }
+          >
+            <ListItemIcon>
+              <Skeleton variant="circular" width={28} height={28} />
+            </ListItemIcon>
+
+            <ListItemText
+              primary={<Skeleton variant="text" width="40%" height={28} />}
+              secondary={
+                <>
+                  <Skeleton variant="text" width="75%" />
+                  <Skeleton variant="text" width="30%" />
+                </>
+              }
+            />
+          </ListItem>
+        </React.Fragment>
+      ))}
+    </List>
+  );
+}
+
 export default function MyResourcesPage() {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -33,7 +73,7 @@ export default function MyResourcesPage() {
   const [filterType, setFilterType] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [page, setPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 5;
 
   const [currentUser, setCurrentUser] = useState(null);
   const [registeredEvents, setRegisteredEvents] = useState([]);
@@ -45,6 +85,7 @@ export default function MyResourcesPage() {
 
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [menuResource, setMenuResource] = useState(null);
+  const [registrationsLoaded, setRegistrationsLoaded] = useState(false);
 
   const handleMenuOpen = (event, resource) => {
     event.preventDefault();
@@ -76,34 +117,47 @@ export default function MyResourcesPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchRegisteredEvents = async () => {
-      if (!currentUser) return;
       try {
         const token = localStorage.getItem("access_token");
         const response = await fetch(`${API_URL}/event-registrations/mine/`, {
-          headers: { "Authorization": `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
+
         if (!response.ok) throw new Error("Failed to fetch registrations");
+
         const data = await response.json();
-        let registrations = Array.isArray(data) ? data : data.results || [];
+        const registrations = Array.isArray(data) ? data : data.results || [];
+
         const eventIds = registrations
-          .map(reg => {
-            if (reg.event && typeof reg.event === 'object') return reg.event.id;
+          .map((reg) => {
+            if (reg.event && typeof reg.event === "object") return reg.event.id;
             return reg.event_id || reg.event;
           })
           .filter(Boolean);
-        setRegisteredEvents(eventIds);
+
+        if (!cancelled) setRegisteredEvents(eventIds);
       } catch (error) {
         console.error("Error fetching registrations:", error);
-        setRegisteredEvents([]);
+        if (!cancelled) setRegisteredEvents([]);
+      } finally {
+        if (!cancelled) setRegistrationsLoaded(true);
       }
     };
+
     fetchRegisteredEvents();
-  }, [currentUser]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
 
   // Fetch resources with pagination
   useEffect(() => {
     const fetchResources = async () => {
+      if (!currentUser || !registrationsLoaded) return;
       if (registeredEvents.length === 0) {
         setResourcesLoading(false);
         setResources([]);
@@ -174,7 +228,7 @@ export default function MyResourcesPage() {
     };
 
     fetchResources();
-  }, [registeredEvents, page, searchQuery, filterType, sortBy]);
+  }, [currentUser, registrationsLoaded, registeredEvents, page, searchQuery, filterType, sortBy]);
 
 
   const getResourceIcon = (type) => {
@@ -252,24 +306,7 @@ export default function MyResourcesPage() {
     navigate(`/resource/${resource.id}`);
   };
 
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery, filterType, sortBy]);
-
   const totalPages = Math.ceil(resourcesTotal / itemsPerPage);
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <Container maxWidth="lg" className="py-6 sm:py-8">
-          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
-            <CircularProgress />
-          </Box>
-        </Container>
-      </div>
-    );
-  }
 
 
   return (
@@ -298,7 +335,10 @@ export default function MyResourcesPage() {
               <TextField
                 placeholder="Search resources..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -319,7 +359,11 @@ export default function MyResourcesPage() {
                   minWidth: { xs: "100%", sm: 220, md: 120 }, // full width below search
                 }}
               >
-                <Select value={filterType} onChange={(e) => setFilterType(e.target.value)} displayEmpty>
+                <Select value={filterType} onChange={(e) => {
+                  setFilterType(e.target.value);
+                  setPage(1);
+                }}
+                  displayEmpty>
                   <MenuItem value="">Type</MenuItem>
                   <MenuItem value="file">File</MenuItem>
                   <MenuItem value="video">Video</MenuItem>
@@ -353,7 +397,11 @@ export default function MyResourcesPage() {
                     flexGrow: { xs: 1, sm: 0, md: 0 }, // stretches on small screens
                   }}
                 >
-                  <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                  <Select value={sortBy} onChange={(e) => {
+                    setSortBy(e.target.value);
+                    setPage(1);
+                  }}
+                  >
                     <MenuItem value="newest">Newest first</MenuItem>
                     <MenuItem value="oldest">Oldest first</MenuItem>
                   </Select>
@@ -368,9 +416,7 @@ export default function MyResourcesPage() {
               </Typography>
               <Paper variant="outlined" sx={{ borderRadius: 2 }}>
                 {resourcesLoading ? (
-                  <Box sx={{ display: "flex", justifyContent: "center", p: 8 }}>
-                    <CircularProgress />
-                  </Box>
+                  <ResourcesListSkeleton rows={itemsPerPage} isMobile={isMobile} />
                 ) : resources.length === 0 ? (
                   <Box sx={{ p: 8, textAlign: "center" }}>
                     <Typography variant="h6" color="text.secondary" gutterBottom>No resources found</Typography>
