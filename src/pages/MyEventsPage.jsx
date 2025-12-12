@@ -1,6 +1,5 @@
-
+// src/pages/MyEventsPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
-// Added useNavigate for programmatic navigation to live session after token creation
 import { Link, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -18,6 +17,7 @@ import {
   Alert,
   CircularProgress, // MOD: spinner for joining state
   Pagination,
+  Skeleton
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
 import AccountSidebar from "../components/AccountSidebar.jsx";
@@ -303,6 +303,52 @@ function EventCard({ ev, onJoinLive, isJoining }) {
   );
 }
 
+function EventCardSkeleton() {
+  return (
+    <Paper
+      elevation={0}
+      className="flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+      sx={{ borderRadius: 2, height: "auto" }}
+    >
+      {/* 16:9 image skeleton */}
+      <Box
+        sx={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: "16 / 9",
+          "@supports not (aspect-ratio: 1 / 1)": { height: 200 },
+        }}
+      >
+        <Skeleton
+          variant="rectangular"
+          sx={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        />
+      </Box>
+
+      <Box sx={{ p: 1.75, display: "flex", flexDirection: "column", gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+          <Skeleton variant="rounded" width={70} height={22} />
+          <Skeleton width={60} height={16} />
+        </Box>
+
+        {/* title (2 lines) */}
+        <Skeleton height={20} width="92%" />
+        <Skeleton height={20} width="70%" />
+
+        {/* date/location */}
+        <Skeleton height={14} width="78%" />
+        <Skeleton height={14} width="55%" />
+
+        {/* actions */}
+        <Box sx={{ mt: "auto", display: "flex", gap: 1 }}>
+          <Skeleton variant="rounded" width={96} height={32} />
+          <Skeleton variant="rounded" width={78} height={32} />
+        </Box>
+      </Box>
+    </Paper>
+  );
+}
+
 
 // ---------------------- Main Page (kept with token-join MOD) ----------------------
 export default function MyEventsPage() {
@@ -533,12 +579,23 @@ export default function MyEventsPage() {
             </Stack>
 
             {loading ? (
-              <Box className="flex items-center justify-center py-16">
-                <div className="w-64">
-                  <LinearProgress />
-                  <p className="text-center text-slate-500 mt-3">Loading your events…</p>
-                </div>
-              </Box>
+              <>
+                <Box sx={{ flexGrow: 1 }}>
+                  <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
+                    {Array.from({ length: PAGE_SIZE }).map((_, idx) => (
+                      <Grid key={`sk-${idx}`} size={{ xs: 4, sm: 4, md: 4 }}>
+                        <EventCardSkeleton />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+
+                {/* pagination row skeleton */}
+                <Box className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 gap-3">
+                  <Skeleton width={240} height={22} />
+                  <Skeleton variant="rounded" width={220} height={36} />
+                </Box>
+              </>
             ) : filtered.length === 0 ? (
               <Paper elevation={0} className="rounded-2xl border border-slate-200">
                 <Box className="p-8 text-center">
