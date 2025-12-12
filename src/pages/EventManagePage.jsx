@@ -456,7 +456,7 @@ export default function EventManagePage() {
                     sx={{ fontWeight: 700, color: "text.primary" }}
                   >
                     {Number(event.price) > 0
-                      ? `₹${Number(event.price).toFixed(2)}`
+                      ? `$${Number(event.price).toFixed(2)}`
                       : "Free"}
                   </Typography>
                 )}
@@ -523,11 +523,13 @@ export default function EventManagePage() {
                 variant="body2"
                 sx={{
                   color: "text.secondary",
-                  whiteSpace: "pre-line",
+                  whiteSpace: "pre-wrap",  // ✅ keep \n and \n\n exactly as typed
+                  wordBreak: "break-word", // ✅ long URLs / words won’t overflow
                 }}
               >
                 {event.description || "No description provided."}
               </Typography>
+
 
               <Divider sx={{ my: 2 }} />
 

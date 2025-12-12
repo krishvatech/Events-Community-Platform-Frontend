@@ -224,6 +224,64 @@ const Row = React.memo(function Row({ children }) {
   );
 });
 
+function ExpandablePostText({ text, variant = "body1", color, maxLines = 5 }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [showToggle, setShowToggle] = React.useState(false);
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!ref.current) return;
+
+    // Only measure overflow when collapsed (keep last showToggle when expanded)
+    if (expanded) return;
+
+    const el = ref.current;
+    const raf = requestAnimationFrame(() => {
+      setShowToggle(el.scrollHeight - el.clientHeight > 1);
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [text, maxLines, expanded]);
+
+  const clampSx = expanded
+    ? {}
+    : {
+      display: "-webkit-box",
+      WebkitLineClamp: maxLines,
+      WebkitBoxOrient: "vertical",
+      overflow: "hidden",
+    };
+
+  return (
+    <Box>
+      <Typography
+        ref={ref}
+        variant={variant}
+        color={color}
+        sx={{
+          whiteSpace: "pre-wrap",   // ✅ renders \n like LinkedIn
+          wordBreak: "break-word",  // ✅ long urls won’t overflow
+          ...clampSx,               // ✅ clamp to 5 lines
+        }}
+      >
+        {text}
+      </Typography>
+
+      {showToggle && (
+        <Button
+          size="small"
+          variant="text"
+          onClick={() => setExpanded((v) => !v)}
+          sx={{ p: 0, minWidth: "auto", mt: 0.5, textTransform: "none" }}
+        >
+          {expanded ? "See less" : "See more"}
+        </Button>
+      )}
+    </Box>
+  );
+}
+
+
 // ------- card renderer -------
 function PostCard({ item }) {
   const kind = (item.type || "text").toLowerCase();
@@ -248,9 +306,7 @@ function PostCard({ item }) {
           />
         )}
         {kind === "text" && (
-          <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-            {item.text || ""}
-          </Typography>
+          <ExpandablePostText text={item.text || ""} variant="body1" maxLines={5} />
         )}
 
         {kind === "image" && (
@@ -291,9 +347,7 @@ function PostCard({ item }) {
             </Box>
 
             {item.caption && (
-              <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                {item.caption}
-              </Typography>
+              <ExpandablePostText text={item.caption} variant="body1" maxLines={5} />
             )}
           </Box>
         )}
@@ -328,9 +382,12 @@ function PostCard({ item }) {
               </Typography>
             ) : null}
             {item.description || item.link_description ? (
-              <Typography variant="body2" color="text.secondary">
-                {item.description || item.link_description}
-              </Typography>
+              <ExpandablePostText
+                text={item.description || item.link_description}
+                variant="body2"
+                color="text.secondary"
+                maxLines={5}
+              />
             ) : null}
           </Box>
         )}
@@ -502,7 +559,7 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
         if (kind === "text") payload.content = text;
         if (kind === "image") payload.caption = caption;
         if (kind === "link") Object.assign(payload, {
-          url: linkUrl.trim(), title: linkTitle.trim() || undefined, description: linkDesc.trim() || undefined
+          url: linkUrl.trim(), title: linkTitle.trim() || undefined, description: linkDesc ? linkDesc : undefined
         });
         if (kind === "poll") Object.assign(payload, {
           question, options: pollOptions.map(o => o.trim()).filter(Boolean)
@@ -568,7 +625,14 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
                     Replace image
                     <input hidden type="file" accept="image/*" onChange={(e) => onPickImage(e.target.files?.[0] || null)} />
                   </Button>
-                  <TextField label="Caption" value={caption} onChange={e => setCaption(e.target.value)} fullWidth />
+                  <TextField
+                    label="Caption"
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    fullWidth
+                    multiline
+                    minRows={2}
+                  />
                 </Row>
               </Stack>
             )}
@@ -2096,6 +2160,8 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
                     fullWidth
+                    multiline
+                    minRows={2}
                   />
                 </Row>
               </Stack>

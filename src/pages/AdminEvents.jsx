@@ -333,7 +333,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
     fd.append("title", title.trim());
     fd.append("slug", slug.trim());
-    fd.append("description", description.trim());
+    fd.append("description", description);
     fd.append("location", location.trim());
     fd.append("category", category);
     fd.append("format", format);
@@ -968,7 +968,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     const fd = new FormData();
     fd.append("title", title.trim());
     fd.append("slug", slug.trim());
-    fd.append("description", description.trim());
+    fd.append("description", description);
     fd.append("location", location.trim());
     fd.append("category", category);
     fd.append("format", format);

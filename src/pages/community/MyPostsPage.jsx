@@ -166,6 +166,51 @@ function mapCreateResponseToUiPost(resp) {
 // 3. Sub-Components
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// LinkedIn-style clamp (See more / See less) — preserves newlines
+// -----------------------------------------------------------------------------
+function ClampedText({ text, maxLines = 5 }) {
+  const [expanded, setExpanded] = React.useState(false);
+  if (!text) return null;
+
+  // Rough check to avoid "See more" for very tiny texts
+  const roughLineCount = (text.match(/\n/g) || []).length + 1;
+  const shouldShowToggle = roughLineCount > maxLines || text.length > 280;
+
+  return (
+    <Box sx={{ mt: 1 }}>
+      <Typography
+        variant="body2"
+        sx={{
+          whiteSpace: "pre-wrap",  // ✅ keep \n and \n\n
+          wordBreak: "break-word", // ✅ long URLs/words don’t overflow
+          ...(expanded
+            ? {}
+            : {
+                display: "-webkit-box",
+                WebkitLineClamp: maxLines,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }),
+        }}
+      >
+        {text}
+      </Typography>
+
+      {shouldShowToggle && (
+        <Button
+          size="small"
+          variant="text"
+          sx={{ mt: 0.5, px: 0, textTransform: "none" }}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? "See less" : "See more"}
+        </Button>
+      )}
+    </Box>
+  );
+}
+
 function PostComposer({ communityId, onCreate }) {
   const [tab, setTab] = React.useState("text");
   const [content, setContent] = React.useState("");
@@ -199,7 +244,7 @@ function PostComposer({ communityId, onCreate }) {
     if (!canSubmit) return;
     onCreate({
       type: tab,
-      content: content.trim(),
+      content: content,
       url: linkUrl.trim(),
       files,
       options: pollOptions.filter((o) => o.trim()),
@@ -215,9 +260,57 @@ function PostComposer({ communityId, onCreate }) {
         <Tab icon={<LinkRoundedIcon />} iconPosition="start" value="link" label="Link" />
         <Tab icon={<BarChartRoundedIcon />} iconPosition="start" value="poll" label="Poll" />
       </Tabs>
-      {tab === "text" && <TextField fullWidth multiline minRows={3} value={content} onChange={(e) => setContent(e.target.value)} placeholder="What's on your mind?" />}
-      {tab === "image" && <Stack spacing={2}><TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Caption (optional)" /><input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={handleImageFiles} /><Button variant="outlined" startIcon={<ImageRoundedIcon />} onClick={() => fileInputRef.current?.click()}>Choose images</Button>{images.length > 0 && <Grid container spacing={1}>{images.map((src, i) => <Grid key={i} item xs={4}><img src={src} alt="p" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 4 }} /></Grid>)}</Grid>}</Stack>}
-      {tab === "link" && <Stack spacing={2}><TextField fullWidth value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." InputProps={{ startAdornment: (<InputAdornment position="start"><LinkRoundedIcon /></InputAdornment>) }} /><TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Caption (optional)" /></Stack>}
+      {tab === "text" && (
+        <Stack spacing={1}>
+          <TextField fullWidth multiline minRows={3} value={content} onChange={(e) => setContent(e.target.value)} placeholder="What's on your mind?" />
+          {content && (
+            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+              <Typography variant="caption" color="text.secondary">Preview</Typography>
+              <ClampedText text={content} maxLines={5} />
+            </Box>
+          )}
+        </Stack>
+      )}
+      {tab === "image" && (
+        <Stack spacing={2}>
+          <TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Caption (optional)" />
+          {content && (
+            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+              <Typography variant="caption" color="text.secondary">Preview</Typography>
+              <ClampedText text={content} maxLines={5} />
+            </Box>
+          )}
+          <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={handleImageFiles} />
+          <Button variant="outlined" startIcon={<ImageRoundedIcon />} onClick={() => fileInputRef.current?.click()}>Choose images</Button>
+          {images.length > 0 && (
+            <Grid container spacing={1}>
+              {images.map((src, i) => (
+                <Grid key={i} item xs={4}>
+                  <img src={src} alt="p" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 4 }} />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Stack>
+      )}
+      {tab === "link" && (
+        <Stack spacing={2}>
+          <TextField
+            fullWidth
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            placeholder="https://..."
+            InputProps={{ startAdornment: (<InputAdornment position="start"><LinkRoundedIcon /></InputAdornment>) }}
+          />
+          <TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Caption (optional)" />
+          {content && (
+            <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+              <Typography variant="caption" color="text.secondary">Preview</Typography>
+              <ClampedText text={content} maxLines={5} />
+            </Box>
+          )}
+        </Stack>
+      )}
       {tab === "poll" && <Stack spacing={2}><TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Ask a question..." />{pollOptions.map((opt, i) => <Stack key={i} direction="row" spacing={1}><TextField fullWidth value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} placeholder={`Option ${i + 1}`} /><IconButton onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}><RemoveRoundedIcon /></IconButton></Stack>)}<Button onClick={() => setPollOptions((o) => [...o, ""])} startIcon={<AddRoundedIcon />} sx={{ alignSelf: "flex-start" }}>Add option</Button></Stack>}
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}><Button variant="contained" endIcon={<SendRoundedIcon />} onClick={handleSubmit} disabled={!canSubmit}>Post</Button></Box>
     </Stack>
@@ -388,11 +481,7 @@ function PostCard({
         }
       />
       <CardContent sx={{ pt: 0 }}>
-        {post.content && (
-          <Typography sx={{ whiteSpace: "pre-wrap" }}>
-            {post.content}
-          </Typography>
-        )}
+        {post.content && <ClampedText text={post.content} maxLines={5} />}
 
         {post.type === "link" && post.link && (
           <Button
@@ -1012,7 +1101,33 @@ function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) .
   const [pollOptions, setPollOptions] = React.useState(post?.type === "poll" ? post.options?.map((o) => (typeof o === "string" ? o : o.text || o.label || "")) || ["", ""] : ["", ""]);
   React.useEffect(() => { if (!open || !post) return; const t = post.type || "text"; setTextContent(post.content || ""); setImageCaption(post.content || ""); setLinkUrl(post.link || ""); if (t === "poll") { setPollOptions(post.options?.map((o) => (typeof o === "string" ? o : o.text || o.label || "")) || ["", ""]); } else { setPollOptions(["", ""]); } setImageFile(null); }, [open, post]);
   const handleSave = async () => { if (!post) return; setSaving(true); let options = { method: "PATCH", headers: { ...authHeader() } }; let body; let url; try { if (type === "poll") { const pollId = post.raw_metadata?.poll_id; if (!pollId) throw new Error("Missing poll_id"); url = `${API_ROOT}/activity/feed/polls/${pollId}/`; const validOptions = pollOptions.map((o) => o.trim()).filter(Boolean); if (!textContent.trim() || validOptions.length < 2) { alert("Poll must have a question and at least 2 options."); setSaving(false); return; } options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ question: textContent, options: validOptions }); } else { const communityId = post.raw_metadata?.community_id || post.community_id; if (!communityId) throw new Error("Missing community id"); url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/edit/`; if (type === "text") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ content: textContent }); } else if (type === "link") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ url: linkUrl, description: textContent }); } else if (type === "image") { const fd = new FormData(); fd.append("caption", imageCaption || ""); if (imageFile) fd.append("image", imageFile); body = fd; } } options.body = body; const res = await fetch(url, options); if (!res.ok) throw new Error("Update failed"); const data = await res.json(); let updated = { ...post }; if (type === "poll") { updated.content = data.question; updated.options = data.options; } else { const meta = data.metadata || post.raw_metadata || {}; if (type === "text") updated.content = meta.text || textContent; if (type === "link") { updated.content = meta.description; updated.link = meta.url; } if (type === "image") updated.content = meta.caption; } onSaved(updated); onClose(); } catch (e) { alert("Failed to update post: " + e.message); } finally { setSaving(false); } };
-  const renderBody = () => { if (type === "poll") return <><TextField fullWidth multiline minRows={3} label="Question" value={textContent} onChange={(e) => setTextContent(e.target.value)} sx={{ mb: 2 }} /><Stack spacing={1}><Typography variant="subtitle2">Options</Typography>{pollOptions.map((opt, i) => (<Stack key={i} direction="row" spacing={1}><TextField fullWidth size="small" value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} /><IconButton size="small" onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}><RemoveRoundedIcon fontSize="small" /></IconButton></Stack>))}<Button startIcon={<AddRoundedIcon />} onClick={() => setPollOptions((o) => [...o, ""])} size="small" sx={{ alignSelf: "flex-start" }}>Add Option</Button></Stack></>; if (type === "link") return <><TextField fullWidth label="Link URL" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} sx={{ mb: 2 }} /><TextField fullWidth multiline minRows={3} label="Description" value={textContent} onChange={e => setTextContent(e.target.value)} /></>; if (type === "image") return <Stack spacing={2}><TextField fullWidth multiline minRows={3} label="Caption" value={imageCaption} onChange={e => setImageCaption(e.target.value)} /><Button variant="outlined" component="label">Change image<input hidden type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} /></Button></Stack>; return <TextField fullWidth multiline minRows={3} label="Content" value={textContent} onChange={e => setTextContent(e.target.value)} />; };
+  const renderBody = () => { if (type === "poll") return <><TextField fullWidth multiline minRows={3} label="Question" value={textContent} onChange={(e) => setTextContent(e.target.value)} sx={{ mb: 2 }} /><Stack spacing={1}><Typography variant="subtitle2">Options</Typography>{pollOptions.map((opt, i) => (<Stack key={i} direction="row" spacing={1}><TextField fullWidth size="small" value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} /><IconButton size="small" onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}><RemoveRoundedIcon fontSize="small" /></IconButton></Stack>))}<Button startIcon={<AddRoundedIcon />} onClick={() => setPollOptions((o) => [...o, ""])} size="small" sx={{ alignSelf: "flex-start" }}>Add Option</Button></Stack></>; if (type === "link") return <>
+        <TextField fullWidth label="Link URL" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} sx={{ mb: 2 }} />
+        <TextField fullWidth multiline minRows={3} label="Description" value={textContent} onChange={e => setTextContent(e.target.value)} />
+        {textContent && (
+          <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+            <Typography variant="caption" color="text.secondary">Preview</Typography>
+            <ClampedText text={textContent} maxLines={5} />
+          </Box>
+        )}
+      </>; if (type === "image") return <Stack spacing={2}>
+        <TextField fullWidth multiline minRows={3} label="Caption" value={imageCaption} onChange={e => setImageCaption(e.target.value)} />
+        {imageCaption && (
+          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+            <Typography variant="caption" color="text.secondary">Preview</Typography>
+            <ClampedText text={imageCaption} maxLines={5} />
+          </Box>
+        )}
+        <Button variant="outlined" component="label">Change image<input hidden type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} /></Button>
+      </Stack>; return <>
+        <TextField fullWidth multiline minRows={3} label="Content" value={textContent} onChange={e => setTextContent(e.target.value)} />
+        {textContent && (
+          <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+            <Typography variant="caption" color="text.secondary">Preview</Typography>
+            <ClampedText text={textContent} maxLines={5} />
+          </Box>
+        )}
+      </>; };
   return <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"><DialogTitle>Edit Post</DialogTitle><DialogContent dividers>{renderBody()}</DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></DialogActions></Dialog>;
 }
 

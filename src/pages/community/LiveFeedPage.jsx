@@ -816,6 +816,56 @@ function PollBlock({ post, onVote }) {
   );
 }
 
+function ClampedText({
+  text,
+  maxLines = 5,
+  mt = 0,
+  variant = "body2",
+  color,
+  sx = {},
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+  if (!text) return null;
+
+  const roughLineCount = (text.match(/\n/g) || []).length + 1;
+  const shouldShowToggle = roughLineCount > maxLines || text.length > 280;
+
+  return (
+    <Box sx={{ mt }}>
+      <Typography
+        variant={variant}
+        color={color}
+        sx={{
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          ...(expanded
+            ? {}
+            : {
+              display: "-webkit-box",
+              WebkitLineClamp: maxLines,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }),
+          ...sx,
+        }}
+      >
+        {text}
+      </Typography>
+
+      {shouldShowToggle && (
+        <Button
+          size="small"
+          variant="text"
+          sx={{ mt: 0.5, px: 0 }}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? "See less" : "See more"}
+        </Button>
+      )}
+    </Box>
+  );
+}
+
 // ---- EVENT BLOCK ----
 function EventBlock({ post, onOpen }) {
   return (
@@ -826,7 +876,9 @@ function EventBlock({ post, onOpen }) {
       <Typography variant="caption" color="text.secondary">
         {post.event?.when ? new Date(post.event.when).toLocaleString() : ""}{post.event?.where ? ` · ${post.event.where}` : ""}
       </Typography>
-      {post.text && <Typography variant="body2" sx={{ mt: 1 }}>{post.text}</Typography>}
+
+      {post.text && <ClampedText text={post.text} maxLines={5} mt={1} />}
+
       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
         <Button size="small" variant="contained" onClick={onOpen} startIcon={<ThumbUpAltOutlinedIcon />}>
           View Event
@@ -1845,9 +1897,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
       {/* Body */}
       <Box sx={{ mt: 1.25 }}>
         {post.type === "text" && (
-          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-            {post.text}
-          </Typography>
+          <ClampedText text={post.text} maxLines={5} />
         )}
 
         {post.type === "resource" && (
@@ -1856,14 +1906,17 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
 
         {post.type === "image" && (
           <>
-            {post.text && <Typography variant="body2" sx={{ mb: 1 }}>{post.text}</Typography>}
+            {post.text && (
+              <Box sx={{ mb: 1 }}>
+                <ClampedText text={post.text} maxLines={5} />
+              </Box>
+            )}
             <Box
               component="img"
               src={toMediaUrl(post.image_url)}
               alt={post.text || "post image"}
               sx={{
                 width: "100%",
-                // 🔹 Clamp actual image size so long/large files don’t stretch the layout
                 maxWidth: { xs: "100%", md: 640 },
                 maxHeight: 420,
                 objectFit: "cover",
@@ -1878,13 +1931,27 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
 
         {post.type === "link" && (
           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
-            {post.text && <Typography variant="body2" sx={{ mb: 1 }}>{post.text}</Typography>}
+            {post.text && (
+              <Box sx={{ mb: 1 }}>
+                <ClampedText text={post.text} maxLines={5} />
+              </Box>
+            )}
+
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
               <Link href={post.url} target="_blank" rel="noreferrer">
                 {post.url_title || post.url}
               </Link>
             </Typography>
-            {post.url_desc && <Typography variant="caption" color="text.secondary">{post.url_desc}</Typography>}
+
+            {post.url_desc && (
+              <ClampedText
+                text={post.url_desc}
+                maxLines={5}
+                variant="caption"
+                color="text.secondary"
+                mt={0.5}
+              />
+            )}
           </Paper>
         )}
 
