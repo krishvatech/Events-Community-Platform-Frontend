@@ -9,6 +9,7 @@ import {
   TextField, Tooltip, Typography, FormControlLabel, Paper,
   Select, Pagination, Switch, FormControl, useMediaQuery,
   Menu, ListItemIcon, ListItemText, Avatar, Container,
+  Skeleton
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -457,6 +458,7 @@ export default function MyResourcesAdmin() {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const [events, setEvents] = useState([]);
   const [registeredEventIds, setRegisteredEventIds] = useState([]);
+  const [registeredEventsLoading, setRegisteredEventsLoading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -464,6 +466,8 @@ export default function MyResourcesAdmin() {
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [actionMenuRow, setActionMenuRow] = useState(null);
   const [viewResource, setViewResource] = useState(null);
+  const [registrationsLoadedOnce, setRegistrationsLoadedOnce] = useState(false);
+  const [resourcesBootstrapped, setResourcesBootstrapped] = useState(false);
 
   const isOwner = currentUser ? isOwnerUser(currentUser) : false;
 
@@ -491,6 +495,8 @@ export default function MyResourcesAdmin() {
   };
 
   const fetchRegisteredEvents = async () => {
+    setRegistrationsLoadedOnce(false);
+    setRegisteredEventsLoading(true);
     try {
       const token = localStorage.getItem("access_token");
       const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -511,6 +517,9 @@ export default function MyResourcesAdmin() {
     } catch (error) {
       console.error("Error fetching registered events:", error);
       setRegisteredEventIds([]);
+    } finally {
+      setRegisteredEventsLoading(false);
+      setRegistrationsLoadedOnce(true);
     }
   };
 
@@ -565,6 +574,7 @@ export default function MyResourcesAdmin() {
       setItems([]);
       setResourcesTotal(0);
       setLoading(false);
+      setResourcesBootstrapped(true);
       return;
     }
 
@@ -629,6 +639,7 @@ export default function MyResourcesAdmin() {
       setResourcesTotal(0);
     } finally {
       setLoading(false);
+      setResourcesBootstrapped(true);
     }
   };
 
@@ -689,14 +700,31 @@ export default function MyResourcesAdmin() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser) {
-      fetchResources();
-    }
-  }, [currentUser, events, registeredEventIds, resourcePage, resourceQuery, resourceFilterType, resourceSort]);
+    if (!currentUser) return;
 
-  useEffect(() => {
-    setResourcePage(1);
-  }, [resourceQuery, resourceFilterType, resourceSort]);
+    // ✅ Staff must wait until registrations are fetched at least once
+    if (!isOwner && !registrationsLoadedOnce) return;
+
+    // ✅ Staff: still keep this guard
+    if (!isOwner && registeredEventsLoading) return;
+
+    fetchResources();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentUser?.id,
+    resourcePage,
+    resourceQuery,
+    resourceFilterType,
+    resourceSort,
+
+    // keep your smart deps
+    isOwner ? "ignore-loading" : registeredEventsLoading,
+    isOwner ? "ignore-ids" : registeredEventIds.join(","),
+
+    // ✅ NEW
+    registrationsLoadedOnce,
+  ]);
+
 
   const totalResourcePages = Math.ceil(
     resourcesTotal / RESOURCE_ITEMS_PER_PAGE
@@ -727,6 +755,59 @@ export default function MyResourcesAdmin() {
       "-"
     );
   }
+
+  const showSkeleton =
+  !resourcesBootstrapped || loading || !currentUser || (!isOwner && registeredEventsLoading);
+
+  const ResourceTableSkeleton = () => (
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Title</TableCell>
+            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Type</TableCell>
+            <TableCell>Event</TableCell>
+            <TableCell align="right">Actions</TableCell>
+          </TableRow>
+        </TableHead>
+
+        <TableBody>
+          {Array.from({ length: RESOURCE_ITEMS_PER_PAGE }).map((_, idx) => (
+            <TableRow key={`skeleton-${idx}`}>
+              <TableCell>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Skeleton variant="circular" width={28} height={28} />
+                  <Skeleton variant="text" width="65%" />
+                </Stack>
+              </TableCell>
+
+              <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                <Skeleton variant="rounded" width={70} height={24} />
+              </TableCell>
+
+              <TableCell>
+                <Skeleton variant="text" width="55%" />
+              </TableCell>
+
+              <TableCell align="right">
+                {isDesktop ? (
+                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Skeleton variant="circular" width={32} height={32} />
+                    <Skeleton variant="circular" width={32} height={32} />
+                    <Skeleton variant="circular" width={32} height={32} />
+                  </Stack>
+                ) : (
+                  <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Skeleton variant="circular" width={32} height={32} />
+                  </Box>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
 
   return (
     <Container
@@ -790,7 +871,10 @@ export default function MyResourcesAdmin() {
         <TextField
           placeholder="Search resources..."
           value={resourceQuery}
-          onChange={(e) => setResourceQuery(e.target.value)}
+          onChange={(e) => {
+            setResourcePage(1);
+            setResourceQuery(e.target.value);
+          }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -812,7 +896,10 @@ export default function MyResourcesAdmin() {
         >
           <Select
             value={resourceFilterType}
-            onChange={(e) => setResourceFilterType(e.target.value)}
+            onChange={(e) => {
+              setResourcePage(1);
+              setResourceFilterType(e.target.value);
+            }}
             displayEmpty
             size="small"
             sx={{ minWidth: { xs: "100%", sm: 120 } }}
@@ -839,7 +926,10 @@ export default function MyResourcesAdmin() {
             </Typography>
             <Select
               value={resourceSort}
-              onChange={(e) => setResourceSort(e.target.value)}
+              onChange={(e) => {
+                setResourcePage(1);
+                setResourceSort(e.target.value);
+              }}
               size="small"
               sx={{ minWidth: { xs: "100%", sm: 140 }, flex: 1 }}
             >
@@ -861,8 +951,11 @@ export default function MyResourcesAdmin() {
         {resourcesTotal} resources
       </Typography>
 
-      {loading ? (
-        <Box sx={{ p: 8, textAlign: "center" }}>Loading...</Box>
+      {showSkeleton ? (
+        <>
+          <Skeleton variant="text" width={280} sx={{ mb: 2 }} />
+          <ResourceTableSkeleton />
+        </>
       ) : items.length === 0 ? (
         <Box sx={{ p: 8, textAlign: "center" }}>
           <Typography variant="h6" color="text.secondary" gutterBottom>
