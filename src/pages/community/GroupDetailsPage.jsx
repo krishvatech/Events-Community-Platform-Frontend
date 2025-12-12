@@ -358,7 +358,7 @@ function EventBlock({ post, onOpen }) {
       <Typography variant="caption" color="text.secondary">
         {post.event?.when ? new Date(post.event.when).toLocaleString() : ""} · {post.event?.where}
       </Typography>
-      {post.text && <Typography variant="body2" sx={{ mt: 1 }}>{post.text}</Typography>}
+      {post.text && <ExpandableText text={post.text} maxLines={5} wrapperSx={{ mt: 1 }} />}
       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
         <Button size="small" variant="contained" onClick={onOpen} startIcon={<ThumbUpAltOutlinedIcon />}>
           View Event
@@ -380,7 +380,7 @@ function ResourceBlock({ post }) {
   return (
     <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{r.title}</Typography>
-      {post.text && <Typography variant="body2" sx={{ mt: 1 }}>{post.text}</Typography>}
+      {post.text && <ExpandableText text={post.text} maxLines={5} wrapperSx={{ mt: 1 }} />}
 
       {hasVideo && (
         <Box sx={{ mt: 1 }}>
@@ -537,7 +537,9 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
         <Box sx={{ flex: 1 }}>
           <Box sx={{ bgcolor: "#f1f5f9", p: 1, borderRadius: 2 }}>
             <Typography variant="subtitle2">{c.author.name}</Typography>
-            <Typography variant="body2">{c.text}</Typography>
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere" }}>
+              {c.text}
+            </Typography>
           </Box>
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
             <Button size="small" startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />} onClick={() => toggleCommentLike(c.id)}>
@@ -823,6 +825,77 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
   );
 }
 
+function ExpandableText({
+  text,
+  maxLines = 5,
+  variant = "body2",
+  color,
+  wrapperSx,
+  sx,
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [canClamp, setCanClamp] = React.useState(false);
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    setExpanded(false);
+  }, [text, maxLines]);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const check = () => {
+      // only meaningful when clamped
+      const overflow = el.scrollHeight > el.clientHeight + 1;
+      setCanClamp(overflow);
+    };
+
+    requestAnimationFrame(check);
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [text, expanded, maxLines]);
+
+  if (!text) return null;
+
+  return (
+    <Box sx={wrapperSx}>
+      <Typography
+        ref={ref}
+        variant={variant}
+        color={color}
+        sx={{
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          overflowWrap: "anywhere",
+          ...(expanded
+            ? {}
+            : {
+              display: "-webkit-box",
+              WebkitLineClamp: maxLines,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }),
+          ...sx,
+        }}
+      >
+        {text}
+      </Typography>
+
+      {canClamp && (
+        <Button
+          size="small"
+          onClick={() => setExpanded((v) => !v)}
+          sx={{ mt: 0.5, px: 0, minWidth: 0, textTransform: "none" }}
+        >
+          {expanded ? "See less" : "See more"}
+        </Button>
+      )}
+    </Box>
+  );
+}
+
+
 // -----------------------------------------------------------------------------
 // 6. POST CARD
 // -----------------------------------------------------------------------------
@@ -887,21 +960,40 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
 
       {/* Body */}
       <Box sx={{ mb: 2 }}>
-        {local.type === "text" && <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{local.text}</Typography>}
+        {local.type === "text" && (
+          <ExpandableText text={local.text} maxLines={5} />
+        )}
+
         {local.type === "resource" && <ResourceBlock post={local} />}
+
         {local.type === "image" && (
           <>
-            {local.text && <Typography variant="body2" sx={{ mb: 1 }}>{local.text}</Typography>}
-            <Box component="img" src={toMediaUrl(local.image_url)} sx={{ width: "100%", borderRadius: 2, maxHeight: 500, objectFit: "cover" }} />
+            <ExpandableText text={local.text} maxLines={5} wrapperSx={{ mb: 1 }} />
+            <Box
+              component="img"
+              src={toMediaUrl(local.image_url)}
+              sx={{ width: "100%", borderRadius: 2, maxHeight: 500, objectFit: "cover" }}
+            />
           </>
         )}
+
         {local.type === "poll" && <PollBlock post={local} onVote={(oid) => onPollVote(local, oid)} />}
+
         {local.type === "event" && <EventBlock post={local} onOpen={() => onOpenEvent?.(local.event?.id || local.id)} />}
+
         {local.type === "link" && (
           <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#fafafa" }}>
-            <Typography variant="body2" sx={{ mb: 0.5 }}>{local.text}</Typography>
-            <Link href={local.url} target="_blank" fontWeight={600}>{local.url_title || local.url}</Link>
-            {local.url_desc && <Typography variant="caption" display="block" color="text.secondary">{local.url_desc}</Typography>}
+            <ExpandableText text={local.text} maxLines={5} wrapperSx={{ mb: 0.5 }} />
+            <Link href={local.url} target="_blank" fontWeight={600}>
+              {local.url_title || local.url}
+            </Link>
+            <ExpandableText
+              text={local.url_desc}
+              variant="caption"
+              color="text.secondary"
+              maxLines={5}
+              wrapperSx={{ mt: 0.5 }}
+            />
           </Paper>
         )}
       </Box>
