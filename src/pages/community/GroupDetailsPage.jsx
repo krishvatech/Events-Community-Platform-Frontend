@@ -7,7 +7,7 @@ import {
   Grid, IconButton, InputAdornment, List, ListItem, ListItemAvatar,
   ListItemText, ListItemButton, ListItemSecondaryAction, Pagination,
   Paper, Popover, Stack, Tab, Tabs, TextField, Tooltip, Typography,
-  CircularProgress, LinearProgress, Link, Checkbox
+  CircularProgress, LinearProgress, Link, Checkbox, Skeleton
 } from "@mui/material";
 
 // Icons
@@ -577,7 +577,12 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
         <Button variant="contained" onClick={() => createComment(text, replyTo?.id)} disabled={!text.trim()}>Post</Button>
       </Stack>
       <Box sx={{ mt: 2 }}>
-        {loading ? <CircularProgress size={20} /> : roots.slice(0, inline ? visibleCount : undefined).map(c => <CommentItem key={c.id} c={c} />)}
+        {loading ? (
+          // Show 3 comment skeletons
+          <ListSkeleton count={3} />
+        ) : (
+          roots.slice(0, inline ? visibleCount : undefined).map(c => <CommentItem key={c.id} c={c} />)
+        )}
         {inline && roots.length > visibleCount && (
           <Button size="small" onClick={() => setVisibleCount(v => v + initialCount)}>Load more comments</Button>
         )}
@@ -777,7 +782,10 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
       <DialogTitle>Share post</DialogTitle>
       <DialogContent dividers>
         {loading ? (
-          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+          // Show 5 friend list items skeletons
+          <Box sx={{ py: 1 }}>
+            <ListSkeleton count={5} type="short" />
+          </Box>
         ) : friends.length === 0 ? (
           <Typography color="text.secondary">
             {groupId ? "No friends found in this group." : "No friends found."}
@@ -1169,7 +1177,17 @@ function PostsTab({ groupId }) {
     } catch (e) { console.error(e); }
   };
 
-  if (loading) return <Stack alignItems="center" py={4}><CircularProgress /></Stack>;
+  // Inside PostsTab function
+  if (loading) {
+    return (
+      <Box>
+        {/* Show 3 skeleton posts while loading */}
+        <PostSkeleton />
+        <PostSkeleton />
+        <PostSkeleton />
+      </Box>
+    );
+  }
   if (!posts.length) return <Typography color="text.secondary" align="center" py={4}>No posts in this group yet.</Typography>;
 
   return (
@@ -1188,15 +1206,22 @@ function PostsTab({ groupId }) {
 
 function MembersTab({ groupId }) {
   const [members, setMembers] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
   React.useEffect(() => {
     (async () => {
+      setLoading(true);
       try {
         const r = await fetch(toApiUrl(`groups/${groupId}/members/`), { headers: { Accept: "application/json", ...authHeaders() } });
         const d = r.ok ? await r.json() : [];
         setMembers(Array.isArray(d?.results) ? d.results : (Array.isArray(d) ? d : []));
       } catch { }
+      setLoading(false);
     })();
   }, [groupId]);
+
+  if (loading) {
+    return <ListSkeleton count={5} type="short" />;
+  }
 
   return (
     <List>
@@ -1226,6 +1251,58 @@ function OverviewTab({ group }) {
         <Typography variant="body2">Visibility: {group.visibility}</Typography>
         <Typography variant="body2">Created: {new Date(group.created_at).toLocaleDateString()}</Typography>
       </Card>
+    </Stack>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// SKELETON COMPONENTS
+// -----------------------------------------------------------------------------
+
+function PostSkeleton() {
+  return (
+    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3, borderColor: "#e2e8f0" }}>
+      {/* Header Skeleton */}
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+        <Skeleton variant="circular" width={40} height={40} />
+        <Box sx={{ flex: 1 }}>
+          <Skeleton variant="text" width="40%" height={24} />
+          <Skeleton variant="text" width="20%" height={16} />
+        </Box>
+      </Stack>
+
+      {/* Body Skeleton */}
+      <Box sx={{ mb: 2 }}>
+        <Skeleton variant="text" sx={{ fontSize: '1rem' }} />
+        <Skeleton variant="text" sx={{ fontSize: '1rem' }} width="80%" />
+        <Skeleton variant="text" sx={{ fontSize: '1rem' }} width="60%" />
+        <Skeleton variant="rectangular" height={200} sx={{ mt: 2, borderRadius: 2 }} />
+      </Box>
+
+      <Divider sx={{ mb: 1 }} />
+
+      {/* Actions Skeleton */}
+      <Stack direction="row" justifyContent="space-around">
+        <Skeleton variant="rectangular" width={60} height={30} sx={{ borderRadius: 1 }} />
+        <Skeleton variant="rectangular" width={60} height={30} sx={{ borderRadius: 1 }} />
+        <Skeleton variant="rectangular" width={60} height={30} sx={{ borderRadius: 1 }} />
+      </Stack>
+    </Paper>
+  );
+}
+
+function ListSkeleton({ count = 3, type = "text" }) {
+  return (
+    <Stack spacing={2} sx={{ mt: 1 }}>
+      {Array.from(new Array(count)).map((_, index) => (
+        <Stack key={index} direction="row" spacing={2} alignItems="center">
+          <Skeleton variant="circular" width={40} height={40} />
+          <Box sx={{ width: '100%' }}>
+            <Skeleton variant="text" width={type === 'short' ? "40%" : "70%"} height={20} />
+            {type !== 'short' && <Skeleton variant="text" width="40%" height={16} />}
+          </Box>
+        </Stack>
+      ))}
     </Stack>
   );
 }
