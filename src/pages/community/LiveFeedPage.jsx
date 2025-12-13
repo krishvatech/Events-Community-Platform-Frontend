@@ -372,6 +372,126 @@ function SuggestedConnections({ list = [] }) {
   );
 }
 
+function SuggestedGroups({ list = [], loading = false, onJoined }) {
+  const [joiningId, setJoiningId] = React.useState(null);
+
+  async function joinGroup(groupId) {
+    try {
+      setJoiningId(groupId);
+      const r = await fetch(toApiUrl(`groups/${groupId}/join-group/`), {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json", ...authHeaders() },
+      });
+      if (r.ok) {
+        onJoined?.(groupId);
+      }
+    } finally {
+      setJoiningId(null);
+    }
+  }
+
+  const items = (list || []).slice(0, 4);
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 1.5,
+        mb: 2,
+        borderColor: BORDER,
+        borderRadius: 3,
+        bgcolor: "background.paper",
+        maxWidth: { xs: "100%", md: 720 },
+        mx: { xs: 0, md: "auto" },
+      }}
+    >
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+          Groups you may like
+        </Typography>
+        <Chip size="small" label="Based on your friends" variant="outlined" />
+      </Stack>
+
+      <Grid container spacing={1}>
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => (
+            <Grid key={i} item xs={12} sm={6} md={3}>
+              <Paper variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
+                <Skeleton variant="rounded" height={64} sx={{ mb: 1, borderRadius: 1.5 }} />
+                <Skeleton width="80%" />
+                <Skeleton width="60%" />
+                <Skeleton variant="rounded" height={30} sx={{ mt: 1, borderRadius: 2 }} />
+              </Paper>
+            </Grid>
+          ))
+          : items.map((g) => (
+            <Grid key={g.id} item xs={12} sm={6} md={3}>
+              <Paper variant="outlined" sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}>
+                <Box
+                  sx={{
+                    height: 64,
+                    borderRadius: 1.5,
+                    overflow: "hidden",
+                    mb: 1,
+                    bgcolor: "grey.100",
+                  }}
+                >
+                  {g.cover_image ? (
+                    <Box
+                      component="img"
+                      src={toMediaUrl(g.cover_image)}
+                      alt={g.name}
+                      sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <Box sx={{ width: "100%", height: "100%" }} />
+                  )}
+                </Box>
+
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+                  {g.name}
+                </Typography>
+
+                <Typography variant="caption" color="text.secondary">
+                  {(g.member_count || 0).toLocaleString()} members
+                </Typography>
+
+                {Number(g.mutuals || 0) > 0 && (
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                    <AvatarGroup
+                      max={3}
+                      sx={{ "& .MuiAvatar-root": { width: 22, height: 22, fontSize: 11 } }}
+                    >
+                      {(g.mutual_members || []).slice(0, 3).map((m) => (
+                        <Avatar key={m.id} src={toMediaUrl(m.avatar || m.avatar_url)}>
+                          {(m.name || "U").slice(0, 1)}
+                        </Avatar>
+                      ))}
+                    </AvatarGroup>
+                    <Typography variant="caption" color="text.secondary">
+                      {g.mutuals} friend{g.mutuals === 1 ? "" : "s"} joined
+                    </Typography>
+                  </Stack>
+                )}
+
+                <Button
+                  fullWidth
+                  size="small"
+                  variant="contained"
+                  sx={{ mt: 1 }}
+                  disabled={joiningId === g.id}
+                  onClick={() => joinGroup(g.id)}
+                >
+                  {joiningId === g.id ? "Joining..." : "Join"}
+                </Button>
+              </Paper>
+            </Grid>
+          ))}
+      </Grid>
+    </Paper>
+  );
+}
+
 
 // ---- API helpers (kept from your file) ----
 const RAW_BASE =
@@ -2307,6 +2427,36 @@ export default function LiveFeedPage({
     })();
   }, []);
 
+  // ✅ Suggested groups (fetched once)
+  const [suggestedGroups, setSuggestedGroups] = React.useState([]);
+  const [suggestedGroupsLoading, setSuggestedGroupsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        setSuggestedGroupsLoading(true);
+        const r = await fetch(toApiUrl("groups/suggested/?limit=8"), {
+          headers: { Accept: "application/json", ...authHeaders() },
+        });
+        const j = r.ok ? await r.json() : [];
+        setSuggestedGroups(Array.isArray(j) ? j : (j.results || []));
+      } catch {
+        setSuggestedGroups([]);
+      } finally {
+        setSuggestedGroupsLoading(false);
+      }
+    })();
+  }, []);
+
+  const removeSuggestedGroup = (id) => {
+    setSuggestedGroups((prev) => prev.filter((g) => g.id !== id));
+  };
+
+
+  const handleJoinedGroup = React.useCallback((groupId) => {
+    setSuggestedGroups((prev) => prev.filter((g) => Number(g.id) !== Number(groupId)));
+  }, []);
+
   // Feed data
   const [posts, setPosts] = React.useState(initialPosts ?? []);
   const [nextUrl, setNextUrl] = React.useState(null);
@@ -3071,8 +3221,18 @@ export default function LiveFeedPage({
                       onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
                     />
                   </Box>
-                  {((idx + 1) % 4 === 0) && (
+                  {/* After 4 posts: mutual connections */}
+                  {((idx + 1) % 8 === 4) && (
                     <SuggestedConnections list={suggested} />
+                  )}
+
+                  {/* After next 4 posts (8 total): group suggestions */}
+                  {((idx + 1) % 8 === 0) && (
+                    <SuggestedGroups
+                      list={suggestedGroups}
+                      loading={suggestedGroupsLoading}
+                      onJoined={removeSuggestedGroup}
+                    />
                   )}
                 </React.Fragment>
               ))}
