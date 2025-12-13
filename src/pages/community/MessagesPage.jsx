@@ -33,6 +33,7 @@ import {
   useMediaQuery,
   Menu,
   MenuItem,
+  Skeleton
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import SearchIcon from "@mui/icons-material/Search";
@@ -1718,6 +1719,7 @@ export default function MessagesPage() {
   // 🔹 Attachment Menu State
   const [attachMenuAnchor, setAttachMenuAnchor] = React.useState(null);
   const isAttachMenuOpen = Boolean(attachMenuAnchor);
+  const hasActiveChat = Boolean(activeId);
 
   // 🔹 Hidden Input Refs
   const fileInputRef = React.useRef(null);
@@ -1956,6 +1958,8 @@ export default function MessagesPage() {
   const [me, setMe] = React.useState(null);
   const [topMembers, setTopMembers] = React.useState([]);
   const [rosterMap, setRosterMap] = React.useState({});
+  const [membersLoading, setMembersLoading] = React.useState(false);
+  const membersReqIdRef = React.useRef(0);
 
   // 🔹 Whether the current user is allowed to send messages to the ACTIVE group
   // (for WhatsApp-style "Only admins can send messages" mode)
@@ -2111,8 +2115,6 @@ export default function MessagesPage() {
               // 2. Priority: Time (Newest first)
               return new Date(b._last_ts || 0) - new Date(a._last_ts || 0);
             });
-
-          if (!activeId && normalized.length) setActiveId(normalized[0].id);
           return normalized;
         });
 
@@ -2610,21 +2612,42 @@ export default function MessagesPage() {
 
   const loadMembers = React.useCallback(async (cid) => {
     if (!cid) return;
+
+    const reqId = ++membersReqIdRef.current;
+    setMembersLoading(true);
+    setTopMembers([]);
+
     try {
       const res = await apiFetch(ENDPOINTS.conversationMembers(cid));
-      if (!res.ok) { setTopMembers([]); return; }
+      if (reqId !== membersReqIdRef.current) return; // stale request
+
+      if (!res.ok) {
+        setTopMembers([]);
+        return;
+      }
+
       const raw = await res.json();
-      const list = Array.isArray(raw) ? raw :
-        (Array.isArray(raw?.results) ? raw.results : []);
+      const list = Array.isArray(raw)
+        ? raw
+        : (Array.isArray(raw?.results) ? raw.results : []);
+
       setTopMembers(dedupeMembers(list));
     } catch (e) {
+      if (reqId !== membersReqIdRef.current) return;
       console.error("members load failed", e);
       setTopMembers([]);
+    } finally {
+      if (reqId === membersReqIdRef.current) setMembersLoading(false);
     }
   }, []);
 
   React.useEffect(() => {
-    if (!activeId) { setTopMembers([]); return; }
+    if (!activeId) {
+      membersReqIdRef.current += 1; // invalidate any in-flight request
+      setMembersLoading(false);
+      setTopMembers([]);
+      return;
+    }
     loadMembers(activeId);
   }, [activeId, loadMembers]);
 
@@ -2826,6 +2849,16 @@ export default function MessagesPage() {
     };
   }, [active, topMembers, rosterMap, me]);
 
+  const MemberRowSkeleton = () => (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Skeleton variant="circular" width={28} height={28} />
+      <Skeleton variant="text" width="60%" height={20} />
+      <Box sx={{ ml: "auto" }}>
+        <Skeleton variant="rounded" width={56} height={20} sx={{ borderRadius: 999 }} />
+      </Box>
+    </Stack>
+  );
+
   // 🔹 Reusable "details" content (Members + Attachments)
   const renderDetailsContent = () => {
 
@@ -2882,41 +2915,52 @@ export default function MessagesPage() {
             )}
 
             <Stack spacing={1}>
-              {topMembers.map((p) => (
-                <Stack
-                  key={p.id}
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  role="button"
-                  tabIndex={0}
-                  sx={{ cursor: "pointer" }}
-                  onClick={() => { if (p.id) openUserProfile(p.id); }}
-                  onKeyDown={(e) => { if (e.key === "Enter" && p.id) openUserProfile(p.id); }}
-                  title="Open user profile"
-                >
-                  <Avatar
-                    src={p.avatar}
-                    sx={{ width: 28, height: 28, cursor: "pointer" }}
-                    onClick={() => openUserProfile(p.id)}
-                  />
-                  <Typography
-                    variant="body2"
-                    sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
-                    onClick={() => openUserProfile(p.id)}
+              {membersLoading ? (
+                Array.from({ length: 6 }).map((_, idx) => (
+                  <MemberRowSkeleton key={`members-skel-${idx}`} />
+                ))
+              ) : topMembers.length > 0 ? (
+                topMembers.map((p) => (
+                  <Stack
+                    key={p.id}
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    role="button"
+                    tabIndex={0}
+                    sx={{ cursor: "pointer" }}
+                    onClick={() => { if (p.id) openUserProfile(p.id); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" && p.id) openUserProfile(p.id); }}
+                    title="Open user profile"
                   >
-                    {/* Display "You" if it's the current user, otherwise the name */}
-                    {p.is_you ? "You" : p.name}
-                  </Typography>
-                  <Box sx={{ ml: "auto" }}>
-                    {/* 🔹 CHANGE: Only show role if it exists AND is NOT "Member" */}
-                    {p.role && p.role.toLowerCase() !== "member" ? (
-                      <Chip size="small" variant="outlined" label={p.role} sx={CHIP_TINY_SX} />
-                    ) : null}
-                  </Box>
-                </Stack>
-              ))}
+                    <Avatar
+                      src={p.avatar}
+                      sx={{ width: 28, height: 28, cursor: "pointer" }}
+                      onClick={() => openUserProfile(p.id)}
+                    />
+                    <Typography
+                      variant="body2"
+                      sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                      onClick={() => openUserProfile(p.id)}
+                    >
+                      {/* Display "You" if it's the current user, otherwise the name */}
+                      {p.is_you ? "You" : p.name}
+                    </Typography>
+                    <Box sx={{ ml: "auto" }}>
+                      {/* 🔹 CHANGE: Only show role if it exists AND is NOT "Member" */}
+                      {p.role && p.role.toLowerCase() !== "member" ? (
+                        <Chip size="small" variant="outlined" label={p.role} sx={CHIP_TINY_SX} />
+                      ) : null}
+                    </Box>
+                  </Stack>
+                ))
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                  No members found
+                </Typography>
+              )}
             </Stack>
+
 
           </AccordionDetails>
         </Accordion>
@@ -3213,548 +3257,575 @@ export default function MessagesPage() {
               maxWidth: "none",  // no cap on tablet/mobile
             }}
           >
-            {/* Top bar */}
-            <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 1 }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-                {/* CLICKABLE: group avatar + name */}
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  spacing={1.5}
-                  role={hasActiveGroup ? "button" : undefined}
-                  tabIndex={hasActiveGroup ? 0 : -1}
-                  sx={{ cursor: hasActiveGroup ? "pointer" : "default", outline: "none" }}
-                  onClick={hasActiveGroup ? openActiveGroup : undefined}
-                  onKeyDown={(e) => { if (e.key === "Enter" && hasActiveGroup) openActiveGroup(); }}
-                  title={hasActiveGroup ? "Open group details" : undefined}
-                >
-                  {/* 🔙 Back button on Mobile / Tablet */}
-                  {isMobileOrTablet && (
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMobileView("list");
-                      }}
-                    >
-                      <ArrowBackRoundedIcon fontSize="small" />
-                    </IconButton>
-                  )}
-
-                  <Avatar
-                    src={topLogo}
-                    sx={{ width: 40, height: 40, cursor: hasActiveGroup ? "pointer" : "default" }}
-                    onClick={hasActiveGroup ? openActiveGroup : undefined}
-                  >
-                    {(topTitle || "C").slice(0, 1)}
-                  </Avatar>
-
-                  {/* Title + presence (online / last seen) */}
-                  <Stack spacing={0.25}>
-                    <Typography
-                      variant="subtitle1"
-                      sx={{
-                        fontWeight: 800,
-                        cursor: hasActiveGroup ? "pointer" : "default",
-                        "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
-                      }}
-                      onClick={hasActiveGroup ? openActiveGroup : undefined}
-                    >
-                      {topTitle}
-                    </Typography>
-
-                    {/* WhatsApp-style status: only for DM (dmPresence is computed above) */}
-                    {dmPresence && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                      >
-                        {dmPresence.isOnline && (
-                          <Box
-                            component="span"
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: "50%",
-                              bgcolor: "success.main",
-                            }}
-                          />
-                        )}
-                        {dmPresence.label}
-                      </Typography>
-                    )}
-                  </Stack>
-                </Stack>
-
-                {/* Right actions */}
-                <Stack direction="row" alignItems="center" spacing={1.25}>
-                  {/* ℹ️ Details icon – opens members/attachments popup */}
-                  <IconButton
-                    size="small"
-                    onClick={() => setDetailsOpen(true)}
-                  >
-                    <InfoOutlinedIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
-              </Stack>
-            </Paper>
-
-
-            {/* Chat thread */}
-            <Paper
-              sx={{
-                p: 2,
-                border: `1px solid ${BORDER}`,
-                borderRadius: 3,
-                flex: 1,
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
-                position: "relative",
-              }}
-            >
-              {/* 🔹 ATTACHMENT PREVIEW OVERLAY (Multi-File Carousel) */}
-              {draftAttachments.length > 0 && (
-                <Box
-                  sx={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    zIndex: 20,
-                    bgcolor: "#e9edef",
-                    display: "flex",
-                    flexDirection: "column",
-                    borderRadius: 3,
-                    overflow: "hidden"
-                  }}
-                >
-                  {/* Header */}
-                  <Stack direction="row" alignItems="center" sx={{ p: 2, zIndex: 2 }}>
-                    <IconButton onClick={handleClearAttachments}>
-                      <CloseRoundedIcon sx={{ fontSize: 30 }} />
-                    </IconButton>
-                    <Typography variant="h6" sx={{ ml: 2 }}>
-                      Preview {draftAttachments.length > 1 && `(${activePreviewIndex + 1} of ${draftAttachments.length})`}
-                    </Typography>
-                  </Stack>
-
-                  {/* Center: Carousel Stage */}
-                  <Box
-                    sx={{
-                      flex: 1,
-                      position: "relative",
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      bgcolor: "#d1d7db",
-                      overflow: "hidden"
-                    }}
-                  >
-                    {/* LEFT ARROW (Show only if not first) */}
-                    {draftAttachments.length > 1 && (
-                      <IconButton
-                        onClick={() => setActivePreviewIndex((prev) => (prev > 0 ? prev - 1 : prev))}
-                        disabled={activePreviewIndex === 0}
-                        sx={{
-                          position: "absolute",
-                          left: 10,
-                          bgcolor: "rgba(255,255,255,0.6)",
-                          "&:hover": { bgcolor: "white" },
-                          zIndex: 10,
-                          display: activePreviewIndex === 0 ? "none" : "flex"
-                        }}
-                      >
-                        <ArrowBackRoundedIcon />
-                      </IconButton>
-                    )}
-
-                    {/* THE ACTIVE FILE */}
-                    <Box sx={{ p: 4, width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
-                      {draftAttachments[activePreviewIndex].type.startsWith("image/") ? (
-                        <img
-                          src={URL.createObjectURL(draftAttachments[activePreviewIndex])}
-                          alt="Preview"
-                          style={{
-                            maxWidth: "100%",
-                            maxHeight: "100%",
-                            objectFit: "contain",
-                            boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
-                            borderRadius: 8
-                          }}
-                        />
-                      ) : (
-                        <Stack alignItems="center" spacing={2} sx={{ p: 4, bgcolor: "white", borderRadius: 4 }}>
-                          <DescriptionOutlinedIcon sx={{ fontSize: 60, color: "#54656f" }} />
-                          <Typography variant="h6">{draftAttachments[activePreviewIndex].name}</Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {(draftAttachments[activePreviewIndex].size / 1024).toFixed(1)} KB
-                          </Typography>
-                        </Stack>
-                      )}
-                    </Box>
-
-                    {/* RIGHT ARROW (Show only if not last) */}
-                    {draftAttachments.length > 1 && (
-                      <IconButton
-                        onClick={() => setActivePreviewIndex((prev) => (prev < draftAttachments.length - 1 ? prev + 1 : prev))}
-                        disabled={activePreviewIndex === draftAttachments.length - 1}
-                        sx={{
-                          position: "absolute",
-                          right: 10,
-                          bgcolor: "rgba(255,255,255,0.6)",
-                          "&:hover": { bgcolor: "white" },
-                          zIndex: 10,
-                          display: activePreviewIndex === draftAttachments.length - 1 ? "none" : "flex"
-                        }}
-                      >
-                        {/* We reuse ArrowBack but rotate it 180deg for Right Arrow */}
-                        <ArrowBackRoundedIcon sx={{ transform: "rotate(180deg)" }} />
-                      </IconButton>
-                    )}
-                  </Box>
-
-                  {/* Thumbnail Strip (Only if > 1 file) */}
-                  {draftAttachments.length > 1 && (
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      sx={{
-                        p: 1,
-                        bgcolor: "rgba(255,255,255,0.5)",
-                        justifyContent: "center",
-                        overflowX: "auto"
-                      }}
-                    >
-                      {draftAttachments.map((file, idx) => (
-                        <Box
-                          key={idx}
-                          onClick={() => setActivePreviewIndex(idx)}
-                          sx={{
-                            width: 50,
-                            height: 50,
-                            borderRadius: 1,
-                            overflow: "hidden",
-                            border: activePreviewIndex === idx ? "2px solid #00a884" : "2px solid transparent",
-                            cursor: "pointer",
-                            flexShrink: 0
-                          }}
-                        >
-                          {file.type.startsWith("image/") ? (
-                            <img
-                              src={URL.createObjectURL(file)}
-                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                            />
-                          ) : (
-                            <Box sx={{ width: "100%", height: "100%", bgcolor: "white", display: "flex", justifyContent: "center", alignItems: "center" }}>
-                              <DescriptionOutlinedIcon fontSize="small" />
-                            </Box>
-                          )}
-                        </Box>
-                      ))}
-                    </Stack>
-                  )}
-
-                  {/* Footer: Caption & Send */}
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    sx={{ p: 2, bgcolor: "#f0f2f5" }}
-                  >
-                    <TextField
-                      size="small"
-                      placeholder="Add a caption..."
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      fullWidth
-                      autoFocus
-                      sx={{ bgcolor: "white", borderRadius: 1 }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                    />
-                    <IconButton
-                      onClick={handleSend}
-                      sx={{
-                        bgcolor: "#00a884",
-                        color: "white",
-                        width: 45, height: 45,
-                        "&:hover": { bgcolor: "#008f6f" }
-                      }}
-                    >
-                      <SendIcon sx={{ fontSize: 20, ml: 0.5 }} />
-                    </IconButton>
-                  </Stack>
-                </Box>
-              )}
-              <Box
-                id="chat-scroll"
+            {!activeId ? (
+              <Paper
                 sx={{
                   flex: 1,
-                  overflowY: "auto",
-                  overflowX: "hidden",
-                  scrollbarWidth: "none",
-                  msOverflowStyle: "none",
-                  "&::-webkit-scrollbar": { display: "none" },
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  px: 3,
+                  background:
+                    "radial-gradient(1200px circle at 30% 0%, rgba(99,102,241,0.10), transparent 55%), radial-gradient(1000px circle at 80% 30%, rgba(20,184,166,0.10), transparent 55%)",
                 }}
               >
-                {pinnedMessages.length > 0 && (
-                  <Box
-                    sx={{
-                      position: "sticky",
-                      top: 0,
-                      zIndex: 2,
-                      mb: 1,
-                      px: 1,
-                      py: 0.75,
-                      borderRadius: 2,
-                      bgcolor: "#f8fafc",
-                      border: `1px solid ${BORDER}`,
-                      boxShadow: pinnedMessages.length > 1 ? "0 2px 4px rgba(0,0,0,0.03)" : "none",
-                    }}
-                  >
-                    {/* Header Row: Always visible */}
+                <Typography variant="body1" color="text.secondary">
+                  Select a conversation on the left or use{" "}
+                  <Box component="span" sx={{ fontWeight: 800 }}>
+                    New chat
+                  </Box>{" "}
+                  to start one.
+                </Typography>
+              </Paper>
+            ) : (
+              <>
+                {/* Top bar */}
+                <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 1 }}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                    {/* CLICKABLE: group avatar + name */}
                     <Stack
                       direction="row"
                       alignItems="center"
-                      justifyContent="space-between"
-                      onClick={() => {
-                        if (pinnedMessages.length > 1) setPinsExpanded(!pinsExpanded);
-                      }}
-                      sx={{
-                        cursor: pinnedMessages.length > 1 ? "pointer" : "default",
-                        userSelect: "none"
-                      }}
+                      spacing={1.5}
+                      role={hasActiveGroup ? "button" : undefined}
+                      tabIndex={hasActiveGroup ? 0 : -1}
+                      sx={{ cursor: hasActiveGroup ? "pointer" : "default", outline: "none" }}
+                      onClick={hasActiveGroup ? openActiveGroup : undefined}
+                      onKeyDown={(e) => { if (e.key === "Enter" && hasActiveGroup) openActiveGroup(); }}
+                      title={hasActiveGroup ? "Open group details" : undefined}
                     >
-                      <Stack direction="row" alignItems="center" spacing={1} sx={{ overflow: "hidden", flex: 1 }}>
-                        <Typography variant="caption" sx={{ fontSize: 13 }}>📌</Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontSize: 13,
-                            fontWeight: pinsExpanded ? 700 : 500,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            color: "text.primary"
+                      {/* 🔙 Back button on Mobile / Tablet */}
+                      {isMobileOrTablet && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMobileView("list");
                           }}
                         >
-                          {pinsExpanded
-                            ? "Pinned messages"
-                            : pinnedMessages[pinnedMessages.length - 1].body}
+                          <ArrowBackRoundedIcon fontSize="small" />
+                        </IconButton>
+                      )}
+
+                      <Avatar
+                        src={topLogo}
+                        sx={{ width: 40, height: 40, cursor: hasActiveGroup ? "pointer" : "default" }}
+                        onClick={hasActiveGroup ? openActiveGroup : undefined}
+                      >
+                        {(topTitle || "C").slice(0, 1)}
+                      </Avatar>
+
+                      {/* Title + presence (online / last seen) */}
+                      <Stack spacing={0.25}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            fontWeight: 800,
+                            cursor: hasActiveGroup ? "pointer" : "default",
+                            "&:hover": hasActiveGroup ? { textDecoration: "underline" } : undefined,
+                          }}
+                          onClick={hasActiveGroup ? openActiveGroup : undefined}
+                        >
+                          {topTitle}
+                        </Typography>
+
+                        {/* WhatsApp-style status: only for DM (dmPresence is computed above) */}
+                        {dmPresence && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                          >
+                            {dmPresence.isOnline && (
+                              <Box
+                                component="span"
+                                sx={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: "50%",
+                                  bgcolor: "success.main",
+                                }}
+                              />
+                            )}
+                            {dmPresence.label}
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Stack>
+
+                    {/* Right actions */}
+                    <Stack direction="row" alignItems="center" spacing={1.25}>
+                      {/* ℹ️ Details icon – opens members/attachments popup */}
+                      <IconButton
+                        size="small"
+                        onClick={() => setDetailsOpen(true)}
+                      >
+                        <InfoOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                  </Stack>
+                </Paper>
+
+
+                {/* Chat thread */}
+                <Paper
+                  sx={{
+                    p: 2,
+                    border: `1px solid ${BORDER}`,
+                    borderRadius: 3,
+                    flex: 1,
+                    minHeight: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    position: "relative",
+                  }}
+                >
+                  {/* 🔹 ATTACHMENT PREVIEW OVERLAY (Multi-File Carousel) */}
+                  {draftAttachments.length > 0 && (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 20,
+                        bgcolor: "#e9edef",
+                        display: "flex",
+                        flexDirection: "column",
+                        borderRadius: 3,
+                        overflow: "hidden"
+                      }}
+                    >
+                      {/* Header */}
+                      <Stack direction="row" alignItems="center" sx={{ p: 2, zIndex: 2 }}>
+                        <IconButton onClick={handleClearAttachments}>
+                          <CloseRoundedIcon sx={{ fontSize: 30 }} />
+                        </IconButton>
+                        <Typography variant="h6" sx={{ ml: 2 }}>
+                          Preview {draftAttachments.length > 1 && `(${activePreviewIndex + 1} of ${draftAttachments.length})`}
                         </Typography>
                       </Stack>
 
-                      {pinnedMessages.length > 1 && (
-                        <Stack direction="row" alignItems="center" spacing={1} sx={{ pl: 1 }}>
-                          {!pinsExpanded && (
-                            <Chip
-                              label={`+${pinnedMessages.length - 1}`}
-                              size="small"
-                              sx={{
-                                height: 20,
-                                fontSize: 10,
-                                fontWeight: 700,
-                                bgcolor: "primary.main",
-                                color: "#fff"
-                              }}
-                            />
-                          )}
-                          <ExpandMoreIcon
-                            fontSize="small"
+                      {/* Center: Carousel Stage */}
+                      <Box
+                        sx={{
+                          flex: 1,
+                          position: "relative",
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          bgcolor: "#d1d7db",
+                          overflow: "hidden"
+                        }}
+                      >
+                        {/* LEFT ARROW (Show only if not first) */}
+                        {draftAttachments.length > 1 && (
+                          <IconButton
+                            onClick={() => setActivePreviewIndex((prev) => (prev > 0 ? prev - 1 : prev))}
+                            disabled={activePreviewIndex === 0}
                             sx={{
-                              transform: pinsExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                              transition: "transform 0.2s"
-                            }}
-                          />
-                        </Stack>
-                      )}
-                    </Stack>
-
-                    {/* Expanded List */}
-                    {pinsExpanded && (
-                      <Stack spacing={0.5} sx={{ mt: 1 }}>
-                        {pinnedMessages.map((m) => (
-                          <Stack
-                            key={`pinned-${m.id}`}
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                            sx={{
-                              cursor: "pointer",
-                              borderRadius: 1,
-                              p: 0.5,
-                              "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const el = document.querySelector(`[data-mid="${m.id}"]`);
-                              if (el) {
-                                el.scrollIntoView({ behavior: "smooth", block: "center" });
-                              }
+                              position: "absolute",
+                              left: 10,
+                              bgcolor: "rgba(255,255,255,0.6)",
+                              "&:hover": { bgcolor: "white" },
+                              zIndex: 10,
+                              display: activePreviewIndex === 0 ? "none" : "flex"
                             }}
                           >
-                            <Box sx={{ width: 24, display: 'flex', justifyContent: 'center' }}>
-                              <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'text.secondary' }} />
-                            </Box>
+                            <ArrowBackRoundedIcon />
+                          </IconButton>
+                        )}
 
+                        {/* THE ACTIVE FILE */}
+                        <Box sx={{ p: 4, width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                          {draftAttachments[activePreviewIndex].type.startsWith("image/") ? (
+                            <img
+                              src={URL.createObjectURL(draftAttachments[activePreviewIndex])}
+                              alt="Preview"
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: "100%",
+                                objectFit: "contain",
+                                boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+                                borderRadius: 8
+                              }}
+                            />
+                          ) : (
+                            <Stack alignItems="center" spacing={2} sx={{ p: 4, bgcolor: "white", borderRadius: 4 }}>
+                              <DescriptionOutlinedIcon sx={{ fontSize: 60, color: "#54656f" }} />
+                              <Typography variant="h6">{draftAttachments[activePreviewIndex].name}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {(draftAttachments[activePreviewIndex].size / 1024).toFixed(1)} KB
+                              </Typography>
+                            </Stack>
+                          )}
+                        </Box>
+
+                        {/* RIGHT ARROW (Show only if not last) */}
+                        {draftAttachments.length > 1 && (
+                          <IconButton
+                            onClick={() => setActivePreviewIndex((prev) => (prev < draftAttachments.length - 1 ? prev + 1 : prev))}
+                            disabled={activePreviewIndex === draftAttachments.length - 1}
+                            sx={{
+                              position: "absolute",
+                              right: 10,
+                              bgcolor: "rgba(255,255,255,0.6)",
+                              "&:hover": { bgcolor: "white" },
+                              zIndex: 10,
+                              display: activePreviewIndex === draftAttachments.length - 1 ? "none" : "flex"
+                            }}
+                          >
+                            {/* We reuse ArrowBack but rotate it 180deg for Right Arrow */}
+                            <ArrowBackRoundedIcon sx={{ transform: "rotate(180deg)" }} />
+                          </IconButton>
+                        )}
+                      </Box>
+
+                      {/* Thumbnail Strip (Only if > 1 file) */}
+                      {draftAttachments.length > 1 && (
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          sx={{
+                            p: 1,
+                            bgcolor: "rgba(255,255,255,0.5)",
+                            justifyContent: "center",
+                            overflowX: "auto"
+                          }}
+                        >
+                          {draftAttachments.map((file, idx) => (
+                            <Box
+                              key={idx}
+                              onClick={() => setActivePreviewIndex(idx)}
+                              sx={{
+                                width: 50,
+                                height: 50,
+                                borderRadius: 1,
+                                overflow: "hidden",
+                                border: activePreviewIndex === idx ? "2px solid #00a884" : "2px solid transparent",
+                                cursor: "pointer",
+                                flexShrink: 0
+                              }}
+                            >
+                              {file.type.startsWith("image/") ? (
+                                <img
+                                  src={URL.createObjectURL(file)}
+                                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                />
+                              ) : (
+                                <Box sx={{ width: "100%", height: "100%", bgcolor: "white", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                                  <DescriptionOutlinedIcon fontSize="small" />
+                                </Box>
+                              )}
+                            </Box>
+                          ))}
+                        </Stack>
+                      )}
+
+                      {/* Footer: Caption & Send */}
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        sx={{ p: 2, bgcolor: "#f0f2f5" }}
+                      >
+                        <TextField
+                          size="small"
+                          placeholder="Add a caption..."
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          fullWidth
+                          autoFocus
+                          sx={{ bgcolor: "white", borderRadius: 1 }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSend();
+                            }
+                          }}
+                        />
+                        <IconButton
+                          onClick={handleSend}
+                          sx={{
+                            bgcolor: "#00a884",
+                            color: "white",
+                            width: 45, height: 45,
+                            "&:hover": { bgcolor: "#008f6f" }
+                          }}
+                        >
+                          <SendIcon sx={{ fontSize: 20, ml: 0.5 }} />
+                        </IconButton>
+                      </Stack>
+                    </Box>
+                  )}
+                  <Box
+                    id="chat-scroll"
+                    sx={{
+                      flex: 1,
+                      overflowY: "auto",
+                      overflowX: "hidden",
+                      scrollbarWidth: "none",
+                      msOverflowStyle: "none",
+                      "&::-webkit-scrollbar": { display: "none" },
+                    }}
+                  >
+                    {pinnedMessages.length > 0 && (
+                      <Box
+                        sx={{
+                          position: "sticky",
+                          top: 0,
+                          zIndex: 2,
+                          mb: 1,
+                          px: 1,
+                          py: 0.75,
+                          borderRadius: 2,
+                          bgcolor: "#f8fafc",
+                          border: `1px solid ${BORDER}`,
+                          boxShadow: pinnedMessages.length > 1 ? "0 2px 4px rgba(0,0,0,0.03)" : "none",
+                        }}
+                      >
+                        {/* Header Row: Always visible */}
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          onClick={() => {
+                            if (pinnedMessages.length > 1) setPinsExpanded(!pinsExpanded);
+                          }}
+                          sx={{
+                            cursor: pinnedMessages.length > 1 ? "pointer" : "default",
+                            userSelect: "none"
+                          }}
+                        >
+                          <Stack direction="row" alignItems="center" spacing={1} sx={{ overflow: "hidden", flex: 1 }}>
+                            <Typography variant="caption" sx={{ fontSize: 13 }}>📌</Typography>
                             <Typography
                               variant="body2"
                               sx={{
                                 fontSize: 13,
+                                fontWeight: pinsExpanded ? 700 : 500,
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
-                                flex: 1
+                                color: "text.primary"
                               }}
                             >
-                              {m.body}
+                              {pinsExpanded
+                                ? "Pinned messages"
+                                : pinnedMessages[pinnedMessages.length - 1].body}
                             </Typography>
                           </Stack>
-                        ))}
-                      </Stack>
+
+                          {pinnedMessages.length > 1 && (
+                            <Stack direction="row" alignItems="center" spacing={1} sx={{ pl: 1 }}>
+                              {!pinsExpanded && (
+                                <Chip
+                                  label={`+${pinnedMessages.length - 1}`}
+                                  size="small"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    bgcolor: "primary.main",
+                                    color: "#fff"
+                                  }}
+                                />
+                              )}
+                              <ExpandMoreIcon
+                                fontSize="small"
+                                sx={{
+                                  transform: pinsExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                                  transition: "transform 0.2s"
+                                }}
+                              />
+                            </Stack>
+                          )}
+                        </Stack>
+
+                        {/* Expanded List */}
+                        {pinsExpanded && (
+                          <Stack spacing={0.5} sx={{ mt: 1 }}>
+                            {pinnedMessages.map((m) => (
+                              <Stack
+                                key={`pinned-${m.id}`}
+                                direction="row"
+                                spacing={1}
+                                alignItems="center"
+                                sx={{
+                                  cursor: "pointer",
+                                  borderRadius: 1,
+                                  p: 0.5,
+                                  "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const el = document.querySelector(`[data-mid="${m.id}"]`);
+                                  if (el) {
+                                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                  }
+                                }}
+                              >
+                                <Box sx={{ width: 24, display: 'flex', justifyContent: 'center' }}>
+                                  <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: 'text.secondary' }} />
+                                </Box>
+
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontSize: 13,
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    flex: 1
+                                  }}
+                                >
+                                  {m.body}
+                                </Typography>
+                              </Stack>
+                            ))}
+                          </Stack>
+                        )}
+                      </Box>
                     )}
+                    {sections.map((sec) => (
+                      <React.Fragment key={sec.label}>
+                        <Stack alignItems="center" sx={{ my: 0.8 }}>
+                          <Chip size="small" variant="outlined" label={sec.label} />
+                        </Stack>
+                        {sec.items.map((m, i) => {
+                          const prev = sec.items[i - 1];
+                          const firstOfBlock = !prev || prev.sender_id !== m.sender_id;
+                          return (
+                            <Bubble
+                              key={m.id}
+                              m={m}
+                              showSender={active && !isDmThread(active) && firstOfBlock}
+                              isPinned={isMessagePinned(m.id)}
+                              conversationId={activeId}
+                              onBubbleClick={handleOpenMessageMenu}
+                              onBubbleContextMenu={handleOpenMessageMenu}
+                            />
+
+                          );
+                        })}
+
+                      </React.Fragment>
+                    ))}
                   </Box>
-                )}
-                {sections.map((sec) => (
-                  <React.Fragment key={sec.label}>
-                    <Stack alignItems="center" sx={{ my: 0.8 }}>
-                      <Chip size="small" variant="outlined" label={sec.label} />
-                    </Stack>
-                    {sec.items.map((m, i) => {
-                      const prev = sec.items[i - 1];
-                      const firstOfBlock = !prev || prev.sender_id !== m.sender_id;
-                      return (
-                        <Bubble
-                          key={m.id}
-                          m={m}
-                          showSender={active && !isDmThread(active) && firstOfBlock}
-                          isPinned={isMessagePinned(m.id)}
-                          conversationId={activeId}
-                          onBubbleClick={handleOpenMessageMenu}
-                          onBubbleContextMenu={handleOpenMessageMenu}
-                        />
 
-                      );
-                    })}
+                  <Divider sx={{ my: 1.25 }} />
 
-                  </React.Fragment>
-                ))}
-              </Box>
-
-              <Divider sx={{ my: 1.25 }} />
-
-              {groupReadOnly ? (
-                // 🔒 WhatsApp-style read-only group banner
-                <Box
-                  sx={{
-                    px: 2,
-                    py: 1,
-                    borderRadius: 1.5,
-                    border: `1px dashed ${BORDER}`,
-                    bgcolor: "#f9fafb",
-                    color: "text.secondary",
-                    fontSize: 13,
-                    textAlign: "center",
-                  }}
-                >
-                  Only admins can send messages in this group.
-                </Box>
-              ) : (
-                <Stack direction="row" spacing={1} alignItems="center">
-                  {/* 🔹 1. Hidden Inputs for File and Camera */}
-                  <input
-                    type="file"
-                    multiple
-                    ref={fileInputRef}
-                    style={{ display: "none" }}
-                    onChange={handleFileChange}
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment" // This triggers the camera on mobile
-                    ref={cameraInputRef}
-                    style={{ display: "none" }}
-                    onChange={handleFileChange}
-                  />
-
-                  {/* 🔹 2. The Plus (+) Button */}
-                  <Tooltip title="Attach">
-                    <IconButton
-                      onClick={handleAttachClick}
-                      size="small"
+                  {groupReadOnly ? (
+                    // 🔒 WhatsApp-style read-only group banner
+                    <Box
                       sx={{
-                        bgcolor: isAttachMenuOpen ? "rgba(0,0,0,0.08)" : "transparent",
-                        transition: "transform 0.2s",
-                        transform: isAttachMenuOpen ? "rotate(45deg)" : "rotate(0deg)"
+                        px: 2,
+                        py: 1,
+                        borderRadius: 1.5,
+                        border: `1px dashed ${BORDER}`,
+                        bgcolor: "#f9fafb",
+                        color: "text.secondary",
+                        fontSize: 13,
+                        textAlign: "center",
                       }}
                     >
-                      <AddRoundedIcon fontSize="medium" />
-                    </IconButton>
-                  </Tooltip>
+                      Only admins can send messages in this group.
+                    </Box>
+                  ) : (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {/* 🔹 1. Hidden Inputs for File and Camera */}
+                      <input
+                        type="file"
+                        multiple
+                        ref={fileInputRef}
+                        style={{ display: "none" }}
+                        onChange={handleFileChange}
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment" // This triggers the camera on mobile
+                        ref={cameraInputRef}
+                        style={{ display: "none" }}
+                        onChange={handleFileChange}
+                      />
 
-                  {/* 🔹 3. The Attachment Menu */}
-                  <Menu
-                    anchorEl={attachMenuAnchor}
-                    open={isAttachMenuOpen}
-                    onClose={handleAttachClose}
-                    anchorOrigin={{ vertical: "top", horizontal: "left" }}
-                    transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-                    sx={{
-                      "& .MuiPaper-root": {
-                        borderRadius: 3,
-                        mb: 1,
-                        boxShadow: "0px 4px 20px rgba(0,0,0,0.15)"
-                      }
-                    }}
-                  >
-                    <MenuItem onClick={handleTriggerFileUpload} sx={{ py: 1.5, pr: 3 }}>
-                      <ListItemIcon>
-                        <UploadFileRoundedIcon fontSize="small" sx={{ color: "#7F66FF" }} />
-                      </ListItemIcon>
-                      <Typography variant="body2" fontWeight={600}>File Upload</Typography>
-                    </MenuItem>
+                      {/* 🔹 2. The Plus (+) Button */}
+                      <Tooltip title="Attach">
+                        <IconButton
+                          onClick={handleAttachClick}
+                          size="small"
+                          sx={{
+                            bgcolor: isAttachMenuOpen ? "rgba(0,0,0,0.08)" : "transparent",
+                            transition: "transform 0.2s",
+                            transform: isAttachMenuOpen ? "rotate(45deg)" : "rotate(0deg)"
+                          }}
+                        >
+                          <AddRoundedIcon fontSize="medium" />
+                        </IconButton>
+                      </Tooltip>
 
-                    <MenuItem onClick={handleTriggerCamera} sx={{ py: 1.5, pr: 3 }}>
-                      <ListItemIcon>
-                        <CameraAltRoundedIcon fontSize="small" sx={{ color: "#D93025" }} />
-                      </ListItemIcon>
-                      <Typography variant="body2" fontWeight={600}>Camera</Typography>
-                    </MenuItem>
-                  </Menu>
+                      {/* 🔹 3. The Attachment Menu */}
+                      <Menu
+                        anchorEl={attachMenuAnchor}
+                        open={isAttachMenuOpen}
+                        onClose={handleAttachClose}
+                        anchorOrigin={{ vertical: "top", horizontal: "left" }}
+                        transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+                        sx={{
+                          "& .MuiPaper-root": {
+                            borderRadius: 3,
+                            mb: 1,
+                            boxShadow: "0px 4px 20px rgba(0,0,0,0.15)"
+                          }
+                        }}
+                      >
+                        <MenuItem onClick={handleTriggerFileUpload} sx={{ py: 1.5, pr: 3 }}>
+                          <ListItemIcon>
+                            <UploadFileRoundedIcon fontSize="small" sx={{ color: "#7F66FF" }} />
+                          </ListItemIcon>
+                          <Typography variant="body2" fontWeight={600}>File Upload</Typography>
+                        </MenuItem>
 
-                  {/* Existing TextField */}
-                  <TextField
-                    size="small"
-                    placeholder="Type a message"
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    fullWidth
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="contained"
-                    size="small"
-                    endIcon={<SendIcon />}
-                    onClick={handleSend}
-                  >
-                    Send
-                  </Button>
-                </Stack>
-              )}
-            </Paper>
+                        <MenuItem onClick={handleTriggerCamera} sx={{ py: 1.5, pr: 3 }}>
+                          <ListItemIcon>
+                            <CameraAltRoundedIcon fontSize="small" sx={{ color: "#D93025" }} />
+                          </ListItemIcon>
+                          <Typography variant="body2" fontWeight={600}>Camera</Typography>
+                        </MenuItem>
+                      </Menu>
+
+                      {/* Existing TextField */}
+                      <TextField
+                        size="small"
+                        placeholder="Type a message"
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        fullWidth
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="contained"
+                        size="small"
+                        endIcon={<SendIcon />}
+                        onClick={handleSend}
+                      >
+                        Send
+                      </Button>
+                    </Stack>
+                  )}
+                </Paper>
+              </>
+            )}
           </Box>
         </Grid>
 
