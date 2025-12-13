@@ -27,6 +27,7 @@ import {
   MenuItem,
   Tooltip,
   ListItemIcon,
+  Skeleton
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
@@ -370,6 +371,35 @@ function displayName(user) {
  * - Tab 0: Staff (from props.staff)
  * - Tab 1: Groups (joined-groups API)
  */
+
+function NewChatListSkeleton({ rows = 7 }) {
+  return (
+    <List dense disablePadding>
+      {Array.from({ length: rows }).map((_, i) => (
+        <ListItemButton
+          key={`newchat-skel-${i}`}
+          disabled
+          sx={{
+            px: 1,
+            py: 1,
+            borderRadius: 2,
+            "&:hover": { bgcolor: "transparent" },
+          }}
+        >
+          <ListItemAvatar sx={{ minWidth: 44 }}>
+            <Skeleton variant="circular" width={40} height={40} />
+          </ListItemAvatar>
+
+          <ListItemText
+            primary={<Skeleton variant="text" width="60%" height={20} />}
+            secondary={<Skeleton variant="text" width="35%" height={16} />}
+          />
+        </ListItemButton>
+      ))}
+    </List>
+  );
+}
+
 function AdminNewChatDialog({
   open,
   staff,
@@ -384,7 +414,7 @@ function AdminNewChatDialog({
   const [groups, setGroups] = React.useState([]);
   const [loadingGroups, setLoadingGroups] = React.useState(false);
 
-    // Load "groups you joined" when dialog opens on Groups tab
+  // Load "groups you joined" when dialog opens on Groups tab
   // 👉 only fetch once per open; filtering is done separately
   React.useEffect(() => {
     if (!open || tab !== 1) return;
@@ -404,8 +434,8 @@ function AdminNewChatDialog({
         const raw = Array.isArray(data?.results)
           ? data.results
           : Array.isArray(data)
-          ? data
-          : [];
+            ? data
+            : [];
 
         const mapped = raw
           .map((g) => ({
@@ -566,6 +596,60 @@ function AdminNewChatDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ConversationListSkeleton({ rows = 8 }) {
+  return (
+    <List dense disablePadding>
+      {Array.from({ length: rows }).map((_, i) => (
+        <ListItemButton
+          key={`conv-skel-${i}`}
+          disabled
+          sx={{
+            px: 1,
+            py: 1,
+            mb: 0.75,
+            borderRadius: 2,
+            alignItems: "flex-start",
+          }}
+        >
+          <ListItemAvatar sx={{ minWidth: 48 }}>
+            <Skeleton variant="circular" width={40} height={40} />
+          </ListItemAvatar>
+
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {/* top row: name + time */}
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Skeleton variant="text" width="55%" height={20} />
+              <Skeleton variant="text" width={40} height={16} />
+            </Stack>
+
+            {/* second row: preview + unread */}
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ mt: 0.25 }}
+            >
+              <Skeleton variant="text" width="85%" height={16} />
+              <Skeleton
+                variant="rounded"
+                width={18}
+                height={18}
+                sx={{ borderRadius: 999 }}
+              />
+            </Stack>
+          </Box>
+        </ListItemButton>
+      ))}
+    </List>
   );
 }
 
@@ -810,7 +894,7 @@ export default function AdminMessagesPage() {
     [threads]
   );
 
-  
+
 
   // Staff for "New chat" – hide staff who already have a DM with real messages
   const staffForNewChat = React.useMemo(() => {
@@ -1211,8 +1295,8 @@ export default function AdminMessagesPage() {
         const arr = Array.isArray(json?.results)
           ? json.results
           : Array.isArray(json)
-          ? json
-          : [];
+            ? json
+            : [];
         if (!cancelled) setPinned(arr);
       } catch (err) {
         console.error("Failed to fetch pinned messages", err);
@@ -1266,18 +1350,18 @@ export default function AdminMessagesPage() {
     return out;
   }, [pinned, messages]);
 
-    const isMyMessage = (msg) => {
-      if (!msg || !me) return false;
-      const senderId =
-        msg.sender_id ??
-        (typeof msg.sender === "object" ? msg.sender.id : msg.sender) ??
-        msg.user_id ??
-        (typeof msg.user === "object" ? msg.user.id : msg.user);
+  const isMyMessage = (msg) => {
+    if (!msg || !me) return false;
+    const senderId =
+      msg.sender_id ??
+      (typeof msg.sender === "object" ? msg.sender.id : msg.sender) ??
+      msg.user_id ??
+      (typeof msg.user === "object" ? msg.user.id : msg.user);
 
-      return String(senderId) === String(me.id);
-    };
+    return String(senderId) === String(me.id);
+  };
 
-    const handleOpenMessageMenu = (event, message) => {
+  const handleOpenMessageMenu = (event, message) => {
     if (!message) return;
     if (event && event.preventDefault) {
       event.preventDefault();
@@ -1329,8 +1413,8 @@ export default function AdminMessagesPage() {
             const arr = Array.isArray(json?.results)
               ? json.results
               : Array.isArray(json)
-              ? json
-              : [];
+                ? json
+                : [];
             setPinned(arr);
           }
         } catch (e) {
@@ -1516,16 +1600,16 @@ export default function AdminMessagesPage() {
       setIsUserAtBottom(true);  // we want to follow our own new message
 
       const formData = new FormData();
-        formData.append("body", body);
-        draftAttachments.forEach((file) => {
-          formData.append("attachments", file);
-        });
+      formData.append("body", body);
+      draftAttachments.forEach((file) => {
+        formData.append("attachments", file);
+      });
 
-        const res = await fetch(ENDPOINTS.conversationMessages(conversationId), {
-          method: "POST",
-          headers: { ...authHeader() }, // let browser set multipart boundary
-          body: formData,
-        });
+      const res = await fetch(ENDPOINTS.conversationMessages(conversationId), {
+        method: "POST",
+        headers: { ...authHeader() }, // let browser set multipart boundary
+        body: formData,
+      });
       const msg = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(msg?.detail || "Failed to send message");
 
@@ -1688,8 +1772,8 @@ export default function AdminMessagesPage() {
             {/* Scrollable conversation list */}
             <Box sx={{ flex: 1, overflowY: "auto", mb: 1 }}>
               {loadingThreads ? (
-                <Box py={4} textAlign="center">
-                  <CircularProgress size={24} />
+                <Box sx={{ pt: 0.5 }}>
+                  <ConversationListSkeleton rows={8} />
                 </Box>
               ) : filteredThreads.length === 0 ? (
                 <Typography
@@ -2200,7 +2284,7 @@ export default function AdminMessagesPage() {
                           ? new Date(m.created_at)
                           : null;
 
-                        
+
                         // ---- date chip (Nov 14, 2025) ----
                         const dateKey = created
                           ? created.toDateString()
@@ -2261,17 +2345,17 @@ export default function AdminMessagesPage() {
                         const body = m.body || m.text || m.message || "";
                         const timeStr = created
                           ? created.toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
                           : "";
 
                         const senderName = mine
                           ? "You"
                           : m.sender_name ||
-                            m.user_name ||
-                            m.author_name ||
-                            headerName;
+                          m.user_name ||
+                          m.author_name ||
+                          headerName;
 
                         const allAttachments = getMessageAttachments(m);
                         const shareAttachment = allAttachments.find((a) => a && a.type === "share");
@@ -2563,16 +2647,16 @@ export default function AdminMessagesPage() {
                                   key={idx}
                                   onClick={() => setActivePreviewIndex(idx)}
                                   sx={{
-                                      width: 48,
-                                      height: 48,
-                                      borderRadius: 1.5,
-                                      overflow: "hidden",
-                                      border:
-                                        idx === activePreviewIndex
-                                          ? "2px solid #0ea5e9"
-                                          : "1px solid #e2e8f0",
-                                      cursor: "pointer",
-                                    }}
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 1.5,
+                                    overflow: "hidden",
+                                    border:
+                                      idx === activePreviewIndex
+                                        ? "2px solid #0ea5e9"
+                                        : "1px solid #e2e8f0",
+                                    cursor: "pointer",
+                                  }}
                                 >
                                   {img ? (
                                     <Box
@@ -2699,30 +2783,30 @@ export default function AdminMessagesPage() {
                   </Box>
                 )}
                 {/* Attach menu: File Upload & Camera (same as MessagesPage) */}
-                  <Menu
-                    anchorEl={attachMenuAnchor}
-                    open={isAttachMenuOpen}
-                    onClose={handleAttachClose}
-                    anchorOrigin={{ vertical: "top", horizontal: "left" }}
-                    transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-                  >
-                    <MenuItem onClick={handleTriggerFileUpload}>
-                      <ListItemIcon>
-                        <UploadFileRoundedIcon fontSize="small" />
-                      </ListItemIcon>
-                      <Typography variant="body2" fontWeight={600}>
-                        File Upload
-                      </Typography>
-                    </MenuItem>
-                    <MenuItem onClick={handleTriggerCamera}>
-                      <ListItemIcon>
-                        <CameraAltRoundedIcon fontSize="small" />
-                      </ListItemIcon>
-                      <Typography variant="body2" fontWeight={600}>
-                        Camera
-                      </Typography>
-                    </MenuItem>
-                  </Menu>
+                <Menu
+                  anchorEl={attachMenuAnchor}
+                  open={isAttachMenuOpen}
+                  onClose={handleAttachClose}
+                  anchorOrigin={{ vertical: "top", horizontal: "left" }}
+                  transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+                >
+                  <MenuItem onClick={handleTriggerFileUpload}>
+                    <ListItemIcon>
+                      <UploadFileRoundedIcon fontSize="small" />
+                    </ListItemIcon>
+                    <Typography variant="body2" fontWeight={600}>
+                      File Upload
+                    </Typography>
+                  </MenuItem>
+                  <MenuItem onClick={handleTriggerCamera}>
+                    <ListItemIcon>
+                      <CameraAltRoundedIcon fontSize="small" />
+                    </ListItemIcon>
+                    <Typography variant="body2" fontWeight={600}>
+                      Camera
+                    </Typography>
+                  </MenuItem>
+                </Menu>
               </>
             ) : (
               <Box
