@@ -12,7 +12,6 @@ import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import HowToVoteOutlinedIcon from "@mui/icons-material/HowToVoteOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import SearchIcon from "@mui/icons-material/Search";
-import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import {
@@ -215,7 +214,7 @@ function SuggestedConnections({ list = [] }) {
         borderRadius: 3,
         bgcolor: "background.paper",
         // ✅ match PostCard width & centering
-        maxWidth: { xs: "100%", md: 720 },
+        maxWidth: { xs: "100%", md: "100%" },
         mx: { xs: 0, md: "auto" },
       }}
     >
@@ -402,7 +401,7 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
         borderColor: BORDER,
         borderRadius: 3,
         bgcolor: "background.paper",
-        maxWidth: { xs: "100%", md: 720 },
+        maxWidth: { xs: "100%", md: "100%" },
         mx: { xs: 0, md: "auto" },
       }}
     >
@@ -1972,9 +1971,10 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         mb: 2,
         border: `1px solid ${BORDER}`,
         borderRadius: 3,
+        width: "100%",
         // 🔹 Make each post card itself fixed-width on desktop
-        maxWidth: { xs: "100%", md: 720 },
-        minWidth: { xs: "100%", md: 720 },
+        maxWidth: { xs: "100%", md: "100%" },
+        minWidth: { xs: "100%", md: "100%" },
         mx: { xs: 0, md: "auto" },
       }}
     >
@@ -2263,8 +2263,9 @@ function PostSkeleton() {
         mb: 2,
         borderRadius: 3,
         borderColor: "#e2e8f0",
-        maxWidth: { xs: "100%", md: 720 },
-        mx: { xs: 0, md: "auto" },
+        width: "100%", // ✅ Forces full width
+        maxWidth: "100%", // ✅ Ensures it doesn't shrink on larger screens
+        mx: "auto",
       }}
     >
       {/* Header Skeleton */}
@@ -3115,7 +3116,7 @@ export default function LiveFeedPage({
             width: "100%",
             // 🔹 Mobile & tablet: full width
             // 🔹 md+ (≥ 900px): clamp the feed to a fixed width and center it
-            maxWidth: { xs: "100%", md: 760 },
+            maxWidth: { xs: "100%", md: "100%" },
             mx: { xs: 0, md: "auto" },
           }}
         >
@@ -3345,20 +3346,6 @@ export default function LiveFeedPage({
         </Dialog>
 
 
-      </Grid>
-
-      {/* Right rail */}
-      <Grid item xs={12} lg={3} sx={{ display: { xs: "none", lg: "block" } }}>
-        <Box
-          sx={{
-            position: "sticky",
-            top: 55,
-            alignSelf: "flex-start",
-            width: "120%",       // take full 3-column width
-          }}
-        >
-          <CommunityProfileCard user={user} stats={stats} tags={tags} />
-        </Box>
       </Grid>
       {showScrollTop && (
         <Box
