@@ -21,7 +21,6 @@ import {
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
 import AccountSidebar from "../components/AccountSidebar.jsx";
-import AccountHero from "../components/AccountHero.jsx";
 
 // ---------------------- API base + helpers (kept) ----------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();

@@ -1,20 +1,18 @@
 // src/pages/EventDetailsPage.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useParams, useLocation } from "react-router-dom";
 import {
-  Avatar,
   Box,
   Button,
   Chip,
   Container,
   Stack,
-  Divider,
-  LinearProgress,
   Paper,
   Typography,
+  Breadcrumbs,
+  Skeleton,
 } from "@mui/material";
 import AccountSidebar from "../components/AccountSidebar.jsx";
-import AccountHero from "../components/AccountHero.jsx";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 const urlJoin = (base, path) => `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -24,23 +22,6 @@ const toAbs = (u) => {
   if (/^https?:\/\//i.test(u)) return u;
   const p = u.startsWith("/") ? u : `/${u}`;
   return `${API_ORIGIN}${p}`;
-};
-const STATIC_EVENT = {
-  id: 10001,
-  slug: "ai-ma-summit-2025",
-  title: "AI & Mergers Summit 2025",
-  preview_image:
-    "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=1600&auto=format&fit=crop",
-  location: "New York, NY",
-  category: "M&A Strategy",
-  start_time: "2025-12-15T09:00:00Z",
-  end_time: "2025-12-15T17:00:00Z",
-  is_live: false,
-  recording_url: "",
-  description:
-    "Explore the intersection of AI and mergers with top operators. Hands-on sessions, case studies, and Q&A.",
-  // meeting_url: "https://example.com/your-live-room", // set this from your API if you have it
-  // agora_channel: "channel_abc123",                    // optional: if you use /live/:slug internally
 };
 const EARLY_JOIN_MINUTES = 15;
 function parseDateSafe(s) {
@@ -68,22 +49,80 @@ function computeStatus(ev) {
   const now = Date.now();
   const s = parseDateSafe(ev.start_time)?.getTime() || 0;
   const e = parseDateSafe(ev.end_time)?.getTime() || 0;
-  if (ev.is_live) return "live";
-  if (s && e && now >= s && now <= e) return "live";
+
+  // ✅ match MyEventsPage behavior
+  if (ev.status === "ended") return "past";
+
+  if (ev.is_live && ev.status !== "ended") return "live";
+  if (s && e && now >= s && now <= e && ev.status !== "ended") return "live";
   if (s && now < s) return "upcoming";
   if (e && now > e) return "past";
   return "upcoming";
 }
+
+
+function EventDetailsSkeleton() {
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <Container maxWidth="xl" className="py-6 sm:py-8">
+        <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
+          <aside className="col-span-12 lg:col-span-3">
+            <AccountSidebar />
+          </aside>
+
+          <main className="col-span-12 lg:col-span-9">
+            <div className="flex flex-col gap-6">
+              <Breadcrumbs sx={{ mb: 2 }}>
+                <Link to="/account/events" style={{ textDecoration: "none", color: "#666" }}>
+                  My Events
+                </Link>
+                <Skeleton variant="text" width={220} />
+              </Breadcrumbs>
+              {/* EVENT CARD skeleton */}
+              <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
+                <Skeleton
+                  variant="rectangular"
+                  sx={{ width: "100%", height: { xs: 160, sm: 200, md: 240 } }}
+                />
+                <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
+                  <Stack spacing={2}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Skeleton variant="rounded" width={72} height={24} />
+                      <Skeleton width={90} height={16} />
+                    </Stack>
+
+                    <Skeleton height={34} width="72%" />
+                    <Skeleton height={16} width="48%" />
+
+                    <Skeleton height={26} width="40%" />
+                    <Skeleton height={18} width="96%" />
+                    <Skeleton height={18} width="92%" />
+                    <Skeleton height={18} width="84%" />
+                  </Stack>
+                </Box>
+              </Paper>
+
+              {/* ATTEND CARD skeleton */}
+              <Paper elevation={0} className="rounded-2xl border border-slate-200">
+                <Box className="p-5">
+                  <Skeleton height={28} width={120} />
+                  <div className="mt-3 flex flex-col gap-2">
+                    <Skeleton variant="rounded" height={40} />
+                    <Skeleton variant="rounded" height={40} />
+                    <Skeleton variant="rounded" height={40} />
+                  </div>
+                </Box>
+              </Paper>
+            </div>
+          </main>
+        </div>
+      </Container>
+    </div>
+  );
+}
+
 export default function EventDetailsPage() {
   const { slug } = useParams();
-  const navigate = useNavigate();
-
-  const storedUser = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
-  }, []);
-  const fullName = storedUser?.name || storedUser?.full_name || "Member";
-  const first = (fullName || "Member").split(" ")[0];
-
   const token =
     localStorage.getItem("token") ||
     localStorage.getItem("access") ||
@@ -96,7 +135,7 @@ export default function EventDetailsPage() {
   const [event, setEvent] = useState(preload || null);
   const [loading, setLoading] = useState(!preload);
   const [error, setError] = useState(null);
-  const [nowTick, setNowTick] = useState(Date.now());
+  const [, setNowTick] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 30 * 1000);
     return () => clearInterval(id);
@@ -153,14 +192,7 @@ export default function EventDetailsPage() {
     return () => { cancelled = true; };
   }, [slug, token, fallbackId]);
   if (loading) {
-    return (
-      <Box className="min-h-screen flex items-center justify-center">
-        <div className="w-64">
-          <LinearProgress />
-          <p className="text-center text-slate-500 mt-3">Loading event…</p>
-        </div>
-      </Box>
-    );
+    return <EventDetailsSkeleton />;
   }
   if (!event) return null;
   const status = computeStatus(event);
@@ -170,31 +202,36 @@ export default function EventDetailsPage() {
       ? { label: "Upcoming", className: "bg-teal-50 text-teal-700" }
       : { label: "Past", className: "bg-slate-100 text-slate-700" };
   // Decide the best join URL:
-  const joinUrl =
-    (event.meeting_url && event.meeting_url.trim()) ||
-    (event.join_url && event.join_url.trim()) ||
-    (event.live_url && event.live_url.trim()) ||
-    `/live/${event.slug}`; // fallback internal route
-  const earlyJoin = !!(joinUrl && status === "upcoming" && canEarlyJoin(event));
-  const canJoin = (status === "live" || earlyJoin) && !!joinUrl;
-  const canWatch = status === "past" && !!event.recording_url;
+  const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=audience`;
+  const isPast = status === "past" || event.status === "ended";
+  const isLive = status === "live" && event.status !== "ended";
+  const isWithinEarlyJoinWindow = canEarlyJoin(event);
+
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
+  const canWatch = isPast && !!event.recording_url;
   const desc = event?.description ?? "";
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Shared Account hero */}
-      <AccountHero />
       {/* BODY with LEFT NAV + MAIN */}
-      <Container maxWidth="lg" className="py-6 sm:py-8">
-        <div className="grid grid-cols-12 gap-6">
+      <Container maxWidth="xl" className="py-6 sm:py-8">
+        <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           {/* LEFT SIDEBAR */}
-          <aside className="col-span-12 md:col-span-3">
+          <aside className="col-span-12 lg:col-span-3">
             <AccountSidebar />
           </aside>
           {/* MAIN */}
-          <main className="col-span-12 md:col-span-9">
+          <main className="col-span-12 lg:col-span-9">
             {/* Stack vertically so Attend appears AFTER the event card */}
             <div className="flex flex-col gap-6">
+              <Breadcrumbs sx={{ mb: 2 }}>
+                <Link to="/account/events" style={{ textDecoration: "none", color: "#666" }}>
+                  My Events
+                </Link>
+                <Typography color="text.primary">
+                  {event?.title || "Event"}
+                </Typography>
+              </Breadcrumbs>
               {/* EVENT CARD */}
               <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
                 {event.preview_image ? (
@@ -266,21 +303,21 @@ export default function EventDetailsPage() {
                 <Box className="p-5">
                   <Typography variant="h6" className="font-extrabold">Attend</Typography>
                   <div className="mt-3 flex flex-col gap-2">
-                    <Button
-                      component={canJoin ? (joinUrl.startsWith("http") ? "a" : Link) : "button"}
-                      {...(canJoin
-                        ? (joinUrl.startsWith("http")
-                          ? { href: joinUrl, target: "_blank", rel: "noopener noreferrer" }
-                          : { to: joinUrl })
-                        : {})}
-                      disabled={!canJoin}
-                      sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                      className="rounded-xl"
-                      variant="contained"
-                    >
-                      {earlyJoin ? "Join (Early Access)" : canJoin ? "Join Live" : "Join (Unavailable)"}
-                    </Button>
-                    {canWatch && (
+                    {canShowActiveJoin ? (
+                      <Button
+                        component={Link}
+                        to={livePath}
+                        sx={{
+                          textTransform: "none",
+                          backgroundColor: "#10b8a6",
+                          "&:hover": { backgroundColor: "#0ea5a4" },
+                        }}
+                        className="rounded-xl"
+                        variant="contained"
+                      >
+                        {isLive ? "Join Live" : "Join"}
+                      </Button>
+                    ) : canWatch ? (
                       <Button
                         component="a"
                         href={event.recording_url}
@@ -292,15 +329,34 @@ export default function EventDetailsPage() {
                       >
                         Watch Recording
                       </Button>
+                    ) : isPast ? (
+                      <Button
+                        disabled
+                        variant="contained"
+                        sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                        className="rounded-xl"
+                      >
+                        Event Ended
+                      </Button>
+                    ) : (
+                      <Button
+                        disabled
+                        variant="contained"
+                        sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                        className="rounded-xl"
+                      >
+                        Join (Not Live Yet)
+                      </Button>
                     )}
+
                     <Button
                       component={Link}
-                      to={`/events`}
+                      to="/account/events"
                       variant="outlined"
                       sx={{ textTransform: "none" }}
                       className="rounded-xl"
                     >
-                      Browse more events
+                      Back to my events
                     </Button>
                   </div>
                 </Box>
