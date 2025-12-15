@@ -391,6 +391,7 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
   }
 
   const items = (list || []).slice(0, 4);
+  if (!loading && items.length === 0) return null;
 
   return (
     <Paper
@@ -3227,7 +3228,7 @@ export default function LiveFeedPage({
                   )}
 
                   {/* After next 4 posts (8 total): group suggestions */}
-                  {((idx + 1) % 8 === 0) && (
+                  {((idx + 1) % 8 === 0) && (suggestedGroupsLoading || (suggestedGroups?.length ?? 0) > 0) && (
                     <SuggestedGroups
                       list={suggestedGroups}
                       loading={suggestedGroupsLoading}
