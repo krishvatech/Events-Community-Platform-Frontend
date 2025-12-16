@@ -1,885 +1,1579 @@
 // src/pages/LiveMeetingPage.jsx
-import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Box,
-  Stack,
-  Button,
-  CircularProgress,
-  Typography,
-  Paper,
+  AppBar,
   Avatar,
-  keyframes,
-  GlobalStyles,
-  Switch,
+  Badge,
+  Box,
+  Chip,
   Divider,
+  Drawer,
   IconButton,
+  LinearProgress,
+  InputAdornment,
+  List,
+  ListItem,
+  ListItemIcon,
+  Menu,
+  MenuItem,
+  ListItemAvatar,
+  ListItemText,
+  Switch,
+  Paper,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Toolbar,
+  Tooltip,
+  Typography,
+  useMediaQuery,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from "@mui/material";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import PodcastsIcon from "@mui/icons-material/Podcasts";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import { useTheme } from "@mui/material/styles";
+import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
+import CloseIcon from "@mui/icons-material/Close";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import SettingsIcon from "@mui/icons-material/Settings";
+import SendIcon from "@mui/icons-material/Send";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
-import {
-  useDyteClient,
-  DyteProvider,
-  useDyteMeeting,
-} from "@dytesdk/react-web-core";
+import MicIcon from "@mui/icons-material/Mic";
+import MicOffIcon from "@mui/icons-material/MicOff";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import VideocamOffIcon from "@mui/icons-material/VideocamOff";
+import ScreenShareIcon from "@mui/icons-material/ScreenShare";
+import CallEndIcon from "@mui/icons-material/CallEnd";
 
-import {
-  DyteMeeting,
-  registerAddons,
-  DyteNotifications,
-} from "@dytesdk/react-ui-kit";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
+import PollIcon from "@mui/icons-material/Poll";
+import GroupIcon from "@mui/icons-material/Group";
+import MenuIcon from "@mui/icons-material/Menu";
 
-import CustomControlbarButton from "@dytesdk/ui-kit-addons/custom-controlbar-button";
-import LiveQnAPanel from "../components/LiveQnAPanel.jsx";
+import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
+import ThumbUpAltIcon from "@mui/icons-material/ThumbUpAlt";
 
-const API_ROOT = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
-).replace(/\/$/, "");
-
-function getToken() {
+function TabPanel({ value, index, children }) {
   return (
-    localStorage.getItem("access") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("access_token") ||
-    ""
-  );
-}
-
-function authHeader() {
-  const tok = getToken();
-  return tok ? { Authorization: `Bearer ${tok}` } : {};
-}
-
-function toApiUrl(pathOrUrl) {
-  try {
-    return new URL(pathOrUrl).toString();
-  } catch {
-    const rel = String(pathOrUrl).replace(/^\/+/, "");
-    return `${API_ROOT}/${rel.replace(/^api\/+/, "")}`;
-  }
-}
-
-// Hook to track permissions
-function useDytePermissions(meeting) {
-  const [permissions, setPermissions] = useState(meeting?.self?.permissions || {});
-
-  useEffect(() => {
-    if (!meeting?.self) return;
-
-    setPermissions(meeting.self.permissions);
-
-    const handleUpdate = (data) => {
-      setPermissions({ ...meeting.self.permissions });
-    };
-
-    meeting.self.on("permissionsUpdate", handleUpdate);
-
-    return () => {
-      meeting.self.off("permissionsUpdate", handleUpdate);
-    };
-  }, [meeting]);
-
-  return permissions;
-}
-
-const pulseAnimation = keyframes`
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7); }
-  70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(25, 118, 210, 0); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(25, 118, 210, 0); }
-`;
-
-// Configuration for Dyte UI
-const BASE_UI_CONFIG = {
-  designTokens: {
-    theme: {
-      text: "255, 255, 255",
-      onBackground: "255, 255, 255",
-      background: "0, 0, 0",
-    },
-  },
-};
-
-function DyteMeetingUI({ config }) {
-  const { meeting } = useDyteMeeting();
-
-  if (!meeting) {
-    return (
-      <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  // ✅ CRITICAL FIX: Only pass config if it is explicitly defined.
-  // Passing {} triggers the "reading 'dyte-meeting'" error.
-  const meetingProps = {
-    meeting: meeting,
-    mode: "fill",
-    showSetupScreen: false,
-    style: { width: "100%", height: "100%" },
-  };
-
-  if (config) {
-    meetingProps.config = config;
-  }
-
-  return (
-    <Box sx={{ flex: 1, minHeight: 0, height: "100%", width: "100%" }}>
-      <DyteMeeting {...meetingProps} />
+    <Box
+      role="tabpanel"
+      hidden={value !== index}
+      sx={{ height: "100%", display: value === index ? "flex" : "none", flexDirection: "column" }}
+    >
+      {value === index ? children : null}
     </Box>
   );
 }
 
-// White Theme Waiting Screen
-function WaitingForHostScreen() {
+function initialsFromName(name = "") {
+  const parts = name.trim().split(" ").filter(Boolean);
+  const a = parts[0]?.[0] ?? "U";
+  const b = parts[1]?.[0] ?? "";
+  return (a + b).toUpperCase();
+}
+
+function StageMiniTile({ p, tileW = 140, tileH = 82 }) {
+  const isSmall = tileW <= 132 || tileH <= 76;
+
   return (
-    <Box
-      sx={{
-        width: "100%",
-        height: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
-        p: 3,
-        boxSizing: "border-box",
-        position: "absolute",
-        top: 0,
-        left: 0,
-        zIndex: 9999,
-      }}
-    >
+    <Tooltip title={p?.name || ""} arrow placement="top">
       <Paper
-        elevation={6}
+        variant="outlined"
         sx={{
-          p: 5,
+          flex: "0 0 auto",
+          width: tileW,
+          height: tileH,
+          borderRadius: 2,
+          borderColor: "rgba(255,255,255,0.10)",
+          bgcolor: "rgba(255,255,255,0.03)",
+          backgroundImage:
+            "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+          position: "relative",
+          overflow: "hidden",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          textAlign: "center",
-          borderRadius: 4,
-          maxWidth: 450,
-          width: "100%",
-          bgcolor: "rgba(255, 255, 255, 0.9)",
-          backdropFilter: "blur(10px)",
+          justifyContent: "center",
+          "&:hover": { bgcolor: "rgba(255,255,255,0.05)" },
         }}
       >
-        <Box sx={{ position: "relative", mb: 4 }}>
-          <Avatar
-            sx={{
-              width: 80,
-              height: 80,
-              bgcolor: "primary.main",
-              animation: `${pulseAnimation} 2s infinite`,
-            }}
-          >
-            <PodcastsIcon sx={{ fontSize: 40, color: "white" }} />
-          </Avatar>
-        </Box>
+        <Avatar
+          sx={{
+            position: "absolute",
+            top: isSmall ? 6 : 8,          // ✅ little top
+            left: "50%",
+            transform: "translateX(-50%)", // ✅ center
+            bgcolor: "rgba(255,255,255,0.14)",
+            width: isSmall ? 30 : 34,
+            height: isSmall ? 30 : 34,
+            fontSize: isSmall ? 11 : 12,
+          }}
+        >
+          {initialsFromName(p.name)}
+        </Avatar>
 
-        <Typography variant="h5" fontWeight="800" color="text.primary" gutterBottom>
-          Waiting for Host
+        <Typography
+          noWrap
+          sx={{
+            position: "absolute",
+            bottom: 8,
+            left: 10,
+            right: 62, // ✅ was 34, now more space for 2 icons
+            fontWeight: 700,
+            fontSize: 12,
+            opacity: 0.9,
+          }}
+        >
+          {p.name}
         </Typography>
 
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 4, lineHeight: 1.6 }}>
-          The live stream hasn&apos;t started yet. Sit tight! We will connect
-          you automatically as soon as the host goes live.
-        </Typography>
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 6,
+            right: 8,
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+          }}
+        >
+          {p.cam ? (
+            <VideocamIcon sx={{ fontSize: 18, color: "#22c55e" }} />
+          ) : (
+            <VideocamOffIcon sx={{ fontSize: 18, color: "#ef4444" }} />
+          )}
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, color: "primary.main" }}>
-          <CircularProgress size={24} thickness={5} color="inherit" />
-          <Typography variant="caption" fontWeight="600" sx={{ letterSpacing: 1, textTransform: "uppercase" }}>
-            Connecting...
-          </Typography>
+          {p.mic ? (
+            <MicIcon sx={{ fontSize: 18, color: "#22c55e" }} />
+          ) : (
+            <MicOffIcon sx={{ fontSize: 18, color: "#ef4444" }} />
+          )}
         </Box>
       </Paper>
+    </Tooltip>
+  );
+}
+
+
+export default function NewLiveMeeting() {
+  const theme = useTheme();
+  const isMdUp = useMediaQuery(theme.breakpoints.up("md"));
+
+  const [rightOpen, setRightOpen] = useState(false); // mobile drawer
+  const [tab, setTab] = useState(0);
+
+  // ✅ Host permissions (local UI state for now)
+  const [hostPerms, setHostPerms] = useState({
+    chat: true,
+    polls: true,
+    screenShare: true,
+  });
+
+  // ✅ Assume current user is host (replace with your real role check)
+  const isHost = true;
+
+  // ✅ Settings menu anchor
+  const [permAnchorEl, setPermAnchorEl] = useState(null);
+  const permMenuOpen = Boolean(permAnchorEl);
+
+  const openPermMenu = (e) => setPermAnchorEl(e.currentTarget);
+  const closePermMenu = () => setPermAnchorEl(null);
+
+  const setPerm = (key) => (e) => {
+    const checked = e.target.checked;
+    setHostPerms((p) => ({ ...p, [key]: checked }));
+  };
+
+  // ✅ Fullscreen support
+  const rootRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const getFullscreenElement = () =>
+    document.fullscreenElement || document.webkitFullscreenElement || null;
+
+  const toggleFullscreen = async () => {
+    try {
+      const el = rootRef.current;
+      if (!el) return;
+
+      const fsEl = getFullscreenElement();
+
+      // Exit
+      if (fsEl) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        return;
+      }
+
+      // Enter (prefer root container)
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    } catch (e) {
+      console.error("Fullscreen error:", e);
+    }
+  };
+
+  // keep icon state in sync (Esc key, browser UI, etc.)
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(Boolean(getFullscreenElement()));
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    onFsChange();
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, []);
+
+  // ✅ If host disables the currently-open tab, jump to Q&A
+  useEffect(() => {
+    if (!hostPerms.chat && tab === 0) setTab(1);   // Chat -> Q&A
+    if (!hostPerms.polls && tab === 2) setTab(1);  // Polls -> Q&A
+  }, [hostPerms.chat, hostPerms.polls, tab]);
+
+  // Desktop right panel toggle
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const isPanelOpen = isMdUp ? rightPanelOpen : rightOpen;
+  const isChatActive = isPanelOpen && tab === 0 && hostPerms.chat;
+
+  // When switching to desktop, keep panel open by default
+  useEffect(() => {
+    if (isMdUp) setRightPanelOpen(true);
+  }, [isMdUp]);
+
+  const toggleRightPanel = (targetTab = 0) => {
+    let nextTab = targetTab;
+
+    // ✅ Chat OFF => open panel but jump to Q&A (so chat never shows)
+    if (nextTab === 0 && !hostPerms.chat) nextTab = 1;
+
+    // ✅ Polls OFF => never land on polls
+    if (nextTab === 2 && !hostPerms.polls) nextTab = 1;
+
+    setTab(nextTab);
+    if (isMdUp) setRightPanelOpen(true);
+    else setRightOpen(true);
+  };
+
+  const closeRightPanel = () => {
+    if (isMdUp) setRightPanelOpen(false);
+    else setRightOpen(false);
+  };
+
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(false);
+
+  const scrollSx = {
+    scrollbarWidth: "thin", // Firefox
+    scrollbarColor: "rgba(255,255,255,0.18) rgba(255,255,255,0.06)", // thumb track
+
+    "&::-webkit-scrollbar": { width: 8, height: 8 },
+    "&::-webkit-scrollbar-track": { background: "rgba(255,255,255,0.06)" },
+    "&::-webkit-scrollbar-thumb": {
+      background: "rgba(255,255,255,0.16)",
+      borderRadius: 999,
+    },
+    "&::-webkit-scrollbar-thumb:hover": {
+      background: "rgba(255,255,255,0.26)",
+    },
+  };
+
+  const [memberInfoOpen, setMemberInfoOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+
+  const openMemberInfo = (member) => {
+    setSelectedMember(member);
+    setMemberInfoOpen(true);
+  };
+
+  const closeMemberInfo = () => {
+    setMemberInfoOpen(false);
+    setSelectedMember(null);
+  };
+
+  const meeting = useMemo(
+    () => ({
+      title: "Q4 2024 M&A Strategy Session",
+      live: true,
+      timer: "00:23",
+      recording: true,
+      roomLabel: "Pinned",
+      host: { name: "Sarah Johnson", role: "Host" },
+    }),
+    []
+  );
+
+  const participants = useMemo(
+    () => [
+      { name: "Sarah Johnson", role: "Host", mic: false, cam: false, active: true },
+      { name: "Michael Chen", role: "Audience", mic: false, cam: false, active: false },
+      { name: "Emma Williams", role: "Audience", mic: false, cam: false, active: false },
+      { name: "David Park", role: "Speaker", mic: false, cam: false, active: false },
+      { name: "Lisa Anderson", role: "Audience", mic: false, cam: false, active: false },
+      { name: "Lisa Anderson", role: "Audience", mic: false, cam: false, active: false },
+      { name: "David Park", role: "Speaker", mic: false, cam: false, active: false },
+      { name: "David Park", role: "Speaker", mic: false, cam: false, active: false },
+      { name: "Michael Chen", role: "Audience", mic: false, cam: false, active: false },
+      { name: "Emma Williams", role: "Audience", mic: false, cam: false, active: false },
+      { name: "David Park", role: "Speaker", mic: false, cam: false, active: false },
+      { name: "Lisa Anderson", role: "Audience", mic: false, cam: false, active: false },
+      { name: "Lisa Anderson", role: "Audience", mic: false, cam: false, active: false },
+      { name: "David Park", role: "Speaker", mic: false, cam: false, active: false },
+      { name: "David Park", role: "Speaker", mic: false, cam: false, active: false },
+    ],
+    []
+  );
+
+  const chat = useMemo(
+    () => [
+      { name: "Sarah Johnson", time: "11:21 PM", text: "Great insights on the Q4 strategy!" },
+      { name: "Michael Chen", time: "11:22 PM", text: "Can you share the slide deck after the session?" },
+      { name: "Emma Williams", time: "11:23 PM", text: "What’s the timeline for the merger completion?" },
+      { name: "Sarah Johnson", time: "11:24 PM", text: "We’re targeting Q2 2025 for completion." },
+    ],
+    []
+  );
+
+  const currentUserName = "You";
+
+  const [qaItems, setQaItems] = useState(() => [
+    {
+      id: "q1",
+      question: "Will there be any impact on current contracts after the merger?",
+      askedBy: "Michael Chen",
+      time: "11:26 PM",
+      createdAt: 1,
+      voters: ["Sarah Johnson", "Emma Williams"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+    {
+      id: "q2",
+      question: "What are the top risks we should watch closely?",
+      askedBy: "Emma Williams",
+      time: "11:28 PM",
+      createdAt: 2,
+      voters: ["Michael Chen"],
+    },
+  ]);
+
+  const toggleQaVote = (id) => {
+    setQaItems((prev) =>
+      prev.map((q) => {
+        if (q.id !== id) return q;
+        const voters = q.voters ?? [];
+        const hasVoted = voters.includes(currentUserName);
+        return {
+          ...q,
+          voters: hasVoted ? voters.filter((n) => n !== currentUserName) : [...voters, currentUserName],
+        };
+      })
+    );
+  };
+
+  // ✅ Highest votes on top (then newest)
+  const qaSorted = useMemo(() => {
+    const arr = [...qaItems];
+    arr.sort((a, b) => (b.voters?.length ?? 0) - (a.voters?.length ?? 0) || (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    return arr;
+  }, [qaItems]);
+
+  const polls = useMemo(
+    () => [
+      {
+        question: "What's your biggest concern about the merger?",
+        votes: 40,
+        voted: true,
+        options: [
+          { label: "Integration timeline", pct: 30 },
+          { label: "Cultural alignment", pct: 20 },
+          { label: "Technology consolidation", pct: 38 },
+          { label: "Job security", pct: 13 },
+        ],
+      },
+      {
+        question: "Which integration priority should we focus on first?",
+        votes: 18,
+        voted: false,
+        options: [
+          { label: "Systems integration", pct: 45 },
+          { label: "Team alignment", pct: 30 },
+          { label: "Customer communication", pct: 25 },
+        ],
+      },
+    ],
+    []
+  );
+
+  const groupedMembers = useMemo(() => {
+    const host = participants.filter((p) => p.role === "Host");
+    const speakers = participants.filter((p) => p.role === "Speaker");
+    const audience = participants.filter((p) => p.role === "Audience");
+    return { host, speakers, audience };
+  }, [participants]);
+
+  const RIGHT_PANEL_W = 400;
+  const APPBAR_H = 44;
+
+  // Others only (Audience + Speaker), host is pinned already
+  const stageOthers = useMemo(() => participants.filter((p) => p.role !== "Host"), [participants]);
+
+  // Strip should be only others (no host duplicate)
+  const stageStrip = stageOthers;
+
+  // ✅ Show 8 participants + "+N more"
+  const MAX_STAGE_TILES = 8;
+
+  const stageStripLimited = useMemo(
+    () => stageStrip.slice(0, MAX_STAGE_TILES),
+    [stageStrip]
+  );
+
+  const stageStripRemaining = Math.max(0, stageStrip.length - stageStripLimited.length);
+
+  // ✅ Make mini tiles auto-fit 8 participants (+ more tile) even when right panel is CLOSED
+  const stageStripRef = useRef(null);
+  const [stageStripWidth, setStageStripWidth] = useState(0);
+
+  useEffect(() => {
+    const el = stageStripRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+
+    const ro = new ResizeObserver((entries) => {
+      const w = Math.floor(entries?.[0]?.contentRect?.width ?? 0);
+      setStageStripWidth(w);
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const stageGapPx = useMemo(() => {
+    const v = theme.spacing(1);
+    const n = parseFloat(String(v).replace("px", ""));
+    return Number.isFinite(n) ? n : 8;
+  }, [theme]);
+
+  // total tiles we try to fit in the strip (8 participants + optional "+N more")
+  const stageTileCount = useMemo(() => {
+    const visible = Math.min(MAX_STAGE_TILES, stageStrip.length);
+    return stageStrip.length > MAX_STAGE_TILES ? visible + 1 : visible;
+  }, [stageStrip.length]);
+
+  const stageTileW = useMemo(() => {
+    const maxW = isMdUp && rightPanelOpen ? 132 : 140; // match your screenshot sizes
+    const minW = isMdUp ? 110 : 104;
+
+    if (!stageStripWidth || !stageTileCount) return maxW;
+
+    const available = stageStripWidth - stageGapPx * (stageTileCount - 1);
+    const ideal = Math.floor(available / stageTileCount);
+
+    return Math.max(minW, Math.min(maxW, ideal));
+  }, [stageStripWidth, stageTileCount, stageGapPx, isMdUp, rightPanelOpen]);
+
+  const stageTileH = useMemo(() => {
+    const ratio = 82 / 140; // keep same ratio as 140x82
+    const h = Math.round(stageTileW * ratio);
+    return Math.max(70, Math.min(82, h));
+  }, [stageTileW]);
+
+
+  // When right panel is open on desktop, make tiles more compact
+  const isCompactStage = isMdUp && rightPanelOpen;
+
+  const headerIconBtnSx = {
+    color: "rgba(255,255,255,0.82)",
+    "&:hover": { bgcolor: "rgba(255,255,255,0.06)" },
+  };
+
+  const headerChipSx = {
+    height: 22,
+    bgcolor: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    "& .MuiChip-label": {
+      px: 1.1,
+      fontWeight: 700,
+      fontSize: 12,
+      color: "rgba(255,255,255,0.85)",
+    },
+  };
+
+  const RightPanelContent = (
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", pb: { xs: "calc(16px + env(safe-area-inset-bottom))", md: 2 }, boxSizing: "border-box" }}>
+      {/* Header */}
+      <Box
+        sx={{
+          px: 2,
+          py: 1.5,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid",
+          borderColor: "rgba(255,255,255,0.08)",
+          bgcolor: "rgba(0,0,0,0.25)",
+        }}
+      >
+        <Typography sx={{ fontWeight: 700 }}>Meeting Details</Typography>
+
+        <IconButton onClick={closeRightPanel} size="small" aria-label="Close panel">
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      {/* Tabs */}
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        variant="fullWidth"
+        sx={{
+          minHeight: 42,
+          borderBottom: "1px solid",
+          borderColor: "rgba(255,255,255,0.08)",
+          "& .MuiTab-root": { minHeight: 42, textTransform: "none", fontWeight: 600 },
+        }}
+      >
+        <Tab icon={<ChatBubbleOutlineIcon fontSize="small" />} iconPosition="start" label="Chat" sx={{ display: hostPerms.chat ? "flex" : "none" }} />
+        <Tab icon={<QuestionAnswerIcon fontSize="small" />} iconPosition="start" label="Q&A" />
+        <Tab icon={<PollIcon fontSize="small" />} iconPosition="start" label="Polls" sx={{ display: hostPerms.polls ? "flex" : "none" }} />
+        <Tab icon={<GroupIcon fontSize="small" />} iconPosition="start" label="Members" />
+      </Tabs>
+
+      {/* Body */}
+      <Box sx={{ flex: 1, minHeight: 0 }}>
+        {/* CHAT */}
+        {hostPerms.chat && (
+          <TabPanel value={tab} index={0}>
+            <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+              <Stack spacing={1.25}>
+                {chat.map((m, idx) => (
+                  <Paper
+                    key={idx}
+                    variant="outlined"
+                    sx={{
+                      p: 1.25,
+                      bgcolor: "rgba(255,255,255,0.03)",
+                      borderColor: "rgba(255,255,255,0.08)",
+                      borderRadius: 2,
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}</Typography>
+                      <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{m.time}</Typography>
+                    </Stack>
+                    <Typography sx={{ mt: 0.5, fontSize: 13, opacity: 0.9 }}>{m.text}</Typography>
+                  </Paper>
+                ))}
+              </Stack>
+            </Box>
+
+            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+
+            <Box sx={{ p: 2 }}>
+              <TextField
+                fullWidth
+                placeholder="Type a message..."
+                size="small"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton size="small" aria-label="Send message">
+                        <SendIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    bgcolor: "rgba(255,255,255,0.03)",
+                    borderRadius: 2,
+                  },
+                }}
+              />
+            </Box>
+          </TabPanel>
+        )}
+
+        {/* Q&A */}
+        <TabPanel value={tab} index={1}>
+          <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+            <Stack spacing={1.5}>
+              {qaSorted.map((q) => {
+                const voters = q.voters ?? [];
+                const votes = voters.length;
+                const hasVoted = voters.includes(currentUserName);
+
+                return (
+                  <Paper
+                    key={q.id}
+                    variant="outlined"
+                    sx={{
+                      p: 1.5,
+                      bgcolor: "rgba(255,255,255,0.03)",
+                      borderColor: "rgba(255,255,255,0.08)",
+                      borderRadius: 2,
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                      <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
+
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        {/* ✅ Hover: show who voted */}
+                        <Tooltip
+                          arrow
+                          placement="left"
+                          title={
+                            <Box sx={{ p: 1 }}>
+                              <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
+                              {votes ? (
+                                <Stack spacing={0.25}>
+                                  {voters.slice(0, 8).map((name) => (
+                                    <Typography key={name} sx={{ fontSize: 12, opacity: 0.9 }}>
+                                      {name}
+                                    </Typography>
+                                  ))}
+                                  {votes > 8 && (
+                                    <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
+                                  )}
+                                </Stack>
+                              ) : (
+                                <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
+                              )}
+                            </Box>
+                          }
+                          componentsProps={{
+                            tooltip: {
+                              sx: {
+                                bgcolor: "rgba(0,0,0,0.92)",
+                                border: "1px solid rgba(255,255,255,0.10)",
+                                borderRadius: 2,
+                              },
+                            },
+                          }}
+                        >
+                          <Box>
+                            <Chip
+                              size="small"
+                              clickable
+                              onClick={() => toggleQaVote(q.id)}
+                              icon={hasVoted ? <ThumbUpAltIcon fontSize="small" /> : <ThumbUpAltOutlinedIcon fontSize="small" />}
+                              label={votes}
+                              sx={{
+                                bgcolor: hasVoted ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                                border: "1px solid rgba(255,255,255,0.10)",
+                                "&:hover": { bgcolor: hasVoted ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                              }}
+                            />
+                          </Box>
+                        </Tooltip>
+
+                        <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{q.time}</Typography>
+                      </Stack>
+                    </Stack>
+
+                    <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92 }}>{q.question}</Typography>
+
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                      <Chip size="small" label={`Asked by ${q.askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                    </Stack>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          </Box>
+
+          <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+
+          <Box sx={{ p: 2 }}>
+            <TextField
+              fullWidth
+              placeholder="Ask a question..."
+              size="small"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" aria-label="Send question">
+                      <SendIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  bgcolor: "rgba(255,255,255,0.03)",
+                  borderRadius: 2,
+                },
+              }}
+            />
+          </Box>
+        </TabPanel>
+
+        {/* POLLS */}
+        {hostPerms.polls && (
+          <TabPanel value={tab} index={2}>
+            <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+              <Stack spacing={1.5}>
+                {polls.map((p, idx) => (
+                  <Paper
+                    key={idx}
+                    variant="outlined"
+                    sx={{
+                      p: 1.5,
+                      bgcolor: "rgba(255,255,255,0.03)",
+                      borderColor: "rgba(255,255,255,0.08)",
+                      borderRadius: 2,
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                      <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Poll</Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{p.votes} votes</Typography>
+                        {p.voted ? (
+                          <Chip size="small" label="You voted" sx={{ bgcolor: "rgba(76,175,80,0.18)" }} />
+                        ) : (
+                          <Chip size="small" label="Active" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                        )}
+                      </Stack>
+                    </Stack>
+
+                    <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92 }}>{p.question}</Typography>
+
+                    <Stack spacing={1} sx={{ mt: 1.25 }}>
+                      {p.options.map((o, i) => (
+                        <Box key={i}>
+                          <Stack direction="row" alignItems="center" justifyContent="space-between">
+                            <Typography sx={{ fontSize: 13, opacity: 0.9 }}>{o.label}</Typography>
+                            <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{o.pct}%</Typography>
+                          </Stack>
+                          <LinearProgress
+                            variant="determinate"
+                            value={o.pct}
+                            sx={{
+                              mt: 0.5,
+                              height: 8,
+                              borderRadius: 999,
+                              bgcolor: "rgba(255,255,255,0.08)",
+                              "& .MuiLinearProgress-bar": {
+                                borderRadius: 999,
+                              },
+                            }}
+                          />
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            </Box>
+          </TabPanel>
+        )}
+
+        {/* MEMBERS */}
+        <TabPanel value={tab} index={3}>
+          <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8, mb: 1 }}>
+                  HOST
+                </Typography>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.03)",
+                    borderColor: "rgba(255,255,255,0.08)",
+                    borderRadius: 2,
+                  }}
+                >
+                  <List dense disablePadding>
+                    {groupedMembers.host.map((m, idx) => (
+                      <ListItem
+                        key={idx}
+                        sx={{ px: 1.25, py: 1, display: "flex", alignItems: "center" }}
+                        secondaryAction={
+                          <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
+                            <Box sx={{ opacity: 0.9 }}>
+                              {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                            </Box>
+                          </Tooltip>
+                        }
+                      >
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+                            {initialsFromName(m.name)}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}</Typography>
+                              <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                            </Stack>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8, mb: 1 }}>
+                  SPEAKERS ({groupedMembers.speakers.length})
+                </Typography>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.03)",
+                    borderColor: "rgba(255,255,255,0.08)",
+                    borderRadius: 2,
+                  }}
+                >
+                  <List dense disablePadding>
+                    {groupedMembers.speakers.map((m, idx) => (
+                      <ListItem
+                        key={idx}
+                        sx={{ px: 1.25, py: 1 }}
+                        secondaryAction={
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
+                              <Box sx={{ opacity: 0.9 }}>
+                                {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                              </Box>
+                            </Tooltip>
+
+                            <Tooltip title="User info">
+                              <IconButton
+                                size="small"
+                                onClick={() => openMemberInfo(m)}
+                                aria-label={`User info: ${m.name}`}
+                                sx={{
+                                  bgcolor: "rgba(255,255,255,0.06)",
+                                  "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                                }}
+                              >
+                                <InfoOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        }
+                      >
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+                            {initialsFromName(m.name)}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}</Typography>}
+                          secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8, mb: 1 }}>
+                  AUDIENCE ({groupedMembers.audience.length})
+                </Typography>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.03)",
+                    borderColor: "rgba(255,255,255,0.08)",
+                    borderRadius: 2,
+                  }}
+                >
+                  <List dense disablePadding>
+                    {groupedMembers.audience.map((m, idx) => (
+                      <ListItem
+                        key={idx}
+                        sx={{ px: 1.25, py: 1 }}
+                        secondaryAction={
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
+                              <Box sx={{ opacity: 0.9 }}>
+                                {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                              </Box>
+                            </Tooltip>
+
+                            <Tooltip title="User info">
+                              <IconButton
+                                size="small"
+                                onClick={() => openMemberInfo(m)}
+                                aria-label={`User info: ${m.name}`}
+                                sx={{
+                                  bgcolor: "rgba(255,255,255,0.06)",
+                                  "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                                }}
+                              >
+                                <InfoOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        }
+                      >
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+                            {initialsFromName(m.name)}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}</Typography>}
+                          secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              </Box>
+            </Stack>
+          </Box>
+        </TabPanel>
+      </Box>
     </Box>
   );
-}
-
-function DyteMeetingWrapper({
-  authToken,
-  eventId,
-  role,
-  onMeetingEnd,
-  onOpenQnA,
-  onMeetingReady,
-  dbStatus,
-}) {
-  const [meeting, initMeeting] = useDyteClient();
-  const [initError, setInitError] = useState("");
-  const [initDone, setInitDone] = useState(false);
-  const [dyteConfig, setDyteConfig] = useState(undefined);
-  const [hostJoined, setHostJoined] = useState(false);
-
-  // Expose meeting instance
-  useEffect(() => {
-    if (!meeting) return;
-    if (typeof onMeetingReady === "function") onMeetingReady(meeting);
-  }, [meeting, onMeetingReady]);
-
-  // Init meeting
-  useEffect(() => {
-    if (!authToken) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setInitError("");
-        setInitDone(false);
-        await initMeeting({
-          authToken,
-          defaults: {
-            audio: false,
-            video: role === "publisher",
-          },
-        });
-        if (!cancelled) setInitDone(true);
-      } catch (err) {
-        if (cancelled) return;
-        setInitError(err.message || "Failed to initialize Dyte meeting");
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [authToken, initMeeting, role]);
-
-  // API Call to update DB Status
-  const updateLiveStatus = useCallback(async (action) => {
-    if (!eventId) return;
-    try {
-      await fetch(toApiUrl(`events/${eventId}/live-status/`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ action }),
-      });
-      console.log(`Updated DB status to: ${action === 'start' ? 'LIVE' : 'ENDED'}`);
-    } catch (e) {
-      console.error("Failed to update live status", e);
-    }
-  }, [eventId]);
-
-  // Trigger 'start' when Host initializes meeting
-  useEffect(() => {
-    if (initDone && role === "publisher") {
-        updateLiveStatus("start");
-    }
-  }, [initDone, role, updateLiveStatus]);
-
-  // -------------------------------------------------------------
-  // ✅ FIX: SPOTLIGHT LOGIC & PINNING
-  // -------------------------------------------------------------
-  useEffect(() => {
-    if (!meeting || !initDone || !meeting.self) return;
-
-    // Helper: Enforce Spotlight Layout
-    const enforceSpotlightLayout = () => {
-       // 'ACTIVE_GRID' automatically handles: Pinned User = Big, Others = Small/Sidebar
-       if (meeting.participants && typeof meeting.participants.setViewMode === 'function') {
-           meeting.participants.setViewMode('ACTIVE_GRID');
-       }
-    };
-
-    // 1. HOST LOGIC: Wait for room join, then pin self
-    if (role === "publisher") {
-      setHostJoined(true);
-
-      const performHostSetup = async () => {
-        try {
-          // Pin self so the host sees themselves big (optional, but good for confidence)
-          if (!meeting.self.isPinned) {
-            await meeting.self.pin();
-          }
-          enforceSpotlightLayout();
-        } catch (e) {
-          console.warn("Host setup error:", e);
-        }
-      };
-
-      // Listener for when the user ACTUALLY enters the room
-      const handleRoomJoined = () => performHostSetup();
-
-      meeting.self.on('roomJoined', handleRoomJoined);
-      
-      // Edge case: If already joined (e.g. hot reload), run immediately
-      if (meeting.self.roomJoined) {
-        performHostSetup();
-      }
-
-      return () => {
-        meeting.self.off('roomJoined', handleRoomJoined);
-      };
-    }
-
-    // 2. AUDIENCE LOGIC: Find Host, Pin Host
-    const checkForHostAndPin = (participant) => {
-      if (!participant) return;
-
-      const preset = (participant.presetName || "").toLowerCase();
-      // Adjust these checks based on your actual Dyte Preset names
-      const isHost =
-        preset.includes("host") ||
-        preset.includes("publisher") ||
-        preset.includes("admin") ||
-        preset.includes("presenter");
-
-      if (isHost) {
-        setHostJoined(true);
-        enforceSpotlightLayout(); // Ensure audience is in Grid mode to see the Pin effect
-
-        if (!participant.isPinned && typeof participant.pin === "function") {
-          participant.pin().catch((e) => {
-            console.warn("Failed to pin host from audience:", e);
-          });
-        }
-      }
-    };
-
-    // Check currently joined participants
-    if (meeting.participants.joined) {
-      Array.from(meeting.participants.joined.values()).forEach(checkForHostAndPin);
-    }
-
-    // Listen for new joiners
-    const handleJoin = (p) => checkForHostAndPin(p);
-    meeting.participants.joined.on("participantJoined", handleJoin);
-
-    return () => {
-      meeting.participants.joined.off("participantJoined", handleJoin);
-    };
-  }, [meeting, initDone, role]);
-
-
-  // Handle Room Left
-  useEffect(() => {
-    if (!meeting || !meeting.self) return;
-    const handleRoomLeft = ({ state }) => {
-      if (["left", "ended", "kicked", "rejected"].includes(state)) {
-        if (typeof onMeetingEnd === "function") onMeetingEnd(state);
-      }
-    };
-    meeting.self.on("roomLeft", handleRoomLeft);
-    return () => {
-      try { meeting.self.off?.("roomLeft", handleRoomLeft); } catch (e) {}
-    };
-  }, [meeting, onMeetingEnd]);
-
-  // Q&A Button Addon
-  useEffect(() => {
-    if (!meeting || !initDone || !meeting.self) return;
-    if (dyteConfig) return; 
-
-    try {
-      const openTab = (tab) => {
-        const dyteRoot = document.querySelector("dyte-meeting");
-        if (dyteRoot) {
-          dyteRoot.dispatchEvent(new CustomEvent("dyteStateUpdate", {
-            detail: { sidebar: { open: false, view: null } },
-            bubbles: true, composed: true,
-          }));
-        }
-        if (typeof onOpenQnA === "function") onOpenQnA(tab || "chat");
-      };
-
-      const qnaIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-4 4V5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.09 9A3 3 0 0 1 15 10c0 2-3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="1.6"/></svg>`;
-      
-      const qnaBtn = new CustomControlbarButton({
-        position: "right",
-        label: "Q&A",
-        icon: qnaIcon,
-        onClick: () => openTab("qna"),
-      });
-
-      const addonsConfig = registerAddons([qnaBtn], meeting);
-      setDyteConfig({ ...BASE_UI_CONFIG, ...addonsConfig });
-
-    } catch (e) { 
-      console.warn("Failed to register Q&A addon", e); 
-    }
-  }, [meeting, initDone, onOpenQnA, dyteConfig]);
-
-  if (!authToken) return <Typography sx={{ p: 3 }} color="error">Missing Auth Token</Typography>;
-  if (initError) return <Typography sx={{ p: 3 }} color="error">{initError}</Typography>;
-  
-  if (!initDone || !meeting) {
-    return (
-      <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  const shouldShowMeeting = hostJoined || dbStatus === "live";
-
-  if (!shouldShowMeeting) {
-    return <WaitingForHostScreen />;
-  }
-
-  return (
-    <DyteProvider value={meeting} fallback={<CircularProgress />}>
-      <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
-        <DyteMeetingUI config={dyteConfig} />
-        <DyteNotifications
-          meeting={meeting}
-          config={{
-            notifications: ["chat", "poll", "participant_joined", "participant_left"],
-            notification_sounds: [],
-          }}
-        />
-      </Box>
-    </DyteProvider>
-  );
-}
-
-// ------------- Page component -------------
-
-export default function LiveMeetingPage() {
-  const { slug } = useParams();
-  const navigate = useNavigate();
-
-  const [eventId, setEventId] = useState(null);
-  const [role, setRole] = useState("audience");
-  const [authToken, setAuthToken] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [dbStatus, setDbStatus] = useState("draft"); 
-  
-  // Sidebar State
-  const [showQnA, setShowQnA] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState("chat");
-  const [sidebarMeeting, setSidebarMeeting] = useState(null);
-
-  // Host Controls
-  const [controlsOpen, setControlsOpen] = useState(false);
-  const [chatEnabled, setChatEnabled] = useState(true);
-  const [pollsEnabled, setPollsEnabled] = useState(true);
-  const [participantsTabVisible, setParticipantsTabVisible] = useState(true);
-  const [screenShareAllowed, setScreenShareAllowed] = useState(true);
-  const [pluginsAllowed, setPluginsAllowed] = useState(true);
-
-  const isHost = role === "publisher";
-  
-  // Permissions & Broadcasting
-  const selfPermissions = useDytePermissions(sidebarMeeting);
-  const canScreenShare = selfPermissions.canProduceScreenshare === "ALLOWED";
-  const [hostForceBlock, setHostForceBlock] = useState(false);
-
-  // 1. Listen for Broadcasts (Audience Side)
-  useEffect(() => {
-    if (!sidebarMeeting) return;
-    const handleBroadcast = ({ type, payload }) => {
-      // Logic: Screen Share Toggle
-      if (type === "toggle-screen-share") {
-        setHostForceBlock(!payload.allowed);
-      }
-      // Logic: Host ID for Pinning
-      if (type === "host-id" && payload.hostId) {
-         // This is handled inside DyteMeetingWrapper's pinning logic via side-effect
-      }
-    };
-    sidebarMeeting.participants.on('broadcastedMessage', handleBroadcast);
-    return () => sidebarMeeting.participants.off('broadcastedMessage', handleBroadcast);
-  }, [sidebarMeeting]);
-
-  const shouldHideScreenShare = !isHost && (!canScreenShare || hostForceBlock);
-
-  // 2. Host Logic: Control Audience & Broadcast Presence
-  useEffect(() => {
-    if (!isHost || !sidebarMeeting) return;
-    
-    // Broadcast Host ID so Audience can Pin them
-    const broadcastPresence = () => {
-        const myId = sidebarMeeting.self.id;
-        sidebarMeeting.participants.broadcastMessage("host-id", { hostId: myId });
-    };
-
-    broadcastPresence(); 
-    const interval = setInterval(broadcastPresence, 4000); 
-
-    return () => clearInterval(interval);
-  }, [isHost, sidebarMeeting]);
-
-  const getAudienceParticipantIds = useCallback(() => {
-    if (!sidebarMeeting?.participants?.joined) return [];
-    const participants = Array.from(sidebarMeeting.participants.joined.values());
-    return participants
-      .filter((p) => p.id !== sidebarMeeting.self.id) 
-      .map((p) => p.id);
-  }, [sidebarMeeting]);
-
-  const updateAudiencePermissions = useCallback(async (permissionsPatch) => {
-    if (!isHost || !sidebarMeeting) return;
-    const audienceIds = getAudienceParticipantIds();
-    if (audienceIds.length === 0) return;
-    try {
-      await sidebarMeeting.participants.updatePermissions(audienceIds, permissionsPatch);
-    } catch (e) {
-      console.error("Failed to update audience permissions:", e);
-    }
-  }, [isHost, sidebarMeeting, getAudienceParticipantIds]);
-
-  // Toggle Handlers
-  const handleToggleChat = async () => {
-    const next = !chatEnabled;
-    setChatEnabled(next);
-    await updateAudiencePermissions({
-      chat: {
-        public: { canSend: next, text: next, files: next },
-        private: { canSend: next, text: next, files: next },
-      },
-    });
-  };
-
-  const handleTogglePolls = async () => {
-    const next = !pollsEnabled;
-    setPollsEnabled(next);
-    await updateAudiencePermissions({ polls: { canCreate: next, canVote: next } });
-  };
-
-  const handleToggleScreenShare = async () => {
-    const next = !screenShareAllowed;
-    setScreenShareAllowed(next); 
-    // Permission Update
-    await updateAudiencePermissions({
-      canProduceScreenshare: next ? "ALLOWED" : "NOT_ALLOWED",
-      requestProduceScreenshare: next
-    });
-    // Broadcast Update (Force Signal)
-    if (sidebarMeeting?.participants) {
-        sidebarMeeting.participants.broadcastMessage("toggle-screen-share", { allowed: next });
-    }
-  };
-
-  const handleTogglePlugins = async () => {
-    const next = !pluginsAllowed;
-    setPluginsAllowed(next);
-    await updateAudiencePermissions({ plugins: { canStart: next, canClose: next } });
-  };
-
-  // Sync New Joiners
-  useEffect(() => {
-    if (!isHost || !sidebarMeeting) return;
-    const handleParticipantJoined = async (participant) => {
-      if (participant.id === sidebarMeeting.self.id) return;
-      try {
-        await sidebarMeeting.participants.updatePermissions([participant.id], {
-          canProduceScreenshare: screenShareAllowed ? "ALLOWED" : "NOT_ALLOWED",
-          requestProduceScreenshare: screenShareAllowed,
-          plugins: { canStart: pluginsAllowed, canClose: pluginsAllowed },
-          chat: {
-            public: { canSend: chatEnabled, text: chatEnabled, files: chatEnabled },
-            private: { canSend: chatEnabled, text: chatEnabled, files: chatEnabled },
-          },
-        });
-      } catch (e) { console.warn("Failed to sync permissions", e); }
-    };
-    sidebarMeeting.participants.joined.on("participantJoined", handleParticipantJoined);
-    return () => { sidebarMeeting.participants.joined.off("participantJoined", handleParticipantJoined); };
-  }, [sidebarMeeting, isHost, screenShareAllowed, pluginsAllowed, chatEnabled]);
-
-  // Q&A CSS class toggle
-  useEffect(() => {
-    const dyteRoot = document.querySelector("dyte-meeting");
-    if (!dyteRoot) return;
-    if (showQnA) dyteRoot.classList.add("qna-open");
-    else dyteRoot.classList.remove("qna-open");
-  }, [showQnA]);
-
-  const handleOpenQnA = (tab) => {
-    if (tab) setSidebarTab(tab);
-    setShowQnA(true);
-  };
-
-  const handleBack = () => {
-    if (role === "publisher") {
-        navigate("/admin/events");
-    } else {
-        navigate(-1);
-    }
-  };
-
-  // Setup Role & ID & Fetch Initial Status
-  useEffect(() => {
-    const search = new URLSearchParams(window.location.search);
-    const idFromQuery = search.get("id");
-    if (!idFromQuery) {
-      setError("Missing event id");
-      setLoading(false);
-      return;
-    }
-    setEventId(idFromQuery);
-    const roleFromQuery = (search.get("role") || "audience").toLowerCase();
-    setRole(roleFromQuery === "publisher" || roleFromQuery === "host" ? "publisher" : "audience");
-    
-    // FETCH DB STATUS
-    const fetchStatus = async () => {
-        try {
-            const res = await fetch(toApiUrl(`events/${idFromQuery}/`), {
-                 headers: authHeader()
-            });
-            if(res.ok) {
-                const data = await res.json();
-                setDbStatus(data.status); 
-            }
-        } catch(e) { console.error("Failed to fetch event status", e); }
-    };
-    fetchStatus();
-
-  }, [slug]);
-
-  // Join API Call
-  useEffect(() => {
-    if (!eventId) return;
-    const join = async () => {
-      try {
-        const url = toApiUrl(`events/${eventId}/dyte/join/`);
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify({ role }),
-        });
-        if (!res.ok) throw new Error("Failed to join live meeting.");
-        const data = await res.json();
-        setAuthToken(data.authToken);
-        if (data.role) setRole(data.role);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    join();
-  }, [eventId, role]);
-
-  // Auto Fullscreen
-  const pageRef = useRef(null);
-  useEffect(() => {
-    if (!authToken || !pageRef.current) return;
-    const el = pageRef.current;
-    const requestFs = el.requestFullscreen || el.webkitRequestFullscreen;
-    if (requestFs) try { requestFs.call(el); } catch (e) {}
-  }, [authToken]);
-
-  // Helper to update DB Status
-  const updateLiveStatus = async (action) => {
-    if (!eventId) return;
-    try {
-      await fetch(toApiUrl(`events/${eventId}/live-status/`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ action }),
-      });
-    } catch (e) {
-      console.error("Failed to update live status", e);
-    }
-  };
-
-  // Correct Redirects on Meeting End & Update DB
-  const handleMeetingEnd = useCallback(async (state) => {
-      console.log("Meeting ended with state:", state);
-      if (document.fullscreenElement) {
-        try { document.exitFullscreen(); } catch (e) {}
-      }
-
-      // REDIRECT LOGIC
-      if (role === "publisher") {
-          await updateLiveStatus("end");
-          navigate("/admin/events");
-      } else {
-          navigate(-1);
-      }
-    }, [role, navigate, eventId]
-  );
-
-  // "Smart" Enforcer for Screen Share Hiding
-  useEffect(() => {
-    if (isHost) return;
-
-    const updateVisibilityRecursively = (node) => {
-      if (!node) return;
-      const tag = (node.tagName || "").toLowerCase();
-      const label = (node.getAttribute("label") || node.getAttribute("aria-label") || "").toLowerCase();
-
-      const isShareComponent = tag === "dyte-screen-share-toggle" || tag === "dyte-screenshare-view-toggle";
-      const isShareLabel = label.includes("share") && label.includes("screen");
-      const isGenericShare = (tag === "dyte-controlbar-button" || tag === "dyte-menu-item") && label === "share";
-
-      if (isShareComponent || isShareLabel || isGenericShare) {
-        if (shouldHideScreenShare) {
-          if (node.style.display !== "none") {
-            node.style.display = "none";
-            node.style.visibility = "hidden";
-            node.style.width = "0px";
-            node.style.height = "0px";
-            node.style.position = "absolute";
-          }
-        } else {
-          if (node.style.display === "none") {
-            node.style.display = "";
-            node.style.visibility = "";
-            node.style.width = "";
-            node.style.height = "";
-            node.style.position = "";
-          }
-        }
-      }
-      if (node.shadowRoot) Array.from(node.shadowRoot.children).forEach(updateVisibilityRecursively);
-      if (node.children) Array.from(node.children).forEach(updateVisibilityRecursively);
-    };
-
-    const timer = setInterval(() => {
-      const meetingEl = document.querySelector("dyte-meeting");
-      if (meetingEl) updateVisibilityRecursively(meetingEl);
-    }, 500);
-    return () => clearInterval(timer);
-  }, [isHost, shouldHideScreenShare]);
-
-
-  // Loading / Error States
-  if (loading) {
-    return (
-      <Box sx={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error && !authToken) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography color="error">{error}</Typography>
-        <Button onClick={handleBack} sx={{ mt: 2 }}>Back</Button>
-      </Box>
-    );
-  }
 
   return (
     <Box
-      ref={pageRef}
+      ref={rootRef}
       sx={{
-        position: "relative",
         height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        bgcolor: "#020617",
-        color: "#e5e7eb",
         overflow: "hidden",
+        bgcolor: "#070A10",
+        color: "#fff",
+        backgroundImage:
+          "radial-gradient(1000px 500px at 50% 0%, rgba(90,120,255,0.18), transparent 55%), radial-gradient(900px 500px at 0% 100%, rgba(20,184,177,0.10), transparent 60%)",
+
+        // ✅ FORCE ALL TEXT WHITE ON DARK
+        "&, & *": { color: "#fff" },
+
+        // ✅ Secondary text
+        "& .MuiTypography-root": { color: "#fff" },
+        "& .MuiListItemText-secondary": { color: "rgba(255,255,255,0.70)" },
+
+        // ✅ Tabs
+        "& .MuiTab-root": { color: "rgba(255,255,255,0.75)" },
+        "& .MuiTab-root.Mui-selected": { color: "#fff" },
+        "& .MuiTabs-indicator": { backgroundColor: "#14b8b1" },
+
+        // ✅ Chip labels (LIVE / Recording / etc.)
+        "& .MuiChip-label": { color: "#fff" },
+
+        // ✅ TextField input + placeholder + border
+        "& .MuiInputBase-input": { color: "#fff" },
+        "& .MuiInputBase-input::placeholder": {
+          color: "rgba(255,255,255,0.55)",
+          opacity: 1,
+        },
+        "& .MuiOutlinedInput-notchedOutline": {
+          borderColor: "rgba(19, 19, 19, 0.16)",
+        },
+
+        // ✅ Icons
+        "& .MuiSvgIcon-root": { color: "rgba(255,255,255,0.90)" },
       }}
     >
-      <GlobalStyles
-        styles={{
-          "dyte-meeting.qna-open dyte-controlbar-button[label='Q&A'], dyte-meeting.qna-open dyte-controlbar-button[aria-label='Q&A']": {
-            backgroundColor: "rgba(59, 130, 246, 0.16)",
-            boxShadow: "0 0 0 1px #3b82f6 inset",
-            borderRadius: "999px",
-          },
-        }}
-      />
-
-      {/* Force Hide CSS for initial load */}
-      {!isHost && shouldHideScreenShare && (
-        <style>{`
-          dyte-meeting dyte-screen-share-toggle,
-          dyte-screen-share-toggle,
-          dyte-meeting dyte-controlbar-button[icon="screenshare"],
-          dyte-controlbar-button[label="Share Screen"],
-          dyte-controlbar-button[label="Share screen"],
-          button[aria-label="Share Screen"] {
-            display: none !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-            width: 0 !important;
-          }
-        `}</style>
-      )}
-
-      {/* Header Bar */}
-      <Box
+      {/* Top Bar */}
+      <AppBar
+        position="sticky"
+        elevation={0}
         sx={{
-          position: "absolute", top: 0, left: 0, right: 0, p: 1, zIndex: 9998,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          pointerEvents: "none", bgcolor: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)",
+          bgcolor: "rgba(5,7,12,0.72)",
+          backgroundImage:
+            "linear-gradient(180deg, rgba(0,0,0,0.70) 0%, rgba(0,0,0,0.35) 100%)",
+          backdropFilter: "blur(14px)",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ pointerEvents: "auto", pl: 1 }}>
-          <Button startIcon={<ArrowBackIcon />} onClick={handleBack} size="small" variant="outlined" sx={{ borderRadius: 999 }}>
-            Back
-          </Button>
-          <Typography variant="body2" color="grey.400">Live meeting powered by Dyte</Typography>
-        </Stack>
+        <Toolbar
+          disableGutters
+          sx={{
+            gap: 1,
+            minHeight: 44,          // ✅ smaller header height
+            px: 1.25,               // ✅ left/right padding
+            py: 0.25,               // ✅ small vertical padding
+          }}
+        >
+          <IconButton sx={headerIconBtnSx} aria-label="Back">
+            <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
+          </IconButton>
 
-        {isHost && (
-          <Box sx={{ position: "relative", pointerEvents: "auto", mr: 1 }}>
-            <IconButton
-              size="small"
-              onClick={() => setControlsOpen((prev) => !prev)}
-              sx={{ color: "grey.100", bgcolor: "rgba(0,0,0,0.45)", "&:hover": { bgcolor: "rgba(255,255,255,0.18)" } }}
-            >
-              <SettingsOutlinedIcon fontSize="small" />
-            </IconButton>
+          <Typography
+            sx={{
+              fontWeight: 800,
+              fontSize: { xs: 14, sm: 16 },
+              color: "rgba(255,255,255,0.88)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              flex: 1,
+            }}
+          >
+            {meeting.title}
+          </Typography>
 
-            {controlsOpen && (
-              <Paper
-                elevation={8}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ pr: 0.5 }}>
+            {meeting.live && (
+              <Chip
+                size="small"
+                label="LIVE"
                 sx={{
-                  position: "absolute", top: 40, right: 0, minWidth: 260,
-                  borderRadius: 3, p: 2, bgcolor: "rgba(18,18,18,0.98)", color: "grey.100",
+                  ...headerChipSx,
+                  bgcolor: "rgba(244,67,54,0.18)",
+                  border: "1px solid rgba(244,67,54,0.35)",
+                  "& .MuiChip-label": {
+                    px: 1.1,
+                    fontWeight: 800,
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.90)",
+                  },
+                }}
+              />
+            )}
+
+            <Chip size="small" label={meeting.timer} sx={headerChipSx} />
+
+            {meeting.recording && <Chip size="small" label="Recording" sx={headerChipSx} />}
+          </Stack>
+
+          <Tooltip title={isHost ? "Host permissions" : "Only host can change"}>
+            <span>
+              <IconButton
+                sx={headerIconBtnSx}
+                aria-label="Host permissions"
+                onClick={isHost ? openPermMenu : undefined}
+                disabled={!isHost}
+              >
+                <SettingsIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+
+          <Tooltip title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+            <IconButton sx={headerIconBtnSx} aria-label="Fullscreen" onClick={toggleFullscreen}>
+              {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+
+          {!isMdUp ? (
+            <Tooltip title="Open panel">
+              <IconButton sx={headerIconBtnSx} aria-label="Open right panel" onClick={() => toggleRightPanel(0)}>
+                <MenuIcon />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Tooltip title="More">
+              <IconButton sx={headerIconBtnSx} aria-label="More options">
+                <MoreVertIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Toolbar>
+      </AppBar>
+
+      <Menu
+        anchorEl={permAnchorEl}
+        open={permMenuOpen}
+        onClose={closePermMenu}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        PaperProps={{
+          sx: {
+            mt: 1,
+            minWidth: 320,
+            bgcolor: "rgba(0,0,0,0.92)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 2.5,
+            overflow: "hidden",
+            backdropFilter: "blur(12px)",
+
+            // ✅ make menu text white
+            color: "#fff",
+            "& .MuiListItemText-primary": { color: "#fff" },
+            "& .MuiListItemText-secondary": { color: "rgba(255,255,255,0.65)" },
+            "& .MuiListItemIcon-root": { color: "#fff" },
+          },
+        }}
+        MenuListProps={{
+          sx: {
+            // ✅ hover bg on dark menu
+            "& .MuiMenuItem-root:hover": { bgcolor: "rgba(255,255,255,0.06)" },
+          },
+        }}
+      >
+        <MenuItem disabled sx={{ fontWeight: 800, opacity: 0.9 }}>
+          Host Permissions
+        </MenuItem>
+
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
+
+        <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+          <ListItemIcon sx={{ minWidth: 34 }}>
+            <ChatBubbleOutlineIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText primary="Chat" secondary="Hide chat tab + block chat panel" />
+          <Switch checked={hostPerms.chat} onChange={setPerm("chat")} />
+        </MenuItem>
+
+        <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+          <ListItemIcon sx={{ minWidth: 34 }}>
+            <PollIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText primary="Polls" secondary="Show/hide Polls tab" />
+          <Switch checked={hostPerms.polls} onChange={setPerm("polls")} />
+        </MenuItem>
+
+        <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+          <ListItemIcon sx={{ minWidth: 34 }}>
+            <ScreenShareIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText primary="Screen share" secondary="Enable/disable screen sharing" />
+          <Switch checked={hostPerms.screenShare} onChange={setPerm("screenShare")} />
+        </MenuItem>
+      </Menu>
+
+      {/* Main Layout */}
+      <Box
+        sx={{
+          display: "flex",
+          height: `calc(100vh - ${APPBAR_H}px)`,
+          overflow: "hidden",
+        }}
+      >
+        {/* Left/Main */}
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            height: "100%",
+            minHeight: 0,
+            overflow: "hidden",
+            p: { xs: 1.5, sm: 2 },
+            pr: { md: 2 },
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+          }}
+        >
+          {/* Video Stage */}
+          <Paper
+            variant="outlined"
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              borderRadius: 3,
+              borderColor: "rgba(255,255,255,0.08)",
+              bgcolor: "rgba(255,255,255,0.04)",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            {/* Pinned badge */}
+            <Box sx={{ position: "absolute", top: 12, left: 12 }}>
+              <Chip size="small" label={meeting.roomLabel} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+            </Box>
+
+            {/* Main participant */}
+            <Box
+              sx={{
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 1.25,
+              }}
+            >
+              <Avatar
+                sx={{
+                  width: 76,
+                  height: 76,
+                  fontSize: 22,
+                  bgcolor: "rgba(255,255,255,0.12)",
                 }}
               >
-                <Typography variant="overline" sx={{ letterSpacing: 1, fontWeight: 600 }}>CONTROLS</Typography>
-                <Divider sx={{ mb: 1 }} />
-                
-                <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
-                  <Typography variant="body2">Enable Chat</Typography>
-                  <Switch size="small" checked={chatEnabled} onChange={handleToggleChat} />
-                </Stack>
-                <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
-                  <Typography variant="body2">Show Polls Tab</Typography>
-                  <Switch size="small" checked={pollsEnabled} onChange={handleTogglePolls} />
-                </Stack>
-                <Divider sx={{ my: 1 }} />
-                <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
-                  <Typography variant="body2">Allow Screen Share</Typography>
-                  <Switch size="small" checked={screenShareAllowed} onChange={handleToggleScreenShare} />
-                </Stack>
-                <Stack direction="row" justifyContent="space-between" sx={{ py: 0.5 }}>
-                  <Typography variant="body2">Allow Plugins</Typography>
-                  <Switch size="small" checked={pluginsAllowed} onChange={handleTogglePlugins} />
-                </Stack>
-              </Paper>
+                {initialsFromName(meeting.host.name)}
+              </Avatar>
+
+              <Typography sx={{ fontWeight: 800, fontSize: 18 }}>{meeting.host.name}</Typography>
+              <Typography sx={{ opacity: 0.7, fontSize: 13 }}>{meeting.host.role}</Typography>
+            </Box>
+          </Paper>
+
+          {/* Participants strip (Audience + Speaker) */}
+          <Box
+            ref={stageStripRef}
+            sx={{
+              flexShrink: 0,
+              display: "flex",
+              gap: 1,
+              overflowX: "auto",
+              flexWrap: "nowrap",
+              pb: 0.5,
+              ...scrollSx,
+            }}
+          >
+            {stageStripLimited.map((p, idx) => (
+              <StageMiniTile key={`${p.name}-${idx}`} p={p} tileW={stageTileW} tileH={stageTileH} />
+            ))}
+
+            {stageStripRemaining > 0 && (
+              <Tooltip title="View all members">
+                <Paper
+                  variant="outlined"
+                  onClick={() => toggleRightPanel(3)}
+                  sx={{
+                    cursor: "pointer",
+                    flex: "0 0 auto",
+                    width: stageTileW,
+                    height: stageTileH,
+                    borderRadius: 2,
+                    borderColor: "rgba(255,255,255,0.10)",
+                    bgcolor: "rgba(255,255,255,0.05)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Typography sx={{ fontWeight: 900, opacity: 0.9 }}>+{stageStripRemaining} more</Typography>
+                </Paper>
+              </Tooltip>
             )}
           </Box>
+
+
+          {/* Bottom Controls */}
+          <Paper
+            variant="outlined"
+            sx={{
+              flexShrink: 0,
+              borderRadius: 999,
+              borderColor: "rgba(255,255,255,0.08)",
+              bgcolor: "rgba(0,0,0,0.35)",
+              backdropFilter: "blur(10px)",
+              px: 2,
+              py: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 1.5,
+              mx: "auto",
+              width: { xs: "100%", sm: "auto" },
+            }}
+          >
+            <Tooltip title={micOn ? "Mute" : "Unmute"}>
+              <IconButton
+                onClick={() => setMicOn((v) => !v)}
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.06)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                }}
+                aria-label="Toggle mic"
+              >
+                {micOn ? <MicIcon /> : <MicOffIcon />}
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title={camOn ? "Turn camera off" : "Turn camera on"}>
+              <IconButton
+                onClick={() => setCamOn((v) => !v)}
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.06)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                }}
+                aria-label="Toggle camera"
+              >
+                {camOn ? <VideocamIcon /> : <VideocamOffIcon />}
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title={!hostPerms.screenShare ? "Screen share disabled by host" : "Share screen"}>
+              <span>
+                <IconButton
+                  disabled={!hostPerms.screenShare}
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.06)",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                    "&.Mui-disabled": { opacity: 0.45 },
+                  }}
+                  aria-label="Share screen"
+                >
+                  <ScreenShareIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : (isChatActive ? "Close chat" : "Open chat")}>
+              <span>
+                <IconButton
+                  onClick={() => {
+                    // toggle behavior: if chat is open on tab=0, close panel
+                    if (hostPerms.chat && isChatActive) closeRightPanel();
+                    else toggleRightPanel(hostPerms.chat ? 0 : 1);
+                  }}
+                  sx={{
+                    bgcolor: isChatActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                    "&:hover": { bgcolor: isChatActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                    opacity: hostPerms.chat ? 1 : 0.7,
+                  }}
+                  aria-label="Chat / panel"
+                >
+                  <ChatBubbleOutlineIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip title="Leave meeting">
+              <IconButton
+                sx={{
+                  bgcolor: "rgba(244,67,54,0.22)",
+                  "&:hover": { bgcolor: "rgba(244,67,54,0.30)" },
+                }}
+                aria-label="Leave meeting"
+              >
+                <CallEndIcon />
+              </IconButton>
+            </Tooltip>
+          </Paper>
+        </Box>
+
+        {/* Right Panel (Desktop) */}
+        {isMdUp && rightPanelOpen && (
+          <Box
+            sx={{
+              width: RIGHT_PANEL_W,
+              borderLeft: "1px solid rgba(255,255,255,0.08)",
+              bgcolor: "rgba(0,0,0,0.25)",
+              backdropFilter: "blur(10px)",
+              height: `calc(100vh - ${APPBAR_H}px)`,
+              position: "sticky",
+              top: APPBAR_H,
+              overflow: "hidden",
+              // (optional) to match the “padded card” look like main stage:
+              p: 2,
+              boxSizing: "border-box",
+            }}
+          >
+            <Paper
+              variant="outlined"
+              sx={{
+                height: "100%",
+                minHeight: 0,
+                borderRadius: 3,
+                borderColor: "rgba(255,255,255,0.08)",
+                bgcolor: "rgba(255,255,255,0.03)",
+                overflow: "hidden",
+              }}
+            >
+              {RightPanelContent}
+            </Paper>
+          </Box>
+        )}
+
+        {/* Right Panel (Mobile Drawer) */}
+        {!isMdUp && (
+          <Drawer
+            anchor="right"
+            open={rightOpen}
+            onClose={() => setRightOpen(false)}
+            PaperProps={{
+              sx: {
+                width: { xs: "92vw", sm: 420 },
+                bgcolor: "rgba(0,0,0,0.85)",
+                borderLeft: "1px solid rgba(255,255,255,0.08)",
+
+                // ✅ FORCE WHITE TEXT ONLY IN MOBILE RIGHT PANEL
+                color: "#fff",
+                "&, & *": { color: "#fff" },
+              },
+            }}
+          >
+            {RightPanelContent}
+          </Drawer>
         )}
       </Box>
+      {/* Member Info Dialog */}
+      <Dialog
+        open={memberInfoOpen}
+        onClose={closeMemberInfo}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: "rgba(0,0,0,0.92)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 3,
+            backdropFilter: "blur(14px)",
 
-      {/* Main Meeting Area */}
-      <Box sx={{ flex: 1, minHeight: 0, pr: showQnA ? { xs: 0, sm: "360px", md: "400px" } : 0, transition: "padding-right 200ms ease" }}>
-        <DyteMeetingWrapper
-          authToken={authToken}
-          eventId={eventId}
-          role={role}
-          onMeetingEnd={handleMeetingEnd}
-          onOpenQnA={handleOpenQnA}
-          onMeetingReady={setSidebarMeeting}
-          dbStatus={dbStatus}
-        />
-      </Box>
+            // ✅ make all dialog text white
+            color: "#fff",
+            "& .MuiTypography-root": { color: "#fff" },
+            "& .MuiChip-label": { color: "#fff" },
+            "& .MuiChip-icon": { color: "rgba(255,255,255,0.9)" },
+            "& .MuiIconButton-root": { color: "#fff" },
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1, fontWeight: 800 }}>User Info</DialogTitle>
 
-      {/* Side Panels */}
-      <LiveQnAPanel
-        open={showQnA}
-        onClose={() => setShowQnA(false)}
-        eventId={eventId}
-        meeting={sidebarMeeting}
-        activeTab={sidebarTab}
-        onChangeTab={setSidebarTab}
-        chatEnabled={chatEnabled}
-        pollsEnabled={pollsEnabled}
-        participantsTabVisible={participantsTabVisible}
-        screenShareAllowed={screenShareAllowed}
-        pluginsAllowed={pluginsAllowed}
-      />
+        <DialogContent
+          dividers
+          sx={{
+            borderColor: "rgba(255,255,255,0.10)",
+            "&.MuiDialogContent-dividers": { borderColor: "rgba(255,255,255,0.10)" },
+          }}
+        >
+          {selectedMember ? (
+            <Stack spacing={2} sx={{ pt: 0.5 }}>
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)", width: 44, height: 44 }}>
+                  {initialsFromName(selectedMember.name)}
+                </Avatar>
+
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 800, fontSize: 14, lineHeight: 1.2 }}>
+                    {selectedMember.name}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{selectedMember.role}</Typography>
+                </Box>
+              </Stack>
+
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Chip size="small" label={selectedMember.role} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                <Chip
+                  size="small"
+                  label={selectedMember.mic ? "Mic: On" : "Mic: Off"}
+                  icon={selectedMember.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                  sx={{ bgcolor: "rgba(255,255,255,0.06)" }}
+                />
+                <Chip
+                  size="small"
+                  label={selectedMember.cam ? "Camera: On" : "Camera: Off"}
+                  icon={selectedMember.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
+                  sx={{ bgcolor: "rgba(255,255,255,0.06)" }}
+                />
+                <Chip
+                  size="small"
+                  label={selectedMember.active ? "Speaking" : "Not speaking"}
+                  sx={{
+                    bgcolor: selectedMember.active ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                  }}
+                />
+              </Stack>
+            </Stack>
+          ) : (
+            <Typography sx={{ fontSize: 13, opacity: 0.75, py: 1 }}>No user selected.</Typography>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 2, py: 1.5 }}>
+          <Button
+            onClick={closeMemberInfo}
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              bgcolor: "rgba(20,184,177,0.40)",
+              "&:hover": { bgcolor: "rgba(20,184,177,0.55)" },
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
