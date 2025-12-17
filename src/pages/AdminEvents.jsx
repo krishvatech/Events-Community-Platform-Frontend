@@ -213,6 +213,30 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "");
 const toISO = (v) => (v ? new Date(v).toISOString() : null);
 
+// --- Schedule defaults: always hour-aligned (HH:00) and default duration 2 hours ---
+const roundToHour = (d = dayjs()) => dayjs(d).minute(0).second(0).millisecond(0);
+
+const getDefaultSchedule = (durationHours = 2) => {
+  const start = roundToHour(dayjs());
+  const end = start.add(durationHours, "hour");
+  return {
+    startDate: start.format("YYYY-MM-DD"),
+    endDate: end.format("YYYY-MM-DD"),
+    startTime: start.format("HH:mm"),
+    endTime: end.format("HH:mm"),
+  };
+};
+
+const computeEndFromStart = (startDate, startTime, durationHours = 2) => {
+  const start = dayjs(`${startDate}T${startTime}:00`);
+  if (!start.isValid()) {
+    return { endDate: startDate, endTime: startTime };
+  }
+  const end = start.add(durationHours, "hour");
+  return { endDate: end.format("YYYY-MM-DD"), endTime: end.format("HH:mm") };
+};
+
+
 function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const token = getToken();
 
@@ -225,12 +249,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [format, setFormat] = React.useState("virtual");
   const [price, setPrice] = React.useState();
 
-  const today = dayjs().format("YYYY-MM-DD");
-  const [startDate, setStartDate] = React.useState(today);
-  const [endDate, setEndDate] = React.useState(today);
-  const [startTime, setStartTime] = React.useState("10:00");
-  const [endTime, setEndTime] = React.useState("12:00");
-  const [timezone, setTimezone] = React.useState("Asia/Kolkata"); // UI only
+const today = dayjs().format("YYYY-MM-DD");
+const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);
+const [startDate, setStartDate] = React.useState(defaultSchedule.startDate);
+const [endDate, setEndDate] = React.useState(defaultSchedule.endDate);
+const [startTime, setStartTime] = React.useState(defaultSchedule.startTime);
+const [endTime, setEndTime] = React.useState(defaultSchedule.endTime);
+const [timezone, setTimezone] = React.useState("Asia/Kolkata"); // UI only // UI only
 
   // Image
   const [imageFile, setImageFile] = React.useState(null);
@@ -250,8 +275,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
   // Publish control
   const [resourcesPublishNow, setResourcesPublishNow] = React.useState(true);
-  const [resPublishDate, setResPublishDate] = React.useState(today);
-  const [resPublishTime, setResPublishTime] = React.useState("10:00");
+  const [resPublishDate, setResPublishDate] = React.useState(defaultSchedule.startDate);
+  const [resPublishTime, setResPublishTime] = React.useState(defaultSchedule.startTime);
 
   const [submitting, setSubmitting] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
@@ -261,9 +286,23 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const iso = (d, t) => (d && t ? dayjs(`${d}T${t}:00`).toISOString() : null);
 
+// ✅ Default schedule on open: current hour (HH:00) → +2 hours
+React.useEffect(() => {
+  if (!open) return;
+  const sch = getDefaultSchedule(2);
+  setStartDate(sch.startDate);
+  setEndDate(sch.endDate);
+  setStartTime(sch.startTime);
+  setEndTime(sch.endTime);
+  // Keep resources publish defaults aligned with the same hour
+  setResPublishDate(sch.startDate);
+  setResPublishTime(sch.startTime);
+}, [open]);
+
   // 🔹 NEW: reset all fields back to defaults after successful create
   const resetForm = () => {
-    const todayStr = dayjs().format("YYYY-MM-DD");
+    const sch = getDefaultSchedule(2);
+    const todayStr = sch.startDate;
 
     setTitle("");
     setSlug("");
@@ -273,10 +312,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setFormat("virtual");
     setPrice(0);
 
-    setStartDate(todayStr);
-    setEndDate(todayStr);
-    setStartTime("10:00");
-    setEndTime("12:00");
+    setStartDate(sch.startDate);
+    setEndDate(sch.endDate);
+    setStartTime(sch.startTime);
+    setEndTime(sch.endTime);
     setTimezone("Asia/Kolkata");
 
     setImageFile(null);
@@ -293,8 +332,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setResTags([]);
 
     setResourcesPublishNow(true);
-    setResPublishDate(todayStr);
-    setResPublishTime("10:00");
+    setResPublishDate(sch.startDate);
+    setResPublishTime(sch.startTime);
 
     setErrors({});
   };
@@ -626,7 +665,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               <TextField label="Start Date" type="date" value={startDate} onChange={(e) => {
                 const v = e.target.value;
                 setStartDate(v);
-                setEndDate(v);      // 🔴 auto-set End Date same as Start Date
+                const next = computeEndFromStart(v, startTime, 2);
+                setEndDate(next.endDate);
+                setEndTime(next.endTime);
               }}
                 fullWidth
                 InputLabelProps={{ shrink: true }}
@@ -647,15 +688,27 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Grid>
             <Grid item xs={12} md={3}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker label="Start time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${startTime}`)}
-                  onChange={(v) => setStartTime(v ? dayjs(v).format("HH:mm") : startTime)}
+                <TimePicker label="Start time *" ampm minutesStep={60} value={dayjs(`1970-01-01T${startTime}`)}
+                  onChange={(v) => {
+                    const newStart = v ? dayjs(v).minute(0).second(0).format("HH:mm") : startTime;
+                    setStartTime(newStart);
+                    const next = computeEndFromStart(startDate, newStart, 2);
+                    setEndDate(next.endDate);
+                    setEndTime(next.endTime);
+                  }}
                   slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
             </Grid>
             <Grid item xs={12} md={3}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker label="End time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${endTime}`)}
-                  onChange={(v) => setEndTime(v ? dayjs(v).format("HH:mm") : endTime)}
+                <TimePicker label="End time *" ampm minutesStep={60} value={dayjs(`1970-01-01T${endTime}`)}
+                  onChange={(v) => {
+                    const newEnd = v ? dayjs(v).minute(0).second(0).format("HH:mm") : endTime;
+                    setEndTime(newEnd);
+                    if (startDate && endDate && startDate === endDate && newEnd <= startTime) {
+                      setEndDate(dayjs(startDate).add(1, "day").format("YYYY-MM-DD"));
+                    }
+                  }}
                   slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
             </Grid>
@@ -727,9 +780,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   <TimePicker
                     label="Publish Time"
                     ampm
-                    minutesStep={15}
+                    minutesStep={60}
                     value={dayjs(`1970-01-01T${resPublishTime}`)}
-                    onChange={(val) => setResPublishTime(val ? dayjs(val).format("HH:mm") : resPublishTime)}
+                    onChange={(val) => setResPublishTime(val ? dayjs(val).minute(0).second(0).format("HH:mm") : resPublishTime)}
                     slotProps={{ textField: { fullWidth: true, error: !!errors.resource_publish_at } }}
                   />
                 </LocalizationProvider>
@@ -1151,7 +1204,11 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 label="Start Date" type="date" fullWidth
-                value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                value={startDate} onChange={(e) => {
+                  const v = e.target.value;
+                  setStartDate(v);
+                  setEndDate(v);
+                }}
                 InputLabelProps={{ shrink: true }}
                 InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
                 error={!!errors.startDate} helperText={errors.startDate}
@@ -1170,17 +1227,29 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <TimePicker
-                  label="Start time *" ampm minutesStep={1}
+                  label="Start time *" ampm minutesStep={60}
                   value={dayjs(`1970-01-01T${startTime}`)}
-                  onChange={(val) => setStartTime(val ? dayjs(val).format("HH:mm") : startTime)}
+                  onChange={(val) => {
+                    const newStart = val ? dayjs(val).minute(0).second(0).format("HH:mm") : startTime;
+                    setStartTime(newStart);
+                    const next = computeEndFromStart(startDate, newStart, 2);
+                    setEndDate(next.endDate);
+                    setEndTime(next.endTime);
+                  }}
                   slotProps={{ textField: { fullWidth: true, error: !!errors.startTime, helperText: errors.startTime } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <TimePicker
-                  label="End time *" ampm minutesStep={1}
+                  label="End time *" ampm minutesStep={60}
                   value={dayjs(`1970-01-01T${endTime}`)}
-                  onChange={(val) => setEndTime(val ? dayjs(val).format("HH:mm") : endTime)}
+                  onChange={(val) => {
+                    const newEnd = val ? dayjs(val).minute(0).second(0).format("HH:mm") : endTime;
+                    setEndTime(newEnd);
+                    if (startDate && endDate && startDate === endDate && newEnd <= startTime) {
+                      setEndDate(dayjs(startDate).add(1, "day").format("YYYY-MM-DD"));
+                    }
+                  }}
                   slotProps={{ textField: { fullWidth: true, error: !!errors.endTime, helperText: errors.endTime } }}
                 />
               </Grid>
