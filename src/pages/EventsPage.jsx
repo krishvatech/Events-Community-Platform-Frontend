@@ -777,8 +777,20 @@ export default function EventsPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-        setRawEvents(data.results || []);
-        setTotal(Number(data.count ?? (data.results || []).length));
+        const items = data.results || [];
+        const now = Date.now();
+
+        const filtered = items.filter((ev) => {
+          const isEndedStatus = String(ev?.status || "").toLowerCase() === "ended";
+          const endMs = ev?.end_time ? new Date(ev.end_time).getTime() : null;
+          const startMs = ev?.start_time ? new Date(ev.start_time).getTime() : null;
+
+          const endedByTime = endMs ? endMs < now : (startMs ? startMs < now : false);
+          return !(isEndedStatus || endedByTime);
+        });
+
+        setRawEvents(filtered);
+        setTotal(Number(data.count ?? filtered.length));
       } catch (e) {
         if (e.name !== "AbortError") setError(String(e?.message || e));
       } finally {
