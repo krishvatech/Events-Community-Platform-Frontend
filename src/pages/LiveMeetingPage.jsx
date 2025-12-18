@@ -474,6 +474,117 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82 }) {
   );
 }
 
+function JoiningMeetingScreen({ onBack, brandText = "IMAA Connect" }) {
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        px: 2,
+        bgcolor: "#05070D",
+        backgroundImage:
+          "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%), radial-gradient(900px 520px at 0% 100%, rgba(20,184,177,0.10), transparent 60%)",
+        color: "#E5E7EB",
+      }}
+    >
+      {/* Back (optional) */}
+      {onBack && (
+        <IconButton
+          onClick={onBack}
+          sx={{
+            position: "fixed",
+            top: 18,
+            left: 18,
+            zIndex: 60,
+            bgcolor: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            backdropFilter: "blur(8px)",
+            "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+          }}
+        >
+          <ArrowBackIosNewIcon sx={{ fontSize: 18, color: "rgba(255,255,255,0.9)" }} />
+        </IconButton>
+      )}
+
+      {/* Top Brand */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 44,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, opacity: 0.95 }}>
+          <AutoAwesomeIcon sx={{ fontSize: 22, color: "rgba(255,255,255,0.85)" }} />
+          <Typography sx={{ fontWeight: 700, letterSpacing: 0.2, color: "rgba(255,255,255,0.85)" }}>
+            {brandText}
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Center Card */}
+      <Paper
+        elevation={0}
+        sx={{
+          width: "100%",
+          maxWidth: 420,
+          borderRadius: 4,
+          px: 3,
+          py: 3,
+          textAlign: "center",
+          bgcolor: "rgba(255,255,255,0.06)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        <CircularProgress size={36} sx={{ color: "rgba(255,255,255,0.65)", mb: 1.5 }} />
+
+        <Typography sx={{ fontWeight: 800, letterSpacing: 0.2, color: "rgba(255,255,255,0.88)" }}>
+          Joining meeting...
+        </Typography>
+
+        <Typography sx={{ mt: 0.5, fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
+          Please wait while we connect you
+        </Typography>
+      </Paper>
+
+      {/* Small tiles under card (like your 2nd image) */}
+      <Box
+        sx={{
+          mt: 2.5,
+          width: "100%",
+          maxWidth: 520,
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 1.25,
+          opacity: 0.95,
+        }}
+      >
+        {[0, 1, 2, 3].map((i) => (
+          <Box
+            key={i}
+            sx={{
+              height: 54,
+              borderRadius: 2.5,
+              bgcolor: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+
 function WaitingForHost({
   onBack,
   eventTitle = "Live Meeting",
@@ -3109,11 +3220,7 @@ export default function NewLiveMeeting() {
   );
 
   if (loadingJoin) {
-    return (
-      <Box sx={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#070A10" }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <JoiningMeetingScreen onBack={handleBack} />;
   }
 
   if (joinError && !authToken) {
@@ -3128,11 +3235,7 @@ export default function NewLiveMeeting() {
   }
 
   if (!initDone || !dyteMeeting) {
-    return (
-      <Box sx={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#070A10" }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <JoiningMeetingScreen onBack={handleBack} />;
   }
 
   if (!shouldShowMeeting) {
