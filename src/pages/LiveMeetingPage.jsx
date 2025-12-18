@@ -3202,6 +3202,8 @@ export default function NewLiveMeeting() {
                 <Chip size="small" label={meeting.roomLabel} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
               </Box>
 
+
+
               {/* Main participant */}
               {/* ✅ Host Video (background) */}
               {stageHasVideo && (
@@ -3337,162 +3339,199 @@ export default function NewLiveMeeting() {
 
 
             {/* Bottom Controls */}
-            <Paper
-              variant="outlined"
+            <Box
               sx={{
                 flexShrink: 0,
-                borderRadius: 999,
-                borderColor: "rgba(255,255,255,0.08)",
-                bgcolor: "rgba(0,0,0,0.35)",
-                backdropFilter: "blur(10px)",
-                px: 2,
-                py: 1,
+                position: "relative",
+                width: "100%",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 1.5,
-                mx: "auto",
-                width: { xs: "100%", sm: "auto" },
               }}
             >
-              <Tooltip title={micOn ? "Mute" : "Unmute"}>
-                <IconButton
-                  onClick={async () => {
-                    if (!dyteMeeting?.self) return;
-
-                    try {
-                      if (dyteMeeting.self.audioEnabled) {
-                        await dyteMeeting.self.disableAudio?.();
-                      } else {
-                        // ensures permission prompt happens on user click if needed
-                        try {
-                          const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-                          s.getTracks().forEach((t) => t.stop());
-                        } catch { }
-
-                        await dyteMeeting.self.enableAudio?.();
-                      }
-
-                      setMicOn(Boolean(dyteMeeting.self.audioEnabled));
-                    } catch (e) {
-                      console.warn("[LiveMeeting] mic toggle failed:", e);
-                      setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
-                    }
-                  }}
-                  aria-label="Toggle mic"
-                >
-                  {micOn ? <MicIcon /> : <MicOffIcon />}
-                </IconButton>
-              </Tooltip>
-
-              <Tooltip title={camOn ? "Turn camera off" : "Turn camera on"}>
-                <IconButton
-                  onClick={async () => {
-                    if (!dyteMeeting?.self) return;
-
-                    // 1. Disable the button temporarily if you want to prevent spamming
-                    // (Optional, but good practice)
-
-                    try {
-                      if (camOn) {
-                        // If currently ON, disable it
-                        await dyteMeeting.self.disableVideo();
-                      } else {
-                        // If currently OFF, enable it
-                        await dyteMeeting.self.enableVideo();
-                      }
-                      // No need to call setCamOn() manually here.
-                      // The 'videoUpdate' event listener in your useEffect will 
-                      // automatically fire and update the UI state correctly.
-                    } catch (e) {
-                      console.error("Failed to toggle camera:", e);
-                    }
-                  }}
-                  sx={{
-                    bgcolor: "rgba(255,255,255,0.06)",
-                    "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                    // Optional: Visual feedback if cam is active
-                    color: camOn ? "#fff" : "inherit"
-                  }}
-                  aria-label="Toggle camera"
-                >
-                  {camOn ? <VideocamIcon /> : <VideocamOffIcon />}
-                </IconButton>
-              </Tooltip>
-
-              <Tooltip
-                title={
-                  !hostPerms.screenShare
-                    ? "Screen share disabled by host"
-                    : !canSelfScreenShare
-                      ? "Screen share not allowed"
-                      : (!isHost && hostForceBlock)
-                        ? "Screen share blocked for audience"
-                        : (isScreenSharing ? "Stop sharing" : "Share screen")
-                }
+              {/* Role badge aligned with bottom controls (left) */}
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: 0,         // change to 12 if you want same inset like stage chip
+                  top: 0,
+                  bottom: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  zIndex: 5,
+                  pointerEvents: "none",
+                }}
               >
-                <span>
+                <Chip
+                  size="small"
+                  label={isHost ? "As Host" : "As Audience"}
+                  sx={{
+                    bgcolor: "rgba(0,0,0,0.55)",
+                    color: "rgba(255,255,255,0.92)",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    fontWeight: 700,
+                    height: 26,
+                    "& .MuiChip-label": { px: 1.1, fontSize: 12 },
+                  }}
+                />
+              </Box>
+              <Paper
+                variant="outlined"
+                sx={{
+                  flexShrink: 0,
+                  borderRadius: 999,
+                  borderColor: "rgba(255,255,255,0.08)",
+                  bgcolor: "rgba(0,0,0,0.35)",
+                  backdropFilter: "blur(10px)",
+                  px: 2,
+                  py: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 1.5,
+                  mx: "auto",
+                  width: { xs: "100%", sm: "auto" },
+                }}
+              >
+                <Tooltip title={micOn ? "Mute" : "Unmute"}>
                   <IconButton
-                    onClick={toggleScreenShareNow}
-                    disabled={screenShareDisabled}
+                    onClick={async () => {
+                      if (!dyteMeeting?.self) return;
+
+                      try {
+                        if (dyteMeeting.self.audioEnabled) {
+                          await dyteMeeting.self.disableAudio?.();
+                        } else {
+                          // ensures permission prompt happens on user click if needed
+                          try {
+                            const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+                            s.getTracks().forEach((t) => t.stop());
+                          } catch { }
+
+                          await dyteMeeting.self.enableAudio?.();
+                        }
+
+                        setMicOn(Boolean(dyteMeeting.self.audioEnabled));
+                      } catch (e) {
+                        console.warn("[LiveMeeting] mic toggle failed:", e);
+                        setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
+                      }
+                    }}
+                    aria-label="Toggle mic"
+                  >
+                    {micOn ? <MicIcon /> : <MicOffIcon />}
+                  </IconButton>
+                </Tooltip>
+
+                <Tooltip title={camOn ? "Turn camera off" : "Turn camera on"}>
+                  <IconButton
+                    onClick={async () => {
+                      if (!dyteMeeting?.self) return;
+
+                      // 1. Disable the button temporarily if you want to prevent spamming
+                      // (Optional, but good practice)
+
+                      try {
+                        if (camOn) {
+                          // If currently ON, disable it
+                          await dyteMeeting.self.disableVideo();
+                        } else {
+                          // If currently OFF, enable it
+                          await dyteMeeting.self.enableVideo();
+                        }
+                        // No need to call setCamOn() manually here.
+                        // The 'videoUpdate' event listener in your useEffect will 
+                        // automatically fire and update the UI state correctly.
+                      } catch (e) {
+                        console.error("Failed to toggle camera:", e);
+                      }
+                    }}
                     sx={{
                       bgcolor: "rgba(255,255,255,0.06)",
                       "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                      "&.Mui-disabled": { opacity: 0.45 },
+                      // Optional: Visual feedback if cam is active
+                      color: camOn ? "#fff" : "inherit"
                     }}
-                    aria-label="Share screen"
+                    aria-label="Toggle camera"
                   >
-                    <ScreenShareIcon />
+                    {camOn ? <VideocamIcon /> : <VideocamOffIcon />}
                   </IconButton>
-                </span>
-              </Tooltip>
+                </Tooltip>
 
-              <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : (isChatActive ? "Close chat" : "Open chat")}>
-                <span>
+                <Tooltip
+                  title={
+                    !hostPerms.screenShare
+                      ? "Screen share disabled by host"
+                      : !canSelfScreenShare
+                        ? "Screen share not allowed"
+                        : (!isHost && hostForceBlock)
+                          ? "Screen share blocked for audience"
+                          : (isScreenSharing ? "Stop sharing" : "Share screen")
+                  }
+                >
+                  <span>
+                    <IconButton
+                      onClick={toggleScreenShareNow}
+                      disabled={screenShareDisabled}
+                      sx={{
+                        bgcolor: "rgba(255,255,255,0.06)",
+                        "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                        "&.Mui-disabled": { opacity: 0.45 },
+                      }}
+                      aria-label="Share screen"
+                    >
+                      <ScreenShareIcon />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+
+                <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : (isChatActive ? "Close chat" : "Open chat")}>
+                  <span>
+                    <IconButton
+                      onClick={() => {
+                        // toggle behavior: if chat is open on tab=0, close panel
+                        if (hostPerms.chat && isChatActive) closeRightPanel();
+                        else toggleRightPanel(hostPerms.chat ? 0 : 1);
+                      }}
+                      sx={{
+                        bgcolor: isChatActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                        "&:hover": { bgcolor: isChatActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                        opacity: hostPerms.chat ? 1 : 0.7,
+                      }}
+                      aria-label="Chat / panel"
+                    >
+                      <ChatBubbleOutlineIcon />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+
+                <Tooltip title="Leave meeting">
                   <IconButton
-                    onClick={() => {
-                      // toggle behavior: if chat is open on tab=0, close panel
-                      if (hostPerms.chat && isChatActive) closeRightPanel();
-                      else toggleRightPanel(hostPerms.chat ? 0 : 1);
+                    onClick={async () => {
+                      // ✅ tell everyone the host ended it
+                      if (isHost) {
+                        const myId = dyteMeeting?.self?.id;
+                        if (myId) {
+                          try {
+                            dyteMeeting?.participants?.broadcastMessage?.("meeting-ended", { hostId: myId });
+                          } catch { }
+                        }
+                      }
+
+                      await handleMeetingEnd("left");
+                      dyteMeeting?.leaveRoom?.();
                     }}
                     sx={{
-                      bgcolor: isChatActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                      "&:hover": { bgcolor: isChatActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
-                      opacity: hostPerms.chat ? 1 : 0.7,
+                      bgcolor: "rgba(244,67,54,0.22)",
+                      "&:hover": { bgcolor: "rgba(244,67,54,0.30)" },
                     }}
-                    aria-label="Chat / panel"
+                    aria-label="Leave meeting"
                   >
-                    <ChatBubbleOutlineIcon />
+                    <CallEndIcon />
                   </IconButton>
-                </span>
-              </Tooltip>
-
-              <Tooltip title="Leave meeting">
-                <IconButton
-                  onClick={async () => {
-                    // ✅ tell everyone the host ended it
-                    if (isHost) {
-                      const myId = dyteMeeting?.self?.id;
-                      if (myId) {
-                        try {
-                          dyteMeeting?.participants?.broadcastMessage?.("meeting-ended", { hostId: myId });
-                        } catch { }
-                      }
-                    }
-
-                    await handleMeetingEnd("left");
-                    dyteMeeting?.leaveRoom?.();
-                  }}
-                  sx={{
-                    bgcolor: "rgba(244,67,54,0.22)",
-                    "&:hover": { bgcolor: "rgba(244,67,54,0.30)" },
-                  }}
-                  aria-label="Leave meeting"
-                >
-                  <CallEndIcon />
-                </IconButton>
-              </Tooltip>
-            </Paper>
+                </Tooltip>
+              </Paper>
+            </Box>
           </Box>
 
           {/* Right Panel (Desktop) */}
