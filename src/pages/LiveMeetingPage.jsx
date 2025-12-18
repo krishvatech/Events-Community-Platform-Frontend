@@ -928,6 +928,7 @@ export default function NewLiveMeeting() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const isPanelOpen = isMdUp ? rightPanelOpen : rightOpen;
   const isChatActive = isPanelOpen && tab === 0 && hostPerms.chat;
+  const isQnaActive = isPanelOpen && tab === 1;
 
   // When switching to desktop, keep panel open by default
   useEffect(() => {
@@ -2061,9 +2062,24 @@ export default function NewLiveMeeting() {
   const chatBottomRef = useRef(null);
 
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [qnaUnreadCount, setQnaUnreadCount] = useState(0);
+
   // ✅ Private chat unread (per user)
   const [privateUnreadByUserId, setPrivateUnreadByUserId] = useState({});
   const myUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
+
+  // refs so WS doesn't need to reconnect on every tab change
+  const isQnaActiveRef = useRef(false);
+  const myUserIdRef = useRef(myUserId);
+
+  useEffect(() => {
+    isQnaActiveRef.current = isQnaActive;
+    if (isQnaActive) setQnaUnreadCount(0); // clear dot when user opens Q&A
+  }, [isQnaActive]);
+
+  useEffect(() => {
+    myUserIdRef.current = myUserId;
+  }, [myUserId]);
 
   const fetchChatMessages = useCallback(
     async (conversationId) => {
@@ -2483,18 +2499,18 @@ export default function NewLiveMeeting() {
     }
   }, [eventId]);
 
-  // Load on open Q&A tab
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
     if (!isQnATabActive) return;
+
+    setQnaUnreadCount(0);   // ✅ clear dot when user opens Q&A
     loadQuestions();
   }, [tab, isPanelOpen, loadQuestions]);
 
   // WS live updates while Q&A tab open
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
-    if (!isQnATabActive || !eventId) return;
-
+    if (!eventId) return;
     const API_RAW = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
     const WS_ROOT = API_RAW.replace(/^http/, "ws").replace(/\/api\/?$/, "");
     const token = getToken();
@@ -2518,12 +2534,21 @@ export default function NewLiveMeeting() {
         }
 
         if (msg.type === "qna.question") {
+          const senderId = String(msg.user_id ?? msg.uid ?? "");
+          const meId = String(myUserIdRef.current || "");
+          const active = Boolean(isQnaActiveRef.current);
+
+          // If I'm NOT on Q&A tab, and this question is from someone else → show dot
+          if (!active && senderId && meId && senderId !== meId) {
+            setQnaUnreadCount((c) => c + 1);
+          }
           setQuestions((prev) => {
             if (prev.some((q) => q.id === msg.question_id)) return prev;
             const newQ = {
               id: msg.question_id,
               content: msg.content,
               user_id: msg.user_id,
+              user_name: msg.user,
               event_id: msg.event_id,
               upvote_count: msg.upvote_count ?? 0,
               user_upvoted: false,
@@ -2741,8 +2766,12 @@ export default function NewLiveMeeting() {
 
   const showChatDot = hostPerms.chat && chatUnreadCount > 0 && !isChatActive;
   const showPrivateDot = Object.keys(privateUnreadByUserId || {}).length > 0;
-  const showAnyChatDot = showChatDot || showPrivateDot;
-  const showMembersDot = showPrivateDot; // ✅ Members tab shows dot if any private unread exists
+  const showQnaDot = qnaUnreadCount > 0 && !isQnaActive;
+
+  const showAnyChatDot = showChatDot || showPrivateDot || showQnaDot;
+  const showAnyPanelDot = showAnyChatDot;
+
+  const showMembersDot = showPrivateDot;
 
 
   const RightPanelContent = (
@@ -2894,7 +2923,21 @@ export default function NewLiveMeeting() {
               label="Chat"
               sx={{ display: hostPerms.chat ? "flex" : "none" }}
             />
-            <Tab icon={<QuestionAnswerIcon fontSize="small" />} iconPosition="start" label="Q&A" />
+            <Tab
+              icon={
+                <Badge
+                  variant="dot"
+                  color="error"
+                  overlap="circular"
+                  invisible={!(qnaUnreadCount > 0 && !isQnaActive)}
+                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                >
+                  <QuestionAnswerIcon fontSize="small" />
+                </Badge>
+              }
+              iconPosition="start"
+              label="Q&A"
+            />
             <Tab icon={<PollIcon fontSize="small" />} iconPosition="start" label="Polls" sx={{ display: "none" }} />
             <Tab
               icon={
@@ -3022,7 +3065,17 @@ export default function NewLiveMeeting() {
                       const voters = q.upvoters ?? [];
                       const votes = q.upvote_count ?? voters.length;
                       const hasVoted = Boolean(q.user_upvoted);
-                      const askedBy = q.user_name || q.user?.name || (q.user_id ? `User ${q.user_id}` : "Audience");
+                      const askedBy =
+                        q.user_name ||
+                        q.user_display ||
+                        q.user || // if WS sends name in `user`
+                        q.user?.name ||
+                        participants.find((p) => {
+                          const raw = p?._raw || {};
+                          const csid = raw.clientSpecificId ?? raw.client_specific_id;
+                          return csid != null && String(csid) === String(q.user_id);
+                        })?.name ||
+                        (q.user_id ? `User ${q.user_id}` : "Audience");
                       const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
 
                       return (
@@ -4105,7 +4158,7 @@ export default function NewLiveMeeting() {
                         variant="dot"
                         color="error"
                         overlap="circular"
-                        invisible={!showAnyChatDot}
+                        invisible={!showAnyPanelDot}
                         anchorOrigin={{ vertical: "top", horizontal: "right" }}
                       >
                         <ChatBubbleOutlineIcon />
