@@ -601,6 +601,10 @@ export default function NewLiveMeeting() {
     if (!hostPerms.polls && tab === 2) setTab(1);  // Polls -> Q&A
   }, [hostPerms.chat, hostPerms.polls, tab]);
 
+  useEffect(() => {
+    if (tab === 2) setTab(1); // if Poll was selected, jump to Q&A
+  }, [tab]);
+
   // Desktop right panel toggle
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const isPanelOpen = isMdUp ? rightPanelOpen : rightOpen;
@@ -2227,7 +2231,7 @@ export default function NewLiveMeeting() {
           >
             <Tab icon={<ChatBubbleOutlineIcon fontSize="small" />} iconPosition="start" label="Chat" sx={{ display: hostPerms.chat ? "flex" : "none" }} />
             <Tab icon={<QuestionAnswerIcon fontSize="small" />} iconPosition="start" label="Q&A" />
-            <Tab icon={<PollIcon fontSize="small" />} iconPosition="start" label="Polls" sx={{ display: hostPerms.polls ? "flex" : "none" }} />
+            <Tab icon={<PollIcon fontSize="small" />} iconPosition="start" label="Polls" sx={{ display: "none" }} />
             <Tab icon={<GroupIcon fontSize="small" />} iconPosition="start" label="Members" />
           </Tabs>
 
@@ -2465,7 +2469,7 @@ export default function NewLiveMeeting() {
             </TabPanel>
 
             {/* POLLS */}
-            {hostPerms.polls && (
+            {false && (
               <TabPanel value={tab} index={2}>
                 <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
                   <Stack spacing={2}>
@@ -3034,14 +3038,15 @@ export default function NewLiveMeeting() {
             <ListItemText primary="Chat" secondary="Hide chat tab + block chat panel" />
             <Switch checked={hostPerms.chat} onChange={handleToggleChat} />
           </MenuItem>
-
-          <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
-            <ListItemIcon sx={{ minWidth: 34 }}>
-              <PollIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="Polls" secondary="Show/hide Polls tab" />
-            <Switch checked={hostPerms.polls} onChange={handleTogglePolls} />
-          </MenuItem>
+          {false && (
+            <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+              <ListItemIcon sx={{ minWidth: 34 }}>
+                <PollIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary="Polls" secondary="Show/hide Polls tab" />
+              <Switch checked={hostPerms.polls} onChange={handleTogglePolls} />
+            </MenuItem>
+          )}
 
           <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
             <ListItemIcon sx={{ minWidth: 34 }}>
