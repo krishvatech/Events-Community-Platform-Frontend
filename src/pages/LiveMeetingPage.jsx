@@ -52,6 +52,8 @@ import VideocamIcon from "@mui/icons-material/Videocam";
 import VideocamOffIcon from "@mui/icons-material/VideocamOff";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
@@ -472,48 +474,202 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82 }) {
   );
 }
 
-function WaitingForHost({ onBack }) {
+function WaitingForHost({
+  onBack,
+  eventTitle = "Live Meeting",
+  scheduled = "--",
+  duration = "--",
+  roleLabel = "Audience",
+}) {
   return (
     <Box
       sx={{
-        height: "100vh",
+        minHeight: "100vh",
+        position: "relative",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "column",
-        gap: 2,
-        bgcolor: "#070A10",
-        color: "#fff",
+        px: 2,
+        bgcolor: "#05070D",
+        backgroundImage:
+          "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%), radial-gradient(900px 520px at 0% 100%, rgba(20,184,177,0.10), transparent 60%)",
+        color: "#E5E7EB",
       }}
     >
-      <Paper
-        elevation={4}
+      {/* Top Brand */}
+      <Box
         sx={{
-          p: 3,
-          borderRadius: 3,
-          bgcolor: "rgba(0,0,0,0.78)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          textAlign: "center",
-          maxWidth: 420,
+          position: "absolute",
+          top: 44,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          pointerEvents: "none",
         }}
       >
-        <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 1 }}>Waiting for host</Typography>
-        <Typography sx={{ opacity: 0.8, mb: 2 }}>
-          The live meeting has not started yet. We will auto-connect as soon as the host goes live.
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, opacity: 0.95 }}>
+          <AutoAwesomeIcon sx={{ fontSize: 22, color: "rgba(255,255,255,0.85)" }} />
+          <Typography
+            sx={{
+              fontWeight: 700,
+              letterSpacing: 0.2,
+              color: "rgba(255,255,255,0.85)",
+            }}
+          >
+            IMAA Connect
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Bottom-left role badge */}
+      <Box sx={{ position: "fixed", left: 16, bottom: 16, zIndex: 50 }}>
+        <Chip
+          label={roleLabel}
+          size="small"
+          sx={{
+            bgcolor: "rgba(255,255,255,0.07)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            color: "rgba(255,255,255,0.85)",
+            fontWeight: 700,
+            backdropFilter: "blur(8px)",
+          }}
+        />
+      </Box>
+
+      {/* Center Card */}
+      <Paper
+        elevation={0}
+        sx={{
+          width: "100%",
+          maxWidth: 560,
+          borderRadius: 4,
+          p: { xs: 2.5, sm: 3 },
+          bgcolor: "rgba(15, 23, 42, 0.60)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          backdropFilter: "blur(12px)",
+          textAlign: "center",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        }}
+      >
+        {/* Icon circle */}
+        <Box
+          sx={{
+            width: 72,
+            height: 72,
+            mx: "auto",
+            mb: 2,
+            borderRadius: "999px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+          }}
+        >
+          <AccessTimeRoundedIcon sx={{ fontSize: 34, color: "rgba(255,255,255,0.70)" }} />
+        </Box>
+
+        <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 0.8, color: "rgba(255,255,255,0.92)" }}>
+          Waiting for host to start the meeting
         </Typography>
-        <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center">
-          <CircularProgress size={24} />
-          <Typography sx={{ fontWeight: 700, letterSpacing: 0.3 }}>Connecting...</Typography>
+
+        <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.65)", mb: 2 }}>
+          The meeting will begin once the host joins. You’ll be automatically connected.
+        </Typography>
+
+        {/* Info box */}
+        <Box
+          sx={{
+            textAlign: "left",
+            borderRadius: 3,
+            p: 2,
+            bgcolor: "rgba(0,0,0,0.18)",
+            border: "1px solid rgba(255,255,255,0.10)",
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Event</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              {eventTitle}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Scheduled</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              {scheduled}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between">
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Duration</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              {duration}
+            </Typography>
+          </Stack>
+        </Box>
+
+        {/* Tip */}
+        <Box
+          sx={{
+            mt: 2,
+            borderRadius: 3,
+            px: 2,
+            py: 1.2,
+            bgcolor: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.10)",
+          }}
+        >
+          <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.75)" }}>
+            💡 Tip: Make sure your microphone and camera are ready
+          </Typography>
+        </Box>
+
+        {/* Connecting */}
+        <Stack direction="row" spacing={1.2} alignItems="center" justifyContent="center" sx={{ mt: 2 }}>
+          <CircularProgress size={22} sx={{ color: "rgba(255,255,255,0.70)" }} />
+          <Typography sx={{ fontWeight: 700, letterSpacing: 0.2, color: "rgba(255,255,255,0.80)" }}>
+            Connecting...
+          </Typography>
         </Stack>
+
         {onBack && (
-          <Button onClick={onBack} sx={{ mt: 2 }} variant="outlined" color="inherit">
-            Back
+          <Button
+            onClick={onBack}
+            variant="outlined"
+            sx={{
+              mt: 2.5,
+              px: 3,
+              py: 1,
+              borderRadius: 999,
+              textTransform: "none",
+              fontWeight: 800,
+              letterSpacing: 0.4,
+              opacity: 1,
+              color: "rgba(255,255,255,0.92)",
+              borderColor: "rgba(255,255,255,0.28)",
+              bgcolor: "rgba(255,255,255,0.06)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.10)",
+                borderColor: "rgba(255,255,255,0.40)",
+              },
+            }}
+          >
+            BACK
           </Button>
         )}
       </Paper>
+
+      {/* Footer */}
+      <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+        Having trouble? Check your connection or contact support
+      </Typography>
     </Box>
   );
 }
+
 
 
 export default function NewLiveMeeting() {
@@ -712,6 +868,9 @@ export default function NewLiveMeeting() {
   const [dbStatus, setDbStatus] = useState("draft");
   const [eventTitle, setEventTitle] = useState("Live Meeting");
 
+  const [scheduledLabel, setScheduledLabel] = useState("--");
+  const [durationLabel, setDurationLabel] = useState("--");
+
   // ---------- Dyte init ----------
   const [dyteMeeting, initMeeting] = useDyteClient();
   const [initDone, setInitDone] = useState(false);
@@ -851,6 +1010,30 @@ export default function NewLiveMeeting() {
           const data = await res.json();
           if (data?.status) setDbStatus(data.status);
           if (data?.title) setEventTitle(data.title);
+          const start =
+            data?.start_time ||
+            data?.starts_at ||
+            data?.start_at ||
+            data?.scheduled_at ||
+            data?.scheduled_start;
+
+          const end =
+            data?.end_time ||
+            data?.ends_at ||
+            data?.end_at;
+
+          if (start) {
+            const d = new Date(start);
+            const day = d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+            const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+            setScheduledLabel(`${day} • ${time}`);
+          }
+
+          let mins = data?.duration_minutes || data?.duration_mins || data?.duration;
+          if (!mins && start && end) {
+            mins = Math.round((new Date(end) - new Date(start)) / 60000);
+          }
+          if (mins) setDurationLabel(`${mins} minutes`);
         }
       } catch (e) {
         console.warn("Failed to fetch event status", e);
@@ -2953,7 +3136,15 @@ export default function NewLiveMeeting() {
   }
 
   if (!shouldShowMeeting) {
-    return <WaitingForHost onBack={handleBack} />;
+    return (
+      <WaitingForHost
+        onBack={handleBack}
+        eventTitle={eventTitle}
+        scheduled={scheduledLabel}
+        duration={durationLabel}
+        roleLabel={role === "publisher" ? "Host" : "Audience"}
+      />
+    );
   }
 
   return (
