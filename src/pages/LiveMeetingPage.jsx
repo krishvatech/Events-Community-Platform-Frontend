@@ -1043,7 +1043,7 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!dyteMeeting?.self) return;
     const handleRoomLeft = ({ state }) => {
-      if (["left", "ended", "kicked", "rejected"].includes(state)) {
+      if (["left", "ended", "kicked", "rejected", "disconnected", "failed"].includes(state)) {
         handleMeetingEnd(state);
       }
     };
@@ -1130,6 +1130,15 @@ export default function NewLiveMeeting() {
         setHostForceBlock(!payload?.allowed);
       }
 
+      if (type === "meeting-ended" && payload?.hostId) {
+        // ignore echo for host itself
+        if (dyteMeeting?.self?.id !== payload.hostId) {
+          handleMeetingEnd("ended");
+          dyteMeeting?.leave?.();
+          dyteMeeting?.leaveRoom?.();
+        }
+      }
+
       // ✅ Host announces itself so audience can pin even if preset is weird
       if (type === "host-id" && payload?.hostId) {
         setHostIdHint(payload.hostId);
@@ -1148,6 +1157,39 @@ export default function NewLiveMeeting() {
     dyteMeeting.participants?.on?.("broadcastedMessage", handleBroadcast);
     return () => dyteMeeting.participants?.off?.("broadcastedMessage", handleBroadcast);
   }, [dyteMeeting, getJoinedParticipants]);
+
+  // ✅ If Host leaves, auto-end for everyone (audience auto leaves)
+  useEffect(() => {
+    if (!dyteMeeting) return;
+    if (isHost) return; // host doesn't need to auto-leave (already leaving)
+
+    const onParticipantLeft = (p) => {
+      const hostId = hostIdHint || pinnedHost?.id;
+      if (!hostId || !p?.id) return;
+
+      // Host left => end meeting for audience
+      if (p.id === hostId) {
+        if (endHandledRef.current) return;
+
+        // optional: reflect UI state
+        setDbStatus("ended");
+
+        // leave + exit screen
+        dyteMeeting.leaveRoom?.();
+        handleMeetingEnd("ended");
+      }
+    };
+
+    dyteMeeting.participants?.joined?.on?.("participantLeft", onParticipantLeft);
+    dyteMeeting.participants?.on?.("participantLeft", onParticipantLeft);
+    dyteMeeting?.on?.("participantLeft", onParticipantLeft);
+
+    return () => {
+      dyteMeeting.participants?.joined?.off?.("participantLeft", onParticipantLeft);
+      dyteMeeting.participants?.off?.("participantLeft", onParticipantLeft);
+      dyteMeeting?.off?.("participantLeft", onParticipantLeft);
+    };
+  }, [dyteMeeting, isHost, hostIdHint, pinnedHost, handleMeetingEnd]);
 
   // Host broadcasts presence so audience can pin
   useEffect(() => {
@@ -3428,6 +3470,16 @@ export default function NewLiveMeeting() {
               <Tooltip title="Leave meeting">
                 <IconButton
                   onClick={async () => {
+                    // ✅ tell everyone the host ended it
+                    if (isHost) {
+                      const myId = dyteMeeting?.self?.id;
+                      if (myId) {
+                        try {
+                          dyteMeeting?.participants?.broadcastMessage?.("meeting-ended", { hostId: myId });
+                        } catch { }
+                      }
+                    }
+
                     await handleMeetingEnd("left");
                     dyteMeeting?.leaveRoom?.();
                   }}
