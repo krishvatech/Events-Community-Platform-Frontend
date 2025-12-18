@@ -1018,6 +1018,41 @@ function ResourceBlock({ post, onOpenEvent }) {
   const hasVideo = !!r.video_url;
   const primaryHref = r.link_url || r.file_url || r.video_url;
 
+  // ---- LinkedIn-style file detection ----
+  const safeUrlParts = (u) => {
+    try {
+      const x = new URL(u);
+      return { pathname: x.pathname || "", href: x.toString() };
+    } catch {
+      const s = String(u || "");
+      const noQ = s.split("?")[0].split("#")[0];
+      return { pathname: noQ, href: s };
+    }
+  };
+
+  const getExt = (u) => {
+    const { pathname } = safeUrlParts(u);
+    const last = (pathname || "").split("/").pop() || "";
+    const dot = last.lastIndexOf(".");
+    if (dot === -1) return "";
+    return last.slice(dot + 1).toLowerCase();
+  };
+
+  const getFileName = (u) => {
+    const { pathname } = safeUrlParts(u);
+    const last = (pathname || "").split("/").pop() || "";
+    return decodeURIComponent(last || "");
+  };
+
+  const fileUrl = r.file_url || "";
+  const fileExt = getExt(fileUrl || primaryHref);
+  const fileName = getFileName(fileUrl || primaryHref) || r.title || "Attachment";
+
+  const isImageFile = ["jpg", "jpeg", "png", "webp", "gif", "bmp", "svg"].includes(fileExt);
+  const isPdfFile = fileExt === "pdf";
+  const hasFile = !!fileUrl;
+
+
   // simple detectors for YouTube/Vimeo
   const ytId = (r.video_url || "").match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1];
   const vmId = (r.video_url || "").match(/vimeo\.com\/(\d+)/)?.[1];
@@ -1056,6 +1091,91 @@ function ResourceBlock({ post, onOpenEvent }) {
             />
           )}
         </Box>
+      )}
+
+      {/* FILE / IMAGE RENDERING (LinkedIn style) */}
+      {!hasVideo && hasFile && isImageFile && (
+        <Box
+          sx={{
+            mt: 1,
+            borderRadius: 2,
+            overflow: "hidden",
+            border: "1px solid #e2e8f0",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Box
+            component="img"
+            src={fileUrl}
+            alt={r.title || "resource image"}
+            sx={{
+              width: "100%",
+              maxHeight: 460,
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
+        </Box>
+      )}
+
+      {!hasVideo && hasFile && isPdfFile && (
+        <Box
+          sx={{
+            mt: 1,
+            borderRadius: 2,
+            overflow: "hidden",
+            border: "1px solid #e2e8f0",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Box
+            component="iframe"
+            src={fileUrl}
+            title={r.title || "PDF"}
+            sx={{ width: "100%", height: 420, border: 0 }}
+          />
+        </Box>
+      )}
+
+      {!hasVideo && hasFile && !isImageFile && !isPdfFile && (
+        <Paper
+          variant="outlined"
+          sx={{
+            mt: 1,
+            p: 1.25,
+            borderRadius: 2,
+            borderColor: "#e2e8f0",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 1.5,
+                bgcolor: "grey.100",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 22,
+              }}
+            >
+              📎
+            </Box>
+
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+                {fileName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {(fileExt || "FILE").toUpperCase()} · Attachment
+              </Typography>
+            </Box>
+
+            <Chip size="small" label={(fileExt || "FILE").toUpperCase()} variant="outlined" />
+          </Stack>
+        </Paper>
       )}
 
       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
