@@ -157,6 +157,32 @@ function initialsFromName(name = "") {
   return (a + b).toUpperCase();
 }
 
+function formatElapsedTime(ms = 0) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hrs = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+
+  const mm = String(mins).padStart(2, "0");
+  const ss = String(secs).padStart(2, "0");
+
+  return hrs > 0 ? `${hrs}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+function formatClockTime(ts) {
+  if (!ts) return "--:--";
+  try {
+    return new Date(ts).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return "--:--";
+  }
+}
+
+
 function ParticipantVideo({ participant, meeting, isSelf = false }) {
   const videoRef = useRef(null);
 
@@ -520,6 +546,13 @@ export default function NewLiveMeeting() {
   const joinedOnceRef = useRef(false);
   const askedMediaPermRef = useRef(false);
   const [roomJoined, setRoomJoined] = useState(false);
+
+  // ✅ Local join timer (per user)
+  const joinedAtRef = useRef(null);
+  const [joinElapsedLabel, setJoinElapsedLabel] = useState("00:00");
+
+  // ✅ Per-participant join clock time (for Member/User Info dialog)
+  const participantJoinedAtRef = useRef(new Map()); // participantId -> timestamp(ms)
 
   // ============ POLL CREATION STATE ============
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
@@ -921,6 +954,21 @@ export default function NewLiveMeeting() {
     };
   }, [dyteMeeting, initDone]);
 
+  // ---------- Join timer (shows how long THIS user has been in the meeting) ----------
+  useEffect(() => {
+    if (!roomJoined) return;
+
+    if (!joinedAtRef.current) joinedAtRef.current = Date.now();
+
+    const tick = () => {
+      setJoinElapsedLabel(formatElapsedTime(Date.now() - joinedAtRef.current));
+    };
+
+    tick();
+    const intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
+  }, [roomJoined]);
+
   // Keep local button state in sync with Dyte actual state
 
   useEffect(() => {
@@ -967,6 +1015,7 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (initDone && role === "publisher") {
       updateLiveStatus("start");
+      setDbStatus("live"); // ✅ show LIVE chip immediately for host too
     }
   }, [initDone, role, updateLiveStatus]);
 
@@ -1318,6 +1367,18 @@ export default function NewLiveMeeting() {
       list.push(dyteMeeting.self);
     }
 
+    list.forEach((pp) => {
+      if (!pp?.id) return;
+      if (participantJoinedAtRef.current.has(pp.id)) return;
+
+      const isSelf = dyteMeeting?.self?.id && pp.id === dyteMeeting.self.id;
+      if (isSelf && joinedAtRef.current) {
+        participantJoinedAtRef.current.set(pp.id, joinedAtRef.current);
+      } else {
+        participantJoinedAtRef.current.set(pp.id, Date.now());
+      }
+    });
+
     return list.map((p) => {
       // ✅ Determine role from preset first, then fall back to pinned host
       const preset = (p.presetName || "").toLowerCase();
@@ -1342,6 +1403,7 @@ export default function NewLiveMeeting() {
         mic: Boolean(p.audioEnabled),
         cam: Boolean(p.videoEnabled),
         active: Boolean(p.isSpeaking),
+        joinedAtTs: participantJoinedAtRef.current.get(p.id),
         _raw: p,
       };
     });
@@ -1429,12 +1491,12 @@ export default function NewLiveMeeting() {
     () => ({
       title: eventTitle,
       live: dbStatus === "live",
-      timer: "LIVE",
+      timer: joinElapsedLabel,
       recording: true,
       roomLabel: "Pinned",
       host: { name: latestPinnedHost?.name || "Host", role: "Host" },
     }),
-    [eventTitle, dbStatus, latestPinnedHost]
+    [eventTitle, dbStatus, latestPinnedHost, joinElapsedLabel]
   );
   const meeting = meetingMeta;
 
@@ -3544,6 +3606,17 @@ export default function NewLiveMeeting() {
                     gap: 2,
                   }}
                 >
+
+                  {/* Row: Joined */}
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Joined</Typography>
+                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
+                      {formatClockTime(selectedMember.joinedAtTs)}
+                    </Typography>
+                  </Box>
+
+                  <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
+
                   {/* Row: Status */}
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Status</Typography>
