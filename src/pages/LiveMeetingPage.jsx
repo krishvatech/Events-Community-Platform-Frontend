@@ -99,6 +99,25 @@ function toApiUrl(pathOrUrl) {
   }
 }
 
+function getMyUserIdFromJwt() {
+  const tok = getToken();
+  if (!tok) return null;
+
+  try {
+    const payload = tok.split(".")[1];
+    if (!payload) return null;
+
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const json = JSON.parse(atob(padded));
+
+    // SimpleJWT usually uses user_id
+    return json.user_id ?? json.id ?? json.sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // -------- Dyte permission hook (copied from Old logic style) ----------
 function useDytePermissions(meeting) {
   const [permissions, setPermissions] = useState(meeting?.self?.permissions || {});
@@ -2042,6 +2061,9 @@ export default function NewLiveMeeting() {
   const chatBottomRef = useRef(null);
 
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  // ✅ Private chat unread (per user)
+  const [privateUnreadByUserId, setPrivateUnreadByUserId] = useState({});
+  const myUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
 
   const fetchChatMessages = useCallback(
     async (conversationId) => {
@@ -2145,6 +2167,22 @@ export default function NewLiveMeeting() {
       const convData = await res.json();
       setPrivateConversationId(convData.id);
 
+      // ✅ Clear unread for this DM as soon as it opens
+      try {
+        await fetch(toApiUrl(`messaging/conversations/${convData.id}/mark-all-read/`), {
+          method: "POST",
+          headers: { ...authHeader() },
+        });
+
+        const ridKey = String(recipientId);
+        setPrivateUnreadByUserId((prev) => {
+          if (!prev?.[ridKey]) return prev;
+          const next = { ...prev };
+          delete next[ridKey];
+          return next;
+        });
+      } catch { }
+
       // 3. Fetch Message History
       const msgRes = await fetch(toApiUrl(`messaging/conversations/${convData.id}/messages/`), {
         headers: { ...authHeader() },
@@ -2190,6 +2228,118 @@ export default function NewLiveMeeting() {
       console.error("Send private message error:", e);
     }
   };
+
+  useEffect(() => {
+    if (!myUserId) return;
+
+    let alive = true;
+
+    const tick = async () => {
+      if (!alive) return;
+
+      try {
+        const res = await fetch(toApiUrl("messaging/conversations/"), {
+          headers: { Accept: "application/json", ...authHeader() },
+        });
+
+        const data = await res.json().catch(() => []);
+        if (!res.ok || !Array.isArray(data)) return;
+
+        const next = {};
+        const activeRid = privateChatUser
+          ? String(privateChatUser._raw?.customParticipantId || privateChatUser.id || "")
+          : "";
+
+        for (const c of data) {
+          if (c?.chat_type !== "dm") continue;
+
+          const unread = Number(c?.unread_count || 0);
+          if (unread <= 0) continue;
+
+          const ids = (c?.participant_ids || []).map((x) => String(x));
+          const otherId = ids.find((x) => x !== myUserId);
+          if (!otherId) continue;
+
+          // If currently inside that DM, don't show dot (optional)
+          if (activeRid && otherId === activeRid) continue;
+
+          next[otherId] = unread;
+        }
+
+        if (alive) setPrivateUnreadByUserId(next);
+      } catch { }
+    };
+
+    tick();
+    const t = setInterval(tick, 3000);
+
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [myUserId, privateChatUser]);
+
+  // ✅ Auto-load new messages while Private Chat is OPEN (active DM)
+  useEffect(() => {
+    if (!privateChatUser || !privateConversationId) return;
+
+    let alive = true;
+
+    const recipientId = String(
+      privateChatUser?._raw?.customParticipantId || privateChatUser?.id || ""
+    );
+
+    const tick = async () => {
+      if (!alive) return;
+
+      try {
+        // 1) Check unread for THIS DM
+        const res = await fetch(
+          toApiUrl(`messaging/conversations/${privateConversationId}/`),
+          { headers: { Accept: "application/json", ...authHeader() } }
+        );
+        const data = await res.json().catch(() => null);
+        if (!res.ok) return;
+
+        const unread = Number(data?.unread_count || 0);
+
+        // If you want ALWAYS refresh, remove this if-block.
+        if (unread <= 0) return;
+
+        // 2) Fetch latest messages
+        const msgRes = await fetch(
+          toApiUrl(`messaging/conversations/${privateConversationId}/messages/`),
+          { headers: { Accept: "application/json", ...authHeader() } }
+        );
+        const msgs = await msgRes.json().catch(() => []);
+        if (alive) setPrivateMessages(Array.isArray(msgs) ? msgs : []);
+
+        // 3) Mark read + clear dot
+        await fetch(
+          toApiUrl(`messaging/conversations/${privateConversationId}/mark-all-read/`),
+          { method: "POST", headers: { ...authHeader() } }
+        );
+
+        if (recipientId) {
+          setPrivateUnreadByUserId((prev) => {
+            if (!prev?.[recipientId]) return prev;
+            const next = { ...prev };
+            delete next[recipientId];
+            return next;
+          });
+        }
+      } catch { }
+    };
+
+    tick();
+    const t = setInterval(tick, 2000);
+
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [privateChatUser, privateConversationId]);
+
 
   useEffect(() => {
     if (!eventId || !hostPerms.chat) return;
@@ -2482,6 +2632,26 @@ export default function NewLiveMeeting() {
     return { host, speakers: [], audience };
   }, [participants, pinnedHost, isHost, dyteMeeting?.self?.id]);
 
+  // --- Self helpers for Members UI ---
+  const selfDyteId = dyteMeeting?.self?.id || null;
+
+  const audienceMembersSorted = useMemo(() => {
+    const arr = [...(groupedMembers?.audience || [])];
+
+    // put self on top (only matters for Audience view, host won't be inside audience anyway)
+    arr.sort((a, b) => {
+      const aSelf = Boolean(selfDyteId && a?.id === selfDyteId);
+      const bSelf = Boolean(selfDyteId && b?.id === selfDyteId);
+      if (aSelf && !bSelf) return -1;
+      if (!aSelf && bSelf) return 1;
+      return String(a?.name || "").localeCompare(String(b?.name || ""));
+    });
+
+    return arr;
+  }, [groupedMembers?.audience, selfDyteId]);
+
+  const isSelfMember = (m) => Boolean(selfDyteId && m?.id === selfDyteId);
+
   const RIGHT_PANEL_W = 400;
   const APPBAR_H = 44;
 
@@ -2570,6 +2740,10 @@ export default function NewLiveMeeting() {
   };
 
   const showChatDot = hostPerms.chat && chatUnreadCount > 0 && !isChatActive;
+  const showPrivateDot = Object.keys(privateUnreadByUserId || {}).length > 0;
+  const showAnyChatDot = showChatDot || showPrivateDot;
+  const showMembersDot = showPrivateDot; // ✅ Members tab shows dot if any private unread exists
+
 
   const RightPanelContent = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", pb: { xs: "calc(16px + env(safe-area-inset-bottom))", md: 2 }, boxSizing: "border-box" }}>
@@ -2722,7 +2896,21 @@ export default function NewLiveMeeting() {
             />
             <Tab icon={<QuestionAnswerIcon fontSize="small" />} iconPosition="start" label="Q&A" />
             <Tab icon={<PollIcon fontSize="small" />} iconPosition="start" label="Polls" sx={{ display: "none" }} />
-            <Tab icon={<GroupIcon fontSize="small" />} iconPosition="start" label="Members" />
+            <Tab
+              icon={
+                <Badge
+                  variant="dot"
+                  color="error"
+                  overlap="circular"
+                  invisible={!showMembersDot}
+                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                >
+                  <GroupIcon fontSize="small" />
+                </Badge>
+              }
+              iconPosition="start"
+              label="Members"
+            />
           </Tabs>
 
           {/* Body */}
@@ -3161,11 +3349,35 @@ export default function NewLiveMeeting() {
                             key={idx}
                             sx={{ px: 1.25, py: 1, display: "flex", alignItems: "center" }}
                             secondaryAction={
-                              <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
-                                <Box sx={{ opacity: 0.9 }}>
-                                  {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
-                                </Box>
-                              </Tooltip>
+                              <Stack direction="row" spacing={0.75} alignItems="center">
+                                <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
+                                  <IconButton size="small" sx={{ color: m.mic ? "#fff" : "rgba(255,255,255,0.5)" }}>
+                                    {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                                  </IconButton>
+                                </Tooltip>
+
+                                {/* Audience can DM Host; Host should NOT see message icon on own name */}
+                                {!isHost && (
+                                  <Tooltip title="Send Message">
+                                    <IconButton
+                                      size="small"
+                                      sx={{ color: "#fff" }}
+                                      onClick={() => handleOpenPrivateChat(m)}
+                                    >
+                                      <Badge
+                                        variant="dot"
+                                        color="error"
+                                        overlap="circular"
+                                        invisible={
+                                          !privateUnreadByUserId[String(m._raw?.customParticipantId || m.id)]
+                                        }
+                                      >
+                                        <ChatBubbleOutlineIcon fontSize="small" />
+                                      </Badge>
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              </Stack>
                             }
                           >
                             <ListItemAvatar>
@@ -3176,7 +3388,7 @@ export default function NewLiveMeeting() {
                             <ListItemText
                               primary={
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                  <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}</Typography>
+                                  <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>
                                   <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
                                 </Stack>
                               }
@@ -3216,7 +3428,7 @@ export default function NewLiveMeeting() {
                                   <IconButton
                                     size="small"
                                     onClick={() => openMemberInfo(m)}
-                                    aria-label={`User info: ${m.name}`}
+                                    aria-label={`User info: ${m.name}{isSelfMember(m) ? " (You)" : ""}`}
                                     sx={{
                                       bgcolor: "rgba(255,255,255,0.06)",
                                       "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
@@ -3234,7 +3446,7 @@ export default function NewLiveMeeting() {
                               </Avatar>
                             </ListItemAvatar>
                             <ListItemText
-                              primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}</Typography>}
+                              primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>}
                               secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
                             />
                           </ListItem>
@@ -3249,7 +3461,7 @@ export default function NewLiveMeeting() {
                     </Typography>
                     <Paper variant="outlined" sx={{ bgcolor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", borderRadius: 2 }}>
                       <List dense disablePadding>
-                        {groupedMembers.audience.map((m, idx) => (
+                        {audienceMembersSorted.map((m, idx) => (
                           <ListItem
                             key={idx}
                             sx={{ px: 1.25, py: 1 }}
@@ -3262,18 +3474,20 @@ export default function NewLiveMeeting() {
                                 </Tooltip>
 
                                 {/* --- NEW MESSAGE ICON --- */}
-                                <Tooltip title="Send Message">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleOpenPrivateChat(m)} // <--- TRIGGER PRIVATE CHAT
-                                    sx={{
-                                      bgcolor: "rgba(255,255,255,0.06)",
-                                      "&:hover": { bgcolor: "rgba(20,184,177,0.25)", color: "#14b8b1" },
-                                    }}
-                                  >
-                                    <ChatBubbleOutlineIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
+                                {!isSelfMember(m) && (
+                                  <Tooltip title="Send Message">
+                                    <IconButton size="small" sx={{ color: "#fff" }} onClick={() => handleOpenPrivateChat(m)}>
+                                      <Badge
+                                        variant="dot"
+                                        color="error"
+                                        overlap="circular"
+                                        invisible={!privateUnreadByUserId[String(m._raw?.customParticipantId || m.id)]}
+                                      >
+                                        <ChatBubbleOutlineIcon fontSize="small" />
+                                      </Badge>
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                                 {/* ------------------------ */}
 
                                 <Tooltip title="User info">
@@ -3294,7 +3508,7 @@ export default function NewLiveMeeting() {
                               </Avatar>
                             </ListItemAvatar>
                             <ListItemText
-                              primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}</Typography>}
+                              primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>}
                               secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
                             />
                           </ListItem>
@@ -3891,7 +4105,7 @@ export default function NewLiveMeeting() {
                         variant="dot"
                         color="error"
                         overlap="circular"
-                        invisible={!showChatDot}
+                        invisible={!showAnyChatDot}
                         anchorOrigin={{ vertical: "top", horizontal: "right" }}
                       >
                         <ChatBubbleOutlineIcon />
