@@ -170,7 +170,7 @@ function ParticipantVideo({ participant, meeting, isSelf = false }) {
     el.autoplay = true;
     el.playsInline = true;
     el.muted = true; // always mute video elements; audio comes from DyteParticipantsAudio
-    
+
 
     try {
       // ✅ BEST for self (official API on meeting.self) :contentReference[oaicite:0]{index=0}
@@ -237,7 +237,7 @@ function ScreenShareVideo({ participant, meeting }) {
     const clearEl = () => {
       try {
         el.srcObject = null;
-      } catch (_) {}
+      } catch (_) { }
     };
 
     const attachWithSdk = () => {
@@ -246,7 +246,7 @@ function ScreenShareVideo({ participant, meeting }) {
           participant.registerScreenShareElement(el);
           return true;
         }
-      } catch (_) {}
+      } catch (_) { }
       return false;
     };
 
@@ -266,7 +266,7 @@ function ScreenShareVideo({ participant, meeting }) {
         try {
           const stream = new MediaStream([videoTrack]);
           el.srcObject = stream;
-          el.play?.().catch(() => {});
+          el.play?.().catch(() => { });
         } catch (_) {
           clearEl();
         }
@@ -291,7 +291,7 @@ function ScreenShareVideo({ participant, meeting }) {
           if (typeof participant.deregisterScreenShareElement === "function") {
             participant.deregisterScreenShareElement(el);
           }
-        } catch (_) {}
+        } catch (_) { }
         clearEl();
         return;
       }
@@ -304,7 +304,7 @@ function ScreenShareVideo({ participant, meeting }) {
       if (typeof participant.on === "function") {
         participant.on("screenShareUpdate", onUpdate);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // As a safety net, retry once shortly after mount (helps if tracks arrive a tick later)
     const t = setTimeout(() => {
@@ -320,13 +320,13 @@ function ScreenShareVideo({ participant, meeting }) {
         if (typeof participant.off === "function") {
           participant.off("screenShareUpdate", onUpdate);
         }
-      } catch (_) {}
+      } catch (_) { }
 
       try {
         if (typeof participant.deregisterScreenShareElement === "function") {
           participant.deregisterScreenShareElement(el);
         }
-      } catch (_) {}
+      } catch (_) { }
 
       clearEl();
     };
@@ -920,22 +920,22 @@ export default function NewLiveMeeting() {
   // Keep local button state in sync with Dyte actual state
 
   useEffect(() => {
-  if (!dyteMeeting?.self) return;
+    if (!dyteMeeting?.self) return;
 
-  const sync = () => {
-    setMicOn(Boolean(dyteMeeting.self.audioEnabled));
-    setCamOn(Boolean(dyteMeeting.self.videoEnabled));
-  };
+    const sync = () => {
+      setMicOn(Boolean(dyteMeeting.self.audioEnabled));
+      setCamOn(Boolean(dyteMeeting.self.videoEnabled));
+    };
 
-  sync();
-  dyteMeeting.self.on?.("audioUpdate", sync);
-  dyteMeeting.self.on?.("videoUpdate", sync);
+    sync();
+    dyteMeeting.self.on?.("audioUpdate", sync);
+    dyteMeeting.self.on?.("videoUpdate", sync);
 
-  return () => {
-    dyteMeeting.self.off?.("audioUpdate", sync);
-    dyteMeeting.self.off?.("videoUpdate", sync);
-  };
-}, [dyteMeeting]);
+    return () => {
+      dyteMeeting.self.off?.("audioUpdate", sync);
+      dyteMeeting.self.off?.("videoUpdate", sync);
+    };
+  }, [dyteMeeting]);
   useEffect(() => {
     if (!dyteMeeting?.self) return;
     setMicOn(Boolean(dyteMeeting.self.audioEnabled));
@@ -1411,11 +1411,11 @@ export default function NewLiveMeeting() {
   // Pinned “host” view data
   const latestPinnedHost = useMemo(() => {
     if (!pinnedHost) return null;
-    
+
     // 1. Try to find the exact same participant ID in the fresh list
     // This gets the version where videoEnabled is effectively 'true'
     const fresh = getJoinedParticipants().find((p) => p.id === pinnedHost.id);
-    
+
     // 2. Return the fresh object if found, otherwise fallback to the state one
     return fresh || pinnedHost;
   }, [pinnedHost, participantsTick, getJoinedParticipants]);
@@ -1436,13 +1436,13 @@ export default function NewLiveMeeting() {
 
   // ✅ Use 'latestPinnedHost' instead of 'pinnedHost'
   const pinnedRaw = latestPinnedHost?._raw || latestPinnedHost || null;
-  
+
   const pinnedIsSelf = Boolean(pinnedRaw?.id && dyteMeeting?.self?.id && pinnedRaw.id === dyteMeeting.self.id);
-  
+
   // ✅ Now this will correctly see 'true' when the host turns the camera on
   const pinnedHasVideo = Boolean(pinnedRaw?.videoEnabled);
 
-  
+
 
   // -------------------------
   // Active screen-share (same behavior as the old DyteMeeting UI: when someone shares, it becomes the main stage)
@@ -1591,7 +1591,7 @@ export default function NewLiveMeeting() {
   const hasScreenshare = !!activeScreenShareParticipant;
   const stageHasVideo = pinnedHasVideo || hasScreenshare;
 
-// If audience and host not live yet
+  // If audience and host not live yet
   const shouldShowMeeting = role === "publisher" || hostJoined || dbStatus === "live";
 
   // Back behavior (same as old intent)
@@ -2851,9 +2851,9 @@ export default function NewLiveMeeting() {
   return (
     <DyteProvider value={dyteMeeting}>
       <DyteParticipantsAudio
-  meeting={dyteMeeting}
-  style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
-/>
+        meeting={dyteMeeting}
+        style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+      />
       <Box
         ref={rootRef}
         sx={{
@@ -3096,30 +3096,30 @@ export default function NewLiveMeeting() {
               {/* Main participant */}
               {/* ✅ Host Video (background) */}
               {stageHasVideo && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  zIndex: 0,
-                  borderRadius: 2,
-                  overflow: "hidden",
-                  bgcolor: "rgba(0,0,0,0.85)",
-                }}
-              >
-                {hasScreenshare ? (
-                  <ScreenShareVideo
-                    participant={activeScreenShareParticipant}
-                    meeting={dyteMeeting}
-                  />
-                ) : (
-                  <ParticipantVideo
-                    participant={pinnedRaw}
-                    meeting={dyteMeeting}
-                    isSelf={pinnedIsSelf}
-                  />
-                )}
-              </Box>
-            )}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 0,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    bgcolor: "rgba(0,0,0,0.85)",
+                  }}
+                >
+                  {hasScreenshare ? (
+                    <ScreenShareVideo
+                      participant={activeScreenShareParticipant}
+                      meeting={dyteMeeting}
+                    />
+                  ) : (
+                    <ParticipantVideo
+                      participant={pinnedRaw}
+                      meeting={dyteMeeting}
+                      isSelf={pinnedIsSelf}
+                    />
+                  )}
+                </Box>
+              )}
 
               {/* Main participant (keep your UI, but hide center avatar when video exists) */}
               <Box
@@ -3259,7 +3259,7 @@ export default function NewLiveMeeting() {
                         try {
                           const s = await navigator.mediaDevices.getUserMedia({ audio: true });
                           s.getTracks().forEach((t) => t.stop());
-                        } catch {}
+                        } catch { }
 
                         await dyteMeeting.self.enableAudio?.();
                       }
@@ -3280,10 +3280,10 @@ export default function NewLiveMeeting() {
                 <IconButton
                   onClick={async () => {
                     if (!dyteMeeting?.self) return;
-                    
+
                     // 1. Disable the button temporarily if you want to prevent spamming
                     // (Optional, but good practice)
-                    
+
                     try {
                       if (camOn) {
                         // If currently ON, disable it
@@ -3431,7 +3431,7 @@ export default function NewLiveMeeting() {
             </Drawer>
           )}
         </Box>
-        {/* Member Info Dialog */}
+        {/* Member Info Dialog - Redesigned */}
         <Dialog
           open={memberInfoOpen}
           onClose={closeMemberInfo}
@@ -3439,89 +3439,201 @@ export default function NewLiveMeeting() {
           fullWidth
           PaperProps={{
             sx: {
-              bgcolor: "rgba(0,0,0,0.92)",
+              bgcolor: "#0b101a", // Deep dark blue/black background
               border: "1px solid rgba(255,255,255,0.10)",
-              borderRadius: 3,
+              borderRadius: 4,
+              boxShadow: "0px 20px 40px rgba(0,0,0,0.6)",
               backdropFilter: "blur(14px)",
-
-              // ✅ make all dialog text white
+              p: 1,
               color: "#fff",
               "& .MuiTypography-root": { color: "#fff" },
-              "& .MuiChip-label": { color: "#fff" },
-              "& .MuiChip-icon": { color: "rgba(255,255,255,0.9)" },
-              "& .MuiIconButton-root": { color: "#fff" },
             },
           }}
         >
-          <DialogTitle sx={{ pb: 1, fontWeight: 800 }}>User Info</DialogTitle>
+          {/* Header Title */}
+          <DialogTitle sx={{ pb: 0, pt: 2, px: 2, fontWeight: 700, fontSize: 16 }}>
+            User Info
+          </DialogTitle>
 
-          <DialogContent
-            dividers
-            sx={{
-              borderColor: "rgba(255,255,255,0.10)",
-              "&.MuiDialogContent-dividers": { borderColor: "rgba(255,255,255,0.10)" },
-            }}
-          >
+          <DialogContent sx={{ px: 2, pb: 2, pt: 1 }}>
             {selectedMember ? (
-              <Stack spacing={2} sx={{ pt: 0.5 }}>
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)", width: 44, height: 44 }}>
+              <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "center" }}>
+
+                {/* 1. Avatar Section with Crown Badge */}
+                <Box sx={{ position: "relative", mb: 1.5 }}>
+                  <Avatar
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      bgcolor: "rgba(255,255,255,0.1)",
+                      fontSize: 32,
+                      border: "2px solid rgba(255,255,255,0.05)",
+                    }}
+                  >
                     {initialsFromName(selectedMember.name)}
                   </Avatar>
 
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 800, fontSize: 14, lineHeight: 1.2 }}>
-                      {selectedMember.name}
-                    </Typography>
-                    <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{selectedMember.role}</Typography>
-                  </Box>
-                </Stack>
+                  {/* Show Crown if Host */}
+                  {selectedMember.role === "Host" && (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 0,
+                        right: 0,
+                        bgcolor: "#ffb300", // Gold color
+                        borderRadius: "50%",
+                        width: 24,
+                        height: 24,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: "2px solid #0b101a",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 12 }}>👑</Typography>
+                    </Box>
+                  )}
+                </Box>
 
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  <Chip size="small" label={selectedMember.role} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
-                  <Chip
-                    size="small"
-                    label={selectedMember.mic ? "Mic: On" : "Mic: Off"}
-                    icon={selectedMember.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
-                    sx={{ bgcolor: "rgba(255,255,255,0.06)" }}
-                  />
-                  <Chip
-                    size="small"
-                    label={selectedMember.cam ? "Camera: On" : "Camera: Off"}
-                    icon={selectedMember.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
-                    sx={{ bgcolor: "rgba(255,255,255,0.06)" }}
-                  />
-                  <Chip
-                    size="small"
-                    label={selectedMember.active ? "Speaking" : "Not speaking"}
-                    sx={{
-                      bgcolor: selectedMember.active ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(255,255,255,0.10)",
-                    }}
-                  />
-                </Stack>
-              </Stack>
+                {/* 2. Name */}
+                <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 0.5 }}>
+                  {selectedMember.name}
+                </Typography>
+
+                {/* 3. Role Chip */}
+                <Chip
+                  label={selectedMember.role}
+                  size="small"
+                  icon={
+                    <Box
+                      sx={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        bgcolor: selectedMember.role === "Host" ? "#ffb300" : "#22c55e", // Gold or Green dot
+                        ml: 0.5,
+                      }}
+                    />
+                  }
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    height: 24,
+                    "& .MuiChip-label": { px: 1.5, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" },
+                    "& .MuiChip-icon": { order: -1, mr: -0.5 }, // Move dot to start
+                  }}
+                />
+
+                {/* 4. Info Card / Table */}
+                <Box
+                  sx={{
+                    mt: 3,
+                    width: "100%",
+                    bgcolor: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 3,
+                    p: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
+                  {/* Row: Status */}
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Status</Typography>
+                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#22c55e" }}>In Meeting</Typography>
+                  </Box>
+
+                  <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
+
+                  {/* Row: Microphone */}
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Microphone</Typography>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      {selectedMember.mic ? (
+                        <>
+                          <MicIcon sx={{ fontSize: 14, color: "#fff" }} />
+                          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>On</Typography>
+                        </>
+                      ) : (
+                        <>
+                          <MicOffIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }} />
+                          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Off</Typography>
+                        </>
+                      )}
+                    </Stack>
+                  </Box>
+
+                  <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
+
+                  {/* Row: Camera */}
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Camera</Typography>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      {selectedMember.cam ? (
+                        <>
+                          <VideocamIcon sx={{ fontSize: 14, color: "#fff" }} />
+                          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>On</Typography>
+                        </>
+                      ) : (
+                        <>
+                          <VideocamOffIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }} />
+                          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Off</Typography>
+                        </>
+                      )}
+                    </Stack>
+                  </Box>
+
+                  <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
+
+                  {/* Row: Permissions */}
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Permissions</Typography>
+                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#facc15" }}>
+                      {selectedMember.role === "Host" ? "Full Access" : "Attendee"}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {/* 5. View Profile Button */}
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<Box component="span" sx={{ fontSize: 18, display: "flex" }}>👤</Box>} // Simple user icon or use PersonOutlineIcon
+                  onClick={() => {
+                    // Logic: Use customParticipantId (DB ID) if available, else fallback to Dyte ID
+                    const userId = selectedMember._raw?.customParticipantId || selectedMember.id;
+                    window.open(`/community/rich-profile/${userId}`, "_blank");
+                  }}
+                  sx={{
+                    mt: 3,
+                    py: 1.5,
+                    borderRadius: 3,
+                    borderColor: "rgba(255,255,255,0.2)",
+                    color: "#fff",
+                    textTransform: "none",
+                    fontWeight: 600,
+                    fontSize: 14,
+                    bgcolor: "rgba(255,255,255,0.02)",
+                    "&:hover": {
+                      bgcolor: "rgba(255,255,255,0.08)",
+                      borderColor: "#fff",
+                    },
+                  }}
+                >
+                  View Profile
+                </Button>
+              </Box>
             ) : (
-              <Typography sx={{ fontSize: 13, opacity: 0.75, py: 1 }}>No user selected.</Typography>
+              <Box sx={{ py: 4, textAlign: "center", opacity: 0.5 }}>
+                <CircularProgress size={24} />
+              </Box>
             )}
           </DialogContent>
-
-          <DialogActions sx={{ px: 2, py: 1.5 }}>
-            <Button
-              onClick={closeMemberInfo}
-              variant="contained"
-              sx={{
-                textTransform: "none",
-                bgcolor: "rgba(20,184,177,0.40)",
-                "&:hover": { bgcolor: "rgba(20,184,177,0.55)" },
-              }}
-            >
-              Close
-            </Button>
-          </DialogActions>
         </Dialog>
       </Box>
     </DyteProvider>
-    
+
   );
 }
