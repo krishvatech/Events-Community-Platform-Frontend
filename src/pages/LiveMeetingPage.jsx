@@ -995,8 +995,7 @@ export default function NewLiveMeeting() {
   const screenShareDisabled =
     !roomJoined ||
     !canSelfScreenShare ||
-    !hostPerms.screenShare ||           // host toggle
-    (!isHost && hostForceBlock);        // host broadcast block for audience
+    (isHost ? !hostPerms.screenShare : true);
 
   const toggleScreenShareNow = useCallback(async () => {
     if (!dyteMeeting?.self) return;
@@ -1509,8 +1508,8 @@ export default function NewLiveMeeting() {
       if (participant.id === dyteMeeting.self?.id) return;
       try {
         await dyteMeeting.participants.updatePermissions([participant.id], {
-          canProduceScreenshare: hostPerms.screenShare ? "ALLOWED" : "NOT_ALLOWED",
-          requestProduceScreenshare: hostPerms.screenShare,
+          canProduceScreenshare: "NOT_ALLOWED",
+          requestProduceScreenshare: false,
           chat: {
             public: { canSend: hostPerms.chat, text: hostPerms.chat, files: hostPerms.chat },
             private: { canSend: hostPerms.chat, text: hostPerms.chat, files: hostPerms.chat },
@@ -2025,13 +2024,13 @@ export default function NewLiveMeeting() {
     if (!isHost) return;
     const next = !hostPerms.screenShare;
     setHostPerms((p) => ({ ...p, screenShare: next }));
-    setHostForceBlock(!next);
-    await updateAudiencePermissions({
-      canProduceScreenshare: next ? "ALLOWED" : "NOT_ALLOWED",
-      requestProduceScreenshare: next,
-    });
-    dyteMeeting?.participants?.broadcastMessage?.("toggle-screen-share", { allowed: next });
-  }, [dyteMeeting, hostPerms.screenShare, isHost, updateAudiencePermissions]);
+
+    // optional safety: if host turns OFF while sharing, stop it
+    if (!next && dyteMeeting?.self?.disableScreenShare) {
+      try { await dyteMeeting.self.disableScreenShare(); } catch { }
+      setIsScreenSharing(false);
+    }
+  }, [dyteMeeting, hostPerms.screenShare, isHost, isScreenSharing]);
 
   // -------- Live chat (messaging backend) ----------
   const [chatConversationId, setChatConversationId] = useState(null);
@@ -3751,33 +3750,34 @@ export default function NewLiveMeeting() {
                     {camOn ? <VideocamIcon /> : <VideocamOffIcon />}
                   </IconButton>
                 </Tooltip>
-
-                <Tooltip
-                  title={
-                    !hostPerms.screenShare
-                      ? "Screen share disabled by host"
-                      : !canSelfScreenShare
-                        ? "Screen share not allowed"
-                        : (!isHost && hostForceBlock)
-                          ? "Screen share blocked for audience"
-                          : (isScreenSharing ? "Stop sharing" : "Share screen")
-                  }
-                >
-                  <span>
-                    <IconButton
-                      onClick={toggleScreenShareNow}
-                      disabled={screenShareDisabled}
-                      sx={{
-                        bgcolor: "rgba(255,255,255,0.06)",
-                        "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                        "&.Mui-disabled": { opacity: 0.45 },
-                      }}
-                      aria-label="Share screen"
-                    >
-                      <ScreenShareIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
+                {isHost && (
+                  <Tooltip
+                    title={
+                      !hostPerms.screenShare
+                        ? "Screen share disabled by host"
+                        : !canSelfScreenShare
+                          ? "Screen share not allowed"
+                          : (!isHost && hostForceBlock)
+                            ? "Screen share blocked for audience"
+                            : (isScreenSharing ? "Stop sharing" : "Share screen")
+                    }
+                  >
+                    <span>
+                      <IconButton
+                        onClick={toggleScreenShareNow}
+                        disabled={screenShareDisabled}
+                        sx={{
+                          bgcolor: "rgba(255,255,255,0.06)",
+                          "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                          "&.Mui-disabled": { opacity: 0.45 },
+                        }}
+                        aria-label="Share screen"
+                      >
+                        <ScreenShareIcon />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                )}
 
                 <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : (isChatActive ? "Close chat" : "Open chat")}>
                   <span>
