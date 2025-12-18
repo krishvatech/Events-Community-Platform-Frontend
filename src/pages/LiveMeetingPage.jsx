@@ -2041,6 +2041,70 @@ export default function NewLiveMeeting() {
   const [chatInput, setChatInput] = useState("");
   const chatBottomRef = useRef(null);
 
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  const fetchChatMessages = useCallback(
+    async (conversationId) => {
+      const cid = conversationId || chatConversationId;
+      if (!cid) return;
+      const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
+        headers: { Accept: "application/json", ...authHeader() },
+      });
+      const data = await res.json().catch(() => []);
+      if (!res.ok) throw new Error(data?.detail || "Failed to load chat.");
+      setChatMessages(Array.isArray(data) ? data : []);
+    },
+    [chatConversationId]
+  );
+
+  const ensureEventConversation = useCallback(async () => {
+    if (!eventId) return null;
+    const res = await fetch(toApiUrl("messaging/conversations/ensure-event/"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ event: eventId }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.detail || "Failed to open chat.");
+    }
+    const cid = data?.id;
+    if (!cid) throw new Error("Chat conversation missing.");
+    setChatConversationId(cid);
+    return cid;
+  }, [eventId]);
+
+  const fetchChatUnread = useCallback(async () => {
+    try {
+      const cid = chatConversationId || (await ensureEventConversation());
+      if (!cid) return 0;
+
+      const res = await fetch(toApiUrl(`messaging/conversations/${cid}/`), {
+        headers: { Accept: "application/json", ...authHeader() },
+      });
+      const data = await res.json().catch(() => null);
+      const unread = Number(data?.unread_count || 0);
+
+      setChatUnreadCount(unread);
+      return unread;
+    } catch {
+      return 0;
+    }
+  }, [chatConversationId, ensureEventConversation]);
+
+  const markChatAllRead = useCallback(async (conversationId) => {
+    const cid = conversationId || chatConversationId;
+    if (!cid) return;
+
+    try {
+      await fetch(toApiUrl(`messaging/conversations/${cid}/mark-all-read/`), {
+        method: "POST",
+        headers: { ...authHeader() },
+      });
+      setChatUnreadCount(0);
+    } catch { }
+  }, [chatConversationId]);
+
   // ============ PRIVATE CHAT STATE ============
   const [privateChatUser, setPrivateChatUser] = useState(null);
   const [privateMessages, setPrivateMessages] = useState([]);
@@ -2127,6 +2191,44 @@ export default function NewLiveMeeting() {
     }
   };
 
+  useEffect(() => {
+    if (!eventId || !hostPerms.chat) return;
+
+    let alive = true;
+
+    const tick = async () => {
+      if (!alive) return;
+
+      const unread = await fetchChatUnread();
+
+      // If user is actively viewing chat, auto-refresh and clear unread
+      if (isChatActive && unread > 0) {
+        const cid = chatConversationId || (await ensureEventConversation());
+        if (cid) {
+          await fetchChatMessages(cid);
+          await markChatAllRead(cid);
+        }
+      }
+    };
+
+    tick();
+    const t = setInterval(tick, 3000);
+
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [
+    eventId,
+    hostPerms.chat,
+    isChatActive,
+    chatConversationId,
+    ensureEventConversation,
+    fetchChatMessages,
+    fetchChatUnread,
+    markChatAllRead,
+  ]);
+
   // Auto-scroll private chat
   useEffect(() => {
     if (privateChatBottomRef.current) {
@@ -2135,36 +2237,9 @@ export default function NewLiveMeeting() {
   }, [privateMessages]);
   // =================================================
 
-  const ensureEventConversation = useCallback(async () => {
-    if (!eventId) return null;
-    const res = await fetch(toApiUrl("messaging/conversations/ensure-event/"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeader() },
-      body: JSON.stringify({ event: eventId }),
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(data?.detail || "Failed to open chat.");
-    }
-    const cid = data?.id;
-    if (!cid) throw new Error("Chat conversation missing.");
-    setChatConversationId(cid);
-    return cid;
-  }, [eventId]);
 
-  const fetchChatMessages = useCallback(
-    async (conversationId) => {
-      const cid = conversationId || chatConversationId;
-      if (!cid) return;
-      const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
-        headers: { Accept: "application/json", ...authHeader() },
-      });
-      const data = await res.json().catch(() => []);
-      if (!res.ok) throw new Error(data?.detail || "Failed to load chat.");
-      setChatMessages(Array.isArray(data) ? data : []);
-    },
-    [chatConversationId]
-  );
+
+
 
   const loadChatThread = useCallback(async () => {
     setChatLoading(true);
@@ -2172,6 +2247,7 @@ export default function NewLiveMeeting() {
     try {
       const cid = await ensureEventConversation();
       await fetchChatMessages(cid);
+      await markChatAllRead(cid);
     } catch (e) {
       setChatError(e?.message || "Unable to load chat.");
     } finally {
@@ -2493,6 +2569,8 @@ export default function NewLiveMeeting() {
     },
   };
 
+  const showChatDot = hostPerms.chat && chatUnreadCount > 0 && !isChatActive;
+
   const RightPanelContent = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", pb: { xs: "calc(16px + env(safe-area-inset-bottom))", md: 2 }, boxSizing: "border-box" }}>
       {/* ================= CONDITION: PRIVATE CHAT VIEW ================= */}
@@ -2626,7 +2704,22 @@ export default function NewLiveMeeting() {
               "& .MuiTab-root": { minHeight: 42, textTransform: "none", fontWeight: 600 },
             }}
           >
-            <Tab icon={<ChatBubbleOutlineIcon fontSize="small" />} iconPosition="start" label="Chat" sx={{ display: hostPerms.chat ? "flex" : "none" }} />
+            <Tab
+              icon={
+                <Badge
+                  variant="dot"
+                  color="error"
+                  overlap="circular"
+                  invisible={!showChatDot}
+                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                >
+                  <ChatBubbleOutlineIcon fontSize="small" />
+                </Badge>
+              }
+              iconPosition="start"
+              label="Chat"
+              sx={{ display: hostPerms.chat ? "flex" : "none" }}
+            />
             <Tab icon={<QuestionAnswerIcon fontSize="small" />} iconPosition="start" label="Q&A" />
             <Tab icon={<PollIcon fontSize="small" />} iconPosition="start" label="Polls" sx={{ display: "none" }} />
             <Tab icon={<GroupIcon fontSize="small" />} iconPosition="start" label="Members" />
@@ -3794,7 +3887,15 @@ export default function NewLiveMeeting() {
                       }}
                       aria-label="Chat / panel"
                     >
-                      <ChatBubbleOutlineIcon />
+                      <Badge
+                        variant="dot"
+                        color="error"
+                        overlap="circular"
+                        invisible={!showChatDot}
+                        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                      >
+                        <ChatBubbleOutlineIcon />
+                      </Badge>
                     </IconButton>
                   </span>
                 </Tooltip>
