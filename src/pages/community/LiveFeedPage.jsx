@@ -14,6 +14,9 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import SearchIcon from "@mui/icons-material/Search";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   CircularProgress, List, ListItem, ListItemAvatar, ListItemText, Divider
@@ -995,20 +998,24 @@ function ClampedText({
 function EventBlock({ post, onOpen }) {
   return (
     <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-        {post.event?.title}
-      </Typography>
+      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ gap: 1 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
+            {post.event?.title}
+          </Typography>
+        </Box>
+
+        <Tooltip title="View event">
+          <IconButton size="small" onClick={onOpen} sx={{ flexShrink: 0, mt: -0.25 }}>
+            <OpenInNewRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
       <Typography variant="caption" color="text.secondary">
         {post.event?.when ? new Date(post.event.when).toLocaleString() : ""}{post.event?.where ? ` · ${post.event.where}` : ""}
       </Typography>
 
       {post.text && <ClampedText text={post.text} maxLines={5} mt={1} />}
-
-      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-        <Button size="small" variant="contained" onClick={onOpen} startIcon={<ThumbUpAltOutlinedIcon />}>
-          View Event
-        </Button>
-      </Stack>
     </Paper>
   );
 }
@@ -1063,11 +1070,41 @@ function ResourceBlock({ post, onOpenEvent }) {
 
   return (
     <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: "#e2e8f0", bgcolor: "#fafafa" }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-        {r.title}
-      </Typography>
+      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ gap: 1 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1, minWidth: 0 }}>
+          {r.title}
+        </Typography>
 
-      {post.text && <Typography variant="body2" sx={{ mt: 1 }}>{post.text}</Typography>}
+        {primaryHref && (
+          <Tooltip title={hasVideo ? "Watch video" : r.link_url ? "Open link" : "View file"}>
+            <IconButton
+              size="small"
+              component="a"
+              href={primaryHref}
+              target="_blank"
+              rel="noreferrer"
+              sx={{ flexShrink: 0, mt: -0.25 }}
+            >
+              {hasVideo ? (
+                <PlayCircleOutlineRoundedIcon fontSize="small" />
+              ) : r.link_url ? (
+                <OpenInNewRoundedIcon fontSize="small" />
+              ) : (
+                <InsertDriveFileOutlinedIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        )}
+      </Stack>
+
+      {post.text && (
+        <ClampedText
+          text={post.text}
+          maxLines={5}
+          mt={1}
+          variant="body2"
+        />
+      )}
 
       {/* VIDEO RENDERING */}
       {hasVideo && (
@@ -1078,7 +1115,7 @@ function ResourceBlock({ post, onOpenEvent }) {
               src={iframeSrc}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              sx={{ width: "100%", height: 360, border: 0, borderRadius: 8 }}
+              sx={{ width: "100%", height: 360, border: 0, borderRadius: 1 }}
               title={r.title}
             />
           ) : (
@@ -1087,7 +1124,7 @@ function ResourceBlock({ post, onOpenEvent }) {
               src={r.video_url}
               controls
               preload="metadata"
-              sx={{ width: "100%", maxHeight: 420, borderRadius: 2, border: "1px solid #e2e8f0", mt: 0.5 }}
+              sx={{ width: "100%", maxHeight: 420, borderRadius: 1, border: "1px solid #e2e8f0", mt: 0.5 }}
             />
           )}
         </Box>
@@ -1098,7 +1135,7 @@ function ResourceBlock({ post, onOpenEvent }) {
         <Box
           sx={{
             mt: 1,
-            borderRadius: 2,
+            borderRadius: 1,
             overflow: "hidden",
             border: "1px solid #e2e8f0",
             bgcolor: "background.paper",
@@ -1122,7 +1159,7 @@ function ResourceBlock({ post, onOpenEvent }) {
         <Box
           sx={{
             mt: 1,
-            borderRadius: 2,
+            borderRadius: 1,
             overflow: "hidden",
             border: "1px solid #e2e8f0",
             bgcolor: "background.paper",
@@ -1143,7 +1180,7 @@ function ResourceBlock({ post, onOpenEvent }) {
           sx={{
             mt: 1,
             p: 1.25,
-            borderRadius: 2,
+            borderRadius: 1,
             borderColor: "#e2e8f0",
             bgcolor: "background.paper",
           }}
@@ -1177,21 +1214,6 @@ function ResourceBlock({ post, onOpenEvent }) {
           </Stack>
         </Paper>
       )}
-
-      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-        {primaryHref && (
-          <Button
-            size="small"
-            variant="contained"
-            component="a"
-            href={primaryHref}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {hasVideo ? "Watch Video" : r.link_url ? "Open Link" : "View File"}
-          </Button>
-        )}
-      </Stack>
     </Paper>
   );
 }
