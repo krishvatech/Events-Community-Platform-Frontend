@@ -71,6 +71,7 @@ const KIND_LABEL = {
   friend_request: "Requests",
   connection_request: "Requests",
   name_change: "Identity",
+  suggestion_digest: "Suggestions",
 };
 
 function kindChip(kind) {
@@ -107,7 +108,7 @@ async function fetchStandardNotifications(url) {
   if (!r.ok) throw new Error("Failed");
   const j = await r.json();
   const raw = Array.isArray(j) ? j : j?.results || [];
-  
+
   return {
     items: raw.map((n) => ({
       id: n.id,
@@ -118,6 +119,7 @@ async function fetchStandardNotifications(url) {
       description: n.description || "",
       created_at: n.created_at,
       is_read: !!n.is_read,
+      data: n.data || {},
       actor: {
         id: n.actor?.id,
         name: n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
@@ -142,7 +144,7 @@ async function loadMyIdentityRequests() {
       headers: { ...tokenHeader(), Accept: "application/json" },
     });
     if (!r.ok) return [];
-    
+
     const data = await r.json();
     const rows = Array.isArray(data) ? data : data.results || [];
     const readIds = getReadIdentityIds();
@@ -151,17 +153,17 @@ async function loadMyIdentityRequests() {
       const fullId = `identity-${req.id}`;
       // Logic: Pending -> Read (white). Processed -> Unread (highlighted) until marked read.
       const isFinished = req.status === 'approved' || req.status === 'rejected';
-      const isRead = isFinished ? readIds.includes(fullId) : true; 
-      
+      const isRead = isFinished ? readIds.includes(fullId) : true;
+
       const dateToUse = (isFinished && req.updated_at) ? req.updated_at : req.created_at;
 
       return {
         id: fullId,
         source: 'identity',
         kind: 'name_change',
-        state: req.status, 
-        title: req.status === 'pending' 
-          ? `Requesting name change to ${req.new_first_name} ${req.new_last_name}` 
+        state: req.status,
+        title: req.status === 'pending'
+          ? `Requesting name change to ${req.new_first_name} ${req.new_last_name}`
           : `Name change request ${req.status}`,
         description: `Status: ${req.status.charAt(0).toUpperCase() + req.status.slice(1)}`,
         created_at: dateToUse,
@@ -219,6 +221,7 @@ function NotificationRow({
   onAcceptRequest,
   onDeclineRequest,
   onFollowBack,
+  onOpenDigest,
 }) {
   const unread = !item.is_read;
   const theme = useTheme();
@@ -236,7 +239,7 @@ function NotificationRow({
         return (
           <>
             <Typography variant="body2">
-              Your name change to <b>{newName}</b> has been <span style={{color: '#1a7f37', fontWeight:600}}>approved</span>.
+              Your name change to <b>{newName}</b> has been <span style={{ color: '#1a7f37', fontWeight: 600 }}>approved</span>.
             </Typography>
           </>
         );
@@ -244,7 +247,7 @@ function NotificationRow({
         return (
           <>
             <Typography variant="body2">
-              Your name change to <b>{newName}</b> was <span style={{color: '#b42318', fontWeight:600}}>rejected</span>.
+              Your name change to <b>{newName}</b> was <span style={{ color: '#b42318', fontWeight: 600 }}>rejected</span>.
             </Typography>
           </>
         );
@@ -255,6 +258,22 @@ function NotificationRow({
           </Typography>
         );
       }
+    }
+
+    if (item.kind === "suggestion_digest") {
+      const cc = item.data?.connection_count ?? 0;
+      const gc = item.data?.group_count ?? 0;
+
+      return (
+        <>
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            Daily suggestions
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            {cc} connections • {gc} groups
+          </Typography>
+        </>
+      );
     }
 
     // Default Render
@@ -270,6 +289,8 @@ function NotificationRow({
       </Stack>
     );
   };
+
+
 
   const ActionsByKind = () => {
     if (item.kind === "friend_request" || item.kind === "connection_request") {
@@ -296,6 +317,35 @@ function NotificationRow({
             startIcon={<HighlightOffIcon />}
           >
             Decline
+          </Button>
+        </Stack>
+      );
+    }
+
+    if (item.kind === "suggestion_digest") {
+      const cc = item.data?.connection_count ?? 0;
+      const gc = item.data?.group_count ?? 0;
+
+      return (
+        <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => onOpenDigest?.(item, "connections")}
+            sx={{ textTransform: "none", borderRadius: 2 }}
+            disabled={cc === 0}
+          >
+            View suggestions
+          </Button>
+
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => onOpenDigest?.(item, "groups")}
+            sx={{ textTransform: "none", borderRadius: 2 }}
+            disabled={gc === 0}
+          >
+            View group activity
           </Button>
         </Stack>
       );
@@ -338,9 +388,9 @@ function NotificationRow({
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <ListItemAvatar sx={{ minWidth: 48 }}>
           {item.kind === 'name_change' ? (
-             <Avatar sx={{ bgcolor: '#394d79', color: 'white' }}>
-               <BadgeRoundedIcon fontSize="small" />
-             </Avatar>
+            <Avatar sx={{ bgcolor: '#394d79', color: 'white' }}>
+              <BadgeRoundedIcon fontSize="small" />
+            </Avatar>
           ) : (
             <Avatar
               src={item.actor?.avatar}
@@ -446,12 +496,12 @@ export default function NotificationsPage({
   const [items, setItems] = React.useState([]);
   const [showOnlyUnread, setShowOnlyUnread] = React.useState(false);
   const [kind, setKind] = React.useState("All");
-  
+
   // --- Pagination State ---
   const [loading, setLoading] = React.useState(true);
   const [hasMore, setHasMore] = React.useState(true);
   const [nextUrl, setNextUrl] = React.useState(`${API_BASE}/notifications/?page_size=10`);
-  
+
   const observerTarget = React.useRef(null);
   const [visibleCount, setVisibleCount] = React.useState(10);
   const [isLoadingMoreLocal, setIsLoadingMoreLocal] = React.useState(false);
@@ -474,6 +524,11 @@ export default function NotificationsPage({
   // Derived state
   const unreadCount = React.useMemo(() => items.filter((i) => !i.is_read).length, [items]);
 
+  const handleOpenDigest = (item, target) => {
+    const focus = target === "groups" ? "groups" : "connections";
+    markAndNavigate(item, `/community?view=live&focus=${focus}`);
+  };
+
   React.useEffect(() => {
     emitUnreadCount(unreadCount);
   }, [unreadCount]);
@@ -492,6 +547,7 @@ export default function NotificationsPage({
         events: ["event"],
         system: ["system"],
         identity: ["name_change"],
+        suggestions: ["suggestion_digest"],
       };
       const keys = norm[k] || [k.slice(0, -1)];
       arr = arr.filter((i) => keys.includes(i.kind));
@@ -511,7 +567,7 @@ export default function NotificationsPage({
     setLoading(true);
     try {
       const promises = [fetchStandardNotifications(url || nextUrl)];
-      
+
       const fetchingIdentity = !isAppend && (kind === 'All' || kind === 'Identity');
       if (fetchingIdentity) {
         promises.push(loadMyIdentityRequests());
@@ -544,7 +600,7 @@ export default function NotificationsPage({
   React.useEffect(() => {
     loadNotifications(`${API_BASE}/notifications/?page_size=10`, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind]); 
+  }, [kind]);
 
   // --- Infinite Scroll ---
   React.useEffect(() => {
@@ -576,7 +632,7 @@ export default function NotificationsPage({
   // --- Handlers ---
   const handleToggleRead = async (id, nowRead) => {
     const item = items.find(i => i.id === id);
-    
+
     // Identity Items Handler
     if (item && item.source === 'identity') {
       if (nowRead) markIdentityIdsAsRead([id]);
@@ -608,10 +664,10 @@ export default function NotificationsPage({
 
     // 2. API Items
     const apiIds = items.filter((i) => !i.is_read && i.source === 'api').map((i) => i.id);
-    
+
     // Update State
     setItems((curr) => curr.map((i) => ({ ...i, is_read: true })));
-    
+
     // Send API req
     if (apiIds.length) {
       try {
@@ -637,7 +693,7 @@ export default function NotificationsPage({
   const handleOpen = (n) => {
     if (onOpen) return onOpen(n); // Custom override
     const ctx = n.context || {};
-    
+
     let dest = null;
     if (n.kind === "friend_request" || n.kind === "connection_request") {
       if (ctx.profile_user_id) dest = `/community/rich-profile/${ctx.profile_user_id}`;
@@ -702,7 +758,7 @@ export default function NotificationsPage({
               <FormControlLabel control={<Switch checked={showOnlyUnread} onChange={(e) => setShowOnlyUnread(e.target.checked)} size="small" />} label="Unread only" sx={{ m: 0 }} />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
                 <Select size="small" value={kind} onChange={(e) => setKind(e.target.value)} sx={{ minWidth: 140 }}>
-                  {["All", "Requests", "Identity", "Follows", "Mentions", "Comments", "Reactions", "Events", "System"].map((k) => (<MenuItem key={k} value={k}>{k}</MenuItem>))}
+                  {["All", "Requests", "Suggestions", "Identity", "Follows", "Mentions", "Comments", "Reactions", "Events", "System"].map((k) => (<MenuItem key={k} value={k}>{k}</MenuItem>))}
                 </Select>
                 <Button size="small" variant="outlined" startIcon={<DoneAllIcon />} onClick={handleMarkAllRead} sx={{ whiteSpace: "nowrap" }}>Mark all read</Button>
               </Stack>
@@ -723,14 +779,15 @@ export default function NotificationsPage({
                 <List sx={{ mt: 1 }}>
                   {groupedLimited[section].map((it) => (
                     <ListItem key={it.id} disableGutters sx={{ px: 0 }}>
-                      <NotificationRow 
-                        item={it} 
+                      <NotificationRow
+                        item={it}
                         onOpen={handleOpen}
                         onAvatarClick={handleAvatarClick} // Pass the handler
-                        onToggleRead={handleToggleRead} 
-                        onAcceptRequest={handleAcceptRequest} 
-                        onDeclineRequest={handleDeclineRequest} 
-                        onFollowBack={handleFollowBack} 
+                        onToggleRead={handleToggleRead}
+                        onAcceptRequest={handleAcceptRequest}
+                        onDeclineRequest={handleDeclineRequest}
+                        onFollowBack={handleFollowBack}
+                        onOpenDigest={handleOpenDigest}
                       />
                     </ListItem>
                   ))}

@@ -1,6 +1,6 @@
 // src/pages/community/LiveFeedPage.jsx
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Avatar, AvatarGroup, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
   Paper, Stack, TextField, Typography, InputAdornment, Popover, Tooltip, Skeleton
@@ -2553,7 +2553,8 @@ export default function LiveFeedPage({
 
   // If parent passes a handler, keep it. Otherwise use smart routing.
   const openEvent = onOpenEvent === NOOP ? smartOpenEvent : onOpenEvent;
-
+  const [searchParams] = useSearchParams();
+  const focus = searchParams.get("focus"); // "connections" | "groups"
 
   // Suggested connections (fetched once)
   const [suggested, setSuggested] = React.useState([]);
@@ -3331,6 +3332,18 @@ export default function LiveFeedPage({
 
 
           {/* (Composer kept commented; leave as-is to avoid changing other UI) */}
+
+          {(focus === "connections") && (
+            <Box sx={{ mb: 2 }}>
+              <SuggestedConnections list={suggested} />
+            </Box>
+          )}
+
+          {(focus === "groups") && (
+            <Box sx={{ mb: 2 }}>
+              <SuggestedGroups list={suggestedGroups} loading={suggestedGroupsLoading} onJoined={removeSuggestedGroup} />
+            </Box>
+          )}
 
           {/* Feed */}
           {loading && posts.length === 0 ? (
