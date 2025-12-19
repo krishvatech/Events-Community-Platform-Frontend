@@ -1591,6 +1591,115 @@ function UniversityAutocomplete({ value, onChange, label = "University" }) {
   );
 }
 
+// -----------------------------------------------------------------------------
+// City Autocomplete (Open-Meteo) → returns { name, admin1, country, country_code, latitude, longitude }
+// -----------------------------------------------------------------------------
+function CityAutocompleteOpenMeteo({ label = "City", value, onSelect }) {
+  const [open, setOpen] = React.useState(false);
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
+
+  React.useEffect(() => {
+    const q = (inputValue || "").trim();
+    if (q.length < 2) {
+      setOptions(value ? [value] : []);
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    const run = async () => {
+      setLoading(true);
+      try {
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=en&format=json`;
+        const r = await fetch(url, { signal: controller.signal });
+        if (!r.ok) return;
+        const data = await r.json();
+
+        const results = (data?.results || []).map((x) => ({
+          name: x.name || "",
+          admin1: x.admin1 || "",
+          country: x.country || "",
+          country_code: x.country_code || "",
+          latitude: x.latitude,
+          longitude: x.longitude,
+        })).filter((x) => x.name && x.country);
+
+        if (active) setOptions(results);
+      } catch (e) {
+        if (e?.name !== "AbortError") console.error("City search failed", e);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const t = setTimeout(run, 350); // debounce
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(t);
+    };
+  }, [inputValue, value]);
+
+  return (
+    <Autocomplete
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      options={options}
+      loading={loading}
+      value={value || null}
+      inputValue={inputValue}
+      onInputChange={(_, v) => setInputValue(v)}
+      isOptionEqualToValue={(o, v) =>
+        o?.name === v?.name &&
+        o?.country === v?.country &&
+        o?.admin1 === v?.admin1
+      }
+      getOptionLabel={(o) => {
+        if (!o) return "";
+        const parts = [o.name, o.admin1, o.country].filter(Boolean);
+        return parts.join(", ");
+      }}
+      onChange={(_, newValue) => {
+        onSelect?.(newValue || null);
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={label}
+          fullWidth
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress size={18} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+      renderOption={(props, option) => (
+        <li {...props}>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {option.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {[option.admin1, option.country].filter(Boolean).join(", ")}
+              {option.country_code ? ` · ${option.country_code}` : ""}
+            </Typography>
+          </Box>
+        </li>
+      )}
+    />
+  );
+}
+
+
 
 
 function AboutTab({
@@ -1846,8 +1955,29 @@ function AboutTab({
 
   React.useEffect(() => {
     const fullLoc = profile.location || "";
-    const [city, country] = fullLoc.includes(",") ? fullLoc.split(",").map(s => s.trim()) : ["", fullLoc];
-    setContactForm({ email: profile.email || "", city, location: country, linkedin: profile.links?.linkedin || "" });
+    const [city, country] = fullLoc.includes(",")
+      ? fullLoc.split(",").map(s => s.trim())
+      : ["", fullLoc];
+
+    const city_obj = city
+      ? {
+        name: city,
+        admin1: "",
+        country: country || "",
+        country_code: "",
+        latitude: null,
+        longitude: null,
+      }
+      : null;
+
+    setContactForm({
+      email: profile.email || "",
+      city,
+      location: country,
+      city_obj, // ✅ add this
+      linkedin: profile.links?.linkedin || ""
+    });
+
     setAboutForm({ bio: profile.bio || "", skillsText: (profile.skills || []).join(", ") });
   }, [profile, latestExp]);
 
@@ -1974,6 +2104,7 @@ function AboutTab({
       org: "",
       position: "",
       city: "",
+      city_obj: null,
       location: "",
       start: "",
       end: "",
@@ -1994,9 +2125,23 @@ function AboutTab({
   const openEditExp = (id) => {
     const x = profile.experience.find(e => e.id === id);
     if (!x) return;
-    const [city, country] = (x.location || "").includes(",") ? x.location.split(",").map(s => s.trim()) : ["", x.location];
+    const [city, country] = (x.location || "").includes(",")
+      ? x.location.split(",").map(s => s.trim())
+      : ["", x.location];
+
+    const city_obj = city
+      ? {
+        name: city,
+        admin1: "",
+        country: country || "",
+        country_code: "",
+        latitude: null,
+        longitude: null,
+      }
+      : null;
+
     setEditExpId(id);
-    setExpForm({ ...x, city, location: country || "" });
+    setExpForm({ ...x, city, location: country || "", city_obj }); // ✅ add city_obj
     setExpOpen(true);
   };
 
@@ -2389,8 +2534,28 @@ function AboutTab({
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="Email" fullWidth value={contactForm.email || ""} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} />
-            <Autocomplete options={CITY_OPTIONS} value={contactForm.city || null} onChange={(_, v) => setContactForm({ ...contactForm, city: v || "" })} renderInput={(p) => <TextField {...p} label="City" />} />
-            <Autocomplete options={COUNTRY_OPTIONS} value={getSelectedCountry({ location: contactForm.location })} getOptionLabel={(o) => o?.label || ""} onChange={(_, v) => setContactForm({ ...contactForm, location: v?.label || "" })} renderInput={(p) => <TextField {...p} label="Country" />} />
+            <CityAutocompleteOpenMeteo
+              label="City"
+              value={contactForm.city_obj || null}
+              onSelect={(place) => {
+                setContactForm((prev) => ({
+                  ...prev,
+                  city_obj: place,
+                  city: place?.name || "",
+                  location: place?.country || "", // ✅ auto-fill country
+                }));
+              }}
+            />
+            <Autocomplete
+              options={COUNTRY_OPTIONS}
+              value={getSelectedCountry({ location: contactForm.location })}
+              getOptionLabel={(o) => o?.label || ""}
+              disabled={!!contactForm.city_obj}   // ✅ lock when city chosen
+              onChange={(_, v) =>
+                setContactForm({ ...contactForm, location: v?.label || "" })
+              }
+              renderInput={(p) => <TextField {...p} label="Country" />}
+            />
             <TextField label="LinkedIn" fullWidth value={contactForm.linkedin || ""} onChange={(e) => setContactForm({ ...contactForm, linkedin: e.target.value })} />
           </Stack>
         </DialogContent>
@@ -2659,17 +2824,20 @@ function AboutTab({
 
             {/* 6. Location: City + Country (same pattern you already use) */}
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-              <Autocomplete
-                options={CITY_OPTIONS}
-                value={expForm.city || ""}
-                onChange={(_, v) =>
-                  setExpForm((prev) => ({ ...prev, city: v || "" }))
-                }
-                renderInput={(params) => (
-                  <TextField {...params} label="City" />
-                )}
-                sx={{ flex: 1, minWidth: 150 }}
-              />
+              <Box sx={{ flex: 1, minWidth: 150 }}>
+                <CityAutocompleteOpenMeteo
+                  label="City"
+                  value={expForm.city_obj || null}
+                  onSelect={(place) => {
+                    setExpForm((prev) => ({
+                      ...prev,
+                      city_obj: place,
+                      city: place?.name || "",
+                      location: place?.country || "", // ✅ auto-fill country
+                    }));
+                  }}
+                />
+              </Box>
 
               <Autocomplete
                 options={COUNTRY_OPTIONS}
