@@ -170,6 +170,114 @@ const CITY_OPTIONS = [
   "Visakhapatnam", "Warsaw", "Washington", "Wellington", "Zurich",
 ];
 
+// -----------------------------------------------------------------------------
+// City Autocomplete (Open-Meteo) → returns { name, admin1, country, country_code, latitude, longitude }
+// -----------------------------------------------------------------------------
+function CityAutocompleteOpenMeteo({ label = "City", value, onSelect }) {
+  const [open, setOpen] = React.useState(false);
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
+
+  React.useEffect(() => {
+    const q = (inputValue || "").trim();
+    if (q.length < 2) {
+      setOptions(value ? [value] : []);
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    const run = async () => {
+      setLoading(true);
+      try {
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=en&format=json`;
+        const r = await fetch(url, { signal: controller.signal });
+        if (!r.ok) return;
+        const data = await r.json();
+
+        const results = (data?.results || []).map((x) => ({
+          name: x.name || "",
+          admin1: x.admin1 || "",
+          country: x.country || "",
+          country_code: x.country_code || "",
+          latitude: x.latitude,
+          longitude: x.longitude,
+        })).filter((x) => x.name && x.country);
+
+        if (active) setOptions(results);
+      } catch (e) {
+        if (e?.name !== "AbortError") console.error("City search failed", e);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const t = setTimeout(run, 350); // debounce
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(t);
+    };
+  }, [inputValue, value]);
+
+  return (
+    <Autocomplete
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      options={options}
+      loading={loading}
+      value={value || null}
+      inputValue={inputValue}
+      onInputChange={(_, v) => setInputValue(v)}
+      isOptionEqualToValue={(o, v) =>
+        o?.name === v?.name &&
+        o?.country === v?.country &&
+        o?.admin1 === v?.admin1
+      }
+      getOptionLabel={(o) => {
+        if (!o) return "";
+        const parts = [o.name, o.admin1, o.country].filter(Boolean);
+        return parts.join(", ");
+      }}
+      onChange={(_, newValue) => {
+        onSelect?.(newValue || null);
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={label}
+          fullWidth
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress size={18} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+      renderOption={(props, option) => (
+        <li {...props}>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {option.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {[option.admin1, option.country].filter(Boolean).join(", ")}
+              {option.country_code ? ` · ${option.country_code}` : ""}
+            </Typography>
+          </Box>
+        </li>
+      )}
+    />
+  );
+}
+
 function UniversityAutocomplete({ value, onChange, label = "University" }) {
   const [inputValue, setInputValue] = React.useState(value || "");
   const [options, setOptions] = React.useState([]);
@@ -2368,8 +2476,23 @@ export default function ProfilePage() {
         <DialogContent dividers>
           <TextField label="Email" type="email" fullWidth sx={{ mt: 1, mb: 2 }} value={contactForm.email} onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))} />
           <TextField label="LinkedIn URL" fullWidth sx={{ mb: 2 }} placeholder="https://www.linkedin.com/in/username" value={contactForm.linkedin} onChange={(e) => setContactForm((f) => ({ ...f, linkedin: e.target.value }))} />
-          <Autocomplete fullWidth size="small" options={CITY_OPTIONS} value={CITY_OPTIONS.find((c) => c === contactForm.city) || null} onChange={(_, value) => setContactForm((prev) => ({ ...prev, city: value || "" }))} renderInput={(params) => <TextField {...params} label="City" placeholder="Select city" sx={{ mb: 2 }} />} />
-          <Autocomplete size="small" fullWidth options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: contactForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setContactForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country" placeholder="Select country" fullWidth />} />
+          <Stack spacing={2}> <CityAutocompleteOpenMeteo
+            label="City"
+            value={
+              contactForm.city
+                ? { name: contactForm.city, admin1: "", country: contactForm.location || "" }
+                : null
+            }
+            onSelect={(place) => {
+              setContactForm((prev) => ({
+                ...prev,
+                city: place?.name || "",
+                location: place?.country || prev.location || "", // ✅ auto-fill country
+              }));
+            }}
+          />
+            <Autocomplete size="small" fullWidth options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: contactForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setContactForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country" placeholder="Select country" fullWidth />} />
+          </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setContactOpen(false)}>Cancel</Button>
@@ -2667,9 +2790,24 @@ export default function ProfilePage() {
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>*Required fields are marked with an asterisk</Typography>
           <CompanyAutocomplete value={expForm.org ? { name: expForm.org } : null} onChange={(newVal) => { const name = typeof newVal === 'string' ? newVal : (newVal?.name || ""); setExpForm(prev => ({ ...prev, org: name })); }} />
           <TextField label="Position *" value={expForm.position} onChange={(e) => setExpForm((f) => ({ ...f, position: e.target.value }))} fullWidth sx={{ mb: 2 }} />
-          <Autocomplete fullWidth size="small" options={CITY_OPTIONS} value={CITY_OPTIONS.find((c) => c === expForm.city) || null} onChange={(_, value) => setExpForm((prev) => ({ ...prev, city: value || "" }))} renderInput={(params) => <TextField {...params} label="City" placeholder="Select city" sx={{ mb: 2 }} />} />
-          <Autocomplete size="small" fullWidth options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: expForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setExpForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country *" placeholder="Select country" fullWidth inputProps={{ ...params.inputProps, autoComplete: "new-password" }} sx={{ mb: 2 }} />} />
-          <TextField select label="Employment type *" value={expForm.relationship_to_org} onChange={(e) => setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))} fullWidth sx={{ mb: 2 }}><MenuItem value="employee">Employee (on payroll)</MenuItem><MenuItem value="independent">Independent (self-employed / contractor / freelance)</MenuItem><MenuItem value="third_party">Third-party (Agency / Consultancy / Temp)</MenuItem></TextField>
+          <Stack spacing={2}><CityAutocompleteOpenMeteo
+            sx={{ mt: 2 }}
+            label="City"
+            value={
+              expForm.city
+                ? { name: expForm.city, admin1: "", country: expForm.location || "" }
+                : null
+            }
+            onSelect={(place) => {
+              setExpForm((prev) => ({
+                ...prev,
+                city: place?.name || "",
+                location: place?.country || prev.location || "", // ✅ auto-fill country
+              }));
+            }}
+          />
+            <Autocomplete size="small" fullWidth options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: expForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setExpForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country *" placeholder="Select country" fullWidth inputProps={{ ...params.inputProps, autoComplete: "new-password" }} sx={{ mb: 2 }} />} />
+          </Stack><TextField select label="Employment type *" value={expForm.relationship_to_org} onChange={(e) => setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))} fullWidth sx={{ mb: 2 }}><MenuItem value="employee">Employee (on payroll)</MenuItem><MenuItem value="independent">Independent (self-employed / contractor / freelance)</MenuItem><MenuItem value="third_party">Third-party (Agency / Consultancy / Temp)</MenuItem></TextField>
           <TextField select label="Work schedule" value={expForm.work_schedule} onChange={(e) => setExpForm((f) => ({ ...f, work_schedule: e.target.value }))} fullWidth sx={{ mb: 2 }}><MenuItem value="full_time">Full-time</MenuItem><MenuItem value="part_time">Part-time</MenuItem></TextField>
           <TextField select fullWidth label="Career stage" value={expForm.career_stage} onChange={(e) => setExpForm((f) => ({ ...f, career_stage: e.target.value }))} sx={{ mb: 1 }}><MenuItem value="internship">Internship</MenuItem><MenuItem value="apprenticeship">Apprenticeship</MenuItem><MenuItem value="trainee">Trainee</MenuItem><MenuItem value="entry">Entry level</MenuItem><MenuItem value="mid">Mid level</MenuItem><MenuItem value="senior">Senior level</MenuItem></TextField>
           <TextField select label="Work arrangement" value={expForm.work_arrangement} onChange={(e) => setExpForm((f) => ({ ...f, work_arrangement: e.target.value }))} fullWidth sx={{ mb: 2 }}><MenuItem value="onsite">On-site</MenuItem><MenuItem value="hybrid">Hybrid</MenuItem><MenuItem value="remote">Remote</MenuItem></TextField>
