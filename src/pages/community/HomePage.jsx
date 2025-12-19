@@ -264,6 +264,9 @@ const EMPTY_PROFILE = {
   links: {},
   experience: [],
   education: [],
+  trainings: [],
+  certifications: [],
+  memberships: [],
   kyc_status: "not_started",
   legal_name_locked: false,
   kyc_decline_reason: "",
@@ -347,6 +350,9 @@ async function fetchProfileExtras() {
       return {
         experiences: Array.isArray(d.experiences) ? d.experiences.map(mapExperience) : [],
         educations: Array.isArray(d.educations) ? d.educations.map(mapEducation) : [],
+        trainings: Array.isArray(d.trainings) ? d.trainings : [],
+        certifications: Array.isArray(d.certifications) ? d.certifications : [],
+        memberships: Array.isArray(d.memberships) ? d.memberships : [],
       };
     }
   } catch { }
@@ -574,12 +580,25 @@ export default function HomePage() {
     setLoading(true);
     try {
       const corePromise = fetchProfileCore();
-      const extrasPromise = fetchProfileExtras().catch(() => ({ experiences: [], educations: [] }));
+      const extrasPromise = fetchProfileExtras().catch(() => ({
+        experiences: [],
+        educations: [],
+        trainings: [],
+        certifications: [],
+        memberships: [],
+      }));
       const core = await corePromise;
       setProfile((prev) => ({ ...prev, ...core }));
       try { localStorage.setItem("profile_core", JSON.stringify(core)); } catch { }
       const extra = await extrasPromise;
-      setProfile((prev) => ({ ...prev, experience: extra.experiences, education: extra.educations }));
+      setProfile((prev) => ({
+        ...prev,
+        experience: extra.experiences,
+        education: extra.educations,
+        trainings: extra.trainings,
+        certifications: extra.certifications,
+        memberships: extra.memberships,
+      }));
     } catch (e) {
       console.error("Failed to load profile:", e);
     } finally {
@@ -1401,6 +1420,90 @@ async function deleteExperienceApi(id) {
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete experience");
 }
 
+// -------------------- Trainings API --------------------
+async function createTrainingApi(payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/trainings/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to add training");
+  return await r.json();
+}
+
+async function updateTrainingApi(id, payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/trainings/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to update training");
+}
+
+async function deleteTrainingApi(id) {
+  const r = await fetch(`${API_ROOT}/auth/me/trainings/${id}/`, {
+    method: "DELETE",
+    headers: { ...authHeader() },
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete training");
+}
+
+// -------------------- Certifications API --------------------
+async function createCertificationApi(payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/certifications/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to add certification");
+  return await r.json();
+}
+
+async function updateCertificationApi(id, payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/certifications/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to update certification");
+}
+
+async function deleteCertificationApi(id) {
+  const r = await fetch(`${API_ROOT}/auth/me/certifications/${id}/`, {
+    method: "DELETE",
+    headers: { ...authHeader() },
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete certification");
+}
+
+// -------------------- Memberships API --------------------
+async function createMembershipApi(payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/memberships/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to add membership");
+  return await r.json();
+}
+
+async function updateMembershipApi(id, payload) {
+  const r = await fetch(`${API_ROOT}/auth/me/memberships/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to update membership");
+}
+
+async function deleteMembershipApi(id) {
+  const r = await fetch(`${API_ROOT}/auth/me/memberships/${id}/`, {
+    method: "DELETE",
+    headers: { ...authHeader() },
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete membership");
+}
+
 const SCHOOL_OPTIONS = ["Harvard University", "Stanford University", "University of Oxford", "University of Cambridge", "MIT", "University of Mumbai", "University of Delhi"];
 const FIELD_OF_STUDY_OPTIONS = ["Computer Science", "Business Administration", "Finance", "Marketing", "Economics", "Engineering", "Arts", "Medicine", "Law"];
 const CITY_OPTIONS = ["New York", "London", "Paris", "Berlin", "Mumbai", "Delhi", "Bangalore", "San Francisco", "Toronto", "Sydney", "Dubai"];
@@ -1755,6 +1858,53 @@ function AboutTab({
   const [eduFiles, setEduFiles] = React.useState([]);
   const latestExp = React.useMemo(() => profile.experience?.[0], [profile.experience]);
 
+  // --- Trainings ---
+  const [trainingOpen, setTrainingOpen] = React.useState(false);
+  const [editTrainingId, setEditTrainingId] = React.useState(null);
+  const [trainingDeleteId, setTrainingDeleteId] = React.useState(null);
+  const [savingTraining, setSavingTraining] = React.useState(false);
+  const [deletingTraining, setDeletingTraining] = React.useState(false);
+  const [trainingForm, setTrainingForm] = React.useState({
+    program_title: "",
+    provider: "",
+    start_month: "",   // YYYY-MM
+    end_month: "",     // YYYY-MM
+    currently_ongoing: false,
+    description: "",
+    credential_url: "",
+  });
+
+  // --- Certifications ---
+  const [certOpen, setCertOpen] = React.useState(false);
+  const [editCertId, setEditCertId] = React.useState(null);
+  const [certDeleteId, setCertDeleteId] = React.useState(null);
+  const [savingCert, setSavingCert] = React.useState(false);
+  const [deletingCert, setDeletingCert] = React.useState(false);
+  const [certForm, setCertForm] = React.useState({
+    certification_name: "",
+    issuing_organization: "",
+    issue_month: "",        // YYYY-MM
+    expiration_month: "",   // YYYY-MM
+    no_expiration: false,
+    credential_id: "",
+    credential_url: "",
+  });
+
+  // --- Memberships ---
+  const [memberOpen, setMemberOpen] = React.useState(false);
+  const [editMemberId, setEditMemberId] = React.useState(null);
+  const [memberDeleteId, setMemberDeleteId] = React.useState(null);
+  const [savingMember, setSavingMember] = React.useState(false);
+  const [deletingMember, setDeletingMember] = React.useState(false);
+  const [memberForm, setMemberForm] = React.useState({
+    organization_name: "",
+    role_type: "Member",
+    start_month: "",   // YYYY-MM
+    end_month: "",     // YYYY-MM
+    ongoing: false,
+    membership_url: "",
+  });
+
   // For modern delete confirmation when removing an education document
   const [deleteDocDialog, setDeleteDocDialog] = React.useState({
     open: false,
@@ -1983,7 +2133,14 @@ function AboutTab({
 
   const reloadExtras = async () => {
     const extra = await fetchProfileExtras();
-    onUpdate?.(prev => ({ ...prev, experience: extra.experiences, education: extra.educations }));
+    onUpdate?.(prev => ({
+      ...prev,
+      experience: extra.experiences,
+      education: extra.educations,
+      trainings: extra.trainings,
+      certifications: extra.certifications,
+      memberships: extra.memberships,
+    }));
   };
 
   const saveEducation = async () => {
@@ -2063,6 +2220,182 @@ function AboutTab({
       showToast?.("error", "Failed to save experience.");
     } finally {
       setSavingExp(false);
+    }
+  };
+
+  const openAddTraining = () => {
+    setEditTrainingId(null);
+    setTrainingForm({
+      program_title: "",
+      provider: "",
+      start_month: "",
+      end_month: "",
+      currently_ongoing: false,
+      description: "",
+      credential_url: "",
+    });
+    setTrainingOpen(true);
+  };
+
+  const openEditTraining = (t) => {
+    setEditTrainingId(t.id);
+    setTrainingForm({
+      program_title: t.program_title || "",
+      provider: t.provider || "",
+      start_month: (t.start_date || "").slice(0, 7),
+      end_month: (t.end_date || "").slice(0, 7),
+      currently_ongoing: !!t.currently_ongoing,
+      description: t.description || "",
+      credential_url: t.credential_url || "",
+    });
+    setTrainingOpen(true);
+  };
+
+  const saveTraining = async () => {
+    if (savingTraining) return;
+    setSavingTraining(true);
+    try {
+      const payload = {
+        program_title: trainingForm.program_title,
+        provider: trainingForm.provider,
+        start_date: trainingForm.start_month ? `${trainingForm.start_month}-01` : null,
+        end_date: trainingForm.currently_ongoing
+          ? null
+          : (trainingForm.end_month ? `${trainingForm.end_month}-01` : null),
+        currently_ongoing: !!trainingForm.currently_ongoing,
+        description: trainingForm.description || "",
+        credential_url: trainingForm.credential_url || "",
+      };
+
+      if (editTrainingId) await updateTrainingApi(editTrainingId, payload);
+      else await createTrainingApi(payload);
+
+      showToast?.("success", editTrainingId ? "Training updated." : "Training added.");
+      setTrainingOpen(false);
+      setEditTrainingId(null);
+      await reloadExtras();
+    } catch (e) {
+      console.error(e);
+      showToast?.("error", "Failed to save training.");
+    } finally {
+      setSavingTraining(false);
+    }
+  };
+
+  // --- Certifications ---
+  const openAddCert = () => {
+    setEditCertId(null);
+    setCertForm({
+      certification_name: "",
+      issuing_organization: "",
+      issue_month: "",
+      expiration_month: "",
+      no_expiration: false,
+      credential_id: "",
+      credential_url: "",
+    });
+    setCertOpen(true);
+  };
+
+  const openEditCert = (c) => {
+    setEditCertId(c.id);
+    setCertForm({
+      certification_name: c.certification_name || "",
+      issuing_organization: c.issuing_organization || "",
+      issue_month: (c.issue_date || "").slice(0, 7),
+      expiration_month: (c.expiration_date || "").slice(0, 7),
+      no_expiration: !!c.no_expiration,
+      credential_id: c.credential_id || "",
+      credential_url: c.credential_url || "",
+    });
+    setCertOpen(true);
+  };
+
+  const saveCert = async () => {
+    if (savingCert) return;
+    setSavingCert(true);
+    try {
+      const payload = {
+        certification_name: certForm.certification_name,
+        issuing_organization: certForm.issuing_organization,
+        issue_date: certForm.issue_month ? `${certForm.issue_month}-01` : null,
+        expiration_date: certForm.no_expiration
+          ? null
+          : (certForm.expiration_month ? `${certForm.expiration_month}-01` : null),
+        no_expiration: !!certForm.no_expiration,
+        credential_id: certForm.credential_id || "",
+        credential_url: certForm.credential_url || "",
+      };
+
+      if (editCertId) await updateCertificationApi(editCertId, payload);
+      else await createCertificationApi(payload);
+
+      showToast?.("success", editCertId ? "Certification updated." : "Certification added.");
+      setCertOpen(false);
+      setEditCertId(null);
+      await reloadExtras();
+    } catch (e) {
+      console.error(e);
+      showToast?.("error", "Failed to save certification.");
+    } finally {
+      setSavingCert(false);
+    }
+  };
+
+  // --- Memberships ---
+  const openAddMember = () => {
+    setEditMemberId(null);
+    setMemberForm({
+      organization_name: "",
+      role_type: "Member",
+      start_month: "",
+      end_month: "",
+      ongoing: false,
+      membership_url: "",
+    });
+    setMemberOpen(true);
+  };
+
+  const openEditMember = (m) => {
+    setEditMemberId(m.id);
+    setMemberForm({
+      organization_name: m.organization_name || "",
+      role_type: m.role_type || "Member",
+      start_month: (m.start_date || "").slice(0, 7),
+      end_month: (m.end_date || "").slice(0, 7),
+      ongoing: !!m.ongoing,
+      membership_url: m.membership_url || "",
+    });
+    setMemberOpen(true);
+  };
+
+  const saveMember = async () => {
+    if (savingMember) return;
+    setSavingMember(true);
+    try {
+      const payload = {
+        organization_name: memberForm.organization_name,
+        role_type: memberForm.role_type || "",
+        start_date: memberForm.start_month ? `${memberForm.start_month}-01` : null,
+        end_date: memberForm.ongoing
+          ? null
+          : (memberForm.end_month ? `${memberForm.end_month}-01` : null),
+        ongoing: !!memberForm.ongoing,
+        membership_url: memberForm.membership_url || "",
+      };
+
+      if (editMemberId) await updateMembershipApi(editMemberId, payload);
+      else await createMembershipApi(payload);
+
+      showToast?.("success", editMemberId ? "Membership updated." : "Membership added.");
+      setMemberOpen(false);
+      setEditMemberId(null);
+      await reloadExtras();
+    } catch (e) {
+      console.error(e);
+      showToast?.("error", "Failed to save membership.");
+    } finally {
+      setSavingMember(false);
     }
   };
 
@@ -2296,30 +2629,75 @@ function AboutTab({
             </List>
           </SectionCard>
 
-          <SectionCard title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small" onClick={() => showToast("info", "Add coming soon")}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <List dense disablePadding>
-              <ListItem disableGutters
-                secondaryAction={
-                  <Box sx={{ display: "flex" }}>
-                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                  </Box>
-                }
-              >
-                <ListItemText primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>} secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>} />
-              </ListItem>
+          <SectionCard
+            title="Certifications & Licenses"
+            action={
+              <Tooltip title="Add">
+                <IconButton size="small" onClick={openAddCert}>
+                  <AddRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            }
+          >
+            {(profile.certifications?.length || 0) > 0 ? (
+              <List dense disablePadding>
+                {profile.certifications.map((cert) => (
+                  <ListItem
+                    key={cert.id}
+                    disableGutters
+                    secondaryAction={
+                      <Box sx={{ display: "flex" }}>
+                        {cert.credential_url ? (
+                          <Tooltip title="View credential">
+                            <IconButton
+                              size="small"
+                              onClick={() => window.open(cert.credential_url, "_blank")}
+                            >
+                              <AttachFileIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : null}
 
-              <ListItem disableGutters
-                secondaryAction={
-                  <Box sx={{ display: "flex" }}>
-                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                  </Box>
-                }
-              >
-                <ListItemText primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>} secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>} />
-              </ListItem>
-            </List>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" onClick={() => setCertDeleteId(cert.id)}>
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => openEditCert(cert)}>
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    }
+                  >
+                    <ListItemText
+                      primary={
+                        <Typography variant="body2" fontWeight={600}>
+                          {cert.certification_name || "Certification"}
+                        </Typography>
+                      }
+                      secondary={
+                        <Typography variant="caption" color="text.secondary">
+                          {cert.issuing_organization || "—"}
+                          {cert.issue_date ? ` • Issued ${toMonthYear(cert.issue_date)}` : ""}
+                          {cert.no_expiration
+                            ? " • No Expiration"
+                            : cert.expiration_date
+                              ? ` • Expires ${toMonthYear(cert.expiration_date)}`
+                              : ""}
+                        </Typography>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Add your certifications & licenses.
+              </Typography>
+            )}
           </SectionCard>
         </Grid>
 
@@ -2331,56 +2709,159 @@ function AboutTab({
             <Typography variant="subtitle2" color="text.secondary">Location</Typography><Box sx={{ display: "flex", gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{profile.location || "—"}</Typography></Box>
           </SectionCard>
 
-          <SectionCard title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small" onClick={() => showToast("info", "Add coming soon")}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <List dense disablePadding>
-              <ListItem disableGutters
-                secondaryAction={
-                  <Box sx={{ display: "flex" }}>
-                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                  </Box>
-                }
-              >
-                <ListItemText primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>} secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>} />
-              </ListItem>
+          <SectionCard
+            title="Trainings & Executive Education"
+            action={
+              <Tooltip title="Add">
+                <IconButton size="small" onClick={openAddTraining}>
+                  <AddRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            }
+          >
+            {(profile.trainings?.length || 0) > 0 ? (
+              <List dense disablePadding>
+                {profile.trainings.map((t) => (
+                  <ListItem
+                    key={t.id}
+                    disableGutters
+                    secondaryAction={
+                      <Box sx={{ display: "flex" }}>
+                        {t.credential_url ? (
+                          <Tooltip title="View credential">
+                            <IconButton
+                              size="small"
+                              onClick={() => window.open(t.credential_url, "_blank")}
+                            >
+                              <AttachFileIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : null}
 
-              <ListItem disableGutters
-                secondaryAction={
-                  <Box sx={{ display: "flex" }}>
-                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                  </Box>
-                }
-              >
-                <ListItemText primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>} secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>} />
-              </ListItem>
-            </List>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" onClick={() => setTrainingDeleteId(t.id)}>
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => openEditTraining(t)}>
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    }
+                  >
+                    <ListItemText
+                      primary={
+                        <Typography variant="body2" fontWeight={600}>
+                          {t.program_title || "Training"}
+                        </Typography>
+                      }
+                      secondary={
+                        <>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {t.provider || "—"}
+                            {t.start_date || t.end_date
+                              ? ` • ${dateRange(t.start_date, t.end_date, !!t.currently_ongoing)}`
+                              : ""}
+                          </Typography>
+
+                          {t.description ? (
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{
+                                mt: 0.5,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                whiteSpace: "normal",
+                              }}
+                            >
+                              {t.description}
+                            </Typography>
+                          ) : null}
+                        </>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Add trainings or executive education programs.
+              </Typography>
+            )}
           </SectionCard>
 
-          <SectionCard title="Memberships" action={<Tooltip title="Add"><IconButton size="small" onClick={() => showToast("info", "Add coming soon")}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <List dense disablePadding>
-              <ListItem disableGutters
-                secondaryAction={
-                  <Box sx={{ display: "flex" }}>
-                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                  </Box>
-                }
-              >
-                <ListItemText primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>} secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>} />
-              </ListItem>
+          <SectionCard
+            title="Memberships"
+            action={
+              <Tooltip title="Add">
+                <IconButton size="small" onClick={openAddMember}>
+                  <AddRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            }
+          >
+            {(profile.memberships?.length || 0) > 0 ? (
+              <List dense disablePadding>
+                {profile.memberships.map((m) => (
+                  <ListItem
+                    key={m.id}
+                    disableGutters
+                    secondaryAction={
+                      <Box sx={{ display: "flex" }}>
+                        {m.membership_url ? (
+                          <Tooltip title="Open link">
+                            <IconButton
+                              size="small"
+                              onClick={() => window.open(m.membership_url, "_blank")}
+                            >
+                              <AttachFileIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : null}
 
-              <ListItem disableGutters
-                secondaryAction={
-                  <Box sx={{ display: "flex" }}>
-                    <Tooltip title="Delete"><IconButton size="small" onClick={() => showToast("info", "Delete coming soon")}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Edit"><IconButton size="small" onClick={() => showToast("info", "Edit coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                  </Box>
-                }
-              >
-                <ListItemText primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>} secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>} />
-              </ListItem>
-            </List>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" onClick={() => setMemberDeleteId(m.id)}>
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => openEditMember(m)}>
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    }
+                  >
+                    <ListItemText
+                      primary={
+                        <Typography variant="body2" fontWeight={600}>
+                          {m.organization_name || "Organization"}
+                        </Typography>
+                      }
+                      secondary={
+                        <Typography variant="caption" color="text.secondary">
+                          {m.role_type ? `${m.role_type}` : "Member"}
+                          {m.start_date || m.end_date
+                            ? ` • ${dateRange(m.start_date, m.end_date, !!m.ongoing)}`
+                            : ""}
+                        </Typography>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Add your memberships.
+              </Typography>
+            )}
           </SectionCard>
 
           <SectionCard
@@ -3078,8 +3559,324 @@ function AboutTab({
         </DialogActions>
       </Dialog>
 
+      {/* Training Add/Edit */}
+      <Dialog open={trainingOpen} onClose={() => setTrainingOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editTrainingId ? "Edit Training" : "Add Training"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <TextField
+              label="Program / Training Title"
+              fullWidth
+              value={trainingForm.program_title || ""}
+              onChange={(e) => setTrainingForm((p) => ({ ...p, program_title: e.target.value }))}
+            />
+            <TextField
+              label="Provider / Institution"
+              fullWidth
+              value={trainingForm.provider || ""}
+              onChange={(e) => setTrainingForm((p) => ({ ...p, provider: e.target.value }))}
+            />
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <TextField
+                label="Start Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                value={trainingForm.start_month || ""}
+                onChange={(e) => setTrainingForm((p) => ({ ...p, start_month: e.target.value }))}
+              />
+              <TextField
+                label="End Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                disabled={!!trainingForm.currently_ongoing}
+                fullWidth
+                value={trainingForm.end_month || ""}
+                onChange={(e) => setTrainingForm((p) => ({ ...p, end_month: e.target.value }))}
+              />
+            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!trainingForm.currently_ongoing}
+                  onChange={(e) =>
+                    setTrainingForm((p) => ({
+                      ...p,
+                      currently_ongoing: e.target.checked,
+                      end_month: e.target.checked ? "" : p.end_month,
+                    }))
+                  }
+                />
+              }
+              label="Currently ongoing"
+            />
+            <TextField
+              label="Description"
+              multiline
+              minRows={3}
+              fullWidth
+              value={trainingForm.description || ""}
+              onChange={(e) => setTrainingForm((p) => ({ ...p, description: e.target.value }))}
+            />
+            <TextField
+              label="Credential URL"
+              fullWidth
+              value={trainingForm.credential_url || ""}
+              onChange={(e) => setTrainingForm((p) => ({ ...p, credential_url: e.target.value }))}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTrainingOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveTraining} disabled={savingTraining}>
+            {savingTraining ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Certification Add/Edit */}
+      <Dialog open={certOpen} onClose={() => setCertOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editCertId ? "Edit Certification" : "Add Certification"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <TextField
+              label="Certification Name"
+              fullWidth
+              value={certForm.certification_name || ""}
+              onChange={(e) => setCertForm((p) => ({ ...p, certification_name: e.target.value }))}
+            />
+            <TextField
+              label="Issuing Organization"
+              fullWidth
+              value={certForm.issuing_organization || ""}
+              onChange={(e) => setCertForm((p) => ({ ...p, issuing_organization: e.target.value }))}
+            />
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <TextField
+                label="Issue Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                value={certForm.issue_month || ""}
+                onChange={(e) => setCertForm((p) => ({ ...p, issue_month: e.target.value }))}
+              />
+              <TextField
+                label="Expiration Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                disabled={!!certForm.no_expiration}
+                fullWidth
+                value={certForm.expiration_month || ""}
+                onChange={(e) => setCertForm((p) => ({ ...p, expiration_month: e.target.value }))}
+              />
+            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!certForm.no_expiration}
+                  onChange={(e) =>
+                    setCertForm((p) => ({
+                      ...p,
+                      no_expiration: e.target.checked,
+                      expiration_month: e.target.checked ? "" : p.expiration_month,
+                    }))
+                  }
+                />
+              }
+              label="No Expiration"
+            />
+            <TextField
+              label="Credential ID"
+              fullWidth
+              value={certForm.credential_id || ""}
+              onChange={(e) => setCertForm((p) => ({ ...p, credential_id: e.target.value }))}
+            />
+            <TextField
+              label="Credential URL"
+              fullWidth
+              value={certForm.credential_url || ""}
+              onChange={(e) => setCertForm((p) => ({ ...p, credential_url: e.target.value }))}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCertOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveCert} disabled={savingCert}>
+            {savingCert ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Membership Add/Edit */}
+      <Dialog open={memberOpen} onClose={() => setMemberOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{editMemberId ? "Edit Membership" : "Add Membership"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <TextField
+              label="Organization / Community Name"
+              fullWidth
+              value={memberForm.organization_name || ""}
+              onChange={(e) => setMemberForm((p) => ({ ...p, organization_name: e.target.value }))}
+            />
+
+            <TextField
+              select
+              label="Role / Type"
+              fullWidth
+              value={memberForm.role_type || "Member"}
+              onChange={(e) => setMemberForm((p) => ({ ...p, role_type: e.target.value }))}
+            >
+              <MenuItem value="Member">Member</MenuItem>
+              <MenuItem value="Admin">Admin</MenuItem>
+              <MenuItem value="Volunteer">Volunteer</MenuItem>
+              <MenuItem value="Fellow">Fellow</MenuItem>
+            </TextField>
+
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <TextField
+                label="Start Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                value={memberForm.start_month || ""}
+                onChange={(e) => setMemberForm((p) => ({ ...p, start_month: e.target.value }))}
+              />
+              <TextField
+                label="End Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                disabled={!!memberForm.ongoing}
+                fullWidth
+                value={memberForm.end_month || ""}
+                onChange={(e) => setMemberForm((p) => ({ ...p, end_month: e.target.value }))}
+              />
+            </Box>
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!memberForm.ongoing}
+                  onChange={(e) =>
+                    setMemberForm((p) => ({
+                      ...p,
+                      ongoing: e.target.checked,
+                      end_month: e.target.checked ? "" : p.end_month,
+                    }))
+                  }
+                />
+              }
+              label="Ongoing"
+            />
+
+            <TextField
+              label="Membership URL"
+              fullWidth
+              value={memberForm.membership_url || ""}
+              onChange={(e) => setMemberForm((p) => ({ ...p, membership_url: e.target.value }))}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMemberOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveMember} disabled={savingMember}>
+            {savingMember ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
 
       {/* Delete Dialogs */}
+
+      <Dialog open={!!trainingDeleteId} onClose={() => setTrainingDeleteId(null)}>
+        <DialogTitle>Delete Training?</DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setTrainingDeleteId(null)} disabled={deletingTraining}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            disabled={deletingTraining}
+            onClick={async () => {
+              if (deletingTraining) return;
+              setDeletingTraining(true);
+              try {
+                await deleteTrainingApi(trainingDeleteId);
+                await reloadExtras();
+                showToast?.("success", "Training deleted.");
+                setTrainingDeleteId(null);
+              } catch (e) {
+                console.error(e);
+                showToast?.("error", "Failed to delete training.");
+              } finally {
+                setDeletingTraining(false);
+              }
+            }}
+          >
+            {deletingTraining ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!certDeleteId} onClose={() => setCertDeleteId(null)}>
+        <DialogTitle>Delete Certification?</DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setCertDeleteId(null)} disabled={deletingCert}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            disabled={deletingCert}
+            onClick={async () => {
+              if (deletingCert) return;
+              setDeletingCert(true);
+              try {
+                await deleteCertificationApi(certDeleteId);
+                await reloadExtras();
+                showToast?.("success", "Certification deleted.");
+                setCertDeleteId(null);
+              } catch (e) {
+                console.error(e);
+                showToast?.("error", "Failed to delete certification.");
+              } finally {
+                setDeletingCert(false);
+              }
+            }}
+          >
+            {deletingCert ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!memberDeleteId} onClose={() => setMemberDeleteId(null)}>
+        <DialogTitle>Delete Membership?</DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setMemberDeleteId(null)} disabled={deletingMember}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            disabled={deletingMember}
+            onClick={async () => {
+              if (deletingMember) return;
+              setDeletingMember(true);
+              try {
+                await deleteMembershipApi(memberDeleteId);
+                await reloadExtras();
+                showToast?.("success", "Membership deleted.");
+                setMemberDeleteId(null);
+              } catch (e) {
+                console.error(e);
+                showToast?.("error", "Failed to delete membership.");
+              } finally {
+                setDeletingMember(false);
+              }
+            }}
+          >
+            {deletingMember ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={!!eduDeleteId} onClose={() => setEduDeleteId(null)}>
         <DialogTitle>Delete Education?</DialogTitle>
         <DialogActions>
