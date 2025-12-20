@@ -435,6 +435,7 @@ export default function MyResourcesPage() {
                             onClick={() => navigate(`/resource/${resource.id}`)}
                             sx={{
                               cursor: 'pointer',
+                              pr: isMobile ? 6 : 20,
                               '&:hover': {
                                 bgcolor: '#f0fdfa'
                               }
@@ -474,6 +475,7 @@ export default function MyResourcesPage() {
                           >
                             <ListItemIcon>{getResourceIcon(resource.type)}</ListItemIcon>
                             <ListItemText
+                              sx={{ pr: isMobile ? 0 : 2 }}
                               primary={
                                 <Typography variant="body1" sx={{ fontWeight: 500, color: '#0ea5a4', '&:hover': { textDecoration: 'underline' } }}>
                                   {resource.title}
@@ -481,7 +483,21 @@ export default function MyResourcesPage() {
                               }
                               secondary={
                                 <>
-                                  <Typography component="span" variant="body2" color="text.secondary">{resource.description || "No description"}</Typography>
+                                  <Typography
+                                    component="span"
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{
+                                      display: "-webkit-box",
+                                      WebkitBoxOrient: "vertical",
+                                      WebkitLineClamp: 1,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    {resource.description || "No description"}
+                                  </Typography>
                                   <br />
                                   <Typography component="span" variant="caption" color="text.secondary">Added {new Date(resource.created_at).toLocaleDateString()}</Typography>
                                 </>
