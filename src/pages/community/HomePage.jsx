@@ -11,6 +11,7 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Divider,
   Grid,
@@ -1911,6 +1912,27 @@ function AboutTab({
     doc: null,
   });
 
+  const trainingToDelete = React.useMemo(
+    () => (profile.trainings || []).find((t) => t.id === trainingDeleteId) || null,
+    [profile.trainings, trainingDeleteId]
+  );
+  const certToDelete = React.useMemo(
+    () => (profile.certifications || []).find((c) => c.id === certDeleteId) || null,
+    [profile.certifications, certDeleteId]
+  );
+  const memberToDelete = React.useMemo(
+    () => (profile.memberships || []).find((m) => m.id === memberDeleteId) || null,
+    [profile.memberships, memberDeleteId]
+  );
+  const eduToDelete = React.useMemo(
+    () => (profile.education || []).find((e) => e.id === eduDeleteId) || null,
+    [profile.education, eduDeleteId]
+  );
+  const expToDelete = React.useMemo(
+    () => (profile.experience || []).find((e) => e.id === expDeleteId) || null,
+    [profile.experience, expDeleteId]
+  );
+
   // --- NEW SKILLS STATE ---
   const [userSkills, setUserSkills] = React.useState([]);
   const [skillOptions, setSkillOptions] = React.useState([]);
@@ -2575,7 +2597,7 @@ function AboutTab({
                             sx={{
                               mt: 0.5,
                               display: "-webkit-box",
-                              WebkitLineClamp: 3,
+                              WebkitLineClamp: 2,
                               WebkitBoxOrient: "vertical",
                               overflow: "hidden",
                               whiteSpace: "normal",
@@ -3524,28 +3546,31 @@ function AboutTab({
         </DialogActions>
       </Dialog>
 
-      {/* Delete Education Document – Modern Confirmation Dialog */}
+      {/* Delete Education Document ? Modern Confirmation Dialog */}
       <Dialog
         open={deleteDocDialog.open}
         onClose={deletingEdu ? undefined : handleCloseDeleteDoc}
         fullWidth
         maxWidth="xs"
       >
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
           <DeleteOutlineRoundedIcon color="error" fontSize="small" />
-          Delete document?
+          Delete Item?
         </DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary">
             This will permanently remove{" "}
-            <Box component="span" sx={{ fontWeight: 600 }}>
-              {deleteDocDialog.doc?.filename}
-            </Box>{" "}
-            from this education entry.
+            <Box component="span" sx={{ fontWeight: 600, color: "text.primary" }}>
+              {deleteDocDialog.doc?.filename || "this item"}
+            </Box>
+            .
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            This action cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDeleteDoc} disabled={deletingEdu}>
+          <Button onClick={handleCloseDeleteDoc} disabled={deletingEdu} variant="outlined" color="inherit">
             Cancel
           </Button>
           <Button
@@ -3554,7 +3579,7 @@ function AboutTab({
             onClick={handleConfirmDeleteDoc}
             disabled={deletingEdu}
           >
-            {deletingEdu ? "Deleting…" : "Delete"}
+            {deletingEdu ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -3788,9 +3813,22 @@ function AboutTab({
       {/* Delete Dialogs */}
 
       <Dialog open={!!trainingDeleteId} onClose={() => setTrainingDeleteId(null)}>
-        <DialogTitle>Delete Training?</DialogTitle>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineRoundedIcon color="error" fontSize="small" />
+          Delete Item?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {trainingToDelete?.program_title || "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText>This action cannot be undone.</DialogContentText>
+        </DialogContent>
         <DialogActions>
-          <Button onClick={() => setTrainingDeleteId(null)} disabled={deletingTraining}>
+          <Button onClick={() => setTrainingDeleteId(null)} disabled={deletingTraining} variant="outlined" color="inherit">
             Cancel
           </Button>
           <Button
@@ -3811,16 +3849,30 @@ function AboutTab({
                 setDeletingTraining(false);
               }
             }}
+            variant="contained"
           >
-            {deletingTraining ? "Deleting…" : "Delete"}
+            {deletingTraining ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={!!certDeleteId} onClose={() => setCertDeleteId(null)}>
-        <DialogTitle>Delete Certification?</DialogTitle>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineRoundedIcon color="error" fontSize="small" />
+          Delete Item?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {certToDelete?.certification_name || "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText>This action cannot be undone.</DialogContentText>
+        </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCertDeleteId(null)} disabled={deletingCert}>
+          <Button onClick={() => setCertDeleteId(null)} disabled={deletingCert} variant="outlined" color="inherit">
             Cancel
           </Button>
           <Button
@@ -3841,16 +3893,30 @@ function AboutTab({
                 setDeletingCert(false);
               }
             }}
+            variant="contained"
           >
-            {deletingCert ? "Deleting…" : "Delete"}
+            {deletingCert ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={!!memberDeleteId} onClose={() => setMemberDeleteId(null)}>
-        <DialogTitle>Delete Membership?</DialogTitle>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineRoundedIcon color="error" fontSize="small" />
+          Delete Item?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {memberToDelete?.organization_name || "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText>This action cannot be undone.</DialogContentText>
+        </DialogContent>
         <DialogActions>
-          <Button onClick={() => setMemberDeleteId(null)} disabled={deletingMember}>
+          <Button onClick={() => setMemberDeleteId(null)} disabled={deletingMember} variant="outlined" color="inherit">
             Cancel
           </Button>
           <Button
@@ -3871,19 +3937,30 @@ function AboutTab({
                 setDeletingMember(false);
               }
             }}
+            variant="contained"
           >
-            {deletingMember ? "Deleting…" : "Delete"}
+            {deletingMember ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={!!eduDeleteId} onClose={() => setEduDeleteId(null)}>
-        <DialogTitle>Delete Education?</DialogTitle>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineRoundedIcon color="error" fontSize="small" />
+          Delete Item?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {eduToDelete ? `${eduToDelete.school || ""} ${eduToDelete.degree || ""}`.trim() || "this item" : "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText>This action cannot be undone.</DialogContentText>
+        </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => setEduDeleteId(null)}
-            disabled={deletingEdu}
-          >
+          <Button onClick={() => setEduDeleteId(null)} disabled={deletingEdu} variant="outlined" color="inherit">
             Cancel
           </Button>
           <Button
@@ -3891,8 +3968,8 @@ function AboutTab({
             disabled={deletingEdu}
             onClick={async () => {
               if (deletingEdu) return;
-              const idToDelete = eduDeleteId;   // keep a copy
-              setEduDeleteId(null);             // close dialog immediately
+              const idToDelete = eduDeleteId;
+              setEduDeleteId(null);
               setDeletingEdu(true);
               try {
                 await deleteEducationApi(idToDelete);
@@ -3905,18 +3982,29 @@ function AboutTab({
                 setDeletingEdu(false);
               }
             }}
+            variant="contained"
           >
-            {deletingEdu ? "Deleting…" : "Delete"}
+            {deletingEdu ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
       <Dialog open={!!expDeleteId} onClose={() => setExpDeleteId(null)}>
-        <DialogTitle>Delete Experience?</DialogTitle>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineRoundedIcon color="error" fontSize="small" />
+          Delete Item?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {expToDelete ? `${expToDelete.org || expToDelete.community_name || ""} ${expToDelete.position || ""}`.trim() || "this item" : "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText>This action cannot be undone.</DialogContentText>
+        </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => setExpDeleteId(null)}
-            disabled={deletingExp}
-          >
+          <Button onClick={() => setExpDeleteId(null)} disabled={deletingExp} variant="outlined" color="inherit">
             Cancel
           </Button>
           <Button
@@ -3937,8 +4025,9 @@ function AboutTab({
                 setDeletingExp(false);
               }
             }}
+            variant="contained"
           >
-            {deletingExp ? "Deleting…" : "Delete"}
+            {deletingExp ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>

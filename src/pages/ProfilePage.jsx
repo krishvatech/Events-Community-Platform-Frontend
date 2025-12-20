@@ -86,6 +86,90 @@ async function deleteEducationDocApi(docId) {
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
 }
 
+async function addTrainingApi(payload) {
+  const r = await fetch(`${API_BASE}/auth/me/trainings/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...tokenHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to add training");
+  return await r.json();
+}
+
+async function updateTrainingApi(id, payload) {
+  const r = await fetch(`${API_BASE}/auth/me/trainings/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...tokenHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to update training");
+  return await r.json();
+}
+
+async function deleteTrainingApi(id) {
+  const r = await fetch(`${API_BASE}/auth/me/trainings/${id}/`, {
+    method: "DELETE",
+    headers: tokenHeader(),
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete training");
+}
+
+async function addCertificationApi(payload) {
+  const r = await fetch(`${API_BASE}/auth/me/certifications/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...tokenHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to add certification");
+  return await r.json();
+}
+
+async function updateCertificationApi(id, payload) {
+  const r = await fetch(`${API_BASE}/auth/me/certifications/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...tokenHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to update certification");
+  return await r.json();
+}
+
+async function deleteCertificationApi(id) {
+  const r = await fetch(`${API_BASE}/auth/me/certifications/${id}/`, {
+    method: "DELETE",
+    headers: tokenHeader(),
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete certification");
+}
+
+async function addMembershipApi(payload) {
+  const r = await fetch(`${API_BASE}/auth/me/memberships/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...tokenHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to add membership");
+  return await r.json();
+}
+
+async function updateMembershipApi(id, payload) {
+  const r = await fetch(`${API_BASE}/auth/me/memberships/${id}/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...tokenHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw new Error("Failed to update membership");
+  return await r.json();
+}
+
+async function deleteMembershipApi(id) {
+  const r = await fetch(`${API_BASE}/auth/me/memberships/${id}/`, {
+    method: "DELETE",
+    headers: tokenHeader(),
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete membership");
+}
+
 function parseSkills(value) {
   const v = (value ?? "").toString().trim();
   if (!v) return [];
@@ -801,31 +885,6 @@ function IsoLanguageAutocomplete({ value, onChange }) {
   );
 }
 
-async function handleDeleteCertificate(certId) {
-  if (!window.confirm("Are you sure you want to delete this certificate?")) return;
-
-  try {
-    const r = await fetch(`${API_BASE}/auth/me/language-certificates/${certId}/`, {
-      method: "DELETE",
-      headers: tokenHeader(),
-    });
-
-    if (r.ok) {
-      showNotification("success", "Certificate deleted");
-
-      // Remove it from the local UI state immediately
-      setExistingCertificates((prev) => prev.filter((c) => c.id !== certId));
-
-      // Refresh the main list in the background to keep everything in sync
-      loadLanguages();
-    } else {
-      throw new Error("Failed to delete certificate");
-    }
-  } catch (e) {
-    showNotification("error", e.message);
-  }
-}
-
 // -------------------- Page --------------------
 export default function ProfilePage() {
   const theme = useTheme();
@@ -836,6 +895,12 @@ export default function ProfilePage() {
 
   const [eduSaving, setEduSaving] = useState(false);
   const [expSaving, setExpSaving] = useState(false);
+  const [savingTraining, setSavingTraining] = useState(false);
+  const [savingCert, setSavingCert] = useState(false);
+  const [savingMember, setSavingMember] = useState(false);
+  const [deletingTraining, setDeletingTraining] = useState(false);
+  const [deletingCert, setDeletingCert] = useState(false);
+  const [deletingMember, setDeletingMember] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // New helper for consistent toast notifications
@@ -860,7 +925,15 @@ export default function ProfilePage() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [aboutMode, setAboutMode] = useState("description");
   const [contactOpen, setContactOpen] = useState(false);
-
+  const [trainingOpen, setTrainingOpen] = useState(false);
+  const [certOpen, setCertOpen] = useState(false);
+  const [memberOpen, setMemberOpen] = useState(false);
+  const [editTrainingId, setEditTrainingId] = useState(null);
+  const [editCertId, setEditCertId] = useState(null);
+  const [editMemberId, setEditMemberId] = useState(null);
+  const [trainingDeleteId, setTrainingDeleteId] = useState(null);
+  const [certDeleteId, setCertDeleteId] = useState(null);
+  const [memberDeleteId, setMemberDeleteId] = useState(null);
 
   // Name Change Request State
   const [nameChangeOpen, setNameChangeOpen] = useState(false);
@@ -870,6 +943,21 @@ export default function ProfilePage() {
   // Lists & Forms
   const [eduList, setEduList] = useState([]);
   const [expList, setExpList] = useState([]);
+  const [trainingList, setTrainingList] = useState([]);
+  const [certList, setCertList] = useState([]);
+  const [memberList, setMemberList] = useState([]);
+  const trainingToDelete = useMemo(
+    () => (trainingList || []).find((t) => t.id === trainingDeleteId) || null,
+    [trainingList, trainingDeleteId]
+  );
+  const certToDelete = useMemo(
+    () => (certList || []).find((c) => c.id === certDeleteId) || null,
+    [certList, certDeleteId]
+  );
+  const memberToDelete = useMemo(
+    () => (memberList || []).find((m) => m.id === memberDeleteId) || null,
+    [memberList, memberDeleteId]
+  );
   const [aboutForm, setAboutForm] = useState({ bio: "", skillsText: "" });
   const [contactForm, setContactForm] = useState({ first_name: "", last_name: "", email: "", linkedin: "", city: "", location: "" });
   const [workOpen, setWorkOpen] = useState(false);
@@ -990,21 +1078,6 @@ export default function ProfilePage() {
     }
   }
 
-  // 4. Delete Language
-  async function deleteLanguage(id) {
-    if (!window.confirm("Are you sure you want to delete this language?")) return;
-    try {
-      const r = await fetch(`${API_BASE}/auth/me/languages/${id}/`, {
-        method: "DELETE",
-        headers: tokenHeader()
-      });
-      if (r.ok) {
-        showNotification("success", "Language deleted");
-        loadLanguages();
-      }
-    } catch (e) { showNotification("error", "Delete failed"); }
-  }
-
   // 5. Open Dialog Helpers
   function openAddLanguage() {
     setEditLangId(null);
@@ -1054,6 +1127,32 @@ export default function ProfilePage() {
   const [deletingDoc, setDeletingDoc] = useState(false);
 
   const EMPTY_EDU_FORM = { school: "", degree: "", field: "", start: "", end: "", grade: "" };
+  const EMPTY_TRAINING_FORM = {
+    program_title: "",
+    provider: "",
+    start_month: "",
+    end_month: "",
+    currently_ongoing: false,
+    description: "",
+    credential_url: "",
+  };
+  const EMPTY_CERT_FORM = {
+    certification_name: "",
+    issuing_organization: "",
+    issue_month: "",
+    expiration_month: "",
+    no_expiration: false,
+    credential_id: "",
+    credential_url: "",
+  };
+  const EMPTY_MEMBER_FORM = {
+    organization_name: "",
+    role_type: "Member",
+    start_month: "",
+    end_month: "",
+    ongoing: false,
+    membership_url: "",
+  };
   const initialExpForm = {
     org: "", position: "", city: "", location: "", start: "", end: "", current: false,
     employment_type: "full_time", work_schedule: "", relationship_to_org: "", career_stage: "",
@@ -1063,6 +1162,9 @@ export default function ProfilePage() {
   const [eduErrors, setEduErrors] = useState({ start: "", end: "" });
   const [expForm, setExpForm] = useState(initialExpForm);
   const [syncProfileLocation, setSyncProfileLocation] = useState(false);
+  const [trainingForm, setTrainingForm] = useState(EMPTY_TRAINING_FORM);
+  const [certForm, setCertForm] = useState(EMPTY_CERT_FORM);
+  const [memberForm, setMemberForm] = useState(EMPTY_MEMBER_FORM);
 
   // Helpers
   const latestExp = useMemo(() => expList.length > 0 ? expList[0] : null, [expList]);
@@ -1817,6 +1919,157 @@ export default function ProfilePage() {
     }
   }
 
+  const openAddTraining = () => {
+    setEditTrainingId(null);
+    setTrainingForm(EMPTY_TRAINING_FORM);
+    setTrainingOpen(true);
+  };
+
+  const openEditTraining = (t) => {
+    setEditTrainingId(t.id);
+    setTrainingForm({
+      program_title: t.program_title || "",
+      provider: t.provider || "",
+      start_month: t.start_date ? String(t.start_date).slice(0, 7) : "",
+      end_month: t.end_date ? String(t.end_date).slice(0, 7) : "",
+      currently_ongoing: !!t.currently_ongoing,
+      description: t.description || "",
+      credential_url: t.credential_url || "",
+    });
+    setTrainingOpen(true);
+  };
+
+  const saveTraining = async () => {
+    setSavingTraining(true);
+    try {
+      const payload = {
+        program_title: trainingForm.program_title || "",
+        provider: trainingForm.provider || "",
+        start_date: trainingForm.start_month ? `${trainingForm.start_month}-01` : null,
+        end_date: trainingForm.currently_ongoing
+          ? null
+          : (trainingForm.end_month ? `${trainingForm.end_month}-01` : null),
+        currently_ongoing: !!trainingForm.currently_ongoing,
+        description: trainingForm.description || "",
+        credential_url: trainingForm.credential_url || "",
+      };
+      if (editTrainingId) {
+        await updateTrainingApi(editTrainingId, payload);
+      } else {
+        await addTrainingApi(payload);
+      }
+      showNotification("success", editTrainingId ? "Training updated" : "Training added");
+      setTrainingOpen(false);
+      setEditTrainingId(null);
+      setTrainingForm(EMPTY_TRAINING_FORM);
+      await loadMeExtras();
+    } catch (e) {
+      showNotification("error", e?.message || "Failed to save training");
+    } finally {
+      setSavingTraining(false);
+    }
+  };
+
+  const openAddCert = () => {
+    setEditCertId(null);
+    setCertForm(EMPTY_CERT_FORM);
+    setCertOpen(true);
+  };
+
+  const openEditCert = (c) => {
+    setEditCertId(c.id);
+    setCertForm({
+      certification_name: c.certification_name || "",
+      issuing_organization: c.issuing_organization || "",
+      issue_month: c.issue_date ? String(c.issue_date).slice(0, 7) : "",
+      expiration_month: c.expiration_date ? String(c.expiration_date).slice(0, 7) : "",
+      no_expiration: !!c.no_expiration,
+      credential_id: c.credential_id || "",
+      credential_url: c.credential_url || "",
+    });
+    setCertOpen(true);
+  };
+
+  const saveCert = async () => {
+    setSavingCert(true);
+    try {
+      const payload = {
+        certification_name: certForm.certification_name || "",
+        issuing_organization: certForm.issuing_organization || "",
+        issue_date: certForm.issue_month ? `${certForm.issue_month}-01` : null,
+        expiration_date: certForm.no_expiration
+          ? null
+          : (certForm.expiration_month ? `${certForm.expiration_month}-01` : null),
+        no_expiration: !!certForm.no_expiration,
+        credential_id: certForm.credential_id || "",
+        credential_url: certForm.credential_url || "",
+      };
+      if (editCertId) {
+        await updateCertificationApi(editCertId, payload);
+      } else {
+        await addCertificationApi(payload);
+      }
+      showNotification("success", editCertId ? "Certification updated" : "Certification added");
+      setCertOpen(false);
+      setEditCertId(null);
+      setCertForm(EMPTY_CERT_FORM);
+      await loadMeExtras();
+    } catch (e) {
+      showNotification("error", e?.message || "Failed to save certification");
+    } finally {
+      setSavingCert(false);
+    }
+  };
+
+  const openAddMember = () => {
+    setEditMemberId(null);
+    setMemberForm(EMPTY_MEMBER_FORM);
+    setMemberOpen(true);
+  };
+
+  const openEditMember = (m) => {
+    setEditMemberId(m.id);
+    setMemberForm({
+      organization_name: m.organization_name || "",
+      role_type: m.role_type || "Member",
+      start_month: m.start_date ? String(m.start_date).slice(0, 7) : "",
+      end_month: m.end_date ? String(m.end_date).slice(0, 7) : "",
+      ongoing: !!m.ongoing,
+      membership_url: m.membership_url || "",
+    });
+    setMemberOpen(true);
+  };
+
+  const saveMember = async () => {
+    setSavingMember(true);
+    try {
+      const payload = {
+        organization_name: memberForm.organization_name || "",
+        role_type: memberForm.role_type || "Member",
+        start_date: memberForm.start_month ? `${memberForm.start_month}-01` : null,
+        end_date: memberForm.ongoing
+          ? null
+          : (memberForm.end_month ? `${memberForm.end_month}-01` : null),
+        ongoing: !!memberForm.ongoing,
+        membership_url: memberForm.membership_url || "",
+      };
+      if (editMemberId) {
+        await updateMembershipApi(editMemberId, payload);
+      } else {
+        await addMembershipApi(payload);
+      }
+      showNotification("success", editMemberId ? "Membership updated" : "Membership added");
+      setMemberOpen(false);
+      setEditMemberId(null);
+      setMemberForm(EMPTY_MEMBER_FORM);
+      await loadMeExtras();
+    } catch (e) {
+      showNotification("error", e?.message || "Failed to save membership");
+    } finally {
+      setSavingMember(false);
+    }
+  };
+
   async function loadMeExtras() {
     try {
       const r = await fetch(`${API_BASE}/auth/me/profile/`, { headers: tokenHeader() });
@@ -1824,16 +2077,25 @@ export default function ProfilePage() {
         const data = await r.json();
         setEduList(Array.isArray(data.educations) ? data.educations : []);
         setExpList(Array.isArray(data.experiences) ? data.experiences : []);
+        setTrainingList(Array.isArray(data.trainings) ? data.trainings : []);
+        setCertList(Array.isArray(data.certifications) ? data.certifications : []);
+        setMemberList(Array.isArray(data.memberships) ? data.memberships : []);
         return;
       }
     } catch { }
     try {
-      const [e1, e2] = await Promise.all([
+      const [e1, e2, t1, c1, m1] = await Promise.all([
         fetch(`${API_BASE}/auth/me/educations/`, { headers: tokenHeader() }),
         fetch(`${API_BASE}/auth/me/experiences/`, { headers: tokenHeader() }),
+        fetch(`${API_BASE}/auth/me/trainings/`, { headers: tokenHeader() }),
+        fetch(`${API_BASE}/auth/me/certifications/`, { headers: tokenHeader() }),
+        fetch(`${API_BASE}/auth/me/memberships/`, { headers: tokenHeader() }),
       ]);
       if (e1.ok) setEduList(await e1.json());
       if (e2.ok) setExpList(await e2.json());
+      if (t1.ok) setTrainingList(await t1.json());
+      if (c1.ok) setCertList(await c1.json());
+      if (m1.ok) setMemberList(await m1.json());
     } catch { }
   }
 
@@ -2177,7 +2439,7 @@ export default function ProfilePage() {
                                   <Box>
                                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{x.position || "Role not specified"}{x.community_name || x.org ? ` · ${x.community_name || x.org}` : ""}</Typography>
                                     <Typography variant="caption" color="text.secondary">{rangeLinkedIn(x.start_date || x.start, x.end_date || x.end, x.currently_work_here ?? x.current)}{x.location ? ` · ${x.location}` : ""}</Typography>
-                                    {x.description && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal" }}>{x.description}</Typography>}
+                                    {x.description && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal" }}>{x.description}</Typography>}
                                   </Box>
                                 } />
                               </ListItem>
@@ -2233,7 +2495,7 @@ export default function ProfilePage() {
                                             />
                                           ))}
                                         </Stack>
-                                      )}
+                                      )}  
                                     </Stack>
                                   }
                                 />
@@ -2242,25 +2504,74 @@ export default function ProfilePage() {
                           </List>
                         ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'grey.200', mx: 'auto' }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>This section is empty</Typography><Box><Button variant="contained" color="success" size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
                       </SectionCard>
-                      <SectionCard sx={{ mt: 2 }} title="Certifications & Licenses" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-                        <List dense disablePadding>
-                          <ListItem disableGutters secondaryAction={
-                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                            </Box>
-                          }>
-                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>AWS Certified Solutions Architect – Associate</Typography>} secondary={<Typography variant="caption" color="text.secondary">Amazon Web Services (AWS) • Issued Jan 2023</Typography>} />
-                          </ListItem>
-                          <ListItem disableGutters secondaryAction={
-                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                            </Box>
-                          }>
-                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>Google Professional Machine Learning Engineer</Typography>} secondary={<Typography variant="caption" color="text.secondary">Google Cloud • Issued Jun 2023</Typography>} />
-                          </ListItem>
-                        </List>
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Certifications & Licenses"
+                        action={
+                          <Tooltip title="Add">
+                            <IconButton size="small" onClick={openAddCert}>
+                              <AddRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        {certList.length ? (
+                          <List dense disablePadding>
+                            {certList.map((cert) => (
+                              <ListItem
+                                key={cert.id}
+                                disableGutters
+                                secondaryAction={
+                                  <Box sx={{ display: "flex" }}>
+                                    {cert.credential_url ? (
+                                      <Tooltip title="View credential">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => window.open(cert.credential_url, "_blank")}
+                                        >
+                                          <AttachFileIcon fontSize="small" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    ) : null}
+                                    <Tooltip title="Delete">
+                                      <IconButton size="small" onClick={() => setCertDeleteId(cert.id)}>
+                                        <DeleteOutlineIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Edit">
+                                      <IconButton size="small" onClick={() => openEditCert(cert)}>
+                                        <EditOutlinedIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Box>
+                                }
+                              >
+                                <ListItemText
+                                  primary={
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {cert.certification_name || "Certification"}
+                                    </Typography>
+                                  }
+                                  secondary={
+                                    <Typography variant="caption" color="text.secondary">
+                                      {cert.issuing_organization || ""}
+                                      {cert.issue_date ? ` - Issued ${toMonthYear(cert.issue_date)}` : ""}
+                                      {cert.no_expiration
+                                        ? " - No Expiration"
+                                        : cert.expiration_date
+                                          ? ` - Expires ${toMonthYear(cert.expiration_date)}`
+                                          : ""}
+                                    </Typography>
+                                  }
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Add your certifications and licenses.
+                          </Typography>
+                        )}
                       </SectionCard>
 
 
@@ -2296,46 +2607,156 @@ export default function ProfilePage() {
                         {form.location ? <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{form.location}</Typography></Box> : <Box sx={{ height: 100, borderRadius: 1, bgcolor: 'grey.100', border: '1px solid', borderColor: 'divider' }} />}
                       </SectionCard>
 
-                      <SectionCard sx={{ mt: 2 }} title="Trainings & Executive Education" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-                        <List dense disablePadding>
-                          <ListItem disableGutters secondaryAction={
-                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                            </Box>
-                          }>
-                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>Executive Leadership Programme</Typography>} secondary={<Typography variant="caption" color="text.secondary">University of Oxford • 2022</Typography>} />
-                          </ListItem>
-                          <ListItem disableGutters secondaryAction={
-                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                            </Box>
-                          }>
-                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>Advanced AI Strategy</Typography>} secondary={<Typography variant="caption" color="text.secondary">MIT Sloan School of Management • 2023</Typography>} />
-                          </ListItem>
-                        </List>
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Trainings & Executive Education"
+                        action={
+                          <Tooltip title="Add">
+                            <IconButton size="small" onClick={openAddTraining}>
+                              <AddRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        {trainingList.length ? (
+                          <List dense disablePadding>
+                            {trainingList.map((t) => (
+                              <ListItem
+                                key={t.id}
+                                disableGutters
+                                secondaryAction={
+                                  <Box sx={{ display: "flex" }}>
+                                    {t.credential_url ? (
+                                      <Tooltip title="View credential">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => window.open(t.credential_url, "_blank")}
+                                        >
+                                          <AttachFileIcon fontSize="small" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    ) : null}
+                                    <Tooltip title="Delete">
+                                      <IconButton size="small" onClick={() => setTrainingDeleteId(t.id)}>
+                                        <DeleteOutlineIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Edit">
+                                      <IconButton size="small" onClick={() => openEditTraining(t)}>
+                                        <EditOutlinedIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Box>
+                                }
+                              >
+                                <ListItemText
+                                  primary={
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {t.program_title || "Training"}
+                                    </Typography>
+                                  }
+                                  secondary={
+                                    <>
+                                      <Typography variant="caption" color="text.secondary" display="block">
+                                        {t.provider || ""}
+                                        {t.start_date || t.end_date
+                                          ? ` - ${rangeLinkedIn(t.start_date, t.end_date, !!t.currently_ongoing)}`
+                                          : ""}
+                                      </Typography>
+                                      {t.description ? (
+                                        <Typography
+                                          variant="body2"
+                                          color="text.secondary"
+                                          sx={{
+                                            mt: 0.5,
+                                            display: "-webkit-box",
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: "vertical",
+                                            overflow: "hidden",
+                                            whiteSpace: "normal",
+                                          }}
+                                        >
+                                          {t.description}
+                                        </Typography>
+                                      ) : null}
+                                    </>
+                                  }
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Add trainings or executive education programs.
+                          </Typography>
+                        )}
                       </SectionCard>
 
-                      <SectionCard sx={{ mt: 2 }} title="Memberships" action={<Tooltip title="Add"><IconButton size="small"><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-                        <List dense disablePadding>
-                          <ListItem disableGutters secondaryAction={
-                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                            </Box>
-                          }>
-                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>IEEE Computer Society</Typography>} secondary={<Typography variant="caption" color="text.secondary">Member since 2018</Typography>} />
-                          </ListItem>
-                          <ListItem disableGutters secondaryAction={
-                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1.5 }}>
-                              <Tooltip title="Edit"><IconButton size="small" onClick={() => showNotification("info", "Edit functionality coming soon")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>
-                              <Tooltip title="Delete"><IconButton size="small" onClick={() => showNotification("info", "Delete functionality coming soon")}><DeleteOutlineIcon fontSize="small" /></IconButton></Tooltip>
-                            </Box>
-                          }>
-                            <ListItemText primary={<Typography variant="body2" fontWeight={600}>Association for Computing Machinery (ACM)</Typography>} secondary={<Typography variant="caption" color="text.secondary">Professional Member</Typography>} />
-                          </ListItem>
-                        </List>
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Memberships"
+                        action={
+                          <Tooltip title="Add">
+                            <IconButton size="small" onClick={openAddMember}>
+                              <AddRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        {memberList.length ? (
+                          <List dense disablePadding>
+                            {memberList.map((m) => (
+                              <ListItem
+                                key={m.id}
+                                disableGutters
+                                secondaryAction={
+                                  <Box sx={{ display: "flex" }}>
+                                    {m.membership_url ? (
+                                      <Tooltip title="Open link">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => window.open(m.membership_url, "_blank")}
+                                        >
+                                          <AttachFileIcon fontSize="small" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    ) : null}
+                                    <Tooltip title="Delete">
+                                      <IconButton size="small" onClick={() => setMemberDeleteId(m.id)}>
+                                        <DeleteOutlineIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Edit">
+                                      <IconButton size="small" onClick={() => openEditMember(m)}>
+                                        <EditOutlinedIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Box>
+                                }
+                              >
+                                <ListItemText
+                                  primary={
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {m.organization_name || "Organization"}
+                                    </Typography>
+                                  }
+                                  secondary={
+                                    <Typography variant="caption" color="text.secondary">
+                                      {m.role_type ? `${m.role_type}` : "Member"}
+                                      {m.start_date || m.end_date
+                                        ? ` - ${rangeLinkedIn(m.start_date, m.end_date, !!m.ongoing)}`
+                                        : ""}
+                                    </Typography>
+                                  }
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Add your memberships.
+                          </Typography>
+                        )}
                       </SectionCard>
                       {/* --- LANGUAGES SECTION --- */}
                       <SectionCard
@@ -2746,31 +3167,31 @@ export default function ProfilePage() {
         </DialogActions>
       </Dialog>
 
-      {/* --- Delete Education Document – Modern Confirmation Dialog --- */}
+      {/* --- Delete Education Document ? Modern Confirmation Dialog --- */}
       <Dialog
         open={deleteDocDialog.open}
         onClose={handleCloseDeleteDoc}
         fullWidth
         maxWidth="xs"
       >
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
           <DeleteOutlineIcon color="error" fontSize="small" />
-          Delete document?
+          Delete Item?
         </DialogTitle>
         <DialogContent dividers>
-          <DialogContentText sx={{ mb: 0.5 }}>
+          <DialogContentText sx={{ mb: 0.5, color: "text.primary" }}>
             This will permanently remove{" "}
             <Box component="span" sx={{ fontWeight: 600 }}>
-              {deleteDocDialog.doc?.filename}
-            </Box>{" "}
-            from this education entry.
+              {deleteDocDialog.doc?.filename || "this item"}
+            </Box>
+            .
           </DialogContentText>
           <DialogContentText>
             This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleCloseDeleteDoc} disabled={deletingDoc}>
+          <Button onClick={handleCloseDeleteDoc} disabled={deletingDoc} variant="outlined" color="inherit">
             Cancel
           </Button>
           <Button
@@ -2779,7 +3200,7 @@ export default function ProfilePage() {
             onClick={handleConfirmDeleteDoc}
             disabled={deletingDoc}
           >
-            {deletingDoc ? "Deleting…" : "Delete"}
+            {deletingDoc ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2864,18 +3285,377 @@ export default function ProfilePage() {
         </DialogActions>
       </Dialog>
 
+      {/* Training Add/Edit */}
+      <Dialog open={trainingOpen} onClose={() => setTrainingOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
+        <DialogTitle>{editTrainingId ? "Edit Training" : "Add Training"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <TextField
+              label="Program / Training Title"
+              fullWidth
+              value={trainingForm.program_title || ""}
+              onChange={(e) => setTrainingForm((p) => ({ ...p, program_title: e.target.value }))}
+            />
+            <TextField
+              label="Provider / Institution"
+              fullWidth
+              value={trainingForm.provider || ""}
+              onChange={(e) => setTrainingForm((p) => ({ ...p, provider: e.target.value }))}
+            />
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <TextField
+                label="Start Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                value={trainingForm.start_month || ""}
+                onChange={(e) => setTrainingForm((p) => ({ ...p, start_month: e.target.value }))}
+              />
+              <TextField
+                label="End Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                disabled={!!trainingForm.currently_ongoing}
+                fullWidth
+                value={trainingForm.end_month || ""}
+                onChange={(e) => setTrainingForm((p) => ({ ...p, end_month: e.target.value }))}
+              />
+            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!trainingForm.currently_ongoing}
+                  onChange={(e) =>
+                    setTrainingForm((p) => ({
+                      ...p,
+                      currently_ongoing: e.target.checked,
+                      end_month: e.target.checked ? "" : p.end_month,
+                    }))
+                  }
+                />
+              }
+              label="Currently ongoing"
+            />
+            <TextField
+              label="Description"
+              multiline
+              minRows={3}
+              fullWidth
+              value={trainingForm.description || ""}
+              onChange={(e) => setTrainingForm((p) => ({ ...p, description: e.target.value }))}
+            />
+            <TextField
+              label="Credential URL"
+              fullWidth
+              value={trainingForm.credential_url || ""}
+              onChange={(e) => setTrainingForm((p) => ({ ...p, credential_url: e.target.value }))}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTrainingOpen(false)} disabled={savingTraining}>Cancel</Button>
+          <Button variant="contained" onClick={saveTraining} disabled={savingTraining}>
+            {savingTraining ? "Saving..." : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Certification Add/Edit */}
+      <Dialog open={certOpen} onClose={() => setCertOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
+        <DialogTitle>{editCertId ? "Edit Certification" : "Add Certification"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <TextField
+              label="Certification Name"
+              fullWidth
+              value={certForm.certification_name || ""}
+              onChange={(e) => setCertForm((p) => ({ ...p, certification_name: e.target.value }))}
+            />
+            <TextField
+              label="Issuing Organization"
+              fullWidth
+              value={certForm.issuing_organization || ""}
+              onChange={(e) => setCertForm((p) => ({ ...p, issuing_organization: e.target.value }))}
+            />
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <TextField
+                label="Issue Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                value={certForm.issue_month || ""}
+                onChange={(e) => setCertForm((p) => ({ ...p, issue_month: e.target.value }))}
+              />
+              <TextField
+                label="Expiration Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                disabled={!!certForm.no_expiration}
+                fullWidth
+                value={certForm.expiration_month || ""}
+                onChange={(e) => setCertForm((p) => ({ ...p, expiration_month: e.target.value }))}
+              />
+            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!certForm.no_expiration}
+                  onChange={(e) =>
+                    setCertForm((p) => ({
+                      ...p,
+                      no_expiration: e.target.checked,
+                      expiration_month: e.target.checked ? "" : p.expiration_month,
+                    }))
+                  }
+                />
+              }
+              label="No Expiration"
+            />
+            <TextField
+              label="Credential ID"
+              fullWidth
+              value={certForm.credential_id || ""}
+              onChange={(e) => setCertForm((p) => ({ ...p, credential_id: e.target.value }))}
+            />
+            <TextField
+              label="Credential URL"
+              fullWidth
+              value={certForm.credential_url || ""}
+              onChange={(e) => setCertForm((p) => ({ ...p, credential_url: e.target.value }))}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCertOpen(false)} disabled={savingCert}>Cancel</Button>
+          <Button variant="contained" onClick={saveCert} disabled={savingCert}>
+            {savingCert ? "Saving..." : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Membership Add/Edit */}
+      <Dialog open={memberOpen} onClose={() => setMemberOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
+        <DialogTitle>{editMemberId ? "Edit Membership" : "Add Membership"}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <TextField
+              label="Organization / Community Name"
+              fullWidth
+              value={memberForm.organization_name || ""}
+              onChange={(e) => setMemberForm((p) => ({ ...p, organization_name: e.target.value }))}
+            />
+
+            <TextField
+              select
+              label="Role / Type"
+              fullWidth
+              value={memberForm.role_type || "Member"}
+              onChange={(e) => setMemberForm((p) => ({ ...p, role_type: e.target.value }))}
+            >
+              <MenuItem value="Member">Member</MenuItem>
+              <MenuItem value="Admin">Admin</MenuItem>
+              <MenuItem value="Volunteer">Volunteer</MenuItem>
+              <MenuItem value="Fellow">Fellow</MenuItem>
+            </TextField>
+
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <TextField
+                label="Start Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                value={memberForm.start_month || ""}
+                onChange={(e) => setMemberForm((p) => ({ ...p, start_month: e.target.value }))}
+              />
+              <TextField
+                label="End Month"
+                type="month"
+                InputLabelProps={{ shrink: true }}
+                disabled={!!memberForm.ongoing}
+                fullWidth
+                value={memberForm.end_month || ""}
+                onChange={(e) => setMemberForm((p) => ({ ...p, end_month: e.target.value }))}
+              />
+            </Box>
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!memberForm.ongoing}
+                  onChange={(e) =>
+                    setMemberForm((p) => ({
+                      ...p,
+                      ongoing: e.target.checked,
+                      end_month: e.target.checked ? "" : p.end_month,
+                    }))
+                  }
+                />
+              }
+              label="Ongoing"
+            />
+
+            <TextField
+              label="Membership URL"
+              fullWidth
+              value={memberForm.membership_url || ""}
+              onChange={(e) => setMemberForm((p) => ({ ...p, membership_url: e.target.value }))}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMemberOpen(false)} disabled={savingMember}>Cancel</Button>
+          <Button variant="contained" onClick={saveMember} disabled={savingMember}>
+            {savingMember ? "Saving..." : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Training */}
+      <Dialog open={!!trainingDeleteId} onClose={() => setTrainingDeleteId(null)}>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineIcon color="error" fontSize="small" />
+          Delete Item?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {trainingToDelete?.program_title || "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText>This action cannot be undone.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTrainingDeleteId(null)} disabled={deletingTraining} variant="outlined" color="inherit">
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            disabled={deletingTraining}
+            onClick={async () => {
+              if (deletingTraining) return;
+              setDeletingTraining(true);
+              try {
+                await deleteTrainingApi(trainingDeleteId);
+                await loadMeExtras();
+                showNotification("success", "Training deleted.");
+                setTrainingDeleteId(null);
+              } catch (e) {
+                console.error(e);
+                showNotification("error", "Failed to delete training.");
+              } finally {
+                setDeletingTraining(false);
+              }
+            }}
+            variant="contained"
+          >
+            {deletingTraining ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Certification */}
+      <Dialog open={!!certDeleteId} onClose={() => setCertDeleteId(null)}>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineIcon color="error" fontSize="small" />
+          Delete Item?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {certToDelete?.certification_name || "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText>This action cannot be undone.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCertDeleteId(null)} disabled={deletingCert} variant="outlined" color="inherit">
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            disabled={deletingCert}
+            onClick={async () => {
+              if (deletingCert) return;
+              setDeletingCert(true);
+              try {
+                await deleteCertificationApi(certDeleteId);
+                await loadMeExtras();
+                showNotification("success", "Certification deleted.");
+                setCertDeleteId(null);
+              } catch (e) {
+                console.error(e);
+                showNotification("error", "Failed to delete certification.");
+              } finally {
+                setDeletingCert(false);
+              }
+            }}
+            variant="contained"
+          >
+            {deletingCert ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Membership */}
+      <Dialog open={!!memberDeleteId} onClose={() => setMemberDeleteId(null)}>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
+          <DeleteOutlineIcon color="error" fontSize="small" />
+          Delete Item?
+        </DialogTitle>
+        <DialogContent dividers>
+          <DialogContentText>
+            This will permanently remove{" "}
+            <Box component="span" sx={{ fontWeight: 700 }}>
+              {memberToDelete?.organization_name || "this item"}
+            </Box>
+            .
+          </DialogContentText>
+          <DialogContentText>This action cannot be undone.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMemberDeleteId(null)} disabled={deletingMember} variant="outlined" color="inherit">
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            disabled={deletingMember}
+            onClick={async () => {
+              if (deletingMember) return;
+              setDeletingMember(true);
+              try {
+                await deleteMembershipApi(memberDeleteId);
+                await loadMeExtras();
+                showNotification("success", "Membership deleted.");
+                setMemberDeleteId(null);
+              } catch (e) {
+                console.error(e);
+                showNotification("error", "Failed to delete membership.");
+              } finally {
+                setDeletingMember(false);
+              }
+            }}
+            variant="contained"
+          >
+            {deletingMember ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* --- Modern Generic Delete Confirmation --- */}
       <Dialog
         open={confirm.open}
         onClose={closeConfirm}
         fullWidth
         maxWidth="xs"
-        // Ensure it sits on top of other dialogs (like Edit Language)
         sx={{ zIndex: (theme) => theme.zIndex.modal + 10 }}
       >
         <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main" }}>
           <DeleteOutlineIcon color="error" />
-          Delete {confirm.type === "certificate" ? "Certificate" : confirm.type === "language" ? "Language" : "Item"}?
+          Delete Item?
         </DialogTitle>
         <DialogContent dividers>
           <DialogContentText sx={{ color: "text.primary", mb: 1 }}>
@@ -2898,7 +3678,6 @@ export default function ProfilePage() {
             disabled={deleteLoading}
             variant="contained"
             color="error"
-            startIcon={deleteLoading ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {deleteLoading ? "Deleting..." : "Delete"}
           </Button>
