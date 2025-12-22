@@ -61,6 +61,20 @@ function groupByDay(items) {
   return groups;
 }
 
+// Keep Community Notifications page scoped to verification items only
+// - API notifications: kind="event" with data.type in ["kyc", "name_change"]
+// - Local identity request (pending only): kind="name_change" (_source="identity")
+function isVerificationItem(item) {
+  const t = String(item?.data?.type || "").toLowerCase();
+  if (t === "kyc" || t === "name_change") return true;
+
+  // Your identity loader uses: source: "identity" (NOT _source)
+  if (item?.source === "identity") return true;
+
+  if (item?.kind === "name_change") return true;
+  return false;
+}
+
 const KIND_LABEL = {
   mention: "Mentions",
   comment: "Comments",
@@ -146,7 +160,9 @@ async function loadMyIdentityRequests() {
     if (!r.ok) return [];
 
     const data = await r.json();
-    const rows = Array.isArray(data) ? data : data.results || [];
+    const rowsAll = Array.isArray(data) ? data : data.results || [];
+    // ✅ Keep only pending here. Approved/Rejected should come from /notifications/
+    const rows = rowsAll.filter((req) => String(req.status || "").toLowerCase() === "pending");
     const readIds = getReadIdentityIds();
 
     return rows.map(req => {
@@ -232,6 +248,33 @@ function NotificationRow({
 
   // --- Dynamic Content for Identity Requests ---
   const renderContent = () => {
+    const notifType = String(item?.data?.type || "").toLowerCase();
+
+    if (notifType === "kyc") {
+      const s = String(item.state || "").toLowerCase();
+
+      if (s === "approved") {
+        return (
+          <Typography variant="body2">
+            Your profile is <span style={{ color: '#1a7f37', fontWeight: 700 }}>verified</span> ✅
+          </Typography>
+        );
+      }
+
+      if (s === "review") {
+        return (
+          <Typography variant="body2">
+            Your identity verification is <span style={{ fontWeight: 700 }}>under review</span> ⏳
+          </Typography>
+        );
+      }
+
+      return (
+        <Typography variant="body2">
+          Identity verification <span style={{ color: '#b42318', fontWeight: 700 }}>failed</span> ❌
+        </Typography>
+      );
+    }
     if (item.kind === 'name_change') {
       const state = item.state || 'pending';
       const newName = item.context?.new_name || "New Name";
@@ -423,7 +466,13 @@ function NotificationRow({
             spacing={isMobile ? 0.5 : 1}
             sx={{ mt: 0.75 }}
           >
-            <Chip size="small" label={kindChip(item.kind)} />
+            {(() => {
+              const t = String(item?.data?.type || "").toLowerCase();
+              const isKyc = t === "kyc";
+              const isNameChange = item.kind === "name_change" || t === "name_change" || item.source === "identity";
+              const label = isKyc ? "KYC" : isNameChange ? "Name Change" : kindChip(item.kind);
+              return <Chip size="small" label={label} />;
+            })()}
             <Typography variant="caption" color="text.secondary">
               {formatWhen(item.created_at)}
             </Typography>
@@ -446,11 +495,19 @@ function NotificationRow({
               )}
             </IconButton>
 
-            {(item.context?.profile_user_id || item.context?.eventId || item.context?.postId || item.context?.groupSlug) && (
-              <IconButton size="small" title="Open" onClick={() => onOpen?.(item)}>
-                <OpenInNewOutlinedIcon fontSize="small" />
-              </IconButton>
-            )}
+            {(
+              item.data?.type === "kyc" ||
+              item.kind === "name_change" ||
+              item.source === "identity" ||
+              item.context?.profile_user_id ||
+              item.context?.eventId ||
+              item.context?.postId ||
+              item.context?.groupSlug
+            ) && (
+                <IconButton size="small" title="Open" onClick={() => onOpen?.(item)}>
+                  <OpenInNewOutlinedIcon fontSize="small" />
+                </IconButton>
+              )}
           </Stack>
 
           {(() => {
@@ -475,7 +532,7 @@ function NotificationRow({
             if (s === "declined" || s === "rejected") {
               return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Rejected" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
             }
-            if (s === "pending" || s === "requested" || s === "waiting" || s === "sent") {
+            if (s === "pending" || s === "review" || s === "under_review" || s === "requested" || s === "waiting" || s === "sent") {
               return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label={s === "sent" ? "Sent" : "Pending"} sx={{ ...common.sx, bgcolor: "#eef2f6", borderColor: "#eef2f6", color: "#374151", "& .MuiChip-icon": { color: "#374151", mr: 0.5 } }} />;
             }
             return <Chip {...common} icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />} label={item.state} sx={{ ...common.sx, bgcolor: "#f3f4f6", borderColor: "#f3f4f6", color: "#111827", "& .MuiChip-icon": { color: "#6b7280", mr: 0.5 } }} />;
@@ -568,13 +625,14 @@ export default function NotificationsPage({
     try {
       const promises = [fetchStandardNotifications(url || nextUrl)];
 
-      const fetchingIdentity = !isAppend && (kind === 'All' || kind === 'Identity');
-      if (fetchingIdentity) {
-        promises.push(loadMyIdentityRequests());
-      }
+      // ✅ Include identity list only when filter is All or Identity
+      const fetchingIdentity = !isAppend && (kind === "All" || kind === "Identity");
+      if (fetchingIdentity) promises.push(loadMyIdentityRequests());
 
       const [apiData, identityData] = await Promise.all(promises);
-      const newItems = [...apiData.items, ...(identityData || [])];
+
+      // ✅ Keep all API notifications (kind filter will handle display)
+      const newItems = [...(apiData.items || []), ...(identityData || [])];
 
       setItems(prev => {
         const combined = isAppend ? [...prev, ...newItems] : newItems;
@@ -594,13 +652,16 @@ export default function NotificationsPage({
     } finally {
       setLoading(false);
     }
-  }, [kind, nextUrl]);
+  }, [nextUrl, kind]);
 
-  // --- Initial Effect ---
   React.useEffect(() => {
+    setVisibleCount(10);
+    setHasMore(true);
+    setNextUrl(`${API_BASE}/notifications/?page_size=10`);
     loadNotifications(`${API_BASE}/notifications/?page_size=10`, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
+
 
   // --- Infinite Scroll ---
   React.useEffect(() => {
@@ -695,6 +756,11 @@ export default function NotificationsPage({
     const ctx = n.context || {};
 
     let dest = null;
+    const t = String(n?.data?.type || "").toLowerCase();
+    if (t === "kyc" || n.kind === "name_change" || n.source === "identity") {
+      markAndNavigate(n, "/account/profile");
+      return;
+    }
     if (n.kind === "friend_request" || n.kind === "connection_request") {
       if (ctx.profile_user_id) dest = `/community/rich-profile/${ctx.profile_user_id}`;
     } else if (ctx.eventId) {
@@ -757,8 +823,22 @@ export default function NotificationsPage({
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent={{ xs: "flex-start", sm: "flex-end" }}>
               <FormControlLabel control={<Switch checked={showOnlyUnread} onChange={(e) => setShowOnlyUnread(e.target.checked)} size="small" />} label="Unread only" sx={{ m: 0 }} />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
-                <Select size="small" value={kind} onChange={(e) => setKind(e.target.value)} sx={{ minWidth: 140 }}>
-                  {["All", "Requests", "Suggestions", "Identity", "Follows", "Mentions", "Comments", "Reactions", "Events", "System"].map((k) => (<MenuItem key={k} value={k}>{k}</MenuItem>))}
+                <Select
+                  size="small"
+                  value={kind}
+                  onChange={(e) => setKind(e.target.value)}
+                  sx={{ minWidth: 160 }}
+                >
+                  <MenuItem value="All">All</MenuItem>
+                  <MenuItem value="Requests">Requests</MenuItem>
+                  <MenuItem value="Follows">Follows</MenuItem>
+                  <MenuItem value="Mentions">Mentions</MenuItem>
+                  <MenuItem value="Comments">Comments</MenuItem>
+                  <MenuItem value="Reactions">Reactions</MenuItem>
+                  <MenuItem value="Events">Events</MenuItem>
+                  <MenuItem value="System">System</MenuItem>
+                  <MenuItem value="Identity">Identity</MenuItem>
+                  <MenuItem value="Suggestions">Suggestions</MenuItem>
                 </Select>
                 <Button size="small" variant="outlined" startIcon={<DoneAllIcon />} onClick={handleMarkAllRead} sx={{ whiteSpace: "nowrap" }}>Mark all read</Button>
               </Stack>
