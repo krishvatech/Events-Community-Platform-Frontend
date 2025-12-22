@@ -391,7 +391,7 @@ const SignInPage = () => {
                   }}
                 />
 
-                <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
+                {/* <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
                   <Link
                     component="button"
                     type="button"
@@ -406,9 +406,9 @@ const SignInPage = () => {
                   >
                     Forgot password?
                   </Link>
-                </Box>
+                </Box> */}
 
-                {/* <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
                   <Link
                     component="button"
                     type="button"
@@ -419,7 +419,7 @@ const SignInPage = () => {
                   >
                     Forgot password?
                   </Link>
-                </Box> */}
+                </Box>
                 
                 <Button
                   type="submit"

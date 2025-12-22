@@ -31,14 +31,41 @@ export default function KYCCallbackPage() {
 
 
     return (
-        <div style={{ padding: "2rem", textAlign: "center" }}>
-            <h2>Verification complete</h2>
-            {status && (
-                <p>
-                    Status reported by Didit: <strong>{status}</strong>
-                </p>
-            )}
-            <p>You can close this tab, we’re updating your account…</p>
+        <div
+            style={{
+                minHeight: "70vh",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                padding: "2rem",
+                gap: "14px",
+            }}
+        >
+            <style>{`
+      @keyframes kycSpin { to { transform: rotate(360deg); } }
+    `}</style>
+
+            <div
+                aria-label="Loading"
+                style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    border: "4px solid rgba(0,0,0,0.12)",
+                    borderTopColor: "rgba(0,0,0,0.55)",
+                    animation: "kycSpin 0.9s linear infinite",
+                }}
+            />
+
+            <div style={{ fontSize: "18px", fontWeight: 600 }}>
+                Updating Your Account…
+            </div>
+
+            <div style={{ fontSize: "14px", opacity: 0.75, maxWidth: 420 }}>
+                Please wait. You’ll be redirected automatically.
+            </div>
         </div>
     );
 }
