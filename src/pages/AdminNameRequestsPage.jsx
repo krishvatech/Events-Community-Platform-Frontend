@@ -60,6 +60,9 @@ export default function AdminNameRequestsPage() {
   const [adminNote, setAdminNote] = useState("");
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
+  const [detailsDialog, setDetailsDialog] = useState({ open: false, request: null });
+  const openDetails = (req) => setDetailsDialog({ open: true, request: req });
+  const closeDetails = () => setDetailsDialog({ open: false, request: null });
 
   const fetchRequests = async () => {
     setLoading(true);
@@ -261,14 +264,43 @@ export default function AdminNameRequestsPage() {
 
                       {/* Didit Status */}
                       <TableCell>
-                        <Chip
-                          label={(req.didit_status || "not_started")
-                            .replace("_", " ")
-                            .toUpperCase()}
-                          size="small"
-                          variant="outlined"
-                          color={getDiditColor(req.didit_status)}
-                        />
+                        <Stack spacing={0.6}>
+                          {/* Didit Status */}
+                          <Chip
+                            label={(req.didit_status || "not_started")
+                              .replace("_", " ")
+                              .toUpperCase()}
+                            size="small"
+                            variant="outlined"
+                            color={getDiditColor(req.didit_status)}
+                          />
+
+                          {/* Extracted Doc Name (from Didit payload, stored in DB) */}
+                          <Typography variant="caption" color="text.secondary" noWrap
+                            title={req.doc_full_name || `${req.doc_first_name || ""} ${req.doc_last_name || ""}`.trim()}
+                          >
+                            Doc: {req.doc_full_name
+                              ? req.doc_full_name
+                              : `${req.doc_first_name || ""} ${req.doc_last_name || ""}`.trim() || "—"}
+                          </Typography>
+
+                          {/* Name Match result */}
+                          {req.didit_status === "approved" ? (
+                            <Chip
+                              size="small"
+                              variant="outlined"
+                              label={req.name_match_passed ? "NAME MATCH: PASS" : "NAME MATCH: FAIL"}
+                              color={req.name_match_passed ? "success" : "error"}
+                            />
+                          ) : (
+                            <Chip
+                              size="small"
+                              variant="outlined"
+                              label="NAME MATCH: N/A"
+                              color="default"
+                            />
+                          )}
+                        </Stack>
                       </TableCell>
 
                       {/* Admin Status */}
@@ -300,6 +332,11 @@ export default function AdminNameRequestsPage() {
                                 onClick={() => handleOpenAction(req, "rejected")}
                               >
                                 <CancelIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="View details">
+                              <IconButton size="small" onClick={() => openDetails(req)}>
+                                <InfoIcon />
                               </IconButton>
                             </Tooltip>
                           </Stack>
@@ -364,6 +401,89 @@ export default function AdminNameRequestsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={detailsDialog.open} onClose={closeDetails} fullWidth maxWidth="sm">
+        <DialogTitle>Name Change Review</DialogTitle>
+        <DialogContent dividers>
+          {detailsDialog.request && (
+            <Stack spacing={2}>
+              <Alert severity="info">
+                Compare requested name with Didit document-extracted name.
+              </Alert>
+
+              {/* Old vs Requested vs Doc */}
+              <Box>
+                <Typography variant="subtitle2">Current Name (Old)</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {detailsDialog.request.old_first_name} {detailsDialog.request.old_middle_name} {detailsDialog.request.old_last_name}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2">Requested Name</Typography>
+                <Typography variant="body2" fontWeight={700}>
+                  {detailsDialog.request.new_first_name} {detailsDialog.request.new_middle_name} {detailsDialog.request.new_last_name}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2">Didit Doc Name (Extracted)</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {detailsDialog.request.doc_full_name
+                    ? detailsDialog.request.doc_full_name
+                    : `${detailsDialog.request.doc_first_name || ""} ${detailsDialog.request.doc_last_name || ""}`.trim() || "—"}
+                </Typography>
+              </Box>
+
+              {/* Status + match */}
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Chip
+                  size="small"
+                  label={`DIDIT: ${(detailsDialog.request.didit_status || "not_started").toUpperCase()}`}
+                  variant="outlined"
+                  color={getDiditColor(detailsDialog.request.didit_status)}
+                />
+                <Chip
+                  size="small"
+                  label={`REQUEST: ${detailsDialog.request.status?.toUpperCase()}`}
+                  color={getStatusColor(detailsDialog.request.status)}
+                />
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={
+                    detailsDialog.request.didit_status === "approved"
+                      ? (detailsDialog.request.name_match_passed ? "NAME MATCH: PASS" : "NAME MATCH: FAIL")
+                      : "NAME MATCH: N/A"
+                  }
+                  color={
+                    detailsDialog.request.didit_status === "approved"
+                      ? (detailsDialog.request.name_match_passed ? "success" : "error")
+                      : "default"
+                  }
+                />
+                {detailsDialog.request.auto_approved && (
+                  <Chip size="small" color="success" label="AUTO-APPROVED" />
+                )}
+              </Stack>
+
+              {/* Debug JSON */}
+              <Box>
+                <Typography variant="subtitle2">Match Debug (for admin)</Typography>
+                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "grey.50", overflow: "auto" }}>
+                  <pre style={{ margin: 0, fontSize: 12 }}>
+                    {JSON.stringify(detailsDialog.request.name_match_debug || {}, null, 2)}
+                  </pre>
+                </Paper>
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDetails}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 }
