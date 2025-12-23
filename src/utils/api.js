@@ -24,7 +24,7 @@ export async function registerUser({ username, firstName, lastName, email, passw
     let data = null;
     try {
       data = await res.clone().json();
-    } catch {}
+    } catch { }
     const text = data ? null : (await res.text().catch(() => null));
 
     const err = new Error(text || data?.detail || `HTTP ${res.status}`);
@@ -44,7 +44,7 @@ export async function getLinkedInAuthUrl() {
     let data = null;
     try {
       data = await res.clone().json();
-    } catch {}
+    } catch { }
     const text = data ? null : (await res.text().catch(() => null));
 
     const err = new Error(text || data?.detail || `HTTP ${res.status}`);
@@ -57,6 +57,10 @@ export async function getLinkedInAuthUrl() {
 /**
  * Token + CSRF helpers
  */
+export const getRefreshToken = () =>
+  localStorage.getItem("refresh_token") ||
+  sessionStorage.getItem("refresh");
+
 export const getToken = () =>
   localStorage.getItem("access_token") ||
   localStorage.getItem("token") ||
@@ -94,6 +98,66 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+let refreshPromise = null;
+
+apiClient.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const original = error?.config;
+
+    // if no response or not 401, reject
+    if (!error?.response || error.response.status !== 401) {
+      return Promise.reject(error);
+    }
+
+    // avoid infinite loop
+    if (original?._retry) return Promise.reject(error);
+    original._retry = true;
+
+    const refresh = getRefreshToken();
+    if (!refresh) return Promise.reject(error);
+
+    try {
+      // One refresh call for many parallel 401s
+      if (!refreshPromise) {
+        refreshPromise = apiClient
+          .post("/auth/token/refresh/", { refresh })
+          .then((r) => r.data)
+          .finally(() => { refreshPromise = null; });
+      }
+
+      const data = await refreshPromise;
+
+      // SimpleJWT usually returns { access }, and with rotation may return { access, refresh }
+      if (data?.access) {
+        localStorage.setItem("access_token", data.access);
+        localStorage.setItem("token", data.access);
+        sessionStorage.setItem("access", data.access);
+      }
+      if (data?.refresh) {
+        localStorage.setItem("refresh_token", data.refresh);
+        sessionStorage.setItem("refresh", data.refresh);
+      }
+
+      // retry original request with new token
+      original.headers = original.headers || {};
+      original.headers.Authorization = `Bearer ${data.access}`;
+      return apiClient(original);
+    } catch (e) {
+      // refresh failed => clear auth and reject
+      try {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("token");
+        localStorage.removeItem("refresh_token");
+        sessionStorage.removeItem("access");
+        sessionStorage.removeItem("refresh");
+        window.dispatchEvent(new Event("auth:changed"));
+      } catch { }
+      return Promise.reject(e);
+    }
+  }
+);
+
 // ===================== Admin • Staff Management =====================
 const ADMIN_USERS_BASE = "/auth/admin/users";
 
@@ -117,9 +181,9 @@ export const bulkSetStaff = (ids, is_staff) =>
 export async function startKYC() {
   const res = await fetch(`${API_BASE}/users/me/start-kyc/`, {
     method: "POST",
-    headers: { 
+    headers: {
       "Content-Type": "application/json",
-      ...authConfig().headers 
+      ...authConfig().headers
     },
   });
 
@@ -127,7 +191,7 @@ export async function startKYC() {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.detail || "Failed to start verification");
   }
-  
+
   return res.json(); // Returns { session_id, url }
 }
 
@@ -140,7 +204,7 @@ export async function submitNameChangeRequest(data) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...authConfig().headers 
+      ...authConfig().headers
     },
     body: JSON.stringify(data),
   });

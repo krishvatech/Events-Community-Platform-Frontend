@@ -5,6 +5,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import AdminSidebar from "../AdminSidebar";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import { isStaffUser } from "../../utils/adminRole.js";
+import { clearAuth } from "../../utils/authStorage";
 
 function resolveActiveKey(pathname) {
   if (pathname === "/admin" || pathname === "/admin/") return "resources"; // default tab for /admin
@@ -31,6 +32,34 @@ export default function AdminLayout() {
   const navigate = useNavigate();
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const IDLE_MIN = 20; // ✅ choose 15–30
+    const IDLE_MS = IDLE_MIN * 60 * 1000;
+
+    let t = null;
+
+    const logoutNow = () => {
+      clearAuth();
+      navigate("/signin", { replace: true });
+    };
+
+    const reset = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(logoutNow, IDLE_MS);
+    };
+
+    // activity events
+    const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+
+    reset(); // start timer
+
+    return () => {
+      if (t) clearTimeout(t);
+      events.forEach((e) => window.removeEventListener(e, reset));
+    };
+  }, [navigate]);
 
   const active = React.useMemo(
     () => resolveActiveKey(location.pathname),
