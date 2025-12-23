@@ -34,7 +34,7 @@ import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 
 // --- Config ---
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
-const TEAL = "#14b8b1"; 
+const TEAL = "#14b8b1";
 const BORDER = "#e2e8f0"; // Matches your community theme
 const getToken = () => localStorage.getItem("access_token") || localStorage.getItem("token") || "";
 const authHeader = () => {
@@ -58,7 +58,7 @@ const ENDPOINTS = {
       page_size: params?.page_size,
     })}`,
   notifMarkReadBulk: () => `${API_ROOT}/group-notifications/mark-read/`,
-  groupsPage: (page = 1) => `${API_ROOT}/groups/?${qs({ page, page_size: 200 })}`,
+  groupsPage: (page = 1) => `${API_ROOT}/groups/?${qs({ page, page_size: 50 })}`,
   pendingForGroup: (groupId) => `${API_ROOT}/groups/${groupId}/member-requests/`,
   approveJoin: (groupId, userId) => `${API_ROOT}/groups/${groupId}/member-requests/approve/${userId}/`,
   rejectJoin: (groupId, userId) => `${API_ROOT}/groups/${groupId}/member-requests/reject/${userId}/`,
@@ -81,7 +81,7 @@ async function loadNameChangeRequests() {
       status: req.status, // 'pending', 'approved', or 'rejected'
       created_at: req.created_at,
       actor_name: req.username || req.user?.username || "User",
-      actor_avatar: "", 
+      actor_avatar: "",
       user_id: req.user,
       data: {
         old_name: `${req.old_first_name} ${req.old_last_name}`,
@@ -104,34 +104,38 @@ async function loadJoinRequests() {
     const data = await res.json();
     const groups = Array.isArray(data) ? data : data?.results || [];
     const manageable = groups.filter((g) => ["owner", "admin", "moderator"].includes(g?.current_user_role));
-    const all = [];
-    for (const g of manageable) {
-      try {
-        const r = await fetch(ENDPOINTS.pendingForGroup(g.id), { headers: { Accept: "application/json", ...authHeader() } });
-        if (!r.ok) continue;
-        const jr = await r.json();
-        const rows = (jr?.requests || []).map((req) => ({
-          id: `join-${g.id}-${req?.user?.id}`,
-          _source: "join",
-          type: "join_request",
-          status: req?.status || "pending",
-          created_at: req?.joined_at,
-          actor_name: req?.user?.name || "Someone",
-          actor_avatar: req?.user?.avatar || "",
-          user_id: req?.user?.id,
-          group: { id: g.id, name: g.name },
-          read_at: null,
-        }));
-        all.push(...rows);
-      } catch { }
-    }
+    const rowsByGroup = await Promise.all(
+      manageable.map(async (g) => {
+        try {
+          const r = await fetch(ENDPOINTS.pendingForGroup(g.id), { headers: { Accept: "application/json", ...authHeader() } });
+          if (!r.ok) return [];
+          const jr = await r.json();
+          return (jr?.requests || []).map((req) => ({
+            id: `join-${g.id}-${req?.user?.id}`,
+            _source: "join",
+            type: "join_request",
+            status: req?.status || "pending",
+            created_at: req?.joined_at,
+            actor_name: req?.user?.name || "Someone",
+            actor_avatar: req?.user?.avatar || "",
+            user_id: req?.user?.id,
+            group: { id: g.id, name: g.name },
+            read_at: null,
+          }));
+        } catch {
+          return [];
+        }
+      })
+    );
+
+    const all = rowsByGroup.flat();
     return { items: all, count: all.length };
   } catch { return { items: [], count: 0 }; }
 }
 
 async function loadMemberJoined(onlyUnread) {
   try {
-    const res = await fetch(ENDPOINTS.notifList({ kind: "member_joined", unread: onlyUnread ? 1 : undefined, page_size: 200 }), { headers: { Accept: "application/json", ...authHeader() } });
+    const res = await fetch(ENDPOINTS.notifList({ kind: "member_joined", unread: onlyUnread ? 1 : undefined, page_size: 50 }), { headers: { Accept: "application/json", ...authHeader() } });
     if (!res.ok) return { items: [], count: 0 };
     const j = await res.json();
     const list = Array.isArray(j) ? j : j?.results || [];
@@ -153,7 +157,7 @@ async function loadMemberJoined(onlyUnread) {
 
 async function loadGroupCreated(onlyUnread) {
   try {
-    const res = await fetch(ENDPOINTS.notifList({ kind: "group_created", unread: onlyUnread ? 1 : undefined, page_size: 200 }), { headers: { Accept: "application/json", ...authHeader() } });
+    const res = await fetch(ENDPOINTS.notifList({ kind: "group_created", unread: onlyUnread ? 1 : undefined, page_size: 50 }), { headers: { Accept: "application/json", ...authHeader() } });
     if (!res.ok) return { items: [], count: 0 };
     const j = await res.json();
     const list = Array.isArray(j) ? j : j?.results || [];
@@ -192,7 +196,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
   const renderStatus = () => {
     const s = n.status || (n.read_at ? "read" : "pending");
     const common = { size: "small", variant: "outlined", sx: { mt: 0.5, height: 24, borderRadius: "999px", fontWeight: 600, "& .MuiChip-label": { px: 0.5, pt: "1px" } } };
-    
+
     if (s === "approved") return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Approved" sx={{ ...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 } }} />;
     if (s === "rejected") return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Rejected" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
     if (s === "pending") return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label="Pending" sx={{ ...common.sx, bgcolor: "#fff7ed", borderColor: "#ffedd5", color: "#c2410c", "& .MuiChip-icon": { color: "#c2410c", mr: 0.5 } }} />;
@@ -297,7 +301,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
               </IconButton>
             )}
           </Stack>
-          
+
           {/* Status Badge (Accepted/Declined/Pending) */}
           {renderStatus()}
         </Stack>
@@ -339,13 +343,13 @@ export default function AdminNotificationsPage() {
   const [items, setItems] = React.useState([]);
   const [count, setCount] = React.useState(0);
   const [unreadCount, setUnreadCount] = React.useState(0);
-  
+
   // -- Loading & Infinite Scroll State --
   const [initialLoading, setInitialLoading] = React.useState(true);
   const [visibleCount, setVisibleCount] = React.useState(8);
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const observerTarget = React.useRef(null);
-  
+
   const [busyId, setBusyId] = React.useState(null);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
   const [userInitial, setUserInitial] = React.useState("A");
@@ -369,6 +373,18 @@ export default function AdminNotificationsPage() {
     fetchMe();
   }, []);
 
+  const syncUnread = React.useCallback((nextItems) => {
+    const unread = nextItems.filter((x) =>
+      (x.type === "join_request" || x.type === "name_change")
+        ? x.status === "pending"
+        : !x.read_at
+    ).length;
+
+    setUnreadCount(unread);
+    try { localStorage.setItem("admin_unread_notifications", String(unread)); } catch { }
+    window.dispatchEvent(new CustomEvent("admin:notify:unread", { detail: { count: unread } }));
+  }, []);
+
   // --- Intersection Observer Logic ---
   React.useEffect(() => {
     // If we have shown all items or are currently loading, do nothing
@@ -385,7 +401,7 @@ export default function AdminNotificationsPage() {
           }, 500);
         }
       },
-      { threshold: 0.1 } 
+      { threshold: 0.1 }
     );
 
     observer.observe(observerTarget.current);
@@ -417,6 +433,10 @@ export default function AdminNotificationsPage() {
       }
       const unread = out.items.filter((x) => (x.type === "join_request" || x.type === "name_change") ? x.status === "pending" : !x.read_at).length;
       setUnreadCount(unread);
+      try {
+        localStorage.setItem("admin_unread_notifications", String(unread));
+      } catch { }
+      window.dispatchEvent(new CustomEvent("admin:notify:unread", { detail: { count: unread } }));
       setItems(out.items);
       setCount(out.count);
       setVisibleCount(8); // Reset scroll on new filter
@@ -428,7 +448,7 @@ export default function AdminNotificationsPage() {
   React.useEffect(() => { fetchData(); }, [fetchData]);
 
   // --- Handlers ---
-  const markRead = async (n) => { 
+  const markRead = async (n) => {
     if (n?._source !== "notif" || !n?.id || n.read_at) return;
     setBusyId(n.id);
     try {
@@ -437,11 +457,22 @@ export default function AdminNotificationsPage() {
         headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ ids: [n.id] }),
       });
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)));
-    } catch (e) { setToast({ open: true, type: "error", msg: "Failed" }); } finally { setBusyId(null); }
+
+      setItems((prev) => {
+        const next = prev.map((x) =>
+          x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x
+        );
+        syncUnread(next);   // ✅ LIVE update sidebar + header
+        return next;
+      });
+    } catch (e) {
+      setToast({ open: true, type: "error", msg: "Failed" });
+    } finally {
+      setBusyId(null);
+    }
   };
 
-  const handleMarkAllRead = async () => { 
+  const handleMarkAllRead = async () => {
     const ids = items.filter((n) => n._source === "notif" && !n.read_at).map((n) => n.id);
     if (!ids.length) return;
     setBusyId("bulk");
@@ -454,28 +485,37 @@ export default function AdminNotificationsPage() {
       const now = new Date().toISOString();
       setItems((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, read_at: now } : n));
       setUnreadCount(0);
+      window.dispatchEvent(new CustomEvent("admin:notify:unread", { detail: { count: 0 } }));
       setToast({ open: true, type: "success", msg: "Marked all read" });
     } catch (e) { setToast({ open: true, type: "error", msg: "Failed" }); } finally { setBusyId(null); }
   };
 
-  const approveJoin = async (n) => { 
+  const approveJoin = async (n) => {
     setBusyId(n.id);
     try {
       await fetch(ENDPOINTS.approveJoin(n.group.id, n.user_id), { method: "POST", headers: { ...authHeader() } });
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: "approved" } : x)));
+      setItems((prev) => {
+        const next = prev.map((x) => (x.id === n.id ? { ...x, status: "approved" } : x));
+        syncUnread(next);
+        return next;
+      });
       setToast({ open: true, type: "success", msg: "Approved" });
     } catch { setToast({ open: true, type: "error", msg: "Failed" }); } finally { setBusyId(null); }
   };
 
-  const rejectJoin = async (n) => { 
+  const rejectJoin = async (n) => {
     setBusyId(n.id);
     try {
       await fetch(ENDPOINTS.rejectJoin(n.group.id, n.user_id), { method: "POST", headers: { ...authHeader() } });
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: "rejected" } : x)));
+      setItems((prev) => {
+        const next = prev.map((x) => (x.id === n.id ? { ...x, status: "rejected" } : x));
+        syncUnread(next);
+        return next;
+      });
       setToast({ open: true, type: "success", msg: "Rejected" });
     } catch { setToast({ open: true, type: "error", msg: "Failed" }); } finally { setBusyId(null); }
   };
-  
+
   const decideNameChange = async (n, status) => {
     setBusyId(n.id);
     try {
@@ -485,20 +525,26 @@ export default function AdminNotificationsPage() {
         body: JSON.stringify({ status: status }),
       });
       if (!res.ok) throw new Error("Failed");
-      
+
       // Update local state to reflect decision immediately
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, status: status, read_at: new Date().toISOString() } : x)));
-      
+      setItems((prev) => {
+        const next = prev.map((x) =>
+          x.id === n.id ? { ...x, status, read_at: new Date().toISOString() } : x
+        );
+        syncUnread(next);
+        return next;
+      });
+
       setToast({ open: true, type: "success", msg: `Request ${status}.` });
-      
+
       // Refresh list to sync with server, but now since we fetch ALL, the approved item will stay.
-      setTimeout(fetchData, 1500); 
+      setTimeout(fetchData, 1500);
     } catch (e) { setToast({ open: true, type: "error", msg: "Error" }); } finally { setBusyId(null); }
   };
 
   return (
     <Container maxWidth="xl" disableGutters sx={{ px: { xs: 0, sm: 0 }, pt: 6, pb: 6 }}>
-      
+
       {/* Header */}
       <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={2} sx={{ mb: 4 }}>
         <Stack direction="row" alignItems="center" spacing={2}>
@@ -512,11 +558,11 @@ export default function AdminNotificationsPage() {
           </Box>
         </Stack>
         {!isMobile && (
-          <Button 
-            variant="outlined" 
-            startIcon={<DoneAllRoundedIcon />} 
-            onClick={handleMarkAllRead} 
-            disabled={initialLoading || unreadCount === 0} 
+          <Button
+            variant="outlined"
+            startIcon={<DoneAllRoundedIcon />}
+            onClick={handleMarkAllRead}
+            disabled={initialLoading || unreadCount === 0}
             sx={{ borderRadius: 99, textTransform: "uppercase", fontSize: 12, px: 2.5, borderColor: TEAL, color: TEAL, '&:hover': { bgcolor: '#f0fdfa', borderColor: TEAL } }}
           >
             Mark all read
@@ -527,10 +573,10 @@ export default function AdminNotificationsPage() {
       {/* Filters */}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} sx={{ mb: 3 }}>
         <Stack direction="row" alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
-          <FormControlLabel 
-            sx={{ ml: 0 }} 
-            control={<Switch checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: TEAL }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: TEAL } }} />} 
-            label={<Typography variant="body2" fontWeight={500} color="#475569">Pending / Unread</Typography>} 
+          <FormControlLabel
+            sx={{ ml: 0 }}
+            control={<Switch checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: TEAL }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: TEAL } }} />}
+            label={<Typography variant="body2" fontWeight={500} color="#475569">Pending / Unread</Typography>}
           />
         </Stack>
         <Box sx={{ flexGrow: 1 }} />
@@ -565,14 +611,14 @@ export default function AdminNotificationsPage() {
           <>
             <Stack spacing={1}>
               {visibleItems.map((n) => (
-                <AdminNotificationRow 
-                  key={n.id} 
-                  n={n} 
-                  busy={busyId === n.id} 
-                  onApprove={approveJoin} 
-                  onReject={rejectJoin} 
-                  onDecideName={decideNameChange} 
-                  onMarkRead={markRead} 
+                <AdminNotificationRow
+                  key={n.id}
+                  n={n}
+                  busy={busyId === n.id}
+                  onApprove={approveJoin}
+                  onReject={rejectJoin}
+                  onDecideName={decideNameChange}
+                  onMarkRead={markRead}
                 />
               ))}
             </Stack>

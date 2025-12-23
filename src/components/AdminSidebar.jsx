@@ -11,6 +11,7 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
+  Badge,
 } from "@mui/material";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole";
 import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
@@ -31,6 +32,99 @@ const TEXT = "#334155";
 const HOVER_BG = "#e6f7f6";
 const CARD_BG = "#ffffff";
 const CARD_BORDER = "#e5e7eb";
+
+// Always resolve to the Django API (e.g., http://localhost:8000/api)
+const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
+const API_ROOT = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
+
+const tokenHeader = () => {
+  const t =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("access") ||
+    localStorage.getItem("jwt");
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+
+async function countFromPaginated(url) {
+  try {
+    const r = await fetch(url, {
+      headers: { ...tokenHeader(), Accept: "application/json" },
+      credentials: "include",
+    });
+    if (!r.ok) return 0;
+    const j = await r.json().catch(() => ({}));
+    if (typeof j.count === "number") return j.count;
+    const arr = Array.isArray(j) ? j : j?.results || [];
+    return arr.length;
+  } catch {
+    return 0;
+  }
+}
+
+async function getUnreadGroupNotifCount(kind) {
+  return countFromPaginated(
+    `${API_ROOT}/group-notifications/?unread=1&kind=${encodeURIComponent(kind)}&page_size=1`
+  );
+}
+
+async function getPendingNameRequestsCount() {
+  // superuser only → if 403, we treat it as 0
+  return countFromPaginated(
+    `${API_ROOT}/auth/admin/name-requests/?status=pending&page_size=1`
+  );
+}
+
+async function getPendingJoinRequestsCount() {
+  try {
+    const r = await fetch(`${API_ROOT}/groups/?page_size=200`, {
+      headers: { ...tokenHeader(), Accept: "application/json" },
+      credentials: "include",
+    });
+    if (!r.ok) return 0;
+    const j = await r.json().catch(() => ({}));
+    const groups = Array.isArray(j) ? j : j?.results || [];
+
+    const manageable = groups.filter((g) =>
+      ["owner", "admin", "moderator"].includes(g?.current_user_role)
+    );
+
+    const counts = await Promise.all(
+      manageable.map(async (g) => {
+        try {
+          const rr = await fetch(`${API_ROOT}/groups/${g.id}/member-requests/`, {
+            headers: { ...tokenHeader(), Accept: "application/json" },
+            credentials: "include",
+          });
+          if (!rr.ok) return 0;
+          const jj = await rr.json().catch(() => ({}));
+          if (typeof jj.count === "number") return jj.count;
+          return Array.isArray(jj.requests) ? jj.requests.length : 0;
+        } catch {
+          return 0;
+        }
+      })
+    );
+
+    return counts.reduce((a, b) => a + (b || 0), 0);
+  } catch {
+    return 0;
+  }
+}
+
+// ✅ This matches what AdminNotificationsPage shows (pending/unread mix)
+async function getAdminNotificationsBadgeCount() {
+  const [joinPending, memberJoinedUnread, groupCreatedUnread, namePending] =
+    await Promise.all([
+      getPendingJoinRequestsCount(),
+      getUnreadGroupNotifCount("member_joined"),
+      getUnreadGroupNotifCount("group_created"),
+      getPendingNameRequestsCount(), // if you DON'T want identity requests in Notifications badge → remove this line
+    ]);
+
+  return (joinPending || 0) + (memberJoinedUnread || 0) + (groupCreatedUnread || 0) + (namePending || 0);
+}
+
 
 const defaultItems = [
   { key: "events", label: "My Events", Icon: EventNoteRoundedIcon },
@@ -71,7 +165,46 @@ export default function AdminSidebar({
       );
   }
 
+  const [adminNotifCount, setAdminNotifCount] = React.useState(
+    Number(localStorage.getItem("admin_unread_notifications") || 0)
+  );
 
+  React.useEffect(() => {
+    let off = false;
+
+    const sync = async () => {
+      const cnt = await getAdminNotificationsBadgeCount();
+      if (!off) {
+        setAdminNotifCount(cnt);
+        try {
+          localStorage.setItem("admin_unread_notifications", String(cnt));
+        } catch { }
+      }
+    };
+
+    sync();
+
+    const onUnread = (e) => {
+      const c = Math.max(0, e?.detail?.count ?? 0);
+      setAdminNotifCount(c);
+      try {
+        localStorage.setItem("admin_unread_notifications", String(c));
+      } catch { }
+    };
+
+    window.addEventListener("admin:notify:unread", onUnread);
+
+    const id = setInterval(sync, 30000);
+    const onFocus = () => sync();
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      off = true;
+      clearInterval(id);
+      window.removeEventListener("admin:notify:unread", onUnread);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
 
   const ListUI = (
     <Paper
@@ -116,7 +249,17 @@ export default function AdminSidebar({
             >
               {ItemIcon && (
                 <ListItemIcon>
-                  <ItemIcon fontSize="small" />
+                  {item.key === "notifications" ? (
+                    <Badge
+                      color="primary"
+                      badgeContent={adminNotifCount || 0}
+                      invisible={!adminNotifCount}
+                    >
+                      <ItemIcon fontSize="small" />
+                    </Badge>
+                  ) : (
+                    <ItemIcon fontSize="small" />
+                  )}
                 </ListItemIcon>
               )}
               <ListItemText primary={item.label} />
