@@ -276,19 +276,29 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect }) {
     const run = async () => {
       setLoading(true);
       try {
-        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=en&format=json`;
-        const r = await fetch(url, { signal: controller.signal });
+        // ✅ Offline city search (your backend)
+        const url = `${API_BASE}/auth/cities/search/?q=${encodeURIComponent(q)}&limit=10`;
+
+        const r = await fetch(url, {
+          signal: controller.signal,
+          headers: tokenHeader(), // ✅ required (IsAuthenticated endpoint)
+        });
         if (!r.ok) return;
+
         const data = await r.json();
 
-        const results = (data?.results || []).map((x) => ({
-          name: x.name || "",
-          admin1: x.admin1 || "",
-          country: x.country || "",
-          country_code: x.country_code || "",
-          latitude: x.latitude,
-          longitude: x.longitude,
-        })).filter((x) => x.name && x.country);
+        // Map backend shape -> keep your existing UI shape {name, admin1, country, ...}
+        const results = (data?.results || [])
+          .map((x) => ({
+            name: x.name || "",
+            admin1: x.is_other ? "Other / Not listed" : "",
+            country: x.country_name || "",
+            country_code: x.country_code || "",
+            latitude: x.lat,
+            longitude: x.lng,
+            label: x.label, // optional
+          }))
+          .filter((x) => x.name && x.country);
 
         if (active) setOptions(results);
       } catch (e) {
@@ -2495,7 +2505,7 @@ export default function ProfilePage() {
                                             />
                                           ))}
                                         </Stack>
-                                      )}  
+                                      )}
                                     </Stack>
                                   }
                                 />

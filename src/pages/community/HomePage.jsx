@@ -1696,6 +1696,124 @@ function UniversityAutocomplete({ value, onChange, label = "University" }) {
 }
 
 // -----------------------------------------------------------------------------
+// City Autocomplete (OFFLINE - Backend GeoCitySearchView)
+// GET /api/auth/cities/search/?q=sur&country=IN&limit=20
+// Returns mapped shape similar to Open-Meteo: { name, admin1, country, country_code, latitude, longitude }
+// -----------------------------------------------------------------------------
+function CityAutocompleteOffline({ label = "City", value, onSelect, countryCode = "" }) {
+  const [open, setOpen] = React.useState(false);
+  const [options, setOptions] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
+
+  React.useEffect(() => {
+    const q = (inputValue || "").trim();
+
+    if (q.length < 2) {
+      setOptions(value ? [value] : []);
+      return;
+    }
+
+    let active = true;
+    const controller = new AbortController();
+
+    const run = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("q", q);
+        params.set("limit", "10");
+        if (countryCode) params.set("country", String(countryCode).toUpperCase());
+
+        const url = `${API_ROOT}/auth/cities/search/?${params.toString()}`;
+
+        const r = await fetch(url, {
+          headers: { ...authHeader(), accept: "application/json" },
+          signal: controller.signal,
+        });
+        if (!r.ok) return;
+
+        const data = await r.json();
+
+        const results = (data?.results || []).map((x) => ({
+          geoname_id: x.geoname_id ?? null,
+          name: x.name || "",
+          admin1: x.admin1_code || "",
+          country: x.country_name || x.country_code || "",
+          country_code: x.country_code || "",
+          latitude: x.lat ?? null,
+          longitude: x.lng ?? null,
+          is_other: !!x.is_other,
+          label: x.label || [x.name, x.country_name || x.country_code].filter(Boolean).join(", "),
+        })).filter((x) => x.name);
+
+        if (active) setOptions(results);
+      } catch (e) {
+        if (e?.name !== "AbortError") console.error("Offline city search failed", e);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const t = setTimeout(run, 300);
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(t);
+    };
+  }, [inputValue, value, countryCode]);
+
+  return (
+    <Autocomplete
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      options={options}
+      loading={loading}
+      value={value || null}
+      inputValue={inputValue}
+      onInputChange={(_, v) => setInputValue(v)}
+      isOptionEqualToValue={(o, v) => {
+        if (o?.geoname_id && v?.geoname_id) return o.geoname_id === v.geoname_id;
+        return o?.name === v?.name && o?.country === v?.country;
+      }}
+      getOptionLabel={(o) => (o?.label ? o.label : [o?.name, o?.country].filter(Boolean).join(", "))}
+      onChange={(_, newValue) => onSelect?.(newValue || null)}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label={label}
+          fullWidth
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress size={18} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+      renderOption={(props, option) => (
+        <li {...props}>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {option.label}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {option.country_code ? `Country Code: ${option.country_code}` : ""}
+              {option.is_other ? " · Custom" : ""}
+            </Typography>
+          </Box>
+        </li>
+      )}
+    />
+  );
+}
+
+
+// -----------------------------------------------------------------------------
 // City Autocomplete (Open-Meteo) → returns { name, admin1, country, country_code, latitude, longitude }
 // -----------------------------------------------------------------------------
 function CityAutocompleteOpenMeteo({ label = "City", value, onSelect }) {
@@ -3037,15 +3155,16 @@ function AboutTab({
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="Email" fullWidth value={contactForm.email || ""} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} />
-            <CityAutocompleteOpenMeteo
+            <CityAutocompleteOffline
               label="City"
               value={contactForm.city_obj || null}
+              countryCode={getSelectedCountry({ location: contactForm.location })?.code || ""} // optional filter
               onSelect={(place) => {
                 setContactForm((prev) => ({
                   ...prev,
                   city_obj: place,
                   city: place?.name || "",
-                  location: place?.country || "", // ✅ auto-fill country
+                  location: place?.country || "", // still auto-fill Country label
                 }));
               }}
             />
@@ -3328,15 +3447,16 @@ function AboutTab({
             {/* 6. Location: City + Country (same pattern you already use) */}
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
               <Box sx={{ flex: 1, minWidth: 150 }}>
-                <CityAutocompleteOpenMeteo
+                <CityAutocompleteOffline
                   label="City"
                   value={expForm.city_obj || null}
+                  countryCode={getSelectedCountry({ location: expForm.location })?.code || ""} // optional filter
                   onSelect={(place) => {
                     setExpForm((prev) => ({
                       ...prev,
                       city_obj: place,
                       city: place?.name || "",
-                      location: place?.country || "", // ✅ auto-fill country
+                      location: place?.country || "", // country label
                     }));
                   }}
                 />
