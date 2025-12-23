@@ -162,22 +162,36 @@ export default function CommunityProfileCard({
 }) {
   const navigate = useNavigate();
 
+  const getAccessToken = () =>
+    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
+    sessionStorage.getItem("access") ||
+    sessionStorage.getItem("token");
+
+  const getRefreshToken = () =>
+    localStorage.getItem("refresh_token") || sessionStorage.getItem("refresh");
+
   const signOut = async () => {
+    const access = getAccessToken();
+    const refresh = getRefreshToken();
+
     try {
-      await axios.post(
-        `${apiBase}/auth/session/logout/`,
-        {},
-        {
-          withCredentials: true,
-          headers: { "X-CSRFToken": getCookie("csrftoken") || "" },
-        }
-      );
-    } catch (e) {
-      // ignore errors, still clear local auth
-    }
+      if (access && refresh) {
+        await axios.post(
+          `${apiBase}/auth/logout/`,
+          { refresh },
+          { headers: { Authorization: `Bearer ${access}` } }
+        );
+      }
+    } catch { }
+
     clearAuth();
+    localStorage.setItem("cart_count", "0");
+    window.dispatchEvent(new Event("cart:update"));
+
     navigate("/", { replace: true });
   };
+
   const [openGroups, setOpenGroups] = React.useState(false);
   const [openFriends, setOpenFriends] = React.useState(false);
 

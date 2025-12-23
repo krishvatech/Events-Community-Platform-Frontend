@@ -130,21 +130,25 @@ const Header = () => {
   });
 
   useEffect(() => {
-    if (owner) return; // no cart fetching for owners
+    if (owner) return;
+
+    if (!authed) {
+      localStorage.setItem("cart_count", "0");
+      setCartCount(0);
+      return;
+    }
+
     (async () => {
       try {
-        const { data } = await axios.get(
-          `${apiBase}/cart/count/`,
-          authConfig()
-        );
+        const { data } = await axios.get(`${apiBase}/cart/count/`, authConfig());
         const count = Number(data?.count ?? 0);
         localStorage.setItem("cart_count", String(count));
         setCartCount(count);
       } catch {
-        // keep whatever is in localStorage
+        // ignore
       }
     })();
-  }, [owner]);
+  }, [owner, authed]);
 
 
 
@@ -214,18 +218,35 @@ const Header = () => {
     return () => window.removeEventListener("pageshow", onShow);
   }, [location.pathname, navigate]);
 
+  const getAccessToken = () =>
+    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
+    sessionStorage.getItem("access") ||
+    sessionStorage.getItem("token");
+
+  const getRefreshToken = () =>
+    localStorage.getItem("refresh_token") || sessionStorage.getItem("refresh");
+
   const signOut = async () => {
+    const access = getAccessToken();
+    const refresh = getRefreshToken();
+
     try {
-      await axios.post(
-        `${apiBase}/auth/session/logout/`,
-        {},
-        {
-          withCredentials: true,
-          headers: { "X-CSRFToken": getCookie("csrftoken") || "" },
-        }
-      );
-    } catch { }
+      if (access && refresh) {
+        await axios.post(
+          `${apiBase}/auth/logout/`,
+          { refresh },
+          { headers: { Authorization: `Bearer ${access}` } }
+        );
+      }
+    } catch (e) {
+      // ignore (still clear local auth)
+    }
+
     clearAuth();
+    localStorage.setItem("cart_count", "0");
+    window.dispatchEvent(new Event("cart:update"));
+
     setAuthed(false);
     navigate("/", { replace: true });
   };

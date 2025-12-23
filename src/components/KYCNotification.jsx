@@ -3,7 +3,7 @@ import { Box, Button, Typography, Container, CircularProgress } from "@mui/mater
 import { useLocation } from "react-router-dom";
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { apiClient, startKYC } from "../utils/api";
+import { apiClient, startKYC, getToken } from "../utils/api";
 
 export default function KYCNotification() {
   const [status, setStatus] = useState(null); // 'not_started', 'pending', 'approved', 'declined'
@@ -19,6 +19,14 @@ export default function KYCNotification() {
   useEffect(() => {
     if (shouldHide) {
       setStatus(null);
+      setIsSuperUser(false);
+      return;
+    }
+
+    // ✅ don’t call /users/me/ when logged out
+    if (!getToken()) {
+      setStatus(null);
+      setIsSuperUser(false);
       return;
     }
 
@@ -27,24 +35,15 @@ export default function KYCNotification() {
         const res = await apiClient.get("/users/me/");
         const userData = res.data;
 
-        // 1. Check if user is Superuser (Admin)
-        // If TRUE: We return immediately, so they DO NOT see the banner.
         if (userData?.is_superuser) {
           setIsSuperUser(true);
           return;
         }
 
-        // 2. Staff and Normal Users pass through here.
-        // We check their KYC status.
         const kyc = userData?.profile?.kyc_status;
-
-        // Show banner if NOT approved
-        if (kyc && kyc !== "approved") {
-          setStatus(kyc);
-        } else {
-          setStatus(null);
-        }
-      } catch (error) {
+        if (kyc && kyc !== "approved") setStatus(kyc);
+        else setStatus(null);
+      } catch {
         setStatus(null);
       }
     };
