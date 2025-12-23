@@ -37,5 +37,10 @@ export function clearAuth() {
     sessionStorage.removeItem("access");
     sessionStorage.removeItem("refresh");
     sessionStorage.removeItem("user");
-  } catch {}
+  } catch { }
+
+  // ✅ notify app immediately (same tab) — important for KYC banner, counts, etc.
+  try {
+    window.dispatchEvent(new Event("auth:changed"));
+  } catch { }
 }

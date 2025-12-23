@@ -15,6 +15,18 @@ export default function KYCNotification() {
   const hideOnRoutes = ["/signin", "/signup", "/live"];
   const shouldHide = hideOnRoutes.some((route) => location.pathname.startsWith(route));
 
+  const [authTick, setAuthTick] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setAuthTick((x) => x + 1);
+    window.addEventListener("auth:changed", bump);
+    window.addEventListener("storage", bump); // cross-tab sync
+    return () => {
+      window.removeEventListener("auth:changed", bump);
+      window.removeEventListener("storage", bump);
+    };
+  }, []);
+
   // Check status on mount & route change
   useEffect(() => {
     if (shouldHide) {
@@ -49,7 +61,7 @@ export default function KYCNotification() {
     };
 
     checkStatus();
-  }, [location.pathname, shouldHide]);
+  }, [location.pathname, shouldHide, authTick]);
 
   // Handle "Verify Now" click
   const handleVerifyClick = async () => {
@@ -71,6 +83,7 @@ export default function KYCNotification() {
   // Logic: 
   // 1. If Superuser (Admin) -> Return Null (Hidden)
   // 2. If Staff or Normal -> Check Status -> Show Banner
+  if (!getToken()) return null;
   if (isSuperUser || !status) return null;
 
   // --- Configuration ---

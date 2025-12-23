@@ -111,7 +111,10 @@ const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { pathname, search } = location;
-  const accountHref = isAdminUser() ? "/admin/events" : "/account/resources";
+  // const accountHref = isAdminUser() ? "/admin/events" : "/account/resources";
+  const isAdmin = isAdminUser();
+  const accountHref = isAdmin ? "/admin/events" : "/account/resources";
+  const resourcesHref = isAdmin ? "/admin/resources" : "/account/resources";
   const owner = isOwnerUser();
   const staff = isStaffUser();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -208,7 +211,10 @@ const Header = () => {
     const guard = () => {
       const path = location.pathname || "/";
       const onProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
-      if (!isAuthed() && onProtected) navigate("/", { replace: true });
+      if (!isAuthed() && onProtected) {
+        const nextPath = encodeURIComponent((location.pathname + location.search) || "/");
+        navigate(`/signin?next=${nextPath}`, { replace: true });
+      }
     };
     guard();
     const onShow = (e) => {
@@ -251,9 +257,15 @@ const Header = () => {
     navigate("/", { replace: true });
   };
 
-  const NavLink = ({ to, children }) => (
+  const NavLink = ({ to, children, requireAuth = false }) => (
     <Link
       to={to}
+      onClick={(e) => {
+        if (requireAuth && !authed) {
+          e.preventDefault();
+          navigate(`/signin?next=${encodeURIComponent(to)}`);
+        }
+      }}
       className="px-1 py-2 text-base text-gray-500 hover:text-teal-400 transition-colors whitespace-nowrap"
     >
       {children}
@@ -308,8 +320,8 @@ const Header = () => {
           >
             <div className="flex items-center gap-6 md:gap-8">
               <NavLink to="/events">Events</NavLink>
-              <NavLink to="/community">Community</NavLink>
-              <NavLink to="/resources">Resources</NavLink>
+              <NavLink to="/community" requireAuth>Community</NavLink>
+              <NavLink to={resourcesHref} requireAuth>Resources</NavLink>
               <NavLink to="/about">About Us</NavLink>
             </div>
           </Box>
@@ -413,10 +425,21 @@ const Header = () => {
             <ListItemButton component={Link} to="/events">
               <ListItemText primary="Events" />
             </ListItemButton>
-            <ListItemButton component={Link} to="/community">
+            <ListItemButton component={Link} to="/community" onClick={(e) => {
+              if (!authed) {
+                e.preventDefault();
+                navigate(`/signin?next=${encodeURIComponent("/community")}`);
+              }
+            }}>
               <ListItemText primary="Community" />
             </ListItemButton>
-            <ListItemButton component={Link} to="/resources">
+
+            <ListItemButton component={Link} to={resourcesHref} onClick={(e) => {
+              if (!authed) {
+                e.preventDefault();
+                navigate(`/signin?next=${encodeURIComponent(resourcesHref)}`);
+              }
+            }}>
               <ListItemText primary="Resources" />
             </ListItemButton>
             <ListItemButton component={Link} to="/about">
