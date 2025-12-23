@@ -69,7 +69,9 @@ async function getUnreadGroupNotifCount(kind) {
 }
 
 async function getPendingNameRequestsCount() {
-  // superuser only → if 403, we treat it as 0
+  // ✅ IMPORTANT: Avoid calling admin-only API for staff users
+  if (!isOwnerUser()) return 0;
+
   return countFromPaginated(
     `${API_ROOT}/auth/admin/name-requests/?status=pending&page_size=1`
   );
