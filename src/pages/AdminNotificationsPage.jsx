@@ -31,6 +31,7 @@ import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
 import HourglassBottomRoundedIcon from "@mui/icons-material/HourglassBottomRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
+import { isOwnerUser } from "../utils/adminRole";
 
 // --- Config ---
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
@@ -69,6 +70,8 @@ const ENDPOINTS = {
 
 // ---- Data Loaders ----
 async function loadNameChangeRequests() {
+  // ✅ Staff should not call superuser-only endpoint
+  if (!isOwnerUser()) return { items: [], count: 0 };
   try {
     const res = await fetch(ENDPOINTS.nameRequestsList(), { headers: { Accept: "application/json", ...authHeader() } });
     if (!res.ok) return { items: [], count: 0 };
