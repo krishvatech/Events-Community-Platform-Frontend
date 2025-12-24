@@ -557,6 +557,32 @@ export default function HomePage() {
   // Toast State
   const [snack, setSnack] = React.useState({ open: false, msg: "", sev: "success" });
 
+  // About (Summary) see more
+  const [aboutExpanded, setAboutExpanded] = React.useState(false);
+  const [aboutHasOverflow, setAboutHasOverflow] = React.useState(false);
+  const aboutBioRef = React.useRef(null);
+
+  const checkAboutOverflow = React.useCallback(() => {
+    const el = aboutBioRef.current;
+    if (!el) return;
+    // detect if clamped text is actually overflowing
+    setAboutHasOverflow(el.scrollHeight > el.clientHeight + 1);
+  }, []);
+
+  React.useEffect(() => {
+    // only measure when collapsed (clamped)
+    if (aboutExpanded) return;
+
+    const raf = requestAnimationFrame(checkAboutOverflow);
+    const onResize = () => checkAboutOverflow();
+
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [profile?.bio, aboutExpanded, checkAboutOverflow]);
+
   const showNotification = (type, msg) => {
     setSnack({ open: true, sev: type, msg });
   };
@@ -1954,6 +1980,31 @@ function AboutTab({
   const [aboutMode, setAboutMode] = React.useState("description");
   const [aboutForm, setAboutForm] = React.useState({ bio: "", skillsText: "" });
 
+  // About (Summary) see more clamp
+  const [aboutExpanded, setAboutExpanded] = React.useState(false);
+  const [aboutHasOverflow, setAboutHasOverflow] = React.useState(false);
+  const aboutBioRef = React.useRef(null);
+
+  const checkAboutOverflow = React.useCallback(() => {
+    const el = aboutBioRef.current;
+    if (!el) return;
+    setAboutHasOverflow(el.scrollHeight > el.clientHeight + 1);
+  }, []);
+
+  React.useEffect(() => {
+    // when bio changes, collapse + re-measure
+    setAboutExpanded(false);
+    const raf = requestAnimationFrame(checkAboutOverflow);
+    return () => cancelAnimationFrame(raf);
+  }, [profile?.bio, checkAboutOverflow]);
+
+  React.useEffect(() => {
+    if (aboutExpanded) return;
+    const onResize = () => checkAboutOverflow();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [aboutExpanded, checkAboutOverflow]);
+
   const [eduOpen, setEduOpen] = React.useState(false);
   const [editEduId, setEditEduId] = React.useState(null);
   const [eduForm, setEduForm] = React.useState({ school: "", degree: "", field: "", start: "", end: "", grade: "" });
@@ -2625,7 +2676,37 @@ function AboutTab({
         <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
 
           <SectionCard title="About" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("description"); setAboutOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>} sx={{ minHeight: 160, display: "flex", flexDirection: "column" }}>
-            <Typography variant="body2">{profile.bio || <Box component="span" sx={{ color: "text.secondary" }}>List your major duties...</Box>}</Typography>
+            <Typography
+              ref={aboutBioRef}
+              variant="body2"
+              sx={{
+                display: aboutExpanded ? "block" : "-webkit-box",
+                ...(aboutExpanded
+                  ? {}
+                  : {
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }),
+                whiteSpace: "pre-wrap", // ✅ keep LinkedIn-style new lines/spaces
+                wordBreak: "break-word",
+              }}
+            >
+              {profile.bio || <Box sx={{ color: "text.secondary" }}>List your major duties...</Box>}
+            </Typography>
+            {Boolean((profile.bio || "").trim()) && (aboutExpanded || aboutHasOverflow) && (
+              <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.5 }}>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => setAboutExpanded((v) => !v)}
+                  sx={{ p: 0, minWidth: 0, textTransform: "none", fontWeight: 600 }}
+                >
+                  {aboutExpanded ? "See less" : "See more"}
+                </Button>
+              </Box>
+            )}
             <Typography variant="caption" color="text.secondary" sx={{ mt: "auto", alignSelf: "flex-end", display: "block", pt: 1 }}>{(profile.bio || "").length}/2000</Typography>
           </SectionCard>
 
@@ -2718,7 +2799,8 @@ function AboutTab({
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: "vertical",
                               overflow: "hidden",
-                              whiteSpace: "normal",
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
                             }}
                           >
                             {exp.description}
@@ -2917,7 +2999,8 @@ function AboutTab({
                                 WebkitLineClamp: 2,
                                 WebkitBoxOrient: "vertical",
                                 overflow: "hidden",
-                                whiteSpace: "normal",
+                                whiteSpace: "pre-wrap",
+                                wordBreak: "break-word",
                               }}
                             >
                               {t.description}

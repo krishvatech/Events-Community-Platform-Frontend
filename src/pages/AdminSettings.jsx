@@ -2369,7 +2369,22 @@ export default function AdminSettings() {
                     </Tooltip>
                   }>
                     <Label>Summary</Label>
-                    <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>{profile.bio?.trim() ? profile.bio : "Add a short description about your role, focus areas, and what you're working on."}</Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        whiteSpace: "pre-wrap",     // ✅ keeps new lines + spaces
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {profile.bio?.trim()
+                        ? profile.bio
+                        : "Add a short description about your role, focus areas, and what you're working on."}
+                    </Typography>
                   </SectionCard>
 
                   <SectionCard sx={{ mt: 2 }} title="Skills" action={

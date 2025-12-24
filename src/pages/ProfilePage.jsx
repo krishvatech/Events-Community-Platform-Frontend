@@ -2346,7 +2346,19 @@ export default function ProfilePage() {
                         }
                       >
                         <Label>Summary</Label>
-                        <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>{form.bio?.trim() ? form.bio : "Add a short description about your role, focus areas, and what you're working on."}</Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            whiteSpace: "pre-line",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical",
+                          }}
+                        >
+                          {form.bio ? form.bio : "Add a short description about your role, focus areas, and what you're working on."}
+                        </Typography>
                       </SectionCard>
 
                       <SectionCard
