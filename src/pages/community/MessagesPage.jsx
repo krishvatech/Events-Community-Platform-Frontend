@@ -1364,6 +1364,8 @@ function NewChatDialog({ open, onClose, onOpened }) {
               "cover_image", "banner_url", "banner", "cover", "header_image", "hero_image",
               "preview_image",
             ]) || "",
+          status: x?.status || ev?.status || null,
+          end_time: x?.end_time || ev?.end_time || null,
         });
         continue;
       }
@@ -1379,12 +1381,14 @@ function NewChatDialog({ open, onClose, onOpened }) {
               "cover_image", "banner_url", "banner", "cover", "header_image", "hero_image",
               "preview_image",
             ]) || "",
+          status: x?.status || ev?.status || null,
+          end_time: x?.end_time || ev?.end_time || null,
         });
         continue;
       }
       if (x?.event_id) {
         const id = x.event_id;
-        out.push({ id, name: x.event_title || `Event #${id}`, avatar: "" });
+        out.push({ id, name: x.event_title || `Event #${id}`, avatar: "", status: x?.status || null, end_time: x?.end_time || null });
       }
     }
     const seen = new Set();
@@ -1512,6 +1516,16 @@ function NewChatDialog({ open, onClose, onOpened }) {
             } catch { }
           }
         }
+
+        const now = Date.now();
+        evOut = evOut.filter((e) => {
+          const st = String(e?.status || "").toLowerCase();
+          if (st === "ended") return true;
+
+          if (!e?.end_time) return false;
+          const t = Date.parse(e.end_time);
+          return Number.isFinite(t) && t <= now;
+        });
 
         setEvents(evOut);
         try { setEvents(await hydrateMissingAvatars(evOut, "event")); } catch { }
@@ -1968,6 +1982,8 @@ export default function MessagesPage() {
   const [activeMessageMode, setActiveMessageMode] = React.useState(null);
   // 🔹 all group IDs where the CURRENT user is a member
   const joinedGroupIdsRef = React.useRef(null);
+  // 🔹 all event IDs where the CURRENT user is registered
+  const registeredEventIdsRef = React.useRef(null);
 
   const active = React.useMemo(
     () => threads.find((t) => t.id === activeId) || null,
@@ -2084,9 +2100,38 @@ export default function MessagesPage() {
           return !joinedIds.has(String(gid));
         };
 
-        // ✅ drop any group conversations where the current user is NOT a member of that group
-        const filteredData = data.filter((t) => !isGroupConversationNotMember(t));
+        // 🔒 helper: hide any EVENT conversation where the logged-in user is NOT registered
+        const isEventConversationNotRegistered = (t) => {
+          // event can come as: t.event (id), t.event_id, or nested object in some shapes
+          const e =
+            t.event ??
+            t.context_event ??
+            t.chat_event ??
+            null;
 
+          const eid =
+            (typeof e === "object" ? e?.id : e) ??
+            t.event_id ??
+            t.context_event_id ??
+            null;
+
+          // if no event id, it's not an event chat → don't filter here
+          if (!eid) return false;
+
+          const registeredIds = registeredEventIdsRef.current;
+
+          // if we haven't loaded registrations yet, don't hide anything
+          if (!registeredIds) return false;
+
+          // ✅ core rule: only allow event conversations whose event_id is in my registrations
+          return !registeredIds.has(String(eid));
+        };
+
+        // ✅ drop any group conversations where the current user is NOT a member
+        // ✅ drop any event conversations where the current user is NOT registered
+        const filteredData = data.filter(
+          (t) => !isGroupConversationNotMember(t) && !isEventConversationNotRegistered(t)
+        );
 
         setThreads((prev) => {
           const byId = new Map(prev.map((p) => [String(p.id), p]));
@@ -2367,6 +2412,36 @@ export default function MessagesPage() {
     navigate(userProfilePath(uid));
   }, [navigate]);
 
+  React.useEffect(() => {
+    (async () => {
+      try {
+        // registrations endpoint (DRF paginated or plain)
+        const res = await apiFetch(`${API_ROOT}/event-registrations/mine/`);
+        if (!res.ok) return;
+
+        const json = await res.json();
+        const arr = Array.isArray(json?.results)
+          ? json.results
+          : Array.isArray(json)
+            ? json
+            : [];
+
+        // event id can be: r.event.id (your serializer), or fallback shapes
+        const ids = new Set(
+          arr
+            .map((r) => String(r?.event?.id ?? r?.event_id ?? r?.event ?? ""))
+            .filter(Boolean)
+        );
+
+        registeredEventIdsRef.current = ids;
+
+        // re-apply filter once we know registrations
+        loadConversations();
+      } catch (e) {
+        console.error("Failed to load event registrations", e);
+      }
+    })();
+  }, [loadConversations]);
 
   // 🔹 Load all groups where THIS user is a member
   React.useEffect(() => {
@@ -3253,7 +3328,7 @@ export default function MessagesPage() {
               flexDirection: "column",
               minHeight: 0,
               // 🔹 full width on mobile / tablet
-              width: { xs: "105%", sm: "185%", md: "180%" },
+              width: { xs: "105%", sm: "185%", md: "149%" },
               maxWidth: "none",  // no cap on tablet/mobile
             }}
           >
