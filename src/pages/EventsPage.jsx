@@ -566,6 +566,7 @@ export default function EventsPage() {
     () => Array.from({ length: PAGE_SIZE }, (_, i) => i),
     [PAGE_SIZE]
   );
+
   const [page, setPage] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [view, setView] = useState("grid"); // 'grid' | 'list'
@@ -575,6 +576,7 @@ export default function EventsPage() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [locationOptionsCache, setLocationOptionsCache] = useState([]);
   const [total, setTotal] = useState(0);
   const CATEGORIES_URL = `${EVENTS_URL}categories/`; // /api/events/categories/
   const [categories, setCategories] = useState([]);
@@ -700,6 +702,42 @@ export default function EventsPage() {
     return () => ctrl.abort();
   }, []); // run once on page load
 
+  // ✅ Locations based on currently displayed events (rawEvents = your current page results)
+  const locationsFromEvents = useMemo(() => {
+    const values = (rawEvents || [])
+      .map((ev) => {
+        // location might be string or object depending on backend
+        if (typeof ev?.location === "string") return ev.location;
+        return ev?.location?.name || ev?.location?.city || "";
+      })
+      .map((v) => String(v || "").trim())
+      .filter(Boolean);
+
+    // case-insensitive dedupe
+    const canonical = new Map();
+    values.forEach((v) => {
+      const key = v.toLowerCase();
+      if (!canonical.has(key)) canonical.set(key, v);
+    });
+
+    return Array.from(canonical.values());
+  }, [rawEvents]);
+
+  useEffect(() => {
+    // When no location filter, store the "full" options list
+    if (!selectedLocation && locationsFromEvents.length) {
+      setLocationOptionsCache(locationsFromEvents);
+    }
+  }, [selectedLocation, locationsFromEvents]);
+
+  const locationOptions = useMemo(() => {
+    const base = selectedLocation
+      ? (locationOptionsCache.length ? locationOptionsCache : locationsFromEvents)
+      : locationsFromEvents;
+
+    return base.length ? base : locations;
+  }, [selectedLocation, locationOptionsCache, locationsFromEvents, locations]);
+
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -822,6 +860,16 @@ export default function EventsPage() {
     return () => ctrl.abort();
   }, [dateRange, startDMY, endDMY, selectedLocation, format, selectedFormats, q]);
 
+  useEffect(() => {
+    if (!selectedLocation) return;
+
+    const list = locationOptionsCache.length ? locationOptionsCache : locationOptions;
+    const ok = list.some(
+      (l) => l.toLowerCase() === String(selectedLocation).toLowerCase()
+    );
+
+    if (!ok) setSelectedLocation("");
+  }, [selectedLocation, locationOptionsCache, locationOptions]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -919,9 +967,17 @@ export default function EventsPage() {
   }, [topic, format, q]);
 
   useEffect(() => {
-    setPriceRange(([min]) => [Math.min(min, Number(maxPrice) || 0), Number(maxPrice) || 0]);
-  }, [maxPrice]);
+    setPriceRange((prev) => {
+      const newMax = Number(maxPrice) || 0;
+      const nextMin = Math.min(prev[0], newMax);
+      const nextMax = newMax;
 
+      // ✅ if same values, do NOT update state (prevents 2nd fetch)
+      if (prev[0] === nextMin && prev[1] === nextMax) return prev;
+
+      return [nextMin, nextMax];
+    });
+  }, [maxPrice]);
 
   useEffect(() => {
     const close = () => setOpenSelect(null);
@@ -1270,7 +1326,16 @@ export default function EventsPage() {
                   <FormControl size="small" className="w-full sm:w-[250px] mb-4 sm:mb-5">
                     <Select
                       value={selectedLocation}
-                      onChange={(e) => setSelectedLocation(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+
+                        // ✅ freeze the full list BEFORE applying location filter
+                        if (!locationOptionsCache.length && locationsFromEvents.length) {
+                          setLocationOptionsCache(locationsFromEvents);
+                        }
+                        setPage(1);
+                        setSelectedLocation(v);
+                      }}
                       displayEmpty
                       renderValue={(v) => v || "Location"}
                       MenuProps={selectMenuProps}
@@ -1283,7 +1348,7 @@ export default function EventsPage() {
                       <MenuItem value="">
                         <em>Location</em>
                       </MenuItem>
-                      {locations.map((loc) => (
+                      {locationOptions.map((loc) => (
                         <MenuItem key={loc} value={loc}>
                           {loc}
                         </MenuItem>
@@ -1585,7 +1650,15 @@ export default function EventsPage() {
               <FormControl size="small" className="w-full sm:w-[250px] mb-4 sm:mb-5">
                 <Select
                   value={selectedLocation}
-                  onChange={(e) => setSelectedLocation(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+
+                    if (!locationOptionsCache.length && locationsFromEvents.length) {
+                      setLocationOptionsCache(locationsFromEvents);
+                    }
+                    setPage(1);
+                    setSelectedLocation(v);
+                  }}
                   displayEmpty
                   renderValue={(v) => v || 'Location'}
                   MenuProps={selectMenuProps}
@@ -1594,7 +1667,7 @@ export default function EventsPage() {
                   <MenuItem value="">
                     <em>Location</em>
                   </MenuItem>
-                  {locations.map((loc) => (
+                  {locationOptions.map((loc) => (
                     <MenuItem key={loc} value={loc}>{loc}</MenuItem>
                   ))}
                 </Select>
