@@ -220,21 +220,16 @@ function EventCard({ ev }) {
       return;
     }
 
-    // PAID: keep add-to-cart (registration will be created after successful checkout)
+    const before = Number(localStorage.getItem("cart_count") || "0");
+
     const item = await addToCart(ev.id);
     if (item) {
-      bumpCartCount(1);
+      // addToCart() already tries to refresh /cart/count/ and dispatches "cart:update"
+      // Fallback: only bump if count didn’t change (e.g., /cart/count failed)
+      const after = Number(localStorage.getItem("cart_count") || "0");
+      if (after === before) bumpCartCount(1);
 
-      const staff = isStaffUser();
-      const owner = isOwnerUser();
-
-      // staff (but not owner) → admin carts
-      if (staff && !owner) {
-        navigate("/admin/carts");
-      } else {
-        // normal users + owners → account cart
-        navigate("/account/cart");
-      }
+      // ✅ DO NOT redirect anywhere
     }
   };
 
@@ -386,18 +381,14 @@ function EventRow({ ev }) {
       return;
     }
 
+    const before = Number(localStorage.getItem("cart_count") || "0");
+
     const item = await addToCart(ev.id);
     if (item) {
-      bumpCartCount(1);
+      const after = Number(localStorage.getItem("cart_count") || "0");
+      if (after === before) bumpCartCount(1);
 
-      const staff = isStaffUser();
-      const owner = isOwnerUser();
-
-      if (staff && !owner) {
-        navigate("/admin/carts");
-      } else {
-        navigate("/account/cart");
-      }
+      // ✅ DO NOT redirect anywhere
     }
   };
 
