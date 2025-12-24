@@ -113,7 +113,7 @@ const Header = () => {
   const { pathname, search } = location;
   // const accountHref = isAdminUser() ? "/admin/events" : "/account/resources";
   const isAdmin = isAdminUser();
-  const accountHref = isAdmin ? "/admin/events" : "/account/resources";
+  const accountHref = isAdmin ? "/admin/events" : "/account/profile";
   const resourcesHref = isAdmin ? "/admin/resources" : "/account/resources";
   const owner = isOwnerUser();
   const staff = isStaffUser();

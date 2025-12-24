@@ -532,6 +532,16 @@ export default function MyEventsPage() {
             <AccountSidebar />
           </aside>
           <main className="col-span-12 lg:col-span-9">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <div>
+                <Typography variant="h5" className="font-semibold tracking-tight">
+                  My Events
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  View, join, and manage events you’ve registered for.
+                </Typography>
+              </div>
+            </div>
             <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
               <Tabs
                 value={tab}

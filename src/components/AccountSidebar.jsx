@@ -34,6 +34,12 @@ const SLATE_700 = "#334155";
 
 const NAV_ITEMS = [
   {
+    key: "profile",
+    label: "Profile",
+    icon: <PersonIcon fontSize="small" />,
+    to: "/account/profile",
+  },
+  {
     key: "resources",
     label: "My Resources",
     icon: <LibraryBooksRoundedIcon fontSize="small" />,
@@ -44,12 +50,6 @@ const NAV_ITEMS = [
     label: "My Events",
     icon: <EventNoteRoundedIcon fontSize="small" />,
     to: "/account/events",
-  },
-  {
-    key: "profile",
-    label: "Profile",
-    icon: <PersonIcon fontSize="small" />,
-    to: "/account/profile",
   },
   {
     key: "elibrary",
@@ -115,13 +115,13 @@ export default function AccountSidebar({ stickyTop = 96 }) {
 
         const btnProps = item.to
           ? {
-              component: Link,
-              to: item.to,
-              onClick: handleClick,
-            }
+            component: Link,
+            to: item.to,
+            onClick: handleClick,
+          }
           : {
-              onClick: handleClick,
-            };
+            onClick: handleClick,
+          };
 
         return (
           <ListItem key={item.key} disablePadding sx={{ my: 0.25 }}>
