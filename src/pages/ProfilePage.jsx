@@ -1012,6 +1012,10 @@ export default function ProfilePage() {
     legal_name_locked: false, kyc_decline_reason: "",
   });
 
+  const [aboutBioExpanded, setAboutBioExpanded] = useState(false);
+  const [aboutBioShowToggle, setAboutBioShowToggle] = useState(false);
+  const aboutBioRef = useRef(null);
+
   // 1. Load Languages
   async function loadLanguages() {
     try {
@@ -1024,6 +1028,20 @@ export default function ProfilePage() {
       }
     } catch (e) { console.error(e); }
   }
+
+  useEffect(() => {
+    const el = aboutBioRef.current;
+    if (!el) return;
+
+    const raf = requestAnimationFrame(() => {
+      // If clamped content is overflowing, enable See more
+      const isOverflowing = el.scrollHeight > el.clientHeight + 1;
+      setAboutBioShowToggle(isOverflowing);
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [form.bio, aboutBioExpanded]);
+
 
   // Add this to your existing useEffect that loads profile data
   useEffect(() => {
@@ -2346,19 +2364,41 @@ export default function ProfilePage() {
                         }
                       >
                         <Label>Summary</Label>
+
                         <Typography
+                          ref={aboutBioRef}
                           variant="body2"
                           sx={{
                             whiteSpace: "pre-line",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            display: "-webkit-box",
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: "vertical",
+                            wordBreak: "break-word",
+                            ...(aboutBioExpanded
+                              ? {}
+                              : {
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: "vertical",
+                              }),
                           }}
                         >
-                          {form.bio ? form.bio : "Add a short description about your role, focus areas, and what you're working on."}
+                          {form.bio?.trim()
+                            ? form.bio
+                            : "Add a short description about your role, focus areas, and what you're working on."}
                         </Typography>
+
+                        {(aboutBioShowToggle || aboutBioExpanded) && (
+                          <Box sx={{ mt: 0.5, display: "flex", justifyContent: "flex-end" }}>
+                            <Button
+                              variant="text"
+                              size="small"
+                              onClick={() => setAboutBioExpanded((v) => !v)}
+                              sx={{ minWidth: "auto", p: 0, textTransform: "none" }}
+                            >
+                              {aboutBioExpanded ? "See less" : "See more"}
+                            </Button>
+                          </Box>
+                        )}
                       </SectionCard>
 
                       <SectionCard

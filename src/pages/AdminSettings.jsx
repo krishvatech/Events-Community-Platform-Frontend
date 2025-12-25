@@ -1077,6 +1077,36 @@ export default function AdminSettings() {
     legal_name_locked: false,
   });
 
+  // About Summary (See more)
+  const aboutBioRef = React.useRef(null);
+  const [aboutBioExpanded, setAboutBioExpanded] = React.useState(false);
+  const [aboutBioHasOverflow, setAboutBioHasOverflow] = React.useState(false);
+
+  const measureAboutBioOverflow = React.useCallback(() => {
+    const el = aboutBioRef.current;
+    if (!el) return;
+
+    // Measure only while collapsed (otherwise clientHeight == scrollHeight)
+    if (aboutBioExpanded) return;
+
+    const hasOverflow = el.scrollHeight > el.clientHeight + 1;
+    setAboutBioHasOverflow(hasOverflow);
+  }, [aboutBioExpanded]);
+
+  React.useEffect(() => {
+    // Optional: when bio changes (after edit), reset to collapsed
+    setAboutBioExpanded(false);
+  }, [profile.bio]);
+
+  React.useEffect(() => {
+    requestAnimationFrame(measureAboutBioOverflow);
+  }, [profile.bio, aboutBioExpanded, measureAboutBioOverflow]);
+
+  React.useEffect(() => {
+    window.addEventListener("resize", measureAboutBioOverflow);
+    return () => window.removeEventListener("resize", measureAboutBioOverflow);
+  }, [measureAboutBioOverflow]);
+
   // --- Languages State ---
   const [langList, setLangList] = React.useState([]);
   const [langOpen, setLangOpen] = React.useState(false);
@@ -2370,21 +2400,36 @@ export default function AdminSettings() {
                   }>
                     <Label>Summary</Label>
                     <Typography
+                      ref={aboutBioRef}
                       variant="body2"
                       sx={{
-                        whiteSpace: "pre-wrap",     // ✅ keeps new lines + spaces
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: "vertical",
+                        whiteSpace: "pre-wrap", // keep new lines + spaces
                         wordBreak: "break-word",
+                        ...(aboutBioExpanded
+                          ? {}
+                          : {
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical",
+                          }),
                       }}
                     >
                       {profile.bio?.trim()
                         ? profile.bio
                         : "Add a short description about your role, focus areas, and what you're working on."}
                     </Typography>
+                    {(aboutBioHasOverflow || aboutBioExpanded) && (
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => setAboutBioExpanded((v) => !v)}
+                        sx={{ mt: 0.5, p: 0, minWidth: "auto", textTransform: "none" }}
+                      >
+                        {aboutBioExpanded ? "See less" : "See more"}
+                      </Button>
+                    )}
                   </SectionCard>
 
                   <SectionCard sx={{ mt: 2 }} title="Skills" action={
