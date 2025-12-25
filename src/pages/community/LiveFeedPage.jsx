@@ -830,7 +830,7 @@ function mapFeedItem(item) {
         link_url: m.link_url || null,
         video_url: toMediaUrl(m.video_url || ""),
         event_id: m.event_id ?? item.target_object_id ?? null,
-        event_title: m.event_title || m.title || null,
+        event_title: m.event_title || null,
       },
       // single source of truth for engagements (likes/comments/shares/metrics)
       engage: rid ? { type: resourceCT, id: Number(rid) } : undefined,
@@ -2099,11 +2099,22 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
     refreshCounts();
   };
 
-  const headingTitle = post.group_id
-    ? (post.group || (post.group_id ? `Group #${post.group_id}` : "—"))
-    : (post.visibility === "community"
-      ? (post.community || (post.community_id ? `Community #${post.community_id}` : "—"))
-      : (post.author?.name || "—"));
+  const resourceEventTitle =
+    post.type === "resource" ? (post.resource?.event_title || null) : null;
+
+  const eventTitle =
+    post.type === "event" ? (post.event?.title || null) : null;
+
+  const headingTitle =
+    resourceEventTitle
+      ? resourceEventTitle
+      : eventTitle
+        ? eventTitle
+        : post.group_id
+          ? (post.group || (post.group_id ? `Group #${post.group_id}` : "—"))
+          : (post.visibility === "community"
+            ? (post.community || (post.community_id ? `Community #${post.community_id}` : "—"))
+            : (post.author?.name || "—"));
   return (
     <Paper
       key={post.id}
@@ -2131,7 +2142,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
 
           <Stack direction="row" spacing={0.5} alignItems="center">
             <Typography variant="caption" color="text.secondary" noWrap>
-              {post.author?.name}
+              {post.type === "resource" ? (post.resource?.title || "Resource") : (post.author?.name)}
             </Typography>
 
             {post.author?.kyc_status === "approved" && (
