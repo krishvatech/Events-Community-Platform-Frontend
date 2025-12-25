@@ -12,6 +12,7 @@ import {
   Skeleton
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import { Autocomplete, CircularProgress } from "@mui/material";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
@@ -61,6 +62,73 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
   });
   const [tagInput, setTagInput] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [eventOptions, setEventOptions] = useState([]);
+  const [eventSearch, setEventSearch] = useState("");
+  const [eventOffset, setEventOffset] = useState(0);
+  const [eventHasMore, setEventHasMore] = useState(true);
+  const [eventLoading, setEventLoading] = useState(false);
+
+  const loadEventsPage = async ({ reset = false } = {}) => {
+    if (eventLoading) return;
+
+    setEventLoading(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      const limit = 20;
+      const offset = reset ? 0 : eventOffset;
+
+      const params = new URLSearchParams();
+      params.set("limit", String(limit));
+      params.set("offset", String(offset));
+      if (eventSearch.trim()) params.set("search", eventSearch.trim());
+
+      const resp = await axios.get(`${API}/events/?${params.toString()}`, config);
+
+      // If backend returns array (no pagination)
+      const results = Array.isArray(resp.data) ? resp.data : (resp.data.results || []);
+      const count = Array.isArray(resp.data) ? results.length : (resp.data.count ?? null);
+
+      setEventOptions((prev) => (reset ? results : [...prev, ...results]));
+
+      const nextOffset = offset + results.length;
+      setEventOffset(nextOffset);
+
+      if (count != null) setEventHasMore(nextOffset < count);
+      else setEventHasMore(results.length === limit);
+    } catch (e) {
+      console.error("Error loading events:", e);
+      if (reset) setEventOptions([]);
+      setEventHasMore(false);
+    } finally {
+      setEventLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+
+    // reset and load first page when dialog opens
+    setEventOptions([]);
+    setEventOffset(0);
+    setEventHasMore(true);
+    loadEventsPage({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const t = setTimeout(() => {
+      setEventOffset(0);
+      setEventHasMore(true);
+      loadEventsPage({ reset: true });
+    }, 350);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventSearch, open]);
 
   useEffect(() => {
     if (initial) {
@@ -164,7 +232,9 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
       const token = localStorage.getItem("access_token");
 
       // 1) Find the selected event
-      const selectedEvent = events.find((e) => String(e.id) === String(form.event_id));
+      const selectedEvent =
+        eventOptions.find((e) => String(e.id) === String(form.event_id)) ||
+        events.find((e) => String(e.id) === String(form.event_id));
 
       // 2) Resolve community id from various possible shapes
       const rawCommunityId =
@@ -284,20 +354,48 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
             <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
               Select Event
             </Typography>
-            <Select
-              value={String(form.event_id)}
-              onChange={(e) => handleChange("event_id", String(e.target.value))}
-              displayEmpty
-            >
-              <MenuItem value="" disabled>
-                Choose an event
-              </MenuItem>
-              {events.map((ev) => (
-                <MenuItem key={ev.id} value={String(ev.id)}>
-                  {ev.title || ev.name}
-                </MenuItem>
-              ))}
-            </Select>
+            <Autocomplete
+              options={eventOptions}
+              loading={eventLoading}
+              getOptionLabel={(opt) => opt?.title || opt?.name || ""}
+              value={
+                eventOptions.find((e) => String(e.id) === String(form.event_id)) ||
+                events.find((e) => String(e.id) === String(form.event_id)) ||
+                null
+              }
+              onChange={(e, newValue) => {
+                handleChange("event_id", newValue ? String(newValue.id) : "");
+              }}
+              inputValue={eventSearch}
+              onInputChange={(e, newInput) => setEventSearch(newInput)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Select Event"
+                  required
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {eventLoading ? <CircularProgress size={18} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+              ListboxProps={{
+                onScroll: (event) => {
+                  const list = event.currentTarget;
+                  const nearBottom =
+                    list.scrollTop + list.clientHeight >= list.scrollHeight - 20;
+
+                  if (nearBottom && eventHasMore && !eventLoading) {
+                    loadEventsPage({ reset: false });
+                  }
+                },
+              }}
+            />
           </FormControl>
 
           {form.type === "file" && (
@@ -757,7 +855,7 @@ export default function MyResourcesAdmin() {
   }
 
   const showSkeleton =
-  !resourcesBootstrapped || loading || !currentUser || (!isOwner && registeredEventsLoading);
+    !resourcesBootstrapped || loading || !currentUser || (!isOwner && registeredEventsLoading);
 
   const ResourceTableSkeleton = () => (
     <TableContainer component={Paper}>
