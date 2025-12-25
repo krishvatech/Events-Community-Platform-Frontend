@@ -29,6 +29,42 @@ const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
   .replace(/\/+$/, "");
 const API_URL = API.endsWith("/api") ? API : `${API}/api`;
 
+// --- ADD: Media URL helper (same idea as LiveFeedPage.jsx) ---
+const API_ORIGIN = API_URL.replace(/\/api\/?$/i, "");
+
+function toMediaUrl(p) {
+  if (!p) return "";
+  try { return new URL(p).toString(); } catch { }
+  const rel = String(p).replace(/^\/+/, "");
+  const keepAsIs = /^(media|static|uploads|images|files|storage)\//i.test(rel);
+  return `${API_ORIGIN}/${keepAsIs ? rel : `media/${rel}`}`;
+}
+
+const safeUrlParts = (u) => {
+  try {
+    const x = new URL(u);
+    return { pathname: x.pathname || "", href: x.toString() };
+  } catch {
+    const s = String(u || "");
+    const noQ = s.split("?")[0].split("#")[0];
+    return { pathname: noQ, href: s };
+  }
+};
+
+const getExt = (u) => {
+  const { pathname } = safeUrlParts(u);
+  const last = (pathname || "").split("/").pop() || "";
+  const dot = last.lastIndexOf(".");
+  if (dot === -1) return "";
+  return last.slice(dot + 1).toLowerCase();
+};
+
+const getFileName = (u) => {
+  const { pathname } = safeUrlParts(u);
+  const last = (pathname || "").split("/").pop() || "";
+  return decodeURIComponent(last || "");
+};
+
 const TypeIcon = ({ type }) => {
   const common = { sx: { color: TEAL } };
   switch (type) {
@@ -109,6 +145,188 @@ function ResourceDetailsSkeleton() {
       </Paper>
     </>
   );
+}
+
+function ResourcePreview({ resource }) {
+  if (!resource) return null;
+
+  const type = (resource.type || "").toLowerCase();
+
+  const fileUrl = toMediaUrl(resource.file || "");
+  const videoUrl = toMediaUrl(resource.video_url || "");
+  const linkUrl = resource.link_url || "";
+
+  // youtube/vimeo helpers (same regex as LiveFeed)
+  const ytId = (videoUrl || "").match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1];
+  const vmId = (videoUrl || "").match(/vimeo\.com\/(\d+)/)?.[1];
+  const ytEmbed = ytId ? `https://www.youtube.com/embed/${ytId}` : null;
+  const vmEmbed = vmId ? `https://player.vimeo.com/video/${vmId}` : null;
+  const canIframe = !!(ytEmbed || vmEmbed);
+  const iframeSrc = ytEmbed || vmEmbed;
+
+  // file detection
+  const fileExt = getExt(fileUrl);
+  const fileName = getFileName(fileUrl) || resource.title || "Attachment";
+  const isImageFile = ["jpg", "jpeg", "png", "webp", "gif", "bmp", "svg"].includes(fileExt);
+  const isPdfFile = fileExt === "pdf";
+  const hasFile = !!fileUrl;
+
+  // --- VIDEO PREVIEW ---
+  if (type === "video" && videoUrl) {
+    return (
+      <Box sx={{ mt: 1 }}>
+        {canIframe ? (
+          <Box
+            component="iframe"
+            src={iframeSrc}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            sx={{ width: "100%", height: 420, border: 0, borderRadius: 1 }}
+            title={resource.title || "Video"}
+          />
+        ) : (
+          <Box
+            component="video"
+            src={videoUrl}
+            controls
+            preload="metadata"
+            sx={{
+              width: "100%",
+              maxHeight: 520,
+              borderRadius: 1,
+              border: "1px solid #e2e8f0",
+            }}
+          />
+        )}
+      </Box>
+    );
+  }
+
+  // --- FILE PREVIEW (image/pdf/other) ---
+  if (type === "file" && hasFile) {
+    if (isImageFile) {
+      return (
+        <Box
+          sx={{
+            mt: 1,
+            borderRadius: 1,
+            overflow: "hidden",
+            border: "1px solid #e2e8f0",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Box
+            component="img"
+            src={fileUrl}
+            alt={resource.title || "resource image"}
+            sx={{ width: "100%", maxHeight: 560, objectFit: "cover", display: "block" }}
+          />
+        </Box>
+      );
+    }
+
+    if (isPdfFile) {
+      return (
+        <Box
+          sx={{
+            mt: 1,
+            borderRadius: 1,
+            overflow: "hidden",
+            border: "1px solid #e2e8f0",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Box
+            component="iframe"
+            src={fileUrl}
+            title={resource.title || "PDF"}
+            sx={{ width: "100%", height: 520, border: 0 }}
+          />
+        </Box>
+      );
+    }
+
+    // other file types -> attachment card
+    return (
+      <Paper
+        variant="outlined"
+        sx={{
+          mt: 1,
+          p: 1.25,
+          borderRadius: 1,
+          borderColor: "#e2e8f0",
+          bgcolor: "background.paper",
+        }}
+      >
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: 1.5,
+              bgcolor: "grey.100",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 22,
+            }}
+          >
+            📎
+          </Box>
+
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+              {fileName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {(fileExt || "FILE").toUpperCase()} · Attachment
+            </Typography>
+          </Box>
+
+          <Chip size="small" label={(fileExt || "FILE").toUpperCase()} variant="outlined" />
+        </Stack>
+      </Paper>
+    );
+  }
+
+  // --- LINK PREVIEW (simple card) ---
+  if (type === "link" && linkUrl) {
+    return (
+      <Paper
+        variant="outlined"
+        sx={{
+          mt: 1,
+          p: 1.5,
+          borderRadius: 1,
+          borderColor: "#e2e8f0",
+          bgcolor: "background.paper",
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+              {resource.title || "Link"}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {linkUrl}
+            </Typography>
+          </Box>
+
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<OpenInNewRoundedIcon />}
+            onClick={() => window.open(linkUrl, "_blank")}
+            sx={{ flexShrink: 0 }}
+          >
+            Open
+          </Button>
+        </Stack>
+      </Paper>
+    );
+  }
+
+  return null;
 }
 
 export default function ResourceDetailsPage() {
@@ -326,6 +544,19 @@ export default function ResourceDetailsPage() {
                       {resource.description || "No description provided"}
                     </Typography>
                   </Box>
+
+                  {/* ADD: Preview (video/file/image) */}
+                  {(resource?.type === "video" || resource?.type === "file" || resource?.type === "link") && (
+                    <>
+                      <Divider sx={{ my: 3 }} />
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" gutterBottom>
+                          Preview
+                        </Typography>
+                        <ResourcePreview resource={resource} />
+                      </Box>
+                    </>
+                  )}
 
                   {event && (
                     <>
