@@ -98,6 +98,13 @@ const decodeJwtPayload = (token) => {
   } catch { return null; }
 };
 
+const getCognitoGroups = (token) => {
+  const payload = decodeJwtPayload(token);
+  const raw = payload?.["cognito:groups"] || [];
+  if (typeof raw === "string") return [raw];
+  return Array.isArray(raw) ? raw : [];
+};
+
 const fetchJSON = async (url, headers = {}) => {
   try {
     const r = await fetch(url, { headers, credentials: "include" });
@@ -212,12 +219,16 @@ const SignInPage = () => {
           usernameOrEmail: formData.email,
           password: formData.password,
         });
+        const idToken = res.idToken || "";
+        const accessToken = res.accessToken || "";
 
         // We’ll use the ID token as "access" for now (contains email/name claims)
         data = {
-          access: res.idToken,
+          access: idToken || accessToken,
           refresh: res.refreshToken,
           user: res.payload,
+          id_token: idToken,
+          access_token: accessToken,
         };
 
       } else {
@@ -241,30 +252,57 @@ const SignInPage = () => {
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('token', data.access);
       }
+      if (data?.id_token) {
+        localStorage.setItem('id_token', data.id_token);
+      }
+      if (data?.access_token) {
+        localStorage.setItem('cognito_access_token', data.access_token);
+      }
       if (data?.refresh) {
         localStorage.setItem('refresh_token', data.refresh);
       }
 
-      // Resolve user (your resolveCurrentUser already falls back to JWT payload)
       let userObj = data?.user ?? null;
-      if (!userObj && data?.access) {
+
+      // Always prefer server /me for Cognito (it includes is_staff/is_superuser)
+      if (AUTH_PROVIDER === "cognito" && data?.access) {
+        const serverUser = await resolveCurrentUser(data.access, formData.email);
+        if (serverUser) userObj = serverUser;
+      } else if (!userObj && data?.access) {
         userObj = await resolveCurrentUser(data.access, formData.email);
       }
+
       localStorage.setItem("user", JSON.stringify(userObj || {}));
 
       saveLoginPayload(data, { email: formData.email });
 
       const params = new URLSearchParams(location.search);
-      const intended = params.get("next") || location.state?.from?.pathname || "/events";
+      const intended = params.get("next") || location.state?.from?.pathname || "/community";
 
-      console.log("redirect check", { userObj, goDashboard: isStaffUser(userObj), intended });
+      const groups = getCognitoGroups(data?.access);
+      const isCognitoStaff = groups.map((g) => String(g).toLowerCase()).includes("staff");
+      const isDbStaff = truthy(userObj?.is_staff);
+      const isDbAdmin = truthy(userObj?.is_superuser);
 
-      if (isStaffUser(userObj)) {
+      console.log("redirect check", {
+        userObj,
+        groups,
+        isDbStaff,
+        isDbAdmin,
+        intended,
+      });
+
+      if (isDbAdmin) {
         window.location.replace("/admin/events");
         return;
       }
 
-      navigate(intended, { replace: true });
+      if (isCognitoStaff && isDbStaff) {
+        window.location.replace("/admin/events");
+        return;
+      }
+
+      navigate(intended || "/community", { replace: true });
       return;
 
     } catch (err) {

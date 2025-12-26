@@ -61,11 +61,19 @@ export const getRefreshToken = () =>
   localStorage.getItem("refresh_token") ||
   sessionStorage.getItem("refresh");
 
+const normalizeToken = (token) => {
+  if (!token) return null;
+  const t = String(token).trim();
+  if (!t || t === "null" || t === "undefined") return null;
+  return t;
+};
+
 export const getToken = () =>
-  localStorage.getItem("access_token") ||
-  localStorage.getItem("token") ||
-  sessionStorage.getItem("access") ||
-  sessionStorage.getItem("token");
+  normalizeToken(localStorage.getItem("id_token")) ||
+  normalizeToken(localStorage.getItem("access_token")) ||
+  normalizeToken(localStorage.getItem("token")) ||
+  normalizeToken(sessionStorage.getItem("access")) ||
+  normalizeToken(sessionStorage.getItem("token"));
 
 export const getCSRF = () =>
   document.cookie.split("; ").find((s) => s.startsWith("csrftoken="))?.split("=")[1];

@@ -12,6 +12,9 @@ export function saveLoginPayload(data, { email, firstName } = {}) {
   if (!name && email) name = email.split("@")[0];  // use email prefix as last resort
   // Save what you need
   sessionStorage.setItem("access", data?.access || data?.token || "");
+  if (data?.id_token) {
+    sessionStorage.setItem("id_token", data.id_token);
+  }
   if (data?.refresh) sessionStorage.setItem("refresh", data.refresh);
   sessionStorage.setItem("user_name", name || "");
   if (data?.user) sessionStorage.setItem("user", JSON.stringify(data.user));
@@ -26,15 +29,18 @@ export function clearLogin() {
 export function clearAuth() {
   try {
     // localStorage variants you use
+    localStorage.removeItem("id_token");
     localStorage.removeItem("token");
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    localStorage.removeItem("cognito_access_token");
     localStorage.removeItem("user");
     localStorage.removeItem("loginPayload");
 
     // sessionStorage variants you use
     sessionStorage.removeItem("token");
     sessionStorage.removeItem("access");
+    sessionStorage.removeItem("id_token");
     sessionStorage.removeItem("refresh");
     sessionStorage.removeItem("user");
   } catch { }
