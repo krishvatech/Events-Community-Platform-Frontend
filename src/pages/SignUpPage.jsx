@@ -6,6 +6,7 @@ import { registerUser } from "../utils/api";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
+import { cognitoSignUp, cognitoConfirmSignUp } from "../utils/cognitoAuth";
 
 
 import {
@@ -30,6 +31,9 @@ const inputSx = {
 
 const SignUpPage = () => {
   const navigate = useNavigate();
+  const [stage, setStage] = useState("signup"); // "signup" | "confirm"
+  const [verifyCode, setVerifyCode] = useState("");
+  const [pendingUsername, setPendingUsername] = useState("");
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -103,7 +107,7 @@ const SignUpPage = () => {
       if (field && field !== "non_field_errors") {
         // friendlier messages
         let pretty = msg;
-        if (/unique/i.test(msg) && field === "email")    pretty = "Email already is exists";
+        if (/unique/i.test(msg) && field === "email") pretty = "Email already is exists";
         if (/unique/i.test(msg) && field === "username") pretty = "Username already taken";
 
         fieldErrors[field] = pretty;
@@ -129,56 +133,118 @@ const SignUpPage = () => {
     return { fieldErrors, items };
   };
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setErrors({});
+  //   if (!validate()) return;
+  //   setLoading(true);
+
+  //   try {
+  //     const username =
+  //       (formData.username && formData.username.toLowerCase().trim()) ||
+  //       `${(formData.firstName || "user").toLowerCase()}${Date.now()}`;
+
+  //     const firstName = (formData.firstName || "").trim();
+  //     const lastName = (formData.lastName || "").trim();
+
+  //     // 👇 IMPORTANT: keys must be firstName / lastName here,
+  //     // NOT first_name / last_name
+  //     await registerUser({
+  //       username,
+  //       firstName,
+  //       lastName,
+  //       email: (formData.email || "").toLowerCase().trim(),
+  //       password: formData.password,
+  //     });
+
+  //     toast.success("✅ Account created! You can now sign in.");
+  //     navigate("/signin", {
+  //       replace: true,
+  //       state: { email: (formData.email || "").toLowerCase().trim(), justSignedUp: true },
+  //     });
+  //   } catch (err) {
+  //     const { fieldErrors, items } = normalizeApiErrors(err);
+
+  //     if (Object.keys(fieldErrors).length) {
+  //       setErrors((prev) => ({ ...prev, ...fieldErrors }));
+  //     }
+
+  //     toast.error(
+  //       <div>
+  //         <strong>Could not create account</strong>
+  //         <ul style={{ margin: "6px 0 0 18px" }}>
+  //           {items.map((t, i) => (
+  //             <li key={i}>{t}</li>
+  //           ))}
+  //         </ul>
+  //       </div>
+  //     );
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setErrors({});
-  if (!validate()) return;
-  setLoading(true);
+    e.preventDefault();
+    setErrors({});
 
-  try {
-    const username =
-      (formData.username && formData.username.toLowerCase().trim()) ||
-      `${(formData.firstName || "user").toLowerCase()}${Date.now()}`;
+    // ✅ Confirm stage: only verifyCode is needed
+    if (stage === "confirm") {
+      if (!verifyCode.trim()) {
+        setErrors((prev) => ({ ...prev, verifyCode: "Verification code is required" }));
+        return;
+      }
 
-    const firstName = (formData.firstName || "").trim();
-    const lastName  = (formData.lastName || "").trim();
+      setLoading(true);
+      try {
+        await cognitoConfirmSignUp({ username: pendingUsername, code: verifyCode.trim() });
 
-    // 👇 IMPORTANT: keys must be firstName / lastName here,
-    // NOT first_name / last_name
-    await registerUser({
-      username,
-      firstName,
-      lastName,
-      email: (formData.email || "").toLowerCase().trim(),
-      password: formData.password,
-    });
-
-    toast.success("✅ Account created! You can now sign in.");
-    navigate("/signin", {
-      replace: true,
-      state: { email: (formData.email || "").toLowerCase().trim(), justSignedUp: true },
-    });
-  } catch (err) {
-    const { fieldErrors, items } = normalizeApiErrors(err);
-
-    if (Object.keys(fieldErrors).length) {
-      setErrors((prev) => ({ ...prev, ...fieldErrors }));
+        toast.success("✅ Account verified! You can now sign in.");
+        navigate("/signin", {
+          replace: true,
+          state: { email: (formData.email || "").toLowerCase().trim(), justSignedUp: true },
+        });
+      } catch (err) {
+        toast.error(`❌ ${err?.message || "Verification failed"}`);
+      } finally {
+        setLoading(false);
+      }
+      return;
     }
 
-    toast.error(
-      <div>
-        <strong>Could not create account</strong>
-        <ul style={{ margin: "6px 0 0 18px" }}>
-          {items.map((t, i) => (
-            <li key={i}>{t}</li>
-          ))}
-        </ul>
-      </div>
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+    // ✅ Signup stage: validate full form first
+    if (!validate()) return;
+
+    setLoading(true);
+    try {
+      const username =
+        (formData.username && formData.username.toLowerCase().trim()) ||
+        `${(formData.firstName || "user").toLowerCase()}${Date.now()}`;
+
+      await cognitoSignUp({
+        username,
+        email: (formData.email || "").toLowerCase().trim(),
+        firstName: (formData.firstName || "").trim(),
+        lastName: (formData.lastName || "").trim(),
+        password: formData.password,
+      });
+
+      toast.info("📩 Verification code sent to your email.");
+      setPendingUsername(username);
+      setStage("confirm");
+    } catch (err) {
+      // Friendly common messages
+      const msg =
+        err?.code === "UsernameExistsException" ? "Username already taken" :
+          err?.code === "InvalidPasswordException" ? "Password does not match Cognito policy" :
+            err?.code === "InvalidParameterException" ? (err?.message || "Invalid input") :
+              (err?.message || "Signup failed");
+
+      toast.error(`❌ ${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -201,10 +267,10 @@ const SignUpPage = () => {
             display: { xs: "none", md: "flex" },
             flexBasis: { md: "50%" },
             flexShrink: 0,
-            alignItems: "stretch",           
+            alignItems: "stretch",
             justifyContent: "center",
-            bgcolor: "transparent",         
-            p:0,                  
+            bgcolor: "transparent",
+            p: 0,
           }}
         >
           <HeroSection />
@@ -227,7 +293,7 @@ const SignUpPage = () => {
             <Typography
               variant="h5"
               fontWeight={400}
-              sx={{ letterSpacing: "-0.2px"}}
+              sx={{ letterSpacing: "-0.2px" }}
               gutterBottom
             >
               Welcome Back
@@ -366,16 +432,16 @@ const SignUpPage = () => {
                     helperText={errors.email}
                     fullWidth
                     sx={{
-                        ...inputSx,
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: 0.5,
-                          "& fieldset": { borderColor: "#d1d5db" }, // default
-                          "&:hover fieldset": { borderColor: "#155dfc" }, // hover
-                          "&.Mui-focused fieldset": { borderColor: "#155dfc" }, // focus
-                        },
-                        "& .MuiInputBase-input": { paddingTop: "8px", paddingBottom: "8px", fontSize: 14 },
-                        "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.5 },
-                      }}
+                      ...inputSx,
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 0.5,
+                        "& fieldset": { borderColor: "#d1d5db" }, // default
+                        "&:hover fieldset": { borderColor: "#155dfc" }, // hover
+                        "&.Mui-focused fieldset": { borderColor: "#155dfc" }, // focus
+                      },
+                      "& .MuiInputBase-input": { paddingTop: "8px", paddingBottom: "8px", fontSize: 14 },
+                      "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.5 },
+                    }}
                   />
                 </Box>
 
@@ -394,16 +460,16 @@ const SignUpPage = () => {
                     helperText={errors.password}
                     fullWidth
                     sx={{
-                        ...inputSx,
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: 0.5,
-                          "& fieldset": { borderColor: "#d1d5db" }, // default
-                          "&:hover fieldset": { borderColor: "#155dfc" }, // hover
-                          "&.Mui-focused fieldset": { borderColor: "#155dfc" }, // focus
-                        },
-                        "& .MuiInputBase-input": { paddingTop: "8px", paddingBottom: "8px", fontSize: 14 },
-                        "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.5 },
-                      }}
+                      ...inputSx,
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 0.5,
+                        "& fieldset": { borderColor: "#d1d5db" }, // default
+                        "&:hover fieldset": { borderColor: "#155dfc" }, // hover
+                        "&.Mui-focused fieldset": { borderColor: "#155dfc" }, // focus
+                      },
+                      "& .MuiInputBase-input": { paddingTop: "8px", paddingBottom: "8px", fontSize: 14 },
+                      "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.5 },
+                    }}
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
@@ -431,16 +497,16 @@ const SignUpPage = () => {
                     helperText={errors.confirmPassword}
                     fullWidth
                     sx={{
-                        ...inputSx,
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: 0.5,
-                          "& fieldset": { borderColor: "#d1d5db" }, // default
-                          "&:hover fieldset": { borderColor: "#155dfc" }, // hover
-                          "&.Mui-focused fieldset": { borderColor: "#155dfc" }, // focus
-                        },
-                        "& .MuiInputBase-input": { paddingTop: "8px", paddingBottom: "8px", fontSize: 14 },
-                        "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.5 },
-                      }}
+                      ...inputSx,
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 0.5,
+                        "& fieldset": { borderColor: "#d1d5db" }, // default
+                        "&:hover fieldset": { borderColor: "#155dfc" }, // hover
+                        "&.Mui-focused fieldset": { borderColor: "#155dfc" }, // focus
+                      },
+                      "& .MuiInputBase-input": { paddingTop: "8px", paddingBottom: "8px", fontSize: 14 },
+                      "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.5 },
+                    }}
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
@@ -452,6 +518,31 @@ const SignUpPage = () => {
                     }}
                   />
                 </Box>
+
+                {stage === "confirm" && (
+                  <Box>
+                    <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 600, color: "#374151", fontSize: 12 }}>
+                      Verification Code
+                    </Typography>
+                    <TextField
+                      name="verifyCode"
+                      placeholder="Enter code from email"
+                      value={verifyCode}
+                      onChange={(e) => setVerifyCode(e.target.value.replace(/\s/g, ""))}
+                      size="small"
+                      fullWidth
+                      sx={{
+                        ...inputSx,
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 0.5,
+                          "& fieldset": { borderColor: "#d1d5db" },
+                          "&:hover fieldset": { borderColor: "#155dfc" },
+                          "&.Mui-focused fieldset": { borderColor: "#155dfc" },
+                        },
+                      }}
+                    />
+                  </Box>
+                )}
 
                 <Button
                   type="submit"
@@ -469,14 +560,14 @@ const SignUpPage = () => {
                     fontWeight: 600,
                   }}
                 >
-                  {loading ? "Creating..." : "Create Your Account"}
+                  {loading ? (stage === "confirm" ? "Verifying..." : "Creating...") : (stage === "confirm" ? "Verify Code" : "Create Your Account")}
                 </Button>
               </Stack>
             </Box>
 
 
 
-           <Typography
+            <Typography
               variant="body2"
               color="text.secondary"
               sx={{ mt: 2, textAlign: "center", fontSize: 12 }}
@@ -491,17 +582,17 @@ const SignUpPage = () => {
               </Box>
             </Typography>
 
-            
+
 
             {/* Feature tiles like your screenshot */}
-            
+
           </Paper>
           <Box sx={{ width: 460, mt: 0, px: { xs: 1, md: 0 } }}>
-              <FeaturesSection />
+            <FeaturesSection />
           </Box>
 
           {/* bottom spacer so the card shadow doesn't touch the edge */}
-          
+
         </Box>
       </Box>
 

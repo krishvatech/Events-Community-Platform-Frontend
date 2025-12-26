@@ -8,6 +8,8 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { saveLoginPayload } from "../utils/authStorage";
 import { useNavigate, useLocation } from 'react-router-dom';
+import { cognitoSignIn } from "../utils/cognitoAuth";
+
 
 import {
   Box,
@@ -199,20 +201,41 @@ const SignInPage = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/auth/login/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      const AUTH_PROVIDER = import.meta.env.VITE_AUTH_PROVIDER;
 
       let data = null;
-      try { data = await response.json(); } catch { /* ignore */ }
 
-      if (!response.ok) {
-        const msg = data?.detail || data?.error || response.statusText || 'Login failed';
-        throw new Error(msg);
+      if (AUTH_PROVIDER === "cognito") {
+        // NOTE: this works only if your pool allows Email as sign-in alias
+        const res = await cognitoSignIn({
+          usernameOrEmail: formData.email,
+          password: formData.password,
+        });
+
+        // We’ll use the ID token as "access" for now (contains email/name claims)
+        data = {
+          access: res.idToken,
+          refresh: res.refreshToken,
+          user: res.payload,
+        };
+
+      } else {
+        // keep your old backend login if you ever need it
+        const response = await fetch(`${API_BASE}/auth/login/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+
+        try { data = await response.json(); } catch { /* ignore */ }
+
+        if (!response.ok) {
+          const msg = data?.detail || data?.error || response.statusText || 'Login failed';
+          throw new Error(msg);
+        }
       }
 
+      // store tokens (your code already does this)
       if (data?.access) {
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('token', data.access);
@@ -221,31 +244,25 @@ const SignInPage = () => {
         localStorage.setItem('refresh_token', data.refresh);
       }
 
-      // Resolve the user with staff info (response.user → /me → by id → JWT → fallback)
+      // Resolve user (your resolveCurrentUser already falls back to JWT payload)
       let userObj = data?.user ?? null;
       if (!userObj && data?.access) {
         userObj = await resolveCurrentUser(data.access, formData.email);
       }
       localStorage.setItem("user", JSON.stringify(userObj || {}));
 
-      // Toast + persist auth bits
-      // toast.success(`✅ Login successful. Welcome ${formData.email}`);
       saveLoginPayload(data, { email: formData.email });
 
-      // Decide destination
       const params = new URLSearchParams(location.search);
       const intended = params.get("next") || location.state?.from?.pathname || "/events";
 
-      // TEMP: one-time debug (you can comment this out)
       console.log("redirect check", { userObj, goDashboard: isStaffUser(userObj), intended });
 
-      // Staff → AdminEvents (hard redirect so nothing else can override it)
       if (isStaffUser(userObj)) {
         window.location.replace("/admin/events");
         return;
       }
 
-      // Non-staff → intended
       navigate(intended, { replace: true });
       return;
 
@@ -420,7 +437,7 @@ const SignInPage = () => {
                     Forgot password?
                   </Link>
                 </Box>
-                
+
                 <Button
                   type="submit"
                   fullWidth

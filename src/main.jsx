@@ -1,4 +1,5 @@
 // src/main.jsx
+import './setupPolyfills';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -6,6 +7,7 @@ import App from './App.jsx';
 import './index.css';
 import './styles/brand.css';
 import "leaflet/dist/leaflet.css";
+
 
 // MUI providers
 import { ThemeProvider, StyledEngineProvider } from '@mui/material/styles';
