@@ -5,7 +5,10 @@ import FeaturesSection from '../components/FeaturesSection.jsx';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { API_BASE } from '../utils/api';
+import { cognitoForgotPassword, cognitoConfirmForgotPassword } from "../utils/cognitoAuth";
+import { InputAdornment, IconButton } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
+
 
 import {
     Box,
@@ -22,7 +25,12 @@ const ForgotPassword = () => {
 
     // If we came from SignInPage with an email, use it. Otherwise empty.
     const initialEmail = location.state?.email || '';
+    const [step, setStep] = useState('request'); // 'request' | 'confirm'
 
+    const [code, setCode] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState(initialEmail);
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
@@ -38,26 +46,62 @@ const ForgotPassword = () => {
         return Object.keys(errs).length === 0;
     };
 
+    const validateStep2 = () => {
+        const errs = {};
+
+        if (!code.trim()) errs.code = 'Verification code is required';
+
+        const strongPwd = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])[^\s]{8,}$/;
+        if (!strongPwd.test(newPassword || '')) {
+            errs.newPassword = 'Min 8 chars, 1 uppercase, 1 number, 1 special';
+        }
+
+        if (newPassword !== confirmPassword) {
+            errs.confirmPassword = 'Passwords do not match';
+        }
+
+        setErrors(errs);
+        return Object.keys(errs).length === 0;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!validate()) return;
+
+        // Step 1: request OTP
+        if (step === 'request') {
+            if (!validate()) return;
+
+            setLoading(true);
+            try {
+                const emailLower = email.trim().toLowerCase();
+                await cognitoForgotPassword({ usernameOrEmail: emailLower });
+
+                toast.success('If the account exists, an OTP has been sent.');
+                setStep('confirm'); // ✅ stay on same page
+            } catch (err) {
+                toast.error('Something went wrong. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
+        // Step 2: confirm OTP + set new password
+        setErrors({});
+        if (!validateStep2()) return;
 
         setLoading(true);
         try {
-            // 👉 Adjust this URL to match your backend reset endpoint
-            // e.g. Djoser: `${API_BASE}/auth/users/reset_password/`
-            // or your custom: `${API_BASE}/auth/password/reset/`
-            await fetch(`${API_BASE}/auth/password/forgot/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email.trim() }),
+            await cognitoConfirmForgotPassword({
+                usernameOrEmail: email.trim().toLowerCase(),
+                code: code.trim(),
+                newPassword,
             });
 
-            toast.success(
-                'If this email is registered, a password reset link has been sent.'
-            );
+            toast.success('Password reset successfully! Redirecting...');
+            setTimeout(() => navigate('/signin'), 1500);
         } catch (err) {
-            toast.error('Something went wrong. Please try again.');
+            toast.error(err?.message || 'Failed to reset password.');
         } finally {
             setLoading(false);
         }
@@ -113,7 +157,7 @@ const ForgotPassword = () => {
                                 Forgot your password?
                             </Typography>
                             <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
-                                Enter your email and we&apos;ll send you a reset link.
+                                Enter your email and we&apos;ll send you a verification code (OTP).
                             </Typography>
                         </Box>
 
@@ -159,6 +203,60 @@ const ForgotPassword = () => {
                                     }}
                                 />
 
+                                {step === 'confirm' && (
+                                    <>
+                                        <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
+                                            Verification Code (OTP)
+                                        </Typography>
+                                        <TextField
+                                            size="small"
+                                            value={code}
+                                            onChange={(e) => setCode(e.target.value.replace(/\s/g, ''))}
+                                            fullWidth
+                                            error={Boolean(errors.code)}
+                                            helperText={errors.code}
+                                            sx={{ mb: 2 }}
+                                        />
+
+                                        <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
+                                            New Password
+                                        </Typography>
+                                        <TextField
+                                            size="small"
+                                            type={showPassword ? 'text' : 'password'}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value.replace(/\s/g, ''))}
+                                            fullWidth
+                                            error={Boolean(errors.newPassword)}
+                                            helperText={errors.newPassword}
+                                            sx={{ mb: 2 }}
+                                            InputProps={{
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+
+                                        <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
+                                            Confirm Password
+                                        </Typography>
+                                        <TextField
+                                            size="small"
+                                            type={showPassword ? 'text' : 'password'}
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value.replace(/\s/g, ''))}
+                                            fullWidth
+                                            error={Boolean(errors.confirmPassword)}
+                                            helperText={errors.confirmPassword}
+                                            sx={{ mb: 2 }}
+                                        />
+                                    </>
+                                )}
+
                                 <Button
                                     type="submit"
                                     fullWidth
@@ -176,7 +274,9 @@ const ForgotPassword = () => {
                                         fontSize: 12,
                                     }}
                                 >
-                                    {loading ? 'Sending reset link...' : 'Send Reset Link'}
+                                    {loading
+                                        ? (step === 'request' ? 'Sending OTP...' : 'Resetting...')
+                                        : (step === 'request' ? 'Send OTP' : 'Reset Password')}
                                 </Button>
 
                                 <Box

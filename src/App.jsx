@@ -41,7 +41,6 @@ import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
 import KYCCallbackPage from "./pages/KYCCallbackPage.jsx";
 import { useParams } from "react-router-dom";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
-import ResetPassword from './pages/ResetPassword';
 import SocialOAuthCallback from "./pages/SocialOAuthCallback.jsx";
 
 function RedirectGroupToAdmin() {
@@ -83,7 +82,6 @@ const AppShell = () => {
         <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
         <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
         <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
-        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
         <Route path="/oauth/callback" element={<SocialOAuthCallback />} />
         {/* Admin area driven by AdminSidebar */}

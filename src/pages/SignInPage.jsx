@@ -11,6 +11,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { cognitoSignIn } from "../utils/cognitoAuth";
 
 
+
 import {
   Box,
   Paper,
@@ -408,7 +409,7 @@ const SignInPage = () => {
                   }}
                 />
 
-                {/* <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
                   <Link
                     component="button"
                     type="button"
@@ -423,9 +424,9 @@ const SignInPage = () => {
                   >
                     Forgot password?
                   </Link>
-                </Box> */}
+                </Box>
 
-                <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
+                {/* <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
                   <Link
                     component="button"
                     type="button"
@@ -436,7 +437,7 @@ const SignInPage = () => {
                   >
                     Forgot password?
                   </Link>
-                </Box>
+                </Box> */}
 
                 <Button
                   type="submit"

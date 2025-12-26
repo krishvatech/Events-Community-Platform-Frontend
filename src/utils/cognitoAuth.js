@@ -61,3 +61,33 @@ export function cognitoSignIn({ usernameOrEmail, password }) {
     });
   });
 }
+
+
+// ✅ Forgot Password: send OTP to email/phone
+export function cognitoForgotPassword({ usernameOrEmail }) {
+  return new Promise((resolve, reject) => {
+    const user = new CognitoUser({ Username: usernameOrEmail, Pool: pool });
+
+    user.forgotPassword({
+      onFailure: (err) => reject(err),
+
+      // Called when Cognito has sent the OTP
+      inputVerificationCode: (data) => {
+        // data.DeliveryMedium, data.Destination
+        resolve(data);
+      },
+    });
+  });
+}
+
+// ✅ Confirm Forgot Password: submit OTP + new password
+export function cognitoConfirmForgotPassword({ usernameOrEmail, code, newPassword }) {
+  return new Promise((resolve, reject) => {
+    const user = new CognitoUser({ Username: usernameOrEmail, Pool: pool });
+
+    user.confirmPassword(code, newPassword, {
+      onSuccess: () => resolve(true),
+      onFailure: (err) => reject(err),
+    });
+  });
+}
