@@ -32,6 +32,28 @@ const decodeJwtPayload = (token) => {
   }
 };
 
+const getBackendUserFromStorage = () => {
+  // In your SignInPage.jsx you do: localStorage.setItem("user", JSON.stringify(userObj || {}));
+  const raw =
+    safeParse(window.localStorage.getItem("user")) ||
+    safeParse(window.sessionStorage.getItem("user"));
+
+  if (!raw) return null;
+  return raw.user ? raw.user : raw;
+};
+
+const getCognitoGroupsFromAccessToken = () => {
+  const token = window.localStorage.getItem("access_token") || "";
+  const claims = decodeJwtPayload(token);
+  const raw = claims?.["cognito:groups"] || [];
+
+  const arr =
+    typeof raw === "string" ? [raw] : Array.isArray(raw) ? raw : [];
+
+  return arr.map((g) => String(g).trim().toLowerCase());
+};
+
+
 // Collect all possible "user-like" objects we might have in storage / token
 const getUserCandidates = () => {
   const candidates = [];
@@ -76,25 +98,32 @@ export const getCurrentUserCandidate = () => {
   return c[0] || null;
 };
 
-// OWNER = Django auth_user.is_superuser = true (from any candidate or JWT claim)
+// OWNER/Admin = platform_admin group + DB flags match
 export const isOwnerUser = () => {
-  const candidates = getUserCandidates();   // user objects / JWT claims
-  return candidates.some((u) => truthyFlag(u?.is_superuser));
+  const groups = getCognitoGroupsFromAccessToken();
+  const dbUser = getBackendUserFromStorage();
+
+  const hasPlatformAdmin = groups.includes("platform_admin");
+  const dbIsStaff = truthyFlag(dbUser?.is_staff);
+  const dbIsSuper = truthyFlag(dbUser?.is_superuser);
+
+  return hasPlatformAdmin && dbIsStaff && dbIsSuper;
 };
 
-// STAFF = auth_user.is_staff = true, BUT NOT owner
+// STAFF = staff group + DB flags match, and NOT platform_admin
 export const isStaffUser = () => {
-  const candidates = getUserCandidates();
+  const groups = getCognitoGroupsFromAccessToken();
+  const dbUser = getBackendUserFromStorage();
 
-  // If ANY candidate is superuser, treat as owner, NOT staff
-  if (candidates.some((u) => truthyFlag(u?.is_superuser))) {
-    return false;
-  }
+  const hasPlatformAdmin = groups.includes("platform_admin");
+  const hasStaff = groups.includes("staff");
 
-  // Otherwise, staff if ANY candidate has is_staff = true
-  return candidates.some((u) => truthyFlag(u?.is_staff));
+  const dbIsStaff = truthyFlag(dbUser?.is_staff);
+  const dbIsSuper = truthyFlag(dbUser?.is_superuser);
+
+  return !hasPlatformAdmin && hasStaff && dbIsStaff && !dbIsSuper;
 };
-
 
 // generic "some level of admin"
-export const isAdminUser = () => isOwnerUser();
+export const isAdminUser = () => isOwnerUser() || isStaffUser();
+
