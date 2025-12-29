@@ -160,8 +160,18 @@ export default function AdminSidebar({
     listItems = listItems.filter((item) => item.key !== "carts");
   }
   if (staffOnly) {
+    const allowed = [
+      "events",
+      "resources",
+      "recordings",
+      "groups",
+      "messages",
+      "carts",
+      "notifications",
+      "settings",
+    ];
     listItems = listItems
-      .filter((item) => !["staff", "posts", "name-requests"].includes(item.key))
+      .filter((item) => allowed.includes(item.key))
       .map((item) =>
         item.key === "settings" ? { ...item, label: "Profile" } : item
       );

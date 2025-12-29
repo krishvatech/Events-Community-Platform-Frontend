@@ -170,6 +170,12 @@ const resolveCurrentUser = async (access, fallbackEmail) => {
 
 /* ───────────────────────── end helpers ────────────────────────────────────── */
 
+const roleToLabel = (role) => {
+  if (role === "admin") return "SuperAdmin";
+  if (role === "staff") return "Staff";
+  return "Normal User";
+};
+
 const SignInPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -306,11 +312,17 @@ const SignInPage = () => {
         },
       });
 
-      if (path === "/admin/events") {
-        window.location.replace(path);
-      } else {
-        navigate(path, { replace: true });
-      }
+      toast.success(`Signed in as ${roleToLabel(role)}`);
+
+      const doRedirect = () => {
+        if (path === "/admin/events") {
+          window.location.replace(path);
+        } else {
+          navigate(path, { replace: true });
+        }
+      };
+
+      setTimeout(doRedirect, 900);
       return;
 
       // console.log("redirect check", {

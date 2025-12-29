@@ -98,7 +98,7 @@ export const getCurrentUserCandidate = () => {
   return c[0] || null;
 };
 
-// OWNER/Admin = platform_admin group + DB flags match
+// OWNER/Admin = platform_admin group OR (is_superuser && is_staff)
 export const isOwnerUser = () => {
   const groups = getCognitoGroupsFromAccessToken();
   const dbUser = getBackendUserFromStorage();
@@ -107,23 +107,17 @@ export const isOwnerUser = () => {
   const dbIsStaff = truthyFlag(dbUser?.is_staff);
   const dbIsSuper = truthyFlag(dbUser?.is_superuser);
 
-  return hasPlatformAdmin && dbIsStaff && dbIsSuper;
+  return hasPlatformAdmin || (dbIsSuper && dbIsStaff);
 };
 
-// STAFF = staff group + DB flags match, and NOT platform_admin
+// STAFF = is_staff true (and not owner)
 export const isStaffUser = () => {
-  const groups = getCognitoGroupsFromAccessToken();
   const dbUser = getBackendUserFromStorage();
 
-  const hasPlatformAdmin = groups.includes("platform_admin");
-  const hasStaff = groups.includes("staff");
-
   const dbIsStaff = truthyFlag(dbUser?.is_staff);
-  const dbIsSuper = truthyFlag(dbUser?.is_superuser);
 
-  return !hasPlatformAdmin && hasStaff && dbIsStaff && !dbIsSuper;
+  return !isOwnerUser() && dbIsStaff;
 };
 
 // generic "some level of admin"
 export const isAdminUser = () => isOwnerUser() || isStaffUser();
-
