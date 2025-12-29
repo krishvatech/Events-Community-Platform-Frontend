@@ -237,8 +237,13 @@ const Header = () => {
     const access = getAccessToken();
     const refresh = getRefreshToken();
 
+    const AUTH_PROVIDER = import.meta.env.VITE_AUTH_PROVIDER;
+
+    const isJwtLike = (t) => typeof t === "string" && t.split(".").length === 3;
+
     try {
-      if (access && refresh) {
+      // ✅ Only call backend logout when using SimpleJWT refresh token
+      if (AUTH_PROVIDER !== "cognito" && access && refresh && isJwtLike(refresh)) {
         await axios.post(
           `${apiBase}/auth/logout/`,
           { refresh },
@@ -246,7 +251,7 @@ const Header = () => {
         );
       }
     } catch (e) {
-      // ignore (still clear local auth)
+      // ignore
     }
 
     clearAuth();

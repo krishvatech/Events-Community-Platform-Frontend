@@ -9,6 +9,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { saveLoginPayload } from "../utils/authStorage";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cognitoSignIn } from "../utils/cognitoAuth";
+import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
 
 
 
@@ -126,12 +127,22 @@ const fetchWithManyAuthStyles = async (url, access) => {
   return null;
 };
 
+const resolveBackendUser = async (idToken, accessToken) => {
+  const url = `${API_BASE}/users/me/`;
+  const tokens = [idToken, accessToken].filter(Boolean);
+  for (const t of tokens) {
+    const u = await fetchWithManyAuthStyles(url, t);
+    if (u) return u;
+  }
+  return null;
+};
+
 /** Try hard to resolve current user with staff flags */
 const resolveCurrentUser = async (access, fallbackEmail) => {
   // 1) Common "me" endpoints
   const meCandidates = [
-    `${API_BASE}/auth/users/me/`, // Djoser
     `${API_BASE}/users/me/`,      // custom
+    `${API_BASE}/auth/users/me/`, // Djoser
     `${API_BASE}/auth/me/`,
     `${API_BASE}/me/`,
   ];
@@ -224,9 +235,9 @@ const SignInPage = () => {
 
         // We’ll use the ID token as "access" for now (contains email/name claims)
         data = {
-          access: idToken || accessToken,
+          access: accessToken || idToken,   // <--- CHANGE HERE
           refresh: res.refreshToken,
-          user: res.payload,
+          user: res.payload,               // id token payload (name/email)
           id_token: idToken,
           access_token: accessToken,
         };
@@ -262,14 +273,24 @@ const SignInPage = () => {
         localStorage.setItem('refresh_token', data.refresh);
       }
 
-      let userObj = data?.user ?? null;
+      const idTokenForBackend =
+        data?.id_token || localStorage.getItem("id_token") || "";
+      const accessTokenForBackend =
+        data?.access || localStorage.getItem("access_token") || "";
+
+      const backendUser =
+        idTokenForBackend || accessTokenForBackend
+          ? await resolveBackendUser(idTokenForBackend, accessTokenForBackend)
+          : null;
+      let userObj = backendUser || data?.user || null;
 
       // Always prefer server /me for Cognito (it includes is_staff/is_superuser)
-      if (AUTH_PROVIDER === "cognito" && data?.access) {
-        const serverUser = await resolveCurrentUser(data.access, formData.email);
+      const fallbackAuthToken = idTokenForBackend || accessTokenForBackend || "";
+      if (AUTH_PROVIDER === "cognito" && fallbackAuthToken && !backendUser) {
+        const serverUser = await resolveCurrentUser(fallbackAuthToken, formData.email);
         if (serverUser) userObj = serverUser;
-      } else if (!userObj && data?.access) {
-        userObj = await resolveCurrentUser(data.access, formData.email);
+      } else if (!userObj && fallbackAuthToken) {
+        userObj = await resolveCurrentUser(fallbackAuthToken, formData.email);
       }
 
       localStorage.setItem("user", JSON.stringify(userObj || {}));
@@ -279,31 +300,53 @@ const SignInPage = () => {
       const params = new URLSearchParams(location.search);
       const intended = params.get("next") || location.state?.from?.pathname || "/community";
 
-      const groups = getCognitoGroups(data?.access);
-      const isCognitoStaff = groups.map((g) => String(g).toLowerCase()).includes("staff");
-      const isDbStaff = truthy(userObj?.is_staff);
-      const isDbAdmin = truthy(userObj?.is_superuser);
+      const idTokenForGroups = data?.id_token || localStorage.getItem("id_token") || "";
+      const accessTokenForGroups = data?.access || localStorage.getItem("access_token") || "";
+      const cognitoGroups = getCognitoGroupsFromTokens(idTokenForGroups, accessTokenForGroups);
 
-      console.log("redirect check", {
-        userObj,
-        groups,
-        isDbStaff,
-        isDbAdmin,
-        intended,
+      const { role, path } = getRoleAndRedirectPath({
+        cognitoGroups,
+        backendUser,
+        defaultPath: intended || "/community",
       });
 
-      if (isDbAdmin) {
-        window.location.replace("/admin/events");
-        return;
-      }
+      console.log("[auth] role redirect", {
+        role,
+        path,
+        cognitoGroups,
+        backendFlags: {
+          is_staff: backendUser?.is_staff,
+          is_superuser: backendUser?.is_superuser,
+        },
+      });
 
-      if (isCognitoStaff && isDbStaff) {
-        window.location.replace("/admin/events");
-        return;
+      if (path === "/admin/events") {
+        window.location.replace(path);
+      } else {
+        navigate(path, { replace: true });
       }
-
-      navigate(intended || "/community", { replace: true });
       return;
+
+      // console.log("redirect check", {
+      //   userObj,
+      //   groups,
+      //   isDbStaff,
+      //   isDbAdmin,
+      //   intended,
+      // });
+
+      // if (isDbAdmin) {
+      //   window.location.replace("/admin/events");
+      //   return;
+      // }
+
+      // if (isCognitoStaff && isDbStaff) {
+      //   window.location.replace("/admin/events");
+      //   return;
+      // }
+
+      // navigate(intended || "/community", { replace: true });
+      // return;
 
     } catch (err) {
       toast.error(`❌ ${err.message || 'Login failed. Please try again.'}`);

@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { saveLoginPayload } from "../utils/authStorage";
-import { isStaffUser } from "../utils/adminRole";
+import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/+$/, "");
 
@@ -37,6 +37,23 @@ const fetchWithManyAuthStyles = async (url, access) => {
     const obj = await fetchJSON(url, h);
     if (obj) return obj;
   }
+  return null;
+};
+
+const resolveBackendUser = async (access) => {
+  if (!access) return null;
+  const meCandidates = [
+    `${API_BASE}/auth/users/me/`,
+    `${API_BASE}/users/me/`,
+    `${API_BASE}/auth/me/`,
+    `${API_BASE}/me/`,
+  ];
+
+  for (const url of meCandidates) {
+    const u = await fetchWithManyAuthStyles(url, access);
+    if (u) return u;
+  }
+
   return null;
 };
 
@@ -106,12 +123,20 @@ const SocialOAuthCallback = () => {
         const payload = { access, refresh, user: userObj };
         saveLoginPayload(payload, { email: userObj?.email });
 
-        // Decide where to go: staff → admin, others → events
-        const staff = isStaffUser();
-        if (staff) {
-          window.location.replace("/admin/events");
+        const idTokenForGroups = localStorage.getItem("id_token") || "";
+        const cognitoGroups = getCognitoGroupsFromTokens(idTokenForGroups, access);
+        const backendUser = await resolveBackendUser(access);
+
+        const { path } = getRoleAndRedirectPath({
+          cognitoGroups,
+          backendUser,
+          defaultPath: "/events",
+        });
+
+        if (path === "/admin/events") {
+          window.location.replace(path);
         } else {
-          navigate("/events", { replace: true });
+          navigate(path, { replace: true });
         }
       } catch (err) {
         console.error(err);
