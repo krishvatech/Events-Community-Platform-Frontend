@@ -112,11 +112,13 @@ export const isOwnerUser = () => {
 
 // STAFF = is_staff true (and not owner)
 export const isStaffUser = () => {
+  const groups = getCognitoGroupsFromAccessToken();
   const dbUser = getBackendUserFromStorage();
 
   const dbIsStaff = truthyFlag(dbUser?.is_staff);
+  const hasStaffGroup = groups.includes("staff");
 
-  return !isOwnerUser() && dbIsStaff;
+  return !isOwnerUser() && (dbIsStaff || hasStaffGroup);
 };
 
 // generic "some level of admin"
