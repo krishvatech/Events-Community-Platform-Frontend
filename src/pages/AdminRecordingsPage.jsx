@@ -36,7 +36,7 @@ const S3_BUCKET_URL =
 const getTokenHeader = () => {
   const t =
     localStorage.getItem("access_token") ||
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("access") ||
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};

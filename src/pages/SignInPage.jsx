@@ -117,8 +117,6 @@ const fetchJSON = async (url, headers = {}) => {
 const fetchWithManyAuthStyles = async (url, access) => {
   const headerSets = [
     { Authorization: `Bearer ${access}`, Accept: "application/json" },
-    { Authorization: `JWT ${access}`, Accept: "application/json" },
-    { Authorization: `Token ${access}`, Accept: "application/json" },
   ];
   for (const h of headerSets) {
     const obj = await fetchJSON(url, h);
@@ -127,13 +125,10 @@ const fetchWithManyAuthStyles = async (url, access) => {
   return null;
 };
 
-const resolveBackendUser = async (idToken, accessToken) => {
+const resolveBackendUser = async (accessToken) => {
   const url = `${API_BASE}/users/me/`;
-  const tokens = [idToken, accessToken].filter(Boolean);
-  for (const t of tokens) {
-    const u = await fetchWithManyAuthStyles(url, t);
-    if (u) return u;
-  }
+  const u = await fetchWithManyAuthStyles(url, accessToken);
+  if (u) return u;
   return null;
 };
 
@@ -230,15 +225,13 @@ const SignInPage = () => {
           usernameOrEmail: formData.email,
           password: formData.password,
         });
-        const idToken = res.idToken || "";
         const accessToken = res.accessToken || "";
 
-        // We’ll use the ID token as "access" for now (contains email/name claims)
+        // Use access token for backend API auth
         data = {
-          access: accessToken || idToken,   // <--- CHANGE HERE
+          access: accessToken,
           refresh: res.refreshToken,
-          user: res.payload,               // id token payload (name/email)
-          id_token: idToken,
+          user: res.payload,
           access_token: accessToken,
         };
 
@@ -259,33 +252,27 @@ const SignInPage = () => {
       }
 
       // store tokens (your code already does this)
-      if (data?.access) {
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('token', data.access);
-      }
-      if (data?.id_token) {
-        localStorage.setItem('id_token', data.id_token);
-      }
-      if (data?.access_token) {
-        localStorage.setItem('cognito_access_token', data.access_token);
+      const accessTokenValue = data?.access_token || data?.access || "";
+      if (accessTokenValue) {
+        localStorage.setItem('access_token', accessTokenValue);
       }
       if (data?.refresh) {
         localStorage.setItem('refresh_token', data.refresh);
       }
 
-      const idTokenForBackend =
-        data?.id_token || localStorage.getItem("id_token") || "";
       const accessTokenForBackend =
-        data?.access || localStorage.getItem("access_token") || "";
+        data?.access_token ||
+        localStorage.getItem("access_token") ||
+        data?.access ||
+        localStorage.getItem("access_token") ||
+        "";
 
       const backendUser =
-        idTokenForBackend || accessTokenForBackend
-          ? await resolveBackendUser(idTokenForBackend, accessTokenForBackend)
-          : null;
+        accessTokenForBackend ? await resolveBackendUser(accessTokenForBackend) : null;
       let userObj = backendUser || data?.user || null;
 
       // Always prefer server /me for Cognito (it includes is_staff/is_superuser)
-      const fallbackAuthToken = idTokenForBackend || accessTokenForBackend || "";
+      const fallbackAuthToken = accessTokenForBackend || "";
       if (AUTH_PROVIDER === "cognito" && fallbackAuthToken && !backendUser) {
         const serverUser = await resolveCurrentUser(fallbackAuthToken, formData.email);
         if (serverUser) userObj = serverUser;
@@ -300,9 +287,8 @@ const SignInPage = () => {
       const params = new URLSearchParams(location.search);
       const intended = params.get("next") || location.state?.from?.pathname || "/community";
 
-      const idTokenForGroups = data?.id_token || localStorage.getItem("id_token") || "";
       const accessTokenForGroups = data?.access || localStorage.getItem("access_token") || "";
-      const cognitoGroups = getCognitoGroupsFromTokens(idTokenForGroups, accessTokenForGroups);
+      const cognitoGroups = getCognitoGroupsFromTokens(accessTokenForGroups);
 
       const { role, path } = getRoleAndRedirectPath({
         cognitoGroups,

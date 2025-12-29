@@ -597,7 +597,7 @@ function getCookie(name) {
 function authHeader() {
   const access =
     localStorage.getItem("access") ||
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("accessToken");
   const headers = {};
   if (access) headers.Authorization = `Bearer ${access}`;

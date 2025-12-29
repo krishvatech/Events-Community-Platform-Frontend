@@ -62,7 +62,7 @@ const toAbsolute = (u) =>
 function authHeader() {
   const token =
     localStorage.getItem("access") ||
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("auth_token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

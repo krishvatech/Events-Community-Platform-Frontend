@@ -26,7 +26,7 @@ const API_ROOT = (
 function getToken() {
   return (
     localStorage.getItem("access") ||
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("access_token") ||
     ""
   );

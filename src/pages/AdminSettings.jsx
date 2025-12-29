@@ -70,7 +70,7 @@ const API_ROOT = (
 
 const getToken = () =>
   localStorage.getItem("access_token") ||
-  localStorage.getItem("token") ||
+  localStorage.getItem("access_token") ||
   localStorage.getItem("access") ||
   "";
 

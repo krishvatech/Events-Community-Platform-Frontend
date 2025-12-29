@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+  (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").trim().replace(/\/+$/, "");
 
 /**
  * Register new user
@@ -58,8 +58,7 @@ export async function getLinkedInAuthUrl() {
  * Token + CSRF helpers
  */
 export const getRefreshToken = () =>
-  localStorage.getItem("refresh_token") ||
-  sessionStorage.getItem("refresh");
+  localStorage.getItem("refresh_token");
 
 const normalizeToken = (token) => {
   if (!token) return null;
@@ -69,11 +68,7 @@ const normalizeToken = (token) => {
 };
 
 export const getToken = () =>
-  normalizeToken(localStorage.getItem("id_token")) ||
-  normalizeToken(localStorage.getItem("access_token")) ||
-  normalizeToken(localStorage.getItem("token")) ||
-  normalizeToken(sessionStorage.getItem("access")) ||
-  normalizeToken(sessionStorage.getItem("token"));
+  normalizeToken(localStorage.getItem("access_token"));
 
 export const getCSRF = () =>
   document.cookie.split("; ").find((s) => s.startsWith("csrftoken="))?.split("=")[1];
@@ -106,8 +101,6 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-let refreshPromise = null;
-
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
@@ -118,51 +111,13 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // avoid infinite loop
-    if (original?._retry) return Promise.reject(error);
-    original._retry = true;
-
-    const refresh = getRefreshToken();
-    if (!refresh) return Promise.reject(error);
-
+    // Cognito-only: no refresh flow here. Clear auth and reject.
     try {
-      // One refresh call for many parallel 401s
-      if (!refreshPromise) {
-        refreshPromise = apiClient
-          .post("/auth/token/refresh/", { refresh })
-          .then((r) => r.data)
-          .finally(() => { refreshPromise = null; });
-      }
-
-      const data = await refreshPromise;
-
-      // SimpleJWT usually returns { access }, and with rotation may return { access, refresh }
-      if (data?.access) {
-        localStorage.setItem("access_token", data.access);
-        localStorage.setItem("token", data.access);
-        sessionStorage.setItem("access", data.access);
-      }
-      if (data?.refresh) {
-        localStorage.setItem("refresh_token", data.refresh);
-        sessionStorage.setItem("refresh", data.refresh);
-      }
-
-      // retry original request with new token
-      original.headers = original.headers || {};
-      original.headers.Authorization = `Bearer ${data.access}`;
-      return apiClient(original);
-    } catch (e) {
-      // refresh failed => clear auth and reject
-      try {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("token");
-        localStorage.removeItem("refresh_token");
-        sessionStorage.removeItem("access");
-        sessionStorage.removeItem("refresh");
-        window.dispatchEvent(new Event("auth:changed"));
-      } catch { }
-      return Promise.reject(e);
-    }
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.dispatchEvent(new Event("auth:changed"));
+    } catch { }
+    return Promise.reject(error);
   }
 );
 

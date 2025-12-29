@@ -9,17 +9,7 @@ const decodeJwtPayload = (token) => {
   }
 };
 
-export const getCognitoGroupsFromIdToken = (idToken) => {
-  if (!idToken) return [];
-  const payload = decodeJwtPayload(idToken);
-  const raw = payload?.["cognito:groups"] || [];
-  if (typeof raw === "string") return [raw];
-  return Array.isArray(raw) ? raw : [];
-};
-
-export const getCognitoGroupsFromTokens = (idToken, accessToken) => {
-  const fromId = getCognitoGroupsFromIdToken(idToken);
-  if (fromId.length) return fromId;
+export const getCognitoGroupsFromTokens = (accessToken) => {
   if (!accessToken) return [];
   const payload = decodeJwtPayload(accessToken);
   const raw = payload?.["cognito:groups"] || [];
@@ -34,12 +24,14 @@ export const getRoleAndRedirectPath = ({ cognitoGroups, backendUser, defaultPath
 
   const isStaff = backendUser?.is_staff === true;
   const isSuperuser = backendUser?.is_superuser === true;
+  const isPlatformAdminGroup = groups.includes("platform_admin");
+  const isStaffGroup = groups.includes("staff");
 
-  if (groups.includes("platform_admin") && isStaff && isSuperuser) {
+  if (isSuperuser || isPlatformAdminGroup) {
     return { role: "admin", path: "/admin/events" };
   }
 
-  if (groups.includes("staff") && isStaff && !isSuperuser) {
+  if (isStaff || isStaffGroup) {
     return { role: "staff", path: "/admin/events" };
   }
 

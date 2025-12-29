@@ -58,7 +58,7 @@ function priceStr(p) {
 function authHeaders() {
   const t =
     localStorage.getItem("access_token") ||
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("access");
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
@@ -186,7 +186,7 @@ function EventCard({ ev }) {
   const handleRegisterCard = async () => {
     const token =
       localStorage.getItem("access_token") ||
-      localStorage.getItem("token") ||
+      localStorage.getItem("access_token") ||
       localStorage.getItem("access");
     if (!token) {
       navigate("/signin");
@@ -353,7 +353,7 @@ function EventRow({ ev }) {
   const handleRegisterRow = async () => {
     const token =
       localStorage.getItem("access_token") ||
-      localStorage.getItem("token") ||
+      localStorage.getItem("access_token") ||
       localStorage.getItem("access");
     if (!token) {
       navigate("/signin");
@@ -674,7 +674,7 @@ export default function EventsPage() {
   useEffect(() => {
     const token =
       localStorage.getItem("access_token") ||
-      localStorage.getItem("token") ||
+      localStorage.getItem("access_token") ||
       localStorage.getItem("access");
 
     // if not logged-in, clear any old state
@@ -777,7 +777,7 @@ export default function EventsPage() {
         const headers = { "Content-Type": "application/json" };
         const token =
           localStorage.getItem("access_token") ||
-          localStorage.getItem("token") ||
+          localStorage.getItem("access_token") ||
           localStorage.getItem("access"); // last for backwards compat
         if (token) headers.Authorization = `Bearer ${token}`;
 

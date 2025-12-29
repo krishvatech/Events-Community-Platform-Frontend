@@ -62,12 +62,7 @@ const getUserCandidates = () => {
   }
 
   // JWT tokens (these usually contain is_superuser / is_staff)
-  const jwtToken =
-    window.localStorage.getItem("access_token") ||
-    window.localStorage.getItem("access") ||
-    window.localStorage.getItem("token") ||
-    window.sessionStorage.getItem("access") ||
-    window.sessionStorage.getItem("token");
+  const jwtToken = window.localStorage.getItem("access_token");
 
   const claims = decodeJwtPayload(jwtToken);
   if (claims) candidates.push(claims);

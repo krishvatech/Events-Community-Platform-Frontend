@@ -50,7 +50,7 @@ import SendRoundedIcon from "@mui/icons-material/SendRounded";
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 function getToken() {
   return (
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("access") ||
     localStorage.getItem("access_token") ||
     ""

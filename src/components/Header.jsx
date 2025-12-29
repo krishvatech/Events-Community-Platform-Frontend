@@ -25,16 +25,12 @@ import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { authConfig } from "../utils/api";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
-import { isOwnerUser, isStaffUser } from "../utils/adminRole.js";
-
 const apiBase =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
-const isAuthed = () =>
-  !!localStorage.getItem("token") ||
-  !!localStorage.getItem("access_token") ||
-  !!sessionStorage.getItem("token") ||
-  !!sessionStorage.getItem("access");
+const getAccessToken = () => localStorage.getItem("access_token");
+
+const isAuthed = () => !!getAccessToken();
 
 const getCookie = (name) =>
   document.cookie
@@ -61,9 +57,12 @@ const decodeJwtPayload = (token) => {
   } catch { return null; }
 };
 
-const readJSON = (store, key) => {
-  try { return JSON.parse((store === "local" ? localStorage : sessionStorage).getItem(key) || "null"); }
-  catch { return null; }
+const readLocalUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null");
+  } catch {
+    return null;
+  }
 };
 
 const hasRoleName = (arr, names = ["admin", "staff"]) =>
@@ -72,36 +71,34 @@ const hasRoleName = (arr, names = ["admin", "staff"]) =>
     return names.some(x => n.includes(x));
   });
 
-const isAdminUser = () => {
-  const candidates = [];
+const getClaims = () => decodeJwtPayload(getAccessToken());
 
-  // user objects you already save sometimes
-  candidates.push(readJSON("local", "user"));
-  candidates.push(readJSON("session", "user"));
-  const lpLocal = readJSON("local", "loginPayload");
-  const lpSess = readJSON("session", "loginPayload");
-  if (lpLocal?.user) candidates.push(lpLocal.user);
-  if (lpSess?.user) candidates.push(lpSess.user);
+const getRoleFlags = () => {
+  const claims = getClaims() || {};
+  const storedUser = readLocalUser() || {};
+  const rawGroups = claims["cognito:groups"] || claims.groups || [];
+  const groups = (Array.isArray(rawGroups) ? rawGroups : [rawGroups])
+    .map((g) => String(g || "").toLowerCase())
+    .filter(Boolean);
 
-  // JWT claims
-  const token =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("token") ||
-    sessionStorage.getItem("access") ||
-    sessionStorage.getItem("token");
-  const claims = decodeJwtPayload(token);
-  if (claims) candidates.push(claims);
+  const isSuperuser =
+    truthy(claims?.is_superuser) ||
+    truthy(storedUser?.is_superuser) ||
+    groups.includes("platform_admin") ||
+    hasRoleName(claims?.groups, ["platform_admin"]);
 
-  return candidates.filter(Boolean).some((u) =>
-    truthy(u?.is_staff) ||
-    truthy(u?.is_superuser) ||
-    truthy(u?.is_admin) ||
-    truthy(u?.staff) ||
-    String(u?.role || "").toLowerCase() === "admin" ||
-    hasRoleName(u?.groups) ||
-    hasRoleName(u?.roles) ||
-    hasRoleName(u?.permissions)
-  );
+  const isStaff =
+    isSuperuser ||
+    truthy(claims?.is_staff) ||
+    truthy(storedUser?.is_staff) ||
+    groups.includes("staff") ||
+    hasRoleName(claims?.groups, ["staff"]);
+
+  return {
+    isAdmin: isStaff || isSuperuser,
+    isOwner: isSuperuser,
+    isStaff: isStaff,
+  };
 };
 
 
@@ -112,11 +109,10 @@ const Header = () => {
   const navigate = useNavigate();
   const { pathname, search } = location;
   // const accountHref = isAdminUser() ? "/admin/events" : "/account/resources";
-  const isAdmin = isAdminUser();
+  const [roleFlags, setRoleFlags] = useState(getRoleFlags());
+  const { isAdmin, isOwner: owner, isStaff: staff } = roleFlags;
   const accountHref = isAdmin ? "/admin/events" : "/account/profile";
   const resourcesHref = isAdmin ? "/admin/resources" : "/account/resources";
-  const owner = isOwnerUser();
-  const staff = isStaffUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const openDrawer = () => setMobileOpen(true);
   const closeDrawer = () => setMobileOpen(false);
@@ -186,17 +182,27 @@ const Header = () => {
     return () => window.removeEventListener("storage", onStorageCart);
   }, []);
 
-  // Sync auth state across tabs
+  // Sync auth state across tabs + in-app auth changes
   useEffect(() => {
-    const onStorage = () => setAuthed(isAuthed());
+    const syncAuth = () => {
+      setAuthed(isAuthed());
+      setRoleFlags(getRoleFlags());
+    };
+    const onStorage = () => syncAuth();
+    const onAuthChanged = () => syncAuth();
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener("auth:changed", onAuthChanged);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("auth:changed", onAuthChanged);
+    };
   }, []);
 
   // Close drawer on route change and re-check auth
   useEffect(() => {
     setMobileOpen(false);
     setAuthed(isAuthed());
+    setRoleFlags(getRoleFlags());
   }, [location.pathname, location.hash]);
 
   // Guard protected routes + handle bfcache restores
@@ -224,14 +230,8 @@ const Header = () => {
     return () => window.removeEventListener("pageshow", onShow);
   }, [location.pathname, navigate]);
 
-  const getAccessToken = () =>
-    localStorage.getItem("token") ||
-    localStorage.getItem("access_token") ||
-    sessionStorage.getItem("access") ||
-    sessionStorage.getItem("token");
-
   const getRefreshToken = () =>
-    localStorage.getItem("refresh_token") || sessionStorage.getItem("refresh");
+    localStorage.getItem("refresh_token");
 
   const signOut = async () => {
     const access = getAccessToken();

@@ -59,7 +59,7 @@ const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 const API_ORIGIN = API_ROOT.replace(/\/api$/, "");
 
 const getToken = () =>
-  localStorage.getItem("token") ||
+  localStorage.getItem("access_token") ||
   localStorage.getItem("access") ||
   localStorage.getItem("access_token") ||
   "";

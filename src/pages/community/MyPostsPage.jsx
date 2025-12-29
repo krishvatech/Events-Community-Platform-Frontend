@@ -69,7 +69,7 @@ const API_ORIGIN = (() => {
 
 function getToken() {
   return (
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("access") ||
     localStorage.getItem("access_token") ||
     ""

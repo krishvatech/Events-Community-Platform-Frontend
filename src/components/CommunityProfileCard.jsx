@@ -93,8 +93,7 @@ function joinApi(url) {
 }
 
 function authHeaders() {
-  const candidates = ["access", "access_token", "accessToken", "jwt", "JWT", "token"];
-  const token = candidates.map((k) => localStorage.getItem(k)).find(Boolean);
+  const token = localStorage.getItem("access_token");
   return token
     ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
     : { "Content-Type": "application/json" };
@@ -163,13 +162,13 @@ export default function CommunityProfileCard({
   const navigate = useNavigate();
 
   const getAccessToken = () =>
-    localStorage.getItem("token") ||
     localStorage.getItem("access_token") ||
-    sessionStorage.getItem("access") ||
-    sessionStorage.getItem("token");
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("access_token");
 
   const getRefreshToken = () =>
-    localStorage.getItem("refresh_token") || sessionStorage.getItem("refresh");
+    localStorage.getItem("refresh_token");
 
   const signOut = async () => {
     const access = getAccessToken();

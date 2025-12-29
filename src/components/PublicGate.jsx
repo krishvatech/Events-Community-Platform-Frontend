@@ -3,12 +3,9 @@ import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 function isAuthed() {
-  // support both localStorage and sessionStorage (your app uses both)
+  // Cognito access token only
   return (
-    !!localStorage.getItem("token") ||
-    !!localStorage.getItem("access_token") ||
-    !!sessionStorage.getItem("access") ||
-    !!sessionStorage.getItem("token")
+    !!localStorage.getItem("access_token")
   );
 }
 

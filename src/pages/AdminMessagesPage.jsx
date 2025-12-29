@@ -52,7 +52,7 @@ const getToken = () =>
   localStorage.getItem("access") ||
   localStorage.getItem("access_token") ||
   localStorage.getItem("jwt") ||
-  localStorage.getItem("token") ||
+  localStorage.getItem("access_token") ||
   "";
 const authHeader = () => {
   const t = getToken();

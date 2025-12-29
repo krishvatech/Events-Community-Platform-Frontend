@@ -124,7 +124,7 @@ function EventDetailsSkeleton() {
 export default function EventDetailsPage() {
   const { slug } = useParams();
   const token =
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("access") ||
     localStorage.getItem("access_token") ||
     "";

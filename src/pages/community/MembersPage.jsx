@@ -60,7 +60,7 @@ const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
 const tokenHeader = () => {
   const t =
     localStorage.getItem("access_token") ||
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("access") ||
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};

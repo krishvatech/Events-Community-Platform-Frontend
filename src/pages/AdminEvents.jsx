@@ -117,7 +117,7 @@ const toAbs = (u) => {
 };
 
 const getToken = () =>
-  localStorage.getItem("token") ||
+  localStorage.getItem("access_token") ||
   localStorage.getItem("access") ||
   localStorage.getItem("access_token") ||
   "";

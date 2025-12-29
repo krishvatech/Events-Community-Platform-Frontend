@@ -30,8 +30,6 @@ const fetchJSON = async (url, headers = {}) => {
 const fetchWithManyAuthStyles = async (url, access) => {
   const headerSets = [
     { Authorization: `Bearer ${access}`, Accept: "application/json" },
-    { Authorization: `JWT ${access}`, Accept: "application/json" },
-    { Authorization: `Token ${access}`, Accept: "application/json" },
   ];
   for (const h of headerSets) {
     const obj = await fetchJSON(url, h);
@@ -111,7 +109,6 @@ const SocialOAuthCallback = () => {
     (async () => {
       try {
         // Store tokens like SignInPage does
-        localStorage.setItem("token", access);
         localStorage.setItem("access_token", access);
         if (refresh) localStorage.setItem("refresh_token", refresh);
 
@@ -123,8 +120,8 @@ const SocialOAuthCallback = () => {
         const payload = { access, refresh, user: userObj };
         saveLoginPayload(payload, { email: userObj?.email });
 
-        const idTokenForGroups = localStorage.getItem("id_token") || "";
-        const cognitoGroups = getCognitoGroupsFromTokens(idTokenForGroups, access);
+        const accessTokenForGroups = localStorage.getItem("access_token") || "";
+        const cognitoGroups = getCognitoGroupsFromTokens(accessTokenForGroups);
         const backendUser = await resolveBackendUser(access);
 
         const { path } = getRoleAndRedirectPath({

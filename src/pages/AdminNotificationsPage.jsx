@@ -37,7 +37,7 @@ import { isOwnerUser } from "../utils/adminRole";
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 const TEAL = "#14b8b1";
 const BORDER = "#e2e8f0"; // Matches your community theme
-const getToken = () => localStorage.getItem("access_token") || localStorage.getItem("token") || "";
+const getToken = () => localStorage.getItem("access_token") || localStorage.getItem("access_token") || "";
 const authHeader = () => {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};

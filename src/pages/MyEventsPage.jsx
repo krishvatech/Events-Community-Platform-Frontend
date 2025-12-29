@@ -363,7 +363,7 @@ export default function MyEventsPage() {
   const first = (fullName || "Member").split(" ")[0];
 
   const token =
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("access") ||
     localStorage.getItem("access_token") ||
     "";

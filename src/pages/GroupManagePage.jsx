@@ -73,7 +73,7 @@ const bust = (url, key) => {
     return `${u}${sep}v=${encodeURIComponent(k)}`;
 };
 const getToken = () =>
-    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
     localStorage.getItem("access") ||
     localStorage.getItem("access_token") ||
     "";

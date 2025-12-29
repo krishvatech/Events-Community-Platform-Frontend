@@ -20,7 +20,7 @@ const API_ROOT = BASE.endsWith("/api") ? BASE : `${BASE}/api`;
 const API_ORIGIN = BASE.replace(/\/api$/, "") || BASE;
 
 const getToken = () =>
-  localStorage.getItem("token") ||
+  localStorage.getItem("access_token") ||
   localStorage.getItem("access") ||
   localStorage.getItem("access_token") ||
   "";
@@ -354,7 +354,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
 }
 
 function EditGroupDialog({ open, group, onClose, onUpdated }) {
-  const token = localStorage.getItem("token") || localStorage.getItem("access") || localStorage.getItem("access_token") || "";
+  const token = localStorage.getItem("access_token") || localStorage.getItem("access") || localStorage.getItem("access_token") || "";
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [visibility, setVisibility] = React.useState("public");
