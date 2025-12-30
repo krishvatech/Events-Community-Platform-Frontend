@@ -42,6 +42,8 @@ import KYCCallbackPage from "./pages/KYCCallbackPage.jsx";
 import { useParams } from "react-router-dom";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import SocialOAuthCallback from "./pages/SocialOAuthCallback.jsx";
+import CognitoOAuthCallback from "./pages/CognitoOAuthCallback.jsx";
+
 
 function RedirectGroupToAdmin() {
   const { idOrSlug } = useParams();
@@ -62,6 +64,7 @@ const AppShell = () => {
     location.pathname === "/signup" ||
     location.pathname === "/forgot-password" ||
     location.pathname === "/reset-password" ||
+    location.pathname === "/cognito/callback" ||
     location.pathname === "/live" ||
     location.pathname.startsWith("/live/");
 
@@ -84,6 +87,7 @@ const AppShell = () => {
         <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
         <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
         <Route path="/oauth/callback" element={<SocialOAuthCallback />} />
+        <Route path="/cognito/callback" element={<CognitoOAuthCallback />} />
         {/* Admin area driven by AdminSidebar */}
         <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
           <Route index element={<AdminResources />} />

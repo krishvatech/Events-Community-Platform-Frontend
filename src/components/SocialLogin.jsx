@@ -2,26 +2,71 @@ import React from 'react';
 import { FaGoogle, FaLinkedinIn } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { Box, Divider, Typography, Button } from '@mui/material';
-
+import { randomString, pkceChallengeFromVerifier } from "../utils/pkce";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
 const SocialLogin = () => {
+  const COGNITO_DOMAIN = (import.meta.env.VITE_COGNITO_DOMAIN || "").replace(/\/+$/, "");
+  const COGNITO_CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
+  const COGNITO_REDIRECT_URI = import.meta.env.VITE_COGNITO_REDIRECT_URI || "http://localhost:5173/cognito/callback";
+
   const handleGoogle = async () => {
     try {
+      const AUTH_PROVIDER = import.meta.env.VITE_AUTH_PROVIDER;
+
+      // If Cognito config is present, use Cognito Hosted UI Google
+      if (AUTH_PROVIDER === "cognito" && COGNITO_DOMAIN && COGNITO_CLIENT_ID) {
+        const state = randomString(16);
+        const verifier = randomString(48);
+        const challenge = await pkceChallengeFromVerifier(verifier);
+
+        sessionStorage.setItem(`pkce_verifier_${state}`, verifier);
+
+        const params = new URLSearchParams({
+          response_type: "code",
+          client_id: COGNITO_CLIENT_ID,
+          redirect_uri: COGNITO_REDIRECT_URI,
+          scope: "openid email profile",
+          state,
+          code_challenge: challenge,
+          code_challenge_method: "S256",
+          identity_provider: "Google",
+        });
+
+        window.location.href = `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
+        return;
+      }
+
+      // fallback (your existing backend social login)
       const res = await fetch(`${API_BASE}/auth/google/url/`, {
-        method: 'GET',
-        credentials: 'include', // <-- important
+        method: "GET",
+        credentials: "include",
       });
-      if (!res.ok) throw new Error('Failed to start Google login');
+      if (!res.ok) throw new Error("Failed to start Google login");
       const data = await res.json();
-      if (!data.authorization_url) throw new Error('No authorization_url from backend');
-      // Redirect browser to Google
+      if (!data.authorization_url) throw new Error("No authorization_url from backend");
       window.location.href = data.authorization_url;
     } catch (err) {
       console.error(err);
-      toast.error('❌ Could not start Google login. Please try again.');
+      toast.error("❌ Could not start Google login. Please try again.");
     }
   };
+  // const handleGoogle = async () => {
+  //   try {
+  //     const res = await fetch(`${API_BASE}/auth/google/url/`, {
+  //       method: 'GET',
+  //       credentials: 'include', // <-- important
+  //     });
+  //     if (!res.ok) throw new Error('Failed to start Google login');
+  //     const data = await res.json();
+  //     if (!data.authorization_url) throw new Error('No authorization_url from backend');
+  //     // Redirect browser to Google
+  //     window.location.href = data.authorization_url;
+  //   } catch (err) {
+  //     console.error(err);
+  //     toast.error('❌ Could not start Google login. Please try again.');
+  //   }
+  // };
 
   // const handleLinkedIn = async () => {
   //   try {
