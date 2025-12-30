@@ -238,7 +238,16 @@ const SignUpPage = () => {
           state: { email: (formData.email || "").toLowerCase().trim(), justSignedUp: true },
         });
       } catch (err) {
-        toast.error(`❌ ${err?.message || "Verification failed"}`);
+        const msg =
+          err?.code === "AliasExistsException"
+            ? "Email already taken"
+            : err?.code === "CodeMismatchException"
+              ? "Invalid verification code"
+              : err?.code === "ExpiredCodeException"
+                ? "Verification code expired"
+                : (err?.message || "Verification failed");
+
+        toast.error(`❌ ${msg}`);
       } finally {
         setLoading(false);
       }
