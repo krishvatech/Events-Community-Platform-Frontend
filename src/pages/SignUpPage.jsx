@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import HeroSection from "../components/HeroSection.jsx";
 import AuthToggle from "../components/AuthToggle.jsx";
 import FeaturesSection from "../components/FeaturesSection.jsx";
-import { registerUser } from "../utils/api";
+import { API_BASE } from "../utils/api";
+import { cognitoSignIn } from "../utils/cognitoAuth";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
@@ -198,6 +199,38 @@ const SignUpPage = () => {
       setLoading(true);
       try {
         await cognitoConfirmSignUp({ username: pendingUsername, code: verifyCode.trim() });
+
+        /**
+         * ✅ DB sync at signup time (no other logic changes):
+         * 1) silently sign-in to get Cognito Access Token
+         * 2) call backend /api/auth/users/me/ once with Bearer token
+         *    -> backend creates auth_user + profile + community membership via existing logic
+         */
+        try {
+          if (formData.password) {
+            const session = await cognitoSignIn({
+              usernameOrEmail: pendingUsername,
+              password: formData.password,
+            });
+
+            await fetch(`${API_BASE}/auth/cognito/bootstrap/`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.accessToken}`,
+              },
+              body: JSON.stringify({
+                username: (formData.username || "").trim().toLowerCase(),
+                email: (formData.email || "").trim().toLowerCase(),
+                firstName: (formData.firstName || "").trim(),
+                lastName: (formData.lastName || "").trim(),
+              }),
+            });
+          }
+        } catch (e) {
+          // Don't block signup UX if sync fails; user can still sign in normally
+          console.warn("Signup DB sync skipped/failed:", e);
+        }
 
         toast.success("✅ Account verified! You can now sign in.");
         navigate("/signin", {
