@@ -11,8 +11,10 @@ const COGNITO_REDIRECT_URI = import.meta.env.VITE_COGNITO_REDIRECT_URI || "http:
 
 const decodeJwtPayload = (token) => {
   try {
-    const b64 = (token.split(".")[1] || "").replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(b64));
+    const part = token.split(".")[1] || "";
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    return JSON.parse(atob(padded));
   } catch {
     return {};
   }
@@ -76,20 +78,33 @@ const CognitoOAuthCallback = () => {
         if (refresh) localStorage.setItem("refresh_token", refresh);
         if (idToken) localStorage.setItem("id_token", idToken);
 
-        // 3) Bootstrap DB (same endpoint your signup confirm already calls)
+        // 3) Bootstrap DB (store Google profile into DB, but DO NOT overwrite username)
         const claims = idToken ? decodeJwtPayload(idToken) : {};
-        const email = (claims.email || "").toLowerCase().trim();
-        const firstName = claims.given_name || "";
-        const lastName = claims.family_name || "";
-        const username = email ? email.split("@")[0] : "";
 
+        // Get reliable profile info from Cognito userInfo endpoint (works for Google federated users)
+        let userInfo = {};
+        try {
+          const uiRes = await fetch(`${COGNITO_DOMAIN}/oauth2/userInfo`, {
+            headers: { Authorization: `Bearer ${access}` },
+          });
+          if (uiRes.ok) userInfo = await uiRes.json().catch(() => ({}));
+        } catch {
+          userInfo = {};
+        }
+
+        // Prefer userInfo, fallback to idToken claims
+        const email = (userInfo.email || claims.email || "").toLowerCase().trim();
+        const firstName = userInfo.given_name || claims.given_name || "";
+        const lastName = userInfo.family_name || claims.family_name || "";
+
+        // ✅ IMPORTANT: don't send username for Google login
         await fetch(`${API_BASE}/auth/cognito/bootstrap/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${access}`,
           },
-          body: JSON.stringify({ username, email, firstName, lastName }),
+          body: JSON.stringify({ email, firstName, lastName }),
         }).catch(() => null);
 
         // 4) Get backend user
