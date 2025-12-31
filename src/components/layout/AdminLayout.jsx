@@ -6,6 +6,9 @@ import AdminSidebar from "../AdminSidebar";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import { isStaffUser } from "../../utils/adminRole.js";
 import { clearAuth } from "../../utils/authStorage";
+import { createWagtailSession } from "../../utils/api";
+import { isOwnerUser } from "../../utils/adminRole";
+
 
 function resolveActiveKey(pathname) {
   if (pathname === "/admin" || pathname === "/admin/") return "resources"; // default tab for /admin
@@ -66,10 +69,25 @@ export default function AdminLayout() {
     [location.pathname]
   );
 
-  const handleSelect = (key) => {
+  const handleSelect = async (key) => {
     if (!key) return;
 
-    // Explicit map keeps navigation stable and avoids accidental "/" fallbacks.
+    if (key === "cms") {
+      try {
+        if (!isOwnerUser()) {
+          alert("CMS is only for platform_admin.");
+          return;
+        }
+        const cmsUrl = await createWagtailSession();
+        window.open(cmsUrl, "_blank");
+      } catch (e) {
+        alert("CMS login failed. Check token / backend logs.");
+      } finally {
+        setMobileOpen(false);
+      }
+      return;
+    }
+
     const map = {
       resources: "/admin/resources",
       recordings: "/admin/recordings",
@@ -85,7 +103,6 @@ export default function AdminLayout() {
     };
 
     navigate(map[key] ?? `/admin/${key}`);
-    // Close drawer if we are on mobile
     setMobileOpen(false);
   };
 

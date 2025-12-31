@@ -43,6 +43,7 @@ import { useParams } from "react-router-dom";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import SocialOAuthCallback from "./pages/SocialOAuthCallback.jsx";
 import CognitoOAuthCallback from "./pages/CognitoOAuthCallback.jsx";
+import AboutPage from "./pages/AboutPage.jsx";
 
 
 function RedirectGroupToAdmin() {
@@ -82,6 +83,7 @@ const AppShell = () => {
 
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
         <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
         <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />

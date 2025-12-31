@@ -139,6 +139,7 @@ const defaultItems = [
   { key: "name-requests", label: "Identity Verification", Icon: BadgeRoundedIcon },
   { key: "staff", label: "Staff", Icon: AdminPanelSettingsRoundedIcon },
   { key: "notifications", label: "Notifications", Icon: NotificationsRoundedIcon },
+  { key: "cms", label: "CMS", Icon: ArticleRoundedIcon },
   { key: "settings", label: "Settings", Icon: SettingsRoundedIcon },
 ];
 

@@ -197,3 +197,30 @@ export const getAdminNameRequests = (params = {}) =>
  */
 export const decideNameRequest = (id, status, admin_note = "") =>
   apiClient.post(`${ADMIN_NAME_REQUESTS_BASE}/${id}/decide/`, { status, admin_note }).then((r) => r.data);
+
+
+export async function createWagtailSession() {
+  const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+  const token =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("access") ||
+    "";
+
+  const r = await fetch(`${API_BASE}/auth/wagtail/session/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include", // IMPORTANT: to receive session cookie
+  });
+
+  if (!r.ok) {
+    const msg = await r.text().catch(() => "");
+    throw new Error(msg || "Failed to create CMS session");
+  }
+
+  // backend root (remove /api)
+  const backendRoot = API_BASE.replace(/\/api$/, "");
+  return `${backendRoot}/cms/`;
+}
