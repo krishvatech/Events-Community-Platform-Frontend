@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { saveLoginPayload } from "../utils/authStorage";
@@ -23,8 +23,11 @@ const decodeJwtPayload = (token) => {
 const CognitoOAuthCallback = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const didRunRef = useRef(false);
 
   useEffect(() => {
+    if (didRunRef.current) return;
+    didRunRef.current = true;
     const code = params.get("code");
     const state = params.get("state");
 
@@ -36,7 +39,7 @@ const CognitoOAuthCallback = () => {
 
     const verifierKey = `pkce_verifier_${state}`;
     const verifier = sessionStorage.getItem(verifierKey);
-    sessionStorage.removeItem(verifierKey);
+    // sessionStorage.removeItem(verifierKey);
 
     if (!verifier) {
       toast.error("❌ PKCE verifier missing (try login again).");
@@ -68,6 +71,8 @@ const CognitoOAuthCallback = () => {
           navigate("/signin", { replace: true });
           return;
         }
+
+        sessionStorage.removeItem(verifierKey);
 
         const access = t.access_token;
         const refresh = t.refresh_token || "";
