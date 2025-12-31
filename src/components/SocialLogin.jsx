@@ -86,12 +86,54 @@ const SocialLogin = () => {
   //   }
   // };
 
-  const handleLinkedIn = () => {
-    // Temporarily disabled for this release
-    toast.info('Sign in with LinkedIn is coming soon', {
-      autoClose: 2500,
-    });
+  const handleLinkedIn = async () => {
+    try {
+      const AUTH_PROVIDER = import.meta.env.VITE_AUTH_PROVIDER;
+
+      // Use Cognito Hosted UI LinkedIn (OIDC provider)
+      if (AUTH_PROVIDER === "cognito" && COGNITO_DOMAIN && COGNITO_CLIENT_ID) {
+        const state = randomString(16);
+        const verifier = randomString(48);
+        const challenge = await pkceChallengeFromVerifier(verifier);
+
+        sessionStorage.setItem(`pkce_verifier_${state}`, verifier);
+
+        const params = new URLSearchParams({
+          response_type: "code",
+          client_id: COGNITO_CLIENT_ID,
+          redirect_uri: COGNITO_REDIRECT_URI,
+          scope: "openid email profile",
+          state,
+          code_challenge: challenge,
+          code_challenge_method: "S256",
+          identity_provider: "LinkedIn", // must match AWS Provider name
+        });
+
+        window.location.href = `${COGNITO_DOMAIN}/oauth2/authorize?${params.toString()}`;
+        return;
+      }
+
+      // fallback (your existing backend LinkedIn social login)
+      const res = await fetch(`${API_BASE}/auth/linkedin/url/`, {
+        method: "GET",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to start LinkedIn login");
+      const data = await res.json();
+      if (!data.authorization_url) throw new Error("No authorization_url from backend");
+      window.location.href = data.authorization_url;
+    } catch (err) {
+      console.error(err);
+      toast.error("❌ Could not start LinkedIn login. Please try again.");
+    }
   };
+
+  // const handleLinkedIn = () => {
+  //   // Temporarily disabled for this release
+  //   toast.info('Sign in with LinkedIn is coming soon', {
+  //     autoClose: 2500,
+  //   });
+  // };
 
   return (
     <Box sx={{ mt: 2 }}>
