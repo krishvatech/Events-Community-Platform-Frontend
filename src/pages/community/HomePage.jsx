@@ -36,6 +36,7 @@ import {
 } from "@mui/material";
 
 // Icons
+import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -2764,91 +2765,152 @@ function AboutTab({
           </SectionCard>
 
           <SectionCard title="Experience" action={<Tooltip title="Add"><IconButton size="small" onClick={openAddExp}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <List dense disablePadding>
-              {profile.experience?.map(exp => (
-                <ListItem key={exp.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setExpDeleteId(exp.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => openEditExp(exp.id)}><EditOutlinedIcon fontSize="small" /></IconButton></Box>}>
-                  <ListItemText
-                    primary={
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {exp.position || "Role not specified"}
-                          {exp.org ? ` · ${exp.org}` : ""}
-                        </Typography>
-                      </Box>
-                    }
-                    secondary={
-                      <React.Fragment>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          display="block"
-                        >
-                          {dateRange(exp.start, exp.end, exp.current)}
-                          {exp.location ? ` · ${exp.location}` : ""}
-                        </Typography>
-
-
-
-                        {exp.description && (
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              mt: 0.5,
-                              display: "-webkit-box",
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: "vertical",
-                              overflow: "hidden",
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {exp.description}
+            {(profile.experience?.length || 0) > 0 ? (
+              <List dense disablePadding>
+                {profile.experience?.map(exp => (
+                  <ListItem key={exp.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setExpDeleteId(exp.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => openEditExp(exp.id)}><EditOutlinedIcon fontSize="small" /></IconButton></Box>}>
+                    <ListItemText
+                      primary={
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {exp.position || "Role not specified"}
+                            {exp.org ? ` · ${exp.org}` : ""}
                           </Typography>
-                        )}
-                      </React.Fragment>
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
+                        </Box>
+                      }
+                      secondary={
+                        <React.Fragment>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            display="block"
+                          >
+                            {dateRange(exp.start, exp.end, exp.current)}
+                            {exp.location ? ` · ${exp.location}` : ""}
+                          </Typography>
+
+
+
+                          {exp.description && (
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{
+                                mt: 0.5,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                whiteSpace: "pre-wrap",
+                                wordBreak: "break-word",
+                              }}
+                            >
+                              {exp.description}
+                            </Typography>
+                          )}
+                        </React.Fragment>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Avatar
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    bgcolor: "grey.200",
+                    color: "grey.600",
+                    mx: "auto",
+                  }}
+                >
+                  <WorkOutlineIcon />
+                </Avatar>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Add your work experience.
+                </Typography>
+
+                <Box>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    size="small"
+                    sx={{ mt: 1.5 }}
+                    onClick={openAddExp}
+                  >
+                    Create
+                  </Button>
+                </Box>
+              </Box>
+            )}
           </SectionCard>
 
           <SectionCard title="Education" action={<Tooltip title="Add"><IconButton size="small" onClick={() => { setEditEduId(null); setEduForm({}); setEduFiles([]); setEduOpen(true); }}><AddRoundedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <List dense disablePadding>
-              {profile.education?.map(edu => (
-                <ListItem key={edu.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setEduDeleteId(edu.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => { setEditEduId(edu.id); setEduForm({ ...edu, start: (edu.start || "").slice(0, 4), end: (edu.end || "").slice(0, 4), documents: edu.documents || [] }); setEduOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Box>}>
-                  <ListItemText
-                    primary={<Typography variant="body2" fontWeight={600}>{edu.degree} — {edu.school}</Typography>}
-                    secondary={
-                      <Stack component="span" spacing={0.5}>
-                        <Typography variant="caption" color="text.secondary">
-                          {edu.start?.slice(0, 4)} - {edu.end?.slice(0, 4)}
-                        </Typography>
+            {(profile.education?.length || 0) > 0 ? (
+              <List dense disablePadding>
+                {profile.education?.map(edu => (
+                  <ListItem key={edu.id} disableGutters secondaryAction={<Box sx={{ display: "flex" }}><IconButton size="small" onClick={() => setEduDeleteId(edu.id)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton><IconButton size="small" onClick={() => { setEditEduId(edu.id); setEduForm({ ...edu, start: (edu.start || "").slice(0, 4), end: (edu.end || "").slice(0, 4), documents: edu.documents || [] }); setEduOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Box>}>
+                    <ListItemText
+                      primary={<Typography variant="body2" fontWeight={600}>{edu.degree} — {edu.school}</Typography>}
+                      secondary={
+                        <Stack component="span" spacing={0.5}>
+                          <Typography variant="caption" color="text.secondary">
+                            {edu.start?.slice(0, 4)} - {edu.end?.slice(0, 4)}
+                          </Typography>
 
-                        {/* --- NEW: Display Documents Chips --- */}
-                        {edu.documents && edu.documents.length > 0 && (
-                          <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>
-                            {edu.documents.map((doc) => (
-                              <Chip
-                                key={doc.id}
-                                icon={<InsertDriveFileIcon style={{ fontSize: 14 }} />}
-                                label={doc.filename}
-                                size="small"
-                                variant="outlined"
-                                onClick={() => window.open(doc.file, '_blank')}
-                                sx={{ cursor: "pointer", height: 24, fontSize: "0.75rem" }}
-                              />
-                            ))}
-                          </Stack>
-                        )}
-                        {/* ---------------------------------- */}
-                      </Stack>
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
+                          {/* --- NEW: Display Documents Chips --- */}
+                          {edu.documents && edu.documents.length > 0 && (
+                            <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 0.5 }}>
+                              {edu.documents.map((doc) => (
+                                <Chip
+                                  key={doc.id}
+                                  icon={<InsertDriveFileIcon style={{ fontSize: 14 }} />}
+                                  label={doc.filename}
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => window.open(doc.file, '_blank')}
+                                  sx={{ cursor: "pointer", height: 24, fontSize: "0.75rem" }}
+                                />
+                              ))}
+                            </Stack>
+                          )}
+                          {/* ---------------------------------- */}
+                        </Stack>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", mx: "auto" }}>
+                  <HistoryEduRoundedIcon />
+                </Avatar>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Add an education to your profile
+                </Typography>
+
+                <Box>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    size="small"
+                    sx={{ mt: 1.5 }}
+                    onClick={() => {
+                      setEditEduId(null);
+                      setEduForm({});
+                      setEduFiles([]);
+                      setEduOpen(true);
+                    }}
+                  >
+                    Create
+                  </Button>
+                </Box>
+              </Box>
+            )}
           </SectionCard>
 
           <SectionCard
