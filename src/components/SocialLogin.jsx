@@ -21,6 +21,13 @@ const SocialLogin = () => {
         const challenge = await pkceChallengeFromVerifier(verifier);
 
         sessionStorage.setItem(`pkce_verifier_${state}`, verifier);
+        // ✅ store where user should land after login
+        const intended =
+          new URLSearchParams(window.location.search).get("next") ||
+          window.location.pathname ||
+          "/community";
+
+        sessionStorage.setItem(`post_login_redirect_${state}`, intended);
 
         const params = new URLSearchParams({
           response_type: "code",
@@ -51,40 +58,6 @@ const SocialLogin = () => {
       toast.error("❌ Could not start Google login. Please try again.");
     }
   };
-  // const handleGoogle = async () => {
-  //   try {
-  //     const res = await fetch(`${API_BASE}/auth/google/url/`, {
-  //       method: 'GET',
-  //       credentials: 'include', // <-- important
-  //     });
-  //     if (!res.ok) throw new Error('Failed to start Google login');
-  //     const data = await res.json();
-  //     if (!data.authorization_url) throw new Error('No authorization_url from backend');
-  //     // Redirect browser to Google
-  //     window.location.href = data.authorization_url;
-  //   } catch (err) {
-  //     console.error(err);
-  //     toast.error('❌ Could not start Google login. Please try again.');
-  //   }
-  // };
-
-  // const handleLinkedIn = async () => {
-  //   try {
-  //     const res = await fetch(`${API_BASE}/auth/linkedin/url/`, {
-  //       method: 'GET',
-  //       credentials: 'include', // <-- important
-  //     });
-  //     if (!res.ok) throw new Error('Failed to start LinkedIn login');
-  //     const data = await res.json();
-  //     if (!data.authorization_url) throw new Error('No authorization_url from backend');
-
-  //     // Redirect browser to LinkedIn consent page
-  //     window.location.href = data.authorization_url;
-  //   } catch (err) {
-  //     console.error(err);
-  //     toast.error('❌ Could not start LinkedIn login. Please try again.');
-  //   }
-  // };
 
   const handleLinkedIn = async () => {
     try {
@@ -97,6 +70,14 @@ const SocialLogin = () => {
         const challenge = await pkceChallengeFromVerifier(verifier);
 
         sessionStorage.setItem(`pkce_verifier_${state}`, verifier);
+
+        // ✅ store where user should land after login
+        const intended =
+          new URLSearchParams(window.location.search).get("next") ||
+          window.location.pathname ||
+          "/community";
+
+        sessionStorage.setItem(`post_login_redirect_${state}`, intended);
 
         const params = new URLSearchParams({
           response_type: "code",
@@ -127,13 +108,6 @@ const SocialLogin = () => {
       toast.error("❌ Could not start LinkedIn login. Please try again.");
     }
   };
-
-  // const handleLinkedIn = () => {
-  //   // Temporarily disabled for this release
-  //   toast.info('Sign in with LinkedIn is coming soon', {
-  //     autoClose: 2500,
-  //   });
-  // };
 
   return (
     <Box sx={{ mt: 2 }}>

@@ -31,6 +31,10 @@ const CognitoOAuthCallback = () => {
     const code = params.get("code");
     const state = params.get("state");
 
+    const redirectKey = `post_login_redirect_${state}`;
+    const intended = sessionStorage.getItem(redirectKey) || "/community";
+    sessionStorage.removeItem(redirectKey);
+
     if (!code || !state) {
       toast.error("❌ Missing code/state from Cognito.");
       navigate("/signin", { replace: true });
@@ -135,7 +139,7 @@ const CognitoOAuthCallback = () => {
         const { path } = getRoleAndRedirectPath({
           cognitoGroups,
           backendUser,
-          defaultPath: "/events",
+          defaultPath: intended,
         });
 
         if (path === "/admin/events") window.location.replace(path);
