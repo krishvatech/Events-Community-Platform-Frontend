@@ -268,20 +268,6 @@ const Header = () => {
     }
 
     clearAuth();
-    // if (AUTH_PROVIDER === "cognito") {
-    //   const COGNITO_DOMAIN = (import.meta.env.VITE_COGNITO_DOMAIN || "").replace(/\/+$/, "");
-    //   const COGNITO_CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || "";
-    //   const LOGOUT_URI =
-    //     import.meta.env.VITE_COGNITO_POST_LOGOUT_REDIRECT_URI ||
-    //     `${window.location.origin}/`;
-
-    //   if (COGNITO_DOMAIN && COGNITO_CLIENT_ID) {
-    //     window.location.href =
-    //       `${COGNITO_DOMAIN}/logout?client_id=${encodeURIComponent(COGNITO_CLIENT_ID)}` +
-    //       `&logout_uri=${encodeURIComponent(LOGOUT_URI)}`;
-    //     return;
-    //   }
-    // }
     localStorage.setItem("cart_count", "0");
     window.dispatchEvent(new Event("cart:update"));
 

@@ -191,6 +191,19 @@ export default function CommunityProfileCard({
       // ignore
     }
 
+    // ✅ Also kill Wagtail (Django) session
+    try {
+      if (access) {
+        await fetch(`${apiBase}/auth/wagtail/logout/`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${access}` },
+          credentials: "include",
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+
     clearAuth();
     localStorage.setItem("cart_count", "0");
     window.dispatchEvent(new Event("cart:update"));
