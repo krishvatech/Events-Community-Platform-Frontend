@@ -77,9 +77,14 @@ const CognitoOAuthCallback = () => {
         const access = t.access_token;
         const refresh = t.refresh_token || "";
         const idToken = t.id_token || "";
-
+        const backendJwt = idToken || access;
         // 2) Store tokens (same keys your app already uses)
-        localStorage.setItem("access_token", access);
+        // ✅ Your app should use idToken for backend APIs
+        localStorage.setItem("access_token", idToken || access);
+
+        // keep the real access token separately (used for /userInfo etc.)
+        localStorage.setItem("cognito_access_token", access);
+
         if (refresh) localStorage.setItem("refresh_token", refresh);
         if (idToken) localStorage.setItem("id_token", idToken);
 
@@ -90,7 +95,7 @@ const CognitoOAuthCallback = () => {
         let userInfo = {};
         try {
           const uiRes = await fetch(`${COGNITO_DOMAIN}/oauth2/userInfo`, {
-            headers: { Authorization: `Bearer ${access}` },
+            headers: { Authorization: `Bearer ${backendJwt}` },
           });
           if (uiRes.ok) userInfo = await uiRes.json().catch(() => ({}));
         } catch {
@@ -107,7 +112,7 @@ const CognitoOAuthCallback = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${access}`,
+            Authorization: `Bearer ${backendJwt}`,
           },
           body: JSON.stringify({ email, firstName, lastName }),
         }).catch(() => null);
@@ -115,12 +120,15 @@ const CognitoOAuthCallback = () => {
         // 4) Get backend user
         let backendUser = null;
         const meRes = await fetch(`${API_BASE}/auth/users/me/`, {
-          headers: { Authorization: `Bearer ${access}`, Accept: "application/json" },
+          headers: { Authorization: `Bearer ${backendJwt}` }, // backendJwt = idToken
         });
         if (meRes.ok) backendUser = await meRes.json().catch(() => null);
 
         localStorage.setItem("user", JSON.stringify(backendUser || claims || {}));
-        saveLoginPayload({ access, refresh, user: backendUser || claims }, { email, firstName });
+        saveLoginPayload(
+          { access_token: backendJwt, refresh, user: backendUser || claims },
+          { email, firstName }
+        );
 
         // 5) Role redirect (same logic you already use)
         const cognitoGroups = getCognitoGroupsFromTokens(access);

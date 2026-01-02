@@ -231,14 +231,21 @@ const SignInPage = () => {
           usernameOrEmail: formData.email,
           password: formData.password,
         });
-        const accessToken = res.accessToken || "";
 
-        // Use access token for backend API auth
+        const idToken = res.idToken || "";         // ✅ use for backend (has email + verified)
+        const accessToken = res.accessToken || ""; // keep for groups / optional cognito calls
+
+        // store both (optional but useful)
+        if (accessToken) localStorage.setItem("cognito_access_token", accessToken);
+        if (idToken) localStorage.setItem("id_token", idToken);
+
+        // ✅ backend should receive idToken
         data = {
-          access: accessToken,
+          access: accessToken,          // keep for cognito groups logic
+          access_token: idToken,        // ✅ used by your API everywhere (localStorage access_token)
           refresh: res.refreshToken,
           user: res.payload,
-          access_token: accessToken,
+          id_token: idToken,
         };
 
       } else {

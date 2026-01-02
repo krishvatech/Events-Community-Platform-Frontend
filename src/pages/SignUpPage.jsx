@@ -217,7 +217,7 @@ const SignUpPage = () => {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${session.accessToken}`,
+                Authorization: `Bearer ${session.idToken}`,
               },
               body: JSON.stringify({
                 username: (formData.username || "").trim().toLowerCase(),

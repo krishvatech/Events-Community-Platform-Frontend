@@ -11,7 +11,7 @@ export function saveLoginPayload(data, { email, firstName } = {}) {
   if (!name) name = firstName || "";               // from your login form (if you have it)
   if (!name && email) name = email.split("@")[0];  // use email prefix as last resort
   // Save what you need
-  const access = data?.access_token || data?.access || data?.token || "";
+  const access = data?.access_token || data?.id_token || data?.access || data?.token || "";
   if (access) localStorage.setItem("access_token", access);
   if (data?.refresh) localStorage.setItem("refresh_token", data.refresh);
   sessionStorage.setItem("user_name", name || "");
