@@ -2520,7 +2520,7 @@ export default function ProfilePage() {
                             <Box>
                               <Button
                                 variant="contained"
-                                color="success"
+                                
                                 size="small"
                                 sx={{ mt: 1.5 }}
                                 onClick={openAddExperience}
@@ -2585,7 +2585,7 @@ export default function ProfilePage() {
                               </ListItem>
                             ))}
                           </List>
-                        ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'grey.200', mx: 'auto' }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an education to your profile</Typography><Box><Button variant="contained" color="success" size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
+                        ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'grey.200', mx: 'auto' }}><HistoryEduRoundedIcon /></Avatar><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an education to your profile</Typography><Box><Button variant="contained"  size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
                       </SectionCard>
                       <SectionCard
                         sx={{ mt: 2 }}
@@ -2651,9 +2651,35 @@ export default function ProfilePage() {
                             ))}
                           </List>
                         ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            Add your certifications and licenses.
-                          </Typography>
+                          <Box sx={{ textAlign: "center", py: 4 }}>
+                            <Avatar
+                              sx={{
+                                width: 64,
+                                height: 64,
+                                bgcolor: "grey.200",
+                                color: "grey.600",
+                                mx: "auto",
+                              }}
+                            >
+                              <VerifiedRoundedIcon />
+                            </Avatar>
+
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                              Add your certifications and licenses.
+                            </Typography>
+
+                            <Box>
+                              <Button
+                                variant="contained"
+                                
+                                size="small"
+                                sx={{ mt: 1.5 }}
+                                onClick={openAddCert}
+                              >
+                                Create
+                              </Button>
+                            </Box>
+                          </Box>
                         )}
                       </SectionCard>
 
@@ -2769,9 +2795,35 @@ export default function ProfilePage() {
                             ))}
                           </List>
                         ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            Add trainings or executive education programs.
-                          </Typography>
+                          <Box sx={{ textAlign: "center", py: 4 }}>
+                            <Avatar
+                              sx={{
+                                width: 64,
+                                height: 64,
+                                bgcolor: "grey.200",
+                                color: "grey.600",
+                                mx: "auto",
+                              }}
+                            >
+                              <HistoryEduRoundedIcon />
+                            </Avatar>
+
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                              Add trainings or executive education programs.
+                            </Typography>
+
+                            <Box>
+                              <Button
+                                variant="contained"
+                                
+                                size="small"
+                                sx={{ mt: 1.5 }}
+                                onClick={openAddTraining}
+                              >
+                                Create
+                              </Button>
+                            </Box>
+                          </Box>
                         )}
                       </SectionCard>
 
@@ -2836,9 +2888,35 @@ export default function ProfilePage() {
                             ))}
                           </List>
                         ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            Add your memberships.
-                          </Typography>
+                          <Box sx={{ textAlign: "center", py: 4 }}>
+                            <Avatar
+                              sx={{
+                                width: 64,
+                                height: 64,
+                                bgcolor: "grey.200",
+                                color: "grey.600",
+                                mx: "auto",
+                              }}
+                            >
+                              <BusinessRoundedIcon />
+                            </Avatar>
+
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                              Add your memberships.
+                            </Typography>
+
+                            <Box>
+                              <Button
+                                variant="contained"
+                                
+                                size="small"
+                                sx={{ mt: 1.5 }}
+                                onClick={openAddMember}
+                              >
+                                Create
+                              </Button>
+                            </Box>
+                          </Box>
                         )}
                       </SectionCard>
                       {/* --- LANGUAGES SECTION --- */}
@@ -2910,7 +2988,35 @@ export default function ProfilePage() {
                             ))}
                           </List>
                         ) : (
-                          <Typography variant="body2" color="text.secondary">Add languages you know.</Typography>
+                          <Box sx={{ textAlign: "center", py: 4 }}>
+                            <Avatar
+                              sx={{
+                                width: 64,
+                                height: 64,
+                                bgcolor: "grey.200",
+                                color: "grey.600",
+                                mx: "auto",
+                              }}
+                            >
+                              <VerifiedRoundedIcon />
+                            </Avatar>
+
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                              Add languages you know.
+                            </Typography>
+
+                            <Box>
+                              <Button
+                                variant="contained"
+                                
+                                size="small"
+                                sx={{ mt: 1.5 }}
+                                onClick={openAddLanguage}
+                              >
+                                Create
+                              </Button>
+                            </Box>
+                          </Box>
                         )}
                       </SectionCard>
                     </Grid>

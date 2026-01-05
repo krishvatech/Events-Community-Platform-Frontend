@@ -2835,7 +2835,7 @@ function AboutTab({
                 <Box>
                   <Button
                     variant="contained"
-                    color="success"
+                    
                     size="small"
                     sx={{ mt: 1.5 }}
                     onClick={openAddExp}
@@ -2896,7 +2896,7 @@ function AboutTab({
                 <Box>
                   <Button
                     variant="contained"
-                    color="success"
+                    
                     size="small"
                     sx={{ mt: 1.5 }}
                     onClick={() => {
@@ -2978,9 +2978,35 @@ function AboutTab({
                 ))}
               </List>
             ) : (
-              <Typography variant="body2" color="text.secondary">
-                Add your certifications & licenses.
-              </Typography>
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Avatar
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    bgcolor: "grey.200",
+                    color: "grey.600",
+                    mx: "auto",
+                  }}
+                >
+                  <VerifiedRoundedIcon />
+                </Avatar>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Add your certifications & licenses.
+                </Typography>
+
+                <Box>
+                  <Button
+                    variant="contained"
+                    
+                    size="small"
+                    sx={{ mt: 1.5 }}
+                    onClick={openAddCert}
+                  >
+                    Create
+                  </Button>
+                </Box>
+              </Box>
             )}
           </SectionCard>
         </Grid>
@@ -3075,9 +3101,35 @@ function AboutTab({
                 ))}
               </List>
             ) : (
-              <Typography variant="body2" color="text.secondary">
-                Add trainings or executive education programs.
-              </Typography>
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Avatar
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    bgcolor: "grey.200",
+                    color: "grey.600",
+                    mx: "auto",
+                  }}
+                >
+                  <HistoryEduRoundedIcon />
+                </Avatar>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Add trainings or executive education programs.
+                </Typography>
+
+                <Box>
+                  <Button
+                    variant="contained"
+                    
+                    size="small"
+                    sx={{ mt: 1.5 }}
+                    onClick={openAddTraining}
+                  >
+                    Create
+                  </Button>
+                </Box>
+              </Box>
             )}
           </SectionCard>
 
@@ -3143,9 +3195,35 @@ function AboutTab({
                 ))}
               </List>
             ) : (
-              <Typography variant="body2" color="text.secondary">
-                Add your memberships.
-              </Typography>
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Avatar
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    bgcolor: "grey.200",
+                    color: "grey.600",
+                    mx: "auto",
+                  }}
+                >
+                  <BusinessRoundedIcon />
+                </Avatar>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Add your memberships.
+                </Typography>
+
+                <Box>
+                  <Button
+                    variant="contained"
+                    
+                    size="small"
+                    sx={{ mt: 1.5 }}
+                    onClick={openAddMember}
+                  >
+                    Create
+                  </Button>
+                </Box>
+              </Box>
             )}
           </SectionCard>
 
@@ -3211,7 +3289,35 @@ function AboutTab({
                 ))}
               </List>
             ) : (
-              <Typography variant="body2" color="text.secondary">Add languages you know.</Typography>
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Avatar
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    bgcolor: "grey.200",
+                    color: "grey.600",
+                    mx: "auto",
+                  }}
+                >
+                  <VerifiedRoundedIcon />
+                </Avatar>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Add languages you know.
+                </Typography>
+
+                <Box>
+                  <Button
+                    variant="contained"
+                    
+                    size="small"
+                    sx={{ mt: 1.5 }}
+                    onClick={openAddLanguage}
+                  >
+                    Create
+                  </Button>
+                </Box>
+              </Box>
             )}
           </SectionCard>
         </Grid>
