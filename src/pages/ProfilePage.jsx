@@ -31,6 +31,7 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { startKYC, submitNameChangeRequest } from "../utils/api";
+import { isFutureDate, isFutureMonth, isFutureYear } from "../utils/dateValidation";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 
 // -------------------- Constants for Dropdowns --------------------
@@ -372,7 +373,7 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect }) {
   );
 }
 
-function UniversityAutocomplete({ value, onChange, label = "University" }) {
+function UniversityAutocomplete({ value, onChange, label = "University", error, helperText }) {
   const [inputValue, setInputValue] = React.useState(value || "");
   const [options, setOptions] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -473,6 +474,8 @@ function UniversityAutocomplete({ value, onChange, label = "University" }) {
           required
           fullWidth
           margin="normal"
+          error={!!error}
+          helperText={helperText || ""}
           InputProps={{
             ...params.InputProps,
             endAdornment: (
@@ -538,7 +541,7 @@ const Label = ({ children, sx }) => (
 );
 
 // -------------------- Company Autocomplete --------------------
-function CompanyAutocomplete({ value, onChange }) {
+function CompanyAutocomplete({ value, onChange, error, helperText }) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -612,6 +615,8 @@ function CompanyAutocomplete({ value, onChange }) {
           label="Company Name *"
           fullWidth
           sx={{ mb: 2 }}
+          error={!!error}
+          helperText={helperText || ""}
           InputProps={{
             ...params.InputProps,
             endAdornment: (
@@ -1188,11 +1193,41 @@ export default function ProfilePage() {
   };
   const [eduForm, setEduForm] = useState(EMPTY_EDU_FORM);
   const [eduErrors, setEduErrors] = useState({ start: "", end: "" });
+  const [eduReqErrors, setEduReqErrors] = useState({ school: "", degree: "", field: "", start: "" });
   const [expForm, setExpForm] = useState(initialExpForm);
+  const [expReqErrors, setExpReqErrors] = useState({
+    org: "",
+    position: "",
+    location: "",
+    relationship_to_org: "",
+    work_schedule: "",
+    career_stage: "",
+    work_arrangement: "",
+    start: "",
+    end: "",
+  });
   const [syncProfileLocation, setSyncProfileLocation] = useState(false);
   const [trainingForm, setTrainingForm] = useState(EMPTY_TRAINING_FORM);
+  const [trainingReqErrors, setTrainingReqErrors] = useState({
+    program_title: "",
+    provider: "",
+    start_month: "",
+    end_month: "",
+  });
   const [certForm, setCertForm] = useState(EMPTY_CERT_FORM);
+  const [certReqErrors, setCertReqErrors] = useState({
+    certification_name: "",
+    issuing_organization: "",
+    issue_month: "",
+    expiration_month: "",
+  });
   const [memberForm, setMemberForm] = useState(EMPTY_MEMBER_FORM);
+  const [memberReqErrors, setMemberReqErrors] = useState({
+    organization_name: "",
+    role_type: "",
+    start_month: "",
+    end_month: "",
+  });
 
   // Helpers
   const latestExp = useMemo(() => expList.length > 0 ? expList[0] : null, [expList]);
@@ -1789,16 +1824,31 @@ export default function ProfilePage() {
     if (eduSaving) return;
 
     setEduErrors({ start: "", end: "" });
+    setEduReqErrors({ school: "", degree: "", field: "", start: "" });
+
+    const reqErrors = { school: "", degree: "", field: "", start: "" };
+    if (!(eduForm.school || "").trim()) reqErrors.school = "School is required";
+    if (!(eduForm.degree || "").trim()) reqErrors.degree = "Degree is required";
+    if (!(eduForm.field || "").trim()) reqErrors.field = "Field of study is required.";
+    if (!(eduForm.start || "").trim()) reqErrors.start = "Start year is required";
+    if (Object.values(reqErrors).some(Boolean)) {
+      setEduReqErrors(reqErrors);
+      if (reqErrors.school || reqErrors.degree) {
+        showNotification("error", "Please fill School and Degree.");
+      }
+      return;
+    }
+
+    const now = new Date();
 
     try {
       setEduSaving(true);
 
       const startY = eduForm.start ? parseInt(eduForm.start, 10) : null;
       const endY = eduForm.end ? parseInt(eduForm.end, 10) : null;
-      const currentYear = new Date().getFullYear();
 
-      if (startY && startY > currentYear) {
-        setEduErrors((p) => ({ ...p, start: "Start year cannot be in the future" }));
+      if (isFutureYear(eduForm.start, now)) {
+        setEduErrors((p) => ({ ...p, start: "Start year can't be in the future." }));
         return;
       }
       if (startY && endY && endY < startY) {
@@ -1826,11 +1876,6 @@ export default function ProfilePage() {
         end_date: normalizeYear(eduForm.end),
         grade: (eduForm.grade || "").trim(),
       };
-
-      if (!payload.school || !payload.degree) {
-        showNotification("error", "Please fill School and Degree.");
-        return;
-      }
 
       // 1. Save Education Data
       const r = await fetch(url, {
@@ -1872,6 +1917,49 @@ export default function ProfilePage() {
     if (expSaving) return;
 
     try {
+      setExpReqErrors({
+        org: "",
+        position: "",
+        location: "",
+        relationship_to_org: "",
+        work_schedule: "",
+        career_stage: "",
+        work_arrangement: "",
+        start: "",
+        end: "",
+      });
+      const reqErrors = {
+        org: "",
+        position: "",
+        location: "",
+        relationship_to_org: "",
+        work_schedule: "",
+        career_stage: "",
+        work_arrangement: "",
+        start: "",
+        end: "",
+      };
+      if (!(expForm.org || "").trim()) reqErrors.org = "Organization is required";
+      if (!(expForm.position || "").trim()) reqErrors.position = "Position is required";
+      if (!(expForm.location || "").trim()) reqErrors.location = "Country is required";
+      if (!(expForm.relationship_to_org || "").trim()) reqErrors.relationship_to_org = "Employment type is required";
+      if (!(expForm.work_schedule || "").trim()) reqErrors.work_schedule = "Work schedule is required.";
+      if (!(expForm.career_stage || "").trim()) reqErrors.career_stage = "Career stage is required.";
+      if (!(expForm.work_arrangement || "").trim()) reqErrors.work_arrangement = "Work arrangement is required.";
+      if (!(expForm.start || "").trim()) reqErrors.start = "Start date is required";
+      if (Object.values(reqErrors).some(Boolean)) {
+        setExpReqErrors(reqErrors);
+        return;
+      }
+
+      const now = new Date();
+      if (expForm.start && isFutureDate(expForm.start, now)) {
+        setExpReqErrors((prev) => ({ ...prev, start: "Start date can't be in the future." }));
+        return;
+      }
+
+      const isCurrent = !!expForm.current || !(expForm.end || "").trim();
+
       setExpSaving(true);
 
       const url = editExpId
@@ -1886,8 +1974,8 @@ export default function ProfilePage() {
           position: expForm.position,
           location: buildLocationFromForm(expForm),
           start_date: expForm.start || null,
-          end_date: expForm.current ? null : expForm.end || null,
-          currently_work_here: !!expForm.current,
+          end_date: isCurrent ? null : expForm.end || null,
+          currently_work_here: isCurrent,
           description: expForm.description || "",
           exit_reason: expForm.exit_reason || "",
           employment_type: expForm.employment_type || "full_time",
@@ -1968,16 +2056,43 @@ export default function ProfilePage() {
   };
 
   const saveTraining = async () => {
+    setTrainingReqErrors({
+      program_title: "",
+      provider: "",
+      start_month: "",
+      end_month: "",
+    });
+    const reqErrors = {
+      program_title: "",
+      provider: "",
+      start_month: "",
+      end_month: "",
+    };
+    if (!(trainingForm.program_title || "").trim()) reqErrors.program_title = "Program title is required";
+    if (!(trainingForm.provider || "").trim()) reqErrors.provider = "Provider is required";
+    if (!(trainingForm.start_month || "").trim()) {
+      reqErrors.start_month = "Start month is required";
+    } else {
+      const now = new Date();
+      if (isFutureMonth(trainingForm.start_month, now)) {
+        reqErrors.start_month = "Start month can't be in the future.";
+      }
+    }
+    if (Object.values(reqErrors).some(Boolean)) {
+      setTrainingReqErrors(reqErrors);
+      return;
+    }
     setSavingTraining(true);
     try {
+      const isOngoing = !!trainingForm.currently_ongoing || !(trainingForm.end_month || "").trim();
       const payload = {
         program_title: trainingForm.program_title || "",
         provider: trainingForm.provider || "",
         start_date: trainingForm.start_month ? `${trainingForm.start_month}-01` : null,
-        end_date: trainingForm.currently_ongoing
+        end_date: isOngoing
           ? null
           : (trainingForm.end_month ? `${trainingForm.end_month}-01` : null),
-        currently_ongoing: !!trainingForm.currently_ongoing,
+        currently_ongoing: isOngoing,
         description: trainingForm.description || "",
         credential_url: trainingForm.credential_url || "",
       };
@@ -2019,16 +2134,43 @@ export default function ProfilePage() {
   };
 
   const saveCert = async () => {
+    setCertReqErrors({
+      certification_name: "",
+      issuing_organization: "",
+      issue_month: "",
+      expiration_month: "",
+    });
+    const reqErrors = {
+      certification_name: "",
+      issuing_organization: "",
+      issue_month: "",
+      expiration_month: "",
+    };
+    if (!(certForm.certification_name || "").trim()) reqErrors.certification_name = "Certification name is required";
+    if (!(certForm.issuing_organization || "").trim()) reqErrors.issuing_organization = "Issuing organization is required";
+    if (!(certForm.issue_month || "").trim()) {
+      reqErrors.issue_month = "Issue month is required";
+    } else {
+      const now = new Date();
+      if (isFutureMonth(certForm.issue_month, now)) {
+        reqErrors.issue_month = "Issue month can't be in the future.";
+      }
+    }
+    if (Object.values(reqErrors).some(Boolean)) {
+      setCertReqErrors(reqErrors);
+      return;
+    }
     setSavingCert(true);
     try {
+      const noExpiration = !!certForm.no_expiration || !(certForm.expiration_month || "").trim();
       const payload = {
         certification_name: certForm.certification_name || "",
         issuing_organization: certForm.issuing_organization || "",
         issue_date: certForm.issue_month ? `${certForm.issue_month}-01` : null,
-        expiration_date: certForm.no_expiration
+        expiration_date: noExpiration
           ? null
           : (certForm.expiration_month ? `${certForm.expiration_month}-01` : null),
-        no_expiration: !!certForm.no_expiration,
+        no_expiration: noExpiration,
         credential_id: certForm.credential_id || "",
         credential_url: certForm.credential_url || "",
       };
@@ -2069,16 +2211,43 @@ export default function ProfilePage() {
   };
 
   const saveMember = async () => {
+    setMemberReqErrors({
+      organization_name: "",
+      role_type: "",
+      start_month: "",
+      end_month: "",
+    });
+    const reqErrors = {
+      organization_name: "",
+      role_type: "",
+      start_month: "",
+      end_month: "",
+    };
+    if (!(memberForm.organization_name || "").trim()) reqErrors.organization_name = "Organization name is required";
+    if (!(memberForm.role_type || "").trim()) reqErrors.role_type = "Role is required";
+    if (!(memberForm.start_month || "").trim()) {
+      reqErrors.start_month = "Start month is required";
+    } else {
+      const now = new Date();
+      if (isFutureMonth(memberForm.start_month, now)) {
+        reqErrors.start_month = "Start month can't be in the future.";
+      }
+    }
+    if (Object.values(reqErrors).some(Boolean)) {
+      setMemberReqErrors(reqErrors);
+      return;
+    }
     setSavingMember(true);
     try {
+      const isOngoing = !!memberForm.ongoing || !(memberForm.end_month || "").trim();
       const payload = {
         organization_name: memberForm.organization_name || "",
         role_type: memberForm.role_type || "Member",
         start_date: memberForm.start_month ? `${memberForm.start_month}-01` : null,
-        end_date: memberForm.ongoing
+        end_date: isOngoing
           ? null
           : (memberForm.end_month ? `${memberForm.end_month}-01` : null),
-        ongoing: !!memberForm.ongoing,
+        ongoing: isOngoing,
         membership_url: memberForm.membership_url || "",
       };
       if (editMemberId) {
@@ -3249,7 +3418,7 @@ export default function ProfilePage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={eduOpen} onClose={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); }} fullWidth maxWidth="sm" fullScreen={isMobile}>
+      <Dialog open={eduOpen} onClose={() => { setEduOpen(false); setEditEduId(null); setEduErrors({ start: "", end: "" }); setEduReqErrors({ school: "", degree: "", field: "", start: "" }); }} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle>{editEduId ? "Edit education" : "Add education"}</DialogTitle>
         <DialogContent dividers>
           <UniversityAutocomplete
@@ -3260,11 +3429,13 @@ export default function ProfilePage() {
                 school: newValue || "",
               }))
             }
+            error={!!eduReqErrors.school}
+            helperText={eduReqErrors.school || ""}
           />
-          <TextField label="Degree *" value={eduForm.degree} onChange={(e) => setEduForm((f) => ({ ...f, degree: e.target.value }))} fullWidth sx={{ mb: 2 }} />
-          <Autocomplete freeSolo options={[...FIELD_OF_STUDY_OPTIONS, "Other"]} value={eduForm.field} onChange={(_, newValue) => setEduForm((f) => ({ ...f, field: newValue || "" }))} onInputChange={(event, newInput) => { if (event && event.type === "change") setEduForm((f) => ({ ...f, field: newInput })); }} renderInput={(params) => <TextField {...params} label="Field of Study *" fullWidth sx={{ mb: 2 }} helperText="Pick from list or type your own (Other)." />} />
+          <TextField label="Degree *" value={eduForm.degree} onChange={(e) => setEduForm((f) => ({ ...f, degree: e.target.value }))} fullWidth sx={{ mb: 2 }} error={!!eduReqErrors.degree} helperText={eduReqErrors.degree || ""} />
+          <Autocomplete freeSolo options={[...FIELD_OF_STUDY_OPTIONS, "Other"]} value={eduForm.field} onChange={(_, newValue) => setEduForm((f) => ({ ...f, field: newValue || "" }))} onInputChange={(event, newInput) => { if (event && event.type === "change") setEduForm((f) => ({ ...f, field: newInput })); }} renderInput={(params) => <TextField {...params} label="Field of Study *" fullWidth sx={{ mb: 2 }} error={!!eduReqErrors.field} helperText={eduReqErrors.field || "Pick from list or type your own (Other)."} />} />
           <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, mb: 2 }}>
-            <TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm((f) => ({ ...f, start: e.target.value }))} fullWidth sx={{ flex: 1 }} inputProps={{ min: 1900, max: new Date().getFullYear() }} error={!!eduErrors.start} helperText={eduErrors.start || ""} />
+            <TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm((f) => ({ ...f, start: e.target.value }))} fullWidth sx={{ flex: 1 }} inputProps={{ min: 1900, max: new Date().getFullYear() }} error={!!(eduReqErrors.start || eduErrors.start)} helperText={eduReqErrors.start || eduErrors.start || ""} />
             <TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm((f) => ({ ...f, end: e.target.value }))} fullWidth sx={{ flex: 1 }} inputProps={{ min: 1900, max: new Date().getFullYear() + 10 }} error={!!eduErrors.end} helperText={eduErrors.end || ""} />
           </Box>
           <TextField label="Grade (optional)" value={eduForm.grade} onChange={(e) => setEduForm((f) => ({ ...f, grade: e.target.value }))} fullWidth />
@@ -3335,6 +3506,7 @@ export default function ProfilePage() {
               setEduOpen(false);
               setEditEduId(null);
               setEduErrors({ start: "", end: "" });
+              setEduReqErrors({ school: "", degree: "", field: "", start: "" });
               setEduForm(EMPTY_EDU_FORM);
               setEduFiles([]);
             }}
@@ -3398,8 +3570,8 @@ export default function ProfilePage() {
         <DialogTitle sx={{ fontWeight: 700 }}>{editExpId ? "Edit experience" : "Create experience"}</DialogTitle>
         <DialogContent dividers>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>*Required fields are marked with an asterisk</Typography>
-          <CompanyAutocomplete value={expForm.org ? { name: expForm.org } : null} onChange={(newVal) => { const name = typeof newVal === 'string' ? newVal : (newVal?.name || ""); setExpForm(prev => ({ ...prev, org: name })); }} />
-          <TextField label="Position *" value={expForm.position} onChange={(e) => setExpForm((f) => ({ ...f, position: e.target.value }))} fullWidth sx={{ mb: 2 }} />
+          <CompanyAutocomplete value={expForm.org ? { name: expForm.org } : null} onChange={(newVal) => { const name = typeof newVal === 'string' ? newVal : (newVal?.name || ""); setExpForm(prev => ({ ...prev, org: name })); }} error={!!expReqErrors.org} helperText={expReqErrors.org || ""} />
+          <TextField label="Position *" value={expForm.position} onChange={(e) => setExpForm((f) => ({ ...f, position: e.target.value }))} fullWidth sx={{ mb: 2 }} error={!!expReqErrors.position} helperText={expReqErrors.position || ""} />
           <Stack spacing={2}><CityAutocompleteOpenMeteo
             sx={{ mt: 2 }}
             label="City"
@@ -3416,14 +3588,14 @@ export default function ProfilePage() {
               }));
             }}
           />
-            <Autocomplete size="small" fullWidth options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: expForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setExpForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country *" placeholder="Select country" fullWidth inputProps={{ ...params.inputProps, autoComplete: "new-password" }} sx={{ mb: 2 }} />} />
-          </Stack><TextField select label="Employment type *" value={expForm.relationship_to_org} onChange={(e) => setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))} fullWidth sx={{ mb: 2 }}><MenuItem value="employee">Employee (on payroll)</MenuItem><MenuItem value="independent">Independent (self-employed / contractor / freelance)</MenuItem><MenuItem value="third_party">Third-party (Agency / Consultancy / Temp)</MenuItem></TextField>
-          <TextField select label="Work schedule" value={expForm.work_schedule} onChange={(e) => setExpForm((f) => ({ ...f, work_schedule: e.target.value }))} fullWidth sx={{ mb: 2 }}><MenuItem value="full_time">Full-time</MenuItem><MenuItem value="part_time">Part-time</MenuItem></TextField>
-          <TextField select fullWidth label="Career stage" value={expForm.career_stage} onChange={(e) => setExpForm((f) => ({ ...f, career_stage: e.target.value }))} sx={{ mb: 1 }}><MenuItem value="internship">Internship</MenuItem><MenuItem value="apprenticeship">Apprenticeship</MenuItem><MenuItem value="trainee">Trainee</MenuItem><MenuItem value="entry">Entry level</MenuItem><MenuItem value="mid">Mid level</MenuItem><MenuItem value="senior">Senior level</MenuItem></TextField>
-          <TextField select label="Work arrangement" value={expForm.work_arrangement} onChange={(e) => setExpForm((f) => ({ ...f, work_arrangement: e.target.value }))} fullWidth sx={{ mb: 2 }}><MenuItem value="onsite">On-site</MenuItem><MenuItem value="hybrid">Hybrid</MenuItem><MenuItem value="remote">Remote</MenuItem></TextField>
+            <Autocomplete size="small" fullWidth options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: expForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setExpForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country *" placeholder="Select country" fullWidth inputProps={{ ...params.inputProps, autoComplete: "new-password" }} sx={{ mb: 2 }} error={!!expReqErrors.location} helperText={expReqErrors.location || ""} />} />
+          </Stack><TextField select label="Employment type *" value={expForm.relationship_to_org} onChange={(e) => setExpForm((f) => ({ ...f, relationship_to_org: e.target.value }))} fullWidth sx={{ mb: 2 }} error={!!expReqErrors.relationship_to_org} helperText={expReqErrors.relationship_to_org || ""}><MenuItem value="employee">Employee (on payroll)</MenuItem><MenuItem value="independent">Independent (self-employed / contractor / freelance)</MenuItem><MenuItem value="third_party">Third-party (Agency / Consultancy / Temp)</MenuItem></TextField>
+          <TextField select label="Work schedule" value={expForm.work_schedule} onChange={(e) => setExpForm((f) => ({ ...f, work_schedule: e.target.value }))} fullWidth sx={{ mb: 2 }} error={!!expReqErrors.work_schedule} helperText={expReqErrors.work_schedule || ""}><MenuItem value="full_time">Full-time</MenuItem><MenuItem value="part_time">Part-time</MenuItem></TextField>
+          <TextField select fullWidth label="Career stage" value={expForm.career_stage} onChange={(e) => setExpForm((f) => ({ ...f, career_stage: e.target.value }))} sx={{ mb: 1 }} error={!!expReqErrors.career_stage} helperText={expReqErrors.career_stage || ""}><MenuItem value="internship">Internship</MenuItem><MenuItem value="apprenticeship">Apprenticeship</MenuItem><MenuItem value="trainee">Trainee</MenuItem><MenuItem value="entry">Entry level</MenuItem><MenuItem value="mid">Mid level</MenuItem><MenuItem value="senior">Senior level</MenuItem></TextField>
+          <TextField select label="Work arrangement" value={expForm.work_arrangement} onChange={(e) => setExpForm((f) => ({ ...f, work_arrangement: e.target.value }))} fullWidth sx={{ mb: 2 }} error={!!expReqErrors.work_arrangement} helperText={expReqErrors.work_arrangement || ""}><MenuItem value="onsite">On-site</MenuItem><MenuItem value="hybrid">Hybrid</MenuItem><MenuItem value="remote">Remote</MenuItem></TextField>
           <Grid container spacing={2} sx={{ mb: 1 }}>
-            <Grid item xs={12} sm={6}><TextField label="Start Date" type="date" value={expForm.start} onChange={(e) => setExpForm((f) => ({ ...f, start: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
-            <Grid item xs={12} sm={6}><TextField label="End Date" type="date" value={expForm.end} onChange={(e) => setExpForm((f) => ({ ...f, end: e.target.value }))} fullWidth disabled={expForm.current} InputLabelProps={{ shrink: true }} /></Grid>
+            <Grid item xs={12} sm={6}><TextField label="Start Date" type="date" value={expForm.start} onChange={(e) => setExpForm((f) => ({ ...f, start: e.target.value }))} fullWidth InputLabelProps={{ shrink: true }} error={!!expReqErrors.start} helperText={expReqErrors.start || ""} /></Grid>
+            <Grid item xs={12} sm={6}><TextField label="End Date" type="date" value={expForm.end} onChange={(e) => setExpForm((f) => ({ ...f, end: e.target.value }))} fullWidth disabled={expForm.current} InputLabelProps={{ shrink: true }} error={!!expReqErrors.end} helperText={expReqErrors.end || ""} /></Grid>
           </Grid>
           <FormControlLabel control={<Checkbox checked={expForm.current} onChange={(e) => { const current = e.target.checked; setExpForm((prev) => ({ ...prev, current, end: current ? "" : prev.end })); }} />} label="I currently work here" sx={{ mb: 1 }} />
           {shouldShowExitReason() && <TextField fullWidth multiline minRows={2} maxRows={4} label="Why did you leave this job?" value={expForm.exit_reason} onChange={(e) => setExpForm((prev) => ({ ...prev, exit_reason: e.target.value }))} sx={{ mt: 2 }} />}
@@ -3484,12 +3656,16 @@ export default function ProfilePage() {
               fullWidth
               value={trainingForm.program_title || ""}
               onChange={(e) => setTrainingForm((p) => ({ ...p, program_title: e.target.value }))}
+              error={!!trainingReqErrors.program_title}
+              helperText={trainingReqErrors.program_title || ""}
             />
             <TextField
               label="Provider / Institution"
               fullWidth
               value={trainingForm.provider || ""}
               onChange={(e) => setTrainingForm((p) => ({ ...p, provider: e.target.value }))}
+              error={!!trainingReqErrors.provider}
+              helperText={trainingReqErrors.provider || ""}
             />
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
               <TextField
@@ -3499,6 +3675,8 @@ export default function ProfilePage() {
                 fullWidth
                 value={trainingForm.start_month || ""}
                 onChange={(e) => setTrainingForm((p) => ({ ...p, start_month: e.target.value }))}
+                error={!!trainingReqErrors.start_month}
+                helperText={trainingReqErrors.start_month || ""}
               />
               <TextField
                 label="End Month"
@@ -3508,6 +3686,8 @@ export default function ProfilePage() {
                 fullWidth
                 value={trainingForm.end_month || ""}
                 onChange={(e) => setTrainingForm((p) => ({ ...p, end_month: e.target.value }))}
+                error={!!trainingReqErrors.end_month}
+                helperText={trainingReqErrors.end_month || ""}
               />
             </Box>
             <FormControlLabel
@@ -3559,12 +3739,16 @@ export default function ProfilePage() {
               fullWidth
               value={certForm.certification_name || ""}
               onChange={(e) => setCertForm((p) => ({ ...p, certification_name: e.target.value }))}
+              error={!!certReqErrors.certification_name}
+              helperText={certReqErrors.certification_name || ""}
             />
             <TextField
               label="Issuing Organization"
               fullWidth
               value={certForm.issuing_organization || ""}
               onChange={(e) => setCertForm((p) => ({ ...p, issuing_organization: e.target.value }))}
+              error={!!certReqErrors.issuing_organization}
+              helperText={certReqErrors.issuing_organization || ""}
             />
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
               <TextField
@@ -3574,6 +3758,8 @@ export default function ProfilePage() {
                 fullWidth
                 value={certForm.issue_month || ""}
                 onChange={(e) => setCertForm((p) => ({ ...p, issue_month: e.target.value }))}
+                error={!!certReqErrors.issue_month}
+                helperText={certReqErrors.issue_month || ""}
               />
               <TextField
                 label="Expiration Month"
@@ -3583,6 +3769,8 @@ export default function ProfilePage() {
                 fullWidth
                 value={certForm.expiration_month || ""}
                 onChange={(e) => setCertForm((p) => ({ ...p, expiration_month: e.target.value }))}
+                error={!!certReqErrors.expiration_month}
+                helperText={certReqErrors.expiration_month || ""}
               />
             </Box>
             <FormControlLabel
@@ -3632,6 +3820,8 @@ export default function ProfilePage() {
               fullWidth
               value={memberForm.organization_name || ""}
               onChange={(e) => setMemberForm((p) => ({ ...p, organization_name: e.target.value }))}
+              error={!!memberReqErrors.organization_name}
+              helperText={memberReqErrors.organization_name || ""}
             />
 
             <TextField
@@ -3640,6 +3830,8 @@ export default function ProfilePage() {
               fullWidth
               value={memberForm.role_type || "Member"}
               onChange={(e) => setMemberForm((p) => ({ ...p, role_type: e.target.value }))}
+              error={!!memberReqErrors.role_type}
+              helperText={memberReqErrors.role_type || ""}
             >
               <MenuItem value="Member">Member</MenuItem>
               <MenuItem value="Admin">Admin</MenuItem>
@@ -3655,6 +3847,8 @@ export default function ProfilePage() {
                 fullWidth
                 value={memberForm.start_month || ""}
                 onChange={(e) => setMemberForm((p) => ({ ...p, start_month: e.target.value }))}
+                error={!!memberReqErrors.start_month}
+                helperText={memberReqErrors.start_month || ""}
               />
               <TextField
                 label="End Month"
@@ -3664,6 +3858,8 @@ export default function ProfilePage() {
                 fullWidth
                 value={memberForm.end_month || ""}
                 onChange={(e) => setMemberForm((p) => ({ ...p, end_month: e.target.value }))}
+                error={!!memberReqErrors.end_month}
+                helperText={memberReqErrors.end_month || ""}
               />
             </Box>
 

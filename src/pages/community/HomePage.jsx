@@ -53,6 +53,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import { startKYC, submitNameChangeRequest } from "../../utils/api"
+import { isFutureDate, isFutureMonth, isFutureYear } from "../../utils/dateValidation";
 // Countries Library
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -181,9 +182,9 @@ function toMonthYear(d) {
   return mi != null && y ? `${monthNames[mi]} ${y}` : String(d);
 }
 
-function dateRange(start, end, current) {
+function dateRange(start, end, current, currentLabel = "present") {
   const s = toMonthYear(start);
-  const e = current ? "present" : toMonthYear(end);
+  const e = current ? currentLabel : toMonthYear(end);
   return s || e ? `${s} - ${e || ""}` : "";
 }
 
@@ -371,7 +372,7 @@ async function fetchProfileExtras() {
 // -----------------------------------------------------------------------------
 // Company Autocomplete Component
 // -----------------------------------------------------------------------------
-function CompanyAutocomplete({ value, onChange }) {
+function CompanyAutocomplete({ value, onChange, error, helperText }) {
   const [open, setOpen] = React.useState(false);
   const [options, setOptions] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -446,6 +447,8 @@ function CompanyAutocomplete({ value, onChange }) {
           {...params}
           label="Company Name"
           fullWidth
+          error={!!error}
+          helperText={helperText || ""}
           InputProps={{
             ...params.InputProps,
             endAdornment: (
@@ -1606,7 +1609,7 @@ function IsoLanguageAutocomplete({ value, onChange }) {
   );
 }
 
-function UniversityAutocomplete({ value, onChange, label = "University" }) {
+function UniversityAutocomplete({ value, onChange, label = "University", error, helperText }) {
   const [inputValue, setInputValue] = React.useState(value || "");
   const [options, setOptions] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -1707,6 +1710,8 @@ function UniversityAutocomplete({ value, onChange, label = "University" }) {
           required
           fullWidth
           margin="normal"
+          error={!!error}
+          helperText={helperText || ""}
           InputProps={{
             ...params.InputProps,
             endAdornment: (
@@ -2009,12 +2014,25 @@ function AboutTab({
   const [eduOpen, setEduOpen] = React.useState(false);
   const [editEduId, setEditEduId] = React.useState(null);
   const [eduForm, setEduForm] = React.useState({ school: "", degree: "", field: "", start: "", end: "", grade: "" });
+  const [eduErrors, setEduErrors] = React.useState({ start: "", end: "" });
+  const [eduReqErrors, setEduReqErrors] = React.useState({ school: "", degree: "", field: "", start: "" });
   const [eduDeleteId, setEduDeleteId] = React.useState(null);
 
   const [expOpen, setExpOpen] = React.useState(false);
   const [editExpId, setEditExpId] = React.useState(null);
   const [expDeleteId, setExpDeleteId] = React.useState(null);
   const [expForm, setExpForm] = React.useState({});
+  const [expReqErrors, setExpReqErrors] = React.useState({
+    org: "",
+    position: "",
+    location: "",
+    relationship_to_org: "",
+    work_schedule: "",
+    career_stage: "",
+    work_arrangement: "",
+    start: "",
+    end: "",
+  });
   const [savingExp, setSavingExp] = React.useState(false);
   const [syncProfileLocation, setSyncProfileLocation] = React.useState(false);
 
@@ -2044,6 +2062,12 @@ function AboutTab({
     description: "",
     credential_url: "",
   });
+  const [trainingReqErrors, setTrainingReqErrors] = React.useState({
+    program_title: "",
+    provider: "",
+    start_month: "",
+    end_month: "",
+  });
 
   // --- Certifications ---
   const [certOpen, setCertOpen] = React.useState(false);
@@ -2060,6 +2084,12 @@ function AboutTab({
     credential_id: "",
     credential_url: "",
   });
+  const [certReqErrors, setCertReqErrors] = React.useState({
+    certification_name: "",
+    issuing_organization: "",
+    issue_month: "",
+    expiration_month: "",
+  });
 
   // --- Memberships ---
   const [memberOpen, setMemberOpen] = React.useState(false);
@@ -2074,6 +2104,12 @@ function AboutTab({
     end_month: "",     // YYYY-MM
     ongoing: false,
     membership_url: "",
+  });
+  const [memberReqErrors, setMemberReqErrors] = React.useState({
+    organization_name: "",
+    role_type: "",
+    start_month: "",
+    end_month: "",
   });
 
   // For modern delete confirmation when removing an education document
@@ -2337,8 +2373,33 @@ function AboutTab({
 
   const saveEducation = async () => {
     if (savingEdu) return;
-    setSavingEdu(true);
+    setEduErrors({ start: "", end: "" });
+    setEduReqErrors({ school: "", degree: "", field: "", start: "" });
+    const reqErrors = { school: "", degree: "", field: "", start: "" };
+    if (!(eduForm.school || "").trim()) reqErrors.school = "School is required";
+    if (!(eduForm.degree || "").trim()) reqErrors.degree = "Degree is required";
+    if (!(eduForm.field || "").trim()) reqErrors.field = "Field of study is required.";
+    if (!(eduForm.start || "").trim()) reqErrors.start = "Start year is required";
+    if (Object.values(reqErrors).some(Boolean)) {
+      setEduReqErrors(reqErrors);
+      if (reqErrors.school || reqErrors.degree) {
+        showToast?.("error", "Please fill School and Degree.");
+      }
+      return;
+    }
+    const now = new Date();
+    if (isFutureYear(eduForm.start, now)) {
+      setEduErrors((p) => ({ ...p, start: "Start year can't be in the future." }));
+      return;
+    }
+    const startY = eduForm.start ? parseInt(eduForm.start, 10) : null;
+    const endY = eduForm.end ? parseInt(eduForm.end, 10) : null;
+    if (startY && endY && endY < startY) {
+      setEduErrors((p) => ({ ...p, end: "End year cannot be before start year" }));
+      return;
+    }
 
+    setSavingEdu(true);
     const payload = {
       ...eduForm,
       start: eduForm.start ? `${eduForm.start}-01-01` : null,
@@ -2378,9 +2439,50 @@ function AboutTab({
 
   const saveExperience = async () => {
     if (savingExp) return;
-    setSavingExp(true);
 
     try {
+      setExpReqErrors({
+        org: "",
+        position: "",
+        location: "",
+        relationship_to_org: "",
+        work_schedule: "",
+        career_stage: "",
+        work_arrangement: "",
+        start: "",
+        end: "",
+      });
+      const reqErrors = {
+        org: "",
+        position: "",
+        location: "",
+        relationship_to_org: "",
+        work_schedule: "",
+        career_stage: "",
+        work_arrangement: "",
+        start: "",
+        end: "",
+      };
+      if (!(expForm.org || "").trim()) reqErrors.org = "Organization is required";
+      if (!(expForm.position || "").trim()) reqErrors.position = "Position is required";
+      if (!(expForm.location || "").trim()) reqErrors.location = "Country is required";
+      if (!(expForm.relationship_to_org || "").trim()) reqErrors.relationship_to_org = "Employment type is required";
+      if (!(expForm.work_schedule || "").trim()) reqErrors.work_schedule = "Work schedule is required.";
+      if (!(expForm.career_stage || "").trim()) reqErrors.career_stage = "Career stage is required.";
+      if (!(expForm.work_arrangement || "").trim()) reqErrors.work_arrangement = "Work arrangement is required.";
+      if (!(expForm.start || "").trim()) reqErrors.start = "Start date is required";
+      if (Object.values(reqErrors).some(Boolean)) {
+        setExpReqErrors(reqErrors);
+        return;
+      }
+      const now = new Date();
+      if (expForm.start && isFutureDate(expForm.start, now)) {
+        setExpReqErrors((prev) => ({ ...prev, start: "Start date can't be in the future." }));
+        return;
+      }
+      const isCurrent = !!expForm.current || !(expForm.end || "").trim();
+
+      setSavingExp(true);
       const loc = [expForm.city, expForm.location].filter(Boolean).join(", ");
       const payload = {
         ...expForm,
@@ -2388,14 +2490,14 @@ function AboutTab({
         position: expForm.position,
         location: loc,
         start: expForm.start || null,
-        end: expForm.current ? null : (expForm.end || null),
-        current: expForm.current,
+        end: isCurrent ? null : (expForm.end || null),
+        current: isCurrent,
       };
 
       if (editExpId) await updateExperienceApi(editExpId, payload);
       else await createExperienceApi(payload);
 
-      if (expForm.current && syncProfileLocation && loc) {
+      if (isCurrent && syncProfileLocation && loc) {
         await saveProfileToMe({
           ...profile,
           profile: { ...profile, location: loc },
@@ -2445,16 +2547,43 @@ function AboutTab({
 
   const saveTraining = async () => {
     if (savingTraining) return;
+    setTrainingReqErrors({
+      program_title: "",
+      provider: "",
+      start_month: "",
+      end_month: "",
+    });
+    const reqErrors = {
+      program_title: "",
+      provider: "",
+      start_month: "",
+      end_month: "",
+    };
+    if (!(trainingForm.program_title || "").trim()) reqErrors.program_title = "Program title is required";
+    if (!(trainingForm.provider || "").trim()) reqErrors.provider = "Provider is required";
+    if (!(trainingForm.start_month || "").trim()) {
+      reqErrors.start_month = "Start month is required";
+    } else {
+      const now = new Date();
+      if (isFutureMonth(trainingForm.start_month, now)) {
+        reqErrors.start_month = "Start month can't be in the future.";
+      }
+    }
+    if (Object.values(reqErrors).some(Boolean)) {
+      setTrainingReqErrors(reqErrors);
+      return;
+    }
     setSavingTraining(true);
     try {
+      const isOngoing = !!trainingForm.currently_ongoing || !(trainingForm.end_month || "").trim();
       const payload = {
         program_title: trainingForm.program_title,
         provider: trainingForm.provider,
         start_date: trainingForm.start_month ? `${trainingForm.start_month}-01` : null,
-        end_date: trainingForm.currently_ongoing
+        end_date: isOngoing
           ? null
           : (trainingForm.end_month ? `${trainingForm.end_month}-01` : null),
-        currently_ongoing: !!trainingForm.currently_ongoing,
+        currently_ongoing: isOngoing,
         description: trainingForm.description || "",
         credential_url: trainingForm.credential_url || "",
       };
@@ -2505,16 +2634,43 @@ function AboutTab({
 
   const saveCert = async () => {
     if (savingCert) return;
+    setCertReqErrors({
+      certification_name: "",
+      issuing_organization: "",
+      issue_month: "",
+      expiration_month: "",
+    });
+    const reqErrors = {
+      certification_name: "",
+      issuing_organization: "",
+      issue_month: "",
+      expiration_month: "",
+    };
+    if (!(certForm.certification_name || "").trim()) reqErrors.certification_name = "Certification name is required";
+    if (!(certForm.issuing_organization || "").trim()) reqErrors.issuing_organization = "Issuing organization is required";
+    if (!(certForm.issue_month || "").trim()) {
+      reqErrors.issue_month = "Issue month is required";
+    } else {
+      const now = new Date();
+      if (isFutureMonth(certForm.issue_month, now)) {
+        reqErrors.issue_month = "Issue month can't be in the future.";
+      }
+    }
+    if (Object.values(reqErrors).some(Boolean)) {
+      setCertReqErrors(reqErrors);
+      return;
+    }
     setSavingCert(true);
     try {
+      const noExpiration = !!certForm.no_expiration || !(certForm.expiration_month || "").trim();
       const payload = {
         certification_name: certForm.certification_name,
         issuing_organization: certForm.issuing_organization,
         issue_date: certForm.issue_month ? `${certForm.issue_month}-01` : null,
-        expiration_date: certForm.no_expiration
+        expiration_date: noExpiration
           ? null
           : (certForm.expiration_month ? `${certForm.expiration_month}-01` : null),
-        no_expiration: !!certForm.no_expiration,
+        no_expiration: noExpiration,
         credential_id: certForm.credential_id || "",
         credential_url: certForm.credential_url || "",
       };
@@ -2563,16 +2719,43 @@ function AboutTab({
 
   const saveMember = async () => {
     if (savingMember) return;
+    setMemberReqErrors({
+      organization_name: "",
+      role_type: "",
+      start_month: "",
+      end_month: "",
+    });
+    const reqErrors = {
+      organization_name: "",
+      role_type: "",
+      start_month: "",
+      end_month: "",
+    };
+    if (!(memberForm.organization_name || "").trim()) reqErrors.organization_name = "Organization name is required";
+    if (!(memberForm.role_type || "").trim()) reqErrors.role_type = "Role is required";
+    if (!(memberForm.start_month || "").trim()) {
+      reqErrors.start_month = "Start month is required";
+    } else {
+      const now = new Date();
+      if (isFutureMonth(memberForm.start_month, now)) {
+        reqErrors.start_month = "Start month can't be in the future.";
+      }
+    }
+    if (Object.values(reqErrors).some(Boolean)) {
+      setMemberReqErrors(reqErrors);
+      return;
+    }
     setSavingMember(true);
     try {
+      const isOngoing = !!memberForm.ongoing || !(memberForm.end_month || "").trim();
       const payload = {
         organization_name: memberForm.organization_name,
         role_type: memberForm.role_type || "",
         start_date: memberForm.start_month ? `${memberForm.start_month}-01` : null,
-        end_date: memberForm.ongoing
+        end_date: isOngoing
           ? null
           : (memberForm.end_month ? `${memberForm.end_month}-01` : null),
-        ongoing: !!memberForm.ongoing,
+        ongoing: isOngoing,
         membership_url: memberForm.membership_url || "",
       };
 
@@ -2785,7 +2968,7 @@ function AboutTab({
                             color="text.secondary"
                             display="block"
                           >
-                            {dateRange(exp.start, exp.end, exp.current)}
+                            {dateRange(exp.start, exp.end, exp.current || !exp.end, "I currently work here")}
                             {exp.location ? ` · ${exp.location}` : ""}
                           </Typography>
 
@@ -2966,11 +3149,9 @@ function AboutTab({
                         <Typography variant="caption" color="text.secondary">
                           {cert.issuing_organization || "—"}
                           {cert.issue_date ? ` • Issued ${toMonthYear(cert.issue_date)}` : ""}
-                          {cert.no_expiration
-                            ? " • No Expiration"
-                            : cert.expiration_date
-                              ? ` • Expires ${toMonthYear(cert.expiration_date)}`
-                              : ""}
+                          {(cert.no_expiration || !cert.expiration_date)
+                            ? " • No expiration"
+                            : ` • Expires ${toMonthYear(cert.expiration_date)}`}
                         </Typography>
                       }
                     />
@@ -3073,7 +3254,7 @@ function AboutTab({
                           <Typography variant="caption" color="text.secondary" display="block">
                             {t.provider || "—"}
                             {t.start_date || t.end_date
-                              ? ` • ${dateRange(t.start_date, t.end_date, !!t.currently_ongoing)}`
+                              ? ` • ${dateRange(t.start_date, t.end_date, !!t.currently_ongoing || !t.end_date, "Currently ongoing")}`
                               : ""}
                           </Typography>
 
@@ -3186,7 +3367,7 @@ function AboutTab({
                         <Typography variant="caption" color="text.secondary">
                           {m.role_type ? `${m.role_type}` : "Member"}
                           {m.start_date || m.end_date
-                            ? ` • ${dateRange(m.start_date, m.end_date, !!m.ongoing)}`
+                            ? ` • ${dateRange(m.start_date, m.end_date, !!m.ongoing || !m.end_date, "Currently ongoing")}`
                             : ""}
                         </Typography>
                       }
@@ -3562,7 +3743,7 @@ function AboutTab({
         </DialogActions>
       </Dialog>
 
-      <Dialog open={eduOpen} onClose={() => setEduOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={eduOpen} onClose={() => { setEduOpen(false); setEduErrors({ start: "", end: "" }); setEduReqErrors({ school: "", degree: "", field: "", start: "" }); }} fullWidth maxWidth="sm">
         <DialogTitle>{editEduId ? "Edit" : "Add"} Education</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
@@ -3574,10 +3755,12 @@ function AboutTab({
                   school: newValue || "",
                 }))
               }
+              error={!!eduReqErrors.school}
+              helperText={eduReqErrors.school || ""}
             />
-            <TextField label="Degree" value={eduForm.degree} onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })} />
-            <Autocomplete freeSolo options={FIELD_OF_STUDY_OPTIONS} value={eduForm.field} onChange={(_, v) => setEduForm({ ...eduForm, field: v || "" })} renderInput={(p) => <TextField {...p} label="Field" />} />
-            <Box sx={{ display: "flex", gap: 2 }}><TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm({ ...eduForm, start: e.target.value })} /><TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm({ ...eduForm, end: e.target.value })} /></Box>
+            <TextField label="Degree" value={eduForm.degree} onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })} error={!!eduReqErrors.degree} helperText={eduReqErrors.degree || ""} />
+            <Autocomplete freeSolo options={FIELD_OF_STUDY_OPTIONS} value={eduForm.field} onChange={(_, v) => setEduForm({ ...eduForm, field: v || "" })} renderInput={(p) => <TextField {...p} label="Field of Study *" error={!!eduReqErrors.field} helperText={eduReqErrors.field || ""} />} />
+            <Box sx={{ display: "flex", gap: 2 }}><TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm({ ...eduForm, start: e.target.value })} error={!!(eduReqErrors.start || eduErrors.start)} helperText={eduReqErrors.start || eduErrors.start || ""} /><TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm({ ...eduForm, end: e.target.value })} error={!!eduErrors.end} helperText={eduErrors.end || ""} /></Box>
             <TextField
               label="Grade (optional)"
               value={eduForm.grade || ""}
@@ -3668,7 +3851,7 @@ function AboutTab({
       </Dialog>
 
       {/* EXPERIENCE DIALOG */}
-      <Dialog open={expOpen} onClose={() => setExpOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={expOpen} onClose={() => { setExpOpen(false); setExpReqErrors({ org: "", position: "", location: "", relationship_to_org: "", work_schedule: "", career_stage: "", work_arrangement: "", start: "", end: "" }); }} fullWidth maxWidth="sm">
         <DialogTitle>
           {editExpId ? "Edit Experience" : "Add Experience"}
         </DialogTitle>
@@ -3683,6 +3866,8 @@ function AboutTab({
                   org: company?.name || "",
                 }))
               }
+              error={!!expReqErrors.org}
+              helperText={expReqErrors.org || ""}
             />
 
             {/* 2. Position / Title */}
@@ -3693,6 +3878,8 @@ function AboutTab({
               onChange={(e) =>
                 setExpForm((prev) => ({ ...prev, position: e.target.value }))
               }
+              error={!!expReqErrors.position}
+              helperText={expReqErrors.position || ""}
             />
 
             {/* 6. Location: City + Country (same pattern you already use) */}
@@ -3724,7 +3911,7 @@ function AboutTab({
                   }))
                 }
                 renderInput={(params) => (
-                  <TextField {...params} label="Country" />
+                  <TextField {...params} label="Country" error={!!expReqErrors.location} helperText={expReqErrors.location || ""} />
                 )}
                 sx={{ flex: 1, minWidth: 150 }}
               />
@@ -3742,6 +3929,8 @@ function AboutTab({
                   relationship_to_org: e.target.value,
                 }))
               }
+              error={!!expReqErrors.relationship_to_org}
+              helperText={expReqErrors.relationship_to_org || ""}
             >
               <MenuItem value="employee">Employee (on payroll)</MenuItem>
               <MenuItem value="independent">
@@ -3763,6 +3952,8 @@ function AboutTab({
                   work_schedule: e.target.value,
                 }))
               }
+              error={!!expReqErrors.work_schedule}
+              helperText={expReqErrors.work_schedule || ""}
             >
               <MenuItem value="full_time">Full-time</MenuItem>
               <MenuItem value="part_time">Part-time</MenuItem>
@@ -3779,6 +3970,8 @@ function AboutTab({
                   career_stage: e.target.value,
                 }))
               }
+              error={!!expReqErrors.career_stage}
+              helperText={expReqErrors.career_stage || ""}
             >
               <MenuItem value="internship">Internship</MenuItem>
               <MenuItem value="apprenticeship">Apprenticeship</MenuItem>
@@ -3799,6 +3992,8 @@ function AboutTab({
                   work_arrangement: e.target.value,
                 }))
               }
+              error={!!expReqErrors.work_arrangement}
+              helperText={expReqErrors.work_arrangement || ""}
             >
               <MenuItem value="onsite">On-site</MenuItem>
               <MenuItem value="hybrid">Hybrid</MenuItem>
@@ -3816,6 +4011,8 @@ function AboutTab({
                 onChange={(e) =>
                   setExpForm((prev) => ({ ...prev, start: e.target.value }))
                 }
+                error={!!expReqErrors.start}
+                helperText={expReqErrors.start || ""}
               />
               <TextField
                 label="End Date"
@@ -3827,6 +4024,8 @@ function AboutTab({
                 onChange={(e) =>
                   setExpForm((prev) => ({ ...prev, end: e.target.value }))
                 }
+                error={!!expReqErrors.end}
+                helperText={expReqErrors.end || ""}
               />
             </Box>
 
@@ -3965,12 +4164,16 @@ function AboutTab({
               fullWidth
               value={trainingForm.program_title || ""}
               onChange={(e) => setTrainingForm((p) => ({ ...p, program_title: e.target.value }))}
+              error={!!trainingReqErrors.program_title}
+              helperText={trainingReqErrors.program_title || ""}
             />
             <TextField
               label="Provider / Institution"
               fullWidth
               value={trainingForm.provider || ""}
               onChange={(e) => setTrainingForm((p) => ({ ...p, provider: e.target.value }))}
+              error={!!trainingReqErrors.provider}
+              helperText={trainingReqErrors.provider || ""}
             />
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
               <TextField
@@ -3980,6 +4183,8 @@ function AboutTab({
                 fullWidth
                 value={trainingForm.start_month || ""}
                 onChange={(e) => setTrainingForm((p) => ({ ...p, start_month: e.target.value }))}
+                error={!!trainingReqErrors.start_month}
+                helperText={trainingReqErrors.start_month || ""}
               />
               <TextField
                 label="End Month"
@@ -3989,6 +4194,8 @@ function AboutTab({
                 fullWidth
                 value={trainingForm.end_month || ""}
                 onChange={(e) => setTrainingForm((p) => ({ ...p, end_month: e.target.value }))}
+                error={!!trainingReqErrors.end_month}
+                helperText={trainingReqErrors.end_month || ""}
               />
             </Box>
             <FormControlLabel
@@ -4040,12 +4247,16 @@ function AboutTab({
               fullWidth
               value={certForm.certification_name || ""}
               onChange={(e) => setCertForm((p) => ({ ...p, certification_name: e.target.value }))}
+              error={!!certReqErrors.certification_name}
+              helperText={certReqErrors.certification_name || ""}
             />
             <TextField
               label="Issuing Organization"
               fullWidth
               value={certForm.issuing_organization || ""}
               onChange={(e) => setCertForm((p) => ({ ...p, issuing_organization: e.target.value }))}
+              error={!!certReqErrors.issuing_organization}
+              helperText={certReqErrors.issuing_organization || ""}
             />
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
               <TextField
@@ -4055,6 +4266,8 @@ function AboutTab({
                 fullWidth
                 value={certForm.issue_month || ""}
                 onChange={(e) => setCertForm((p) => ({ ...p, issue_month: e.target.value }))}
+                error={!!certReqErrors.issue_month}
+                helperText={certReqErrors.issue_month || ""}
               />
               <TextField
                 label="Expiration Month"
@@ -4064,6 +4277,8 @@ function AboutTab({
                 fullWidth
                 value={certForm.expiration_month || ""}
                 onChange={(e) => setCertForm((p) => ({ ...p, expiration_month: e.target.value }))}
+                error={!!certReqErrors.expiration_month}
+                helperText={certReqErrors.expiration_month || ""}
               />
             </Box>
             <FormControlLabel
@@ -4113,6 +4328,8 @@ function AboutTab({
               fullWidth
               value={memberForm.organization_name || ""}
               onChange={(e) => setMemberForm((p) => ({ ...p, organization_name: e.target.value }))}
+              error={!!memberReqErrors.organization_name}
+              helperText={memberReqErrors.organization_name || ""}
             />
 
             <TextField
@@ -4121,6 +4338,8 @@ function AboutTab({
               fullWidth
               value={memberForm.role_type || "Member"}
               onChange={(e) => setMemberForm((p) => ({ ...p, role_type: e.target.value }))}
+              error={!!memberReqErrors.role_type}
+              helperText={memberReqErrors.role_type || ""}
             >
               <MenuItem value="Member">Member</MenuItem>
               <MenuItem value="Admin">Admin</MenuItem>
@@ -4136,6 +4355,8 @@ function AboutTab({
                 fullWidth
                 value={memberForm.start_month || ""}
                 onChange={(e) => setMemberForm((p) => ({ ...p, start_month: e.target.value }))}
+                error={!!memberReqErrors.start_month}
+                helperText={memberReqErrors.start_month || ""}
               />
               <TextField
                 label="End Month"
@@ -4145,6 +4366,8 @@ function AboutTab({
                 fullWidth
                 value={memberForm.end_month || ""}
                 onChange={(e) => setMemberForm((p) => ({ ...p, end_month: e.target.value }))}
+                error={!!memberReqErrors.end_month}
+                helperText={memberReqErrors.end_month || ""}
               />
             </Box>
 
