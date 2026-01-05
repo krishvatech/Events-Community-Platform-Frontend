@@ -20,6 +20,23 @@ const decodeJwtPayload = (token) => {
   }
 };
 
+const updateTimezone = async (accessToken) => {
+  if (!accessToken) return;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  try {
+    await fetch(`${API_BASE}/users/me/`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ profile: { timezone: tz } }),
+    });
+  } catch (e) {
+    console.warn("Timezone update failed:", e);
+  }
+};
+
 const CognitoOAuthCallback = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -91,6 +108,8 @@ const CognitoOAuthCallback = () => {
 
         if (refresh) localStorage.setItem("refresh_token", refresh);
         if (idToken) localStorage.setItem("id_token", idToken);
+
+        await updateTimezone(backendJwt);
 
         // 3) Bootstrap DB (store Google profile into DB, but DO NOT overwrite username)
         const claims = idToken ? decodeJwtPayload(idToken) : {};

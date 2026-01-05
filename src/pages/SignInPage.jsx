@@ -132,6 +132,23 @@ const resolveBackendUser = async (accessToken) => {
   return null;
 };
 
+const updateTimezone = async (accessToken) => {
+  if (!accessToken) return;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  try {
+    await fetch(`${API_BASE}/users/me/`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ profile: { timezone: tz } }),
+    });
+  } catch (e) {
+    console.warn("Timezone update failed:", e);
+  }
+};
+
 /** Try hard to resolve current user with staff flags */
 const resolveCurrentUser = async (access, fallbackEmail) => {
   // 1) Common "me" endpoints
@@ -279,6 +296,8 @@ const SignInPage = () => {
         data?.access ||
         localStorage.getItem("access_token") ||
         "";
+
+      await updateTimezone(accessTokenForBackend);
 
       const backendUser =
         accessTokenForBackend ? await resolveBackendUser(accessTokenForBackend) : null;

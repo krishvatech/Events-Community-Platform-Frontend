@@ -213,6 +213,7 @@ const SignUpPage = () => {
               password: formData.password,
             });
 
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             await fetch(`${API_BASE}/auth/cognito/bootstrap/`, {
               method: "POST",
               headers: {
@@ -224,6 +225,7 @@ const SignUpPage = () => {
                 email: (formData.email || "").trim().toLowerCase(),
                 firstName: (formData.firstName || "").trim(),
                 lastName: (formData.lastName || "").trim(),
+                timezone: tz,
               }),
             });
           }

@@ -55,6 +55,23 @@ const resolveBackendUser = async (access) => {
   return null;
 };
 
+const updateTimezone = async (accessToken) => {
+  if (!accessToken) return;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  try {
+    await fetch(`${API_BASE}/users/me/`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ profile: { timezone: tz } }),
+    });
+  } catch (e) {
+    console.warn("Timezone update failed:", e);
+  }
+};
+
 /**
  * Try to resolve current user using same strategy as SignInPage:
  * /auth/users/me/, /users/me/, /auth/me/, /me/, then fallback to JWT.
@@ -111,6 +128,8 @@ const SocialOAuthCallback = () => {
         // Store tokens like SignInPage does
         localStorage.setItem("access_token", access);
         if (refresh) localStorage.setItem("refresh_token", refresh);
+
+        await updateTimezone(access);
 
         // Try to resolve user object
         const userObj = await resolveCurrentUser(access, null);
