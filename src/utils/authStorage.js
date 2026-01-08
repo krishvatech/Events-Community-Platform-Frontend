@@ -31,6 +31,8 @@ export function clearAuth() {
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
     localStorage.removeItem("loginPayload");
+    localStorage.removeItem("unread_messages");
+    localStorage.removeItem("unread_notifications");
 
     // sessionStorage variants you use
     sessionStorage.removeItem("user");
@@ -40,5 +42,7 @@ export function clearAuth() {
   // ✅ notify app immediately (same tab) — important for KYC banner, counts, etc.
   try {
     window.dispatchEvent(new Event("auth:changed"));
+    window.dispatchEvent(new CustomEvent("messages:unread", { detail: { count: 0 } }));
+    window.dispatchEvent(new CustomEvent("notify:unread", { detail: { count: 0 } }));
   } catch { }
 }
