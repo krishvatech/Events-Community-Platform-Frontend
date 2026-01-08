@@ -486,11 +486,7 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect }) {
         o?.country === v?.country &&
         o?.admin1 === v?.admin1
       }
-      getOptionLabel={(o) => {
-        if (!o) return "";
-        const parts = [o.name, o.admin1, o.country].filter(Boolean);
-        return parts.join(", ");
-      }}
+      getOptionLabel={(o) => o?.name || ""}
       onChange={(_, newValue) => {
         onSelect?.(newValue || null);
       }}
@@ -1222,9 +1218,11 @@ export default function AdminSettings() {
   }, []);
 
   const [contactOpen, setContactOpen] = React.useState(false);
+  const [locationOpen, setLocationOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState({
-    first_name: "", last_name: "", email: "", city: "", location: "", linkedin: "", job_title: "",
+    first_name: "", last_name: "", email: "", linkedin: "", job_title: "",
   });
+  const [locationForm, setLocationForm] = React.useState({ city: "", country: "" });
 
   const [eduList, setEduList] = React.useState([]);
   const [expList, setExpList] = React.useState([]);
@@ -1556,6 +1554,10 @@ export default function AdminSettings() {
     }
     return profile.headline || "";
   }, [latestExp, profile]);
+  const parsedLocation = React.useMemo(
+    () => parseLocationString(profile.location),
+    [profile.location]
+  );
 
   // Sync Work Form
   React.useEffect(() => {
@@ -1586,6 +1588,23 @@ export default function AdminSettings() {
     if (city) return city;
     if (country) return country;
     return "";
+  }
+  function parseLocationString(locationString) {
+    const raw = (locationString || "").trim();
+    if (!raw) return { city: "", country: "" };
+    const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const city = parts[0];
+      const lastPart = parts[parts.length - 1];
+      const maybeCountry = getSelectedCountry({ location: lastPart });
+      return { city, country: maybeCountry ? maybeCountry.label : lastPart };
+    }
+    if (parts.length === 1) {
+      const maybeCountry = getSelectedCountry({ location: parts[0] });
+      if (maybeCountry) return { city: "", country: maybeCountry.label };
+      return { city: parts[0], country: "" };
+    }
+    return { city: "", country: "" };
   }
 
   const [confirm, setConfirm] = React.useState({ open: false, type: null, id: null, label: "" });
@@ -1644,39 +1663,62 @@ export default function AdminSettings() {
   const openContact = () => {
     if (!profile) return;
     const links = parseLinks(profile.linksText);
-    let city = "", country = "";
-    if (profile.location) {
-      const parts = profile.location.split(",").map((p) => p.trim());
-      if (parts.length === 1) country = parts[0];
-      else if (parts.length >= 2) { city = parts[0]; country = parts.slice(1).join(", "); }
-    }
     setContactForm({
       first_name: profile.first_name || "", last_name: profile.last_name || "",
-      email: profile.email || "", city, location: country,
+      email: profile.email || "",
       linkedin: links.linkedin || "", job_title: profile.job_title || "",
     });
     setContactOpen(true);
   };
 
+  const openLocation = () => {
+    if (!profile) return;
+    const { city, country } = parseLocationString(profile.location);
+    setLocationForm({ city, country });
+    setLocationOpen(true);
+  };
+
   const saveContact = async () => {
     try {
       setSaving(true);
-      const { first_name, last_name, email, city, location, linkedin, job_title } = contactForm;
-      const combinedLocation = city && location ? `${city}, ${location}` : location || city || "";
+      const { first_name, last_name, email, linkedin, job_title } = contactForm;
       const links = { ...(profile?.links || {}), linkedin: (linkedin || "").trim() };
       const userPayload = { first_name: (first_name || "").trim(), last_name: (last_name || "").trim(), email: (email || "").trim() || undefined };
-      const profilePayload = { job_title: (job_title || "").trim(), location: combinedLocation, links };
+      const profilePayload = { job_title: (job_title || "").trim(), location: profile.location, links };
 
       await updateAdminContact(userPayload, profilePayload);
       setProfile((prev) => ({
         ...prev, ...userPayload, job_title: profilePayload.job_title,
-        location: profilePayload.location, links, linksText: JSON.stringify(links),
+        links, linksText: JSON.stringify(links),
       }));
       setContactOpen(false);
       showNotification("success", "Contact updated");
     } catch (err) {
       showNotification("error", "Failed to update contact");
     } finally { setSaving(false); }
+  };
+
+  const saveLocation = async () => {
+    try {
+      setSaving(true);
+      const city = (locationForm.city || "").trim();
+      const country = (locationForm.country || "").trim();
+      const combinedLocation = [city, country].filter(Boolean).join(", ");
+      const profilePayload = {
+        location: combinedLocation,
+      };
+      await updateAdminContact({}, profilePayload);
+      setProfile((prev) => ({
+        ...prev,
+        location: combinedLocation,
+      }));
+      setLocationOpen(false);
+      showNotification("success", "Location updated");
+    } catch (err) {
+      showNotification("error", "Failed to update location");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveAbout = async () => {
@@ -2863,8 +2905,30 @@ export default function AdminSettings() {
                         <ListItemText primary={<Typography variant="body2">{profile.email || "—"}</Typography>} secondary={<Typography variant="caption" color="text.secondary" display="block">Private field.</Typography>} />
                       </ListItem>
                     </List>
-                    <Label sx={{ mt: 2, mb: 1 }}>Live Location</Label>
-                    {profile.location ? <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{profile.location}</Typography></Box> : <Box sx={{ height: 100, borderRadius: 1, bgcolor: "grey.100", border: "1px solid", borderColor: "divider" }} />}
+                  </SectionCard>
+
+                  <SectionCard
+                    sx={{ mt: 2 }}
+                    title="Location"
+                    action={
+                      <Tooltip title="Edit Location">
+                        <IconButton size="small" onClick={openLocation}>
+                          <EditRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    }
+                  >
+                    <Stack spacing={1}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <PlaceIcon fontSize="small" />
+                        <Typography variant="body2">
+                          City: {parsedLocation.city || "\u2014"}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" sx={{ pl: 3 }}>
+                        Country: {parsedLocation.country || "\u2014"}
+                      </Typography>
+                    </Stack>
                   </SectionCard>
 
                   {/* NEW: Trainings & Executive Education (Static Data) */}
@@ -3379,23 +3443,27 @@ export default function AdminSettings() {
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="Email" type="email" fullWidth value={contactForm.email} onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))} />
+            <TextField label="LinkedIn URL" fullWidth value={contactForm.linkedin} onChange={(e) => setContactForm((f) => ({ ...f, linkedin: e.target.value }))} />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}><Button onClick={() => setContactOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveContact} disabled={saving}>{saving ? "Saving…" : "Save"}</Button></DialogActions>
+      </Dialog>
+
+      <Dialog open={locationOpen} onClose={() => setLocationOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit Location</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
             <CityAutocompleteOpenMeteo
               label="City"
-              value={
-                contactForm.city
-                  ? { name: contactForm.city, admin1: "", country: contactForm.location || "" }
-                  : null
-              }
+              value={locationForm.city ? { name: locationForm.city, admin1: "", country: locationForm.country || "" } : null}
               onSelect={(place) => {
-                setContactForm((prev) => ({
+                setLocationForm((prev) => ({
                   ...prev,
                   city: place?.name || "",
-                  location: place?.country || prev.location || "", // ✅ auto-fill country
+                  country: place?.country || prev.country || "",
                 }));
               }}
             />
-
-            {/* ✅ spacing fix (see section 3) */}
             <Box sx={{ mt: 1.5 }}>
               <Autocomplete
                 fullWidth
@@ -3403,17 +3471,19 @@ export default function AdminSettings() {
                 options={COUNTRY_OPTIONS}
                 autoHighlight
                 getOptionLabel={(opt) => opt?.label ?? ""}
-                value={getSelectedCountry({ location: contactForm.location })}
-                onChange={(_, value) => setContactForm((f) => ({ ...f, location: value?.label || "" }))}
+                value={getSelectedCountry({ location: locationForm.country })}
+                onChange={(_, value) => setLocationForm((f) => ({ ...f, country: value?.label || "" }))}
                 renderInput={(params) => (
                   <TextField {...params} label="Country" placeholder="Select country" />
                 )}
               />
             </Box>
-            <TextField label="LinkedIn URL" fullWidth value={contactForm.linkedin} onChange={(e) => setContactForm((f) => ({ ...f, linkedin: e.target.value }))} />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}><Button onClick={() => setContactOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveContact} disabled={saving}>{saving ? "Saving…" : "Save"}</Button></DialogActions>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setLocationOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveLocation} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        </DialogActions>
       </Dialog>
 
       {/* --- Education Dialog --- */}

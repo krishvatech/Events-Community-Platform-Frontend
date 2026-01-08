@@ -332,11 +332,7 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect }) {
         o?.country === v?.country &&
         o?.admin1 === v?.admin1
       }
-      getOptionLabel={(o) => {
-        if (!o) return "";
-        const parts = [o.name, o.admin1, o.country].filter(Boolean);
-        return parts.join(", ");
-      }}
+      getOptionLabel={(o) => o?.name || ""}
       onChange={(_, newValue) => {
         onSelect?.(newValue || null);
       }}
@@ -940,6 +936,7 @@ export default function ProfilePage() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [aboutMode, setAboutMode] = useState("description");
   const [contactOpen, setContactOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
   const [trainingOpen, setTrainingOpen] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState(false);
@@ -974,7 +971,8 @@ export default function ProfilePage() {
     [memberList, memberDeleteId]
   );
   const [aboutForm, setAboutForm] = useState({ bio: "", skillsText: "" });
-  const [contactForm, setContactForm] = useState({ first_name: "", last_name: "", email: "", linkedin: "", city: "", location: "" });
+  const [contactForm, setContactForm] = useState({ first_name: "", last_name: "", email: "", linkedin: "" });
+  const [locationForm, setLocationForm] = useState({ city: "", country: "" });
   const [workOpen, setWorkOpen] = useState(false);
   const [workForm, setWorkForm] = useState({ sector: "", industry: "", employees: "" });
 
@@ -1232,6 +1230,10 @@ export default function ProfilePage() {
   // Helpers
   const latestExp = useMemo(() => expList.length > 0 ? expList[0] : null, [expList]);
   const fullName = `${form.first_name || ""} ${form.last_name || ""}`.trim() || "User";
+  const parsedLocation = useMemo(
+    () => parseLocationString(form.location),
+    [form.location]
+  );
 
   const toMonthYear = (d) => {
     if (!d) return "";
@@ -1260,6 +1262,23 @@ export default function ProfilePage() {
     if (city) return city;
     if (country) return country;
     return "";
+  }
+  function parseLocationString(locationString) {
+    const raw = (locationString || "").trim();
+    if (!raw) return { city: "", country: "" };
+    const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const city = parts[0];
+      const lastPart = parts[parts.length - 1];
+      const maybeCountry = getSelectedCountry({ location: lastPart });
+      return { city, country: maybeCountry ? maybeCountry.label : lastPart };
+    }
+    if (parts.length === 1) {
+      const maybeCountry = getSelectedCountry({ location: parts[0] });
+      if (maybeCountry) return { city: "", country: maybeCountry.label };
+      return { city: parts[0], country: "" };
+    }
+    return { city: "", country: "" };
   }
 
   // Sync Work Form
@@ -1603,26 +1622,20 @@ export default function ProfilePage() {
   };
 
   const openEditContact = () => {
-    const locStr = (form.location || "").trim();
-    let city = "", country = "";
-    if (locStr) {
-      const parts = locStr.split(",").map((p) => p.trim()).filter(Boolean);
-      if (parts.length === 1) {
-        const maybeCountry = getSelectedCountry({ location: parts[0] });
-        if (maybeCountry) country = maybeCountry.label; else city = parts[0];
-      } else if (parts.length >= 2) {
-        city = parts[0];
-        const lastPart = parts[parts.length - 1];
-        const maybeCountry = getSelectedCountry({ location: lastPart });
-        country = maybeCountry ? maybeCountry.label : lastPart;
-      }
-    }
     const linksObj = parseLinks(form.linksText);
     setContactForm({
-      first_name: form.first_name || "", last_name: form.last_name || "", email: form.email || "",
-      linkedin: typeof linksObj.linkedin === "string" ? linksObj.linkedin : "", city, location: country,
+      first_name: form.first_name || "",
+      last_name: form.last_name || "",
+      email: form.email || "",
+      linkedin: typeof linksObj.linkedin === "string" ? linksObj.linkedin : "",
     });
     setContactOpen(true);
+  };
+
+  const openEditLocation = () => {
+    const { city, country } = parseLocationString(form.location);
+    setLocationForm({ city, country });
+    setLocationOpen(true);
   };
 
   function askDeleteLanguage(id, label) {
@@ -1797,7 +1810,6 @@ export default function ProfilePage() {
       const lastName = (contactForm.last_name || "").trim();
       const email = (contactForm.email || "").trim();
       const linkedinUrl = (contactForm.linkedin || "").trim();
-      const locationString = buildLocationFromForm(contactForm);
       const existingLinks = parseLinks(form.linksText);
       const newLinks = { ...existingLinks };
       if (linkedinUrl) newLinks.linkedin = linkedinUrl; else delete newLinks.linkedin;
@@ -1806,17 +1818,55 @@ export default function ProfilePage() {
         first_name: firstName, last_name: lastName, email: email || undefined,
         profile: {
           full_name: form.full_name, timezone: form.timezone, bio: form.bio, headline: form.headline,
-          job_title: form.job_title, company: form.company, location: locationString,
+          job_title: form.job_title, company: form.company, location: form.location,
           // Removed legacy skills update; skills are stored in structured tables. Links preserved.
           links: newLinks,
         },
       };
       const r = await fetch(`${API_BASE}/users/me/`, { method: "PUT", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Save failed");
-      setForm(prev => ({ ...prev, first_name: firstName, last_name: lastName, email: email || "", location: locationString, linksText: Object.keys(newLinks).length > 0 ? JSON.stringify(newLinks) : "" }));
+      setForm(prev => ({ ...prev, first_name: firstName, last_name: lastName, email: email || "", linksText: Object.keys(newLinks).length > 0 ? JSON.stringify(newLinks) : "" }));
       showNotification("success", "Contact updated");
       setContactOpen(false);
     } catch (e) { showNotification("error", e?.message || "Save failed"); } finally { setSaving(false); }
+  }
+
+  async function saveLocation() {
+    try {
+      setSaving(true);
+      const city = (locationForm.city || "").trim();
+      const country = (locationForm.country || "").trim();
+      const locationString = [city, country].filter(Boolean).join(", ");
+
+      const payload = {
+        first_name: form.first_name,
+        last_name: form.last_name,
+        email: form.email,
+        profile: {
+          full_name: form.full_name,
+          timezone: form.timezone,
+          bio: form.bio,
+          headline: form.headline,
+          job_title: form.job_title,
+          company: form.company,
+          location: locationString,
+          links: parseLinks(form.linksText),
+        },
+      };
+      const r = await fetch(`${API_BASE}/users/me/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error("Save failed");
+      setForm((prev) => ({ ...prev, location: locationString }));
+      showNotification("success", "Location updated");
+      setLocationOpen(false);
+    } catch (e) {
+      showNotification("error", e?.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function createEducation() {
@@ -2881,8 +2931,30 @@ export default function ProfilePage() {
                             <ListItemText primary={<Typography variant="body2">{form.email || '—'}</Typography>} secondary={<Typography variant="caption" color="text.secondary" display="block">Private field.</Typography>} />
                           </ListItem>
                         </List>
-                        <Label sx={{ mt: 2, mb: 1 }}>Live Location</Label>
-                        {form.location ? <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{form.location}</Typography></Box> : <Box sx={{ height: 100, borderRadius: 1, bgcolor: 'grey.100', border: '1px solid', borderColor: 'divider' }} />}
+                      </SectionCard>
+
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Location"
+                        action={
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={openEditLocation}>
+                              <EditRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        <Stack spacing={1}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <PlaceIcon fontSize="small" />
+                            <Typography variant="body2">
+                              City: {parsedLocation.city || "\u2014"}
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ pl: 3 }}>
+                            Country: {parsedLocation.country || "\u2014"}
+                          </Typography>
+                        </Stack>
                       </SectionCard>
 
                       <SectionCard
@@ -3255,27 +3327,60 @@ export default function ProfilePage() {
         <DialogContent dividers>
           <TextField label="Email" type="email" fullWidth sx={{ mt: 1, mb: 2 }} value={contactForm.email} onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))} />
           <TextField label="LinkedIn URL" fullWidth sx={{ mb: 2 }} placeholder="https://www.linkedin.com/in/username" value={contactForm.linkedin} onChange={(e) => setContactForm((f) => ({ ...f, linkedin: e.target.value }))} />
-          <Stack spacing={2}> <CityAutocompleteOpenMeteo
-            label="City"
-            value={
-              contactForm.city
-                ? { name: contactForm.city, admin1: "", country: contactForm.location || "" }
-                : null
-            }
-            onSelect={(place) => {
-              setContactForm((prev) => ({
-                ...prev,
-                city: place?.name || "",
-                location: place?.country || prev.location || "", // ✅ auto-fill country
-              }));
-            }}
-          />
-            <Autocomplete size="small" fullWidth options={COUNTRY_OPTIONS} autoHighlight value={getSelectedCountry({ location: contactForm.location })} getOptionLabel={(opt) => opt?.label ?? ""} isOptionEqualToValue={(o, v) => o.code === v.code} onChange={(_, newVal) => setContactForm((f) => ({ ...f, location: newVal ? newVal.label : "" }))} renderOption={(props, option) => (<li {...props}><span style={{ marginRight: 8 }}>{option.emoji}</span>{option.label}</li>)} renderInput={(params) => <TextField {...params} label="Country" placeholder="Select country" fullWidth />} />
-          </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setContactOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={saveContact} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={locationOpen} onClose={() => setLocationOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Edit Location</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <CityAutocompleteOpenMeteo
+              label="City"
+              value={
+                locationForm.city
+                  ? { name: locationForm.city, admin1: "", country: locationForm.country || "" }
+                  : null
+              }
+              onSelect={(place) => {
+                setLocationForm((prev) => ({
+                  ...prev,
+                  city: place?.name || "",
+                  country: place?.country || prev.country || "",
+                }));
+              }}
+            />
+            <Autocomplete
+              size="small"
+              fullWidth
+              options={COUNTRY_OPTIONS}
+              autoHighlight
+              value={getSelectedCountry({ location: locationForm.country })}
+              getOptionLabel={(opt) => opt?.label ?? ""}
+              isOptionEqualToValue={(o, v) => o.code === v.code}
+              onChange={(_, newVal) =>
+                setLocationForm((f) => ({ ...f, country: newVal ? newVal.label : "" }))
+              }
+              renderOption={(props, option) => (
+                <li {...props}>
+                  <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                  {option.label}
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField {...params} label="Country" placeholder="Select country" fullWidth />
+              )}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setLocationOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveLocation} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
         </DialogActions>
       </Dialog>
 

@@ -381,7 +381,14 @@ React.useEffect(() => {
     if (!slug.trim()) e.slug = "Required";
     if (!location.trim()) e.location = "Required";
     if (!description.trim()) e.description = "Required";
-    if (Number(price) < 0) e.price = "Price must be ≥ 0";
+    const priceValue = Number(price);
+    if (price === "" || price === null || typeof price === "undefined") {
+      e.price = "Price is required";
+    } else if (!Number.isFinite(priceValue)) {
+      e.price = "Price must be a valid number";
+    } else if (priceValue < 1) {
+      e.price = "Price must be >= 1";
+    }
 
     const s = dayjs.tz(`${startDate}T${startTime}:00`, timezone);
     const ed = dayjs.tz(`${endDate}T${endTime}:00`, timezone);
@@ -1044,7 +1051,14 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     if (!slug.trim()) e.slug = "Required";
     if (!location.trim()) e.location = "Required";
     if (!description.trim()) e.description = "Description is required";
-    if (Number(price) < 0) e.price = "Price must be ≥ 0";
+    const priceValue = Number(price);
+    if (price === "" || price === null || typeof price === "undefined") {
+      e.price = "Price is required";
+    } else if (!Number.isFinite(priceValue)) {
+      e.price = "Price must be a valid number";
+    } else if (priceValue < 1) {
+      e.price = "Price must be >= 1";
+    }
 
     if (startDate && endDate) {
       const s = dayjs.tz(`${startDate}T${startTime}:00`, timezone);

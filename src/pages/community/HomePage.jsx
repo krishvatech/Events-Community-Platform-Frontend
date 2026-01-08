@@ -174,6 +174,24 @@ const getSelectedCountry = (profile) => {
   ) || null;
 };
 
+function parseLocationString(locationString) {
+  const raw = (locationString || "").trim();
+  if (!raw) return { city: "", country: "" };
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const city = parts[0];
+    const lastPart = parts[parts.length - 1];
+    const maybeCountry = getSelectedCountry({ location: lastPart });
+    return { city, country: maybeCountry ? maybeCountry.label : lastPart };
+  }
+  if (parts.length === 1) {
+    const maybeCountry = getSelectedCountry({ location: parts[0] });
+    if (maybeCountry) return { city: "", country: maybeCountry.label };
+    return { city: parts[0], country: "" };
+  }
+  return { city: "", country: "" };
+}
+
 function toMonthYear(d) {
   if (!d) return "";
   const [y, m] = String(d).split("-");
@@ -1809,7 +1827,7 @@ function CityAutocompleteOffline({ label = "City", value, onSelect, countryCode 
         if (o?.geoname_id && v?.geoname_id) return o.geoname_id === v.geoname_id;
         return o?.name === v?.name && o?.country === v?.country;
       }}
-      getOptionLabel={(o) => (o?.label ? o.label : [o?.name, o?.country].filter(Boolean).join(", "))}
+      getOptionLabel={(o) => o?.name || ""}
       onChange={(_, newValue) => onSelect?.(newValue || null)}
       renderInput={(params) => (
         <TextField
@@ -2037,7 +2055,9 @@ function AboutTab({
   const [syncProfileLocation, setSyncProfileLocation] = React.useState(false);
 
   const [contactOpen, setContactOpen] = React.useState(false);
+  const [locationOpen, setLocationOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState({});
+  const [locationForm, setLocationForm] = React.useState({ city_obj: null, city: "", location: "" });
 
   const [savingAbout, setSavingAbout] = React.useState(false);
   const [savingEdu, setSavingEdu] = React.useState(false);
@@ -2046,6 +2066,10 @@ function AboutTab({
   const [deletingExp, setDeletingExp] = React.useState(false);
   const [eduFiles, setEduFiles] = React.useState([]);
   const latestExp = React.useMemo(() => profile.experience?.[0], [profile.experience]);
+  const parsedLocation = React.useMemo(
+    () => parseLocationString(profile.location),
+    [profile.location]
+  );
 
   // --- Trainings ---
   const [trainingOpen, setTrainingOpen] = React.useState(false);
@@ -2332,10 +2356,7 @@ function AboutTab({
   };
 
   React.useEffect(() => {
-    const fullLoc = profile.location || "";
-    const [city, country] = fullLoc.includes(",")
-      ? fullLoc.split(",").map(s => s.trim())
-      : ["", fullLoc];
+    const { city, country } = parseLocationString(profile.location);
 
     const city_obj = city
       ? {
@@ -2350,10 +2371,12 @@ function AboutTab({
 
     setContactForm({
       email: profile.email || "",
+      linkedin: profile.links?.linkedin || ""
+    });
+    setLocationForm({
       city,
       location: country,
-      city_obj, // ✅ add this
-      linkedin: profile.links?.linkedin || ""
+      city_obj,
     });
 
     setAboutForm({ bio: profile.bio || "", skillsText: (profile.skills || []).join(", ") });
@@ -2780,19 +2803,15 @@ function AboutTab({
     setSavingContact(true);
 
     try {
-      const loc = [contactForm.city, contactForm.location]
-        .filter(Boolean)
-        .join(", ");
       const links = { ...(profile.links || {}), linkedin: contactForm.linkedin };
       const payload = {
         email: contactForm.email,
-        profile: { ...profile, location: loc, links },
+        profile: { ...profile, location: profile.location || "", links },
       };
       await saveProfileToMe(payload);
       onUpdate?.({
         ...profile,
         email: payload.email,
-        location: loc,
         links,
       });
       showToast?.("success", "Contact info updated.");
@@ -2800,6 +2819,33 @@ function AboutTab({
     } catch (e) {
       console.error(e);
       showToast?.("error", "Failed to save contact info.");
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const saveLocation = async () => {
+    if (savingContact) return;
+    setSavingContact(true);
+
+    try {
+      const loc = [locationForm.city, locationForm.location]
+        .filter(Boolean)
+        .join(", ");
+      const payload = {
+        email: profile.email,
+        profile: { ...profile, location: loc, links: profile.links || {} },
+      };
+      await saveProfileToMe(payload);
+      onUpdate?.({
+        ...profile,
+        location: loc,
+      });
+      showToast?.("success", "Location updated.");
+      setLocationOpen(false);
+    } catch (e) {
+      console.error(e);
+      showToast?.("error", "Failed to save location.");
     } finally {
       setSavingContact(false);
     }
@@ -3195,9 +3241,15 @@ function AboutTab({
         {/* RIGHT: Contact + New Sections */}
         <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
           <SectionCard title="Contact" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => setContactOpen(true)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <Typography variant="subtitle2" color="text.secondary">LinkedIn</Typography><Box sx={{ display: "flex", gap: 1, mb: 1 }}><LinkedInIcon fontSize="small" /><Typography variant="body2">{profile.links?.linkedin || "—"}</Typography></Box>
-            <Typography variant="subtitle2" color="text.secondary">Email</Typography><Box sx={{ display: "flex", gap: 1, mb: 1 }}><EmailIcon fontSize="small" /><Typography variant="body2">{profile.email || "—"}</Typography></Box>
-            <Typography variant="subtitle2" color="text.secondary">Location</Typography><Box sx={{ display: "flex", gap: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{profile.location || "—"}</Typography></Box>
+            <Typography variant="subtitle2" color="text.secondary">LinkedIn</Typography><Box sx={{ display: "flex", gap: 1, mb: 1 }}><LinkedInIcon fontSize="small" /><Typography variant="body2">{profile.links?.linkedin || "\u2014"}</Typography></Box>
+            <Typography variant="subtitle2" color="text.secondary">Email</Typography><Box sx={{ display: "flex", gap: 1, mb: 1 }}><EmailIcon fontSize="small" /><Typography variant="body2">{profile.email || "\u2014"}</Typography></Box>
+          </SectionCard>
+
+          <SectionCard title="Location" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => setLocationOpen(true)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
+            <Typography variant="subtitle2" color="text.secondary">City</Typography>
+            <Box sx={{ display: "flex", gap: 1, mb: 1 }}><PlaceIcon fontSize="small" /><Typography variant="body2">{parsedLocation.city || "\u2014"}</Typography></Box>
+            <Typography variant="subtitle2" color="text.secondary">Country</Typography>
+            <Typography variant="body2" sx={{ pl: 3 }}>{parsedLocation.country || "\u2014"}</Typography>
           </SectionCard>
 
           <SectionCard
@@ -3587,29 +3639,6 @@ function AboutTab({
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField label="Email" fullWidth value={contactForm.email || ""} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} />
-            <CityAutocompleteOffline
-              label="City"
-              value={contactForm.city_obj || null}
-              countryCode={getSelectedCountry({ location: contactForm.location })?.code || ""} // optional filter
-              onSelect={(place) => {
-                setContactForm((prev) => ({
-                  ...prev,
-                  city_obj: place,
-                  city: place?.name || "",
-                  location: place?.country || "", // still auto-fill Country label
-                }));
-              }}
-            />
-            <Autocomplete
-              options={COUNTRY_OPTIONS}
-              value={getSelectedCountry({ location: contactForm.location })}
-              getOptionLabel={(o) => o?.label || ""}
-              disabled={!!contactForm.city_obj}   // ✅ lock when city chosen
-              onChange={(_, v) =>
-                setContactForm({ ...contactForm, location: v?.label || "" })
-              }
-              renderInput={(p) => <TextField {...p} label="Country" />}
-            />
             <TextField label="LinkedIn" fullWidth value={contactForm.linkedin || ""} onChange={(e) => setContactForm({ ...contactForm, linkedin: e.target.value })} />
           </Stack>
         </DialogContent>
@@ -3621,6 +3650,47 @@ function AboutTab({
             disabled={savingContact}
           >
             {savingContact ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={locationOpen} onClose={() => setLocationOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Edit Location</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <CityAutocompleteOffline
+              label="City"
+              value={locationForm.city_obj || null}
+              countryCode={getSelectedCountry({ location: locationForm.location })?.code || ""}
+              onSelect={(place) => {
+                setLocationForm((prev) => ({
+                  ...prev,
+                  city_obj: place,
+                  city: place?.name || "",
+                  location: place?.country || "",
+                }));
+              }}
+            />
+            <Autocomplete
+              options={COUNTRY_OPTIONS}
+              value={getSelectedCountry({ location: locationForm.location })}
+              getOptionLabel={(o) => o?.label || ""}
+              disabled={!!locationForm.city_obj}
+              onChange={(_, v) =>
+                setLocationForm((prev) => ({ ...prev, location: v?.label || "" }))
+              }
+              renderInput={(p) => <TextField {...p} label="Country" />}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLocationOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={saveLocation}
+            disabled={savingContact}
+          >
+            {savingContact ? "Saving…": "Save"}
           </Button>
         </DialogActions>
       </Dialog>
