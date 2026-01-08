@@ -15,6 +15,7 @@ import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import PollRoundedIcon from "@mui/icons-material/PollRounded";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
@@ -174,7 +175,11 @@ function mapFeedPollToPost(row) {
     if (t !== "poll") return null;
 
     const opts = Array.isArray(m.options)
-        ? m.options.map(o => String(o?.text ?? o?.label ?? o))
+        ? m.options.map((o) => ({
+            id: o?.id ?? o?.option_id ?? null,
+            label: o?.text ?? o?.label ?? String(o),
+            votes: typeof o?.vote_count === "number" ? o.vote_count : (typeof o?.votes === "number" ? o.votes : 0),
+        }))
         : [];
 
     const gidRaw = row?.group_id ?? m.group_id ?? m.groupId ?? m.group?.id;
@@ -190,12 +195,88 @@ function mapFeedPollToPost(row) {
         type: "poll",
         question: m.question ?? m.title ?? row.title ?? row.text ?? "",
         options: opts,
+        user_votes: Array.isArray(m.user_votes) ? m.user_votes : [],
+        is_closed: Boolean(m.is_closed),
         created_at: row.created_at || m.created_at || row.createdAt || new Date().toISOString(),
         created_by: row.created_by || row.user || row.actor || null,
         hidden: !!(row.is_hidden ?? m.is_hidden),
         is_hidden: !!(row.is_hidden ?? m.is_hidden),
         group_id: gid,
     };
+}
+
+function PollResultsBlock({ post }) {
+    const options = Array.isArray(post?.options) ? post.options : [];
+    const userVotes = Array.isArray(post?.user_votes) ? post.user_votes : [];
+    const totalVotes = options.reduce(
+        (sum, o) => sum + (typeof o?.votes === "number" ? o.votes : (o?.vote_count ?? 0)),
+        0
+    );
+    const question = post?.question || post?.text || "";
+
+    return (
+        <Box>
+            {question && (
+                <Typography className="mb-1 font-medium">{question}</Typography>
+            )}
+
+            {options.length === 0 ? (
+                <Typography variant="caption" color="text.secondary">
+                    No options added yet.
+                </Typography>
+            ) : (
+                <Stack spacing={1}>
+                    {options.map((opt, idx) => {
+                        const optionId = opt?.id ?? opt?.option_id ?? null;
+                        const label = opt?.label ?? opt?.text ?? toStr(opt);
+                        const votes = typeof opt?.votes === "number" ? opt.votes : (opt?.vote_count ?? 0);
+                        const percent = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+                        const chosen = optionId != null && userVotes.includes(optionId);
+
+                        return (
+                            <Paper
+                                key={optionId ?? `${label}-${idx}`}
+                                variant="outlined"
+                                sx={{
+                                    p: 1,
+                                    borderRadius: 2,
+                                    borderColor: "#e2e8f0",
+                                    bgcolor: chosen ? "action.selected" : "background.paper",
+                                }}
+                            >
+                                <Stack spacing={0.5}>
+                                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                {label}
+                                            </Typography>
+                                            {chosen && (
+                                                <Chip
+                                                    size="small"
+                                                    icon={<CheckCircleOutlineIcon sx={{ fontSize: 16 }} />}
+                                                    label="Your vote"
+                                                    color="success"
+                                                    variant="outlined"
+                                                />
+                                            )}
+                                        </Stack>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                            {percent}%
+                                        </Typography>
+                                    </Stack>
+                                    <LinearProgress variant="determinate" value={percent} sx={{ height: 8, borderRadius: 1 }} />
+                                </Stack>
+                            </Paper>
+                        );
+                    })}
+                </Stack>
+            )}
+
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+                Total votes: {totalVotes} vote{totalVotes === 1 ? "" : "s"}{post?.is_closed ? " | Poll closed" : ""}
+            </Typography>
+        </Box>
+    );
 }
 
 
@@ -3059,7 +3140,9 @@ export default function GroupManagePage() {
             return;
         }
         const isHidden = Boolean(post.hidden ?? post.is_hidden);
-        setActivePost({ ...post, _feed_item_id: fid, hidden: isHidden, is_hidden: isHidden });
+        const isPoll = String(post.type).toLowerCase() === "poll";
+        const pollOptions = isPoll ? (post.options || []).map((o) => o?.label ?? o?.text ?? String(o)) : post.options;
+        setActivePost({ ...post, options: pollOptions, _feed_item_id: fid, hidden: isHidden, is_hidden: isHidden });
         setPostMenuAnchor(evt.currentTarget);
     };
     const closePostMenu = () => { setPostMenuAnchor(null); /* keep activePost for edit form */ };
@@ -4251,14 +4334,7 @@ export default function GroupManagePage() {
                                                                     )}
                                                                 </>
                                                             ) : p.type === "poll" ? (
-                                                                <>
-                                                                    <Typography className="mb-1 font-medium">{p.question}</Typography>
-                                                                    <Stack spacing={0.5}>
-                                                                        {(p.options || []).map((o, i) => (
-                                                                            <Chip key={i} size="small" label={toStr(o)} className="bg-slate-100 text-slate-700 w-fit" />
-                                                                        ))}
-                                                                    </Stack>
-                                                                </>
+                                                                <PollResultsBlock post={p} />
                                                             ) : p.type === "event" ? (
                                                                 <>
                                                                     <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
