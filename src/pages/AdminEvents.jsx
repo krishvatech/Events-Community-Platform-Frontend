@@ -28,6 +28,8 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import AdminGroups from "./AdminGroups.jsx";
 import AdminResources from "./AdminResources.jsx";
 import AdminNameRequestsPage from "./AdminNameRequestsPage.jsx";
@@ -43,7 +45,6 @@ import AlternateEmailRoundedIcon from "@mui/icons-material/AlternateEmailRounded
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import { IconButton, InputAdornment } from "@mui/material";
 import AdminPostsPage from "./AdminPostsPage.jsx";
 import MyRecordingsPage from "./MyRecordingsPage.jsx"
@@ -53,6 +54,9 @@ import AdminSidebar from "../components/AdminSidebar.jsx";
 import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -104,6 +108,29 @@ const getSelectedCountry = ({ location }) => {
   );
 };
 
+const FALLBACK_TIMEZONES = [
+  "Asia/Kolkata",
+  "UTC",
+  "Asia/Dubai",
+  "Europe/London",
+  "America/New_York",
+];
+
+const getBrowserTimezone = () => {
+  if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
+  }
+  return "Asia/Kolkata";
+};
+
+const getTimezoneOptions = () => {
+  if (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
+    return Intl.supportedValuesOf("timeZone");
+  }
+  return FALLBACK_TIMEZONES;
+};
+
+const TIMEZONE_OPTIONS = getTimezoneOptions();
 
 const asList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
@@ -211,7 +238,11 @@ const slugify = (s) =>
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-const toISO = (v) => (v ? new Date(v).toISOString() : null);
+const toUTCISO = (date, time, tz) => {
+  if (!date || !time || !tz) return null;
+  const dt = dayjs.tz(`${date}T${time}:00`, tz);
+  return dt.isValid() ? dt.toDate().toISOString() : null;
+};
 
 // --- Schedule defaults: always hour-aligned (HH:00) and default duration 2 hours ---
 const roundToHour = (d = dayjs()) => dayjs(d).minute(0).second(0).millisecond(0);
@@ -255,7 +286,13 @@ const [startDate, setStartDate] = React.useState(defaultSchedule.startDate);
 const [endDate, setEndDate] = React.useState(defaultSchedule.endDate);
 const [startTime, setStartTime] = React.useState(defaultSchedule.startTime);
 const [endTime, setEndTime] = React.useState(defaultSchedule.endTime);
-const [timezone, setTimezone] = React.useState("Asia/Kolkata"); // UI only // UI only
+const [timezone, setTimezone] = React.useState(getBrowserTimezone());
+
+  const timezoneOptions = React.useMemo(() => {
+    return timezone && !TIMEZONE_OPTIONS.includes(timezone)
+      ? [timezone, ...TIMEZONE_OPTIONS]
+      : TIMEZONE_OPTIONS;
+  }, [timezone]);
 
   // Image
   const [imageFile, setImageFile] = React.useState(null);
@@ -316,7 +353,7 @@ React.useEffect(() => {
     setEndDate(sch.endDate);
     setStartTime(sch.startTime);
     setEndTime(sch.endTime);
-    setTimezone("Asia/Kolkata");
+    setTimezone(getBrowserTimezone());
 
     setImageFile(null);
     setLocalImagePreview("");
@@ -346,8 +383,8 @@ React.useEffect(() => {
     if (!description.trim()) e.description = "Required";
     if (Number(price) < 0) e.price = "Price must be ≥ 0";
 
-    const s = dayjs(`${startDate}T${startTime}:00`);
-    const ed = dayjs(`${endDate}T${endTime}:00`);
+    const s = dayjs.tz(`${startDate}T${startTime}:00`, timezone);
+    const ed = dayjs.tz(`${endDate}T${endTime}:00`, timezone);
     if (s.isValid() && ed.isValid() && !ed.isAfter(s)) {
       // ⛔ End before or same as start → show error on end date + end time
       e.endTime = "End must be after start";
@@ -377,8 +414,9 @@ React.useEffect(() => {
     fd.append("category", category);
     fd.append("format", format);
     fd.append("price", String(price ?? 0));
-    fd.append("start_time", iso(startDate, startTime));
-    fd.append("end_time", iso(endDate, endTime));
+    fd.append("timezone", timezone);
+    fd.append("start_time", toUTCISO(startDate, startTime, timezone));
+    fd.append("end_time", toUTCISO(endDate, endTime, timezone));
     fd.append("recording_url", "");
 
     if (imageFile) fd.append("preview_image", imageFile, imageFile.name);
@@ -713,12 +751,19 @@ React.useEffect(() => {
               </LocalizationProvider>
             </Grid>
             <Grid item xs={12} md={4}>
-              <TextField label="Timezone *" select value={timezone} onChange={(e) => setTimezone(e.target.value)} fullWidth
-                SelectProps={{ IconComponent: ExpandMoreRoundedIcon }}>
-                {["Asia/Kolkata", "UTC", "Europe/London", "America/New_York", "America/Los_Angeles"].map((tz) => (
-                  <MenuItem key={tz} value={tz}>{tz.replace("/", " - ")}</MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                fullWidth
+                options={timezoneOptions}
+                value={timezone}
+                onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Event Timezone"
+                    helperText="Times are saved in this timezone."
+                  />
+                )}
+              />
             </Grid>
           </Grid>
         </Paper>
@@ -921,6 +966,14 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const token = getToken();
 
   // --- local state from existing event ---
+  const initialTimezone = event?.timezone || getBrowserTimezone();
+  const initialStart = event?.start_time
+    ? dayjs(event.start_time).tz(initialTimezone)
+    : dayjs();
+  const initialEnd = event?.end_time
+    ? dayjs(event.end_time).tz(initialTimezone)
+    : initialStart.add(2, "hour");
+
   const [title, setTitle] = useState(event?.title || "");
   const [slug, setSlug] = useState(event?.slug || "");
   const [description, setDescription] = useState(event?.description || "");
@@ -931,20 +984,17 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     typeof event?.price === "number" ? event.price : Number(event?.price || 0)
   );
 
-  const [startDate, setStartDate] = useState(
-    event?.start_time ? new Date(event.start_time).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)
-  );
-  const [endDate, setEndDate] = useState(
-    event?.end_time ? new Date(event.end_time).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)
-  );
-  const [startTime, setStartTime] = useState(
-    event?.start_time ? new Date(event.start_time).toISOString().slice(11, 16) : "10:00"
-  );
-  const [endTime, setEndTime] = useState(
-    event?.end_time ? new Date(event.end_time).toISOString().slice(11, 16) : "12:00"
-  );
+  const [startDate, setStartDate] = useState(initialStart.format("YYYY-MM-DD"));
+  const [endDate, setEndDate] = useState(initialEnd.format("YYYY-MM-DD"));
+  const [startTime, setStartTime] = useState(initialStart.format("HH:mm"));
+  const [endTime, setEndTime] = useState(initialEnd.format("HH:mm"));
 
-  const [timezone, setTimezone] = useState("Asia/Kolkata"); // UI-only like Create dialog
+  const [timezone, setTimezone] = useState(initialTimezone);
+  const timezoneOptions = useMemo(() => {
+    return timezone && !TIMEZONE_OPTIONS.includes(timezone)
+      ? [timezone, ...TIMEZONE_OPTIONS]
+      : TIMEZONE_OPTIONS;
+  }, [timezone]);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ open: false, type: "success", msg: "" });
@@ -957,6 +1007,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   useEffect(() => {
     if (!open) return;
     // hydrate on open in case `event` changed
+    const tz = event?.timezone || getBrowserTimezone();
     setTitle(event?.title || "");
     setSlug(event?.slug || "");
     setDescription(event?.description || "");
@@ -965,10 +1016,13 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     setFormat(event?.format || "virtual");
     setPrice(typeof event?.price === "number" ? event.price : Number(event?.price || 0));
 
-    setStartDate(event?.start_time ? new Date(event.start_time).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
-    setEndDate(event?.end_time ? new Date(event.end_time).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
-    setStartTime(event?.start_time ? new Date(event.start_time).toISOString().slice(11, 16) : "10:00");
-    setEndTime(event?.end_time ? new Date(event.end_time).toISOString().slice(11, 16) : "12:00");
+    const start = event?.start_time ? dayjs(event.start_time).tz(tz) : dayjs();
+    const end = event?.end_time ? dayjs(event.end_time).tz(tz) : start.add(2, "hour");
+    setTimezone(tz);
+    setStartDate(start.format("YYYY-MM-DD"));
+    setEndDate(end.format("YYYY-MM-DD"));
+    setStartTime(start.format("HH:mm"));
+    setEndTime(end.format("HH:mm"));
 
     setImageFile(null);
     setLocalImagePreview("");
@@ -982,7 +1036,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
 
-  const combineToISO = (d, t) => (d && t ? new Date(`${d}T${t}:00`).toISOString() : null);
+  const combineToISO = (d, t) => toUTCISO(d, t, timezone);
 
   const validate = () => {
     const e = {};
@@ -993,9 +1047,9 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     if (Number(price) < 0) e.price = "Price must be ≥ 0";
 
     if (startDate && endDate) {
-      const s = new Date(`${startDate}T${startTime}:00`);
-      const ed = new Date(`${endDate}T${endTime}:00`);
-      if (ed <= s) {
+      const s = dayjs.tz(`${startDate}T${startTime}:00`, timezone);
+      const ed = dayjs.tz(`${endDate}T${endTime}:00`, timezone);
+      if (s.isValid() && ed.isValid() && !ed.isAfter(s)) {
         // ⛔ End before or same as start → show error on end date + end time
         e.endTime = "End must be after start";
         e.endDate = "End must be after start";
@@ -1026,6 +1080,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     fd.append("category", category);
     fd.append("format", format);
     fd.append("price", String(price ?? 0));
+    fd.append("timezone", timezone);
     fd.append("start_time", combineToISO(startDate, startTime));
     fd.append("end_time", combineToISO(endDate, endTime));
 
@@ -1256,15 +1311,19 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             </LocalizationProvider>
 
             <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Timezone *" select fullWidth
-                value={timezone} onChange={(e) => setTimezone(e.target.value)}
-                SelectProps={{ IconComponent: ExpandMoreRoundedIcon }}
-              >
-                {["America/Miami", "UTC", "Asia/Kolkata", "Europe/London", "America/Los_Angeles"].map((tz) => (
-                  <MenuItem key={tz} value={tz}>{tz.replace("/", " - ")}</MenuItem>
-                ))}
-              </TextField>
+              <Autocomplete
+                fullWidth
+                options={timezoneOptions}
+                value={timezone}
+                onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Event Timezone"
+                    helperText="Times are saved in this timezone."
+                  />
+                )}
+              />
             </Grid>
           </Grid>
         </DialogContent>

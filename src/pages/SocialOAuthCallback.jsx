@@ -61,12 +61,17 @@ const updateTimezone = async (accessToken) => {
   try {
     await fetch(`${API_BASE}/users/me/`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
       body: JSON.stringify({ profile: { timezone: tz } }),
-    });
+    },
+      {
+        url: `${API_BASE}/auth/users/me/`,
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ profile: { timezone: tz } }),
+      });
   } catch (e) {
     console.warn("Timezone update failed:", e);
   }

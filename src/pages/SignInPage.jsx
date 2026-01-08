@@ -267,10 +267,11 @@ const SignInPage = () => {
 
       } else {
         // keep your old backend login if you ever need it
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const response = await fetch(`${API_BASE}/auth/login/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({ ...formData, timezone: tz }),
         });
 
         try { data = await response.json(); } catch { /* ignore */ }
