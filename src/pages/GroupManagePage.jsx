@@ -4902,7 +4902,7 @@ export default function GroupManagePage() {
                                             }
                                             setDeletingGroup(false);
                                             setDeleteGroupOpen(false);
-                                            navigate("/groups"); // adjust route if your list lives elsewhere
+                                            navigate("/admin/groups"); // adjust route if your list lives elsewhere
                                         } catch (e) {
                                             setDeletingGroup(false);
                                             alert(`Failed to delete group: ${e?.message || e}`);
