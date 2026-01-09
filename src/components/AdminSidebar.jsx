@@ -182,15 +182,42 @@ export default function AdminSidebar({
     Number(localStorage.getItem("admin_unread_notifications") || 0)
   );
 
+  // New state for messages count
+  const [messageCount, setMessageCount] = React.useState(
+    Number(localStorage.getItem("unread_messages") || 0)
+  );
+
   React.useEffect(() => {
     let off = false;
 
+    // Helper to get total unread messages across all conversations
+    const getUnreadMessageCount = async () => {
+      try {
+        const res = await fetch(`${API_ROOT}/messaging/conversations/`, {
+          headers: { ...tokenHeader(), Accept: "application/json" },
+        });
+        const raw = await res.json().catch(() => ([]));
+        const data = Array.isArray(raw) ? raw : (raw?.results || []);
+
+        // Sum up unread_count from each conversation
+        const total = data.reduce((acc, curr) => acc + (curr.unread_count || 0), 0);
+        return total;
+      } catch (e) {
+        console.error("Failed to fetch unread messages count", e);
+        return 0;
+      }
+    };
+
     const sync = async () => {
       const cnt = await getAdminNotificationsBadgeCount();
+      const msgCnt = await getUnreadMessageCount();
+
       if (!off) {
         setAdminNotifCount(cnt);
+        setMessageCount(msgCnt);
         try {
           localStorage.setItem("admin_unread_notifications", String(cnt));
+          localStorage.setItem("unread_messages", String(msgCnt));
         } catch { }
       }
     };
@@ -205,7 +232,17 @@ export default function AdminSidebar({
       } catch { }
     };
 
+    // Listener for messages:unread from AdminMessagesPage
+    const onMessageUnread = (e) => {
+      const c = Math.max(0, e?.detail?.count ?? 0);
+      setMessageCount(c);
+      try {
+        localStorage.setItem("unread_messages", String(c));
+      } catch { }
+    };
+
     window.addEventListener("admin:notify:unread", onUnread);
+    window.addEventListener("messages:unread", onMessageUnread);
 
     const id = setInterval(sync, 30000);
     const onFocus = () => sync();
@@ -215,6 +252,7 @@ export default function AdminSidebar({
       off = true;
       clearInterval(id);
       window.removeEventListener("admin:notify:unread", onUnread);
+      window.removeEventListener("messages:unread", onMessageUnread);
       window.removeEventListener("focus", onFocus);
     };
   }, []);
@@ -267,6 +305,14 @@ export default function AdminSidebar({
                       color="primary"
                       badgeContent={adminNotifCount || 0}
                       invisible={!adminNotifCount}
+                    >
+                      <ItemIcon fontSize="small" />
+                    </Badge>
+                  ) : item.key === "messages" ? (
+                    <Badge
+                      color="primary"
+                      badgeContent={messageCount || 0}
+                      invisible={!messageCount}
                     >
                       <ItemIcon fontSize="small" />
                     </Badge>

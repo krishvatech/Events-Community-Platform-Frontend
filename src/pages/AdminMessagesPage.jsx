@@ -40,6 +40,10 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import CameraAltRoundedIcon from "@mui/icons-material/CameraAltRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
+import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRounded";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 
 // ---- API helpers ----
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(
@@ -271,6 +275,30 @@ const isImageAttachment = (att) => {
   if (contentType.startsWith("image/")) return true;
   if (lowerName.match(/\.(png|jpe?g|gif|webp|bmp|heic|heif)$/)) return true;
   return false;
+};
+
+const downloadAttachmentFromApi = async (conversationId, messageId, index, filename) => {
+  try {
+    const url = `${MESSAGING_BASE}/conversations/${conversationId}/messages/${messageId}/download-attachment/?index=${index}`;
+    const res = await fetch(url, {
+      headers: { ...authHeader() },
+    });
+    if (!res.ok) {
+      console.error("Download failed");
+      return;
+    }
+    const blob = await res.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename || "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(objectUrl);
+  } catch (e) {
+    console.error("Download error", e);
+  }
 };
 
 function SharePreview({ attachment, mine }) {
@@ -2336,11 +2364,15 @@ export default function AdminMessagesPage() {
                         }
 
                         // ---- message bubble with avatar + time ----
+                        const senderId = m.sender_id ?? (typeof m.sender === 'object' ? m.sender?.id : m.sender) ?? m.user_id ?? (typeof m.user === 'object' ? m.user?.id : m.user);
+
+                        // Fallback: In 1:1 chat, if sender is NOT the active target, it's likely me.
+                        const isPartner = !isGroupChat && activeTarget?.id && String(senderId) === String(activeTarget.id);
+
                         const mine =
                           m.is_mine === true ||
-                          m.sender === meId ||
-                          m.sender_id === meId ||
-                          m.user_id === meId;
+                          String(senderId) === String(meId) ||
+                          (!isGroupChat && activeTarget?.id && !isPartner && !!senderId);
 
                         const body = m.body || m.text || m.message || "";
                         const timeStr = created
@@ -2421,11 +2453,142 @@ export default function AdminMessagesPage() {
                               }}
                               onContextMenu={(e) => handleOpenMessageMenu(e, m)}
                             >
-                              {/* 🔹 Attachments preview (same style as user messages page) */}
-                              {/* 🔹 Attachments preview (same style as user messages page) */}
+                              {/* 🔹 Attachments preview */}
                               {attachments.length > 0 && (
                                 <Stack spacing={0.75} sx={{ mb: body ? 0.75 : 0 }}>
-                                  {/* your existing attachments.map(...) code stays the same */}
+                                  {attachments.map((att, index) => {
+                                    // Find real index in original array in case filtering happened
+                                    const realIndex = allAttachments.indexOf(att);
+
+                                    const url = getAttachmentUrl(att);
+                                    const name = getAttachmentName(att);
+                                    const type = (att.content_type || att.mime_type || att.type || "").toLowerCase();
+                                    const size = att.size || 0;
+
+                                    const isImage = isImageAttachment(att);
+                                    const isVideo = type.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(url);
+                                    const isPdf = type === "application/pdf" || url.toLowerCase().endsWith(".pdf");
+
+                                    const formatSize = (bytes) => {
+                                      if (!bytes) return "";
+                                      const k = bytes / 1024;
+                                      return k < 1024 ? `${k.toFixed(1)} KB` : `${(k / 1024).toFixed(1)} MB`;
+                                    };
+
+                                    // Handler for downloading
+                                    const handleDownload = (e) => {
+                                      e.stopPropagation();
+                                      if (!conversationId) return;
+                                      downloadAttachmentFromApi(conversationId, m.id, realIndex, name);
+                                    };
+
+                                    // 1. IMAGE
+                                    if (isImage) {
+                                      return (
+                                        <Box
+                                          key={index}
+                                          onClick={() => window.open(url, "_blank")}
+                                          sx={{
+                                            width: "100%",
+                                            height: 200,
+                                            borderRadius: 2,
+                                            overflow: "hidden",
+                                            cursor: "pointer",
+                                            bgcolor: "rgba(0,0,0,0.05)",
+                                            border: "1px solid rgba(0,0,0,0.08)",
+                                          }}
+                                        >
+                                          <img
+                                            src={url}
+                                            alt={name}
+                                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                          />
+                                        </Box>
+                                      );
+                                    }
+
+                                    // 2. VIDEO
+                                    if (isVideo) {
+                                      return (
+                                        <Box
+                                          key={index}
+                                          sx={{
+                                            width: "100%",
+                                            borderRadius: 2,
+                                            overflow: "hidden",
+                                            bgcolor: "#000",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                          }}
+                                        >
+                                          <video
+                                            src={url}
+                                            controls
+                                            style={{ width: "100%", maxHeight: 250 }}
+                                          />
+                                        </Box>
+                                      );
+                                    }
+
+                                    // 3. PDF
+                                    if (isPdf) {
+                                      return (
+                                        <Box
+                                          key={index}
+                                          onClick={(e) => window.open(url, "_blank")}
+                                          sx={{
+                                            width: 240,
+                                            maxWidth: "100%",
+                                            borderRadius: 2,
+                                            overflow: "hidden",
+                                            bgcolor: mine ? "rgba(0,0,0,0.05)" : "#f0f2f5",
+                                            cursor: "pointer",
+                                            border: "1px solid rgba(0,0,0,0.08)"
+                                          }}
+                                        >
+                                          <Box sx={{ height: 100, bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+                                            <PictureAsPdfRoundedIcon sx={{ fontSize: 48, color: "#e0e0e0" }} />
+                                          </Box>
+                                          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5 }}>
+                                            <PictureAsPdfRoundedIcon sx={{ color: "#d32f2f", fontSize: 24 }} />
+                                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                              <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
+                                              <Typography variant="caption" color="text.secondary">{formatSize(size)} • PDF</Typography>
+                                            </Box>
+                                            <IconButton size="small" onClick={handleDownload} sx={{ p: 0.5 }}>
+                                              <FileDownloadOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                                            </IconButton>
+                                          </Stack>
+                                        </Box>
+                                      );
+                                    }
+
+                                    // 4. GENERIC FILE
+                                    return (
+                                      <Stack
+                                        key={index}
+                                        direction="row"
+                                        alignItems="center"
+                                        spacing={1.5}
+                                        onClick={handleDownload}
+                                        sx={{
+                                          p: 1.5,
+                                          borderRadius: 2,
+                                          bgcolor: "rgba(0,0,0,0.06)",
+                                          cursor: "pointer",
+                                          border: "1px solid rgba(0,0,0,0.05)"
+                                        }}
+                                      >
+                                        <InsertDriveFileRoundedIcon sx={{ color: "#54656f", fontSize: 24 }} />
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                                          <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
+                                          <Typography variant="caption" sx={{ opacity: 0.7 }}>{formatSize(size)} • {type.split('/').pop().toUpperCase() || "FILE"}</Typography>
+                                        </Box>
+                                        <FileDownloadOutlinedIcon sx={{ opacity: 0.6 }} fontSize="small" />
+                                      </Stack>
+                                    );
+                                  })}
                                 </Stack>
                               )}
 
