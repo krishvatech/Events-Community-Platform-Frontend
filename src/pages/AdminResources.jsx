@@ -9,7 +9,7 @@ import {
   TextField, Tooltip, Typography, FormControlLabel, Paper,
   Select, Pagination, Switch, FormControl, useMediaQuery,
   Menu, ListItemIcon, ListItemText, Avatar, Container,
-  Skeleton
+  Skeleton, Snackbar, Alert, Slide
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { Autocomplete, CircularProgress } from "@mui/material";
@@ -66,7 +66,22 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
   const [eventSearch, setEventSearch] = useState("");
   const [eventOffset, setEventOffset] = useState(0);
   const [eventHasMore, setEventHasMore] = useState(true);
+
   const [eventLoading, setEventLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "error", // "error" | "warning" | "info" | "success"
+  });
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === "clickaway") return;
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
+
+  const showSnackbar = (message, severity = "error") => {
+    setSnackbar({ open: true, message, severity });
+  };
 
   const loadEventsPage = async ({ reset = false } = {}) => {
     if (eventLoading) return;
@@ -180,6 +195,15 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      const allowedExtensions = ["pdf", "doc", "docx", "jpg", "jpeg", "png", "ppt", "pptx"];
+      const fileExtension = file.name.split(".").pop().toLowerCase();
+
+      if (!allowedExtensions.includes(fileExtension)) {
+        showSnackbar(`Invalid file type. Allowed types: ${allowedExtensions.join(", ")}`, "error");
+        e.target.value = ""; // Clear the input
+        return;
+      }
+
       setForm((prev) => ({ ...prev, file }));
     }
   };
@@ -197,33 +221,33 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
 
   const handleSubmit = async () => {
     if (!form.title || !form.event_id) {
-      alert("Please fill in title and select an event");
+      showSnackbar("Please fill in title and select an event", "warning");
       return;
     }
     if (!form.publishNow) {
       if (!form.publishDate || !form.publishTime) {
-        alert("Please pick a publish date and time or turn on 'Publish immediately'.");
+        showSnackbar("Please pick a publish date and time or turn on 'Publish immediately'.", "warning");
         return;
       }
       const scheduled = new Date(`${form.publishDate}T${form.publishTime}:00`);
       if (isNaN(scheduled.getTime())) {
-        alert("Invalid schedule date/time.");
+        showSnackbar("Invalid schedule date/time.", "error");
         return;
       }
     }
 
     if (form.type === "file" && !form.file && !initial) {
-      alert("Please select a file to upload");
+      showSnackbar("Please select a file to upload", "warning");
       return;
     }
 
     if (form.type === "link" && !form.link_url) {
-      alert("Please provide a link URL");
+      showSnackbar("Please provide a link URL", "warning");
       return;
     }
 
     if (form.type === "video" && !form.video_url) {
-      alert("Please provide a video URL");
+      showSnackbar("Please provide a video URL", "warning");
       return;
     }
 
@@ -244,7 +268,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
         selectedEvent?.community; // if backend returns a plain id as "community"
 
       if (!selectedEvent || !rawCommunityId) {
-        alert("No valid community_id found for the selected event. Please check your /events response.");
+        showSnackbar("No valid community_id found for the selected event. Please check your /events response.", "error");
         setUploading(false);
         return;
       }
@@ -308,7 +332,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
         errorMsg = error.message;
       }
 
-      alert(`Failed to ${initial ? "update" : "create"} resource:\n${errorMsg}`);
+      showSnackbar(`Failed to ${initial ? "update" : "create"} resource:\n${errorMsg}`, "error");
     } finally {
       setUploading(false);
     }
@@ -437,7 +461,7 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
                   type="file"
                   hidden
                   onChange={handleFileChange}
-                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.ppt,.pptx"
                 />
               </Button>
 
@@ -547,6 +571,18 @@ function ResourceDialog({ open, onClose, onSaved, initial, events }) {
           {uploading ? "Saving..." : initial ? "Update" : "Upload"}
         </Button>
       </DialogActions>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        TransitionComponent={Slide}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Dialog>
   );
 }
