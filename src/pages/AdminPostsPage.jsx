@@ -656,6 +656,10 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
     } else if (t === "poll") {
       out.question = resp.question ?? meta.question ?? prevItem.question ?? "";
       out.options = resp.options ?? meta.options ?? prevItem.options ?? [];
+      // poll edit resets votes -> zero them out in local state immediately
+      if (resp.options) {
+        out.options = resp.options.map(o => ({ ...o, vote_count: 0 }));
+      }
     }
 
     return out;
@@ -698,10 +702,15 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
           url: linkUrl.trim(), title: linkTitle.trim() || undefined, description: linkDesc ? linkDesc : undefined
         });
         if (kind === "poll") Object.assign(payload, {
-          question, options: pollOptions.map(o => o.trim()).filter(Boolean)
+          question, options: pollOptions.map(o => o.trim()).filter(Boolean), reset_votes: true
         });
 
-        res = await fetch(POST_DETAIL_URL, {
+        // POLLS use a different endpoint!
+        const URL_TO_USE = kind === "poll"
+          ? `${API_ROOT}/activity/feed/${item.id}/poll/`
+          : POST_DETAIL_URL;
+
+        res = await fetch(URL_TO_USE, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", ...tokenHeaders },
           body: JSON.stringify(payload),
@@ -711,7 +720,17 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
       let updated;
       if (res?.ok) {
         const json = await res.json();
-        updated = normalizeServerPost(json, item, kind);
+        if (kind === "poll") {
+          // Backend returns the Poll object (not FeedItem).
+          // We must manually merge it into our item structure
+          updated = {
+            ...item,
+            question: json.question,
+            options: json.options ? json.options.map(o => ({ ...o, vote_count: 0 })) : [],
+          };
+        } else {
+          updated = normalizeServerPost(json, item, kind);
+        }
       } else {
         // fallback: local shape (already what PostCard expects)
         updated = {
@@ -786,6 +805,9 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
 
             {kind === "poll" && (
               <Stack spacing={1.5}>
+                <Alert severity="warning">
+                  Editing a poll will reset all existing votes.
+                </Alert>
                 <TextField label="Question" value={question} onChange={e => setQuestion(e.target.value)} fullWidth />
                 <Stack spacing={1}>
                   {pollOptions.map((opt, i) => (
@@ -829,9 +851,14 @@ function DeleteConfirmDialog({ open, onClose, communityId, item, onDeleted }) {
 
     setBusy(true);
     const tokenHeaders = authHeader();
-    const POST_DETAIL_URL = `${API_ROOT}/communities/${communityId}/posts/${item.id}/delete/`;
+
+    // Polls use a different delete endpoint
+    const DELETE_URL = (item.type === "poll")
+      ? `${API_ROOT}/activity/feed/${item.id}/poll/delete/`
+      : `${API_ROOT}/communities/${communityId}/posts/${item.id}/delete/`;
+
     try {
-      await fetch(POST_DETAIL_URL, { method: "DELETE", headers: { ...tokenHeaders } });
+      await fetch(DELETE_URL, { method: "DELETE", headers: { ...tokenHeaders } });
     } catch { }
     setBusy(false);
     onDeleted?.();
