@@ -280,13 +280,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [format, setFormat] = React.useState("virtual");
   const [price, setPrice] = React.useState();
 
-const today = dayjs().format("YYYY-MM-DD");
-const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);
-const [startDate, setStartDate] = React.useState(defaultSchedule.startDate);
-const [endDate, setEndDate] = React.useState(defaultSchedule.endDate);
-const [startTime, setStartTime] = React.useState(defaultSchedule.startTime);
-const [endTime, setEndTime] = React.useState(defaultSchedule.endTime);
-const [timezone, setTimezone] = React.useState(getBrowserTimezone());
+  const today = dayjs().format("YYYY-MM-DD");
+  const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);
+  const [startDate, setStartDate] = React.useState(defaultSchedule.startDate);
+  const [endDate, setEndDate] = React.useState(defaultSchedule.endDate);
+  const [startTime, setStartTime] = React.useState(defaultSchedule.startTime);
+  const [endTime, setEndTime] = React.useState(defaultSchedule.endTime);
+  const [timezone, setTimezone] = React.useState(getBrowserTimezone());
 
   const timezoneOptions = React.useMemo(() => {
     return timezone && !TIMEZONE_OPTIONS.includes(timezone)
@@ -323,18 +323,18 @@ const [timezone, setTimezone] = React.useState(getBrowserTimezone());
     (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const iso = (d, t) => (d && t ? dayjs(`${d}T${t}:00`).toISOString() : null);
 
-// ✅ Default schedule on open: current hour (HH:00) → +2 hours
-React.useEffect(() => {
-  if (!open) return;
-  const sch = getDefaultSchedule(2);
-  setStartDate(sch.startDate);
-  setEndDate(sch.endDate);
-  setStartTime(sch.startTime);
-  setEndTime(sch.endTime);
-  // Keep resources publish defaults aligned with the same hour
-  setResPublishDate(sch.startDate);
-  setResPublishTime(sch.startTime);
-}, [open]);
+  // ✅ Default schedule on open: current hour (HH:00) → +2 hours
+  React.useEffect(() => {
+    if (!open) return;
+    const sch = getDefaultSchedule(2);
+    setStartDate(sch.startDate);
+    setEndDate(sch.endDate);
+    setStartTime(sch.startTime);
+    setEndTime(sch.endTime);
+    // Keep resources publish defaults aligned with the same hour
+    setResPublishDate(sch.startDate);
+    setResPublishTime(sch.startTime);
+  }, [open]);
 
   // 🔹 NEW: reset all fields back to defaults after successful create
   const resetForm = () => {
@@ -1746,179 +1746,116 @@ function EventsPage() {
       return {};
     }
   }, []);
-  const myId = user?.id || user?.pk || user?.user_id || null;
-  const [imageFile, setImageFile] = useState(null);
+
   const [events, setEvents] = useState([]);
-  const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
-  // hosting flow state
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Pagination & Filtering
+  const PAGE_SIZE = 6;
+  const [page, setPage] = useState(1);
+  const [tab, setTab] = useState(0); // 0=All, 1=Upcoming, 2=Live, 3=Past
+  const [q, setQ] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0); // to force refetch
+
+  // Dialogs
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+
+  // Hosting/Joining
   const [hostingId, setHostingId] = useState(null);
   const [joiningId, setJoiningId] = useState(null);
   const [errOpen, setErrOpen] = useState(false);
   const [errMsg, setErrMsg] = useState("");
-  // ➕ Pagination
-  const PAGE_SIZE = 6;
-  const [page, setPage] = useState(1);
-  // Tabs: 0=All, 1=Upcoming, 2=Live, 3=Past
-  const [tab, setTab] = useState(0);
 
-  // NEW: create dialog state
-  const [createOpen, setCreateOpen] = useState(false);
+  // Helpers
+  const statusTabMap = { 1: "upcoming", 2: "live", 3: "past" };
 
-  const [editOpen, setEditOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(null);
+  // Reset page on tab/search change
+  useEffect(() => {
+    setPage(1);
+  }, [tab, q]);
 
-  // Fetch events:
-  // - Owner: see ALL events
-  // - Staff: see only purchased / registered events (same logic as MyEventsPage)
+  // Main Fetch Effect
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
 
-    const headers = {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-
-    const fetchJSON = async (path) => {
-      const fullUrl = path.startsWith("http") ? path : urlJoin(API_BASE, path);
-      const res = await fetch(fullUrl, { headers });
-      if (!res.ok) {
-        throw new Error(`${res.status}`);
-      }
-      return res.json();
-    };
-
-    const loadOwnerEvents = async () => {
-      const res = await fetch(`${API_ROOT}/events/`, { headers });
-      if (!res.ok) throw new Error(`${res.status}`);
-      const json = await res.json().catch(() => ({}));
-      const data = asList(json);
-      return Array.isArray(data) ? data : [];
-    };
-
-    const loadStaffEvents = async () => {
-      let me = null;
+    const fetchData = async () => {
       try {
-        me = await fetchJSON("/users/me/");
-      } catch {
-        // ignore, we'll still try user=me endpoints
-      }
+        const headers = {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
 
-      const candidates = [
-        "/events/mine/",
-        "/event-registrations/mine/",
-        "/registrations/mine/",
-        "/event-registrations/?user=me",
-        me?.id ? `/event-registrations/?user=${me.id}` : null,
-      ].filter(Boolean);
+        // Determine endpoint
+        // Owner/Admin -> /events/ (sees all)
+        // Staff -> /events/mine/ (sees registered, with similar filters)
+        // Note: Staff using /mine/ might not see events they created but didn't register for,
+        // but this aligns with previous behavior of preferring /mine/ endpoint.
+        const baseUrl = isOwner ? `${API_ROOT}/events/` : `${API_ROOT}/events/mine/`;
 
-      let raw = [];
-      for (const p of candidates) {
-        try {
-          const data = await fetchJSON(p);
-          const list = asList(data);
-          if (Array.isArray(list)) {
-            raw = list;
-            if (list.length > 0) break; // first non-empty wins (same behaviour as MyEventsPage)
-          }
-        } catch {
-          // try next candidate
+        const url = new URL(baseUrl);
+        url.searchParams.set("limit", String(PAGE_SIZE));
+        url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
+
+        if (q.trim()) {
+          url.searchParams.set("search", q.trim());
         }
-      }
 
-      // If these are registrations, pull out the event object
-      let list = [];
-      if (raw.length > 0 && raw[0] && raw[0].event) {
-        list = raw.map((r) => r.event).filter(Boolean);
-      } else {
-        list = raw;
-      }
+        const bucket = statusTabMap[tab];
+        if (bucket) {
+          url.searchParams.set("bucket", bucket); // upcoming | live | past
+        }
 
-      // de-duplicate by id/slug (same as MyEventsPage)
-      const seen = new Set();
-      const dedup = [];
-      for (const ev of list) {
-        const key = ev?.id ?? ev?.slug;
-        if (!key || seen.has(key)) continue;
-        seen.add(key);
-        dedup.push(ev);
-      }
-      return dedup;
-    };
+        // Ordering defaults
+        // Upcoming -> start_time ascending (soonest first)
+        // Past/Live/All -> start_time descending (newest/active first)
+        if (bucket === "upcoming") {
+          url.searchParams.set("ordering", "start_time");
+        } else {
+          url.searchParams.set("ordering", "-start_time");
+        }
 
-    const load = async () => {
-      setLoading(true);
-      try {
-        const arr = isOwner ? await loadOwnerEvents() : await loadStaffEvents();
+        const res = await fetch(url.toString(), { headers });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+
         if (!cancelled) {
-          setEvents(arr);
+          const results = Array.isArray(data?.results) ? data.results : [];
+          const count = typeof data?.count === "number" ? data.count : 0;
+          setEvents(results);
+          setTotalCount(count);
           setLoading(false);
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) {
+          console.error("Fetch failed", e);
           setEvents([]);
+          setTotalCount(0);
           setLoading(false);
         }
       }
     };
 
-    load();
+    fetchData();
+
     return () => {
       cancelled = true;
     };
-  }, [token, isOwner]);
+  }, [page, tab, q, isOwner, token, refreshKey]);
 
-
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    return events.filter((ev) => {
-      const searchHit =
-        !term ||
-        `${ev.title || ""} ${ev.category || ""} ${ev.location || ""}`
-          .toLowerCase()
-          .includes(term);
-
-      if (!searchHit) return false;
-
-      const status = computeStatus(ev);
-      if (tab === 1) return status === "upcoming";
-      if (tab === 2) return status === "live";
-      if (tab === 3) return status === "past";
-      return true; // All
-    });
-  }, [events, q, tab]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [q, tab]);
-
-  useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-    if (page > maxPage) setPage(maxPage);
-  }, [filtered.length, page]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, page]);
-
-  // Host flow (unchanged)
+  // Actions
   const onHost = async (ev) => {
-    const eventId = ev?.id ?? null;
-    if (!eventId) return;
-    setHostingId(eventId);
-
+    if (!ev?.id) return;
+    setHostingId(ev.id);
     try {
-      // Just open the Dyte meeting page as 'publisher'
-      const livePath = `/live/${ev.slug || eventId}?id=${eventId}&role=publisher`;
+      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=publisher`;
       window.open(livePath, "_blank");
     } catch (e) {
-      setErrMsg(
-        typeof e?.message === "string" && e.message
-          ? e.message
-          : "Unable to start live meeting."
-      );
+      setErrMsg(e?.message || "Unable to start live meeting.");
       setErrOpen(true);
     } finally {
       setHostingId(null);
@@ -1927,22 +1864,12 @@ function EventsPage() {
 
   const handleJoinLive = async (ev) => {
     if (!ev?.id) return;
-
     setJoiningId(ev.id);
     try {
-      // same pattern as MyEventsPage: /live/:slug?id=...&role=audience
       const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
-
-      navigate(livePath, {
-        state: { event: ev },
-        replace: false,
-      });
+      navigate(livePath, { state: { event: ev } });
     } catch (e) {
-      setErrMsg(
-        typeof e?.message === "string" && e.message.length
-          ? `Unable to join live: ${e.message}`
-          : "Unable to join live at the moment."
-      );
+      setErrMsg(e?.message || "Unable to join live.");
       setErrOpen(true);
     } finally {
       setJoiningId(null);
@@ -1956,46 +1883,28 @@ function EventsPage() {
 
   const handleEventUpdated = (updated) => {
     if (!updated) return;
-    setEvents((prev) =>
-      prev.map((e) => (e.id === updated.id ? { ...e, ...updated } : e))
-    );
+    // Optimistic update in list
+    setEvents((prev) => prev.map((e) => (e.id === updated.id ? { ...e, ...updated } : e)));
   };
 
-
-  // When a new event is created from the dialog, show it immediately at the top
-  const onCreated = (ev) => {
-    setEvents((prev) => [ev, ...prev]);
+  const onCreated = () => {
+    // Reset to first page and reload to see new item
+    setTab(0);
+    setPage(1);
+    setRefreshKey((k) => k + 1);
   };
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
-    <Container
-      maxWidth="lg"
-      disableGutters
-      className="pt-6 pb-6 sm:pt-1 sm:pb-8"
-    >
+    <Container maxWidth="lg" disableGutters className="pt-6 pb-6 sm:pt-1 sm:pb-8">
       {/* Header */}
-      <Box
-        className="mb-4"
-        sx={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: { xs: "flex-start", sm: "center" },
-          gap: 2,
-        }}
-      >
-        <Avatar sx={{ bgcolor: "#0ea5a4" }}>
-          {(user?.first_name || "A")[0].toUpperCase()}
-        </Avatar>
-
+      <Box className="mb-4" sx={{ display: "flex", flexWrap: "wrap", alignItems: { xs: "flex-start", sm: "center" }, gap: 2 }}>
+        <Avatar sx={{ bgcolor: "#0ea5a4" }}>{(user?.first_name || "A")[0].toUpperCase()}</Avatar>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h5" className="font-extrabold">
-            Events
-          </Typography>
-          <Typography className="text-slate-500">
-            Manage sessions you’ve created. Start hosting with one click.
-          </Typography>
+          <Typography variant="h5" className="font-extrabold">Events</Typography>
+          <Typography className="text-slate-500">Manage sessions you’ve created. Start hosting with one click.</Typography>
         </Box>
-
         {isOwnerUser() && (
           <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
             <Button
@@ -2004,18 +1913,15 @@ function EventsPage() {
               startIcon={<AddRoundedIcon />}
               variant="contained"
               className="rounded-xl"
-              sx={{
-                textTransform: "none",
-                backgroundColor: "#10b8a6",
-                "&:hover": { backgroundColor: "#0ea5a4" },
-              }}
+              sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
             >
               Create Event
             </Button>
           </Box>
         )}
       </Box>
-      {/* Tabs: All / Upcoming / Live / Past */}
+
+      {/* Tabs */}
       <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
         <Tabs
           value={tab}
@@ -2037,12 +1943,7 @@ function EventsPage() {
       </Paper>
 
       {/* Search */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        alignItems={{ xs: "stretch", sm: "center" }}
-        className="mb-5"
-      >
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} className="mb-5">
         <TextField
           size="small"
           placeholder="Search your events…"
@@ -2051,88 +1952,42 @@ function EventsPage() {
           InputProps={{ startAdornment: <SearchRoundedIcon className="mr-2 text-slate-400" /> }}
           sx={{ width: { xs: "100%", sm: 360 } }}
         />
-        <Box sx={{ flex: 1, display: { xs: "none", sm: "block" } }} />
       </Stack>
 
       {/* Grid */}
       {loading ? (
-        <>
-          <Box sx={{ flexGrow: 1 }}>
-            <Grid
-              container
-              spacing={{ xs: 2, md: 3 }}
-              columns={{ xs: 4, sm: 12, md: 12 }}
-            >
-              {Array.from({ length: PAGE_SIZE }).map((_, idx) => (
-                <Grid
-                  key={idx}
-                  size={{ xs: 4, sm: 4, md: 4 }}
-                >
-                  <Paper
-                    elevation={0}
-                    className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
-                  >
-                    {/* Image skeleton */}
-                    <Box
-                      sx={{
-                        position: "relative",
-                        width: "100%",
-                        paddingTop: "56.25%",
-                      }}
-                    >
-                      <Skeleton
-                        variant="rectangular"
-                        sx={{
-                          position: "absolute",
-                          inset: 0,
-                        }}
-                      />
+        <Box sx={{ flexGrow: 1 }}>
+          <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
+            {Array.from({ length: PAGE_SIZE }).map((_, idx) => (
+              <Grid key={idx} size={{ xs: 4, sm: 4, md: 4 }}>
+                <Paper elevation={0} className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden">
+                  <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
+                    <Skeleton variant="rectangular" sx={{ position: "absolute", inset: 0 }} />
+                  </Box>
+                  <Box className="p-4 flex flex-col gap-2 flex-1">
+                    <Box className="flex items-center justify-between gap-2">
+                      <Skeleton variant="rounded" width={72} height={24} />
+                      <Skeleton variant="text" width={60} height={18} />
                     </Box>
-
-                    {/* Content skeleton */}
-                    <Box className="p-4 flex flex-col gap-2 flex-1">
-                      {/* status/category */}
-                      <Box className="flex items-center justify-between gap-2">
-                        <Skeleton variant="rounded" width={72} height={24} />
-                        <Skeleton variant="text" width={60} height={18} />
-                      </Box>
-
-                      {/* title */}
-                      <Skeleton variant="text" width="80%" height={28} />
-
-                      {/* date/location */}
-                      <Skeleton variant="text" width="60%" height={20} />
-
-                      {/* button */}
-                      <Box className="mt-auto pt-1">
-                        <Skeleton variant="rounded" height={40} />
-                      </Box>
-                    </Box>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-          {/* ⚠️ No pagination while loading – we keep real pagination for actual data */}
-        </>
-      ) : filtered.length === 0 ? (
+                    <Skeleton variant="text" width="80%" height={28} />
+                    <Skeleton variant="text" width="60%" height={20} />
+                    <Box className="mt-auto pt-1"><Skeleton variant="rounded" height={40} /></Box>
+                  </Box>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      ) : events.length === 0 ? (
         <Paper elevation={0} className="rounded-2xl border border-slate-200">
           <Box className="p-8 text-center">
-            <Typography variant="h6" className="font-semibold text-slate-700">
-              No events found
-            </Typography>
-            <p className="text-slate-500 mt-1">
-              Try a different search{isOwner ? " or create a new event." : "."}
-            </p>
+            <Typography variant="h6" className="font-semibold text-slate-700">No events found</Typography>
+            <p className="text-slate-500 mt-1">Try a different search{isOwner ? " or create a new event." : "."}</p>
             {isOwner && (
               <Button
                 onClick={() => setCreateOpen(true)}
                 className="mt-4 rounded-xl"
-                sx={{
-                  textTransform: "none",
-                  backgroundColor: "#10b8a6",
-                  "&:hover": { backgroundColor: "#0ea5a4" },
-                }}
+                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 variant="contained"
               >
                 Create Event
@@ -2143,16 +1998,9 @@ function EventsPage() {
       ) : (
         <>
           <Box sx={{ flexGrow: 1 }}>
-            <Grid
-              container
-              spacing={{ xs: 2, md: 3 }}
-              columns={{ xs: 4, sm: 12, md: 12 }}   // ✅ same as MyEventsPage
-            >
-              {paged.map((ev) => (
-                <Grid
-                  key={ev.id || ev.slug}
-                  size={{ xs: 4, sm: 4, md: 4 }}     // ✅ 1 card on mobile, 3 on tablet/desktop
-                >
+            <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
+              {events.map((ev) => (
+                <Grid key={ev.id || ev.slug} size={{ xs: 4, sm: 4, md: 4 }}>
                   <AdminEventCard
                     ev={ev}
                     onHost={onHost}
@@ -2165,31 +2013,34 @@ function EventsPage() {
                 </Grid>
               ))}
             </Grid>
-
           </Box>
 
           {/* Pagination */}
           <Box className="mt-4 flex items-center justify-center">
-            <Pagination count={pageCount} page={page} onChange={(_, p) => setPage(p)} color="primary" shape="rounded" />
+            <Pagination
+              count={pageCount}
+              page={page}
+              onChange={(_, p) => setPage(p)}
+              color="primary"
+              shape="rounded"
+            />
           </Box>
         </>
       )}
 
-      {/* Error Snackbar */}
+      {/* Dialogs */}
       <Snackbar open={errOpen} autoHideDuration={6000} onClose={() => setErrOpen(false)}>
         <Alert onClose={() => setErrOpen(false)} severity="error" variant="filled" sx={{ width: "100%" }}>
           {errMsg || "Unable to host right now."}
         </Alert>
       </Snackbar>
 
-      {/* Create Event Dialog */}
       <CreateEventDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={onCreated}
       />
 
-      {/* Edit Event Dialog (owner only) */}
       <EditEventDialog
         open={editOpen}
         onClose={() => setEditOpen(false)}
