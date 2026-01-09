@@ -205,6 +205,83 @@ function mapFeedPollToPost(row) {
     };
 }
 
+// --- Voters Dialog Component (Adapted from AdminPostsPage) ---
+function PollVotersDialog({ open, onClose, option, postId }) {
+    const [loading, setLoading] = React.useState(false);
+    const [rows, setRows] = React.useState([]);
+    const [anonymous, setAnonymous] = React.useState(false);
+
+    React.useEffect(() => {
+        if (!open || !option?.id) return;
+        setLoading(true);
+        setRows([]);
+        setAnonymous(false);
+
+        (async () => {
+            try {
+                const token = getToken();
+                const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+                const res = await fetch(`${API_ROOT}/activity/feed/polls/options/${option.id}/votes/`, { headers });
+                if (res.ok) {
+                    const data = await res.json();
+                    setAnonymous(!!data.anonymous);
+                    const raw = Array.isArray(data.results) ? data.results : [];
+                    setRows(raw.map(r => {
+                        const u = r.user || r.voter || r;
+                        return {
+                            id: u.id || u.user_id,
+                            name: u.name || u.full_name || u.username || `User #${u.id}`,
+                            avatar: toAbs(u.avatar || u.photo || u.profile_image || ""),
+                            votedAt: r.voted_at || r.created_at
+                        };
+                    }));
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [open, option?.id]);
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ pb: 1 }}>
+                <Typography variant="h6">Voters</Typography>
+                <Typography variant="subtitle2" color="text.secondary" noWrap>
+                    For: {option?.label || option?.text || "Option"}
+                </Typography>
+            </DialogTitle>
+            <DialogContent dividers>
+                {loading ? (
+                    <Stack alignItems="center" py={3}><CircularProgress size={24} /></Stack>
+                ) : anonymous ? (
+                    <Alert severity="info" variant="outlined">Anonymous poll — voter list hidden.</Alert>
+                ) : rows.length === 0 ? (
+                    <Typography color="text.secondary" align="center" py={2}>No voters found (or hidden).</Typography>
+                ) : (
+                    <List dense disablePadding>
+                        {rows.map((u, i) => (
+                            <ListItem key={u.id || i}>
+                                <ListItemAvatar>
+                                    <Avatar src={u.avatar}>{(u.name || "?")[0]}</Avatar>
+                                </ListItemAvatar>
+                                <ListItemText
+                                    primary={u.name}
+                                    secondary={u.votedAt ? new Date(u.votedAt).toLocaleDateString() : null}
+                                />
+                            </ListItem>
+                        ))}
+                    </List>
+                )}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Close</Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
 function PollResultsBlock({ post }) {
     const options = Array.isArray(post?.options) ? post.options : [];
     const userVotes = Array.isArray(post?.user_votes) ? post.user_votes : [];
@@ -213,6 +290,14 @@ function PollResultsBlock({ post }) {
         0
     );
     const question = post?.question || post?.text || "";
+
+    const [votersOpen, setVotersOpen] = React.useState(false);
+    const [scannedOption, setScannedOption] = React.useState(null);
+
+    const handleOpenVoters = (opt) => {
+        setScannedOption(opt);
+        setVotersOpen(true);
+    };
 
     return (
         <Box>
@@ -232,6 +317,7 @@ function PollResultsBlock({ post }) {
                         const votes = typeof opt?.votes === "number" ? opt.votes : (opt?.vote_count ?? 0);
                         const percent = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
                         const chosen = optionId != null && userVotes.includes(optionId);
+                        const hasVotes = votes > 0;
 
                         return (
                             <Paper
@@ -260,9 +346,22 @@ function PollResultsBlock({ post }) {
                                                 />
                                             )}
                                         </Stack>
-                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                            {percent}%
-                                        </Typography>
+
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                {percent}%
+                                            </Typography>
+                                            {hasVotes && (
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    sx={{ py: 0, px: 1, minWidth: "auto", height: 24, fontSize: "0.7rem", textTransform: "none" }}
+                                                    onClick={() => handleOpenVoters(opt)}
+                                                >
+                                                    Voters
+                                                </Button>
+                                            )}
+                                        </Stack>
                                     </Stack>
                                     <LinearProgress variant="determinate" value={percent} sx={{ height: 8, borderRadius: 1 }} />
                                 </Stack>
@@ -275,6 +374,13 @@ function PollResultsBlock({ post }) {
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
                 Total votes: {totalVotes} vote{totalVotes === 1 ? "" : "s"}{post?.is_closed ? " | Poll closed" : ""}
             </Typography>
+
+            <PollVotersDialog
+                open={votersOpen}
+                onClose={() => setVotersOpen(false)}
+                option={scannedOption}
+                postId={post.id}
+            />
         </Box>
     );
 }
@@ -3010,16 +3116,14 @@ export default function GroupManagePage() {
     const [postsError, setPostsError] = React.useState("");
 
     // Compose state
-    const [postType, setPostType] = React.useState("text"); // text | image | link | poll | event
+    const [postType, setPostType] = React.useState("text"); // text | image | link | poll
     const [postText, setPostText] = React.useState("");
     const [postImageFile, setPostImageFile] = React.useState(null);
     const [postLinkUrl, setPostLinkUrl] = React.useState("");
     const [pollQuestion, setPollQuestion] = React.useState("");
     const [pollOptions, setPollOptions] = React.useState(["", ""]); // at least two
-    const [eventTitle, setEventTitle] = React.useState("");
-    const [eventStart, setEventStart] = React.useState("");
-    const [eventEnd, setEventEnd] = React.useState("");
     const [creating, setCreating] = React.useState(false);
+    const [saving, setSaving] = React.useState(false);
     const [notifTab, setNotifTab] = React.useState(0);
 
 
@@ -3238,7 +3342,10 @@ export default function GroupManagePage() {
 
             let postsArr = Array.isArray(postsJson) ? postsJson : [];
             // drop polls if backend mixes them here; we'll pull them from Activity Feed
-            postsArr = postsArr.filter(p => (p?.type || "").toLowerCase() !== "poll");
+            postsArr = postsArr.filter(p => {
+                const t = (p?.type || "").toLowerCase();
+                return t !== "poll" && t !== "event";
+            });
 
             // (B) polls come from Activity Feed (scope=group)
             const currentGid = Number(group?.id) || null;
@@ -3319,6 +3426,7 @@ export default function GroupManagePage() {
 
     // CREATE post
     const createPost = async () => {
+        if (creating) return;
         try {
             setCreating(true);
 
@@ -3364,23 +3472,6 @@ export default function GroupManagePage() {
                     const j = await res.json().catch(() => ({}));
                     throw new Error(j?.detail || `HTTP ${res.status}`);
                 }
-            } else if (postType === "event") {
-                const payload = {
-                    type: "event",
-                    title: eventTitle.trim(),
-                    starts_at: eventStart ? new Date(eventStart).toISOString() : null,
-                    ends_at: eventEnd ? new Date(eventEnd).toISOString() : null,
-                    text: postText || undefined,
-                };
-                const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/posts/`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                    body: JSON.stringify(payload),
-                });
-                if (!res.ok) {
-                    const j = await res.json().catch(() => ({}));
-                    throw new Error(j?.detail || `HTTP ${res.status}`);
-                }
             } else {
                 // text
                 const payload = { type: "text", text: postText };
@@ -3398,7 +3489,6 @@ export default function GroupManagePage() {
             // Reset minimal fields
             setPostText(""); setPostImageFile(null); setPostLinkUrl("");
             setPollQuestion(""); setPollOptions(["", ""]);
-            setEventTitle(""); setEventStart(""); setEventEnd("");
 
             await fetchPosts(); // refresh
         } catch (e) {
@@ -4135,7 +4225,7 @@ export default function GroupManagePage() {
                                                                 <MenuItem value="image">Image</MenuItem>
                                                                 <MenuItem value="link">Link</MenuItem>
                                                                 <MenuItem value="poll">Poll</MenuItem>
-                                                                <MenuItem value="event">Event</MenuItem>
+
                                                             </TextField>
 
                                                             <Button
@@ -4239,40 +4329,7 @@ export default function GroupManagePage() {
                                                             </>
                                                         )}
 
-                                                        {postType === "event" && (
-                                                            <>
-                                                                <TextField
-                                                                    label="Event title"
-                                                                    fullWidth
-                                                                    value={eventTitle}
-                                                                    onChange={(e) => setEventTitle(e.target.value)}
-                                                                />
-                                                                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                                                                    <TextField
-                                                                        label="Starts at"
-                                                                        type="datetime-local"
-                                                                        value={eventStart}
-                                                                        onChange={(e) => setEventStart(e.target.value)}
-                                                                        InputLabelProps={{ shrink: true }}
-                                                                        fullWidth
-                                                                    />
-                                                                    <TextField
-                                                                        label="Ends at"
-                                                                        type="datetime-local"
-                                                                        value={eventEnd}
-                                                                        onChange={(e) => setEventEnd(e.target.value)}
-                                                                        InputLabelProps={{ shrink: true }}
-                                                                        fullWidth
-                                                                    />
-                                                                </Stack>
-                                                                <TextField
-                                                                    label="Description (optional)"
-                                                                    multiline minRows={2} fullWidth
-                                                                    value={postText}
-                                                                    onChange={(e) => setPostText(e.target.value)}
-                                                                />
-                                                            </>
-                                                        )}
+
                                                     </Stack>
                                                 </Paper>
                                             )}
@@ -4335,17 +4392,7 @@ export default function GroupManagePage() {
                                                                 </>
                                                             ) : p.type === "poll" ? (
                                                                 <PollResultsBlock post={p} />
-                                                            ) : p.type === "event" ? (
-                                                                <>
-                                                                    <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
-                                                                        <EventNoteRoundedIcon fontSize="small" />
-                                                                        <Typography className="font-medium">{p.title}</Typography>
-                                                                    </Stack>
-                                                                    <Typography variant="caption" className="text-slate-600">
-                                                                        {p.starts_at ? new Date(p.starts_at).toLocaleString() : ""} — {p.ends_at ? new Date(p.ends_at).toLocaleString() : ""}
-                                                                    </Typography>
-                                                                    {p.text && <ClampedText text={p.text} sx={{ mt: 1 }} />}
-                                                                </>
+
                                                             ) : (
                                                                 <ClampedText text={p.text || ""} />
                                                             )}
@@ -5105,7 +5152,8 @@ export default function GroupManagePage() {
                                 <Button onClick={() => setEditPostOpen(false)} sx={{ textTransform: "none" }}>Cancel</Button>
                                 <Button
                                     onClick={async () => {
-                                        if (!activePost) return;
+                                        if (saving || !activePost) return;
+                                        setSaving(true);
                                         const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 
                                         try {
@@ -5205,12 +5253,15 @@ export default function GroupManagePage() {
                                             await fetchPosts();
                                         } catch (e) {
                                             alert(String(e?.message || e));
+                                        } finally {
+                                            setSaving(false);
                                         }
                                     }}
                                     variant="contained"
+                                    disabled={saving}
                                     sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                                 >
-                                    Save
+                                    {saving ? "Saving…" : "Save"}
                                 </Button>
 
                             </DialogActions>
