@@ -26,6 +26,7 @@ import {
   Tab,
   Tabs,
   Skeleton,
+  LinearProgress,
 } from "@mui/material";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
@@ -283,8 +284,60 @@ function ExpandablePostText({ text, variant = "body1", color, maxLines = 5 }) {
 
 
 // ------- card renderer -------
+// ------- card renderer -------
 function PostCard({ item }) {
   const kind = (item.type || "text").toLowerCase();
+
+  // --- Voters Dialog State ---
+  const [votersOpen, setVotersOpen] = React.useState(false);
+  const [votersLoading, setVotersLoading] = React.useState(false);
+  const [votersRows, setVotersRows] = React.useState([]);
+  const [votersAnonymous, setVotersAnonymous] = React.useState(false);
+  const [votersOption, setVotersOption] = React.useState("");
+  const [votersCount, setVotersCount] = React.useState(0);
+
+  const handleOpenVoters = async (opt) => {
+    if (!item.id || !opt?.id) return;
+    setVotersOpen(true);
+    setVotersLoading(true);
+    setVotersOption(opt.text || opt.label || "Option");
+    setVotersRows([]);
+    setVotersAnonymous(false);
+    setVotersCount(0);
+
+    try {
+      const url = toApiUrl(`activity/feed/polls/options/${opt.id}/votes/`);
+      const res = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+      if (res.ok) {
+        const data = await res.json();
+        // data: { count: number, results: [ { user, voted_at }, ... ], anonymous: boolean }
+        setVotersCount(data.count || 0);
+        setVotersAnonymous(!!data.anonymous);
+
+        const rawResults = Array.isArray(data.results) ? data.results : [];
+        const rows = rawResults.map(r => {
+          const u = r.user || r.voter || r;
+          return {
+            id: u.id || u.user_id,
+            name: nameFrom(u),
+            avatar: avatarFrom(u),
+            votedAt: r.voted_at || r.created_at
+          };
+        });
+        setVotersRows(rows);
+      }
+    } catch (e) {
+      console.error("Failed to fetch voters", e);
+    } finally {
+      setVotersLoading(false);
+    }
+  };
+
+  const handleCloseVoters = () => {
+    setVotersOpen(false);
+    setVotersRows([]);
+  };
+
   return (
     <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER }}>
       <CardContent>
@@ -399,16 +452,57 @@ function PostCard({ item }) {
                 {item.question}
               </Typography>
             )}
-            <Stack spacing={0.75}>
-              {(item.options || []).map((opt, i) => (
-                <Paper
-                  key={i}
-                  variant="outlined"
-                  sx={{ p: 1, borderRadius: 2, borderColor: BORDER }}
-                >
-                  {typeof opt === "string" ? opt : (opt?.text ?? opt?.label ?? "")}
-                </Paper>
-              ))}
+            <Stack spacing={1.5}>
+              {(function () {
+                const options = item.options || [];
+                // Safer total calculation
+                const totalVotes = options.reduce((acc, o) => acc + (Number(o?.vote_count) || 0), 0);
+
+                return options.map((opt, i) => {
+                  const label = typeof opt === "string" ? opt : (opt?.text ?? opt?.label ?? "");
+                  const votes = typeof opt === "object" ? (Number(opt.vote_count) || 0) : 0;
+                  const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+                  const hasVotes = votes > 0;
+                  // If fetch already confirmed anonymous for this post, we might know. 
+                  // But usually we just check fetched data. 
+                  // For the button, we show it if there are votes.
+
+                  return (
+                    <Box key={i}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={0.5}>
+                        <Typography variant="body2">{label}</Typography>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                            {votes} votes · {pct}%
+                          </Typography>
+                          {/* "Voters" button: only if this option has votes */}
+                          {hasVotes && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              sx={{ py: 0, px: 1, minWidth: "auto", height: 24, fontSize: "0.7rem", textTransform: "none" }}
+                              onClick={() => handleOpenVoters(opt)}
+                            >
+                              Voters
+                            </Button>
+                          )}
+                        </Stack>
+                      </Stack>
+                      <LinearProgress
+                        variant="determinate"
+                        value={pct}
+                        sx={{ height: 6, borderRadius: 3, bgcolor: "#f0f2f5", "& .MuiLinearProgress-bar": { borderRadius: 3 } }}
+                      />
+                    </Box>
+                  );
+                });
+              })()}
+
+              <Box sx={{ mt: 0.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Total votes: {(item.options || []).reduce((acc, o) => acc + (Number(o?.vote_count) || 0), 0)}
+                </Typography>
+              </Box>
             </Stack>
           </Box>
         )}
@@ -429,6 +523,48 @@ function PostCard({ item }) {
           label={(item.type || "Text").toUpperCase()}
         />
       </CardActions>
+
+      {/* Voters Dialog */}
+      <Dialog open={votersOpen} onClose={handleCloseVoters} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h6" component="div">Voters</Typography>
+          <Typography variant="subtitle2" color="text.secondary" noWrap>
+            For: {votersOption}
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          {votersLoading ? (
+            <Stack alignItems="center" py={3}><CircularProgress size={24} /></Stack>
+          ) : votersAnonymous ? (
+            <Alert severity="info" variant="outlined">
+              Anonymous poll — voter list hidden.
+            </Alert>
+          ) : votersRows.length === 0 ? (
+            <Typography color="text.secondary" align="center" py={2}>
+              No voters found (or hidden).
+            </Typography>
+          ) : (
+            <List dense disablePadding>
+              {votersRows.map((u, idx) => (
+                <ListItem key={u.id || idx}>
+                  <ListItemAvatar>
+                    <Avatar src={u.avatar} alt={u.name} sx={{ width: 32, height: 32 }}>
+                      {(u.name || "?").slice(0, 1)}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={u.name}
+                    secondary={u.votedAt ? new Date(u.votedAt).toLocaleDateString() : null}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseVoters}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 }
