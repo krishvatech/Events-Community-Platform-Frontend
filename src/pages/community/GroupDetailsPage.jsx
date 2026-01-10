@@ -24,6 +24,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 import CommunitySidebar from "../../components/CommunitySideBar.jsx";
 
@@ -208,7 +209,15 @@ function mapFeedItem(item) {
 
   if (m.is_hidden || m.is_deleted) return null;
 
-  const t = (m.type || m.post_type || item.type || "text").toLowerCase();
+  let t = (m.type || m.post_type || item.type || "text").toLowerCase();
+
+  // ⬇️ ROBUST POLL DETECTION
+  const rawOptions = m.options ?? item.options ?? m.poll_options ?? item.poll_options ?? [];
+  const hasOptions = Array.isArray(rawOptions) && rawOptions.length > 0;
+
+  if (t === 'poll' || m.poll_id || item.poll_id || hasOptions || m.question) {
+    t = 'poll';
+  }
 
   // IMAGE
   if (t === "image" || m.image || m.image_url || m.imageUrl) {
@@ -221,9 +230,9 @@ function mapFeedItem(item) {
   }
 
   // POLL
-  if (t === "poll" || Array.isArray(m.options) || m.poll_id) {
-    const question = m.question ?? item.question ?? item.title ?? "";
-    const options = (m.options || []).map((o, i) => ({
+  if (t === "poll") {
+    const question = m.question ?? item.question ?? item.title ?? m.text ?? "Poll";
+    const options = (rawOptions).map((o, i) => ({
       id: o.id ?? o.option_id ?? i + 1,
       label: o.text ?? o.label ?? String(o),
       votes: o.vote_count ?? o.votes ?? 0,
@@ -234,8 +243,8 @@ function mapFeedItem(item) {
       text: question,
       poll_id: pickId(m.poll_id, item.poll_id, item.target_object_id, item.id),
       options,
-      user_votes: m.user_votes || [],
-      is_closed: Boolean(m.is_closed),
+      user_votes: m.user_votes ?? item.user_votes ?? [],
+      is_closed: Boolean(m.is_closed ?? item.is_closed),
     };
   }
 
@@ -429,6 +438,16 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
   const [text, setText] = React.useState("");
   const [replyTo, setReplyTo] = React.useState(null);
   const [visibleCount, setVisibleCount] = React.useState(initialCount);
+  const [me, setMe] = React.useState(null);
+
+  // New State for Delete Confirm Dialog
+  const [confirmDelId, setConfirmDelId] = React.useState(null);
+  const [delBusy, setDelBusy] = React.useState(false);
+
+  // Load current user for permissions
+  React.useEffect(() => {
+    getMeCached().then(setMe);
+  }, []);
 
   const load = React.useCallback(async () => {
     if (!postId && !target?.id) return;
@@ -450,7 +469,7 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
       const flatRaw = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
       const rootsOnly = flatRaw.map(normalizeCommentRow);
 
-      // ⬇️ FIX: Fetch replies for these roots! (Live Feed Style)
+      // Fetch replies
       const replyUrls = rootsOnly.map((root) =>
         toApiUrl(`engagements/comments/?parent=${root.id}&page_size=100`)
       );
@@ -531,35 +550,88 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
     } catch { }
   }
 
-  const CommentItem = ({ c, depth = 0 }) => (
-    <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #e2e8f0" : "none", ml: depth ? 1.5 : 0, mt: 1 }}>
-      <Stack direction="row" spacing={1}>
-        <Avatar src={c.author.avatar} sx={{ width: 24, height: 24 }}>{(c.author.name || "U")[0]}</Avatar>
-        <Box sx={{ flex: 1 }}>
-          <Box sx={{ bgcolor: "#f1f5f9", p: 1, borderRadius: 2 }}>
-            <Typography variant="subtitle2">{c.author.name}</Typography>
-            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere" }}>
-              {c.text}
-            </Typography>
+  // UPDATED: Triggers Dialog
+  function requestDelete(cid) {
+    setConfirmDelId(cid);
+  }
+
+  // UPDATED: Performs actual delete
+  async function performDelete() {
+    if (!confirmDelId) return;
+    setDelBusy(true);
+    // Optimistic remove
+    const cid = confirmDelId;
+    try {
+      await fetch(toApiUrl(`engagements/comments/${cid}/`), {
+        method: "DELETE", headers: authHeaders(),
+      });
+      // Remove from UI
+      setItems(curr => curr.filter(x => x.id !== cid));
+      setConfirmDelId(null);
+      await load();
+    } catch {
+      await load(); // Rollback
+    } finally {
+      setDelBusy(false);
+    }
+  }
+
+  const CommentItem = ({ c, depth = 0 }) => {
+    const isMe = me && c.author?.id && String(c.author.id) === String(me.id);
+    return (
+      <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #e2e8f0" : "none", ml: depth ? 1.5 : 0, mt: 1 }}>
+        <Stack direction="row" spacing={1}>
+          <Avatar src={c.author.avatar} sx={{ width: 24, height: 24 }}>{(c.author.name || "U")[0]}</Avatar>
+          <Box sx={{ flex: 1 }}>
+            <Box sx={{ bgcolor: "#f1f5f9", p: 1, borderRadius: 2 }}>
+              <Typography variant="subtitle2">{c.author.name}</Typography>
+              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                {c.text}
+              </Typography>
+            </Box>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+              {/* Like */}
+              <Button
+                size="small"
+                startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+                onClick={() => toggleCommentLike(c.id)}
+                sx={{ color: c.user_has_liked ? "teal" : "inherit", minWidth: 0 }}
+              >
+                {c.like_count || 0}
+              </Button>
+              {/* Reply */}
+              <Button
+                size="small"
+                startIcon={<ReplyRoundedIcon fontSize="small" />}
+                onClick={() => setReplyTo(c)}
+                sx={{ color: "primary.main", minWidth: 0 }}
+              >
+                REPLY
+              </Button>
+              {/* Delete */}
+              {isMe && (
+                <Button
+                  size="small"
+                  startIcon={<DeleteOutlineRoundedIcon fontSize="small" />}
+                  onClick={() => requestDelete(c.id)}
+                  sx={{ color: "error.main", minWidth: 0 }}
+                >
+                  DELETE
+                </Button>
+              )}
+            </Stack>
           </Box>
-          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
-            <Button size="small" startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />} onClick={() => toggleCommentLike(c.id)} sx={{ color: c.user_has_liked ? "teal" : "inherit" }}>
-              {c.like_count || 0}
-            </Button>
-            <Button size="small" startIcon={<ReplyRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>Reply</Button>
-          </Stack>
-        </Box>
-      </Stack>
-      {/* ⬇️ FIX: Ensure children are rendered recursively */}
-      {c.children && c.children.length > 0 && (
-        <Box sx={{ mt: 1 }}>
-          {c.children
-            .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
-            .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
-        </Box>
-      )}
-    </Box>
-  );
+        </Stack>
+        {c.children && c.children.length > 0 && (
+          <Box sx={{ mt: 1 }}>
+            {c.children
+              .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+              .map(child => <CommentItem key={child.id} c={child} depth={depth + 1} />)}
+          </Box>
+        )}
+      </Box>
+    );
+  };
 
   const content = (
     <Box>
@@ -588,6 +660,20 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
           <Button size="small" onClick={() => setVisibleCount(v => v + initialCount)}>Load more comments</Button>
         )}
       </Box>
+
+      {/* NEW: Custom Delete Dialog */}
+      <Dialog open={!!confirmDelId} onClose={() => { if (!delBusy) setConfirmDelId(null); }}>
+        <DialogTitle>Delete Comment?</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this comment? This action cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDelId(null)} disabled={delBusy}>Cancel</Button>
+          <Button onClick={performDelete} color="error" variant="contained" disabled={delBusy}>
+            {delBusy ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 
@@ -1109,37 +1195,57 @@ function PostsTab({ groupId }) {
   const fetchPosts = React.useCallback(async () => {
     setLoading(true);
     try {
+      // 1. Fetch Posts
       const res = await fetch(toApiUrl(`groups/${groupId}/posts/`), { headers: { Accept: "application/json", ...authHeaders() } });
-      if (res.ok) {
-        const data = await res.json();
-        const raw = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-        const mapped = raw.map(mapFeedItem).filter(Boolean);
+      const data = res.ok ? await res.json() : [];
+      const postsArr = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
 
-        // ⬇️ FIX: Force attach current Group ID to all posts so ShareDialog works
-        const numericGroupId = Number(groupId);
+      // 2. Fetch Polls from Activity Feed
+      const pollsUrl = toApiUrl(`activity/feed/?scope=group&group_id=${groupId}`);
+      const resPolls = await fetch(pollsUrl, { headers: { Accept: "application/json", ...authHeaders() } });
+      const dataPolls = resPolls.ok ? await resPolls.json() : [];
+      const pollsFeed = Array.isArray(dataPolls?.results) ? dataPolls.results : (Array.isArray(dataPolls) ? dataPolls : []);
 
-        const ids = mapped.map(p => p.id).filter(id => Number.isInteger(id));
-        if (ids.length) {
-          const metrics = await fetchBatchMetrics(ids);
-          const hydrated = mapped.map(p => {
-            const m = metrics[p.id];
-            const base = m ? {
-              ...p,
-              user_has_liked: !!(m.user_has_liked ?? m.me_liked),
-              my_reaction: m.my_reaction || (m.user_has_liked ? "like" : null),
-              metrics: { ...p.metrics, ...m }
-            } : p;
+      // 3. Merge & Dedupe (prefer feed item if collision)
+      const allRaw = [...postsArr, ...pollsFeed];
+      const mapped = allRaw.map(mapFeedItem).filter(Boolean);
 
-            // Attach group_id explicitly
-            return { ...base, group_id: numericGroupId };
-          });
-          setPosts(hydrated);
-        } else {
-          // Attach group_id explicitly even if no metrics
-          setPosts(mapped.map(p => ({ ...p, group_id: numericGroupId })));
+      const seenIds = new Set();
+      const uniqueMapped = [];
+      for (const p of mapped) {
+        if (!seenIds.has(p.id)) {
+          seenIds.add(p.id);
+          uniqueMapped.push(p);
         }
       }
-    } catch { }
+
+      // Sort by created_at desc
+      uniqueMapped.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      // 4. Hydrate with metrics
+      const numericGroupId = Number(groupId);
+      const ids = uniqueMapped.map(p => p.id).filter(id => Number.isInteger(id));
+
+      if (ids.length) {
+        const metrics = await fetchBatchMetrics(ids);
+        const hydrated = uniqueMapped.map(p => {
+          const m = metrics[p.id];
+          const base = m ? {
+            ...p,
+            user_has_liked: !!(m.user_has_liked ?? m.me_liked),
+            my_reaction: m.my_reaction || (m.user_has_liked ? "like" : null),
+            metrics: { ...p.metrics, ...m }
+          } : p;
+          // Attach group_id explicitly
+          return { ...base, group_id: numericGroupId };
+        });
+        setPosts(hydrated);
+      } else {
+        setPosts(uniqueMapped.map(p => ({ ...p, group_id: numericGroupId })));
+      }
+    } catch (e) {
+      console.error("Failed to load group posts:", e);
+    }
     setLoading(false);
   }, [groupId]);
 
