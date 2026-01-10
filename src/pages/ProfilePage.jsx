@@ -2891,7 +2891,7 @@ export default function ProfilePage() {
                             <Box>
                               <Button
                                 variant="contained"
-                                
+
                                 size="small"
                                 sx={{ mt: 1.5 }}
                                 onClick={openAddExperience}
@@ -2956,7 +2956,7 @@ export default function ProfilePage() {
                               </ListItem>
                             ))}
                           </List>
-                        ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'grey.200', mx: 'auto' }}><HistoryEduRoundedIcon /></Avatar><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an education to your profile</Typography><Box><Button variant="contained"  size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
+                        ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'grey.200', mx: 'auto' }}><HistoryEduRoundedIcon /></Avatar><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an education to your profile</Typography><Box><Button variant="contained" size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
                       </SectionCard>
                       <SectionCard
                         sx={{ mt: 2 }}
@@ -3042,7 +3042,7 @@ export default function ProfilePage() {
                             <Box>
                               <Button
                                 variant="contained"
-                                
+
                                 size="small"
                                 sx={{ mt: 1.5 }}
                                 onClick={openAddCert}
@@ -3053,7 +3053,98 @@ export default function ProfilePage() {
                           </Box>
                         )}
                       </SectionCard>
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Memberships"
+                        action={
+                          <Tooltip title="Add">
+                            <IconButton size="small" onClick={openAddMember}>
+                              <AddRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        {memberList.length ? (
+                          <List dense disablePadding>
+                            {memberList.map((m) => (
+                              <ListItem
+                                key={m.id}
+                                disableGutters
+                                secondaryAction={
+                                  <Box sx={{ display: "flex" }}>
+                                    {m.membership_url ? (
+                                      <Tooltip title="Open link">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => window.open(m.membership_url, "_blank")}
+                                        >
+                                          <AttachFileIcon fontSize="small" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    ) : null}
+                                    <Tooltip title="Delete">
+                                      <IconButton size="small" onClick={() => setMemberDeleteId(m.id)}>
+                                        <DeleteOutlineIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Edit">
+                                      <IconButton size="small" onClick={() => openEditMember(m)}>
+                                        <EditOutlinedIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Box>
+                                }
+                              >
+                                <ListItemText
+                                  primary={
+                                    <Typography variant="body2" fontWeight={600}>
+                                      {m.organization_name || "Organization"}
+                                    </Typography>
+                                  }
+                                  secondary={
+                                    <Typography variant="caption" color="text.secondary">
+                                      {m.role_type ? `${m.role_type}` : "Member"}
+                                      {m.start_date || m.end_date
+                                        ? ` - ${rangeLinkedIn(m.start_date, m.end_date, !!m.ongoing)}`
+                                        : ""}
+                                    </Typography>
+                                  }
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Box sx={{ textAlign: "center", py: 4 }}>
+                            <Avatar
+                              sx={{
+                                width: 64,
+                                height: 64,
+                                bgcolor: "grey.200",
+                                color: "grey.600",
+                                mx: "auto",
+                              }}
+                            >
+                              <BusinessRoundedIcon />
+                            </Avatar>
 
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                              Add your memberships.
+                            </Typography>
+
+                            <Box>
+                              <Button
+                                variant="contained"
+
+                                size="small"
+                                sx={{ mt: 1.5 }}
+                                onClick={openAddMember}
+                              >
+                                Create
+                              </Button>
+                            </Box>
+                          </Box>
+                        )}
+                      </SectionCard>
 
                     </Grid>
 
@@ -3308,7 +3399,7 @@ export default function ProfilePage() {
                             <Box>
                               <Button
                                 variant="contained"
-                                
+
                                 size="small"
                                 sx={{ mt: 1.5 }}
                                 onClick={openAddTraining}
@@ -3320,98 +3411,7 @@ export default function ProfilePage() {
                         )}
                       </SectionCard>
 
-                      <SectionCard
-                        sx={{ mt: 2 }}
-                        title="Memberships"
-                        action={
-                          <Tooltip title="Add">
-                            <IconButton size="small" onClick={openAddMember}>
-                              <AddRoundedIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        }
-                      >
-                        {memberList.length ? (
-                          <List dense disablePadding>
-                            {memberList.map((m) => (
-                              <ListItem
-                                key={m.id}
-                                disableGutters
-                                secondaryAction={
-                                  <Box sx={{ display: "flex" }}>
-                                    {m.membership_url ? (
-                                      <Tooltip title="Open link">
-                                        <IconButton
-                                          size="small"
-                                          onClick={() => window.open(m.membership_url, "_blank")}
-                                        >
-                                          <AttachFileIcon fontSize="small" />
-                                        </IconButton>
-                                      </Tooltip>
-                                    ) : null}
-                                    <Tooltip title="Delete">
-                                      <IconButton size="small" onClick={() => setMemberDeleteId(m.id)}>
-                                        <DeleteOutlineIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Edit">
-                                      <IconButton size="small" onClick={() => openEditMember(m)}>
-                                        <EditOutlinedIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </Box>
-                                }
-                              >
-                                <ListItemText
-                                  primary={
-                                    <Typography variant="body2" fontWeight={600}>
-                                      {m.organization_name || "Organization"}
-                                    </Typography>
-                                  }
-                                  secondary={
-                                    <Typography variant="caption" color="text.secondary">
-                                      {m.role_type ? `${m.role_type}` : "Member"}
-                                      {m.start_date || m.end_date
-                                        ? ` - ${rangeLinkedIn(m.start_date, m.end_date, !!m.ongoing)}`
-                                        : ""}
-                                    </Typography>
-                                  }
-                                />
-                              </ListItem>
-                            ))}
-                          </List>
-                        ) : (
-                          <Box sx={{ textAlign: "center", py: 4 }}>
-                            <Avatar
-                              sx={{
-                                width: 64,
-                                height: 64,
-                                bgcolor: "grey.200",
-                                color: "grey.600",
-                                mx: "auto",
-                              }}
-                            >
-                              <BusinessRoundedIcon />
-                            </Avatar>
 
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                              Add your memberships.
-                            </Typography>
-
-                            <Box>
-                              <Button
-                                variant="contained"
-                                
-                                size="small"
-                                sx={{ mt: 1.5 }}
-                                onClick={openAddMember}
-                              >
-                                Create
-                              </Button>
-                            </Box>
-                          </Box>
-                        )}
-                      </SectionCard>
                       {/* --- LANGUAGES SECTION --- */}
                       <SectionCard
                         sx={{ mt: 2 }}
@@ -3501,7 +3501,7 @@ export default function ProfilePage() {
                             <Box>
                               <Button
                                 variant="contained"
-                                
+
                                 size="small"
                                 sx={{ mt: 1.5 }}
                                 onClick={openAddLanguage}
