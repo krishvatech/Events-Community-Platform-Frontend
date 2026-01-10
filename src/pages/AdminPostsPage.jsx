@@ -1257,16 +1257,38 @@ function CommentsDialog({
     } catch { }
   }
 
-  async function deleteComment(c) {
-    if (!canDelete(c)) return;
-    const ok = window.confirm("Delete this comment?");
-    if (!ok) return;
+  const [confirmDelId, setConfirmDelId] = React.useState(null);
+  const [delBusy, setDelBusy] = React.useState(false);
+
+  function deleteComment(c) {
+    if (canDelete(c)) setConfirmDelId(c.id);
+  }
+
+  async function performDelete() {
+    if (!confirmDelId) return;
+    setDelBusy(true);
     try {
-      const r = await fetch(toApiUrl(`engagements/comments/${c.id}/`), { method: "DELETE", headers: { ...authHeaders() } });
+      const r = await fetch(toApiUrl(`engagements/comments/${confirmDelId}/`), { method: "DELETE", headers: { ...authHeaders() } });
       if (!r.ok) throw new Error();
       await load();
     } catch { alert("Could not delete comment."); }
+    finally { setDelBusy(false); setConfirmDelId(null); }
   }
+
+  const deleteConfirmationDialog = (
+    <Dialog open={!!confirmDelId} onClose={() => !delBusy && setConfirmDelId(null)} maxWidth="xs" fullWidth>
+      <DialogTitle>Delete comment?</DialogTitle>
+      <DialogContent>
+        <DialogContentText>Are you sure you want to delete this comment?</DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setConfirmDelId(null)} disabled={delBusy}>Cancel</Button>
+        <Button onClick={performDelete} color="error" variant="contained" disabled={delBusy}>
+          {delBusy ? <CircularProgress size={18} /> : "Delete"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 
   async function toggleCommentLike(commentId) {
     // optimistic
@@ -1389,40 +1411,44 @@ function CommentsDialog({
             </Stack>
           )}
         </Box>
+        {deleteConfirmationDialog}
       </Box>
     );
   }
 
   // MODAL
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Comments</DialogTitle>
-      <DialogContent dividers>
-        {loading ? (
-          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
-        ) : roots.length === 0 ? (
-          <Typography color="text.secondary">No comments yet.</Typography>
-        ) : (
-          <Stack spacing={2}>{roots.map(c => <CommentItem key={c.id} c={c} />)}</Stack>
-        )}
-      </DialogContent>
-      <Divider />
-      <Box sx={{ px: 2, py: 1.5 }}>
-        {replyTo && (
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-            <Typography variant="caption" color="text.secondary">
-              Replying to {replyTo.author?.name || `#${replyTo.author_id}`}
-            </Typography>
-            <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+    <>
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+        <DialogTitle>Comments</DialogTitle>
+        <DialogContent dividers>
+          {loading ? (
+            <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+          ) : roots.length === 0 ? (
+            <Typography color="text.secondary">No comments yet.</Typography>
+          ) : (
+            <Stack spacing={2}>{roots.map(c => <CommentItem key={c.id} c={c} />)}</Stack>
+          )}
+        </DialogContent>
+        <Divider />
+        <Box sx={{ px: 2, py: 1.5 }}>
+          {replyTo && (
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Replying to {replyTo.author?.name || `#${replyTo.author_id}`}
+              </Typography>
+              <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+            </Stack>
+          )}
+          <Stack direction="row" spacing={1}>
+            <TextField size="small" fullWidth placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+              value={text} onChange={e => setText(e.target.value)} />
+            <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
           </Stack>
-        )}
-        <Stack direction="row" spacing={1}>
-          <TextField size="small" fullWidth placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
-            value={text} onChange={e => setText(e.target.value)} />
-          <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
-        </Stack>
-      </Box>
-    </Dialog>
+        </Box>
+      </Dialog>
+      {deleteConfirmationDialog}
+    </>
   );
 }
 
@@ -1486,7 +1512,7 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
     // connection shapes (two participants)
     if (!u) u = pickOtherUser(row);
 
-    // some APIs wrap it again (e.g., { friend: { user: {...} } })
+    // some APIs wrap it again (e.g., {friend: {user: {...} } })
     if (u && u.user && (u.user.id || u.user.user_id)) u = u.user;
 
     // last-ditch: some rows store user object under 'counterparty' or 'other_user'

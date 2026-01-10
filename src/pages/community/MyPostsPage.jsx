@@ -11,9 +11,11 @@ import {
   CardContent,
   CardHeader,
   Checkbox,
+  CircularProgress, // Added for delBusy spinner if not already there, checking imports... yes it is not there, need to add it or use LinearProgress? LiveFeed used CircularProgress. let's add it to imports just in case or use LinearProgress since it is imported on line 22
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Divider,
   Grid,
@@ -187,11 +189,11 @@ function ClampedText({ text, maxLines = 5 }) {
           ...(expanded
             ? {}
             : {
-                display: "-webkit-box",
-                WebkitLineClamp: maxLines,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }),
+              display: "-webkit-box",
+              WebkitLineClamp: maxLines,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }),
         }}
       >
         {text}
@@ -729,12 +731,16 @@ function PostCard({
 // 4. Dialogs
 // -----------------------------------------------------------------------------
 
-function CommentsDialog({ open, postId, onClose }) { /* ... (unchanged) ... */
+function CommentsDialog({ open, postId, onClose }) {
   const [loading, setLoading] = React.useState(false);
   const [comments, setComments] = React.useState([]);
   const [text, setText] = React.useState("");
   const [replyingTo, setReplyingTo] = React.useState(null);
   const [meId, setMeId] = React.useState(null);
+
+  // Delete confirmation state
+  const [confirmDelId, setConfirmDelId] = React.useState(null);
+  const [delBusy, setDelBusy] = React.useState(false);
 
   async function getMeId() {
     try { const r = await fetch(`${API_ROOT}/users/me/`, { headers: authHeader() }); const d = await r.json(); return d?.id; } catch { return null; }
@@ -742,12 +748,103 @@ function CommentsDialog({ open, postId, onClose }) { /* ... (unchanged) ... */
   function normalizeUser(u) { if (!u) return { id: null, name: "User", avatar: "" }; const id = u.id || u.user_id; const name = u.name || u.full_name || u.username || "User"; const avatar = toAbsolute(u.user_image || u.avatar || u.user_image_url); return { id, name, avatar }; }
   function normalizeComment(c, currentUserId) { const author = normalizeUser(c.author || c.user); const replies = (c.replies || []).map(r => normalizeComment(r, currentUserId)); return { id: c.id, created: c.created_at, body: c.text || c.body || "", author, likedByMe: !!(c.liked || c.liked_by_me), likeCount: Number(c.like_count || c.likes || 0), canDelete: !!((author.id && currentUserId && author.id === currentUserId)), replies }; }
   async function fetchComments(pid, uid) { try { const r = await fetch(`${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${pid}`, { headers: authHeader() }); if (!r.ok) return []; const j = await r.json(); const rootsRaw = j.results || []; const roots = rootsRaw.map(r => ({ ...normalizeComment(r, uid), replies: [] })); await Promise.all(roots.map(async (root) => { try { const rr = await fetch(`${API_ROOT}/engagements/comments/?parent=${root.id}`, { headers: authHeader() }); const jj = await rr.json(); root.replies = (jj.results || []).map(x => normalizeComment(x, uid)); } catch { } })); return roots; } catch { return []; } }
+
   React.useEffect(() => { let mounted = true; (async () => { if (!open || !postId) return; setLoading(true); const uid = await getMeId(); if (mounted) setMeId(uid); const list = await fetchComments(postId, uid); if (mounted) setComments(list); setLoading(false); })(); return () => { mounted = false; }; }, [open, postId]);
+
   const handleSubmit = async () => { if (!text.trim()) return; const payload = replyingTo ? { text, parent: replyingTo } : { text, target_type: "activity_feed.feeditem", target_id: postId }; try { await fetch(`${API_ROOT}/engagements/comments/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(payload) }); setText(""); setReplyingTo(null); const list = await fetchComments(postId, meId); setComments(list); } catch { alert("Failed to post"); } };
   const onLike = async (cid) => { try { await fetch(`${API_ROOT}/engagements/reactions/toggle/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ target_type: "comment", target_id: cid, reaction: "like" }) }); const list = await fetchComments(postId, meId); setComments(list); } catch { } };
-  const onDelete = async (cid) => { if (!confirm("Delete this comment?")) return; try { await fetch(`${API_ROOT}/engagements/comments/${cid}/`, { method: "DELETE", headers: authHeader() }); const list = await fetchComments(postId, meId); setComments(list); } catch { } };
-  const CommentItem = ({ c, depth = 0 }) => (<Box sx={{ pl: depth * 4, py: 1 }}> <Stack direction="row" spacing={1}> <Avatar src={c.author.avatar} sx={{ width: 32, height: 32 }} /> <Box sx={{ flex: 1 }}> <Box sx={{ bgcolor: "action.hover", p: 1.5, borderRadius: 2 }}> <Typography variant="subtitle2" fontWeight={700}>{c.author.name}</Typography> <Typography variant="body2">{c.body}</Typography> </Box> <Stack direction="row" spacing={2} sx={{ mt: 0.5, ml: 1 }}> <Typography variant="caption" color="text.secondary">{timeAgo(c.created)}</Typography> <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => onLike(c.id)}> {c.likedByMe ? "Unlike" : "Like"} ({c.likeCount}) </Typography> <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => setReplyingTo(c.id)}> Reply </Typography> {c.canDelete && <Typography variant="caption" color="error" sx={{ cursor: "pointer" }} onClick={() => onDelete(c.id)}>Delete</Typography>} </Stack> </Box> </Stack> {c.replies.map(r => <CommentItem key={r.id} c={r} depth={depth + 1} />)} </Box>);
-  return (<Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"> <DialogTitle>Comments</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : comments.length ? comments.map(c => <CommentItem key={c.id} c={c} />) : <Typography color="text.secondary">No comments yet.</Typography>} </DialogContent> <DialogActions sx={{ p: 2, display: "block" }}> {replyingTo && <Typography variant="caption" display="block" sx={{ mb: 1 }}>Replying... <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => setReplyingTo(null)}>Cancel</span></Typography>} <Stack direction="row" spacing={1}> <TextField fullWidth size="small" placeholder="Write a comment..." value={text} onChange={e => setText(e.target.value)} /> <IconButton color="primary" onClick={handleSubmit}><SendRoundedIcon /></IconButton> </Stack> </DialogActions> </Dialog>);
+
+  // Trigger custom dialog
+  const onDelete = async (cid) => {
+    setConfirmDelId(cid);
+  };
+
+  // Perform actual delete
+  const performDelete = async () => {
+    if (!confirmDelId) return;
+    setDelBusy(true);
+    try {
+      await fetch(`${API_ROOT}/engagements/comments/${confirmDelId}/`, { method: "DELETE", headers: authHeader() });
+      setConfirmDelId(null);
+      const list = await fetchComments(postId, meId);
+      setComments(list);
+    } catch {
+      alert("Could not delete comment.");
+    } finally {
+      setDelBusy(false);
+    }
+  };
+
+  const CommentItem = ({ c, depth = 0 }) => (
+    <Box sx={{ pl: depth * 4, py: 1 }}>
+      <Stack direction="row" spacing={1}>
+        <Avatar src={c.author.avatar} sx={{ width: 32, height: 32 }} />
+        <Box sx={{ flex: 1 }}>
+          <Box sx={{ bgcolor: "action.hover", p: 1.5, borderRadius: 2 }}>
+            <Typography variant="subtitle2" fontWeight={700}>{c.author.name}</Typography>
+            <Typography variant="body2">{c.body}</Typography>
+          </Box>
+          <Stack direction="row" spacing={2} sx={{ mt: 0.5, ml: 1 }}>
+            <Typography variant="caption" color="text.secondary">{timeAgo(c.created)}</Typography>
+            <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => onLike(c.id)}> {c.likedByMe ? "Unlike" : "Like"} ({c.likeCount}) </Typography>
+            <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => setReplyingTo(c.id)}> Reply </Typography>
+            {c.canDelete && <Typography variant="caption" color="error" sx={{ cursor: "pointer" }} onClick={() => onDelete(c.id)}>Delete</Typography>}
+          </Stack>
+        </Box>
+      </Stack>
+      {c.replies.map(r => <CommentItem key={r.id} c={r} depth={depth + 1} />)}
+    </Box>
+  );
+
+  const deleteConfirmationDialog = (
+    <Dialog
+      open={!!confirmDelId}
+      onClose={() => !delBusy && setConfirmDelId(null)}
+      maxWidth="xs"
+      fullWidth
+    >
+      <DialogTitle>Delete Comment?</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          Are you sure you want to delete this comment?
+          This action cannot be undone.
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setConfirmDelId(null)} disabled={delBusy}>
+          Cancel
+        </Button>
+        <Button
+          onClick={performDelete}
+          color="error"
+          variant="contained"
+          disabled={delBusy}
+        // reusing LinearProgress in button is weird, stick into text or just disable
+        >
+          {delBusy ? "Deleting..." : "Delete"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
+  return (
+    <>
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+        <DialogTitle>Comments</DialogTitle>
+        <DialogContent dividers>
+          {loading ? <LinearProgress /> : comments.length ? comments.map(c => <CommentItem key={c.id} c={c} />) : <Typography color="text.secondary">No comments yet.</Typography>}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, display: "block" }}>
+          {replyingTo && <Typography variant="caption" display="block" sx={{ mb: 1 }}>Replying... <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => setReplyingTo(null)}>Cancel</span></Typography>}
+          <Stack direction="row" spacing={1}>
+            <TextField fullWidth size="small" placeholder="Write a comment..." value={text} onChange={e => setText(e.target.value)} />
+            <IconButton color="primary" onClick={handleSubmit}><SendRoundedIcon /></IconButton>
+          </Stack>
+        </DialogActions>
+      </Dialog>
+      {deleteConfirmationDialog}
+    </>
+  );
 }
 
 function LikesDialog({ open, postId, onClose }) {
@@ -1101,33 +1198,35 @@ function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) .
   const [pollOptions, setPollOptions] = React.useState(post?.type === "poll" ? post.options?.map((o) => (typeof o === "string" ? o : o.text || o.label || "")) || ["", ""] : ["", ""]);
   React.useEffect(() => { if (!open || !post) return; const t = post.type || "text"; setTextContent(post.content || ""); setImageCaption(post.content || ""); setLinkUrl(post.link || ""); if (t === "poll") { setPollOptions(post.options?.map((o) => (typeof o === "string" ? o : o.text || o.label || "")) || ["", ""]); } else { setPollOptions(["", ""]); } setImageFile(null); }, [open, post]);
   const handleSave = async () => { if (!post) return; setSaving(true); let options = { method: "PATCH", headers: { ...authHeader() } }; let body; let url; try { if (type === "poll") { const pollId = post.raw_metadata?.poll_id; if (!pollId) throw new Error("Missing poll_id"); url = `${API_ROOT}/activity/feed/polls/${pollId}/`; const validOptions = pollOptions.map((o) => o.trim()).filter(Boolean); if (!textContent.trim() || validOptions.length < 2) { alert("Poll must have a question and at least 2 options."); setSaving(false); return; } options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ question: textContent, options: validOptions }); } else { const communityId = post.raw_metadata?.community_id || post.community_id; if (!communityId) throw new Error("Missing community id"); url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/edit/`; if (type === "text") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ content: textContent }); } else if (type === "link") { options.headers["Content-Type"] = "application/json"; body = JSON.stringify({ url: linkUrl, description: textContent }); } else if (type === "image") { const fd = new FormData(); fd.append("caption", imageCaption || ""); if (imageFile) fd.append("image", imageFile); body = fd; } } options.body = body; const res = await fetch(url, options); if (!res.ok) throw new Error("Update failed"); const data = await res.json(); let updated = { ...post }; if (type === "poll") { updated.content = data.question; updated.options = data.options; } else { const meta = data.metadata || post.raw_metadata || {}; if (type === "text") updated.content = meta.text || textContent; if (type === "link") { updated.content = meta.description; updated.link = meta.url; } if (type === "image") updated.content = meta.caption; } onSaved(updated); onClose(); } catch (e) { alert("Failed to update post: " + e.message); } finally { setSaving(false); } };
-  const renderBody = () => { if (type === "poll") return <><TextField fullWidth multiline minRows={3} label="Question" value={textContent} onChange={(e) => setTextContent(e.target.value)} sx={{ mb: 2 }} /><Stack spacing={1}><Typography variant="subtitle2">Options</Typography>{pollOptions.map((opt, i) => (<Stack key={i} direction="row" spacing={1}><TextField fullWidth size="small" value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} /><IconButton size="small" onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}><RemoveRoundedIcon fontSize="small" /></IconButton></Stack>))}<Button startIcon={<AddRoundedIcon />} onClick={() => setPollOptions((o) => [...o, ""])} size="small" sx={{ alignSelf: "flex-start" }}>Add Option</Button></Stack></>; if (type === "link") return <>
-        <TextField fullWidth label="Link URL" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} sx={{ mb: 2 }} />
-        <TextField fullWidth multiline minRows={3} label="Description" value={textContent} onChange={e => setTextContent(e.target.value)} />
-        {textContent && (
-          <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
-            <Typography variant="caption" color="text.secondary">Preview</Typography>
-            <ClampedText text={textContent} maxLines={5} />
-          </Box>
-        )}
-      </>; if (type === "image") return <Stack spacing={2}>
-        <TextField fullWidth multiline minRows={3} label="Caption" value={imageCaption} onChange={e => setImageCaption(e.target.value)} />
-        {imageCaption && (
-          <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
-            <Typography variant="caption" color="text.secondary">Preview</Typography>
-            <ClampedText text={imageCaption} maxLines={5} />
-          </Box>
-        )}
-        <Button variant="outlined" component="label">Change image<input hidden type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} /></Button>
-      </Stack>; return <>
-        <TextField fullWidth multiline minRows={3} label="Content" value={textContent} onChange={e => setTextContent(e.target.value)} />
-        {textContent && (
-          <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
-            <Typography variant="caption" color="text.secondary">Preview</Typography>
-            <ClampedText text={textContent} maxLines={5} />
-          </Box>
-        )}
-      </>; };
+  const renderBody = () => {
+    if (type === "poll") return <><TextField fullWidth multiline minRows={3} label="Question" value={textContent} onChange={(e) => setTextContent(e.target.value)} sx={{ mb: 2 }} /><Stack spacing={1}><Typography variant="subtitle2">Options</Typography>{pollOptions.map((opt, i) => (<Stack key={i} direction="row" spacing={1}><TextField fullWidth size="small" value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} /><IconButton size="small" onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}><RemoveRoundedIcon fontSize="small" /></IconButton></Stack>))}<Button startIcon={<AddRoundedIcon />} onClick={() => setPollOptions((o) => [...o, ""])} size="small" sx={{ alignSelf: "flex-start" }}>Add Option</Button></Stack></>; if (type === "link") return <>
+      <TextField fullWidth label="Link URL" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} sx={{ mb: 2 }} />
+      <TextField fullWidth multiline minRows={3} label="Description" value={textContent} onChange={e => setTextContent(e.target.value)} />
+      {textContent && (
+        <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+          <Typography variant="caption" color="text.secondary">Preview</Typography>
+          <ClampedText text={textContent} maxLines={5} />
+        </Box>
+      )}
+    </>; if (type === "image") return <Stack spacing={2}>
+      <TextField fullWidth multiline minRows={3} label="Caption" value={imageCaption} onChange={e => setImageCaption(e.target.value)} />
+      {imageCaption && (
+        <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+          <Typography variant="caption" color="text.secondary">Preview</Typography>
+          <ClampedText text={imageCaption} maxLines={5} />
+        </Box>
+      )}
+      <Button variant="outlined" component="label">Change image<input hidden type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} /></Button>
+    </Stack>; return <>
+      <TextField fullWidth multiline minRows={3} label="Content" value={textContent} onChange={e => setTextContent(e.target.value)} />
+      {textContent && (
+        <Box sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1.25 }}>
+          <Typography variant="caption" color="text.secondary">Preview</Typography>
+          <ClampedText text={textContent} maxLines={5} />
+        </Box>
+      )}
+    </>;
+  };
   return <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"><DialogTitle>Edit Post</DialogTitle><DialogContent dividers>{renderBody()}</DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></DialogActions></Dialog>;
 }
 
@@ -1195,8 +1294,8 @@ export default function MyPostsPage() {
   const [sharesId, setSharesId] = React.useState(null);
   const [shareActionPostId, setShareActionPostId] = React.useState(null);
 
-  const [visibleCount, setVisibleCount] = React.useState(4);  
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false); 
+  const [visibleCount, setVisibleCount] = React.useState(4);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const observerTarget = React.useRef(null);                      // intersection trigger at bottom
   const [showScrollTop, setShowScrollTop] = React.useState(false);
 

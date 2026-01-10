@@ -18,7 +18,7 @@ import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
+  Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText,
   CircularProgress, List, ListItem, ListItemAvatar, ListItemText, Divider
 } from "@mui/material";
 import { Checkbox, ListItemButton } from "@mui/material";
@@ -1270,6 +1270,9 @@ function CommentsDialog({
 
   // NEW: how many root comments to show inline
   const [visibleCount, setVisibleCount] = React.useState(initialCount);
+  // DELETE CONFIRMATION State
+  const [confirmDelId, setConfirmDelId] = React.useState(null);
+  const [delBusy, setDelBusy] = React.useState(false);
 
   // who am I (for delete-own)
   React.useEffect(() => {
@@ -1377,29 +1380,59 @@ function CommentsDialog({
 
   async function deleteComment(c) {
     if (!canDelete(c)) return;
+    setConfirmDelId(c.id);
+  }
 
-    const ok = window.confirm("Delete this comment?");
-    if (!ok) return;
-
-    // optimistic UI: drop this comment and all its replies
-    setItems(prev => {
-      const ids = collectDescendants(prev, c.id);
-      return prev.filter(row => !ids.has(row.id));
-    });
-
+  async function performDelete() {
+    if (!confirmDelId) return;
+    setDelBusy(true);
     try {
-      const r = await fetch(toApiUrl(`engagements/comments/${c.id}/`), {
+      const r = await fetch(toApiUrl(`engagements/comments/${confirmDelId}/`), {
         method: "DELETE",
         headers: { ...authHeaders() },
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      // success: nothing else to do
+      // success: nothing else to do, optimistic update was NOT done here so we load
+      await load();
+      setConfirmDelId(null);
     } catch (e) {
-      // fallback: reload if server refused
       await load();
       alert("Could not delete comment. Please try again.");
+    } finally {
+      setDelBusy(false);
     }
   }
+
+  const deleteConfirmationDialog = (
+    <Dialog
+      open={!!confirmDelId}
+      onClose={() => !delBusy && setConfirmDelId(null)}
+      maxWidth="xs"
+      fullWidth
+    >
+      <DialogTitle>Delete Comment?</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          Are you sure you want to delete this comment?
+          This action cannot be undone.
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setConfirmDelId(null)} disabled={delBusy}>
+          Cancel
+        </Button>
+        <Button
+          onClick={performDelete}
+          color="error"
+          variant="contained"
+          disabled={delBusy}
+          startIcon={delBusy ? <CircularProgress size={16} color="inherit" /> : null}
+        >
+          Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 
   React.useEffect(() => { load(); }, [load]);
 
@@ -1681,6 +1714,7 @@ function CommentsDialog({
             </Stack>
           )}
         </Box>
+        {deleteConfirmationDialog}
       </Box>
     );
   }
@@ -1688,39 +1722,42 @@ function CommentsDialog({
 
   // --------- ORIGINAL MODAL (left intact for compatibility) ----------
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Comments</DialogTitle>
-      <DialogContent dividers>
-        {loading ? (
-          <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
-        ) : roots.length === 0 ? (
-          <Typography color="text.secondary">No comments yet.</Typography>
-        ) : (
-          <Stack spacing={2}>
-            {roots.map(c => <CommentItem key={c.id} c={c} />)}
+    <>
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+        <DialogTitle>Comments</DialogTitle>
+        <DialogContent dividers>
+          {loading ? (
+            <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+          ) : roots.length === 0 ? (
+            <Typography color="text.secondary">No comments yet.</Typography>
+          ) : (
+            <Stack spacing={2}>
+              {roots.map(c => <CommentItem key={c.id} c={c} />)}
+            </Stack>
+          )}
+        </DialogContent>
+        <Divider />
+        <Box sx={{ px: 2, py: 1.5 }}>
+          {replyTo && (
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
+              <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+            </Stack>
+          )}
+          <Stack direction="row" spacing={1}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+            <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
           </Stack>
-        )}
-      </DialogContent>
-      <Divider />
-      <Box sx={{ px: 2, py: 1.5 }}>
-        {replyTo && (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-            <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
-            <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
-          </Stack>
-        )}
-        <Stack direction="row" spacing={1}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
-        </Stack>
-      </Box>
-    </Dialog>
+        </Box>
+      </Dialog>
+      {deleteConfirmationDialog}
+    </>
   );
 }
 

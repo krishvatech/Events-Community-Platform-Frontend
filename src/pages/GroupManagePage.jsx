@@ -1,7 +1,7 @@
 // src/pages/GroupManagePage.jsx
 import React from "react";
 import {
-    Alert, Avatar, AvatarGroup, Box, Button, Chip, Container, Dialog, DialogActions, DialogContent,
+    Alert, Avatar, AvatarGroup, Box, Button, Chip, Container, Dialog, DialogActions, DialogContent, DialogContentText,
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
     TextField, Typography, Switch, FormControlLabel, CircularProgress,
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup, Badge,
@@ -1488,6 +1488,10 @@ function GroupCommentsDialog({
     const [text, setText] = React.useState("");
     const [replyTo, setReplyTo] = React.useState(null);
     const [visibleCount, setVisibleCount] = React.useState(initialCount);
+    // DELETE CONFIRMATION State
+    const [confirmDelId, setConfirmDelId] = React.useState(null);
+    const [delBusy, setDelBusy] = React.useState(false);
+
     // add just once inside GroupCommentsDialog
     const authHeader = () => (getToken() ? { Authorization: `Bearer ${getToken()}` } : {});
 
@@ -1659,18 +1663,62 @@ function GroupCommentsDialog({
 
     async function deleteComment(c) {
         if (!c?.id) return;
-        const token = getToken();
-        const ok = window.confirm("Delete this comment?");
-        if (!ok) return;
+        // Open custom dialog instead of window.confirm
+        setConfirmDelId(c.id);
+    }
 
+    async function performDelete() {
+        if (!confirmDelId) return;
+        setDelBusy(true);
+        const token = getToken();
         try {
-            const r = await fetch(`${API_ROOT}/engagements/comments/${c.id}/`, {
+            const r = await fetch(`${API_ROOT}/engagements/comments/${confirmDelId}/`, {
                 method: "DELETE",
                 headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             });
-            if (r.ok) await load();
-        } catch { /* ignore */ }
+            if (r.ok) {
+                await load();
+                setConfirmDelId(null);
+            } else {
+                throw new Error("Failed to delete");
+            }
+        } catch {
+            alert("Could not delete comment.");
+        } finally {
+            setDelBusy(false);
+        }
     }
+
+    const deleteConfirmationDialog = (
+        <Dialog
+            open={!!confirmDelId}
+            onClose={() => !delBusy && setConfirmDelId(null)}
+            maxWidth="xs"
+            fullWidth
+        >
+            <DialogTitle>Delete Comment?</DialogTitle>
+            <DialogContent>
+                <DialogContentText>
+                    Are you sure you want to delete this comment?
+                    This action cannot be undone.
+                </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setConfirmDelId(null)} disabled={delBusy}>
+                    Cancel
+                </Button>
+                <Button
+                    onClick={performDelete}
+                    color="error"
+                    variant="contained"
+                    disabled={delBusy}
+                    startIcon={delBusy ? <CircularProgress size={16} color="inherit" /> : null}
+                >
+                    Delete
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
 
 
     const CommentItem = ({ c, depth = 0 }) => (
@@ -1778,45 +1826,49 @@ function GroupCommentsDialog({
                         </Stack>
                     )}
                 </Box>
+                {deleteConfirmationDialog}
             </Box>
         );
     }
 
     // -------- ORIGINAL MODAL (kept intact) --------
     return (
-        <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="md">
-            <DialogTitle>Comments</DialogTitle>
-            <DialogContent dividers>
-                {loading ? (
-                    <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
-                ) : roots.length === 0 ? (
-                    <Typography color="text.secondary">No comments yet.</Typography>
-                ) : (
-                    <Stack spacing={2}>{roots.map((c) => <CommentItem key={c.id} c={c} />)}</Stack>
-                )}
-            </DialogContent>
-            <Divider />
-            <Box sx={{ px: 2, py: 1.5 }}>
-                {replyTo && (
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                        <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
-                        <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+        <>
+            <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="md">
+                <DialogTitle>Comments</DialogTitle>
+                <DialogContent dividers>
+                    {loading ? (
+                        <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+                    ) : roots.length === 0 ? (
+                        <Typography color="text.secondary">No comments yet.</Typography>
+                    ) : (
+                        <Stack spacing={2}>{roots.map((c) => <CommentItem key={c.id} c={c} />)}</Stack>
+                    )}
+                </DialogContent>
+                <Divider />
+                <Box sx={{ px: 2, py: 1.5 }}>
+                    {replyTo && (
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                            <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
+                            <Button size="small" onClick={() => setReplyTo(null)}>Cancel</Button>
+                        </Stack>
+                    )}
+                    <Stack direction="row" spacing={1}>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                        />
+                        <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>
+                            Post
+                        </Button>
                     </Stack>
-                )}
-                <Stack direction="row" spacing={1}>
-                    <TextField
-                        size="small"
-                        fullWidth
-                        placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                    />
-                    <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>
-                        Post
-                    </Button>
-                </Stack>
-            </Box>
-        </Dialog>
+                </Box>
+            </Dialog>
+            {deleteConfirmationDialog}
+        </>
     );
 }
 
