@@ -35,6 +35,7 @@ import {
   Typography,
   Popover,
   Skeleton,
+  Slide,
 } from "@mui/material";
 import {
   AddRounded as AddRoundedIcon,
@@ -137,7 +138,7 @@ function mapFeedItemRowToUiPost(row) {
   if (type === "text") return { ...base, content: m.text || "" };
   if (type === "link") return { ...base, content: m.description || m.title || "", link: m.url || "" };
   if (type === "image") return { ...base, content: m.caption || "", images: m.image_url ? [m.image_url] : [] };
-  if (type === "poll") return { ...base, content: m.question || "", options: Array.isArray(m.options) ? m.options : [] };
+  if (type === "poll") return { ...base, content: m.question || "", options: Array.isArray(m.options) ? m.options : [], user_votes: m.user_votes || [] };
 
   return { ...base, content: m.text || "" };
 }
@@ -334,9 +335,58 @@ function PostCard({
   const initial = (name[0] || "U").toUpperCase();
   const photo = post.actor_avatar || "";
 
-  const [likers, setLikers] = React.useState([]);
+  const likersInitial = [];
+  const [likers, setLikers] = React.useState(likersInitial);
   const likeCount = Number(post.metrics?.likes || 0);
   const shareCount = Number(post.metrics?.shares || 0);
+
+  // voters dialog state
+  const [votersOpen, setVotersOpen] = React.useState(false);
+  const [votersLoading, setVotersLoading] = React.useState(false);
+  const [votersRows, setVotersRows] = React.useState([]);
+  const [votersAnonymous, setVotersAnonymous] = React.useState(false);
+  const [votersOption, setVotersOption] = React.useState("");
+
+  const handleOpenVoters = async (opt) => {
+    if (!post.id || !opt?.id) return;
+    setVotersOpen(true);
+    setVotersLoading(true);
+    setVotersOption(opt.text || opt.label || "Option");
+    setVotersRows([]);
+    setVotersAnonymous(false);
+
+    try {
+      const url = `${API_ROOT}/activity/feed/polls/options/${opt.id}/votes/`;
+      const res = await fetch(url, { headers: { Accept: "application/json", ...authHeader() } });
+      if (res.ok) {
+        const data = await res.json();
+        setVotersAnonymous(!!data.anonymous);
+        const rawResults = Array.isArray(data.results) ? data.results : [];
+        const rows = rawResults.map(r => {
+          const u = r.user || r.voter || r;
+          const uId = u.id || u.user_id;
+          const uName = u.name || u.full_name || u.username || `User #${uId}`;
+          const uAvatar = toAbsolute(u.avatar || u.user_image || u.user_image_url);
+          return {
+            id: uId,
+            name: uName,
+            avatar: uAvatar,
+            votedAt: r.voted_at || r.created_at
+          };
+        });
+        setVotersRows(rows);
+      }
+    } catch (e) {
+      console.error("Failed to fetch voters", e);
+    } finally {
+      setVotersLoading(false);
+    }
+  };
+
+  const handleCloseVoters = () => {
+    setVotersOpen(false);
+    setVotersRows([]);
+  };
 
   // NEW: my reaction info for UI
   const myReactionId =
@@ -454,6 +504,8 @@ function PostCard({
       )
       : 0;
 
+  const userHasVoted = post.user_votes && post.user_votes.length > 0;
+
   return (
     <Card variant="outlined" sx={{ borderRadius: 3, mb: 2 }}>
       <CardHeader
@@ -530,31 +582,50 @@ function PostCard({
                   ? Math.round((votes / totalVotes) * 100)
                   : 0;
               const oid = opt.id || opt.option_id;
+              const hasVotes = votes > 0;
               return (
                 <Box
                   key={i}
-                  sx={{ mb: 1.5, cursor: oid ? "pointer" : "default" }}
-                  onClick={() => oid && onVote(post.id, oid)}
+                  sx={{ mb: 1.5 }}
                 >
                   <Stack
                     direction="row"
                     justifyContent="space-between"
                     sx={{ mb: 0.5 }}
                   >
-                    <Typography variant="body2">
-                      {label}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      fontWeight={600}
+                    <Box
+                      onClick={() => !userHasVoted && oid && onVote(post.id, oid)}
+                      sx={{ cursor: (!userHasVoted && oid) ? "pointer" : "default", flex: 1 }}
                     >
-                      {pct}%
-                    </Typography>
+                      <Typography variant="body2">
+                        {label}
+                      </Typography>
+                    </Box>
+
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Typography
+                        variant="body2"
+                        fontWeight={600}
+                      >
+                        {pct}%
+                      </Typography>
+                      {hasVotes && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          sx={{ py: 0, px: 1, minWidth: "auto", height: 24, fontSize: "0.7rem", textTransform: "none" }}
+                          onClick={(e) => { e.stopPropagation(); handleOpenVoters(opt); }}
+                        >
+                          Voters
+                        </Button>
+                      )}
+                    </Stack>
                   </Stack>
                   <LinearProgress
                     variant="determinate"
                     value={pct}
-                    sx={{ height: 10, borderRadius: 5 }}
+                    sx={{ height: 10, borderRadius: 5, cursor: (!userHasVoted && oid) ? "pointer" : "default" }}
+                    onClick={() => !userHasVoted && oid && onVote(post.id, oid)}
                   />
                   <Typography
                     variant="caption"
@@ -722,6 +793,48 @@ function PostCard({
           </Box>
         </Popover>
       </CardActions>
+
+      {/* Voters Dialog */}
+      <Dialog open={votersOpen} onClose={handleCloseVoters} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h6" component="div">Voters</Typography>
+          <Typography variant="subtitle2" color="text.secondary" noWrap>
+            For: {votersOption}
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          {votersLoading ? (
+            <Stack alignItems="center" py={3}><CircularProgress size={24} /></Stack>
+          ) : votersAnonymous ? (
+            <Alert severity="info" variant="outlined">
+              Anonymous poll — voter list hidden.
+            </Alert>
+          ) : votersRows.length === 0 ? (
+            <Typography color="text.secondary" align="center" py={2}>
+              No voters found (or hidden).
+            </Typography>
+          ) : (
+            <List dense disablePadding>
+              {votersRows.map((u, idx) => (
+                <ListItem key={u.id || idx}>
+                  <ListItemAvatar>
+                    <Avatar src={u.avatar} alt={u.name} sx={{ width: 32, height: 32 }}>
+                      {(u.name || "?").slice(0, 1)}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={u.name}
+                    secondary={u.votedAt ? new Date(u.votedAt).toLocaleDateString() : null}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseVoters}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 }
@@ -731,7 +844,12 @@ function PostCard({
 // 4. Dialogs
 // -----------------------------------------------------------------------------
 
-function CommentsDialog({ open, postId, onClose }) {
+// Transition for dialogs
+const Transition = React.forwardRef(function Transition(props, ref) {
+  return <Slide direction="up" ref={ref} {...props} />;
+});
+
+function CommentsDialog({ open, postId, onClose, isPostOwner }) {
   const [loading, setLoading] = React.useState(false);
   const [comments, setComments] = React.useState([]);
   const [text, setText] = React.useState("");
@@ -746,7 +864,7 @@ function CommentsDialog({ open, postId, onClose }) {
     try { const r = await fetch(`${API_ROOT}/users/me/`, { headers: authHeader() }); const d = await r.json(); return d?.id; } catch { return null; }
   }
   function normalizeUser(u) { if (!u) return { id: null, name: "User", avatar: "" }; const id = u.id || u.user_id; const name = u.name || u.full_name || u.username || "User"; const avatar = toAbsolute(u.user_image || u.avatar || u.user_image_url); return { id, name, avatar }; }
-  function normalizeComment(c, currentUserId) { const author = normalizeUser(c.author || c.user); const replies = (c.replies || []).map(r => normalizeComment(r, currentUserId)); return { id: c.id, created: c.created_at, body: c.text || c.body || "", author, likedByMe: !!(c.liked || c.liked_by_me), likeCount: Number(c.like_count || c.likes || 0), canDelete: !!((author.id && currentUserId && author.id === currentUserId)), replies }; }
+  function normalizeComment(c, currentUserId) { const author = normalizeUser(c.author || c.user); const replies = (c.replies || []).map(r => normalizeComment(r, currentUserId)); return { id: c.id, created: c.created_at, body: c.text || c.body || "", author, likedByMe: !!(c.liked || c.liked_by_me), likeCount: Number(c.like_count || c.likes || 0), canDelete: !!((author.id && currentUserId && author.id === currentUserId) || isPostOwner), replies }; }
   async function fetchComments(pid, uid) { try { const r = await fetch(`${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${pid}`, { headers: authHeader() }); if (!r.ok) return []; const j = await r.json(); const rootsRaw = j.results || []; const roots = rootsRaw.map(r => ({ ...normalizeComment(r, uid), replies: [] })); await Promise.all(roots.map(async (root) => { try { const rr = await fetch(`${API_ROOT}/engagements/comments/?parent=${root.id}`, { headers: authHeader() }); const jj = await rr.json(); root.replies = (jj.results || []).map(x => normalizeComment(x, uid)); } catch { } })); return roots; } catch { return []; } }
 
   React.useEffect(() => { let mounted = true; (async () => { if (!open || !postId) return; setLoading(true); const uid = await getMeId(); if (mounted) setMeId(uid); const list = await fetchComments(postId, uid); if (mounted) setComments(list); setLoading(false); })(); return () => { mounted = false; }; }, [open, postId]);
@@ -841,18 +959,27 @@ function CommentsDialog({ open, postId, onClose }) {
     <Dialog
       open={!!confirmDelId}
       onClose={() => !delBusy && setConfirmDelId(null)}
+      TransitionComponent={Transition}
       maxWidth="xs"
       fullWidth
+      PaperProps={{ sx: { borderRadius: 3 } }}
+      sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
     >
-      <DialogTitle>Delete Comment?</DialogTitle>
+      <DialogTitle sx={{ pb: 1 }}>Delete Comment?</DialogTitle>
       <DialogContent>
-        <DialogContentText>
+        <DialogContentText color="text.secondary">
           Are you sure you want to delete this comment?
           This action cannot be undone.
         </DialogContentText>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={() => setConfirmDelId(null)} disabled={delBusy}>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button
+          onClick={() => setConfirmDelId(null)}
+          disabled={delBusy}
+          variant="outlined"
+          color="inherit"
+          sx={{ borderRadius: 2, textTransform: "none" }}
+        >
           Cancel
         </Button>
         <Button
@@ -860,7 +987,8 @@ function CommentsDialog({ open, postId, onClose }) {
           color="error"
           variant="contained"
           disabled={delBusy}
-        // reusing LinearProgress in button is weird, stick into text or just disable
+          disableElevation
+          sx={{ borderRadius: 2, textTransform: "none" }}
         >
           {delBusy ? "Deleting..." : "Delete"}
         </Button>
@@ -1182,7 +1310,6 @@ function ShareToFriendDialog({ open, onClose, postId }) {
           user_ids: selected // Sending array of user IDs
         })
       });
-      alert("Post shared successfully!");
       onClose();
       setSelected([]);
     } catch (e) {
@@ -1271,10 +1398,48 @@ function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) .
   return <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm"><DialogTitle>Edit Post</DialogTitle><DialogContent dividers>{renderBody()}</DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button variant="contained" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button></DialogActions></Dialog>;
 }
 
-function PostDeleteConfirm({ open, post, onClose, onDeleted }) { /* ... (unchanged) ... */
+function PostDeleteConfirm({ open, post, onClose, onDeleted }) {
   const [busy, setBusy] = React.useState(false);
   const handleDelete = async () => { setBusy(true); let url; if (post.type === "poll") url = `${API_ROOT}/activity/feed/${post.id}/poll/delete/`; else { const communityId = post.raw_metadata?.community_id || post.community_id; url = `${API_ROOT}/communities/${communityId}/posts/${post.id}/delete/`; } try { const res = await fetch(url, { method: "DELETE", headers: authHeader() }); if (res.ok || res.status === 204) { onDeleted(post.id); onClose(); return; } throw new Error("Delete failed"); } catch { alert("Could not delete post."); } finally { setBusy(false); } };
-  return <Dialog open={open} onClose={onClose}><DialogTitle>Delete Post?</DialogTitle><DialogContent>This cannot be undone.</DialogContent><DialogActions><Button onClick={onClose}>Cancel</Button><Button color="error" variant="contained" onClick={handleDelete} disabled={busy}>Delete</Button></DialogActions></Dialog>;
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      TransitionComponent={Transition}
+      keepMounted
+      maxWidth="xs"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: 3 } }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>Delete Post?</DialogTitle>
+      <DialogContent>
+        <DialogContentText color="text.secondary">
+          Are you sure you want to delete this post? This action cannot be undone.
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          color="inherit"
+          sx={{ borderRadius: 2, textTransform: "none" }}
+        >
+          Cancel
+        </Button>
+        <Button
+          color="error"
+          variant="contained"
+          onClick={handleDelete}
+          disabled={busy}
+          disableElevation
+          sx={{ borderRadius: 2, textTransform: "none" }}
+        >
+          Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }
 
 function PostSkeleton() {
@@ -1625,7 +1790,7 @@ export default function MyPostsPage() {
       </Dialog>
       {editObj && <PostEditDialog open={!!editObj} post={editObj} onClose={() => setEditObj(null)} onSaved={(updated) => setPosts((p) => p.map((x) => (x.id === updated.id ? updated : x)))} />}
       {deleteObj && <PostDeleteConfirm open={!!deleteObj} post={deleteObj} onClose={() => setDeleteObj(null)} onDeleted={(id) => setPosts((p) => p.filter((x) => x.id !== id))} />}
-      <CommentsDialog open={!!commentId} postId={commentId} onClose={() => setCommentId(null)} />
+      <CommentsDialog open={!!commentId} postId={commentId} onClose={() => setCommentId(null)} isPostOwner={true} />
       <LikesDialog open={!!likesId} postId={likesId} onClose={() => setLikesId(null)} />
       <SharesDialog open={!!sharesId} postId={sharesId} onClose={() => setSharesId(null)} />
 
