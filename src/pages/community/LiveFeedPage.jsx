@@ -1361,7 +1361,7 @@ function CommentsDialog({
       (Array.isArray(me?.roles) && me.roles.includes("admin")));
 
   function canDelete(c) {
-    return c?.author_id === myId || isAdmin;
+    return c?.author_id === myId;
   }
 
   // collect the comment id + all nested reply ids for optimistic removal
@@ -1567,7 +1567,7 @@ function CommentsDialog({
   // It needs to receive 'myId' and 'isAdmin' as props now.
 
   const CommentItem = ({ c, depth = 0, myId, isAdmin, onToggleLike, onReply, onDelete }) => {
-    const canDelete = c?.author_id === myId || isAdmin;
+    const canDelete = c?.author_id === myId;
 
     return (
       <Box
