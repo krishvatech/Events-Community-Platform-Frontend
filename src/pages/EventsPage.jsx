@@ -1038,6 +1038,15 @@ export default function EventsPage() {
   const heroSubtitle =
     cmsPage?.hero_subtitle ||
     "The leading platform for M&A professionals to connect, learn, and grow";
+  const defaultButtons = [
+    { key: "primary", label: "Explore events", url: "/events" },
+    { key: "secondary", label: "Join Community", url: "/signup" },
+    { key: "tertiary", label: "Post an event", url: "/signup" },
+  ];
+  const ctaButtons =
+    Array.isArray(cmsPage?.cta_buttons) && cmsPage.cta_buttons.length
+      ? cmsPage.cta_buttons
+      : defaultButtons;
 
   return (
     <>
@@ -1062,33 +1071,67 @@ export default function EventsPage() {
                 {heroSubtitle}
               </p>
               <div className="mt-8 flex flex-wrap justify-center items-center gap-4">
-                <Button
-                  component={Link}
-                  to="/events"
-                  size="large"
-                  variant="contained"
-                  className="normal-case rounded-xl bg-teal-500 hover:bg-teal-600"
-                >
-                  Explore events
-                </Button>
-                <Button
-                  component={Link}
-                  to="/signup"
-                  size="large"
-                  variant="outlined"
-                  className="normal-case rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10"
-                >
-                  Join Community
-                </Button>
-                <Button
-                  component={Link}
-                  to="/signup"
-                  size="large"
-                  variant="outlined"
-                  className="normal-case rounded-xl border-white/30 text-white hover:border-white hover:bg-white/10"
-                >
-                  Post an event
-                </Button>
+                {ctaButtons
+                  .filter((btn) => (btn?.label || "").trim())
+                  .map((btn) => {
+                    const label = String(btn?.label || "").trim();
+                    const url = String(btn?.url || "").trim() || "#";
+                    const isExternal = /^https?:\/\//i.test(url);
+
+                    const baseProps = {
+                      key: btn?.key || label,
+                      size: "large",
+                    };
+
+                    if (btn?.key === "primary") {
+                      return (
+                        <Button
+                          {...baseProps}
+                          component={isExternal ? "a" : Link}
+                          href={isExternal ? url : undefined}
+                          to={!isExternal ? url : undefined}
+                          target={isExternal ? "_blank" : undefined}
+                          rel={isExternal ? "noreferrer" : undefined}
+                          variant="contained"
+                          className="normal-case rounded-xl bg-teal-500 hover:bg-teal-600"
+                        >
+                          {label}
+                        </Button>
+                      );
+                    }
+
+                    if (btn?.key === "secondary") {
+                      return (
+                        <Button
+                          {...baseProps}
+                          component={isExternal ? "a" : Link}
+                          href={isExternal ? url : undefined}
+                          to={!isExternal ? url : undefined}
+                          target={isExternal ? "_blank" : undefined}
+                          rel={isExternal ? "noreferrer" : undefined}
+                          variant="outlined"
+                          className="normal-case rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10"
+                        >
+                          {label}
+                        </Button>
+                      );
+                    }
+
+                    return (
+                      <Button
+                        {...baseProps}
+                        component={isExternal ? "a" : Link}
+                        href={isExternal ? url : undefined}
+                        to={!isExternal ? url : undefined}
+                        target={isExternal ? "_blank" : undefined}
+                        rel={isExternal ? "noreferrer" : undefined}
+                        variant="outlined"
+                        className="normal-case rounded-xl border-white/30 text-white hover:border-white hover:bg-white/10"
+                      >
+                        {label}
+                      </Button>
+                    );
+                  })}
               </div>
             </div>
           </Container>
