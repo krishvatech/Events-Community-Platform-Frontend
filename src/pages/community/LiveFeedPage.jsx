@@ -17,6 +17,8 @@ import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRound
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText,
   CircularProgress, List, ListItem, ListItemAvatar, ListItemText, Divider
@@ -1599,14 +1601,15 @@ function CommentsDialog({
             size="small"
             startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
             onClick={() => onToggleLike(c.id)}
+            sx={{ color: c.user_has_liked ? "teal" : "inherit" }}
           >
             {c.like_count ?? 0}
           </Button>
-          <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={() => onReply(c)}>
+          <Button size="small" startIcon={<ReplyRoundedIcon fontSize="small" />} onClick={() => onReply(c)}>
             Reply
           </Button>
           {canDelete && (
-            <Button size="small" color="error" onClick={() => onDelete(c)}>
+            <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => onDelete(c)}>
               Delete
             </Button>
           )}

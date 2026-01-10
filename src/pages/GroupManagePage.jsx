@@ -23,6 +23,8 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
@@ -1745,15 +1747,15 @@ function GroupCommentsDialog({
                     size="small"
                     startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
                     onClick={() => toggleCommentLike(c.id)}
-
+                    sx={{ color: c.user_has_liked ? "teal" : "inherit" }}
                 >
                     {c.like_count ?? 0}
                 </Button>
-                <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
+                <Button size="small" startIcon={<ReplyRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
                     Reply
                 </Button>
                 {((me?.id || me?.user?.id) === c.author_id || (me?.id || me?.user?.id) === groupOwnerId) && (
-                    <Button size="small" color="error" onClick={() => deleteComment(c)}>Delete</Button>
+                    <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => deleteComment(c)}>Delete</Button>
                 )}
             </Stack>
 

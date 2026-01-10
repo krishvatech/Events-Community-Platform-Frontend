@@ -23,6 +23,7 @@ import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 import CommunitySidebar from "../../components/CommunitySideBar.jsx";
 
@@ -542,10 +543,10 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
             </Typography>
           </Box>
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
-            <Button size="small" startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />} onClick={() => toggleCommentLike(c.id)}>
+            <Button size="small" startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />} onClick={() => toggleCommentLike(c.id)} sx={{ color: c.user_has_liked ? "teal" : "inherit" }}>
               {c.like_count || 0}
             </Button>
-            <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={() => setReplyTo(c)}>Reply</Button>
+            <Button size="small" startIcon={<ReplyRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>Reply</Button>
           </Stack>
         </Box>
       </Stack>

@@ -46,6 +46,8 @@ import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import IosShareIcon from "@mui/icons-material/IosShare";
 import SearchIcon from "@mui/icons-material/Search";
+import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 
 
 
@@ -151,6 +153,24 @@ async function toggleProfilePostReaction(post, reactionId) {
     },
     credentials: "include",
     body: JSON.stringify(body),
+  });
+}
+
+// 👉 NEW: Toggle like on a comment
+async function toggleCommentLike(commentId) {
+  if (!commentId) return;
+  await fetch(`${API_BASE}/engagements/reactions/toggle/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...tokenHeader(),
+    },
+    credentials: "include",
+    body: JSON.stringify({
+      target_type: "engagements.comment",
+      target_id: commentId,
+      reaction: "like",
+    }),
   });
 }
 
@@ -1313,6 +1333,32 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
 
   // -------- Single comment item (with nested replies) --------
   function CommentItem({ c, depth = 0 }) {
+    // Initial state from the comment object
+    // Note: ensure your backend returns `user_has_liked` and `like_count` (or `likes_count`) for comments
+    const [liked, setLiked] = React.useState(!!c.user_has_liked);
+    const [likeCount, setLikeCount] = React.useState(
+      Number(c.like_count || c.likes_count || 0)
+    );
+
+    const handleLike = async () => {
+      const oldLiked = liked;
+      const oldCount = likeCount;
+
+      // Optimistic update
+      const newLiked = !oldLiked;
+      setLiked(newLiked);
+      setLikeCount(newLiked ? oldCount + 1 : Math.max(0, oldCount - 1));
+
+      try {
+        await toggleCommentLike(c.id);
+      } catch (e) {
+        console.error("Failed to toggle comment like", e);
+        // Revert
+        setLiked(oldLiked);
+        setLikeCount(oldCount);
+      }
+    };
+
     return (
       <Box sx={{ pl: depth ? 5 : 0, mt: depth ? 0.75 : 1 }}>
         <Stack direction="row" spacing={1} alignItems="flex-start">
@@ -1336,17 +1382,41 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
               alignItems="center"
               sx={{ mt: 0.5 }}
             >
+              {/* LIKE BUTTON */}
+              <Button
+                size="small"
+                onClick={handleLike}
+                startIcon={
+                  liked ? (
+                    <FavoriteRoundedIcon sx={{ fontSize: 16 }} />
+                  ) : (
+                    <FavoriteBorderIcon sx={{ fontSize: 16 }} />
+                  )
+                }
+                sx={{
+                  color: liked ? "teal" : "text.secondary",
+                  minWidth: "auto",
+                  px: 1,
+                }}
+              >
+                {likeCount > 0 ? likeCount : "Like"}
+              </Button>
+
               <Button
                 size="small"
                 onClick={() => setReplyTo(c)}
+                startIcon={<ReplyRoundedIcon sx={{ fontSize: 16 }} />}
+                sx={{ color: "text.secondary", minWidth: "auto", px: 1 }}
               >
                 Reply
               </Button>
 
               <Button
                 size="small"
-                color="error"
+                color="inherit" // or "error" if you prefer red always
                 onClick={() => handleDelete(c)}
+                startIcon={<DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />}
+                sx={{ color: "text.secondary", minWidth: "auto", px: 1, "&:hover": { color: "error.main" } }}
               >
                 Delete
               </Button>

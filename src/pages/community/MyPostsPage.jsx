@@ -752,7 +752,40 @@ function CommentsDialog({ open, postId, onClose }) {
   React.useEffect(() => { let mounted = true; (async () => { if (!open || !postId) return; setLoading(true); const uid = await getMeId(); if (mounted) setMeId(uid); const list = await fetchComments(postId, uid); if (mounted) setComments(list); setLoading(false); })(); return () => { mounted = false; }; }, [open, postId]);
 
   const handleSubmit = async () => { if (!text.trim()) return; const payload = replyingTo ? { text, parent: replyingTo } : { text, target_type: "activity_feed.feeditem", target_id: postId }; try { await fetch(`${API_ROOT}/engagements/comments/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(payload) }); setText(""); setReplyingTo(null); const list = await fetchComments(postId, meId); setComments(list); } catch { alert("Failed to post"); } };
-  const onLike = async (cid) => { try { await fetch(`${API_ROOT}/engagements/reactions/toggle/`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ target_type: "comment", target_id: cid, reaction: "like" }) }); const list = await fetchComments(postId, meId); setComments(list); } catch { } };
+  // recursive update helper
+  function updateCommentInTree(list, targetId, updater) {
+    return list.map(c => {
+      if (c.id === targetId) return updater(c);
+      if (c.replies && c.replies.length) {
+        return { ...c, replies: updateCommentInTree(c.replies, targetId, updater) };
+      }
+      return c;
+    });
+  }
+
+  const toggleCommentLike = async (cid) => {
+    // optimistic
+    setComments(prev => updateCommentInTree(prev, cid, c => ({
+      ...c,
+      likedByMe: !c.likedByMe,
+      likeCount: Math.max(0, c.likeCount + (c.likedByMe ? -1 : 1))
+    })));
+
+    try {
+      await fetch(`${API_ROOT}/engagements/reactions/toggle/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ target_type: "comment", target_id: cid, reaction: "like" })
+      });
+    } catch {
+      // rollback
+      setComments(prev => updateCommentInTree(prev, cid, c => ({
+        ...c,
+        likedByMe: !c.likedByMe,
+        likeCount: Math.max(0, c.likeCount + (c.likedByMe ? -1 : 1))
+      })));
+    }
+  };
 
   // Trigger custom dialog
   const onDelete = async (cid) => {
@@ -784,11 +817,19 @@ function CommentsDialog({ open, postId, onClose }) {
             <Typography variant="subtitle2" fontWeight={700}>{c.author.name}</Typography>
             <Typography variant="body2">{c.body}</Typography>
           </Box>
-          <Stack direction="row" spacing={2} sx={{ mt: 0.5, ml: 1 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5, ml: 1 }}>
             <Typography variant="caption" color="text.secondary">{timeAgo(c.created)}</Typography>
-            <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => onLike(c.id)}> {c.likedByMe ? "Unlike" : "Like"} ({c.likeCount}) </Typography>
-            <Typography variant="caption" sx={{ cursor: "pointer", fontWeight: 600 }} onClick={() => setReplyingTo(c.id)}> Reply </Typography>
-            {c.canDelete && <Typography variant="caption" color="error" sx={{ cursor: "pointer" }} onClick={() => onDelete(c.id)}>Delete</Typography>}
+            <Button size="small"
+              startIcon={c.likedByMe ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
+              onClick={() => toggleCommentLike(c.id)}
+              sx={{ color: c.likedByMe ? "teal" : "inherit" }}
+            >
+              {c.likeCount}
+            </Button>
+            <Button size="small" startIcon={<ReplyRoundedIcon fontSize="small" />} onClick={() => setReplyingTo(c.id)}>
+              Reply
+            </Button>
+            {c.canDelete && <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => onDelete(c.id)}>Delete</Button>}
           </Stack>
         </Box>
       </Stack>

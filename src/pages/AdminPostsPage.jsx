@@ -46,6 +46,7 @@ import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import Pagination from "@mui/material/Pagination";
 import RepeatRoundedIcon from "@mui/icons-material/RepeatRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
@@ -1345,13 +1346,14 @@ function CommentsDialog({
         <Button size="small"
           startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderRoundedIcon fontSize="small" />}
           onClick={() => toggleCommentLike(c.id)}
+          sx={{ color: c.user_has_liked ? "teal" : "inherit" }}
         >
           {c.like_count ?? 0}
         </Button>
-        <Button size="small" startIcon={<ChatBubbleOutlineRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
+        <Button size="small" startIcon={<ReplyRoundedIcon fontSize="small" />} onClick={() => setReplyTo(c)}>
           Reply
         </Button>
-        {canDelete(c) && <Button size="small" color="error" onClick={() => deleteComment(c)}>Delete</Button>}
+        {canDelete(c) && <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => deleteComment(c)}>Delete</Button>}
       </Stack>
 
       {!!c.children?.length && (
