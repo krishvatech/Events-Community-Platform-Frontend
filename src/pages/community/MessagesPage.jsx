@@ -1717,8 +1717,12 @@ export default function MessagesPage() {
   const videoRef = React.useRef(null);
   const canvasRef = React.useRef(null);
   const isFirstLoadRef = React.useRef(true);
+  const shouldScrollOnOpenRef = React.useRef(false);
   React.useEffect(() => {
     isFirstLoadRef.current = true;
+  }, [activeId]);
+  React.useEffect(() => {
+    if (activeId) shouldScrollOnOpenRef.current = true;
   }, [activeId]);
 
   // CENTER: chat
@@ -2638,6 +2642,17 @@ export default function MessagesPage() {
     return () => clearInterval(iv);
   }, [activeId, loadMessages]);
 
+  React.useEffect(() => {
+    if (!activeId || !shouldScrollOnOpenRef.current) return;
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById("chat-scroll");
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+      shouldScrollOnOpenRef.current = false;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [activeId, messages.length]);
+
   // light polling to refresh conversation list (last message / unread)
   React.useEffect(() => {
     const iv = setInterval(loadConversations, 10000);
@@ -3273,13 +3288,26 @@ export default function MessagesPage() {
                 let showOnline = false;
 
                 if (isDmThread(t)) {
-                  // ✅ Always decide from rosterMap (no need to open chat first)
-                  const partnerId = getDmPartnerId(t, me, rosterMap);
-                  if (partnerId) {
-                    const entry = rosterMap[String(partnerId)];
-                    const prof = entry?.profile;
-                    if (prof?.is_online) {
-                      showOnline = true;
+                  const directProfile =
+                    t?.other_user?.profile ||
+                    t?.other_user ||
+                    t?.dm_partner?.profile ||
+                    t?.dm_partner ||
+                    t?.recipient?.profile ||
+                    t?.recipient ||
+                    null;
+
+                  if (directProfile?.is_online) {
+                    showOnline = true;
+                  } else {
+                    // Always decide from rosterMap (no need to open chat first)
+                    const partnerId = getDmPartnerId(t, me, rosterMap);
+                    if (partnerId) {
+                      const entry = rosterMap[String(partnerId)];
+                      const prof = entry?.profile || entry;
+                      if (prof?.is_online) {
+                        showOnline = true;
+                      }
                     }
                   }
                 }
