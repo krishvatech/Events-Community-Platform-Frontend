@@ -31,6 +31,7 @@ import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
+import { apiClient } from "../utils/api";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -561,6 +562,9 @@ export default function EventsPage() {
   const [registeredIds, setRegisteredIds] = useState(new Set());
   // raw events payload coming from the server (we'll enrich it with the "registered" flag)
   const [rawEvents, setRawEvents] = useState([]);
+  const [cmsLoading, setCmsLoading] = useState(true);
+  const [cmsError, setCmsError] = useState("");
+  const [cmsPage, setCmsPage] = useState(null);
   const PAGE_SIZE = 9; // 9 items per page
   const skeletonItems = useMemo(
     () => Array.from({ length: PAGE_SIZE }, (_, i) => i),
@@ -599,6 +603,34 @@ export default function EventsPage() {
     onOpen: () => setOpenSelect(name),
     onClose: () => setOpenSelect(null),
   });
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const res = await apiClient.get("/cms/pages/events/");
+        if (!mounted) return;
+        setCmsPage(res.data);
+        setCmsError("");
+      } catch (e) {
+        if (!mounted) return;
+        const status = e?.response?.status;
+        if (status === 404) {
+          setCmsPage(null);
+          setCmsError("");
+        } else {
+          setCmsError(e?.response?.data?.detail || e?.message || "Failed to load events page");
+        }
+      } finally {
+        if (mounted) setCmsLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // ✅ TOP-LEVEL: build UI objects with the isRegistered flag
   useEffect(() => {
@@ -1001,6 +1033,12 @@ export default function EventsPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const heroBg = cmsPage?.hero_image_url || "/images/events-hero-bg.png";
+  const heroTitle = cmsPage?.hero_title || "Explore M&A Events";
+  const heroSubtitle =
+    cmsPage?.hero_subtitle ||
+    "The leading platform for M&A professionals to connect, learn, and grow";
+
   return (
     <>
       <Header />
@@ -1009,7 +1047,7 @@ export default function EventsPage() {
         <div
           className="relative text-white text-center"
           style={{
-            backgroundImage: "url(/images/events-hero-bg.png)",
+            backgroundImage: `url("${heroBg}")`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
@@ -1018,10 +1056,10 @@ export default function EventsPage() {
           <Container maxWidth={false} disableGutters>
             <div className="relative mx-auto max-w-7xl px-6 py-16 md:py-20">
               <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
-                Explore M&A Events
+                {heroTitle}
               </h1>
               <p className="mx-auto max-w-3xl text-lg md:text-xl text-white/80">
-                The leading platform for M&A professionals to connect, learn, and grow
+                {heroSubtitle}
               </p>
               <div className="mt-8 flex flex-wrap justify-center items-center gap-4">
                 <Button
