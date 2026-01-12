@@ -2185,7 +2185,20 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
         !!conversation &&
         (!!chatOn || myRole === "owner" || myRole === "admin"); // when chat is OFF, only owner/admin can still post
 
-    const myId = Number(currentUserId) || null;
+    const myId = React.useMemo(() => {
+        const fromProp = Number(currentUserId);
+        if (fromProp) return fromProp;
+        const fromGroup = Number(group?.current_user?.id ?? group?.current_user_id);
+        if (fromGroup) return fromGroup;
+        try {
+            const raw = localStorage.getItem("user");
+            if (raw) {
+                const id = Number(JSON.parse(raw)?.id);
+                if (id) return id;
+            }
+        } catch { }
+        return null;
+    }, [currentUserId, group?.current_user?.id, group?.current_user_id]);
 
 
     const userDisplayName = (u, fallbackId) =>
@@ -4555,11 +4568,16 @@ export default function GroupManagePage() {
                                                     </Box>
 
                                                     {/* Combined list or empty state */}
+                                                    {notifTab === 0 && (reqsLoading || promotionLoading) && (
+                                                        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                                                            <CircularProgress />
+                                                        </Box>
+                                                    )}
                                                     {(notifTab === 0 || notifTab === 1) && (
                                                         <>
                                                             {reqsError && <Alert severity="error">{reqsError}</Alert>}
 
-                                                            {reqsLoading ? (
+                                                            {reqsLoading && notifTab !== 0 ? (
                                                                 <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                                                                     <CircularProgress />
                                                                 </Box>
@@ -4622,7 +4640,7 @@ export default function GroupManagePage() {
                                                         <>
                                                             {promotionError && <Alert severity="error">{promotionError}</Alert>}
 
-                                                            {promotionLoading ? (
+                                                            {promotionLoading && notifTab !== 0 ? (
                                                                 <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                                                                     <CircularProgress />
                                                                 </Box>
@@ -4684,7 +4702,7 @@ export default function GroupManagePage() {
                                                     )}
 
                                                     {/* All Notifications Combined View */}
-                                                    {notifTab === 0 && reqs.length === 0 && promotionReqs.length === 0 && (
+                                                    {notifTab === 0 && !reqsLoading && !promotionLoading && reqs.length === 0 && promotionReqs.length === 0 && (
                                                         <Alert severity="info">
                                                             No notifications. Your group is all caught up! ✓
                                                         </Alert>
