@@ -266,7 +266,10 @@ function mapFeedItem(item) {
   }
 
   // RESOURCE
-  if (t === "resource" || t === "file" || t === "link" || t === "video" || m.resource_id) {
+  if (
+    t === "resource" || t === "file" || t === "video" ||
+    m.resource_id || m.file || m.file_url || m.link_url || m.video_url
+  ) {
     const rid = m.resource_id ?? item.object_id ?? item.id;
     return {
       ...base,
@@ -284,7 +287,8 @@ function mapFeedItem(item) {
   }
 
   // LINK (Simple)
-  if ((t === "link" || m.url) && !m.resource_id) {
+  if ((t === "link" || m.url) &&
+    !m.resource_id && !m.file && !m.file_url && !m.link_url && !m.video_url) {
     return {
       ...base,
       type: "link",
@@ -1198,7 +1202,18 @@ function PostsTab({ groupId }) {
       // 1. Fetch Posts
       const res = await fetch(toApiUrl(`groups/${groupId}/posts/`), { headers: { Accept: "application/json", ...authHeaders() } });
       const data = res.ok ? await res.json() : [];
-      const postsArr = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      const postsArrRaw = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      const numericGroupId = Number(groupId);
+      const postsArr = postsArrRaw
+        .filter(p => {
+          const gid = Number(p?.group_id ?? p?.group?.id ?? p?.groupId ?? p?.groupID ?? null);
+          return Number.isFinite(numericGroupId) && numericGroupId ? gid === numericGroupId : true;
+        })
+        // Drop polls/events if backend mixes them in this endpoint.
+        .filter(p => {
+          const t = String(p?.type || "").toLowerCase();
+          return t !== "poll" && t !== "event";
+        });
 
       // 2. Fetch Polls from Activity Feed
       const pollsUrl = toApiUrl(`activity/feed/?scope=group&group_id=${groupId}`);
@@ -1209,10 +1224,13 @@ function PostsTab({ groupId }) {
       // 3. Merge & Dedupe (prefer feed item if collision)
       const allRaw = [...postsArr, ...pollsFeed];
       const mapped = allRaw.map(mapFeedItem).filter(Boolean);
+      const scopedMapped = Number.isFinite(numericGroupId) && numericGroupId
+        ? mapped.filter(p => Number(p.group_id) === numericGroupId)
+        : mapped;
 
       const seenIds = new Set();
       const uniqueMapped = [];
-      for (const p of mapped) {
+      for (const p of scopedMapped) {
         if (!seenIds.has(p.id)) {
           seenIds.add(p.id);
           uniqueMapped.push(p);
@@ -1223,7 +1241,6 @@ function PostsTab({ groupId }) {
       uniqueMapped.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
       // 4. Hydrate with metrics
-      const numericGroupId = Number(groupId);
       const ids = uniqueMapped.map(p => p.id).filter(id => Number.isInteger(id));
 
       if (ids.length) {
