@@ -733,9 +733,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Grid>
             <Grid item xs={12} md={3}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker label="Start time *" ampm minutesStep={60} value={dayjs(`1970-01-01T${startTime}`)}
+                <TimePicker label="Start time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${startTime}`)}
                   onChange={(v) => {
-                    const newStart = v ? dayjs(v).minute(0).second(0).format("HH:mm") : startTime;
+                    const newStart = v ? dayjs(v).second(0).format("HH:mm") : startTime;
                     setStartTime(newStart);
                     const next = computeEndFromStart(startDate, newStart, 2);
                     setEndDate(next.endDate);
@@ -746,9 +746,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Grid>
             <Grid item xs={12} md={3}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker label="End time *" ampm minutesStep={60} value={dayjs(`1970-01-01T${endTime}`)}
+                <TimePicker label="End time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${endTime}`)}
                   onChange={(v) => {
-                    const newEnd = v ? dayjs(v).minute(0).second(0).format("HH:mm") : endTime;
+                    const newEnd = v ? dayjs(v).second(0).format("HH:mm") : endTime;
                     setEndTime(newEnd);
                     if (startDate && endDate && startDate === endDate && newEnd <= startTime) {
                       setEndDate(dayjs(startDate).add(1, "day").format("YYYY-MM-DD"));
@@ -1296,10 +1296,10 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <TimePicker
-                  label="Start time *" ampm minutesStep={60}
+                  label="Start time *" ampm minutesStep={1}
                   value={dayjs(`1970-01-01T${startTime}`)}
                   onChange={(val) => {
-                    const newStart = val ? dayjs(val).minute(0).second(0).format("HH:mm") : startTime;
+                    const newStart = val ? dayjs(val).second(0).format("HH:mm") : startTime;
                     setStartTime(newStart);
                     const next = computeEndFromStart(startDate, newStart, 2);
                     setEndDate(next.endDate);
@@ -1310,10 +1310,10 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <TimePicker
-                  label="End time *" ampm minutesStep={60}
+                  label="End time *" ampm minutesStep={1}
                   value={dayjs(`1970-01-01T${endTime}`)}
                   onChange={(val) => {
-                    const newEnd = val ? dayjs(val).minute(0).second(0).format("HH:mm") : endTime;
+                    const newEnd = val ? dayjs(val).second(0).format("HH:mm") : endTime;
                     setEndTime(newEnd);
                     if (startDate && endDate && startDate === endDate && newEnd <= startTime) {
                       setEndDate(dayjs(startDate).add(1, "day").format("YYYY-MM-DD"));
