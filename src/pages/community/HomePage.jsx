@@ -2197,6 +2197,18 @@ function AboutTab({
   const [syncProfileLocation, setSyncProfileLocation] = React.useState(false);
 
   const [contactOpen, setContactOpen] = React.useState(false);
+  const [contactEditSection, setContactEditSection] = React.useState("all"); // "emails", "phones", "socials", "websites", "scheduler", "all"
+
+  const openContactEditor = (section) => {
+    setContactEditSection(section);
+    setContactOpen(true);
+  };
+
+  const closeContactEditor = () => {
+    setContactOpen(false);
+    setContactEditSection("all");
+  };
+
   const [locationOpen, setLocationOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState(() => createEmptyContactForm());
   const [locationForm, setLocationForm] = React.useState({ city_obj: null, city: "", location: "" });
@@ -2975,7 +2987,7 @@ function AboutTab({
         links,
       });
       showToast?.("success", "Contact info updated.");
-      setContactOpen(false);
+      closeContactEditor();
     } catch (e) {
       console.error(e);
       showToast?.("error", "Failed to save contact info.");
@@ -3493,8 +3505,7 @@ function AboutTab({
 
         {/* RIGHT: Contact + New Sections */}
         <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "320px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
-          <SectionCard title="Contact" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => setContactOpen(true)}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <Typography variant="subtitle2" color="text.secondary">Emails</Typography>
+          <SectionCard title="E-Mail" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("emails")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
             <Stack spacing={1} sx={{ mt: 1 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <EmailIcon fontSize="small" />
@@ -3513,8 +3524,9 @@ function AboutTab({
                 </Typography>
               ) : null}
             </Stack>
+          </SectionCard>
 
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Phones</Typography>
+          <SectionCard title="Phone Numbers" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("phones")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
             <Stack spacing={1} sx={{ mt: 1 }}>
               {phonePreview.length ? (
                 phonePreview.map((item, idx) => (
@@ -3534,8 +3546,9 @@ function AboutTab({
                 </Typography>
               ) : null}
             </Stack>
+          </SectionCard>
 
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Social Profiles</Typography>
+          <SectionCard title="Social Profiles" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("socials")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
             <Stack spacing={1} sx={{ mt: 1 }}>
               {socialItems.filter((item) => item.url).length ? (
                 socialItems.filter((item) => item.url).map((item) => (
@@ -3557,8 +3570,9 @@ function AboutTab({
                 <Typography variant="body2" color="text.secondary">\u2014</Typography>
               )}
             </Stack>
+          </SectionCard>
 
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Websites</Typography>
+          <SectionCard title="Websites" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("websites")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
             <Stack spacing={1} sx={{ mt: 1 }}>
               {websitePreview.length ? (
                 websitePreview.map((item, idx) => (
@@ -3586,8 +3600,9 @@ function AboutTab({
                 </Typography>
               ) : null}
             </Stack>
+          </SectionCard>
 
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Scheduler</Typography>
+          <SectionCard title="Scheduling Link" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("scheduler")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
               <CalendarTodayIcon fontSize="small" />
               {contactLinks.scheduler?.url ? (
@@ -3906,352 +3921,381 @@ function AboutTab({
 
 
 
-      {/* CONTACT DIALOG (Cleaned up - No Names/Request Button) */}
-      <Dialog open={contactOpen} onClose={() => setContactOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Edit Contact</DialogTitle>
+      {/* CONTACT DIALOG */}
+      <Dialog open={contactOpen} onClose={closeContactEditor} fullWidth maxWidth="sm">
+        <DialogTitle>
+          {{
+            all: "Edit Contact",
+            emails: "Edit E-Mail",
+            phones: "Edit Phone Numbers",
+            socials: "Edit Social Profiles",
+            websites: "Edit Websites",
+            scheduler: "Edit Scheduling Link",
+          }[contactEditSection] || "Edit Contact"}
+        </DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 1 }}>
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Emails</Typography>
-              <Stack spacing={1.5} sx={{ mt: 1 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <TextField label="Main Email" type="email" fullWidth value={profile.email || ""} disabled />
-                  <Chip label="Main" size="small" color="primary" variant="outlined" />
-                </Box>
-                {contactForm.emails.map((item, idx) => (
-                  <Grid container spacing={1} alignItems="center" key={`email-row-${idx}`}>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        label="Email"
-                        type="email"
-                        fullWidth
-                        value={item.email}
-                        onChange={(e) =>
+            {[
+              {
+                key: "emails",
+                node: (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Emails</Typography>
+                    <Stack spacing={1.5} sx={{ mt: 1 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <TextField label="Main Email" type="email" fullWidth value={profile.email || ""} disabled />
+                        <Chip label="Main" size="small" color="primary" variant="outlined" />
+                      </Box>
+                      {contactForm.emails.map((item, idx) => (
+                        <Grid container spacing={1} alignItems="center" key={`email-row-${idx}`}>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              label="Email"
+                              type="email"
+                              fullWidth
+                              value={item.email}
+                              onChange={(e) =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  emails: prev.emails.map((row, i) => (i === idx ? { ...row, email: e.target.value } : row)),
+                                }))
+                              }
+                            />
+                          </Grid>
+                          <Grid item xs={6} md={3}>
+                            <TextField
+                              select
+                              label="Type"
+                              fullWidth
+                              value={item.type}
+                              onChange={(e) =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  emails: prev.emails.map((row, i) => (i === idx ? { ...row, type: e.target.value } : row)),
+                                }))
+                              }
+                            >
+                              {CONTACT_EMAIL_TYPES.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={5} md={2}>
+                            <TextField
+                              select
+                              label="Visibility"
+                              fullWidth
+                              value={item.visibility}
+                              onChange={(e) =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  emails: prev.emails.map((row, i) => (i === idx ? { ...row, visibility: e.target.value } : row)),
+                                }))
+                              }
+                            >
+                              {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={1} md={1}>
+                            <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
+                              <DeleteOutlineRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Grid>
+                        </Grid>
+                      ))}
+                      <Button
+                        variant="outlined"
+                        startIcon={<AddRoundedIcon fontSize="small" />}
+                        onClick={() =>
                           setContactForm((prev) => ({
                             ...prev,
-                            emails: prev.emails.map((row, i) => (i === idx ? { ...row, email: e.target.value } : row)),
-                          }))
-                        }
-                      />
-                    </Grid>
-                    <Grid item xs={6} md={3}>
-                      <TextField
-                        select
-                        label="Type"
-                        fullWidth
-                        value={item.type}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({
-                            ...prev,
-                            emails: prev.emails.map((row, i) => (i === idx ? { ...row, type: e.target.value } : row)),
-                          }))
-                        }
-                      >
-                        {CONTACT_EMAIL_TYPES.map((opt) => (
-                          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item xs={5} md={2}>
-                      <TextField
-                        select
-                        label="Visibility"
-                        fullWidth
-                        value={item.visibility}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({
-                            ...prev,
-                            emails: prev.emails.map((row, i) => (i === idx ? { ...row, visibility: e.target.value } : row)),
-                          }))
-                        }
-                      >
-                        {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
-                          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item xs={1} md={1}>
-                      <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
-                        <DeleteOutlineRoundedIcon fontSize="small" />
-                      </IconButton>
-                    </Grid>
-                  </Grid>
-                ))}
-                <Button
-                  variant="outlined"
-                  startIcon={<AddRoundedIcon fontSize="small" />}
-                  onClick={() =>
-                    setContactForm((prev) => ({
-                      ...prev,
-                      emails: [...prev.emails, { email: "", type: "professional", visibility: "private" }],
-                    }))
-                  }
-                >
-                  Add email
-                </Button>
-              </Stack>
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Phones</Typography>
-              <Stack spacing={1.5} sx={{ mt: 1 }}>
-                {contactForm.phones.map((item, idx) => (
-                  <Grid container spacing={1} alignItems="center" key={`phone-row-${idx}`}>
-                    <Grid item xs={12} md={5}>
-                      <TextField
-                        label="Number"
-                        fullWidth
-                        value={item.number}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({
-                            ...prev,
-                            phones: prev.phones.map((row, i) => (i === idx ? { ...row, number: e.target.value } : row)),
-                          }))
-                        }
-                      />
-                    </Grid>
-                    <Grid item xs={6} md={2}>
-                      <TextField
-                        select
-                        label="Type"
-                        fullWidth
-                        value={item.type}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({
-                            ...prev,
-                            phones: prev.phones.map((row, i) => (i === idx ? { ...row, type: e.target.value } : row)),
+                            emails: [...prev.emails, { email: "", type: "professional", visibility: "private" }],
                           }))
                         }
                       >
-                        {CONTACT_PHONE_TYPES.map((opt) => (
-                          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item xs={6} md={2}>
-                      <TextField
-                        select
-                        label="Visibility"
-                        fullWidth
-                        value={item.visibility}
-                        onChange={(e) =>
+                        Add email
+                      </Button>
+                    </Stack>
+                  </Box>
+                ),
+              },
+              {
+                key: "phones",
+                node: (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Phones</Typography>
+                    <Stack spacing={1.5} sx={{ mt: 1 }}>
+                      {contactForm.phones.map((item, idx) => (
+                        <Grid container spacing={1} alignItems="center" key={`phone-row-${idx}`}>
+                          <Grid item xs={12} md={5}>
+                            <TextField
+                              label="Number"
+                              fullWidth
+                              value={item.number}
+                              onChange={(e) =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  phones: prev.phones.map((row, i) => (i === idx ? { ...row, number: e.target.value } : row)),
+                                }))
+                              }
+                            />
+                          </Grid>
+                          <Grid item xs={6} md={2}>
+                            <TextField
+                              select
+                              label="Type"
+                              fullWidth
+                              value={item.type}
+                              onChange={(e) =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  phones: prev.phones.map((row, i) => (i === idx ? { ...row, type: e.target.value } : row)),
+                                }))
+                              }
+                            >
+                              {CONTACT_PHONE_TYPES.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={6} md={2}>
+                            <TextField
+                              select
+                              label="Visibility"
+                              fullWidth
+                              value={item.visibility}
+                              onChange={(e) =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  phones: prev.phones.map((row, i) => (i === idx ? { ...row, visibility: e.target.value } : row)),
+                                }))
+                              }
+                            >
+                              {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={8} md={2}>
+                            <FormControlLabel
+                              control={
+                                <Radio
+                                  checked={!!item.primary}
+                                  onChange={() =>
+                                    setContactForm((prev) => ({
+                                      ...prev,
+                                      phones: prev.phones.map((row, i) => ({ ...row, primary: i === idx })),
+                                    }))
+                                  }
+                                />
+                              }
+                              label="Primary"
+                            />
+                          </Grid>
+                          <Grid item xs={4} md={1}>
+                            <IconButton onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
+                              <DeleteOutlineRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Grid>
+                        </Grid>
+                      ))}
+                      <Button
+                        variant="outlined"
+                        startIcon={<AddRoundedIcon fontSize="small" />}
+                        onClick={() =>
                           setContactForm((prev) => ({
                             ...prev,
-                            phones: prev.phones.map((row, i) => (i === idx ? { ...row, visibility: e.target.value } : row)),
+                            phones: [...prev.phones, { number: "", type: "professional", visibility: "private", primary: prev.phones.length === 0 }],
                           }))
                         }
                       >
-                        {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
-                          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                        ))}
-                      </TextField>
-                    </Grid>
-                    <Grid item xs={8} md={2}>
-                      <FormControlLabel
-                        control={
-                          <Radio
-                            checked={!!item.primary}
-                            onChange={() =>
-                              setContactForm((prev) => ({
-                                ...prev,
-                                phones: prev.phones.map((row, i) => ({ ...row, primary: i === idx })),
-                              }))
-                            }
-                          />
-                        }
-                        label="Primary"
-                      />
-                    </Grid>
-                    <Grid item xs={4} md={1}>
-                      <IconButton onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
-                        <DeleteOutlineRoundedIcon fontSize="small" />
-                      </IconButton>
-                    </Grid>
-                  </Grid>
-                ))}
-                <Button
-                  variant="outlined"
-                  startIcon={<AddRoundedIcon fontSize="small" />}
-                  onClick={() =>
-                    setContactForm((prev) => ({
-                      ...prev,
-                      phones: [...prev.phones, { number: "", type: "professional", visibility: "private", primary: prev.phones.length === 0 }],
-                    }))
-                  }
-                >
-                  Add phone
-                </Button>
-              </Stack>
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Social Profiles</Typography>
-              <Stack spacing={1.5} sx={{ mt: 1 }}>
-                <TextField
-                  label="LinkedIn URL"
-                  fullWidth
-                  value={contactForm.socials.linkedin}
-                  onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, linkedin: e.target.value } }))}
-                />
-                <TextField
-                  label="X URL"
-                  fullWidth
-                  value={contactForm.socials.x}
-                  onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, x: e.target.value } }))}
-                />
-                <TextField
-                  label="Facebook URL"
-                  fullWidth
-                  value={contactForm.socials.facebook}
-                  onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, facebook: e.target.value } }))}
-                />
-                <TextField
-                  label="Instagram URL"
-                  fullWidth
-                  value={contactForm.socials.instagram}
-                  onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, instagram: e.target.value } }))}
-                />
-                <TextField
-                  label="GitHub URL"
-                  fullWidth
-                  value={contactForm.socials.github}
-                  onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, github: e.target.value } }))}
-                />
-              </Stack>
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Websites</Typography>
-              <Stack spacing={1.5} sx={{ mt: 1 }}>
-                {contactForm.websites.map((item, idx) => (
-                  <Grid container spacing={1} alignItems="center" key={`site-row-${idx}`}>
-                    <Grid item xs={12} md={4}>
+                        Add phone
+                      </Button>
+                    </Stack>
+                  </Box>
+                ),
+              },
+              {
+                key: "socials",
+                node: (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Social Profiles</Typography>
+                    <Stack spacing={1.5} sx={{ mt: 1 }}>
                       <TextField
-                        label="Label"
+                        label="LinkedIn URL"
                         fullWidth
-                        value={item.label}
-                        onChange={(e) =>
+                        value={contactForm.socials.linkedin}
+                        onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, linkedin: e.target.value } }))}
+                      />
+                      <TextField
+                        label="X URL"
+                        fullWidth
+                        value={contactForm.socials.x}
+                        onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, x: e.target.value } }))}
+                      />
+                      <TextField
+                        label="Facebook URL"
+                        fullWidth
+                        value={contactForm.socials.facebook}
+                        onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, facebook: e.target.value } }))}
+                      />
+                      <TextField
+                        label="Instagram URL"
+                        fullWidth
+                        value={contactForm.socials.instagram}
+                        onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, instagram: e.target.value } }))}
+                      />
+                      <TextField
+                        label="GitHub URL"
+                        fullWidth
+                        value={contactForm.socials.github}
+                        onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, github: e.target.value } }))}
+                      />
+                    </Stack>
+                  </Box>
+                ),
+              },
+              {
+                key: "websites",
+                node: (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Websites</Typography>
+                    <Stack spacing={1.5} sx={{ mt: 1 }}>
+                      {contactForm.websites.map((item, idx) => (
+                        <Grid container spacing={1} alignItems="center" key={`site-row-${idx}`}>
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              label="Label"
+                              fullWidth
+                              value={item.label}
+                              onChange={(e) =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  websites: prev.websites.map((row, i) => (i === idx ? { ...row, label: e.target.value } : row)),
+                                }))
+                              }
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={5}>
+                            <TextField
+                              label="URL"
+                              fullWidth
+                              value={item.url}
+                              onChange={(e) =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  websites: prev.websites.map((row, i) => (i === idx ? { ...row, url: e.target.value } : row)),
+                                }))
+                              }
+                            />
+                          </Grid>
+                          <Grid item xs={7} md={2}>
+                            <TextField
+                              select
+                              label="Visibility"
+                              fullWidth
+                              value={item.visibility}
+                              onChange={(e) =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  websites: prev.websites.map((row, i) => (i === idx ? { ...row, visibility: e.target.value } : row)),
+                                }))
+                              }
+                            >
+                              {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={5} md={1}>
+                            <IconButton onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}>
+                              <DeleteOutlineRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Grid>
+                        </Grid>
+                      ))}
+                      <Button
+                        variant="outlined"
+                        startIcon={<AddRoundedIcon fontSize="small" />}
+                        onClick={() =>
                           setContactForm((prev) => ({
                             ...prev,
-                            websites: prev.websites.map((row, i) => (i === idx ? { ...row, label: e.target.value } : row)),
-                          }))
-                        }
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={5}>
-                      <TextField
-                        label="URL"
-                        fullWidth
-                        value={item.url}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({
-                            ...prev,
-                            websites: prev.websites.map((row, i) => (i === idx ? { ...row, url: e.target.value } : row)),
-                          }))
-                        }
-                      />
-                    </Grid>
-                    <Grid item xs={7} md={2}>
-                      <TextField
-                        select
-                        label="Visibility"
-                        fullWidth
-                        value={item.visibility}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({
-                            ...prev,
-                            websites: prev.websites.map((row, i) => (i === idx ? { ...row, visibility: e.target.value } : row)),
+                            websites: [...prev.websites, { label: "", url: "", visibility: "private" }],
                           }))
                         }
                       >
-                        {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
-                          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                        ))}
-                      </TextField>
+                        Add website
+                      </Button>
+                    </Stack>
+                  </Box>
+                ),
+              },
+              {
+                key: "scheduler",
+                node: (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Scheduler</Typography>
+                    <Grid container spacing={1} sx={{ mt: 1 }} alignItems="center">
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          label="Label"
+                          fullWidth
+                          value={contactForm.scheduler.label}
+                          onChange={(e) =>
+                            setContactForm((prev) => ({
+                              ...prev,
+                              scheduler: { ...prev.scheduler, label: e.target.value },
+                            }))
+                          }
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={5}>
+                        <TextField
+                          label="URL"
+                          fullWidth
+                          value={contactForm.scheduler.url}
+                          onChange={(e) =>
+                            setContactForm((prev) => ({
+                              ...prev,
+                              scheduler: { ...prev.scheduler, url: e.target.value },
+                            }))
+                          }
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <TextField
+                          select
+                          label="Visibility"
+                          fullWidth
+                          value={contactForm.scheduler.visibility}
+                          onChange={(e) =>
+                            setContactForm((prev) => ({
+                              ...prev,
+                              scheduler: { ...prev.scheduler, visibility: e.target.value },
+                            }))
+                          }
+                        >
+                          {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
                     </Grid>
-                    <Grid item xs={5} md={1}>
-                      <IconButton onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}>
-                        <DeleteOutlineRoundedIcon fontSize="small" />
-                      </IconButton>
-                    </Grid>
-                  </Grid>
-                ))}
-                <Button
-                  variant="outlined"
-                  startIcon={<AddRoundedIcon fontSize="small" />}
-                  onClick={() =>
-                    setContactForm((prev) => ({
-                      ...prev,
-                      websites: [...prev.websites, { label: "", url: "", visibility: "private" }],
-                    }))
-                  }
-                >
-                  Add website
-                </Button>
-              </Stack>
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Scheduler</Typography>
-              <Grid container spacing={1} sx={{ mt: 1 }} alignItems="center">
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="Label"
-                    fullWidth
-                    value={contactForm.scheduler.label}
-                    onChange={(e) =>
-                      setContactForm((prev) => ({
-                        ...prev,
-                        scheduler: { ...prev.scheduler, label: e.target.value },
-                      }))
-                    }
-                  />
-                </Grid>
-                <Grid item xs={12} md={5}>
-                  <TextField
-                    label="URL"
-                    fullWidth
-                    value={contactForm.scheduler.url}
-                    onChange={(e) =>
-                      setContactForm((prev) => ({
-                        ...prev,
-                        scheduler: { ...prev.scheduler, url: e.target.value },
-                      }))
-                    }
-                  />
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    select
-                    label="Visibility"
-                    fullWidth
-                    value={contactForm.scheduler.visibility}
-                    onChange={(e) =>
-                      setContactForm((prev) => ({
-                        ...prev,
-                        scheduler: { ...prev.scheduler, visibility: e.target.value },
-                      }))
-                    }
-                  >
-                    {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-              </Grid>
-            </Box>
+                  </Box>
+                ),
+              },
+            ].filter(s => contactEditSection === "all" || s.key === contactEditSection).map((s, idx, arr) => (
+              <React.Fragment key={s.key}>
+                {s.node}
+                {idx < arr.length - 1 && <Divider />}
+              </React.Fragment>
+            ))}
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setContactOpen(false)}>Cancel</Button>
+          <Button onClick={closeContactEditor}>Cancel</Button>
           <Button
             variant="contained"
             onClick={saveContact}
