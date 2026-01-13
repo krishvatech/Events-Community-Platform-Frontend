@@ -75,6 +75,14 @@ const CONTACT_VISIBILITY_OPTIONS = [
   { value: "public", label: "Public" },
 ];
 
+const SOCIAL_REGEX = {
+  linkedin: /^(https?:\/\/)?(www\.)?linkedin\.com\/.*$/i,
+  x: /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/.*$/i,
+  facebook: /^(https?:\/\/)?(www\.)?facebook\.com\/.*$/i,
+  instagram: /^(https?:\/\/)?(www\.)?instagram\.com\/.*$/i,
+  github: /^(https?:\/\/)?(www\.)?github\.com\/.*$/i,
+};
+
 
 // -------------------- API helpers --------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -1096,6 +1104,14 @@ export default function ProfilePage() {
   const [aboutMode, setAboutMode] = useState("description");
   const [contactOpen, setContactOpen] = useState(false);
   const [contactEditSection, setContactEditSection] = useState("all");
+
+  // Reset errors when opening/closing
+  useEffect(() => {
+    if (contactOpen) {
+      setSocialErrors({ linkedin: "", x: "", facebook: "", instagram: "", github: "" });
+    }
+  }, [contactOpen]);
+
   const [locationOpen, setLocationOpen] = useState(false);
   const [trainingOpen, setTrainingOpen] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
@@ -1132,6 +1148,7 @@ export default function ProfilePage() {
   );
   const [aboutForm, setAboutForm] = useState({ bio: "", skillsText: "" });
   const [contactForm, setContactForm] = useState(() => createEmptyContactForm());
+  const [socialErrors, setSocialErrors] = useState({ linkedin: "", x: "", facebook: "", instagram: "", github: "" });
   const [locationForm, setLocationForm] = useState({ city: "", country: "" });
   const [workOpen, setWorkOpen] = useState(false);
   const [workForm, setWorkForm] = useState({ sector: "", industry: "", employees: "" });
@@ -1987,6 +2004,38 @@ export default function ProfilePage() {
 
   async function saveContact() {
     try {
+      // Validate Socials
+      const errors = { linkedin: "", x: "", facebook: "", instagram: "", github: "" };
+      let hasError = false;
+      const { socials } = contactForm;
+
+      if (socials.linkedin && !SOCIAL_REGEX.linkedin.test(socials.linkedin)) {
+        errors.linkedin = "Invalid LinkedIn URL";
+        hasError = true;
+      }
+      if (socials.x && !SOCIAL_REGEX.x.test(socials.x)) {
+        errors.x = "Invalid X/Twitter URL";
+        hasError = true;
+      }
+      if (socials.facebook && !SOCIAL_REGEX.facebook.test(socials.facebook)) {
+        errors.facebook = "Invalid Facebook URL";
+        hasError = true;
+      }
+      if (socials.instagram && !SOCIAL_REGEX.instagram.test(socials.instagram)) {
+        errors.instagram = "Invalid Instagram URL";
+        hasError = true;
+      }
+      if (socials.github && !SOCIAL_REGEX.github.test(socials.github)) {
+        errors.github = "Invalid GitHub URL";
+        hasError = true;
+      }
+
+      if (hasError) {
+        setSocialErrors(errors);
+        showNotification("error", "Please fix the social profile errors.");
+        return;
+      }
+
       setSaving(true);
       const existingLinks = parseLinks(form.linksText);
       const newLinks = buildLinksWithContact(existingLinks, contactForm);
@@ -3920,31 +3969,56 @@ export default function ProfilePage() {
                     label="LinkedIn URL"
                     fullWidth
                     value={contactForm.socials.linkedin}
-                    onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, linkedin: e.target.value } }))}
+                    error={!!socialErrors.linkedin}
+                    helperText={socialErrors.linkedin || ""}
+                    onChange={(e) => {
+                      setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, linkedin: e.target.value } }));
+                      setSocialErrors((prev) => ({ ...prev, linkedin: "" }));
+                    }}
                   />
                   <TextField
                     label="X URL"
                     fullWidth
                     value={contactForm.socials.x}
-                    onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, x: e.target.value } }))}
+                    error={!!socialErrors.x}
+                    helperText={socialErrors.x || ""}
+                    onChange={(e) => {
+                      setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, x: e.target.value } }));
+                      setSocialErrors((prev) => ({ ...prev, x: "" }));
+                    }}
                   />
                   <TextField
                     label="Facebook URL"
                     fullWidth
                     value={contactForm.socials.facebook}
-                    onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, facebook: e.target.value } }))}
+                    error={!!socialErrors.facebook}
+                    helperText={socialErrors.facebook || ""}
+                    onChange={(e) => {
+                      setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, facebook: e.target.value } }));
+                      setSocialErrors((prev) => ({ ...prev, facebook: "" }));
+                    }}
                   />
                   <TextField
                     label="Instagram URL"
                     fullWidth
                     value={contactForm.socials.instagram}
-                    onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, instagram: e.target.value } }))}
+                    error={!!socialErrors.instagram}
+                    helperText={socialErrors.instagram || ""}
+                    onChange={(e) => {
+                      setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, instagram: e.target.value } }));
+                      setSocialErrors((prev) => ({ ...prev, instagram: "" }));
+                    }}
                   />
                   <TextField
                     label="GitHub URL"
                     fullWidth
                     value={contactForm.socials.github}
-                    onChange={(e) => setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, github: e.target.value } }))}
+                    error={!!socialErrors.github}
+                    helperText={socialErrors.github || ""}
+                    onChange={(e) => {
+                      setContactForm((prev) => ({ ...prev, socials: { ...prev.socials, github: e.target.value } }));
+                      setSocialErrors((prev) => ({ ...prev, github: "" }));
+                    }}
                   />
                 </Stack>
               </Box>
