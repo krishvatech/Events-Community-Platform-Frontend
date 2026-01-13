@@ -561,6 +561,10 @@ function CompanyAutocomplete({ value, onChange, error, helperText }) {
   const [inputValue, setInputValue] = React.useState("");
 
   React.useEffect(() => {
+    setInputValue(value?.name || "");
+  }, [value]);
+
+  React.useEffect(() => {
     let active = true;
 
     if (inputValue === "") {
@@ -598,7 +602,8 @@ function CompanyAutocomplete({ value, onChange, error, helperText }) {
       }}
       options={options}
       loading={loading}
-      value={value}
+      value={value || null}
+      inputValue={inputValue}
       onChange={(event, newValue) => {
         if (typeof newValue === 'string') {
           onChange({ name: newValue, logo: null, domain: null });
@@ -608,7 +613,12 @@ function CompanyAutocomplete({ value, onChange, error, helperText }) {
           onChange(newValue);
         }
       }}
-      onInputChange={(event, newInputValue) => setInputValue(newInputValue)}
+      onInputChange={(event, newInputValue, reason) => {
+        setInputValue(newInputValue);
+        if (reason === "input") {
+          onChange(newInputValue ? { name: newInputValue, logo: null, domain: null } : null);
+        }
+      }}
       renderOption={(props, option) => (
         <ListItem {...props} key={option.domain || option.name}>
           <ListItemAvatar>
