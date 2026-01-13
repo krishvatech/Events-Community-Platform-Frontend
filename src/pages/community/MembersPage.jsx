@@ -483,7 +483,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
   );
 }
 
-function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
+function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOpenProfile }) {
   const hasMarkers = markers && markers.length > 0;
   const SHOW_INDIVIDUAL_DOTS = true;
   function AutoZoom({ markers }) {
@@ -649,6 +649,9 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
                   key={i}
                   center={[lat, lng]}
                   radius={3}
+                  eventHandlers={{
+                    click: () => onOpenProfile?.(m.user),
+                  }}
                   pathOptions={{
                     color: "#ffffff",
                     weight: 1,
@@ -658,8 +661,11 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580 }) {
                     fillOpacity: 1,
                   }}
                 >
-                  <LeafletTooltip direction="top" offset={[0, -4]}>
-                    <Box sx={{ fontSize: 12 }}>
+                  <LeafletTooltip direction="top" offset={[0, -4]} interactive>
+                    <Box
+                      sx={{ fontSize: 12, cursor: "pointer" }}
+                      onClick={() => onOpenProfile?.(m.user)}
+                    >
                       <div style={{ fontWeight: 600 }}>{m.userName}</div>
                       <div style={{ opacity: 0.85 }}>
                         {m.isFriend ? "My Contact" : "Member"}
@@ -1024,6 +1030,7 @@ export default function MembersPage() {
           isFriend: item.isFriend,
           userName: userDisplayName(item.user),
           countryCode: code,
+          user: item.user,
         });
       });
     });
@@ -1622,6 +1629,7 @@ export default function MembersPage() {
                 markers={markers}
                 countryAgg={countryAgg}
                 showMap={showMap}
+                onOpenProfile={handleOpenProfile}
               />
             </Paper>
           </Box>
@@ -1731,6 +1739,7 @@ export default function MembersPage() {
               countryAgg={countryAgg}
               showMap={showMap}
               minHeight={360}
+              onOpenProfile={handleOpenProfile}
             />
           </Paper>
         </Box>
