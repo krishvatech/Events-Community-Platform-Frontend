@@ -128,7 +128,7 @@ const fmtDateRange = (start, end) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Members", "Resources"];
+const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Resources"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 const MEMBERS_PER_PAGE = 5;
 const RESOURCES_PER_PAGE = 5;
@@ -641,7 +641,7 @@ export default function EventManagePage() {
               variant="subtitle1"
               sx={{ fontWeight: 600, mb: 0.25 }}
             >
-              Members
+              REGISTERED MEMBERS
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
               People who have purchased this event.
