@@ -48,6 +48,12 @@ import IosShareIcon from "@mui/icons-material/IosShare";
 import SearchIcon from "@mui/icons-material/Search";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import LinkedInIcon from "@mui/icons-material/LinkedIn";
+import TwitterIcon from "@mui/icons-material/Twitter";
+import FacebookIcon from "@mui/icons-material/Facebook";
+import InstagramIcon from "@mui/icons-material/Instagram";
+import GitHubIcon from "@mui/icons-material/GitHub";
+import LanguageIcon from "@mui/icons-material/Language";
 
 
 
@@ -61,6 +67,30 @@ const tokenHeader = () => {
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
+
+function parseLinks(value) {
+  const v = (value ?? "").toString().trim();
+  if (!v) return {};
+  try {
+    const j = JSON.parse(v);
+    if (j && typeof j === "object" && !Array.isArray(j)) return j;
+  } catch { }
+  const out = {};
+  v.split(/\n|,|;/).forEach((part) => {
+    const [k, ...rest] = part.split("=");
+    const key = (k || "").trim();
+    const val = rest.join("=").trim();
+    if (key && val) out[key] = val;
+  });
+  return out;
+}
+
+function normalizeUrl(value) {
+  const v = (value || "").trim();
+  if (!v) return "";
+  if (/^https?:\/\//i.test(v)) return v;
+  return `https://${v}`;
+}
 
 const POST_REACTIONS = [
   { id: "like", label: "Like", emoji: "👍" },
@@ -1945,6 +1975,7 @@ export default function RichProfile() {
   const [experiences, setExperiences] = useState([]);
   const [educations, setEducations] = useState([]);
   const [loadingExtras, setLoadingExtras] = useState(true);
+  const [profileLinks, setProfileLinks] = useState({});
 
   const me = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
@@ -2092,7 +2123,7 @@ export default function RichProfile() {
   // In this rich profile we show two tabs: Posts and About. Posts are mocked
   // locally. When integrating with a backend, replace MOCK_POSTS with
   // fetched posts for this user. The tab state controls which tab is active.
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(1);
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(true);
 
@@ -2467,10 +2498,19 @@ export default function RichProfile() {
 
       const exps = Array.isArray(j?.experiences) ? j.experiences : [];
       const edus = Array.isArray(j?.educations) ? j.educations : [];
+      const rawLinks =
+        j?.links ||
+        j?.profile?.links ||
+        j?.profile?.links_text ||
+        j?.profile?.linksText ||
+        {};
+      const parsedLinks = typeof rawLinks === "string" ? parseLinks(rawLinks) : rawLinks;
+      const links = (parsedLinks && typeof parsedLinks === "object") ? parsedLinks : {};
 
       if (!alive) return;
       setExperiences(exps);
       setEducations(edus);
+      setProfileLinks(links);
       setLoadingExtras(false);
     })();
     return () => { alive = false; };
@@ -2495,6 +2535,92 @@ export default function RichProfile() {
     userItem?.profile?.job_title ||
     userItem?.profile?.role ||
     "";
+
+  const canViewContactVisibility = (visibility) => {
+    const v = (visibility || "public").toLowerCase();
+    if (v === "public" || !v) return true;
+    if (v === "contacts") return isMe || friendStatus === "friends";
+    if (v === "private") return isMe;
+    return isMe;
+  };
+
+  const resolvedLinks = useMemo(() => {
+    const fromUser =
+      userItem?.profile?.links && typeof userItem.profile.links === "object"
+        ? userItem.profile.links
+        : {};
+    const fromUserText = parseLinks(
+      userItem?.profile?.links_text || userItem?.profile?.linksText
+    );
+    const fromProfile =
+      profileLinks && typeof profileLinks === "object" ? profileLinks : {};
+    return { ...fromUserText, ...fromUser, ...fromProfile };
+  }, [profileLinks, userItem]);
+
+  const socialItems = useMemo(() => {
+    const contactSocials =
+      resolvedLinks?.contact?.socials && typeof resolvedLinks.contact.socials === "object"
+        ? resolvedLinks.contact.socials
+        : {};
+    const pickSocial = (key, fallbacks = []) => {
+      const direct = resolvedLinks[key] || fallbacks.map((f) => resolvedLinks[f]).find(Boolean);
+      if (direct) return { url: direct, visibility: "public" };
+      const fromContact = contactSocials[key];
+      if (typeof fromContact === "string") return { url: fromContact, visibility: "public" };
+      if (fromContact && typeof fromContact === "object") {
+        return { url: fromContact.url || fromContact.link || "", visibility: fromContact.visibility || "public" };
+      }
+      return { url: "", visibility: "public" };
+    };
+
+    const socials = [
+      { key: "linkedin", label: "LinkedIn", icon: <LinkedInIcon fontSize="small" />, ...pickSocial("linkedin", ["linkedIn"]) },
+      { key: "x", label: "X", icon: <TwitterIcon fontSize="small" />, ...pickSocial("x", ["twitter"]) },
+      { key: "facebook", label: "Facebook", icon: <FacebookIcon fontSize="small" />, ...pickSocial("facebook") },
+      { key: "instagram", label: "Instagram", icon: <InstagramIcon fontSize="small" />, ...pickSocial("instagram") },
+      { key: "github", label: "GitHub", icon: <GitHubIcon fontSize="small" />, ...pickSocial("github") },
+    ];
+    return socials
+      .filter((s) => canViewContactVisibility(s.visibility))
+      .map((s) => ({ ...s, url: normalizeUrl(s.url) }))
+      .filter((s) => s.url);
+  }, [resolvedLinks, friendStatus, isMe]);
+
+  const portfolioLinks = useMemo(() => {
+    const out = [];
+    const seen = new Set();
+    const add = (label, url) => {
+      const clean = normalizeUrl(url);
+      if (!clean) return;
+      const key = clean.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ label, url: clean });
+    };
+
+    add("Portfolio", resolvedLinks.portfolio);
+    add("Website", resolvedLinks.website || resolvedLinks.site);
+
+    if (Array.isArray(resolvedLinks.websites)) {
+      resolvedLinks.websites.forEach((item) => {
+        if (typeof item === "string") add("Website", item);
+        else add(item?.label || "Website", item?.url);
+      });
+    }
+
+    if (Array.isArray(resolvedLinks?.contact?.websites)) {
+      resolvedLinks.contact.websites.forEach((item) => {
+        if (typeof item === "string") {
+          add("Website", item);
+          return;
+        }
+        if (!canViewContactVisibility(item?.visibility)) return;
+        add(item?.label || "Website", item?.url);
+      });
+    }
+
+    return out;
+  }, [resolvedLinks, friendStatus, isMe]);
 
   /* =========================
      Connections popup (friends list)
