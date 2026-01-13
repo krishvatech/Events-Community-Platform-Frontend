@@ -3614,7 +3614,9 @@ function AboutTab({
               {socialItems.filter((item) => item.url).length ? (
                 socialItems.filter((item) => item.url).map((item) => (
                   <Box key={item.key} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {item.icon}
+                    <Box component="a" href={item.url} target="_blank" rel="noopener noreferrer" sx={{ color: "inherit", display: "flex" }}>
+                      {item.icon}
+                    </Box>
                     <Typography
                       variant="body2"
                       component="a"
@@ -3638,15 +3640,19 @@ function AboutTab({
               {websitePreview.length ? (
                 websitePreview.map((item, idx) => (
                   <Box key={`site-${idx}`} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <LinkIcon fontSize="small" />
-                    <Typography variant="body2">{item.label || "Website"}</Typography>
+                    <Box component="a" href={item.url} target="_blank" rel="noopener noreferrer" sx={{ color: "inherit", display: "flex", textDecoration: "none", alignItems: "center", gap: 1 }}>
+                      <LinkIcon fontSize="small" />
+                      <Typography variant="body2" sx={{ textDecoration: "underline" }}>
+                        {item.label || "Website"}
+                      </Typography>
+                    </Box>
                     <Typography
                       variant="body2"
                       component="a"
                       href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      sx={{ wordBreak: "break-word" }}
+                      sx={{ wordBreak: "break-word", ml: "auto" }}
                     >
                       {item.url}
                     </Typography>
@@ -3665,17 +3671,27 @@ function AboutTab({
 
           <SectionCard title="Scheduling Link" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("scheduler")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-              <CalendarTodayIcon fontSize="small" />
+              {contactLinks.scheduler?.url ? (
+                <Box component="a" href={contactLinks.scheduler.url} target="_blank" rel="noopener noreferrer" sx={{ color: "inherit", display: "flex" }}>
+                  <CalendarTodayIcon fontSize="small" />
+                </Box>
+              ) : (
+                <CalendarTodayIcon fontSize="small" />
+              )}
               {contactLinks.scheduler?.url ? (
                 <>
-                  <Typography variant="body2">{contactLinks.scheduler.label || "Scheduler"}</Typography>
+                  <Box component="a" href={contactLinks.scheduler.url} target="_blank" rel="noopener noreferrer" sx={{ color: "inherit", display: "flex", textDecoration: "none", alignItems: "center", gap: 1 }}>
+                    <Typography variant="body2" sx={{ textDecoration: "underline" }}>
+                      {contactLinks.scheduler.label || "Scheduler"}
+                    </Typography>
+                  </Box>
                   <Typography
                     variant="body2"
                     component="a"
                     href={contactLinks.scheduler.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    sx={{ wordBreak: "break-word" }}
+                    sx={{ wordBreak: "break-word", ml: "auto" }}
                   >
                     {contactLinks.scheduler.url}
                   </Typography>
