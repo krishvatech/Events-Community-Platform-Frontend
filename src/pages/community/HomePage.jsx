@@ -1250,6 +1250,7 @@ export default function HomePage() {
             saveLanguage={saveLanguage}
             deleteLanguage={deleteLanguage}
             handleDeleteCertificate={handleDeleteCertificate}
+            onStartKYC={handleStartKYC}
           />
         )}
 
@@ -2138,6 +2139,78 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect }) {
 
 
 
+function VerificationCard({ status, onVerify }) {
+  const isVerified = status === "approved";
+  const isPending = status === "pending" || status === "review";
+  const today = new Date().toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' });
+
+  return (
+    <SectionCard
+      title="Verification"
+      sx={{
+        mb: 2,
+        borderColor: isVerified ? "primary.light" : isPending ? "#14b8a6" : "divider",
+        bgcolor: isVerified ? "primary.50" : isPending ? "#f0fdfa" : "background.paper"
+      }}
+    >
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", textAlign: "center", pb: 1 }}>
+        {isVerified ? (
+          <>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "primary.main" }}>
+              <VerifiedRoundedIcon sx={{ fontSize: 40 }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                Verified Profile
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Your profile has been verified on {today}. This will provide you with more benefits of the community platform.
+              </Typography>
+            </Box>
+          </>
+        ) : isPending ? (
+          <>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#14b8a6" }}>
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  border: "3px solid",
+                  borderColor: "#14b8a6",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 24
+                }}
+              >
+                ⏳
+              </Box>
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                Verification {status === "review" ? "Under Review" : "Pending"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Your verification request is currently being processed. You will be notified once the review is complete.
+              </Typography>
+            </Box>
+          </>
+        ) : (
+          <>
+            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+              Verify your profile and identity to unleash all benefits of the community platform.
+            </Typography>
+            <Button variant="contained" color="primary" onClick={onVerify} sx={{ px: 4, borderRadius: 20 }}>
+              GET VERIFIED
+            </Button>
+          </>
+        )}
+      </Box>
+    </SectionCard>
+  );
+}
+
 function AboutTab({
   profile,
   onUpdate,
@@ -2162,6 +2235,7 @@ function AboutTab({
   saveLanguage,
   deleteLanguage,
   handleDeleteCertificate,
+  onStartKYC,
 }) {
 
   const [aboutOpen, setAboutOpen] = React.useState(false);
@@ -3132,6 +3206,8 @@ function AboutTab({
       <Grid container spacing={2} sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, alignItems: "flex-start" }}>
         {/* LEFT: About / Skills / Experience / Education */}
         <Grid item xs={12} sx={{ display: "flex", flexDirection: "column", gap: 2, flexBasis: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, maxWidth: { xs: "100%", sm: "345px", md: "540px", lg: "540px", xl: "540px" }, flexShrink: 0, "@media (min-width:1024px) and (max-width:1024px)": { flexBasis: "330px", maxWidth: "330px" } }}>
+
+          <VerificationCard status={profile.kyc_status} onVerify={onStartKYC} />
 
           <SectionCard title="About" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => { setAboutMode("description"); setAboutOpen(true); }}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>} sx={{ minHeight: 160, display: "flex", flexDirection: "column" }}>
             <Typography

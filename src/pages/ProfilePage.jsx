@@ -672,6 +672,78 @@ function SectionCard({ title, action, children, sx }) {
   );
 }
 
+function VerificationCard({ status, onVerify }) {
+  const isVerified = status === "approved";
+  const isPending = status === "pending" || status === "review";
+  const today = new Date().toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' });
+
+  return (
+    <SectionCard
+      title="Verification"
+      sx={{
+        mb: 2,
+        borderColor: isVerified ? "primary.light" : isPending ? "#14b8a6" : "divider",
+        bgcolor: isVerified ? "primary.50" : isPending ? "#f0fdfa" : "background.paper"
+      }}
+    >
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", textAlign: "center", pb: 1 }}>
+        {isVerified ? (
+          <>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "primary.main" }}>
+              <VerifiedRoundedIcon sx={{ fontSize: 40 }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                Verified Profile
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Your profile has been verified on {today}. This will provide you with more benefits of the community platform.
+              </Typography>
+            </Box>
+          </>
+        ) : isPending ? (
+          <>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#14b8a6" }}>
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  border: "3px solid",
+                  borderColor: "#14b8a6",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 24
+                }}
+              >
+                ⏳
+              </Box>
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                Verification {status === "review" ? "Under Review" : "Pending"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Your verification request is currently being processed. You will be notified once the review is complete.
+              </Typography>
+            </Box>
+          </>
+        ) : (
+          <>
+            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+              Verify your profile and identity to unleash all benefits of the community platform.
+            </Typography>
+            <Button variant="contained" color="primary" onClick={onVerify} sx={{ px: 4, borderRadius: 20 }}>
+              GET VERIFIED
+            </Button>
+          </>
+        )}
+      </Box>
+    </SectionCard>
+  );
+}
+
 function SectionSkeleton({ minHeight = 140, lines = 3 }) {
   return (
     <Card
@@ -1084,6 +1156,23 @@ export default function ProfilePage() {
   // New helper for consistent toast notifications
   const showNotification = (type, msg) => {
     setSnack({ open: true, sev: type, msg });
+  };
+
+  // KYC Verification Handler
+  const handleStartKYC = async () => {
+    try {
+      showNotification("info", "Initiating verification...");
+      const data = await startKYC();
+
+      if (data.url) {
+        // Redirect user to Didit
+        window.location.href = data.url;
+      } else {
+        showNotification("error", "Could not start verification. Please try again.");
+      }
+    } catch (error) {
+      showNotification("error", error.message);
+    }
   };
 
   const [mode, setMode] = useState("preview");
@@ -1661,22 +1750,6 @@ export default function ProfilePage() {
   }
 
   useEffect(() => { loadMeExtras(); fetchMyFriends(); loadUserSkills(); }, []);
-
-  const handleStartKYC = async () => {
-    try {
-      // Use global loading or a specific button loading state
-      showNotification("info", "Initiating verification...");
-      const data = await startKYC();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        showNotification("error", "Could not start verification. Please try again.");
-      }
-    } catch (error) {
-      showNotification("error", error.message);
-    }
-  };
 
   async function fetchSkillOptions(query) {
     // REMOVED: The check that returns early if !q
@@ -2799,6 +2872,7 @@ export default function ProfilePage() {
                   <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
                     {/* LEFT COLUMN */}
                     <Grid item xs={12} lg={6}>
+                      <VerificationCard status={form.kyc_status} onVerify={handleStartKYC} />
                       <SectionCard
                         title="About"
                         action={
