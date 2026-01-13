@@ -174,6 +174,7 @@ function toCard(ev) {
     topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
     attendees: Number(ev.attending_count ?? ev.registrations_count ?? 0),
     price: ev.price,
+    is_free: ev.is_free || false,
     registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
   };
 }
@@ -314,7 +315,13 @@ function EventCard({ ev }) {
 
       {/* Footer */}
       <div className="flex items-center justify-between border-t p-6">
-        <div className="text-xl font-semibold text-neutral-900">{priceStr(ev.price)}</div>
+        <div className="text-xl font-semibold text-neutral-900">
+          {ev.is_free ? (
+            <span className="text-teal-600">Free to Join</span>
+          ) : (
+            priceStr(ev.price)
+          )}
+        </div>
 
         {/* Hide register button for owner users */}
         {!owner && (
@@ -475,7 +482,11 @@ function EventRow({ ev }) {
               </div>
 
               <div className="mt-3 text-base font-semibold text-neutral-900">
-                {priceStr(ev.price)}
+                {ev.is_free ? (
+                  <span className="text-teal-600">Free to Join</span>
+                ) : (
+                  priceStr(ev.price)
+                )}
               </div>
             </div>
 

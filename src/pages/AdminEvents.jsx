@@ -279,6 +279,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [category, setCategory] = React.useState("Workshop");
   const [format, setFormat] = React.useState("virtual");
   const [price, setPrice] = React.useState();
+  const [isFree, setIsFree] = React.useState(false);
 
   const today = dayjs().format("YYYY-MM-DD");
   const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);
@@ -348,6 +349,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setCategory("Workshop");
     setFormat("virtual");
     setPrice(0);
+    setIsFree(false);
 
     setStartDate(sch.startDate);
     setEndDate(sch.endDate);
@@ -382,12 +384,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (!location.trim()) e.location = "Required";
     if (!description.trim()) e.description = "Required";
     const priceValue = Number(price);
-    if (price === "" || price === null || typeof price === "undefined") {
-      e.price = "Price is required";
-    } else if (!Number.isFinite(priceValue)) {
-      e.price = "Price must be a valid number";
-    } else if (priceValue < 1) {
-      e.price = "Price must be >= 1";
+    if (!isFree) {
+      if (price === "" || price === null || typeof price === "undefined") {
+        e.price = "Price is required (or mark as free)";
+      } else if (!Number.isFinite(priceValue)) {
+        e.price = "Price must be a valid number";
+      } else if (priceValue < 1) {
+        e.price = "Price must be >= 1";
+      }
     }
 
     const s = dayjs.tz(`${startDate}T${startTime}:00`, timezone);
@@ -420,7 +424,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("location", location.trim());
     fd.append("category", category);
     fd.append("format", format);
-    fd.append("price", String(price ?? 0));
+    fd.append("price", String(isFree ? 0 : (price ?? 0)));
+    fd.append("is_free", String(isFree));
     fd.append("timezone", timezone);
     fd.append("start_time", toUTCISO(startDate, startTime, timezone));
     fd.append("end_time", toUTCISO(endDate, endTime, timezone));
@@ -578,9 +583,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   />
                 )}
               />
-              <Grid container spacing={2}>
-                {/* Category – full width */}
-                <Grid item xs={12}>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                {/* Category – half width */}
+                <Grid item xs={12} sm={6}>
                   <TextField
                     label="Category"
                     select
@@ -596,8 +601,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   </TextField>
                 </Grid>
 
-                {/* Format – full width */}
-                <Grid item xs={12}>
+                {/* Format – half width */}
+                <Grid item xs={12} sm={6}>
                   <TextField
                     label="Format"
                     select
@@ -623,8 +628,16 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 fullWidth
                 error={!!errors.price}
                 helperText={errors.price}
-                sx={{ mt: 2 }}
+                disabled={isFree}
+                sx={{ mt: 3 }}
               />
+
+              <Box sx={{ mt: 1.5, mb: 1 }}>
+                <FormControlLabel
+                  control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
+                  label="Free Event (all users can register)"
+                />
+              </Box>
 
               {/* hidden slug */}
               <Box sx={{ display: "none" }}>
@@ -990,6 +1003,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const [price, setPrice] = useState(
     typeof event?.price === "number" ? event.price : Number(event?.price || 0)
   );
+  const [isFree, setIsFree] = useState(event?.is_free || false);
 
   const [startDate, setStartDate] = useState(initialStart.format("YYYY-MM-DD"));
   const [endDate, setEndDate] = useState(initialEnd.format("YYYY-MM-DD"));
@@ -1022,6 +1036,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     setCategory(event?.category || "Workshop");
     setFormat(event?.format || "virtual");
     setPrice(typeof event?.price === "number" ? event.price : Number(event?.price || 0));
+    setIsFree(event?.is_free || false);
 
     const start = event?.start_time ? dayjs(event.start_time).tz(tz) : dayjs();
     const end = event?.end_time ? dayjs(event.end_time).tz(tz) : start.add(2, "hour");
@@ -1052,12 +1067,14 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     if (!location.trim()) e.location = "Required";
     if (!description.trim()) e.description = "Description is required";
     const priceValue = Number(price);
-    if (price === "" || price === null || typeof price === "undefined") {
-      e.price = "Price is required";
-    } else if (!Number.isFinite(priceValue)) {
-      e.price = "Price must be a valid number";
-    } else if (priceValue < 1) {
-      e.price = "Price must be >= 1";
+    if (!isFree) {
+      if (price === "" || price === null || typeof price === "undefined") {
+        e.price = "Price is required (or mark as free)";
+      } else if (!Number.isFinite(priceValue)) {
+        e.price = "Price must be a valid number";
+      } else if (priceValue < 1) {
+        e.price = "Price must be >= 1";
+      }
     }
 
     if (startDate && endDate) {
@@ -1093,7 +1110,8 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     fd.append("location", location.trim());
     fd.append("category", category);
     fd.append("format", format);
-    fd.append("price", String(price ?? 0));
+    fd.append("price", String(isFree ? 0 : (price ?? 0)));
+    fd.append("is_free", String(isFree));
     fd.append("timezone", timezone);
     fd.append("start_time", combineToISO(startDate, startTime));
     fd.append("end_time", combineToISO(endDate, endTime));
@@ -1210,26 +1228,41 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                 )}
               />
 
-              <TextField
-                label="Category" select fullWidth className="mb-3"
-                value={category} onChange={(e) => setCategory(e.target.value)}
-              >
-                {categories.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-              </TextField>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Category" select fullWidth
+                    value={category} onChange={(e) => setCategory(e.target.value)}
+                  >
+                    {categories.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                  </TextField>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Format" select fullWidth
+                    value={format} onChange={(e) => setFormat(e.target.value)}
+                  >
+                    {formats.map((f) => <MenuItem key={f.value} value={f.value}>{f.label}</MenuItem>)}
+                  </TextField>
+                </Grid>
+              </Grid>
 
               <TextField
-                label="Format" select fullWidth className="mb-3"
-                value={format} onChange={(e) => setFormat(e.target.value)}
-              >
-                {formats.map((f) => <MenuItem key={f.value} value={f.value}>{f.label}</MenuItem>)}
-              </TextField>
-
-              <TextField
-                label="Price (₹)" type="number" fullWidth className="mb-3"
+                label="Price (₹)" type="number" fullWidth
                 value={price} onChange={(e) => setPrice(e.target.value)}
                 inputProps={{ min: 0, step: "0.01" }}
                 error={!!errors.price} helperText={errors.price}
+                disabled={isFree}
+                sx={{ mt: 3 }}
               />
+
+              <Box sx={{ mt: 1.5, mb: 2 }}>
+                <FormControlLabel
+                  control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
+                  label="Free Event (all users can register)"
+                />
+              </Box>
 
               {/* keep slug hidden but present */}
               <Box sx={{ display: "none" }}>
