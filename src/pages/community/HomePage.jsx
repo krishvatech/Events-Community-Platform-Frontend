@@ -245,6 +245,7 @@ const CONTACT_EMAIL_TYPES = [
   { value: "professional", label: "Professional" },
   { value: "educational", label: "Educational" },
   { value: "personal", label: "Personal" },
+  { value: "", label: "Uncategorized" },
 ];
 
 const CONTACT_PHONE_TYPES = [
@@ -261,6 +262,7 @@ const CONTACT_VISIBILITY_OPTIONS = [
 function createEmptyContactForm() {
   return {
     emails: [],
+    main_email: { type: "", visibility: "private" },
     phones: [],
     websites: [],
     scheduler: { label: "Calendly", url: "", visibility: "private" },
@@ -275,12 +277,18 @@ function buildContactFormFromLinks(links) {
   const websites = Array.isArray(contact.websites) ? contact.websites : [];
   const scheduler = contact.scheduler && typeof contact.scheduler === "object" ? contact.scheduler : {};
 
+  const main_email = contact.main_email || { type: "", visibility: "private" };
+
   return {
     emails: emails.map((item) => ({
       email: item?.email || "",
       type: item?.type || "professional",
       visibility: item?.visibility || "private",
     })),
+    main_email: {
+      type: main_email.type || "",
+      visibility: main_email.visibility || "private",
+    },
     phones: phones.map((item) => ({
       number: item?.number || "",
       type: item?.type || "professional",
@@ -333,6 +341,11 @@ function buildLinksWithContact(existingLinks, contactForm) {
     }))
     .filter((item) => item.email);
 
+  const main_email = {
+    type: contactForm?.main_email?.type || "",
+    visibility: contactForm?.main_email?.visibility || "private",
+  };
+
   let phones = (contactForm?.phones || [])
     .map((item) => ({
       number: (item?.number || "").trim(),
@@ -365,6 +378,7 @@ function buildLinksWithContact(existingLinks, contactForm) {
 
   const contact = {};
   if (emails.length) contact.emails = emails;
+  if (main_email) contact.main_email = main_email;
   if (phones.length) contact.phones = phones;
   if (websites.length) contact.websites = websites;
   if (scheduler) contact.scheduler = scheduler;
@@ -3511,6 +3525,11 @@ function AboutTab({
                 <EmailIcon fontSize="small" />
                 <Typography variant="body2">{profile.email || "\u2014"}</Typography>
                 <Chip label="Main" size="small" color="primary" variant="outlined" />
+                {profile.links?.contact?.main_email?.type && (
+                  <Typography variant="caption" color="text.secondary">
+                    ({CONTACT_EMAIL_TYPES.find(t => t.value === profile.links.contact.main_email.type)?.label || profile.links.contact.main_email.type})
+                  </Typography>
+                )}
               </Box>
               {emailPreview.map((item, idx) => (
                 <Box key={`email-${idx}`} sx={{ display: "flex", alignItems: "center", gap: 1, pl: 3 }}>
@@ -3942,16 +3961,73 @@ function AboutTab({
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Emails</Typography>
                     <Stack spacing={1.5} sx={{ mt: 1 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <TextField label="Main Email" type="email" fullWidth value={profile.email || ""} disabled />
-                        <Chip label="Main" size="small" color="primary" variant="outlined" />
-                      </Box>
+                      {/* Main Email Row */}
+                      <Grid container spacing={1} alignItems="center">
+                        <Grid item xs={12} md={5}>
+                          <TextField
+                            label="Main Email"
+                            fullWidth
+                            disabled
+                            value={profile.email || ""}
+                            helperText="Primary account email"
+                          />
+                        </Grid>
+                        <Grid item xs={6} md={4}>
+                          <TextField
+                            select
+                            label="Type"
+                            fullWidth
+                            value={contactForm.main_email?.type || ""}
+                            SelectProps={{
+                              displayEmpty: true,
+                              renderValue: (selected) => {
+                                if (selected === "") return "Uncategorized";
+                                return CONTACT_EMAIL_TYPES.find(t => t.value === selected)?.label || selected;
+                              }
+                            }}
+                            InputLabelProps={{ shrink: true }}
+                            onChange={(e) =>
+                              setContactForm((prev) => ({
+                                ...prev,
+                                main_email: { ...prev.main_email, type: e.target.value },
+                              }))
+                            }
+                          >
+                            {CONTACT_EMAIL_TYPES.map((opt) => (
+                              <MenuItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                          <TextField
+                            select
+                            label="Visibility"
+                            fullWidth
+                            value={contactForm.main_email?.visibility || "private"}
+                            onChange={(e) =>
+                              setContactForm((prev) => ({
+                                ...prev,
+                                main_email: { ...prev.main_email, visibility: e.target.value },
+                              }))
+                            }
+                          >
+                            {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
+                              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                            ))}
+                          </TextField>
+                        </Grid>
+                        {/* No delete for main email */}
+                      </Grid>
+
+                      <Divider sx={{ my: 1 }} />
+
                       {contactForm.emails.map((item, idx) => (
                         <Grid container spacing={1} alignItems="center" key={`email-row-${idx}`}>
-                          <Grid item xs={12} md={6}>
+                          <Grid item xs={12} md={5}>
                             <TextField
-                              label="Email"
-                              type="email"
+                              label="Email Address"
                               fullWidth
                               value={item.email}
                               onChange={(e) =>
@@ -3980,7 +4056,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={5} md={2}>
+                          <Grid item xs={6} md={3}>
                             <TextField
                               select
                               label="Visibility"
