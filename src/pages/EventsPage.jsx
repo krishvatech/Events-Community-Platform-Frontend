@@ -174,7 +174,7 @@ function toCard(ev) {
     end: ev.end_time,                        // DateTimeField
     location: ev.location,
     topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
-    attendees: Number(ev.attending_count ?? ev.registrations_count ?? 0),
+    attendees: Number(ev.registrations_count ?? ev.attending_count ?? 0),
     price: ev.price,
     is_free: ev.is_free || false,
     registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
