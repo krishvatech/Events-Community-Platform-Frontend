@@ -298,7 +298,7 @@ function createEmptyContactForm() {
     main_email: { type: "", visibility: "private" },
     phones: [],
     websites: [],
-    scheduler: { label: "Calendly", url: "", visibility: "private" },
+    scheduler: { label: "Calendly", url: "https://calendly.com/me", visibility: "private" },
     socials: { linkedin: "", x: "", facebook: "", instagram: "", github: "" },
   };
 }
@@ -335,7 +335,7 @@ function buildContactFormFromLinks(links) {
     })),
     scheduler: {
       label: scheduler?.label || "Calendly",
-      url: scheduler?.url || "",
+      url: scheduler?.url || "https://calendly.com/me",
       visibility: scheduler?.visibility || "private",
     },
     socials: {

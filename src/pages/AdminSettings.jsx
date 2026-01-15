@@ -733,7 +733,7 @@ function createEmptyContactForm() {
     emails: [],
     phones: [],
     websites: [],
-    scheduler: { label: "Calendly", url: "", visibility: "private" },
+    scheduler: { label: "Calendly", url: "https://calendly.com/me", visibility: "private" },
     socials: { linkedin: "", x: "", facebook: "", instagram: "", github: "" },
     main_email: { type: "", visibility: "private" },
   };
@@ -774,7 +774,7 @@ function buildContactFormFromLinks(links) {
     })),
     scheduler: {
       label: scheduler?.label || "Calendly",
-      url: scheduler?.url || "",
+      url: scheduler?.url || "https://calendly.com/me",
       visibility: scheduler?.visibility || "private",
     },
     socials: {
@@ -2903,7 +2903,6 @@ export default function AdminSettings() {
           ) : (
             <Stack spacing={3}>
               <Box><Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: 0.2 }}>Admin Settings</Typography><Typography variant="body2" sx={{ color: "text.secondary" }}>Update how you appear as an admin across the community.</Typography></Box>
-              <VerificationCard status={profile.kyc_status} onVerify={handleStartKYC} />
               <Card variant="outlined" sx={{ borderRadius: 3, borderColor: "divider", boxShadow: { xs: "none", md: "0 18px 45px rgba(15,23,42,0.08)" } }}>
                 <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
                   <Grid container spacing={{ xs: 3, md: 4 }} alignItems="flex-start">
