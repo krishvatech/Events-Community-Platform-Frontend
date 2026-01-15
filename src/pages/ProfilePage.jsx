@@ -1250,6 +1250,7 @@ export default function ProfilePage() {
   const [socialErrors, setSocialErrors] = useState({ linkedin: "", x: "", facebook: "", instagram: "", github: "" });
   const [emailErrors, setEmailErrors] = useState({});
   const [phoneErrors, setPhoneErrors] = useState({});
+  const [websiteErrors, setWebsiteErrors] = useState({});
   const [locationForm, setLocationForm] = useState({ city: "", country: "" });
   const [workOpen, setWorkOpen] = useState(false);
   const [workForm, setWorkForm] = useState({ sector: "", industry: "", employees: "" });
@@ -2154,6 +2155,30 @@ export default function ProfilePage() {
       if (hasPhoneError) {
         setPhoneErrors(newPhoneErrors);
         showNotification("error", "Please fix invalid phone numbers");
+        return;
+      }
+
+      // Validate Websites
+      const newWebsiteErrors = {};
+      let hasWebsiteError = false;
+      const WEBSITE_REGEX = /^https:\/\/([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i;
+
+      contactForm.websites.forEach((item, idx) => {
+        const url = (item.url || "").trim();
+        const label = (item.label || "").trim();
+
+        if (label && !url) {
+          newWebsiteErrors[idx] = "URL is required";
+          hasWebsiteError = true;
+        } else if (url && !WEBSITE_REGEX.test(url)) {
+          newWebsiteErrors[idx] = "Must start with https://";
+          hasWebsiteError = true;
+        }
+      });
+
+      if (hasWebsiteError) {
+        setWebsiteErrors(newWebsiteErrors);
+        showNotification("error", "Please fix invalid website URLs");
         return;
       }
 
@@ -4202,12 +4227,18 @@ export default function ProfilePage() {
                           label="URL"
                           fullWidth
                           value={item.url}
-                          onChange={(e) =>
+                          error={!!websiteErrors[idx]}
+                          helperText={websiteErrors[idx] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
                             setContactForm((prev) => ({
                               ...prev,
-                              websites: prev.websites.map((row, i) => (i === idx ? { ...row, url: e.target.value } : row)),
-                            }))
-                          }
+                              websites: prev.websites.map((row, i) => (i === idx ? { ...row, url: val } : row)),
+                            }));
+                            if (websiteErrors[idx]) {
+                              setWebsiteErrors((prev) => ({ ...prev, [idx]: "" }));
+                            }
+                          }}
                         />
                       </Grid>
                       <Grid item xs={7} sm={2}>
