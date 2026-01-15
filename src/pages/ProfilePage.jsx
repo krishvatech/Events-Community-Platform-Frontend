@@ -1248,6 +1248,7 @@ export default function ProfilePage() {
   const [aboutForm, setAboutForm] = useState({ bio: "", skillsText: "" });
   const [contactForm, setContactForm] = useState(() => createEmptyContactForm());
   const [socialErrors, setSocialErrors] = useState({ linkedin: "", x: "", facebook: "", instagram: "", github: "" });
+  const [emailErrors, setEmailErrors] = useState({});
   const [locationForm, setLocationForm] = useState({ city: "", country: "" });
   const [workOpen, setWorkOpen] = useState(false);
   const [workForm, setWorkForm] = useState({ sector: "", industry: "", employees: "" });
@@ -2119,6 +2120,22 @@ export default function ProfilePage() {
         return;
       }
 
+      // Validate Emails
+      const newEmailErrors = {};
+      let hasEmailError = false;
+      contactForm.emails.forEach((item, idx) => {
+        if (item.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.email)) {
+          newEmailErrors[idx] = "Invalid email format";
+          hasEmailError = true;
+        }
+      });
+
+      if (hasEmailError) {
+        setEmailErrors(newEmailErrors);
+        showNotification("error", "Please fix invalid emails");
+        return;
+      }
+
       setSaving(true);
       const existingLinks = parseLinks(form.linksText);
       const newLinks = buildLinksWithContact(existingLinks, contactForm);
@@ -2136,7 +2153,15 @@ export default function ProfilePage() {
       const r = await fetch(`${API_BASE}/users/me/`, { method: "PUT", headers: { "Content-Type": "application/json", ...tokenHeader() }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("Save failed");
       setForm(prev => ({ ...prev, linksText: Object.keys(newLinks).length > 0 ? JSON.stringify(newLinks) : "" }));
-      showNotification("success", "Contact updated");
+
+      let successMsg = "Contact info saved";
+      if (contactEditSection === "emails") successMsg = "Emails saved";
+      else if (contactEditSection === "phones") successMsg = "Phone numbers saved";
+      else if (contactEditSection === "socials") successMsg = "Social profiles saved";
+      else if (contactEditSection === "websites") successMsg = "Websites saved";
+      else if (contactEditSection === "scheduler") successMsg = "Scheduling link saved";
+
+      showNotification("success", successMsg);
       closeContactEditor();
     } catch (e) { showNotification("error", e?.message || "Save failed"); } finally { setSaving(false); }
   }
@@ -3821,23 +3846,16 @@ export default function ProfilePage() {
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {/* MAIN EMAIL ROW */}
                   <Grid container spacing={1} alignItems="center">
-                    <Grid item xs={12} md={6}>
+                    <Grid item xs={12} sm={6}>
                       <TextField
                         label="Main Email"
                         type="email"
                         fullWidth
                         value={form.email || ""}
                         disabled
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <Chip label="Main" size="small" color="primary" variant="outlined" />
-                            </InputAdornment>
-                          ),
-                        }}
                       />
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={6} sm={3}>
                       <TextField
                         select
                         label="Type"
@@ -3865,7 +3883,7 @@ export default function ProfilePage() {
                         ))}
                       </TextField>
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={6} sm={3}>
                       <TextField
                         select
                         label="Visibility"
@@ -3888,21 +3906,27 @@ export default function ProfilePage() {
                   </Grid>
                   {contactForm.emails.map((item, idx) => (
                     <Grid container spacing={1} alignItems="center" key={`email-row-${idx}`}>
-                      <Grid item xs={12} md={6}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
                           label="Email"
                           type="email"
                           fullWidth
                           value={item.email}
-                          onChange={(e) =>
+                          error={!!emailErrors[idx]}
+                          helperText={emailErrors[idx] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
                             setContactForm((prev) => ({
                               ...prev,
-                              emails: prev.emails.map((row, i) => (i === idx ? { ...row, email: e.target.value } : row)),
-                            }))
-                          }
+                              emails: prev.emails.map((row, i) => (i === idx ? { ...row, email: val } : row)),
+                            }));
+                            if (emailErrors[idx]) {
+                              setEmailErrors((prev) => ({ ...prev, [idx]: "" }));
+                            }
+                          }}
                         />
                       </Grid>
-                      <Grid item xs={6} md={3}>
+                      <Grid item xs={6} sm={3}>
                         <TextField
                           select
                           label="Type"
@@ -3920,7 +3944,7 @@ export default function ProfilePage() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={5} md={2}>
+                      <Grid item xs={5} sm={2}>
                         <TextField
                           select
                           label="Visibility"
@@ -3938,7 +3962,7 @@ export default function ProfilePage() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={1} md={1}>
+                      <Grid item xs={1} sm={1}>
                         <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
@@ -3970,7 +3994,7 @@ export default function ProfilePage() {
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {contactForm.phones.map((item, idx) => (
                     <Grid container spacing={1} alignItems="center" key={`phone-row-${idx}`}>
-                      <Grid item xs={12} md={5}>
+                      <Grid item xs={12} sm={5}>
                         <TextField
                           label="Number"
                           fullWidth
@@ -3983,7 +4007,7 @@ export default function ProfilePage() {
                           }
                         />
                       </Grid>
-                      <Grid item xs={6} md={2}>
+                      <Grid item xs={6} sm={2}>
                         <TextField
                           select
                           label="Type"
@@ -4001,7 +4025,7 @@ export default function ProfilePage() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={6} md={2}>
+                      <Grid item xs={6} sm={2}>
                         <TextField
                           select
                           label="Visibility"
@@ -4019,7 +4043,7 @@ export default function ProfilePage() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={8} md={2}>
+                      <Grid item xs={8} sm={2}>
                         <FormControlLabel
                           control={
                             <Radio
@@ -4035,7 +4059,7 @@ export default function ProfilePage() {
                           label="Primary"
                         />
                       </Grid>
-                      <Grid item xs={4} md={1}>
+                      <Grid item xs={4} sm={1}>
                         <IconButton onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
@@ -4133,7 +4157,7 @@ export default function ProfilePage() {
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {contactForm.websites.map((item, idx) => (
                     <Grid container spacing={1} alignItems="center" key={`site-row-${idx}`}>
-                      <Grid item xs={12} md={4}>
+                      <Grid item xs={12} sm={4}>
                         <TextField
                           label="Label"
                           fullWidth
@@ -4146,7 +4170,7 @@ export default function ProfilePage() {
                           }
                         />
                       </Grid>
-                      <Grid item xs={12} md={5}>
+                      <Grid item xs={12} sm={5}>
                         <TextField
                           label="URL"
                           fullWidth
@@ -4159,7 +4183,7 @@ export default function ProfilePage() {
                           }
                         />
                       </Grid>
-                      <Grid item xs={7} md={2}>
+                      <Grid item xs={7} sm={2}>
                         <TextField
                           select
                           label="Visibility"
@@ -4177,7 +4201,7 @@ export default function ProfilePage() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={5} md={1}>
+                      <Grid item xs={5} sm={1}>
                         <IconButton onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}>
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
@@ -4207,7 +4231,7 @@ export default function ProfilePage() {
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Scheduler</Typography>
                 <Grid container spacing={1} sx={{ mt: 1 }} alignItems="center">
-                  <Grid item xs={12} md={4}>
+                  <Grid item xs={12} sm={4}>
                     <TextField
                       label="Label"
                       fullWidth
@@ -4220,7 +4244,7 @@ export default function ProfilePage() {
                       }
                     />
                   </Grid>
-                  <Grid item xs={12} md={5}>
+                  <Grid item xs={12} sm={5}>
                     <TextField
                       label="URL"
                       fullWidth
@@ -4233,7 +4257,7 @@ export default function ProfilePage() {
                       }
                     />
                   </Grid>
-                  <Grid item xs={12} md={3}>
+                  <Grid item xs={12} sm={3}>
                     <TextField
                       select
                       label="Visibility"

@@ -1473,6 +1473,7 @@ export default function AdminSettings() {
   const [locationOpen, setLocationOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState(() => createEmptyContactForm());
   const [socialErrors, setSocialErrors] = React.useState({ linkedin: "", x: "", facebook: "", instagram: "", github: "" });
+  const [emailErrors, setEmailErrors] = React.useState({});
   const [locationForm, setLocationForm] = React.useState({ city: "", country: "" });
 
   const [eduList, setEduList] = React.useState([]);
@@ -1988,6 +1989,22 @@ export default function AdminSettings() {
         return;
       }
 
+      // Validate Emails
+      const newEmailErrors = {};
+      let hasEmailError = false;
+      contactForm.emails.forEach((item, idx) => {
+        if (item.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.email)) {
+          newEmailErrors[idx] = "Invalid email format";
+          hasEmailError = true;
+        }
+      });
+
+      if (hasEmailError) {
+        setEmailErrors(newEmailErrors);
+        showNotification("error", "Please fix invalid emails");
+        return;
+      }
+
       setSaving(true);
       const links = buildLinksWithContact(parseLinks(profile.linksText), contactForm);
       const userPayload = { first_name: (profile.first_name || "").trim(), last_name: (profile.last_name || "").trim() };
@@ -1998,8 +2015,16 @@ export default function AdminSettings() {
         ...prev, ...userPayload, job_title: profilePayload.job_title,
         links, linksText: JSON.stringify(links),
       }));
+
+      let successMsg = "Contact info saved";
+      if (contactEditSection === "emails") successMsg = "Emails saved";
+      else if (contactEditSection === "phones") successMsg = "Phone numbers saved";
+      else if (contactEditSection === "socials") successMsg = "Social profiles saved";
+      else if (contactEditSection === "websites") successMsg = "Websites saved";
+      else if (contactEditSection === "scheduler") successMsg = "Scheduling link saved";
+
+      showNotification("success", successMsg);
       closeContactEditor();
-      showNotification("success", "Contact updated");
     } catch (err) {
       showNotification("error", "Failed to update contact");
     } finally { setSaving(false); }
@@ -3917,23 +3942,16 @@ export default function AdminSettings() {
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {/* MAIN EMAIL ROW */}
                   <Grid container spacing={1} alignItems="center">
-                    <Grid item xs={12} md={6}>
+                    <Grid item xs={12} sm={6}>
                       <TextField
                         label="Main Email"
                         type="email"
                         fullWidth
                         value={profile.email || ""}
                         disabled
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <Chip label="Main" size="small" color="primary" variant="outlined" />
-                            </InputAdornment>
-                          ),
-                        }}
                       />
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={6} sm={3}>
                       <TextField
                         select
                         label="Type"
@@ -3961,7 +3979,7 @@ export default function AdminSettings() {
                         ))}
                       </TextField>
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    <Grid item xs={6} sm={3}>
                       <TextField
                         select
                         label="Visibility"
@@ -3984,21 +4002,27 @@ export default function AdminSettings() {
                   </Grid>
                   {contactForm.emails.map((item, idx) => (
                     <Grid container spacing={1} alignItems="center" key={`email-row-${idx}`}>
-                      <Grid item xs={12} md={6}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
                           label="Email"
                           type="email"
                           fullWidth
                           value={item.email}
-                          onChange={(e) =>
+                          error={!!emailErrors[idx]}
+                          helperText={emailErrors[idx] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
                             setContactForm((prev) => ({
                               ...prev,
-                              emails: prev.emails.map((row, i) => (i === idx ? { ...row, email: e.target.value } : row)),
-                            }))
-                          }
+                              emails: prev.emails.map((row, i) => (i === idx ? { ...row, email: val } : row)),
+                            }));
+                            if (emailErrors[idx]) {
+                              setEmailErrors((prev) => ({ ...prev, [idx]: "" }));
+                            }
+                          }}
                         />
                       </Grid>
-                      <Grid item xs={6} md={3}>
+                      <Grid item xs={6} sm={3}>
                         <TextField
                           select
                           label="Type"
@@ -4016,7 +4040,7 @@ export default function AdminSettings() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={5} md={2}>
+                      <Grid item xs={5} sm={2}>
                         <TextField
                           select
                           label="Visibility"
@@ -4034,7 +4058,7 @@ export default function AdminSettings() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={1} md={1}>
+                      <Grid item xs={1} sm={1}>
                         <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
@@ -4066,7 +4090,7 @@ export default function AdminSettings() {
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {contactForm.phones.map((item, idx) => (
                     <Grid container spacing={1} alignItems="center" key={`phone-row-${idx}`}>
-                      <Grid item xs={12} md={5}>
+                      <Grid item xs={12} sm={5}>
                         <TextField
                           label="Number"
                           fullWidth
@@ -4079,7 +4103,7 @@ export default function AdminSettings() {
                           }
                         />
                       </Grid>
-                      <Grid item xs={6} md={2}>
+                      <Grid item xs={6} sm={2}>
                         <TextField
                           select
                           label="Type"
@@ -4097,7 +4121,7 @@ export default function AdminSettings() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={6} md={2}>
+                      <Grid item xs={6} sm={2}>
                         <TextField
                           select
                           label="Visibility"
@@ -4115,7 +4139,7 @@ export default function AdminSettings() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={8} md={2}>
+                      <Grid item xs={8} sm={2}>
                         <FormControlLabel
                           control={
                             <Radio
@@ -4131,7 +4155,7 @@ export default function AdminSettings() {
                           label="Primary"
                         />
                       </Grid>
-                      <Grid item xs={4} md={1}>
+                      <Grid item xs={4} sm={1}>
                         <IconButton onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
@@ -4229,7 +4253,7 @@ export default function AdminSettings() {
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {contactForm.websites.map((item, idx) => (
                     <Grid container spacing={1} alignItems="center" key={`site-row-${idx}`}>
-                      <Grid item xs={12} md={4}>
+                      <Grid item xs={12} sm={4}>
                         <TextField
                           label="Label"
                           fullWidth
@@ -4242,7 +4266,7 @@ export default function AdminSettings() {
                           }
                         />
                       </Grid>
-                      <Grid item xs={12} md={5}>
+                      <Grid item xs={12} sm={5}>
                         <TextField
                           label="URL"
                           fullWidth
@@ -4255,7 +4279,7 @@ export default function AdminSettings() {
                           }
                         />
                       </Grid>
-                      <Grid item xs={7} md={2}>
+                      <Grid item xs={7} sm={2}>
                         <TextField
                           select
                           label="Visibility"
@@ -4273,7 +4297,7 @@ export default function AdminSettings() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={5} md={1}>
+                      <Grid item xs={5} sm={1}>
                         <IconButton onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}>
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
@@ -4303,7 +4327,7 @@ export default function AdminSettings() {
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Scheduler</Typography>
                 <Grid container spacing={1} sx={{ mt: 1 }} alignItems="center">
-                  <Grid item xs={12} md={4}>
+                  <Grid item xs={12} sm={4}>
                     <TextField
                       label="Label"
                       fullWidth
@@ -4316,7 +4340,7 @@ export default function AdminSettings() {
                       }
                     />
                   </Grid>
-                  <Grid item xs={12} md={5}>
+                  <Grid item xs={12} sm={5}>
                     <TextField
                       label="URL"
                       fullWidth
@@ -4329,7 +4353,7 @@ export default function AdminSettings() {
                       }
                     />
                   </Grid>
-                  <Grid item xs={12} md={3}>
+                  <Grid item xs={12} sm={3}>
                     <TextField
                       select
                       label="Visibility"

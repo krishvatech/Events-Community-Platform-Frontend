@@ -2318,6 +2318,7 @@ function AboutTab({
   const [locationOpen, setLocationOpen] = React.useState(false);
   const [contactForm, setContactForm] = React.useState(() => createEmptyContactForm());
   const [socialErrors, setSocialErrors] = React.useState({ linkedin: "", x: "", facebook: "", instagram: "", github: "" });
+  const [emailErrors, setEmailErrors] = React.useState({});
   const [locationForm, setLocationForm] = React.useState({ city_obj: null, city: "", location: "" });
 
   const [savingAbout, setSavingAbout] = React.useState(false);
@@ -3114,6 +3115,22 @@ function AboutTab({
       return;
     }
 
+    // Validate Emails
+    const newEmailErrors = {};
+    let hasEmailError = false;
+    contactForm.emails.forEach((item, idx) => {
+      if (item.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.email)) {
+        newEmailErrors[idx] = "Invalid email format";
+        hasEmailError = true;
+      }
+    });
+
+    if (hasEmailError) {
+      setEmailErrors(newEmailErrors);
+      showToast?.("error", "Please fix invalid emails");
+      return;
+    }
+
     setSavingContact(true);
 
     try {
@@ -3126,7 +3143,15 @@ function AboutTab({
         ...profile,
         links,
       });
-      showToast?.("success", "Contact info updated.");
+
+      let successMsg = "Contact info saved";
+      if (contactEditSection === "emails") successMsg = "Emails saved";
+      else if (contactEditSection === "phones") successMsg = "Phone numbers saved";
+      else if (contactEditSection === "socials") successMsg = "Social profiles saved";
+      else if (contactEditSection === "websites") successMsg = "Websites saved";
+      else if (contactEditSection === "scheduler") successMsg = "Scheduling link saved";
+
+      showToast?.("success", successMsg);
       closeContactEditor();
     } catch (e) {
       console.error(e);
@@ -4107,16 +4132,15 @@ function AboutTab({
                     <Stack spacing={1.5} sx={{ mt: 1 }}>
                       {/* Main Email Row */}
                       <Grid container spacing={1} alignItems="center">
-                        <Grid item xs={12} md={5}>
+                        <Grid item xs={12} sm={5}>
                           <TextField
                             label="Main Email"
                             fullWidth
                             disabled
                             value={profile.email || ""}
-                            helperText="Primary account email"
                           />
                         </Grid>
-                        <Grid item xs={6} md={4}>
+                        <Grid item xs={6} sm={4}>
                           <TextField
                             select
                             label="Type"
@@ -4144,7 +4168,7 @@ function AboutTab({
                             ))}
                           </TextField>
                         </Grid>
-                        <Grid item xs={6} md={3}>
+                        <Grid item xs={6} sm={3}>
                           <TextField
                             select
                             label="Visibility"
@@ -4169,20 +4193,26 @@ function AboutTab({
 
                       {contactForm.emails.map((item, idx) => (
                         <Grid container spacing={1} alignItems="center" key={`email-row-${idx}`}>
-                          <Grid item xs={12} md={5}>
+                          <Grid item xs={12} sm={5}>
                             <TextField
                               label="Email Address"
                               fullWidth
                               value={item.email}
-                              onChange={(e) =>
+                              error={!!emailErrors[idx]}
+                              helperText={emailErrors[idx] || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
                                 setContactForm((prev) => ({
                                   ...prev,
-                                  emails: prev.emails.map((row, i) => (i === idx ? { ...row, email: e.target.value } : row)),
-                                }))
-                              }
+                                  emails: prev.emails.map((row, i) => (i === idx ? { ...row, email: val } : row)),
+                                }));
+                                if (emailErrors[idx]) {
+                                  setEmailErrors((prev) => ({ ...prev, [idx]: "" }));
+                                }
+                              }}
                             />
                           </Grid>
-                          <Grid item xs={6} md={3}>
+                          <Grid item xs={6} sm={3}>
                             <TextField
                               select
                               label="Type"
@@ -4200,7 +4230,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={6} md={3}>
+                          <Grid item xs={6} sm={3}>
                             <TextField
                               select
                               label="Visibility"
@@ -4218,7 +4248,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={1} md={1}>
+                          <Grid item xs={1} sm={1}>
                             <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
                               <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
@@ -4249,7 +4279,7 @@ function AboutTab({
                     <Stack spacing={1.5} sx={{ mt: 1 }}>
                       {contactForm.phones.map((item, idx) => (
                         <Grid container spacing={1} alignItems="center" key={`phone-row-${idx}`}>
-                          <Grid item xs={12} md={5}>
+                          <Grid item xs={12} sm={5}>
                             <TextField
                               label="Number"
                               fullWidth
@@ -4262,7 +4292,7 @@ function AboutTab({
                               }
                             />
                           </Grid>
-                          <Grid item xs={6} md={2}>
+                          <Grid item xs={6} sm={2}>
                             <TextField
                               select
                               label="Type"
@@ -4280,7 +4310,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={6} md={2}>
+                          <Grid item xs={6} sm={2}>
                             <TextField
                               select
                               label="Visibility"
@@ -4298,7 +4328,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={8} md={2}>
+                          <Grid item xs={8} sm={2}>
                             <FormControlLabel
                               control={
                                 <Radio
@@ -4314,7 +4344,7 @@ function AboutTab({
                               label="Primary"
                             />
                           </Grid>
-                          <Grid item xs={4} md={1}>
+                          <Grid item xs={4} sm={1}>
                             <IconButton onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
                               <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
@@ -4410,7 +4440,7 @@ function AboutTab({
                     <Stack spacing={1.5} sx={{ mt: 1 }}>
                       {contactForm.websites.map((item, idx) => (
                         <Grid container spacing={1} alignItems="center" key={`site-row-${idx}`}>
-                          <Grid item xs={12} md={4}>
+                          <Grid item xs={12} sm={4}>
                             <TextField
                               label="Label"
                               fullWidth
@@ -4423,7 +4453,7 @@ function AboutTab({
                               }
                             />
                           </Grid>
-                          <Grid item xs={12} md={5}>
+                          <Grid item xs={12} sm={5}>
                             <TextField
                               label="URL"
                               fullWidth
@@ -4436,7 +4466,7 @@ function AboutTab({
                               }
                             />
                           </Grid>
-                          <Grid item xs={7} md={2}>
+                          <Grid item xs={7} sm={2}>
                             <TextField
                               select
                               label="Visibility"
@@ -4454,7 +4484,7 @@ function AboutTab({
                               ))}
                             </TextField>
                           </Grid>
-                          <Grid item xs={5} md={1}>
+                          <Grid item xs={5} sm={1}>
                             <IconButton onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}>
                               <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
@@ -4483,7 +4513,7 @@ function AboutTab({
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Scheduler</Typography>
                     <Grid container spacing={1} sx={{ mt: 1 }} alignItems="center">
-                      <Grid item xs={12} md={4}>
+                      <Grid item xs={12} sm={4}>
                         <TextField
                           label="Label"
                           fullWidth
@@ -4496,7 +4526,7 @@ function AboutTab({
                           }
                         />
                       </Grid>
-                      <Grid item xs={12} md={5}>
+                      <Grid item xs={12} sm={5}>
                         <TextField
                           label="URL"
                           fullWidth
@@ -4509,7 +4539,7 @@ function AboutTab({
                           }
                         />
                       </Grid>
-                      <Grid item xs={12} md={3}>
+                      <Grid item xs={12} sm={3}>
                         <TextField
                           select
                           label="Visibility"
