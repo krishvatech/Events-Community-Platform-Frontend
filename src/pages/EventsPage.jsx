@@ -183,7 +183,7 @@ function toCard(ev) {
 // ————————————————————————————————————————
 // Card (thumbnail view)
 // ————————————————————————————————————————
-function EventCard({ ev, setRegisteredIds, setRawEvents }) {
+function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
   const navigate = useNavigate();
   const owner = isOwnerUser();
 
@@ -211,8 +211,12 @@ function EventCard({ ev, setRegisteredIds, setRawEvents }) {
 
       toast.success("Thank you very much for registering for this event.");
 
+      toast.success("Thank you very much for registering for this event.");
+
       // locally mark as registered and bump the shown count
-      setRegisteredIds(prev => new Set([...prev, ev.id]));
+      // We expect the backend to return the created registration, but if not we make a mock one
+      const newReg = { id: (await res.clone().json().catch(() => ({})))?.id, event: ev, status: 'registered' };
+      setMyRegistrations(prev => ({ ...prev, [ev.id]: newReg }));
       setRawEvents(prev =>
         (prev || []).map(e =>
           e.id === ev.id
@@ -331,15 +335,12 @@ function EventCard({ ev, setRegisteredIds, setRawEvents }) {
         {/* Hide register button for owner users */}
         {!owner && (
           ev.isRegistered ? (
-            <Button
-              variant="contained"
-              size="large"
-              disabled
-              className="normal-case rounded-full px-5 bg-emerald-500/80"
-              title="You are already registered for this event"
-            >
-              Registered
-            </Button>
+            <RegisteredActions
+              ev={ev}
+              reg={myRegistrations[ev.id]}
+              setMyRegistrations={setMyRegistrations}
+              setRawEvents={setRawEvents}
+            />
           ) : (
             <Button
               variant="contained"
@@ -357,10 +358,141 @@ function EventCard({ ev, setRegisteredIds, setRawEvents }) {
   );
 }
 
+function RegisteredActions({ ev, reg, setMyRegistrations, setRawEvents }) {
+  const [loading, setLoading] = useState(false);
+
+  // Free event: Unregister (delete)
+  const handleUnregister = async () => {
+    if (!confirm("Are you sure you want to unregister from this event?")) return;
+    if (!reg?.id) {
+      toast.error("Registration ID missing. Please refresh.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/event-registrations/${reg.id}/`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      toast.info("You have unregistered from the event.");
+      setMyRegistrations(prev => {
+        const next = { ...prev };
+        delete next[ev.id];
+        return next;
+      });
+      setRawEvents(prev =>
+        (prev || []).map(e =>
+          e.id === ev.id
+            ? { ...e, registrations_count: Math.max(0, Number(e?.registrations_count ?? e?.attending_count ?? 1) - 1) }
+            : e
+        )
+      );
+    } catch (e) {
+      toast.error("Failed to unregister: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Paid event: Request Cancellation
+  const handleCancelRequest = async () => {
+    if (!confirm("This is a paid event. Submitting a cancellation request will undergo admin review for refunds. Proceed?")) return;
+    if (!reg?.id) return;
+
+    setLoading(true);
+    try {
+      // Assuming endpoint: POST /api/event-registrations/{id}/cancel_request/
+      const res = await fetch(`${API_BASE}/event-registrations/${reg.id}/cancel_request/`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      toast.success("Cancellation request submitted.");
+      // Update local state to show 'Cancellation Requested'
+      setMyRegistrations(prev => ({
+        ...prev,
+        [ev.id]: { ...reg, status: 'cancellation_requested', cancellation_requested: true }
+      }));
+    } catch (e) {
+      toast.error("Failed to submit request: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isCancelRequested = reg?.status === 'cancellation_requested' || reg?.cancellation_requested;
+
+  if (ev.is_free) {
+    return (
+      <div className="flex gap-2">
+        <Button
+          variant="outlined"
+          size="large"
+          disabled
+          className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
+        >
+          Registered
+        </Button>
+        <Button
+          variant="text"
+          size="large"
+          color="error"
+          onClick={handleUnregister}
+          disabled={loading}
+          className="normal-case rounded-full px-4 hover:bg-red-50"
+        >
+          {loading ? "..." : "Leave"}
+        </Button>
+      </div>
+    );
+  }
+
+  // Paid
+  return (
+    <div className="flex gap-2">
+      {isCancelRequested ? (
+        <Button
+          variant="contained"
+          size="large"
+          disabled
+          className="normal-case rounded-full px-5 bg-amber-200 text-amber-900"
+        >
+          Cancellation Pending
+        </Button>
+      ) : (
+        <>
+          <Button
+            variant="outlined"
+            size="large"
+            disabled
+            className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
+          >
+            Registered
+          </Button>
+          <Button
+            variant="text"
+            size="medium"
+            color="warning"
+            onClick={handleCancelRequest}
+            disabled={loading}
+            className="normal-case rounded-full px-3 text-xs text-amber-700 hover:bg-amber-50"
+            title="Request Cancellation / Refund"
+          >
+            {loading ? "..." : "Cancel"}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ————————————————————————————————————————
 // Row (details/list view)
 // ————————————————————————————————————————
-function EventRow({ ev, setRegisteredIds, setRawEvents }) {
+function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
   const navigate = useNavigate();
 
   const handleRegisterRow = async () => {
@@ -386,7 +518,10 @@ function EventRow({ ev, setRegisteredIds, setRawEvents }) {
 
       toast.success("Thank you very much for registering for this event.");
 
-      setRegisteredIds(prev => new Set([...prev, ev.id]));
+      toast.success("Thank you very much for registering for this event.");
+
+      const newReg = { id: (await res.clone().json().catch(() => ({})))?.id, event: ev, status: 'registered' };
+      setMyRegistrations(prev => ({ ...prev, [ev.id]: newReg }));
       setRawEvents(prev =>
         (prev || []).map(e =>
           e.id === ev.id
@@ -499,26 +634,26 @@ function EventRow({ ev, setRegisteredIds, setRawEvents }) {
             </div>
 
             <div className="shrink-0">
-              {ev.isRegistered ? (
-                <Button
-                  variant="contained"
-                  size="large"
-                  disabled
-                  className="normal-case rounded-full px-5 bg-emerald-500/80"
-                  title="You are already registered for this event"
-                >
-                  Registered
-                </Button>
-              ) : (
-                <Button
-                  variant="contained"
-                  size="large"
-                  color="primary"
-                  onClick={handleRegisterRow}
-                  className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
-                >
-                  Register Now
-                </Button>
+              {/* Hide register button for owner users (assuming generic 'owner' check logic same as Card) */}
+              {isOwnerUser() ? null : (
+                ev.isRegistered ? (
+                  <RegisteredActions
+                    ev={ev}
+                    reg={myRegistrations[ev.id]}
+                    setMyRegistrations={setMyRegistrations}
+                    setRawEvents={setRawEvents}
+                  />
+                ) : (
+                  <Button
+                    variant="contained"
+                    size="large"
+                    color="primary"
+                    onClick={handleRegisterRow}
+                    className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
+                  >
+                    Register Now
+                  </Button>
+                )
               )}
             </div>
 
@@ -577,8 +712,9 @@ function EventRowSkeleton() {
 // Page
 // ————————————————————————————————————————
 export default function EventsPage() {
+  const navigate = useNavigate();
   // which events the logged-in user has registered for
-  const [registeredIds, setRegisteredIds] = useState(new Set());
+  const [myRegistrations, setMyRegistrations] = useState({}); // { eventId: registrationObj }
   // raw events payload coming from the server (we'll enrich it with the "registered" flag)
   const [rawEvents, setRawEvents] = useState([]);
   const [cmsLoading, setCmsLoading] = useState(true);
@@ -622,6 +758,19 @@ export default function EventsPage() {
     onOpen: () => setOpenSelect(name),
     onClose: () => setOpenSelect(null),
   });
+  const handlePostEventClick = () => {
+    if (isOwnerUser()) {
+      navigate("/admin/events");
+      return;
+    }
+
+    if (isStaffUser()) {
+      toast.error("Only platform admins can post an event.");
+      return;
+    }
+
+    toast.error("You are not allowing to Post an Event");
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -656,10 +805,10 @@ export default function EventsPage() {
     setEvents(
       (rawEvents || []).map(ev => {
         const ui = toCard(ev);
-        return { ...ui, isRegistered: registeredIds.has(ev.id) };
+        return { ...ui, isRegistered: !!myRegistrations[ev.id] };
       })
     );
-  }, [rawEvents, registeredIds]);
+  }, [rawEvents, myRegistrations]);
 
 
   useEffect(() => {
@@ -744,14 +893,18 @@ export default function EventsPage() {
 
         const data = await res.json();
         const items = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-        const ids = new Set(items.map(x => (x?.event?.id ?? x?.event_id)).filter(Boolean));
-        setRegisteredIds(ids);
+        const map = {};
+        for (const item of items) {
+          const evid = item?.event?.id ?? item?.event_id;
+          if (evid) map[evid] = item;
+        }
+        setMyRegistrations(map);
       } catch {
-        setRegisteredIds(new Set()); // fallback: treat as none
+        setMyRegistrations({});
       }
     })();
     return () => ctrl.abort();
-  }, []); // run once on page load
+  }, []);
 
   // ✅ Locations based on currently displayed events (rawEvents = your current page results)
   const locationsFromEvents = useMemo(() => {
@@ -1096,11 +1249,27 @@ export default function EventsPage() {
                     const label = String(btn?.label || "").trim();
                     const url = String(btn?.url || "").trim() || "#";
                     const isExternal = /^https?:\/\//i.test(url);
+                    const isPostEvent =
+                      btn?.key === "tertiary" ||
+                      label.toLowerCase() === "post an event";
 
                     const baseProps = {
                       key: btn?.key || label,
                       size: "large",
                     };
+
+                    if (isPostEvent) {
+                      return (
+                        <Button
+                          {...baseProps}
+                          onClick={handlePostEventClick}
+                          variant="outlined"
+                          className="normal-case rounded-xl border-white/30 text-white hover:border-white hover:bg-white/10"
+                        >
+                          {label}
+                        </Button>
+                      );
+                    }
 
                     if (btn?.key === "primary") {
                       return (
@@ -1638,7 +1807,7 @@ export default function EventsPage() {
                   ))
                   : events.map((ev) => (
                     <Box key={ev.id}>
-                      <EventCard ev={ev} setRegisteredIds={setRegisteredIds} setRawEvents={setRawEvents} />
+                      <EventCard ev={ev} myRegistrations={myRegistrations} setMyRegistrations={setMyRegistrations} setRawEvents={setRawEvents} />
                     </Box>
                   ))}
               </Box>
@@ -1652,7 +1821,7 @@ export default function EventsPage() {
                   ))
                   : events.map((ev) => (
                     <Grid item key={ev.id} xs={12}>
-                      <EventRow ev={ev} setRegisteredIds={setRegisteredIds} setRawEvents={setRawEvents} />
+                      <EventRow ev={ev} myRegistrations={myRegistrations} setMyRegistrations={setMyRegistrations} setRawEvents={setRawEvents} />
                     </Grid>
                   ))}
               </Grid>
