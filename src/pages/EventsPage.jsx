@@ -3,6 +3,8 @@
 // Reuses existing Header/Footer and our MUI + Tailwind setup.
 
 import React, { useEffect, useMemo, useState } from "react";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
@@ -76,7 +78,7 @@ async function addToCart(eventId, qty = 1) {
     });
     if (!res.ok) {
       const text = await res.text();
-      alert(`Add to cart failed (${res.status}): ${text}`);
+      toast.error(`Add to cart failed (${res.status}): ${text}`);
       return null;
     }
     const item = await res.json();
@@ -91,7 +93,7 @@ async function addToCart(eventId, qty = 1) {
 
     return item;
   } catch {
-    alert("Could not add to cart. Please try again.");
+    toast.error("Could not add to cart. Please try again.");
     return null;
   }
 }
@@ -181,7 +183,7 @@ function toCard(ev) {
 // ————————————————————————————————————————
 // Card (thumbnail view)
 // ————————————————————————————————————————
-function EventCard({ ev }) {
+function EventCard({ ev, setRegisteredIds, setRawEvents }) {
   const navigate = useNavigate();
   const owner = isOwnerUser();
 
@@ -203,9 +205,12 @@ function EventCard({ ev }) {
       });
       if (!res.ok) {
         const msg = await res.text();
-        alert(`Registration failed (${res.status}): ${msg}`);
+        toast.error(`Registration failed (${res.status}): ${msg}`);
         return;
       }
+
+      toast.success("Thank you very much for registering for this event.");
+
       // locally mark as registered and bump the shown count
       setRegisteredIds(prev => new Set([...prev, ev.id]));
       setRawEvents(prev =>
@@ -355,7 +360,7 @@ function EventCard({ ev }) {
 // ————————————————————————————————————————
 // Row (details/list view)
 // ————————————————————————————————————————
-function EventRow({ ev }) {
+function EventRow({ ev, setRegisteredIds, setRawEvents }) {
   const navigate = useNavigate();
 
   const handleRegisterRow = async () => {
@@ -375,9 +380,12 @@ function EventRow({ ev }) {
       });
       if (!res.ok) {
         const msg = await res.text();
-        alert(`Registration failed (${res.status}): ${msg}`);
+        toast.error(`Registration failed (${res.status}): ${msg}`);
         return;
       }
+
+      toast.success("Thank you very much for registering for this event.");
+
       setRegisteredIds(prev => new Set([...prev, ev.id]));
       setRawEvents(prev =>
         (prev || []).map(e =>
@@ -1630,7 +1638,7 @@ export default function EventsPage() {
                   ))
                   : events.map((ev) => (
                     <Box key={ev.id}>
-                      <EventCard ev={ev} />
+                      <EventCard ev={ev} setRegisteredIds={setRegisteredIds} setRawEvents={setRawEvents} />
                     </Box>
                   ))}
               </Box>
@@ -1644,7 +1652,7 @@ export default function EventsPage() {
                   ))
                   : events.map((ev) => (
                     <Grid item key={ev.id} xs={12}>
-                      <EventRow ev={ev} />
+                      <EventRow ev={ev} setRegisteredIds={setRegisteredIds} setRawEvents={setRawEvents} />
                     </Grid>
                   ))}
               </Grid>
@@ -1887,6 +1895,18 @@ export default function EventsPage() {
           />
         </Box>
       </Container>
+      <ToastContainer
+        position="top-center"
+        autoClose={2000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
     </>
   );
 }
