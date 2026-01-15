@@ -663,7 +663,7 @@ export default function EventManagePage() {
           <TextField
             fullWidth
             size="small"
-            placeholder="Search members…"
+            placeholder="Search members..."
             value={memberSearch}
             onChange={(e) => setMemberSearch(e.target.value)}
             InputProps={{
@@ -736,16 +736,23 @@ export default function EventManagePage() {
                   ) : (
                     pagedMembers.map((r) => {
                       const name = r.user_name || r.user_email || "Unnamed";
-                      const email = r.user_email || "—";
+                      const email = r.user_email || "";
                       const purchased = r.registered_at
                         ? new Date(r.registered_at).toLocaleString()
-                        : "—";
+                        : "";
+                      const avatarSrc = toAbs(
+                        r.user_avatar_url ||
+                          r.user_image_url ||
+                          r.user_avatar ||
+                          r.user_image
+                      );
 
                       return (
                         <TableRow key={r.id} hover>
                           <TableCell>
                             <Stack direction="row" spacing={1} alignItems="center">
                               <Avatar
+                                src={avatarSrc || undefined}
                                 sx={{
                                   width: 28,
                                   height: 28,
