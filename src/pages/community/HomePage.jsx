@@ -2321,6 +2321,7 @@ function AboutTab({
   const [emailErrors, setEmailErrors] = React.useState({});
   const [phoneErrors, setPhoneErrors] = React.useState({});
   const [websiteErrors, setWebsiteErrors] = React.useState({});
+  const [schedulerError, setSchedulerError] = React.useState("");
   const [locationForm, setLocationForm] = React.useState({ city_obj: null, city: "", location: "" });
 
   const [savingAbout, setSavingAbout] = React.useState(false);
@@ -3165,15 +3166,41 @@ function AboutTab({
       if (label && !url) {
         newWebsiteErrors[idx] = "URL is required";
         hasWebsiteError = true;
-      } else if (url && !WEBSITE_REGEX.test(url)) {
-        newWebsiteErrors[idx] = "Must start with https://";
-        hasWebsiteError = true;
+      } else if (url) {
+        if (!url.toLowerCase().startsWith("https://")) {
+          newWebsiteErrors[idx] = "Must start with https://";
+          hasWebsiteError = true;
+        } else if (!WEBSITE_REGEX.test(url)) {
+          newWebsiteErrors[idx] = "Enter valid URL";
+          hasWebsiteError = true;
+        }
       }
     });
 
     if (hasWebsiteError) {
       setWebsiteErrors(newWebsiteErrors);
       showToast?.("error", "Please fix invalid website URLs");
+      return;
+    }
+
+    // Validate Scheduler
+    let schedulerErrorMsg = "";
+    const schedulerUrl = (contactForm.scheduler?.url || "").trim();
+    const schedulerLabel = (contactForm.scheduler?.label || "").trim();
+
+    if (schedulerLabel && !schedulerUrl) {
+      schedulerErrorMsg = "URL is required";
+    } else if (schedulerUrl) {
+      if (!schedulerUrl.toLowerCase().startsWith("https://")) {
+        schedulerErrorMsg = "Must start with https://";
+      } else if (!WEBSITE_REGEX.test(schedulerUrl)) {
+        schedulerErrorMsg = "Enter valid URL";
+      }
+    }
+
+    if (schedulerErrorMsg) {
+      setSchedulerError(schedulerErrorMsg);
+      showToast?.("error", "Please fix invalid scheduling link");
       return;
     }
 
@@ -4589,12 +4616,15 @@ function AboutTab({
                           label="URL"
                           fullWidth
                           value={contactForm.scheduler.url}
-                          onChange={(e) =>
+                          error={!!schedulerError}
+                          helperText={schedulerError}
+                          onChange={(e) => {
                             setContactForm((prev) => ({
                               ...prev,
                               scheduler: { ...prev.scheduler, url: e.target.value },
-                            }))
-                          }
+                            }));
+                            setSchedulerError("");
+                          }}
                         />
                       </Grid>
                       <Grid item xs={12} sm={3}>
