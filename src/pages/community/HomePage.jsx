@@ -60,6 +60,9 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
+import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import { startKYC, submitNameChangeRequest } from "../../utils/api"
 import { isFutureDate, isFutureMonth, isFutureYear } from "../../utils/dateValidation";
 // Countries Library
@@ -256,11 +259,30 @@ const CONTACT_PHONE_TYPES = [
   { value: "personal", label: "Personal" },
 ];
 
+const VISIBILITY_META = {
+  public: { label: "Visible to Public", Icon: PublicOutlinedIcon },
+  contacts: { label: "Visible to your Contacts", Icon: PeopleAltOutlinedIcon },
+  private: { label: "Invisible", Icon: VisibilityOffOutlinedIcon },
+};
+
 const CONTACT_VISIBILITY_OPTIONS = [
   { value: "private", label: "Private" },
   { value: "contacts", label: "Contacts" },
   { value: "public", label: "Public" },
 ];
+
+const renderVisibilityIcon = (visibility) => {
+  const meta = VISIBILITY_META[visibility];
+  if (!meta) return null;
+  const Icon = meta.Icon;
+  return (
+    <Tooltip title={meta.label} arrow enterTouchDelay={0} leaveTouchDelay={2000}>
+      <Box component="span" sx={{ display: "flex", alignItems: "center", color: "text.secondary" }}>
+        <Icon fontSize="small" />
+      </Box>
+    </Tooltip>
+  );
+};
 
 const SOCIAL_REGEX = {
   linkedin: /^(https?:\/\/)?(www\.)?linkedin\.com\/.*$/i,
@@ -3755,6 +3777,7 @@ function AboutTab({
                   <EmailIcon fontSize="small" />
                 </Box>
                 <Typography variant="body2">{profile.email || "\u2014"}</Typography>
+                {renderVisibilityIcon(profile.links?.contact?.main_email?.visibility || "private")}
                 <Chip label="Main" size="small" color="primary" variant="outlined" />
                 {profile.links?.contact?.main_email?.type && (
                   <Typography variant="caption" color="text.secondary">
@@ -3768,6 +3791,7 @@ function AboutTab({
                     <EmailIcon fontSize="small" sx={{ color: "text.secondary" }} />
                   </Box>
                   <Typography variant="body2">{item.email}</Typography>
+                  {renderVisibilityIcon(item.visibility || "private")}
                   <Typography variant="caption" color="text.secondary">({getEmailTypeLabel(item.type)})</Typography>
                 </Box>
               ))}
@@ -3786,6 +3810,7 @@ function AboutTab({
                   <Box key={`phone-${idx}`} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <PhoneIcon fontSize="small" />
                     <Typography variant="body2">{item.number}</Typography>
+                    {renderVisibilityIcon(item.visibility || "private")}
                     <Typography variant="caption" color="text.secondary">({item.type})</Typography>
                     {item.primary ? <Chip label="Primary" size="small" variant="outlined" /> : null}
                   </Box>
