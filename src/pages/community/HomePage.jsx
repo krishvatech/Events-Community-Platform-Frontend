@@ -248,6 +248,9 @@ const CONTACT_EMAIL_TYPES = [
   { value: "", label: "Uncategorized" },
 ];
 
+const getEmailTypeLabel = (type) =>
+  CONTACT_EMAIL_TYPES.find((t) => t.value === type)?.label || type;
+
 const CONTACT_PHONE_TYPES = [
   { value: "professional", label: "Professional" },
   { value: "personal", label: "Personal" },
@@ -3753,14 +3756,14 @@ function AboutTab({
                 <Chip label="Main" size="small" color="primary" variant="outlined" />
                 {profile.links?.contact?.main_email?.type && (
                   <Typography variant="caption" color="text.secondary">
-                    ({CONTACT_EMAIL_TYPES.find(t => t.value === profile.links.contact.main_email.type)?.label || profile.links.contact.main_email.type})
+                    ({getEmailTypeLabel(profile.links.contact.main_email.type)})
                   </Typography>
                 )}
               </Box>
               {emailPreview.map((item, idx) => (
                 <Box key={`email-${idx}`} sx={{ display: "flex", alignItems: "center", gap: 1, pl: 3 }}>
                   <Typography variant="body2">{item.email}</Typography>
-                  <Typography variant="caption" color="text.secondary">({item.type})</Typography>
+                  <Typography variant="caption" color="text.secondary">({getEmailTypeLabel(item.type)})</Typography>
                 </Box>
               ))}
               {emailRemaining > 0 ? (
