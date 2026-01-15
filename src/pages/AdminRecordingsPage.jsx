@@ -389,7 +389,8 @@ export default function AdminRecordingsPage() {
                 >
                   <MUICard
                     elevation={0}
-                    className="rounded-2xl border border-slate-200 overflow-hidden flex flex-col w-full"
+                    className="rounded-2xl border border-slate-200 overflow-hidden flex flex-col w-full cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => navigate(`/admin/recordings/${ev.id}`)}
                   >
                     <div
                       style={{
@@ -403,6 +404,7 @@ export default function AdminRecordingsPage() {
                         <video
                           src={`${S3_BUCKET_URL}/${ev.recording_url}`}
                           controls
+                          onClick={(e) => e.stopPropagation()}
                           style={{
                             position: "absolute",
                             inset: 0,
@@ -451,27 +453,23 @@ export default function AdminRecordingsPage() {
                             <Button
                               size="small"
                               variant="contained"
-                              startIcon={
-                                <PlayCircleOutlineRoundedIcon />
-                              }
-                              component="a"
-                              href={`${S3_BUCKET_URL}/${ev.recording_url}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              startIcon={<PlayCircleOutlineRoundedIcon />}
+                              onClick={() => navigate(`/admin/recordings/${ev.id}`)}
                               sx={{
                                 textTransform: "none",
                                 borderRadius: 2,
                               }}
                             >
-                              Watch
+                              View Details
                             </Button>
                             <Button
                               size="small"
                               variant="outlined"
                               startIcon={<DownloadRoundedIcon />}
-                              onClick={() =>
-                                handleDownload(ev.recording_url)
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownload(ev.recording_url);
+                              }}
                               sx={{
                                 textTransform: "none",
                                 borderRadius: 2,

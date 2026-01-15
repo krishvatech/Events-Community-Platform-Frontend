@@ -66,6 +66,17 @@ const handleDownload = async (recordingUrl) => {
   }
 };
 
+const handleTrackReplay = async (eventId) => {
+  try {
+    await fetch(`${API}/events/${eventId}/track-replay/`, {
+      method: "POST",
+      headers: getTokenHeader(),
+    });
+  } catch (err) {
+    console.error("Failed to track replay:", err);
+  }
+};
+
 function RecordingCardSkeleton() {
   return (
     <MUICard
@@ -289,6 +300,7 @@ export default function MyRecordingsPage() {
                               <video
                                 src={`${S3_BUCKET_URL}/${ev.recording_url}`}
                                 controls
+                                onPlay={() => handleTrackReplay(ev.id)}
                                 style={{
                                   position: "absolute",
                                   inset: 0,
@@ -362,6 +374,7 @@ export default function MyRecordingsPage() {
                                     href={`${S3_BUCKET_URL}/${ev.recording_url}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    onClick={() => handleTrackReplay(ev.id)}
                                     sx={{
                                       textTransform: "none",
                                       borderRadius: 2,

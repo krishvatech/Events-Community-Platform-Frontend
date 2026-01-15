@@ -45,6 +45,7 @@ import SocialOAuthCallback from "./pages/SocialOAuthCallback.jsx";
 import CognitoOAuthCallback from "./pages/CognitoOAuthCallback.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import CmsBridge from "./pages/CmsBridge.jsx";
+import AdminRecordingDetailsPage from "./pages/AdminRecordingDetailsPage.jsx";
 
 
 function RedirectGroupToAdmin() {
@@ -108,6 +109,7 @@ const AppShell = () => {
           <Route path="/admin/events/:eventId" element={<EventManagePage />} />
           {/* keep your recordings behavior same as before */}
           <Route path="recordings" element={<AdminRecordingsPage />} />
+          <Route path="recordings/:id" element={<AdminRecordingDetailsPage />} />
           <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
           <Route path="carts" element={<AdminCarts />} />
           <Route path="staff" element={<AdminStaffPage />} />
