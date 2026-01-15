@@ -1474,6 +1474,7 @@ export default function AdminSettings() {
   const [contactForm, setContactForm] = React.useState(() => createEmptyContactForm());
   const [socialErrors, setSocialErrors] = React.useState({ linkedin: "", x: "", facebook: "", instagram: "", github: "" });
   const [emailErrors, setEmailErrors] = React.useState({});
+  const [phoneErrors, setPhoneErrors] = React.useState({});
   const [locationForm, setLocationForm] = React.useState({ city: "", country: "" });
 
   const [eduList, setEduList] = React.useState([]);
@@ -2002,6 +2003,26 @@ export default function AdminSettings() {
       if (hasEmailError) {
         setEmailErrors(newEmailErrors);
         showNotification("error", "Please fix invalid emails");
+        return;
+      }
+
+      // Validate Phones
+      const newPhoneErrors = {};
+      let hasPhoneError = false;
+      // Regex: optional +, then 10 to 12 digits. Anchor start/end.
+      const PHONE_REGEX = /^\+?[0-9]{10,12}$/;
+
+      contactForm.phones.forEach((item, idx) => {
+        const val = (item.number || "").trim();
+        if (val && !PHONE_REGEX.test(val)) {
+          newPhoneErrors[idx] = "Must be 10-12 digits (numeric only)";
+          hasPhoneError = true;
+        }
+      });
+
+      if (hasPhoneError) {
+        setPhoneErrors(newPhoneErrors);
+        showNotification("error", "Please fix invalid phone numbers");
         return;
       }
 
@@ -4095,12 +4116,18 @@ export default function AdminSettings() {
                           label="Number"
                           fullWidth
                           value={item.number}
-                          onChange={(e) =>
+                          error={!!phoneErrors[idx]}
+                          helperText={phoneErrors[idx] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
                             setContactForm((prev) => ({
                               ...prev,
-                              phones: prev.phones.map((row, i) => (i === idx ? { ...row, number: e.target.value } : row)),
-                            }))
-                          }
+                              phones: prev.phones.map((row, i) => (i === idx ? { ...row, number: val } : row)),
+                            }));
+                            if (phoneErrors[idx]) {
+                              setPhoneErrors((prev) => ({ ...prev, [idx]: "" }));
+                            }
+                          }}
                         />
                       </Grid>
                       <Grid item xs={6} sm={2}>
