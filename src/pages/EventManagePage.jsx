@@ -33,6 +33,11 @@ import {
   TableBody,
   Pagination,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import { EditEventDialog } from "./AdminEvents.jsx";
@@ -50,7 +55,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ArrowDropDownRoundedIcon from "@mui/icons-material/ArrowDropDownRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 
-import { isOwnerUser } from "../utils/adminRole.js";
+import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
 // ---- API helpers ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -133,6 +138,8 @@ const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 const MEMBERS_PER_PAGE = 5;
 const RESOURCES_PER_PAGE = 5;
 
+
+
 export default function EventManagePage() {
   const { eventId } = useParams();
   const location = useLocation();
@@ -145,6 +152,10 @@ export default function EventManagePage() {
   const [eventError, setEventError] = useState("");
 
   const [editOpen, setEditOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogAction, setDialogAction] = useState(null); // 'deregister' | 'approve' | 'reject'
+  const [selectedReg, setSelectedReg] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const [registrations, setRegistrations] = useState([]);
   const [registrationsLoading, setRegistrationsLoading] = useState(false);
@@ -229,14 +240,22 @@ export default function EventManagePage() {
         };
 
         const res = await fetch(
-          `${API_ROOT}/events/${eventId}/registrations/`,
+          `${API_ROOT}/events/${eventId}/registrations/?limit=50`,
           { headers, signal: controller.signal }
         );
         const json = await res.json().catch(() => []);
         if (!res.ok) {
           throw new Error(json?.detail || `HTTP ${res.status}`);
         }
-        setRegistrations(Array.isArray(json) ? json : []);
+
+        let data = [];
+        if (Array.isArray(json)) {
+          data = json;
+        } else if (json && Array.isArray(json.results)) {
+          data = json.results;
+        }
+
+        setRegistrations(data);
       } catch (e) {
         if (e.name === "AbortError") return;
         setRegistrationsError(e?.message || "Unable to load members");
@@ -248,6 +267,62 @@ export default function EventManagePage() {
     loadRegs();
     return () => controller.abort();
   }, [eventId, isOwner]);
+
+  // MOD: Handle Member Actions with Dialog
+  const openDialog = (action, reg) => {
+    setDialogAction(action);
+    setSelectedReg(reg);
+    setDialogOpen(true);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!dialogAction || !selectedReg) return;
+    setActionLoading(true);
+    const token = getToken();
+
+    try {
+      let url = "";
+      let method = "POST";
+
+      if (dialogAction === "deregister") {
+        url = `${API_ROOT}/event-registrations/${selectedReg.id}/`;
+        method = "DELETE";
+      } else if (dialogAction === "approve") {
+        url = `${API_ROOT}/event-registrations/${selectedReg.id}/approve_cancellation/`;
+      } else if (dialogAction === "reject") {
+        url = `${API_ROOT}/event-registrations/${selectedReg.id}/reject_cancellation/`;
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) throw new Error("Action failed");
+
+      // Update local state
+      if (dialogAction === "deregister") {
+        setRegistrations((prev) => prev.filter((r) => r.id !== selectedReg.id));
+      } else if (dialogAction === "approve") {
+        setRegistrations((prev) =>
+          prev.map((r) =>
+            r.id === selectedReg.id ? { ...r, status: "cancelled" } : r
+          )
+        );
+      } else if (dialogAction === "reject") {
+        setRegistrations((prev) =>
+          prev.map((r) =>
+            r.id === selectedReg.id ? { ...r, status: "registered" } : r
+          )
+        );
+      }
+      setDialogOpen(false);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // ---- derived values ----
   const status = useMemo(() => computeStatus(event || {}), [event]);
@@ -716,9 +791,11 @@ export default function EventManagePage() {
                   >
                     <TableCell>Name</TableCell>
                     <TableCell>Email</TableCell>
+                    <TableCell>Status</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                       Purchased at
                     </TableCell>
+                    <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -742,9 +819,9 @@ export default function EventManagePage() {
                         : "";
                       const avatarSrc = toAbs(
                         r.user_avatar_url ||
-                          r.user_image_url ||
-                          r.user_avatar ||
-                          r.user_image
+                        r.user_image_url ||
+                        r.user_avatar ||
+                        r.user_image
                       );
 
                       return (
@@ -775,8 +852,53 @@ export default function EventManagePage() {
                           <TableCell>
                             <Typography variant="body2">{email}</Typography>
                           </TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={r.status || 'registered'}
+                              color={r.status === 'cancellation_requested' ? 'warning' : (r.status === 'cancelled' ? 'default' : 'success')}
+                              variant="outlined"
+                            />
+                          </TableCell>
                           <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                             <Typography variant="body2">{purchased}</Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                              {(Number(event?.price) === 0 || event?.is_free) && (
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  onClick={() => openDialog("deregister", r)}
+                                >
+                                  Deregister
+                                </Button>
+                              )}
+
+                              {!(Number(event?.price) === 0 || event?.is_free) && (
+                                <>
+                                  {r.status === "cancellation_requested" && (
+                                    <>
+                                      <Button
+                                        size="small"
+                                        color="success"
+                                        variant="contained"
+                                        onClick={() => openDialog("approve", r)}
+                                      >
+                                        Accept
+                                      </Button>
+                                      <Button
+                                        size="small"
+                                        color="error"
+                                        onClick={() => openDialog("reject", r)}
+                                      >
+                                        Reject
+                                      </Button>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </Stack>
                           </TableCell>
                         </TableRow>
                       );
@@ -1311,6 +1433,45 @@ export default function EventManagePage() {
             {registrationsError}
           </Alert>
         </Snackbar>
+
+        <Dialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          PaperProps={{ style: { borderRadius: 16, padding: 8 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>
+            {dialogAction === "deregister" && "Deregister User?"}
+            {dialogAction === "approve" && "Approve Cancellation?"}
+            {dialogAction === "reject" && "Reject Request?"}
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {dialogAction === "deregister" && "Are you sure you want to remove this user from the event?"}
+              {dialogAction === "approve" && "This will approve the cancellation and refund process. Proceed?"}
+              {dialogAction === "reject" && "This will reject the cancellation request. The user will remain registered."}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => setDialogOpen(false)}
+              disabled={actionLoading}
+              color="inherit"
+              className="rounded-full"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmAction}
+              disabled={actionLoading}
+              variant="contained"
+              color={dialogAction === "approve" ? "success" : "error"}
+              className="rounded-full normal-case px-4"
+              autoFocus
+            >
+              {actionLoading ? "Processing..." : "Confirm"}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </Box>
   );

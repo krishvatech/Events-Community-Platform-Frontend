@@ -8,6 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import Footer from "../components/Footer.jsx";
+import RegisteredActions from "../components/RegisteredActions.jsx";
 import {
   Box,
   Button,
@@ -211,8 +212,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 
       toast.success("Thank you very much for registering for this event.");
 
-      toast.success("Thank you very much for registering for this event.");
-
       // locally mark as registered and bump the shown count
       // We expect the backend to return the created registration, but if not we make a mock one
       const newReg = { id: (await res.clone().json().catch(() => ({})))?.id, event: ev, status: 'registered' };
@@ -335,12 +334,14 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
         {/* Hide register button for owner users */}
         {!owner && (
           ev.isRegistered ? (
-            <RegisteredActions
-              ev={ev}
-              reg={myRegistrations[ev.id]}
-              setMyRegistrations={setMyRegistrations}
-              setRawEvents={setRawEvents}
-            />
+            <Button
+              variant="outlined"
+              size="large"
+              disabled
+              className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
+            >
+              Registered
+            </Button>
           ) : (
             <Button
               variant="contained"
@@ -358,136 +359,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
   );
 }
 
-function RegisteredActions({ ev, reg, setMyRegistrations, setRawEvents }) {
-  const [loading, setLoading] = useState(false);
-
-  // Free event: Unregister (delete)
-  const handleUnregister = async () => {
-    if (!confirm("Are you sure you want to unregister from this event?")) return;
-    if (!reg?.id) {
-      toast.error("Registration ID missing. Please refresh.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/event-registrations/${reg.id}/`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
-      if (!res.ok) throw new Error(await res.text());
-
-      toast.info("You have unregistered from the event.");
-      setMyRegistrations(prev => {
-        const next = { ...prev };
-        delete next[ev.id];
-        return next;
-      });
-      setRawEvents(prev =>
-        (prev || []).map(e =>
-          e.id === ev.id
-            ? { ...e, registrations_count: Math.max(0, Number(e?.registrations_count ?? e?.attending_count ?? 1) - 1) }
-            : e
-        )
-      );
-    } catch (e) {
-      toast.error("Failed to unregister: " + e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Paid event: Request Cancellation
-  const handleCancelRequest = async () => {
-    if (!confirm("This is a paid event. Submitting a cancellation request will undergo admin review for refunds. Proceed?")) return;
-    if (!reg?.id) return;
-
-    setLoading(true);
-    try {
-      // Assuming endpoint: POST /api/event-registrations/{id}/cancel_request/
-      const res = await fetch(`${API_BASE}/event-registrations/${reg.id}/cancel_request/`, {
-        method: "POST",
-        headers: authHeaders(),
-      });
-      if (!res.ok) throw new Error(await res.text());
-
-      toast.success("Cancellation request submitted.");
-      // Update local state to show 'Cancellation Requested'
-      setMyRegistrations(prev => ({
-        ...prev,
-        [ev.id]: { ...reg, status: 'cancellation_requested', cancellation_requested: true }
-      }));
-    } catch (e) {
-      toast.error("Failed to submit request: " + e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isCancelRequested = reg?.status === 'cancellation_requested' || reg?.cancellation_requested;
-
-  if (ev.is_free) {
-    return (
-      <div className="flex gap-2">
-        <Button
-          variant="outlined"
-          size="large"
-          disabled
-          className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
-        >
-          Registered
-        </Button>
-        <Button
-          variant="text"
-          size="large"
-          color="error"
-          onClick={handleUnregister}
-          disabled={loading}
-          className="normal-case rounded-full px-4 hover:bg-red-50"
-        >
-          {loading ? "..." : "Leave"}
-        </Button>
-      </div>
-    );
-  }
-
-  // Paid
-  return (
-    <div className="flex gap-2">
-      {isCancelRequested ? (
-        <Button
-          variant="contained"
-          size="large"
-          disabled
-          className="normal-case rounded-full px-5 bg-amber-200 text-amber-900"
-        >
-          Cancellation Pending
-        </Button>
-      ) : (
-        <>
-          <Button
-            variant="outlined"
-            size="large"
-            disabled
-            className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
-          >
-            Registered
-          </Button>
-          <Button
-            variant="text"
-            size="medium"
-            color="warning"
-            onClick={handleCancelRequest}
-            disabled={loading}
-            className="normal-case rounded-full px-3 text-xs text-amber-700 hover:bg-amber-50"
-            title="Request Cancellation / Refund"
-          >
-            {loading ? "..." : "Cancel"}
-          </Button>
-        </>
-      )}
-    </div>
-  );
-}
+// RegisteredActions moved to ../components/RegisteredActions.jsx
 
 // ————————————————————————————————————————
 // Row (details/list view)
@@ -515,8 +387,6 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
         toast.error(`Registration failed (${res.status}): ${msg}`);
         return;
       }
-
-      toast.success("Thank you very much for registering for this event.");
 
       toast.success("Thank you very much for registering for this event.");
 
@@ -637,12 +507,14 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
               {/* Hide register button for owner users (assuming generic 'owner' check logic same as Card) */}
               {isOwnerUser() ? null : (
                 ev.isRegistered ? (
-                  <RegisteredActions
-                    ev={ev}
-                    reg={myRegistrations[ev.id]}
-                    setMyRegistrations={setMyRegistrations}
-                    setRawEvents={setRawEvents}
-                  />
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    disabled
+                    className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
+                  >
+                    Registered
+                  </Button>
                 ) : (
                   <Button
                     variant="contained"

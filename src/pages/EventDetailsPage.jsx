@@ -13,6 +13,7 @@ import {
   Skeleton,
 } from "@mui/material";
 import AccountSidebar from "../components/AccountSidebar.jsx";
+import RegisteredActions from "../components/RegisteredActions.jsx";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 const urlJoin = (base, path) => `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -58,6 +59,19 @@ function computeStatus(ev) {
   if (s && now < s) return "upcoming";
   if (e && now > e) return "past";
   return "upcoming";
+}
+
+function priceStr(p) {
+  if (p === 0) return "Free";
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(Number(p));
+  } catch {
+    return `$${p}`;
+  }
 }
 
 
@@ -140,6 +154,28 @@ export default function EventDetailsPage() {
     const id = setInterval(() => setNowTick(Date.now()), 30 * 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Fetch registration status
+  const [registration, setRegistration] = useState(null);
+  useEffect(() => {
+    if (!event?.id || !token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // Uses the backend filter ?event={id}
+        const res = await fetch(`${API_BASE}/event-registrations/?event=${event.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          const results = Array.isArray(data) ? data : (data.results || []);
+          if (results.length > 0) setRegistration(results[0]);
+        }
+      } catch { }
+    })();
+    return () => { cancelled = true; };
+  }, [event?.id, token]);
   useEffect(() => {
     let cancelled = false;
     async function fetchEvent() {
@@ -302,6 +338,9 @@ export default function EventDetailsPage() {
               <Paper elevation={0} className="rounded-2xl border border-slate-200">
                 <Box className="p-5">
                   <Typography variant="h6" className="font-extrabold">Attend</Typography>
+                  <Typography variant="h5" className="font-bold text-teal-600 mt-1 mb-2">
+                    {event.is_free ? "Free" : priceStr(event.price)}
+                  </Typography>
                   <div className="mt-3 flex flex-col gap-2">
                     {canShowActiveJoin ? (
                       <Button
@@ -347,6 +386,19 @@ export default function EventDetailsPage() {
                       >
                         Join (Not Live Yet)
                       </Button>
+
+
+                    )}
+
+                    {registration && (
+                      <Box className="flex justify-center py-2">
+                        <RegisteredActions
+                          ev={event}
+                          reg={registration}
+                          onUnregistered={() => setRegistration(null)}
+                          onCancelRequested={(_, updated) => setRegistration(updated)}
+                        />
+                      </Box>
                     )}
 
                     <Button

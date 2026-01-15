@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
 import AccountSidebar from "../components/AccountSidebar.jsx";
+import RegisteredActions from "../components/RegisteredActions.jsx";
 
 // ---------------------- API base + helpers (kept) ----------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -106,7 +107,7 @@ function statusChip(status) {
 }
 
 // ---------------------- Event Card (kept, with small MOD) ----------------------
-function EventCard({ ev, onJoinLive, isJoining }) {
+function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJoining }) {
   const status = computeStatus(ev);
   const chip = statusChip(status);
   const [imgFailed, setImgFailed] = useState(false);
@@ -285,6 +286,16 @@ function EventCard({ ev, onJoinLive, isJoining }) {
             );
           })()}
 
+          {/* Cancel / Unregister Actions */}
+          {reg && (
+            <RegisteredActions
+              ev={ev}
+              reg={reg}
+              onUnregistered={onUnregistered}
+              onCancelRequested={onCancelRequested}
+            />
+          )}
+
           <Button
             size="small"
             component={Link}
@@ -372,6 +383,7 @@ export default function MyEventsPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
+  const [myRegistrations, setMyRegistrations] = useState({});
 
   // State to track which event is currently being joined (null when idle)
   const [joiningId, setJoiningId] = useState(null);
@@ -435,11 +447,19 @@ export default function MyEventsPage() {
 
         // registrations -> events
         let list = [];
+        const newRegs = {};
         if (raw.length > 0 && raw[0] && raw[0].event) {
-          list = raw.map((r) => r.event).filter(Boolean);
+          list = raw.map((r) => {
+            if (r.event) {
+              newRegs[r.event.id] = r;
+              return r.event;
+            }
+            return null;
+          }).filter(Boolean);
         } else {
           list = raw;
         }
+        setMyRegistrations(newRegs);
 
         // de-dup
         const seen = new Set();
@@ -638,8 +658,23 @@ export default function MyEventsPage() {
                       <Grid key={ev.id ?? ev.slug} size={{ xs: 4, sm: 4, md: 4 }}>
                         <EventCard
                           ev={ev}
+                          reg={myRegistrations[ev.id]}
                           onJoinLive={handleJoinLive}
                           isJoining={joiningId === ev.id}
+                          onUnregistered={(eventId) => {
+                            setEvents(prev => prev.filter(e => e.id !== eventId));
+                            setMyRegistrations(prev => {
+                              const next = { ...prev };
+                              delete next[eventId];
+                              return next;
+                            });
+                          }}
+                          onCancelRequested={(eventId, updatedReg) => {
+                            setMyRegistrations(prev => ({
+                              ...prev,
+                              [eventId]: updatedReg
+                            }));
+                          }}
                         />
                       </Grid>
                     ))}
