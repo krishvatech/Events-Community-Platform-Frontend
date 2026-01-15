@@ -3403,7 +3403,9 @@ export default function AdminSettings() {
                   }>
                     <Stack spacing={1}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <EmailIcon fontSize="small" />
+                        <Box sx={{ width: 24, display: "flex", justifyContent: "center" }}>
+                          <EmailIcon fontSize="small" />
+                        </Box>
                         <Typography variant="body2">{profile.email || "\u2014"}</Typography>
                         <Chip label="Main" size="small" color="primary" variant="outlined" />
                         {profile.links?.contact?.main_email?.type && (
@@ -3413,7 +3415,10 @@ export default function AdminSettings() {
                         )}
                       </Box>
                       {emailPreview.map((item, idx) => (
-                        <Box key={`email-${idx}`} sx={{ display: "flex", alignItems: "center", gap: 1, pl: 3 }}>
+                        <Box key={`email-${idx}`} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Box sx={{ width: 24, display: "flex", justifyContent: "center" }}>
+                            <EmailIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                          </Box>
                           <Typography variant="body2">{item.email}</Typography>
                           <Typography variant="caption" color="text.secondary">({getEmailTypeLabel(item.type)})</Typography>
                         </Box>
