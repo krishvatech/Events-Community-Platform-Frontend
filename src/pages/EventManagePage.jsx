@@ -1,6 +1,8 @@
 // src/pages/EventManagePage.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import RegisteredActions from "../components/RegisteredActions";
 
 import {
   Avatar,
@@ -174,6 +176,7 @@ export default function EventManagePage() {
   const [resourcePage, setResourcePage] = useState(1);
 
   const isOwner = isOwnerUser();
+  const [myReg, setMyReg] = useState(null); // New state for my registration
   const resources = event?.resources || [];
   const tabLabels = isOwner ? EVENT_TAB_LABELS : STAFF_EVENT_TAB_LABELS;
 
@@ -266,6 +269,51 @@ export default function EventManagePage() {
 
     loadRegs();
     return () => controller.abort();
+  }, [eventId, isOwner]);
+
+  // ---- load MY registration (for staff/attendee view) ----
+  useEffect(() => {
+    if (!eventId || isOwner) return;
+
+    const token = getToken();
+    if (!token) return;
+
+    const loadMyReg = async () => {
+      try {
+        // 1. Get my user ID
+        let userId = null;
+        try {
+          const u = JSON.parse(localStorage.getItem("user"));
+          userId = u?.id;
+        } catch { }
+
+        if (!userId) {
+          const meRes = await fetch(`${API_ROOT}/users/me/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (meRes.ok) {
+            const me = await meRes.json();
+            userId = me.id;
+          }
+        }
+        if (!userId) return;
+
+        // 2. Fetch registration for this event & user
+        // Using filter ?event=X&user=Y
+        const res = await fetch(
+          `${API_ROOT}/event-registrations/?event=${eventId}&user=${userId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const json = await res.json();
+        const list = Array.isArray(json) ? json : json.results || [];
+        if (list.length > 0) {
+          setMyReg(list[0]);
+        }
+      } catch (err) {
+        console.error("Failed to load my registration", err);
+      }
+    };
+    loadMyReg();
   }, [eventId, isOwner]);
 
   // MOD: Handle Member Actions with Dialog
@@ -605,6 +653,23 @@ export default function EventManagePage() {
                 {event.description || "No description provided."}
               </Typography>
 
+              {/* Self-Management Actions (Leave / Cancel Request) */}
+              {myReg && (
+                <Box sx={{ mt: 3, mb: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                    Your Registration
+                  </Typography>
+                  <RegisteredActions
+                    ev={event}
+                    reg={myReg}
+                    onUnregistered={() => {
+                      setMyReg(null);
+                      // toast is handled in RegisteredActions, but we can add extra if needed
+                    }}
+                    onCancelRequested={(eid, updated) => setMyReg(updated)}
+                  />
+                </Box>
+              )}
 
               <Divider sx={{ my: 2 }} />
 
@@ -665,7 +730,7 @@ export default function EventManagePage() {
             </Box>
           </Paper>
         </Grid>
-      </Grid>
+      </Grid >
     );
   };
 
