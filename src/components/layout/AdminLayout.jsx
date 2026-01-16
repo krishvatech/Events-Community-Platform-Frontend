@@ -6,7 +6,7 @@ import AdminSidebar from "../AdminSidebar";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import { isStaffUser } from "../../utils/adminRole.js";
 import { clearAuth } from "../../utils/authStorage";
-import { createWagtailSession } from "../../utils/api";
+import { createWagtailSession, getSaleorDashboardUrl } from "../../utils/api";
 import { isOwnerUser } from "../../utils/adminRole";
 
 
@@ -82,6 +82,19 @@ export default function AdminLayout() {
         window.open(cmsUrl, "_blank");
       } catch (e) {
         alert("CMS login failed. Check token / backend logs.");
+      } finally {
+        setMobileOpen(false);
+      }
+      return;
+    }
+
+    if (key === "saleor") {
+      if (!isOwnerUser()) { alert("Saleor Dashboard is only for platform_admin."); return; }
+      try {
+        const { url } = await getSaleorDashboardUrl(); // new util in api.js
+        window.open(url, "_blank");
+      } catch (e) {
+        alert("Saleor access failed. Please login again.");
       } finally {
         setMobileOpen(false);
       }
