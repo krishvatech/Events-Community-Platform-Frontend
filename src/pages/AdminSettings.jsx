@@ -47,7 +47,7 @@ import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import LinkedInIcon from "@mui/icons-material/LinkedIn";
-import TwitterIcon from "@mui/icons-material/Twitter";
+import XIcon from "@mui/icons-material/X";
 import FacebookIcon from "@mui/icons-material/Facebook";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import GitHubIcon from "@mui/icons-material/GitHub";
@@ -1855,7 +1855,7 @@ export default function AdminSettings() {
   const websiteRemaining = Math.max(0, contactLinks.websites.length - websitePreview.length);
   const socialItems = [
     { key: "linkedin", label: "LinkedIn", icon: <LinkedInIcon fontSize="small" />, url: contactLinks.socials.linkedin },
-    { key: "x", label: "X", icon: <TwitterIcon fontSize="small" />, url: contactLinks.socials.x },
+    { key: "x", label: "X", icon: <XIcon fontSize="small" />, url: contactLinks.socials.x },
     { key: "facebook", label: "Facebook", icon: <FacebookIcon fontSize="small" />, url: contactLinks.socials.facebook },
     { key: "instagram", label: "Instagram", icon: <InstagramIcon fontSize="small" />, url: contactLinks.socials.instagram },
     { key: "github", label: "GitHub", icon: <GitHubIcon fontSize="small" />, url: contactLinks.socials.github },
