@@ -283,6 +283,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
   const today = dayjs().format("YYYY-MM-DD");
   const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);
+  const [isMultiDay, setIsMultiDay] = React.useState(false);
   const [startDate, setStartDate] = React.useState(defaultSchedule.startDate);
   const [endDate, setEndDate] = React.useState(defaultSchedule.endDate);
   const [startTime, setStartTime] = React.useState(defaultSchedule.startTime);
@@ -351,6 +352,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setPrice(0);
     setIsFree(false);
 
+    setIsMultiDay(false);
     setStartDate(sch.startDate);
     setEndDate(sch.endDate);
     setStartTime(sch.startTime);
@@ -721,16 +723,38 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
         {/* ===== Schedule ===== */}
         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-          <Typography variant="h6" className="font-semibold mb-3">Schedule</Typography>
+          <Box className="flex items-center justify-between mb-3">
+            <Typography variant="h6" className="font-semibold">Schedule</Typography>
+            <FormControlLabel
+              control={<Switch checked={isMultiDay} onChange={(e) => {
+                const v = e.target.checked;
+                setIsMultiDay(v);
+                if (!v) {
+                  // If switching to Single Day, force end date to equal start date
+                  setEndDate(startDate);
+                }
+              }} />}
+              label="Multi-day event?"
+            />
+          </Box>
           <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} md={6}>
-              <TextField label="Start Date" type="date" value={startDate} onChange={(e) => {
-                const v = e.target.value;
-                setStartDate(v);
-                const next = computeEndFromStart(v, startTime, 2);
-                setEndDate(next.endDate);
-                setEndTime(next.endTime);
-              }}
+            <Grid item xs={12} md={isMultiDay ? 6 : 12}>
+              <TextField
+                label={isMultiDay ? "Start Date" : "Date"}
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setStartDate(v);
+                  if (isMultiDay) {
+                    const next = computeEndFromStart(v, startTime, 2);
+                    setEndDate(next.endDate);
+                    setEndTime(next.endTime);
+                  } else {
+                    // Single day: force end date same as start
+                    setEndDate(v);
+                  }
+                }}
                 fullWidth
                 InputLabelProps={{ shrink: true }}
                 InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
@@ -739,15 +763,17 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 helperText={errors.startDate}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth
-                InputLabelProps={{ shrink: true }}
-                InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
-                // 🔻 show error when end < start
-                error={!!errors.endDate}
-                helperText={errors.endDate}
-              />
-            </Grid>
+            {isMultiDay && (
+              <Grid item xs={12} md={6}>
+                <TextField label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
+                  // 🔻 show error when end < start
+                  error={!!errors.endDate}
+                  helperText={errors.endDate}
+                />
+              </Grid>
+            )}
           </Grid>
 
           <Grid container spacing={2}>
@@ -1012,6 +1038,10 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   );
   const [isFree, setIsFree] = useState(event?.is_free || false);
 
+  const [isMultiDay, setIsMultiDay] = useState(() => {
+    if (!initialStart || !initialEnd) return false;
+    return initialStart.format("YYYY-MM-DD") !== initialEnd.format("YYYY-MM-DD");
+  });
   const [startDate, setStartDate] = useState(initialStart.format("YYYY-MM-DD"));
   const [endDate, setEndDate] = useState(initialEnd.format("YYYY-MM-DD"));
   const [startTime, setStartTime] = useState(initialStart.format("HH:mm"));
@@ -1048,6 +1078,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     const start = event?.start_time ? dayjs(event.start_time).tz(tz) : dayjs();
     const end = event?.end_time ? dayjs(event.end_time).tz(tz) : start.add(2, "hour");
     setTimezone(tz);
+    setIsMultiDay(start.format("YYYY-MM-DD") !== end.format("YYYY-MM-DD"));
     setStartDate(start.format("YYYY-MM-DD"));
     setEndDate(end.format("YYYY-MM-DD"));
     setStartTime(start.format("HH:mm"));
@@ -1333,28 +1364,41 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             </Grid>
 
             {/* Dates */}
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12 }}>
+              <FormControlLabel
+                control={<Switch checked={isMultiDay} onChange={(e) => {
+                  const v = e.target.checked;
+                  setIsMultiDay(v);
+                  if (!v) setEndDate(startDate);
+                }} />}
+                label="Multi-day event?"
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, md: isMultiDay ? 6 : 12 }}>
               <TextField
-                label="Start Date" type="date" fullWidth
+                label={isMultiDay ? "Start Date" : "Date"} type="date" fullWidth
                 value={startDate} onChange={(e) => {
                   const v = e.target.value;
                   setStartDate(v);
-                  setEndDate(v);
+                  if (!isMultiDay) setEndDate(v);
                 }}
                 InputLabelProps={{ shrink: true }}
                 InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
                 error={!!errors.startDate} helperText={errors.startDate}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField
-                label="End Date" type="date" fullWidth
-                value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
-                error={!!errors.endDate} helperText={errors.endDate}
-              />
-            </Grid>
+            {isMultiDay && (
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  label="End Date" type="date" fullWidth
+                  value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
+                  error={!!errors.endDate} helperText={errors.endDate}
+                />
+              </Grid>
+            )}
 
             <Grid size={{ xs: 12 }}>
               <Grid container spacing={3}>
