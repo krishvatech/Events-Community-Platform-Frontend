@@ -2952,7 +2952,7 @@ export default function NewLiveMeeting() {
                 </Badge>
               }
               iconPosition="start"
-              label="Members"
+              label="Participants"
             />
           </Tabs>
 
@@ -3967,7 +3967,7 @@ export default function NewLiveMeeting() {
               ))}
 
               {stageStripRemaining > 0 && (
-                <Tooltip title="View all members">
+                <Tooltip title="View all participants">
                   <Paper
                     variant="outlined"
                     onClick={() => toggleRightPanel(3)}
