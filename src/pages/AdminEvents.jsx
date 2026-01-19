@@ -381,7 +381,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     const e = {};
     if (!title.trim()) e.title = "Required";
     if (!slug.trim()) e.slug = "Required";
-    if (!location.trim()) e.location = "Required";
+    if (["in_person", "hybrid"].includes(format) && !location.trim()) e.location = "Required";
     if (!description.trim()) e.description = "Required";
     const priceValue = Number(price);
     if (!isFree) {
@@ -509,8 +509,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
           <Typography variant="h6" className="font-semibold mb-3">Basic Info</Typography>
 
-          <Box className="flex items-start gap-3 mb-3">
-            <Avatar sx={{ bgcolor: "#10b8a6", width: 40, height: 40 }} />
+          <Box className="flex items-start mb-3">
             <TextField
               label="Name of the Event *"
               value={title}
@@ -525,99 +524,114 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             />
           </Box>
 
+          <TextField
+            label="Description *"
+            multiline
+            minRows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            fullWidth
+            error={!!errors.description}
+            helperText={errors.description}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            label="Format"
+            select
+            value={format}
+            onChange={(e) => {
+              const next = e.target.value;
+              setFormat(next);
+              if (next === "virtual") {
+                setErrors((prev) => ({ ...prev, location: "" }));
+              }
+            }}
+            fullWidth
+            sx={{ mb: 2 }}
+          >
+            {formats.map((f) => (
+              <MenuItem key={f.value} value={f.value}>
+                {f.label}
+              </MenuItem>
+            ))}
+          </TextField>
+
           <Grid container spacing={2} alignItems="flex-start">
             {/* Left */}
             <Grid item xs={12} md={6}>
+              {format === "virtual" ? (
+                <Autocomplete
+                  size="small"
+                  fullWidth
+                  options={COUNTRY_OPTIONS}
+                  autoHighlight
+                  value={getSelectedCountry({ location })}
+                  getOptionLabel={(opt) => opt?.label ?? ""}
+                  isOptionEqualToValue={(o, v) => o.code === v.code}
+                  onChange={(_, newVal) => {
+                    setLocation(newVal ? newVal.label : "");
+                    setErrors((prev) => ({ ...prev, location: "" }));
+                  }}
+                  ListboxProps={{
+                    style: {
+                      maxHeight: 36 * 7,
+                      overflowY: "auto",
+                      paddingTop: 0,
+                      paddingBottom: 0,
+                    },
+                  }}
+                  renderOption={(props, option) => (
+                    <li {...props} key={option.code}>
+                      <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                      {option.label}
+                    </li>
+                  )}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Country"
+                      placeholder="Select country"
+                      fullWidth
+                      error={!!errors.location}
+                      helperText={errors.location}
+                      inputProps={{
+                        ...params.inputProps,
+                        autoComplete: "new-password",
+                      }}
+                      sx={{ mb: 2 }}
+                    />
+                  )}
+                />
+              ) : (
+                <TextField
+                  label="Location *"
+                  value={location}
+                  onChange={(e) => {
+                    setLocation(e.target.value);
+                    setErrors((prev) => ({ ...prev, location: "" }));
+                  }}
+                  fullWidth
+                  error={!!errors.location}
+                  helperText={errors.location || "City & country, or full address"}
+                  sx={{ mb: 2 }}
+                />
+              )}
+
               <TextField
-                label="Description *"
-                multiline
-                minRows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                label="Category"
+                select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
                 fullWidth
-                error={!!errors.description}
-                helperText={errors.description}
-                sx={{ mb: 2 }}
-              />
-
-              {/* Country */}
-              <Autocomplete
-                size="small"
-                fullWidth
-                options={COUNTRY_OPTIONS}
-                autoHighlight
-                value={getSelectedCountry({ location })}
-                getOptionLabel={(opt) => opt?.label ?? ""}
-                isOptionEqualToValue={(o, v) => o.code === v.code}
-                onChange={(_, newVal) => {
-                  setLocation(newVal ? newVal.label : "");
-                  setErrors((prev) => ({ ...prev, location: "" }));
-                }}
-                ListboxProps={{
-                  style: {
-                    maxHeight: 36 * 7,
-                    overflowY: "auto",
-                    paddingTop: 0,
-                    paddingBottom: 0,
-                  },
-                }}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.code}>
-                    <span style={{ marginRight: 8 }}>{option.emoji}</span>
-                    {option.label}
-                  </li>
-                )}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Country *"
-                    placeholder="Select country"
-                    fullWidth
-                    error={!!errors.location}
-                    helperText={errors.location}
-                    inputProps={{
-                      ...params.inputProps,
-                      autoComplete: "new-password",
-                    }}
-                    sx={{ mb: 2 }}
-                  />
-                )}
-              />
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                {/* Category – half width */}
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Category"
-                    select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    fullWidth
-                  >
-                    {categories.map((c) => (
-                      <MenuItem key={c} value={c}>
-                        {c}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-
-                {/* Format – half width */}
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Format"
-                    select
-                    value={format}
-                    onChange={(e) => setFormat(e.target.value)}
-                    fullWidth
-                  >
-                    {formats.map((f) => (
-                      <MenuItem key={f.value} value={f.value}>
-                        {f.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-              </Grid>
+                sx={{ mt: 1 }}
+              >
+                {categories.map((c) => (
+                  <MenuItem key={c} value={c}>
+                    {c}
+                  </MenuItem>
+                ))}
+              </TextField>
 
               <TextField
                 label="Price ($)"
@@ -1064,7 +1078,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     const e = {};
     if (!title.trim()) e.title = "Required";
     if (!slug.trim()) e.slug = "Required";
-    if (!location.trim()) e.location = "Required";
+    if (["in_person", "hybrid"].includes(format) && !location.trim()) e.location = "Required";
     if (!description.trim()) e.description = "Description is required";
     const priceValue = Number(price);
     if (!isFree) {
@@ -1156,8 +1170,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             Update the fields and click Save.
           </Typography>
 
-          <Box className="flex items-start gap-3 mb-4">
-            <Avatar sx={{ bgcolor: "#10b8a6", width: 40, height: 40 }} />
+          <Box className="flex items-start mb-4">
             <TextField
               label="Name of the Event *"
               value={title}
@@ -1173,83 +1186,107 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             />
           </Box>
 
+          <TextField
+            label="Description *"
+            multiline minRows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            fullWidth className="mb-3"
+            error={!!errors.description} helperText={errors.description}
+          />
+
+          <TextField
+            label="Format"
+            select
+            value={format}
+            onChange={(e) => {
+              const next = e.target.value;
+              setFormat(next);
+              if (next === "virtual") {
+                setErrors((prev) => ({ ...prev, location: "" }));
+              }
+            }}
+            fullWidth
+            className="mb-3"
+          >
+            {formats.map((f) => (
+              <MenuItem key={f.value} value={f.value}>
+                {f.label}
+              </MenuItem>
+            ))}
+          </TextField>
+
           <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
             {/* Left */}
             <Grid size={{ xs: 12, md: 7 }}>
-              <TextField
-                label="Description *"
-                multiline minRows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                fullWidth className="mb-3"
-                error={!!errors.description} helperText={errors.description}
-              />
-
-              <Autocomplete
-                size="small"
-                fullWidth
-                className="mb-3"
-                options={COUNTRY_OPTIONS}
-                autoHighlight
-                value={getSelectedCountry({ location })}
-                getOptionLabel={(opt) => opt?.label ?? ""}
-                isOptionEqualToValue={(o, v) => o.code === v.code}
-                onChange={(_, newVal) => {
-                  setLocation(newVal ? newVal.label : "");
-                  setErrors((prev) => ({ ...prev, location: "" }));
-                }}
-                ListboxProps={{
-                  style: {
-                    maxHeight: 36 * 7,
-                    overflowY: "auto",
-                    paddingTop: 0,
-                    paddingBottom: 0,
-                  },
-                }}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.code}>
-                    <span style={{ marginRight: 8 }}>{option.emoji}</span>
-                    {option.label}
-                  </li>
-                )}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Country *"
-                    placeholder="Select country"
-                    fullWidth
-                    error={!!errors.location}
-                    helperText={errors.location}
-                    inputProps={{
-                      ...params.inputProps,
-                      autoComplete: "new-password",
-                    }}
-                  />
-                )}
-              />
-
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Category" select fullWidth
-                    value={category} onChange={(e) => setCategory(e.target.value)}
-                  >
-                    {categories.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                  </TextField>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Format" select fullWidth
-                    value={format} onChange={(e) => setFormat(e.target.value)}
-                  >
-                    {formats.map((f) => <MenuItem key={f.value} value={f.value}>{f.label}</MenuItem>)}
-                  </TextField>
-                </Grid>
-              </Grid>
+              {format === "virtual" ? (
+                <Autocomplete
+                  size="small"
+                  fullWidth
+                  className="mb-3"
+                  options={COUNTRY_OPTIONS}
+                  autoHighlight
+                  value={getSelectedCountry({ location })}
+                  getOptionLabel={(opt) => opt?.label ?? ""}
+                  isOptionEqualToValue={(o, v) => o.code === v.code}
+                  onChange={(_, newVal) => {
+                    setLocation(newVal ? newVal.label : "");
+                    setErrors((prev) => ({ ...prev, location: "" }));
+                  }}
+                  ListboxProps={{
+                    style: {
+                      maxHeight: 36 * 7,
+                      overflowY: "auto",
+                      paddingTop: 0,
+                      paddingBottom: 0,
+                    },
+                  }}
+                  renderOption={(props, option) => (
+                    <li {...props} key={option.code}>
+                      <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                      {option.label}
+                    </li>
+                  )}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Country"
+                      placeholder="Select country"
+                      fullWidth
+                      error={!!errors.location}
+                      helperText={errors.location}
+                      inputProps={{
+                        ...params.inputProps,
+                        autoComplete: "new-password",
+                      }}
+                    />
+                  )}
+                />
+              ) : (
+                <TextField
+                  label="Location *"
+                  value={location}
+                  onChange={(e) => {
+                    setLocation(e.target.value);
+                    setErrors((prev) => ({ ...prev, location: "" }));
+                  }}
+                  fullWidth
+                  className="mb-3"
+                  error={!!errors.location}
+                  helperText={errors.location || "City & country, or full address"}
+                />
+              )}
 
               <TextField
-                label="Price (₹)" type="number" fullWidth
+                label="Category" select fullWidth
+                value={category} onChange={(e) => setCategory(e.target.value)}
+                sx={{ mt: 1 }}
+              >
+                {categories.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+              </TextField>
+
+              <TextField
+                label="Price ($)" type="number" fullWidth
                 value={price} onChange={(e) => setPrice(e.target.value)}
                 inputProps={{ min: 0, step: "0.01" }}
                 error={!!errors.price} helperText={errors.price}
