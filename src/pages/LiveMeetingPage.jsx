@@ -22,8 +22,7 @@ import {
   Switch,
   Paper,
   Stack,
-  Tab,
-  Tabs,
+
   TextField,
   Toolbar,
   Tooltip,
@@ -60,7 +59,7 @@ import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
 
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
-import PollIcon from "@mui/icons-material/Poll";
+
 import GroupIcon from "@mui/icons-material/Group";
 import MenuIcon from "@mui/icons-material/Menu";
 
@@ -2779,18 +2778,20 @@ export default function NewLiveMeeting() {
   const showMembersDot = showPrivateDot;
 
 
-  const RightPanelContent = (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", pb: { xs: "calc(16px + env(safe-area-inset-bottom))", md: 2 }, boxSizing: "border-box" }}>
-      {/* ================= CONDITION: PRIVATE CHAT VIEW ================= */}
+  // ================= SIDEBAR COMPONENTS =================
+
+  // 1. Main Content Area (Left side)
+  const SidebarMainContent = (
+    <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%" }}>
       {privateChatUser ? (
         <>
           {/* 1. Private Chat Header (User Name on Top) */}
           <Box
             sx={{
-              px: 2, py: 1.5,
+              px: 2, py: 2,
               display: "flex", alignItems: "center", gap: 1.5,
               borderBottom: "1px solid", borderColor: "rgba(255,255,255,0.08)",
-              bgcolor: "rgba(0,0,0,0.25)",
+              bgcolor: "rgba(0,0,0,0.10)",
             }}
           >
             <IconButton onClick={handleClosePrivateChat} size="small" sx={{ color: "rgba(255,255,255,0.7)" }}>
@@ -2878,88 +2879,32 @@ export default function NewLiveMeeting() {
           </Box>
         </>
       ) : (
-        // ================= EXISTING TABS VIEW =================
+        // ================= EXISTING TABS BODY (REUSED) =================
         <>
           {/* Header */}
           <Box
             sx={{
               px: 2,
-              py: 1.5,
+              py: 2,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               borderBottom: "1px solid",
               borderColor: "rgba(255,255,255,0.08)",
-              bgcolor: "rgba(0,0,0,0.25)",
+              bgcolor: "rgba(0,0,0,0.10)",
             }}
           >
-            <Typography sx={{ fontWeight: 700 }}>Meeting Details</Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: 16 }}>
+              {tab === 0 && "Public Chat"}
+              {tab === 1 && "Q&A"}
+              {tab === 2 && "Polls"}
+              {tab === 3 && "Participants"}
+            </Typography>
 
             <IconButton onClick={closeRightPanel} size="small" aria-label="Close panel">
               <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
-
-          {/* Tabs */}
-          <Tabs
-            value={tab}
-            onChange={(_, v) => setTab(v)}
-            variant="fullWidth"
-            sx={{
-              minHeight: 42,
-              borderBottom: "1px solid",
-              borderColor: "rgba(255,255,255,0.08)",
-              "& .MuiTab-root": { minHeight: 42, textTransform: "none", fontWeight: 600 },
-            }}
-          >
-            <Tab
-              icon={
-                <Badge
-                  variant="dot"
-                  color="error"
-                  overlap="circular"
-                  invisible={!showChatDot}
-                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
-                >
-                  <ChatBubbleOutlineIcon fontSize="small" />
-                </Badge>
-              }
-              iconPosition="start"
-              label="Chat"
-              sx={{ display: hostPerms.chat ? "flex" : "none" }}
-            />
-            <Tab
-              icon={
-                <Badge
-                  variant="dot"
-                  color="error"
-                  overlap="circular"
-                  invisible={!(qnaUnreadCount > 0 && !isQnaActive)}
-                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
-                >
-                  <QuestionAnswerIcon fontSize="small" />
-                </Badge>
-              }
-              iconPosition="start"
-              label="Q&A"
-            />
-            <Tab icon={<PollIcon fontSize="small" />} iconPosition="start" label="Polls" sx={{ display: "none" }} />
-            <Tab
-              icon={
-                <Badge
-                  variant="dot"
-                  color="error"
-                  overlap="circular"
-                  invisible={!showMembersDot}
-                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
-                >
-                  <GroupIcon fontSize="small" />
-                </Badge>
-              }
-              iconPosition="start"
-              label="Participants"
-            />
-          </Tabs>
 
           {/* Body */}
           <Box sx={{ flex: 1, minHeight: 0 }}>
@@ -3070,10 +3015,16 @@ export default function NewLiveMeeting() {
                       const voters = q.upvoters ?? [];
                       const votes = q.upvote_count ?? voters.length;
                       const hasVoted = Boolean(q.user_upvoted);
-                      const askedBy =
-                        q.user_name ||
+
+                      // Check if self
+                      const selfCsid = dyteMeeting?.self?.clientSpecificId;
+                      const isSelfQuestion = selfCsid && String(selfCsid) === String(q.user_id);
+
+                      const askedBy = isSelfQuestion
+                        ? "You"
+                        : q.user_name ||
                         q.user_display ||
-                        q.user || // if WS sends name in `user`
+                        q.user ||
                         q.user?.name ||
                         participants.find((p) => {
                           const raw = p?._raw || {};
@@ -3081,6 +3032,7 @@ export default function NewLiveMeeting() {
                           return csid != null && String(csid) === String(q.user_id);
                         })?.name ||
                         (q.user_id ? `User ${q.user_id}` : "Audience");
+
                       const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
 
                       return (
@@ -3098,7 +3050,6 @@ export default function NewLiveMeeting() {
                             <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
 
                             <Stack direction="row" spacing={1} alignItems="center">
-                              {/* ✅ Hover: show who voted */}
                               <Tooltip
                                 arrow
                                 placement="left"
@@ -3204,186 +3155,10 @@ export default function NewLiveMeeting() {
               </Box>
             </TabPanel>
 
-            {/* POLLS */}
-            {false && (
-              <TabPanel value={tab} index={2}>
-                <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
-                  <Stack spacing={2}>
-                    {/* HOST: Create Poll UI */}
-                    {isHost && (
-                      <Box>
-                        {!isCreatingPoll ? (
-                          <Button
-                            fullWidth
-                            variant="outlined"
-                            startIcon={<AddIcon />}
-                            onClick={() => setIsCreatingPoll(true)}
-                            sx={{
-                              py: 1.5,
-                              borderStyle: "dashed",
-                              borderColor: "rgba(255,255,255,0.2)",
-                              color: "rgba(255,255,255,0.7)",
-                              "&:hover": {
-                                borderColor: "rgba(255,255,255,0.4)",
-                                bgcolor: "rgba(255,255,255,0.03)",
-                              },
-                            }}
-                          >
-                            Create New Poll
-                          </Button>
-                        ) : (
-                          <Paper
-                            variant="outlined"
-                            sx={{
-                              p: 2,
-                              bgcolor: "rgba(255,255,255,0.03)",
-                              borderColor: "rgba(20,184,177,0.5)", // Highlight active creation
-                              borderRadius: 2,
-                            }}
-                          >
-                            <Typography sx={{ fontWeight: 800, fontSize: 13, mb: 1.5 }}>
-                              CREATE NEW POLL
-                            </Typography>
-
-                            {/* Question Input */}
-                            <TextField
-                              fullWidth
-                              size="small"
-                              placeholder="Ask a question..."
-                              value={createPollQuestion}
-                              onChange={(e) => setCreatePollQuestion(e.target.value)}
-                              sx={{
-                                mb: 2,
-                                "& .MuiOutlinedInput-root": {
-                                  bgcolor: "rgba(0,0,0,0.2)",
-                                },
-                              }}
-                            />
-
-                            {/* Options Inputs */}
-                            <Stack spacing={1.5}>
-                              {createPollOptions.map((opt, idx) => (
-                                <Stack key={idx} direction="row" spacing={1} alignItems="center">
-                                  <TextField
-                                    fullWidth
-                                    size="small"
-                                    placeholder={`Option ${idx + 1}`}
-                                    value={opt}
-                                    onChange={(e) => handleOptionChange(idx, e.target.value)}
-                                    sx={{
-                                      "& .MuiOutlinedInput-root": {
-                                        bgcolor: "rgba(0,0,0,0.2)",
-                                      },
-                                    }}
-                                  />
-                                  {createPollOptions.length > 2 && (
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => handleRemoveOption(idx)}
-                                      sx={{ color: "rgba(255,255,255,0.4)", "&:hover": { color: "#ef4444" } }}
-                                    >
-                                      <DeleteOutlineIcon fontSize="small" />
-                                    </IconButton>
-                                  )}
-                                </Stack>
-                              ))}
-                            </Stack>
-
-                            {/* Add Option Button */}
-                            <Button
-                              size="small"
-                              startIcon={<AddIcon fontSize="small" />}
-                              onClick={handleAddOption}
-                              sx={{ mt: 1.5, textTransform: "none", color: "rgba(255,255,255,0.6)" }}
-                            >
-                              Add another option
-                            </Button>
-
-                            <Divider sx={{ my: 2, borderColor: "rgba(255,255,255,0.1)" }} />
-
-                            {/* Actions */}
-                            <Stack direction="row" spacing={1} justifyContent="flex-end">
-                              <Button
-                                onClick={handleCancelPoll}
-                                sx={{ color: "rgba(255,255,255,0.6)", textTransform: "none" }}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                variant="contained"
-                                onClick={handleLaunchPoll}
-                                disabled={!createPollQuestion.trim() || createPollOptions.some((o) => !o.trim())}
-                                sx={{
-                                  bgcolor: "#14b8b1",
-                                  color: "#fff",
-                                  fontWeight: 700,
-                                  textTransform: "none",
-                                  "&:hover": { bgcolor: "#0e8e88" },
-                                }}
-                              >
-                                Launch Poll
-                              </Button>
-                            </Stack>
-                          </Paper>
-                        )}
-                      </Box>
-                    )}
-
-                    {/* Existing Polls List */}
-                    {polls.map((p, idx) => (
-                      <Paper
-                        key={idx}
-                        variant="outlined"
-                        sx={{
-                          p: 1.5,
-                          bgcolor: "rgba(255,255,255,0.03)",
-                          borderColor: "rgba(255,255,255,0.08)",
-                          borderRadius: 2,
-                        }}
-                      >
-                        <Stack direction="row" alignItems="center" justifyContent="space-between">
-                          <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Poll</Typography>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{p.votes} votes</Typography>
-                            {p.voted ? (
-                              <Chip size="small" label="You voted" sx={{ bgcolor: "rgba(76,175,80,0.18)" }} />
-                            ) : (
-                              <Chip size="small" label="Active" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
-                            )}
-                          </Stack>
-                        </Stack>
-
-                        <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92 }}>{p.question}</Typography>
-
-                        <Stack spacing={1} sx={{ mt: 1.25 }}>
-                          {p.options.map((o, i) => (
-                            <Box key={i}>
-                              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                <Typography sx={{ fontSize: 13, opacity: 0.9 }}>{o.label}</Typography>
-                                <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{o.pct}%</Typography>
-                              </Stack>
-                              <LinearProgress
-                                variant="determinate"
-                                value={o.pct}
-                                sx={{
-                                  mt: 0.5,
-                                  height: 8,
-                                  borderRadius: 999,
-                                  bgcolor: "rgba(255,255,255,0.08)",
-                                  "& .MuiLinearProgress-bar": {
-                                    borderRadius: 999,
-                                  },
-                                }}
-                              />
-                            </Box>
-                          ))}
-                        </Stack>
-                      </Paper>
-                    ))}
-                  </Stack>
-                </Box>
-              </TabPanel>
-            )}
+            {/* POLLS (Hidden) */}
+            <TabPanel value={tab} index={2}>
+              {/* ... Polls Logic (Hidden) ... */}
+            </TabPanel>
 
             {/* MEMBERS */}
             <TabPanel value={tab} index={3}>
@@ -3427,7 +3202,15 @@ export default function NewLiveMeeting() {
                                         color="error"
                                         overlap="circular"
                                         invisible={
-                                          !privateUnreadByUserId[String(m._raw?.customParticipantId || m.id)]
+                                          !privateUnreadByUserId[
+                                          String(
+                                            m.clientSpecificId ||
+                                            m._raw?.clientSpecificId ||
+                                            m._raw?.client_specific_id ||
+                                            m._raw?.customParticipantId ||
+                                            m.id
+                                          )
+                                          ] && !privateUnreadByUserId[String(m.id)]
                                         }
                                       >
                                         <ChatBubbleOutlineIcon fontSize="small" />
@@ -3543,7 +3326,17 @@ export default function NewLiveMeeting() {
                                         variant="dot"
                                         color="error"
                                         overlap="circular"
-                                        invisible={!privateUnreadByUserId[String(m._raw?.customParticipantId || m.id)]}
+                                        invisible={
+                                          !privateUnreadByUserId[
+                                          String(
+                                            m.clientSpecificId ||
+                                            m._raw?.clientSpecificId ||
+                                            m._raw?.client_specific_id ||
+                                            m._raw?.customParticipantId ||
+                                            m.id
+                                          )
+                                          ] && !privateUnreadByUserId[String(m.id)]
+                                        }
                                       >
                                         <ChatBubbleOutlineIcon fontSize="small" />
                                       </Badge>
@@ -3586,6 +3379,122 @@ export default function NewLiveMeeting() {
           </Box>
         </>
       )}
+    </Box>
+  );
+
+  // 2. Vertical Icon Rail (Right side)
+  const SidebarIconRail = (
+    <Box
+      sx={{
+        width: 70, // Fixed width for the rail
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        pt: 2.5,
+        gap: 2.5,
+        bgcolor: "rgba(0,0,0,0.3)",
+        borderLeft: "1px solid rgba(255,255,255,0.08)",
+      }}
+    >
+      {/* Chat Icon */}
+      {hostPerms.chat && (
+        <Tooltip title={tab === 0 && rightPanelOpen ? "Close Chat" : "Open Chat"} placement="left" arrow>
+          <IconButton
+            onClick={() => {
+              if (rightPanelOpen && tab === 0) {
+                if (isMdUp) setRightPanelOpen(false);
+                else setRightOpen(false);
+              } else {
+                if (isMdUp) setRightPanelOpen(true);
+                else setRightOpen(true);
+                setTab(0);
+                if (privateChatUser) setPrivateChatUser(null);
+              }
+            }}
+            sx={{
+              width: 44,
+              height: 44,
+              bgcolor: (!privateChatUser && tab === 0 && rightPanelOpen) ? "rgba(20,184,177,0.15)" : "transparent",
+              color: (!privateChatUser && tab === 0 && rightPanelOpen) ? "#14b8b1" : "rgba(255,255,255,0.55)",
+              border: (!privateChatUser && tab === 0 && rightPanelOpen) ? "1px solid rgba(20,184,177,0.3)" : "1px solid transparent",
+              "&:hover": { bgcolor: "rgba(20,184,177,0.08)", color: "#fff" },
+              transition: "all 0.2s",
+            }}
+          >
+            <Badge variant="dot" color="error" invisible={!showChatDot}>
+              <ChatBubbleOutlineIcon />
+            </Badge>
+          </IconButton>
+        </Tooltip>
+      )}
+
+      {/* Q&A Icon */}
+      <Tooltip title={tab === 1 && rightPanelOpen ? "Close Q&A" : "Open Q&A"} placement="left" arrow>
+        <IconButton
+          onClick={() => {
+            if (rightPanelOpen && tab === 1) {
+              if (isMdUp) setRightPanelOpen(false);
+              else setRightOpen(false);
+            } else {
+              if (isMdUp) setRightPanelOpen(true);
+              else setRightOpen(true);
+              setTab(1);
+              if (privateChatUser) setPrivateChatUser(null);
+            }
+          }}
+          sx={{
+            width: 44,
+            height: 44,
+            bgcolor: (!privateChatUser && tab === 1 && rightPanelOpen) ? "rgba(20,184,177,0.15)" : "transparent",
+            color: (!privateChatUser && tab === 1 && rightPanelOpen) ? "#14b8b1" : "rgba(255,255,255,0.55)",
+            border: (!privateChatUser && tab === 1 && rightPanelOpen) ? "1px solid rgba(20,184,177,0.3)" : "1px solid transparent",
+            "&:hover": { bgcolor: "rgba(20,184,177,0.08)", color: "#fff" },
+            transition: "all 0.2s",
+          }}
+        >
+          <Badge variant="dot" color="error" invisible={!(qnaUnreadCount > 0 && !isQnaActive)}>
+            <QuestionAnswerIcon />
+          </Badge>
+        </IconButton>
+      </Tooltip>
+
+      {/* Participants Icon */}
+      <Tooltip title={tab === 3 && rightPanelOpen ? "Close Participants" : "Open Participants"} placement="left" arrow>
+        <IconButton
+          onClick={() => {
+            if (rightPanelOpen && tab === 3) {
+              if (isMdUp) setRightPanelOpen(false);
+              else setRightOpen(false);
+            } else {
+              if (isMdUp) setRightPanelOpen(true);
+              else setRightOpen(true);
+              setTab(3);
+              if (privateChatUser) setPrivateChatUser(null);
+            }
+          }}
+          sx={{
+            width: 44,
+            height: 44,
+            bgcolor: (!privateChatUser && tab === 3 && rightPanelOpen) ? "rgba(20,184,177,0.15)" : "transparent",
+            color: (!privateChatUser && tab === 3 && rightPanelOpen) ? "#14b8b1" : "rgba(255,255,255,0.55)",
+            border: (!privateChatUser && tab === 3 && rightPanelOpen) ? "1px solid rgba(20,184,177,0.3)" : "1px solid transparent",
+            "&:hover": { bgcolor: "rgba(20,184,177,0.08)", color: "#fff" },
+            transition: "all 0.2s",
+          }}
+        >
+          <Badge variant="dot" color="error" invisible={!showMembersDot}>
+            <GroupIcon />
+          </Badge>
+        </IconButton>
+      </Tooltip>
+    </Box>
+  );
+
+  const RightPanelContent = (
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "row", overflow: "hidden" }}>
+      {SidebarMainContent}
+      {SidebarIconRail}
     </Box>
   );
 
@@ -4209,35 +4118,43 @@ export default function NewLiveMeeting() {
           </Box>
 
           {/* Right Panel (Desktop) */}
-          {isMdUp && rightPanelOpen && (
-            <Box
-              sx={{
-                width: RIGHT_PANEL_W,
-                borderLeft: "1px solid rgba(255,255,255,0.08)",
-                bgcolor: "rgba(0,0,0,0.25)",
-                backdropFilter: "blur(10px)",
-                height: `calc(100vh - ${APPBAR_H}px)`,
-                position: "sticky",
-                top: APPBAR_H,
-                overflow: "hidden",
-                // (optional) to match the “padded card” look like main stage:
-                p: 2,
-                boxSizing: "border-box",
-              }}
-            >
-              <Paper
-                variant="outlined"
-                sx={{
-                  height: "100%",
-                  minHeight: 0,
-                  borderRadius: 3,
-                  borderColor: "rgba(255,255,255,0.08)",
-                  bgcolor: "rgba(255,255,255,0.03)",
-                  overflow: "hidden",
-                }}
-              >
-                {RightPanelContent}
-              </Paper>
+          {isMdUp && (
+            <Box sx={{ display: "flex", flexDirection: "row", height: `calc(100vh - ${APPBAR_H}px)`, position: "sticky", top: APPBAR_H }}>
+              {/* Content Panel (Collapsible) */}
+              {rightPanelOpen && (
+                <Box
+                  sx={{
+                    width: RIGHT_PANEL_W - 70, // 350px left for content
+                    borderLeft: "1px solid rgba(255,255,255,0.08)",
+                    bgcolor: "rgba(0,0,0,0.25)",
+                    backdropFilter: "blur(10px)",
+                    height: "100%",
+                    overflow: "hidden",
+                    // (optional) to match the “padded card” look:
+                    p: 2,
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      height: "100%",
+                      minHeight: 0,
+                      borderRadius: 3,
+                      borderColor: "rgba(255,255,255,0.08)",
+                      bgcolor: "rgba(255,255,255,0.03)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {SidebarMainContent}
+                  </Paper>
+                </Box>
+              )}
+
+              {/* Icon Rail (Always Visible) */}
+              <Box sx={{ height: "100%" }}>
+                {SidebarIconRail}
+              </Box>
             </Box>
           )}
 
