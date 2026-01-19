@@ -3518,27 +3518,26 @@ export default function ProfilePage() {
                           </Tooltip>
                         }
                       >
-                        <Stack spacing={1}>
+                        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                           {socialItems.filter((item) => item.url).length ? (
                             socialItems.filter((item) => item.url).map((item) => (
-                              <Box key={item.key} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                <Box component="a" href={item.url} target="_blank" rel="noopener noreferrer" sx={{ color: "inherit", display: "flex" }}>
-                                  {item.icon}
-                                </Box>
-                                <Typography
-                                  variant="body2"
+                              <Tooltip key={item.key} title={item.label}>
+                                <Box
                                   component="a"
                                   href={item.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  sx={{ wordBreak: "break-word" }}
+                                  aria-label={`${item.label} profile`}
+                                  sx={{ color: "inherit", display: "flex" }}
                                 >
-                                  {item.url}
-                                </Typography>
-                              </Box>
+                                  {item.icon}
+                                </Box>
+                              </Tooltip>
                             ))
                           ) : (
-                            <Typography variant="body2" color="text.secondary">\u2014</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              The member has not yet provided any social profiles.
+                            </Typography>
                           )}
                         </Stack>
                       </SectionCard>
