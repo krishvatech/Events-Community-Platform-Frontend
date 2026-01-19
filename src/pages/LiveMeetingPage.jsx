@@ -4139,7 +4139,7 @@ export default function NewLiveMeeting() {
                   </Tooltip>
                 )}
 
-                <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : (isChatActive ? "Close chat" : "Open chat")}>
+                <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : (isChatActive ? "Close Sidebar" : "Open Sidebar")}>
                   <span>
                     <IconButton
                       onClick={() => {
