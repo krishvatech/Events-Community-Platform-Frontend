@@ -701,11 +701,9 @@ export default function EventManagePage() {
                     sx={{ color: "text.disabled" }}
                   />
                   <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Attending:{" "}
+                    Registered Members:{" "}
                     <strong>
-                      {event.attending_count != null
-                        ? event.attending_count
-                        : 0}
+                      {Math.max(1, event.attending_count != null ? event.attending_count : 0)}
                     </strong>
                   </Typography>
                 </Stack>
