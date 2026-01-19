@@ -34,6 +34,7 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  ListItemButton, // <--- ADDED
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -54,6 +55,8 @@ import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
 
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
@@ -433,6 +436,7 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82 }) {
 
         {/* Avatar overlay (show always, matches your UI) */}
         <Avatar
+          src={p.picture} // ✅ Use profile picture
           sx={{
             position: "absolute",
             top: isSmall ? 6 : 8,
@@ -1759,6 +1763,7 @@ export default function NewLiveMeeting() {
         cam: Boolean(p.videoEnabled),
         active: Boolean(p.isSpeaking),
         joinedAtTs: participantJoinedAtRef.current.get(p.id),
+        picture: p.picture || p.avatar || p.profilePicture || p.customParticipantId || "", // ✅ Extract picture
         _raw: p,
       };
     });
@@ -2793,7 +2798,7 @@ export default function NewLiveMeeting() {
             </IconButton>
 
             <Stack direction="row" spacing={1.5} alignItems="center">
-              <Avatar sx={{ width: 32, height: 32, bgcolor: "rgba(255,255,255,0.14)", fontSize: 13 }}>
+              <Avatar src={privateChatUser.picture} sx={{ width: 32, height: 32, bgcolor: "rgba(255,255,255,0.14)", fontSize: 13 }}>
                 {initialsFromName(privateChatUser.name)}
               </Avatar>
               <Box>
@@ -3400,7 +3405,7 @@ export default function NewLiveMeeting() {
                         {groupedMembers.host.map((m, idx) => (
                           <ListItem
                             key={idx}
-                            sx={{ px: 1.25, py: 1, display: "flex", alignItems: "center" }}
+                            disablePadding
                             secondaryAction={
                               <Stack direction="row" spacing={0.75} alignItems="center">
                                 <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
@@ -3433,19 +3438,21 @@ export default function NewLiveMeeting() {
                               </Stack>
                             }
                           >
-                            <ListItemAvatar>
-                              <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
-                                {initialsFromName(m.name)}
-                              </Avatar>
-                            </ListItemAvatar>
-                            <ListItemText
-                              primary={
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>
-                                  <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
-                                </Stack>
-                              }
-                            />
+                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1 }}>
+                              <ListItemAvatar>
+                                <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+                                  {initialsFromName(m.name)}
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText
+                                primary={
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>
+                                    <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                                  </Stack>
+                                }
+                              />
+                            </ListItemButton>
                           </ListItem>
                         ))}
                       </List>
@@ -3468,7 +3475,7 @@ export default function NewLiveMeeting() {
                         {groupedMembers.speakers.map((m, idx) => (
                           <ListItem
                             key={idx}
-                            sx={{ px: 1.25, py: 1 }}
+                            disablePadding
                             secondaryAction={
                               <Stack direction="row" spacing={0.75} alignItems="center">
                                 <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
@@ -3493,15 +3500,17 @@ export default function NewLiveMeeting() {
                               </Stack>
                             }
                           >
-                            <ListItemAvatar>
-                              <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
-                                {initialsFromName(m.name)}
-                              </Avatar>
-                            </ListItemAvatar>
-                            <ListItemText
-                              primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>}
-                              secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
-                            />
+                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1 }}>
+                              <ListItemAvatar>
+                                <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+                                  {initialsFromName(m.name)}
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText
+                                primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>}
+                                secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
+                              />
+                            </ListItemButton>
                           </ListItem>
                         ))}
                       </List>
@@ -3517,7 +3526,7 @@ export default function NewLiveMeeting() {
                         {audienceMembersSorted.map((m, idx) => (
                           <ListItem
                             key={idx}
-                            sx={{ px: 1.25, py: 1 }}
+                            disablePadding
                             secondaryAction={
                               <Stack direction="row" spacing={0.75} alignItems="center">
                                 <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
@@ -3555,15 +3564,17 @@ export default function NewLiveMeeting() {
                               </Stack>
                             }
                           >
-                            <ListItemAvatar>
-                              <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
-                                {initialsFromName(m.name)}
-                              </Avatar>
-                            </ListItemAvatar>
-                            <ListItemText
-                              primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>}
-                              secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
-                            />
+                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1 }}>
+                              <ListItemAvatar>
+                                <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+                                  {initialsFromName(m.name)}
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText
+                                primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>}
+                                secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
+                              />
+                            </ListItemButton>
                           </ListItem>
                         ))}
                       </List>
@@ -3901,6 +3912,7 @@ export default function NewLiveMeeting() {
                 {!stageHasVideo && (
                   <>
                     <Avatar
+                      src={pinnedRaw?.picture} // ✅ Use pinned host picture
                       sx={{
                         width: 76,
                         height: 76,
@@ -4277,185 +4289,10 @@ export default function NewLiveMeeting() {
 
           <DialogContent sx={{ px: 2, pb: 2, pt: 1 }}>
             {selectedMember ? (
-              <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "center" }}>
-
-                {/* 1. Avatar Section with Crown Badge */}
-                <Box sx={{ position: "relative", mb: 1.5 }}>
-                  <Avatar
-                    sx={{
-                      width: 80,
-                      height: 80,
-                      bgcolor: "rgba(255,255,255,0.1)",
-                      fontSize: 32,
-                      border: "2px solid rgba(255,255,255,0.05)",
-                    }}
-                  >
-                    {initialsFromName(selectedMember.name)}
-                  </Avatar>
-
-                  {/* Show Crown if Host */}
-                  {selectedMember.role === "Host" && (
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        top: 0,
-                        right: 0,
-                        bgcolor: "#ffb300", // Gold color
-                        borderRadius: "50%",
-                        width: 24,
-                        height: 24,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        border: "2px solid #0b101a",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
-                      }}
-                    >
-                      <Typography sx={{ fontSize: 12 }}>👑</Typography>
-                    </Box>
-                  )}
-                </Box>
-
-                {/* 2. Name */}
-                <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 0.5 }}>
-                  {selectedMember.name}
-                </Typography>
-
-                {/* 3. Role Chip */}
-                <Chip
-                  label={selectedMember.role}
-                  size="small"
-                  icon={
-                    <Box
-                      sx={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        bgcolor: selectedMember.role === "Host" ? "#ffb300" : "#22c55e", // Gold or Green dot
-                        ml: 0.5,
-                      }}
-                    />
-                  }
-                  sx={{
-                    bgcolor: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    height: 24,
-                    "& .MuiChip-label": { px: 1.5, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" },
-                    "& .MuiChip-icon": { order: -1, mr: -0.5 }, // Move dot to start
-                  }}
-                />
-
-                {/* 4. Info Card / Table */}
-                <Box
-                  sx={{
-                    mt: 3,
-                    width: "100%",
-                    bgcolor: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 3,
-                    p: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 2,
-                  }}
-                >
-
-                  {/* Row: Joined */}
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Joined</Typography>
-                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
-                      {formatClockTime(selectedMember.joinedAtTs)}
-                    </Typography>
-                  </Box>
-
-                  <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
-
-                  {/* Row: Status */}
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Status</Typography>
-                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#22c55e" }}>In Meeting</Typography>
-                  </Box>
-
-                  <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
-
-                  {/* Row: Microphone */}
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Microphone</Typography>
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                      {selectedMember.mic ? (
-                        <>
-                          <MicIcon sx={{ fontSize: 14, color: "#fff" }} />
-                          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>On</Typography>
-                        </>
-                      ) : (
-                        <>
-                          <MicOffIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }} />
-                          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Off</Typography>
-                        </>
-                      )}
-                    </Stack>
-                  </Box>
-
-                  <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
-
-                  {/* Row: Camera */}
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Camera</Typography>
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                      {selectedMember.cam ? (
-                        <>
-                          <VideocamIcon sx={{ fontSize: 14, color: "#fff" }} />
-                          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>On</Typography>
-                        </>
-                      ) : (
-                        <>
-                          <VideocamOffIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }} />
-                          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Off</Typography>
-                        </>
-                      )}
-                    </Stack>
-                  </Box>
-
-                  <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
-
-                  {/* Row: Permissions */}
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Permissions</Typography>
-                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#facc15" }}>
-                      {selectedMember.role === "Host" ? "Full Access" : "Attendee"}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {/* 5. View Profile Button */}
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<Box component="span" sx={{ fontSize: 18, display: "flex" }}>👤</Box>} // Simple user icon or use PersonOutlineIcon
-                  onClick={() => {
-                    // Logic: Use customParticipantId (DB ID) if available, else fallback to Dyte ID
-                    const userId = selectedMember._raw?.customParticipantId || selectedMember.id;
-                    window.open(`/community/rich-profile/${userId}`, "_blank");
-                  }}
-                  sx={{
-                    mt: 3,
-                    py: 1.5,
-                    borderRadius: 3,
-                    borderColor: "rgba(255,255,255,0.2)",
-                    color: "#fff",
-                    textTransform: "none",
-                    fontWeight: 600,
-                    fontSize: 14,
-                    bgcolor: "rgba(255,255,255,0.02)",
-                    "&:hover": {
-                      bgcolor: "rgba(255,255,255,0.08)",
-                      borderColor: "#fff",
-                    },
-                  }}
-                >
-                  View Profile
-                </Button>
-              </Box>
+              <MemberInfoContent
+                selectedMember={selectedMember}
+                onClose={closeMemberInfo}
+              />
             ) : (
               <Box sx={{ py: 4, textAlign: "center", opacity: 0.5 }}>
                 <CircularProgress size={24} />
@@ -4466,5 +4303,316 @@ export default function NewLiveMeeting() {
       </Box>
     </DyteProvider>
 
+  );
+}
+
+// ✅ Separate sub-component to handle async friendship logic locally
+function MemberInfoContent({ selectedMember, onClose }) {
+  const [connStatus, setConnStatus] = useState("loading"); // "loading" | "none" | "friends" | "pending_outgoing" | "pending_incoming"
+  const [connLoading, setConnLoading] = useState(false);
+
+  // 1. Check friendship status on mount
+  useEffect(() => {
+    let alive = true;
+    const checkStatus = async () => {
+      // Use DB ID if available, else Dyte ID (though friends API needs DB ID usually)
+      const userId = selectedMember._raw?.customParticipantId || selectedMember.id;
+      if (!userId) {
+        if (alive) setConnStatus("none");
+        return;
+      }
+
+      try {
+        const res = await fetch(toApiUrl(`friends/status/?user_id=${userId}`), {
+          headers: { ...authHeader() },
+        });
+        const d = await res.json().catch(() => ({}));
+        if (alive) {
+          // backend returning 'incoming_pending' etc.
+          const map = { incoming_pending: "pending_incoming", outgoing_pending: "pending_outgoing" };
+          const s = (map[d?.status] || d?.status || "none").toLowerCase();
+          setConnStatus(s);
+        }
+      } catch (e) {
+        if (alive) setConnStatus("none");
+      }
+    };
+    checkStatus();
+    return () => { alive = false; };
+  }, [selectedMember]);
+
+  // 2. Send request
+  const handleConnect = async () => {
+    const userId = selectedMember._raw?.customParticipantId || selectedMember.id;
+    if (!userId) return;
+
+    setConnLoading(true);
+    try {
+      const res = await fetch(toApiUrl("friend-requests/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ to_user: Number(userId) }),
+      });
+      if (res.ok) {
+        // success
+        setConnStatus("pending_outgoing");
+      } else {
+        const msg = await res.text();
+        console.error("Failed to send request:", msg);
+        alert("Failed to send connection request.");
+      }
+    } catch (e) {
+      console.error("Connect error:", e);
+    } finally {
+      setConnLoading(false);
+    }
+  };
+
+  const userId = selectedMember?._raw?.customParticipantId || selectedMember?.id;
+  const profileLink = `/community/rich-profile/${userId}`;
+
+  return (
+    <Box sx={{ mt: 2, display: "flex", flexDirection: "column", alignItems: "center" }}>
+
+      {/* 1. Avatar Section with Crown Badge */}
+      <Box sx={{ position: "relative", mb: 1.5 }}>
+        <Avatar
+          src={selectedMember.picture} // ✅ Use real picture
+          sx={{
+            width: 80,
+            height: 80,
+            bgcolor: "rgba(255,255,255,0.1)",
+            fontSize: 32,
+            border: "2px solid rgba(255,255,255,0.05)",
+          }}
+        >
+          {initialsFromName(selectedMember.name)}
+        </Avatar>
+
+        {/* Show Crown if Host */}
+        {selectedMember.role === "Host" && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bgcolor: "#ffb300", // Gold color
+              borderRadius: "50%",
+              width: 24,
+              height: 24,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "2px solid #0b101a",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
+            }}
+          >
+            <Typography sx={{ fontSize: 12 }}>👑</Typography>
+          </Box>
+        )}
+      </Box>
+
+      {/* 2. Name */}
+      <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 0.5 }}>
+        {selectedMember.name}
+      </Typography>
+
+      {/* 3. Role Chip */}
+      <Chip
+        label={selectedMember.role}
+        size="small"
+        icon={
+          <Box
+            sx={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              bgcolor: selectedMember.role === "Host" ? "#ffb300" : "#22c55e", // Gold or Green dot
+              ml: 0.5,
+            }}
+          />
+        }
+        sx={{
+          bgcolor: "rgba(255,255,255,0.06)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          height: 24,
+          "& .MuiChip-label": { px: 1.5, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)" },
+          "& .MuiChip-icon": { order: -1, mr: -0.5 }, // Move dot to start
+        }}
+      />
+
+      {/* 4. Info Card / Table */}
+      <Box
+        sx={{
+          mt: 3,
+          width: "100%",
+          bgcolor: "rgba(255,255,255,0.02)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 3,
+          p: 2,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+        }}
+      >
+
+        {/* Row: Joined */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Joined</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
+            {formatClockTime(selectedMember.joinedAtTs)}
+          </Typography>
+        </Box>
+
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
+
+        {/* Row: Status */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Status</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#22c55e" }}>In Meeting</Typography>
+        </Box>
+
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
+
+        {/* Row: Microphone */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Microphone</Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            {selectedMember.mic ? (
+              <>
+                <MicIcon sx={{ fontSize: 14, color: "#fff" }} />
+                <Typography sx={{ fontSize: 13, fontWeight: 600 }}>On</Typography>
+              </>
+            ) : (
+              <>
+                <MicOffIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }} />
+                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Off</Typography>
+              </>
+            )}
+          </Stack>
+        </Box>
+
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
+
+        {/* Row: Camera */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Camera</Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            {selectedMember.cam ? (
+              <>
+                <VideocamIcon sx={{ fontSize: 14, color: "#fff" }} />
+                <Typography sx={{ fontSize: 13, fontWeight: 600 }}>On</Typography>
+              </>
+            ) : (
+              <>
+                <VideocamOffIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }} />
+                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Off</Typography>
+              </>
+            )}
+          </Stack>
+        </Box>
+
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
+
+        {/* Row: Permissions */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Permissions</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#facc15" }}>
+            {selectedMember.role === "Host" ? "Full Access" : "Attendee"}
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* 5. Actions: View Profile + Connect */}
+      <Stack direction="row" spacing={1.5} sx={{ mt: 3, width: "100%" }}>
+        {/* View Profile */}
+        <Button
+          fullWidth
+          variant="outlined"
+          startIcon={<Box component="span" sx={{ fontSize: 18, display: "flex" }}>👤</Box>}
+          onClick={() => {
+            window.open(profileLink, "_blank");
+          }}
+          sx={{
+            py: 1.5,
+            borderRadius: 3,
+            borderColor: "rgba(255,255,255,0.2)",
+            color: "#fff",
+            textTransform: "none",
+            fontWeight: 600,
+            fontSize: 14,
+            bgcolor: "rgba(255,255,255,0.02)",
+            "&:hover": {
+              bgcolor: "rgba(255,255,255,0.08)",
+              borderColor: "#fff",
+            },
+          }}
+        >
+          View Profile
+        </Button>
+
+        {/* Connect Button */}
+        {connStatus === "none" && (
+          <Button
+            fullWidth
+            variant="contained"
+            disabled={connLoading}
+            onClick={handleConnect}
+            startIcon={<PersonAddAlt1RoundedIcon />}
+            sx={{
+              py: 1.5,
+              borderRadius: 3,
+              bgcolor: "#14b8b1",
+              color: "#fff",
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: 14,
+              "&:hover": { bgcolor: "#0e8e88" },
+            }}
+          >
+            {connLoading ? "Sending..." : "Connect"}
+          </Button>
+        )}
+
+        {connStatus === "pending_outgoing" && (
+          <Button
+            fullWidth
+            disabled
+            variant="contained"
+            sx={{
+              py: 1.5,
+              borderRadius: 3,
+              bgcolor: "rgba(255,255,255,0.1) !important",
+              color: "rgba(255,255,255,0.5) !important",
+              textTransform: "none",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            Request Sent
+          </Button>
+        )}
+
+        {connStatus === "friends" && (
+          <Button
+            fullWidth
+            disabled
+            variant="outlined"
+            startIcon={<CheckRoundedIcon />}
+            sx={{
+              py: 1.5,
+              borderRadius: 3,
+              borderColor: "rgba(20,184,177,0.5) !important",
+              color: "#14b8b1 !important",
+              textTransform: "none",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            Connected
+          </Button>
+        )}
+      </Stack>
+    </Box>
   );
 }
