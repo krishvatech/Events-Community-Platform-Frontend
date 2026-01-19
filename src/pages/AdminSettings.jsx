@@ -52,6 +52,7 @@ import FacebookIcon from "@mui/icons-material/Facebook";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import PhoneIcon from "@mui/icons-material/Phone";
+import { isValidPhoneNumber } from 'libphonenumber-js';
 import PhoneInputWithCountry from "../components/PhoneInputWithCountry";
 import LinkIcon from "@mui/icons-material/Link";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
@@ -2037,13 +2038,13 @@ export default function AdminSettings() {
       // Validate Phones
       const newPhoneErrors = {};
       let hasPhoneError = false;
-      // Regex: optional +, then 7 to 15 digits. Anchor start/end.
-      const PHONE_REGEX = /^\+?[0-9]{7,15}$/;
 
       contactForm.phones.forEach((item, idx) => {
         const val = (item.number || "").trim();
-        if (val && !PHONE_REGEX.test(val)) {
-          newPhoneErrors[idx] = "Must be 7-15 digits";
+        // Ensure '+' prefix for validation
+        const checkVal = val.startsWith('+') ? val : '+' + val;
+        if (val && !isValidPhoneNumber(checkVal)) {
+          newPhoneErrors[idx] = "Invalid phone number for this region.";
           hasPhoneError = true;
         }
       });
@@ -4214,7 +4215,7 @@ export default function AdminSettings() {
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Phones</Typography>
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {contactForm.phones.map((item, idx) => (
-                    <Grid container spacing={1} alignItems="center" key={`phone-row-${idx}`}>
+                    <Grid container spacing={1} alignItems="flex-start" key={`phone-row-${idx}`}>
                       <Grid item xs={12} sm={3}>
                         <PhoneInputWithCountry
                           label="Number"
