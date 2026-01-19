@@ -26,6 +26,7 @@ import {
   ListItemText,
   Skeleton
 } from "@mui/material";
+import Autocomplete from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
@@ -1174,7 +1175,7 @@ export default function MembersPage() {
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   size="small"
-                  placeholder="Search by name, company, country..."
+                  placeholder="Search by name, company, region..."
                   fullWidth
                   InputProps={{
                     startAdornment: (
@@ -1200,106 +1201,64 @@ export default function MembersPage() {
                     spacing={1}
                   >
                     {/* Company */}
-                    <TextField
-                      size="small"
-                      select
+                    <Autocomplete
+                      multiple
                       fullWidth
-                      label="Company"
+                      size="small"
+                      options={globalOptions.companies}
                       value={selectedCompanies}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setSelectedCompanies(
-                          typeof value === "string" ? value.split(",") : value
-                        );
-                      }}
-                      InputLabelProps={{ shrink: true }}
-                      SelectProps={{
-                        multiple: true,
-                        displayEmpty: true,
-                        renderValue: (selected) => {
-                          if (!selected || selected.length === 0) {
-                            return "All companies";
-                          }
-                          return selected.join(", ");
-                        },
-                      }}
+                      onChange={(_, newValue) => setSelectedCompanies(newValue)}
+                      filterSelectedOptions
+                      disableCloseOnSelect
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Company"
+                          placeholder={selectedCompanies.length ? "" : "All companies"}
+                        />
+                      )}
                       sx={{ flex: 1 }}
-                    >
-                      {globalOptions.companies.map((name) => (
-                        <MenuItem key={name} value={name}>
-                          <Checkbox checked={selectedCompanies.indexOf(name) > -1} />
-                          <ListItemText primary={name} />
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                    />
 
-                    {/* Country */}
-                    <TextField
-                      size="small"
-                      select
+                    {/* Region */}
+                    <Autocomplete
+                      multiple
                       fullWidth
-                      label="Country"
+                      size="small"
+                      options={globalOptions.countries}
                       value={selectedCountries}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setSelectedCountries(
-                          typeof value === "string" ? value.split(",") : value
-                        );
-                      }}
-                      InputLabelProps={{ shrink: true }}
-                      SelectProps={{
-                        multiple: true,
-                        displayEmpty: true,
-                        renderValue: (selected) => {
-                          if (!selected || selected.length === 0) {
-                            return "All countries";
-                          }
-                          return selected.join(", ");
-                        },
-                      }}
+                      onChange={(_, newValue) => setSelectedCountries(newValue)}
+                      filterSelectedOptions
+                      disableCloseOnSelect
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Region"
+                          placeholder={selectedCountries.length ? "" : "All regions"}
+                        />
+                      )}
                       sx={{ flex: 1 }}
-                    >
-                      {globalOptions.countries.map((name) => (
-                        <MenuItem key={name} value={name}>
-                          <Checkbox checked={selectedCountries.indexOf(name) > -1} />
-                          <ListItemText primary={name} />
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                    />
 
                     {/* Job title */}
-                    <TextField
-                      size="small"
-                      select
+                    <Autocomplete
+                      multiple
                       fullWidth
-                      label="Job title"
+                      size="small"
+                      options={globalOptions.titles}
                       value={selectedTitles}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setSelectedTitles(
-                          typeof value === "string" ? value.split(",") : value
-                        );
-                      }}
-                      InputLabelProps={{ shrink: true }}
-                      SelectProps={{
-                        multiple: true,
-                        displayEmpty: true,
-                        renderValue: (selected) => {
-                          if (!selected || selected.length === 0) {
-                            return "All job titles";
-                          }
-                          return selected.join(", ");
-                        },
-                      }}
+                      onChange={(_, newValue) => setSelectedTitles(newValue)}
+                      filterSelectedOptions
+                      disableCloseOnSelect
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Job title"
+                          placeholder={selectedTitles.length ? "" : "All job titles"}
+                        />
+                      )}
                       sx={{ flex: 1 }}
-                    >
-                      {globalOptions.titles.map((name) => (
-                        <MenuItem key={name} value={name}>
-                          <Checkbox checked={selectedTitles.indexOf(name) > -1} />
-                          <ListItemText primary={name} />
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                    />
                   </Stack>
 
                   {/* Row 2: Industry, Company size */}
