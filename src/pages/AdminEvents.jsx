@@ -557,9 +557,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             ))}
           </TextField>
 
-          <Grid container spacing={2} alignItems="flex-start">
+          <Grid
+            container
+            spacing={2}
+            alignItems="flex-start"
+            sx={{ flexWrap: { xs: "wrap", sm: "nowrap" } }}
+          >
             {/* Left */}
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6} sx={{ minWidth: 0 }}>
               {format === "virtual" ? (
                 <Autocomplete
                   size="small"
@@ -660,39 +665,24 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Grid>
 
             {/* Right: Image */}
-            <Grid item xs={12} md={6}>
-              <Typography variant="subtitle1" className="font-semibold">Add Logo or Picture</Typography>
+            <Grid item xs={12} sm={6} sx={{ minWidth: 0, mt: { xs: 2, sm: 0 } }}>
+              <Typography variant="subtitle1" className="font-semibold">Update Logo / Picture</Typography>
               <Typography variant="caption" className="text-slate-500 block mb-2">
-                Recommended size is 650×365px – Max 50 MB
+                Recommended 650x365px - Max 50 MB
               </Typography>
 
               <Box
                 className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                sx={{
-                  width: { xs: "100%", sm: 360 }, // nice fixed width on tablet/desktop
-                  maxWidth: "100%",
-                  position: "relative",
-                  paddingTop: "56.25%",          // 16:9 ratio
-                  mx: "auto",                    // ⬅️ center horizontally on ALL breakpoints
-                  mb: 1.5,
-                  overflow: "hidden",
-                }}
+                sx={{ height: 200, position: "relative", overflow: "hidden" }}
               >
                 {localImagePreview ? (
                   <img
                     src={localImagePreview}
                     alt="preview"
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 ) : (
-                  <Stack alignItems="center" spacing={1} sx={{ position: "absolute", inset: 0 }}>
+                  <Stack alignItems="center" spacing={1}>
                     <ImageRoundedIcon />
                     <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
                   </Stack>
@@ -732,8 +722,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         {/* ===== Schedule ===== */}
         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
           <Typography variant="h6" className="font-semibold mb-3">Schedule</Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={3}>
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid item xs={12} md={6}>
               <TextField label="Start Date" type="date" value={startDate} onChange={(e) => {
                 const v = e.target.value;
                 setStartDate(v);
@@ -749,7 +739,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 helperText={errors.startDate}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={6}>
               <TextField label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth
                 InputLabelProps={{ shrink: true }}
                 InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
@@ -758,7 +748,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 helperText={errors.endDate}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+          </Grid>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={4}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <TimePicker label="Start time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${startTime}`)}
                   onChange={(v) => {
@@ -771,7 +764,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={4}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <TimePicker label="End time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${endTime}`)}
                   onChange={(v) => {
@@ -1363,51 +1356,55 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
               />
             </Grid>
 
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <TimePicker
-                  label="Start time *" ampm minutesStep={1}
-                  value={dayjs(`1970-01-01T${startTime}`)}
-                  onChange={(val) => {
-                    const newStart = val ? dayjs(val).second(0).format("HH:mm") : startTime;
-                    setStartTime(newStart);
-                    const next = computeEndFromStart(startDate, newStart, 2);
-                    setEndDate(next.endDate);
-                    setEndTime(next.endTime);
-                  }}
-                  slotProps={{ textField: { fullWidth: true, error: !!errors.startTime, helperText: errors.startTime } }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <TimePicker
-                  label="End time *" ampm minutesStep={1}
-                  value={dayjs(`1970-01-01T${endTime}`)}
-                  onChange={(val) => {
-                    const newEnd = val ? dayjs(val).second(0).format("HH:mm") : endTime;
-                    setEndTime(newEnd);
-                    if (startDate && endDate && startDate === endDate && newEnd <= startTime) {
-                      setEndDate(dayjs(startDate).add(1, "day").format("YYYY-MM-DD"));
-                    }
-                  }}
-                  slotProps={{ textField: { fullWidth: true, error: !!errors.endTime, helperText: errors.endTime } }}
-                />
-              </Grid>
-            </LocalizationProvider>
-
             <Grid size={{ xs: 12 }}>
-              <Autocomplete
-                fullWidth
-                options={timezoneOptions}
-                value={timezone}
-                onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Event Timezone"
-                    helperText="Times are saved in this timezone."
+              <Grid container spacing={3}>
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <TimePicker
+                      label="Start time *" ampm minutesStep={1}
+                      value={dayjs(`1970-01-01T${startTime}`)}
+                      onChange={(val) => {
+                        const newStart = val ? dayjs(val).second(0).format("HH:mm") : startTime;
+                        setStartTime(newStart);
+                        const next = computeEndFromStart(startDate, newStart, 2);
+                        setEndDate(next.endDate);
+                        setEndTime(next.endTime);
+                      }}
+                      slotProps={{ textField: { fullWidth: true, error: !!errors.startTime, helperText: errors.startTime } }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <TimePicker
+                      label="End time *" ampm minutesStep={1}
+                      value={dayjs(`1970-01-01T${endTime}`)}
+                      onChange={(val) => {
+                        const newEnd = val ? dayjs(val).second(0).format("HH:mm") : endTime;
+                        setEndTime(newEnd);
+                        if (startDate && endDate && startDate === endDate && newEnd <= startTime) {
+                          setEndDate(dayjs(startDate).add(1, "day").format("YYYY-MM-DD"));
+                        }
+                      }}
+                      slotProps={{ textField: { fullWidth: true, error: !!errors.endTime, helperText: errors.endTime } }}
+                    />
+                  </Grid>
+                </LocalizationProvider>
+
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <Autocomplete
+                    fullWidth
+                    options={timezoneOptions}
+                    value={timezone}
+                    onChange={(_, newVal) => setTimezone(newVal || getBrowserTimezone())}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Event Timezone"
+                        helperText="Times are saved in this timezone."
+                      />
+                    )}
                   />
-                )}
-              />
+                </Grid>
+              </Grid>
             </Grid>
           </Grid>
         </DialogContent>
