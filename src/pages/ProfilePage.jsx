@@ -19,6 +19,7 @@ import FacebookIcon from "@mui/icons-material/Facebook";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import PhoneIcon from "@mui/icons-material/Phone";
+import PhoneInputWithCountry from "../components/PhoneInputWithCountry";
 import LinkIcon from "@mui/icons-material/Link";
 import EmailIcon from "@mui/icons-material/Email";
 import PlaceIcon from "@mui/icons-material/Place";
@@ -2167,13 +2168,13 @@ export default function ProfilePage() {
       // Validate Phones
       const newPhoneErrors = {};
       let hasPhoneError = false;
-      // Regex: optional +, then 10 to 12 digits. Anchor start/end.
-      const PHONE_REGEX = /^\+?[0-9]{10,12}$/;
+      // Regex: optional +, then 7 to 15 digits. Anchor start/end.
+      const PHONE_REGEX = /^\+?[0-9]{7,15}$/;
 
       contactForm.phones.forEach((item, idx) => {
         const val = (item.number || "").trim();
         if (val && !PHONE_REGEX.test(val)) {
-          newPhoneErrors[idx] = "Must be 10-12 digits (numeric only)";
+          newPhoneErrors[idx] = "Must be 7-15 digits";
           hasPhoneError = true;
         }
       });
@@ -3444,26 +3445,38 @@ export default function ProfilePage() {
                       >
                         <Stack spacing={1}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Box sx={{ width: 24, display: "flex", justifyContent: "center" }}>
-                              <EmailIcon fontSize="small" />
+                            {/* Left: Icon + Email */}
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1 }}>
+                              <Box sx={{ width: 24, display: "flex", justifyContent: "center" }}>
+                                <EmailIcon fontSize="small" />
+                              </Box>
+                              <Typography variant="body2">{form.email || "\u2014"}</Typography>
                             </Box>
-                            <Typography variant="body2">{form.email || "\u2014"}</Typography>
-                            {renderVisibilityIcon(contactLinks.main_email?.visibility || "private")}
-                            <Chip label="Main" size="small" color="primary" variant="outlined" />
-                            {contactLinks.main_email?.type && (
-                              <Typography variant="caption" color="text.secondary">
-                                ({getEmailTypeLabel(contactLinks.main_email.type)})
-                              </Typography>
-                            )}
+                            {/* Right: Metadata */}
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              {renderVisibilityIcon(contactLinks.main_email?.visibility || "private")}
+                              {contactLinks.main_email?.type && (
+                                <Typography variant="caption" color="text.secondary">
+                                  ({getEmailTypeLabel(contactLinks.main_email.type)})
+                                </Typography>
+                              )}
+                              <Chip label="Main" size="small" color="primary" variant="outlined" />
+                            </Box>
                           </Box>
                           {emailPreview.map((item, idx) => (
                             <Box key={`email-${idx}`} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                              <Box sx={{ width: 24, display: "flex", justifyContent: "center" }}>
-                                <EmailIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                              {/* Left: Icon + Email */}
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1 }}>
+                                <Box sx={{ width: 24, display: "flex", justifyContent: "center" }}>
+                                  <EmailIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                                </Box>
+                                <Typography variant="body2">{item.email}</Typography>
                               </Box>
-                              <Typography variant="body2">{item.email}</Typography>
-                              {renderVisibilityIcon(item.visibility || "private")}
-                              <Typography variant="caption" color="text.secondary">({getEmailTypeLabel(item.type)})</Typography>
+                              {/* Right: Metadata */}
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                {renderVisibilityIcon(item.visibility || "private")}
+                                <Typography variant="caption" color="text.secondary">({getEmailTypeLabel(item.type)})</Typography>
+                              </Box>
                             </Box>
                           ))}
                           {emailRemaining > 0 ? (
@@ -3489,15 +3502,21 @@ export default function ProfilePage() {
                           {phonePreview.length ? (
                             phonePreview.map((item, idx) => (
                               <Box key={`phone-${idx}`} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                <PhoneIcon fontSize="small" />
-                                <Typography variant="body2">{item.number}</Typography>
+                                <Box sx={{ flex: 1 }}>
+                                  <PhoneInputWithCountry
+                                    viewMode
+                                    value={item.number}
+                                  />
+                                </Box>
                                 {renderVisibilityIcon(item.visibility || "private")}
                                 <Typography variant="caption" color="text.secondary">({getEmailTypeLabel(item.type)})</Typography>
                                 {item.primary ? <Chip label="Primary" size="small" variant="outlined" /> : null}
                               </Box>
                             ))
                           ) : (
-                            <Typography variant="body2" color="text.secondary">\u2014</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              The member has not yet provided any phone numbers.
+                            </Typography>
                           )}
                           {phoneRemaining > 0 ? (
                             <Typography variant="caption" color="text.secondary" sx={{ pl: 3 }}>
@@ -3576,7 +3595,9 @@ export default function ProfilePage() {
                               </Box>
                             ))
                           ) : (
-                            <Typography variant="body2" color="text.secondary">\u2014</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              The member has not yet provided any websites.
+                            </Typography>
                           )}
                           {websiteRemaining > 0 ? (
                             <Typography variant="caption" color="text.secondary" sx={{ pl: 3 }}>
@@ -4099,15 +4120,13 @@ export default function ProfilePage() {
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {contactForm.phones.map((item, idx) => (
                     <Grid container spacing={1} alignItems="center" key={`phone-row-${idx}`}>
-                      <Grid item xs={12} sm={5}>
-                        <TextField
+                      <Grid item xs={12} sm={3}>
+                        <PhoneInputWithCountry
                           label="Number"
-                          fullWidth
                           value={item.number}
                           error={!!phoneErrors[idx]}
                           helperText={phoneErrors[idx] || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
+                          onChange={(val) => {
                             setContactForm((prev) => ({
                               ...prev,
                               phones: prev.phones.map((row, i) => (i === idx ? { ...row, number: val } : row)),
@@ -4118,7 +4137,7 @@ export default function ProfilePage() {
                           }}
                         />
                       </Grid>
-                      <Grid item xs={6} sm={2}>
+                      <Grid item xs={6} sm={3}>
                         <TextField
                           select
                           label="Type"
@@ -4136,7 +4155,7 @@ export default function ProfilePage() {
                           ))}
                         </TextField>
                       </Grid>
-                      <Grid item xs={6} sm={2}>
+                      <Grid item xs={6} sm={3}>
                         <TextField
                           select
                           label="Visibility"
