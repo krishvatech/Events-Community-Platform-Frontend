@@ -82,6 +82,16 @@ const isAbort = (e) =>
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 1.35;
+const LINKEDIN_COMPANY_SIZES = [
+  "1-10",
+  "11-50",
+  "51-200",
+  "201-500",
+  "501-1000",
+  "1001-5000",
+  "5001-10000",
+  "10000+",
+];
 
 function extractCountryFromLocation(raw) {
   if (!raw) return "";
@@ -188,6 +198,25 @@ function getMinCompanySize(s) {
   const firstPart = s.split("-")[0]; // Take the part before dash
   const clean = firstPart.replace(/[^0-9]/g, ""); // Remove non-digits (like +, commas)
   return parseInt(clean, 10) || 0;
+}
+
+function formatCompanySizeLabel(size) {
+  const raw = String(size || "").trim();
+  if (!raw) return "";
+  if (/employee/i.test(raw)) return raw;
+
+  const nums = raw.match(/\d[\d,]*/g) || [];
+  const hasPlus = /\+/.test(raw);
+  const toNum = (v) => Number(String(v).replace(/,/g, ""));
+  const fmt = (v) => toNum(v).toLocaleString("en-US");
+
+  if (nums.length >= 2) {
+    return `${fmt(nums[0])}-${fmt(nums[1])} employees`;
+  }
+  if (nums.length === 1 && hasPlus) {
+    return `${fmt(nums[0])}+ employees`;
+  }
+  return raw;
 }
 
 function flagEmojiFromISO2(code) {
@@ -803,8 +832,11 @@ export default function MembersPage() {
           a.localeCompare(b)
         );
 
-        // ✅ Sort company sizes numerically (Small -> Large)
-        const sortedSizes = (data.sizes || []).sort((a, b) => getMinCompanySize(a) - getMinCompanySize(b));
+        // ✅ Sort company sizes numerically (Small -> Large), and ensure LinkedIn-style ranges exist
+        const sizeSet = new Set([...(data.sizes || []), ...LINKEDIN_COMPANY_SIZES]);
+        const sortedSizes = Array.from(sizeSet).sort(
+          (a, b) => getMinCompanySize(a) - getMinCompanySize(b)
+        );
 
         setGlobalOptions({
           companies: data.companies || [],
@@ -1317,7 +1349,7 @@ export default function MembersPage() {
                         displayEmpty: true,
                         renderValue: (selected) => {
                           if (!selected || selected.length === 0) return "All sizes";
-                          return selected.join(", ");
+                          return selected.map((s) => formatCompanySizeLabel(s)).join(", ");
                         },
                       }}
                       sx={{ flex: 1 }}
@@ -1325,7 +1357,7 @@ export default function MembersPage() {
                       {globalOptions.sizes.map((name) => (
                         <MenuItem key={name} value={name}>
                           <Checkbox checked={selectedCompanySizes.indexOf(name) > -1} />
-                          <ListItemText primary={name} />
+                          <ListItemText primary={formatCompanySizeLabel(name)} />
                         </MenuItem>
                       ))}
                     </TextField>
