@@ -4876,7 +4876,25 @@ function AboutTab({
               helperText={eduReqErrors.school || ""}
             />
             <TextField label="Degree" value={eduForm.degree} onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })} error={!!eduReqErrors.degree} helperText={eduReqErrors.degree || ""} />
-            <Autocomplete freeSolo options={FIELD_OF_STUDY_OPTIONS} value={eduForm.field} onChange={(_, v) => setEduForm({ ...eduForm, field: v || "" })} renderInput={(p) => <TextField {...p} label="Field of Study *" error={!!eduReqErrors.field} helperText={eduReqErrors.field || ""} />} />
+            <Autocomplete
+              freeSolo
+              options={[...FIELD_OF_STUDY_OPTIONS, "Other"]}
+              value={eduForm.field}
+              onChange={(_, v) => setEduForm((f) => ({ ...f, field: v || "" }))}
+              onInputChange={(event, newInput) => {
+                if (event && event.type === "change") {
+                  setEduForm((f) => ({ ...f, field: newInput }));
+                }
+              }}
+              renderInput={(p) => (
+                <TextField
+                  {...p}
+                  label="Field of Study *"
+                  error={!!eduReqErrors.field}
+                  helperText={eduReqErrors.field || "Pick from list or type your own (Other)."}
+                />
+              )}
+            />
             <Box sx={{ display: "flex", gap: 2 }}><TextField label="Start Year" type="number" value={eduForm.start} onChange={(e) => setEduForm({ ...eduForm, start: e.target.value })} error={!!(eduReqErrors.start || eduErrors.start)} helperText={eduReqErrors.start || eduErrors.start || ""} /><TextField label="End Year" type="number" value={eduForm.end} onChange={(e) => setEduForm({ ...eduForm, end: e.target.value })} error={!!eduErrors.end} helperText={eduErrors.end || ""} /></Box>
             <TextField
               label="Grade (optional)"
