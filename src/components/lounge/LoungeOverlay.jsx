@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Box, Dialog, IconButton, Typography, CircularProgress, Backdrop, Button } from '@mui/material';
+import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography, CircularProgress, Backdrop, Button, TextField } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import LoungeGrid from './LoungeGrid';
 
@@ -15,6 +15,9 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     const [wsStatus, setWsStatus] = useState('connecting'); // 'connecting', 'open', 'closed'
     const [myInternalId, setMyInternalId] = useState(null);
     const [myUsername, setMyUsername] = useState(null);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [createName, setCreateName] = useState("Networking Table");
+    const [createSaving, setCreateSaving] = useState(false);
     const socketRef = useRef(null);
 
     useEffect(() => {
@@ -210,10 +213,9 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     };
 
     const handleCreateTable = async () => {
-        // This could call the REST API created earlier
-        const name = prompt("Enter table name:", "Networking Table");
-        if (!name) return;
-
+        const name = (createName || "").trim();
+        if (!name || !eventId || createSaving) return;
+        setCreateSaving(true);
         try {
             const url = `${API_RAW}/events/${eventId}/create-lounge-table/`.replace(/([^:]\/)\/+/g, "$1");
             const res = await fetch(url, {
@@ -226,27 +228,31 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             });
             if (res.ok) {
                 // Broadcast will update the UI via WebSocket
+                setCreateOpen(false);
             }
         } catch (err) {
             console.error("Failed to create table", err);
+        } finally {
+            setCreateSaving(false);
         }
     };
 
     // if (!open) return null; // REMOVED: Preserve state even when closed
 
     return (
-        <Dialog
-            fullScreen
-            open={open}
-            onClose={onClose}
-            sx={{ zIndex: 1200 }}
-            PaperProps={{
-                sx: {
-                    bgcolor: '#05070D',
-                    backgroundImage: 'radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%)',
-                }
-            }}
-        >
+        <>
+            <Dialog
+                fullScreen
+                open={open}
+                onClose={onClose}
+                sx={{ zIndex: 1200 }}
+                PaperProps={{
+                    sx: {
+                        bgcolor: '#05070D',
+                        backgroundImage: 'radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%)',
+                    }
+                }}
+            >
             <Box sx={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
@@ -288,7 +294,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                             currentUserId={myInternalId || currentUserId}
                             myUsername={myUsername}
                             isAdmin={isAdmin}
-                            onCreateTable={handleCreateTable}
+                            onCreateTable={() => setCreateOpen(true)}
                         />
                         <Box sx={{ px: 4, pb: 2 }}>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)' }}>
@@ -298,7 +304,75 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     </Box>
                 )}
             </Box>
-        </Dialog>
+            </Dialog>
+
+            <Dialog
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: "#0b101a",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: 3,
+                        color: "#fff",
+                    },
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
+                    Create a Room
+                </DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        label="Room name"
+                        value={createName}
+                        onChange={(e) => setCreateName(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleCreateTable();
+                            }
+                        }}
+                        variant="outlined"
+                        InputLabelProps={{ sx: { color: "rgba(255,255,255,0.7)" } }}
+                        sx={{
+                            mt: 1,
+                            "& .MuiOutlinedInput-root": {
+                                color: "#fff",
+                                bgcolor: "rgba(255,255,255,0.04)",
+                                borderRadius: 2,
+                            },
+                            "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: "rgba(255,255,255,0.2)",
+                            },
+                        }}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button
+                        onClick={() => setCreateOpen(false)}
+                        sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleCreateTable}
+                        disabled={!createName.trim() || createSaving}
+                        sx={{
+                            textTransform: "none",
+                            bgcolor: "#14b8b1",
+                            "&:hover": { bgcolor: "#0e8e88" },
+                        }}
+                    >
+                        {createSaving ? "Creating..." : "Create"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </>
     );
 };
 

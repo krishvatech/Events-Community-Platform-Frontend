@@ -2741,6 +2741,34 @@ export default function NewLiveMeeting() {
   }, [activeTableId, activeTableName, resolveTableName]);
 
   useEffect(() => {
+    if (!eventId || !activeTableId) return;
+    if (activeTableName) return;
+
+    let alive = true;
+    const loadTableName = async () => {
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
+          headers: { Accept: "application/json", ...authHeader() },
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const tables = Array.isArray(data?.tables) ? data.tables : [];
+        const match = tables.find((t) => String(t?.id) === String(activeTableId));
+        if (alive && match?.name) {
+          setActiveTableName(match.name);
+        }
+      } catch {
+        // keep fallback name
+      }
+    };
+
+    loadTableName();
+    return () => {
+      alive = false;
+    };
+  }, [eventId, activeTableId, activeTableName]);
+
+  useEffect(() => {
     const chatActive = hostPerms.chat && tab === 0 && isPanelOpen;
     if (!chatActive || (!eventId && !activeTableId)) return;
     loadChatThread();
