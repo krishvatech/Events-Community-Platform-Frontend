@@ -54,7 +54,7 @@ import FacebookIcon from "@mui/icons-material/Facebook";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import LanguageIcon from "@mui/icons-material/Language";
- 
+
 
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -2496,6 +2496,17 @@ export default function RichProfile() {
         }
       }
 
+      if (j && j.user) {
+        // MERGE API data into userItem so we have the latest Location, Avatar, etc.
+        // The public_profile endpoint returns { user: {...}, profile: {...}, ... }
+        // UserMiniSerializer usually puts avatar_url on the user object too.
+        setUserItem((prev) => ({
+          ...(prev || {}),
+          ...j.user,
+          profile: j.profile || j.user?.profile || prev?.profile || {},
+        }));
+      }
+
       const exps = Array.isArray(j?.experiences) ? j.experiences : [];
       const edus = Array.isArray(j?.educations) ? j.educations : [];
       const rawLinks =
@@ -2556,6 +2567,43 @@ export default function RichProfile() {
       profileLinks && typeof profileLinks === "object" ? profileLinks : {};
     return { ...fromUserText, ...fromUser, ...fromProfile };
   }, [profileLinks, userItem]);
+
+  // --- Helper: Extract visible phone ---
+  const visiblePhone = useMemo(() => {
+    const contact = resolvedLinks?.contact || {};
+    // "phones" is usually an array: [{ number: "+123...", type:"mobile", visibility:"public", primary:true }, ...]
+    const phones = Array.isArray(contact.phones) ? contact.phones : [];
+
+    // Filter by visibility
+    const visible = phones.filter(p => canViewContactVisibility(p.visibility));
+    if (!visible.length) return null;
+
+    // Pick primary, else first
+    return visible.find(p => p.primary) || visible[0];
+  }, [resolvedLinks, friendStatus, isMe]);
+
+  // --- Helper: Check Email Visibility ---
+  const canSeeEmail = useMemo(() => {
+    // If it's me, I can always see it
+    if (isMe) return true;
+
+    // Check specific setting in contact.main_email
+    const contact = resolvedLinks?.contact || {};
+    const mainEmail = contact.main_email || {}; // { type, visibility }
+
+    // If explicit visibility is set, respect it
+    if (mainEmail.visibility) {
+      return canViewContactVisibility(mainEmail.visibility);
+    }
+
+    // Default behavior if no setting found:
+    // Usually email is private by default in this system unless shared? 
+    // Or if "public" by default? 
+    // Based on user request "ensure email is completely hidden if invisible", 
+    // let's assume default is PRIVATE if not specified, or fallback to 'contacts' depending on your product logic.
+    // For safety per request: default to PRIVATE if missing config.
+    return false;
+  }, [resolvedLinks, friendStatus, isMe]);
 
   const socialItems = useMemo(() => {
     const contactSocials =
@@ -2934,12 +2982,28 @@ export default function RichProfile() {
                       <Stack spacing={2.5}>
                         {/* About section */}
                         <Section title="About">
-                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                              Email:
-                            </Typography>
-                            <Typography variant="body2">{userItem?.email || "—"}</Typography>
-                          </Box>
+                          {/* EMAIL - conditionally rendered */}
+                          {canSeeEmail && (
+                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                                Email:
+                              </Typography>
+                              <Typography variant="body2">{userItem?.email || "—"}</Typography>
+                            </Box>
+                          )}
+
+                          {/* PHONE - conditionally rendered */}
+                          {visiblePhone && (
+                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                                Phone:
+                              </Typography>
+                              <Typography variant="body2">
+                                {visiblePhone.number}
+                                {/* Optional: show type or primary badge */}
+                              </Typography>
+                            </Box>
+                          )}
                           <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
                             <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
                               Company:
