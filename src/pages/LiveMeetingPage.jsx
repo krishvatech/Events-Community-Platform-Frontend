@@ -33,7 +33,9 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  ListItemButton, // <--- ADDED
+  ListItemButton,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -56,6 +58,7 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
+import ShuffleIcon from "@mui/icons-material/Shuffle";
 
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
@@ -70,6 +73,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
 
 import { DyteParticipantsAudio } from "@dytesdk/react-ui-kit";
+import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
+import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 
 
 
@@ -827,6 +832,14 @@ export default function NewLiveMeeting() {
   const openPermMenu = (e) => setPermAnchorEl(e.currentTarget);
   const closePermMenu = () => setPermAnchorEl(null);
 
+  // ✅ Breakout Orchestration State
+  const [breakoutTimer, setBreakoutTimer] = useState(null);
+  const [breakoutAnnouncement, setBreakoutAnnouncement] = useState("");
+  const [showBreakoutAnnouncement, setShowBreakoutAnnouncement] = useState(false);
+  const [isBreakoutControlsOpen, setIsBreakoutControlsOpen] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const mainSocketRef = useRef(null);
+
   // ✅ Fullscreen support
   const rootRef = useRef(null);
   const endHandledRef = useRef(false);
@@ -929,6 +942,7 @@ export default function NewLiveMeeting() {
 
   // Desktop right panel toggle
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [loungeOpen, setLoungeOpen] = useState(false);
   const isPanelOpen = isMdUp ? rightPanelOpen : rightOpen;
   const isChatActive = isPanelOpen && tab === 0 && hostPerms.chat;
   const isQnaActive = isPanelOpen && tab === 1;
@@ -997,10 +1011,12 @@ export default function NewLiveMeeting() {
   const isHost = role === "publisher";
 
   const [authToken, setAuthToken] = useState("");
+  const mainAuthTokenRef = useRef("");
   const [loadingJoin, setLoadingJoin] = useState(true);
   const [joinError, setJoinError] = useState("");
   const [dbStatus, setDbStatus] = useState("draft");
   const [eventTitle, setEventTitle] = useState("Live Meeting");
+  const [isBreakout, setIsBreakout] = useState(false);
 
   const [scheduledLabel, setScheduledLabel] = useState("--");
   const [durationLabel, setDurationLabel] = useState("--");
@@ -1047,6 +1063,31 @@ export default function NewLiveMeeting() {
   const [pinnedHost, setPinnedHost] = useState(null);
   const [hostIdHint, setHostIdHint] = useState(null);
 
+
+  const handleEnterBreakout = async (tableId) => {
+    if (!eventId || !tableId) return;
+    try {
+      const url = `${API_ROOT}/events/${eventId}/lounge-join-table/`.replace(/([^:]\/)\/+/g, "$1");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ table_id: tableId }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          console.log("[LiveMeeting] Joining breakout room with token");
+          setAuthToken(data.token);
+          setIsBreakout(true);
+        }
+      } else {
+        console.error("[LiveMeeting] Failed to fetch breakout token:", res.status);
+      }
+    } catch (err) {
+      console.error("[LiveMeeting] Failed to join breakout:", err);
+    }
+  };
 
   const getJoinedParticipants = useCallback(() => {
     const participantsObj = dyteMeeting?.participants;
@@ -1131,6 +1172,7 @@ export default function NewLiveMeeting() {
     }
 
     setEventId(idFromQuery);
+    // Force re-fetch of main token if desired, but we usually get it once
 
     const roleFromQuery = (search.get("role") || "audience").toLowerCase();
     setRole(normalizeRole(roleFromQuery));
@@ -1178,11 +1220,27 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!eventId) return;
 
+    // 1. If we are in a breakout room, we don't manage tokens here
+    // (Breakout tokens are managed by LoungeOverlay -> handleEnterBreakout)
+    if (isBreakout) return;
+
+    // 2. If we already have the main token, just use it
+    if (mainAuthTokenRef.current) {
+      console.log("[LiveMeeting] Already have main token, using it");
+      if (authToken !== mainAuthTokenRef.current) {
+        setAuthToken(mainAuthTokenRef.current);
+      }
+      setLoadingJoin(false);
+      return;
+    }
+
+    // 3. Otherwise, fetch it for the first time
     (async () => {
       setLoadingJoin(true);
       setJoinError("");
 
       try {
+        console.log("[LiveMeeting] Fetching initial Dyte token for role:", role);
         const res = await fetch(toApiUrl(`events/${eventId}/dyte/join/`), {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeader() },
@@ -1192,15 +1250,98 @@ export default function NewLiveMeeting() {
         if (!res.ok) throw new Error("Failed to join live meeting.");
         const data = await res.json();
 
+        console.log("[LiveMeeting] Received initial Dyte token");
         setAuthToken(data.authToken);
+        mainAuthTokenRef.current = data.authToken;
         if (data.role) setRole(normalizeRole(data.role));
       } catch (e) {
+        console.error("[LiveMeeting] Failed to fetch initial Dyte token:", e);
         setJoinError(e.message || "Join failed");
       } finally {
         setLoadingJoin(false);
       }
     })();
-  }, [eventId, role]);
+  }, [eventId, role, isBreakout]);
+
+  // ---------- Persistent Main Event WebSocket (for Force Join, Timer, Broadcast) ----------
+  useEffect(() => {
+    if (!eventId) return;
+
+    const token = getToken();
+    const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+
+    // Construct WS URL for the main event consumer
+    const WS_ROOT = API_ROOT.replace(/^http/, "ws").replace(/\/api\/?$/, "");
+    const wsUrl = `${WS_ROOT}/ws/events/${eventId}/${qs}`.replace(/([^:]\/)\/+/g, "$1");
+
+    console.log("[MainSocket] Connecting to:", wsUrl);
+    const ws = new WebSocket(wsUrl);
+    mainSocketRef.current = ws;
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        console.log("[MainSocket] Received:", msg.type, msg);
+
+        if (msg.type === "force_join_breakout") {
+          // 1. Join the table via API to get token
+          handleEnterBreakout(msg.table_id);
+        } else if (msg.type === "server_debug") {
+          // Silent in production
+        } else if (msg.type === "breakout_timer") {
+          setBreakoutTimer(msg.duration);
+        } else if (msg.type === "breakout_announcement") {
+          setBreakoutAnnouncement(msg.message);
+          setShowBreakoutAnnouncement(true);
+        } else if (msg.type === "lounge_state" || msg.type === "welcome") {
+          if (msg.online_users) setOnlineUsers(msg.online_users);
+        } else if (msg.type === "breakout_end") {
+          console.log("[MainSocket] Breakout session ended by host.");
+          // Return to main meeting
+          setAuthToken(mainAuthTokenRef.current);
+          setIsBreakout(false);
+        } else {
+          console.log("[MainSocket] Other message type:", msg.type, msg);
+        }
+      } catch (err) {
+        console.warn("[MainSocket] Failed to parse message:", err);
+      }
+    };
+
+    ws.onclose = (e) => {
+      console.log("[MainSocket] Disconnected");
+      console.log("[MainSocket] Close event:", {
+        code: e.code,
+        reason: e.reason,
+        wasClean: e.wasClean,
+        eventId: eventId,
+        timestamp: new Date().toISOString()
+      });
+      mainSocketRef.current = null;
+    };
+
+    return () => {
+      console.log("[MainSocket] Cleanup function called - closing WebSocket");
+      if (ws.readyState <= WebSocket.OPEN) ws.close();
+    };
+  }, [eventId]);
+
+  // Timer countdown logic
+  useEffect(() => {
+    if (breakoutTimer === null || breakoutTimer <= 0) return;
+
+    const interval = setInterval(() => {
+      setBreakoutTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [breakoutTimer]);
 
   // ---------- Init Dyte meeting ----------
   useEffect(() => {
@@ -1210,12 +1351,15 @@ export default function NewLiveMeeting() {
     (async () => {
       try {
         setInitDone(false);
+        // ✅ Reset join flags so we can join the NEW meeting room
+        joinedOnceRef.current = false;
+        setRoomJoined(false);
 
         await initMeeting({
           authToken,
           defaults: {
-            audio: false,
-            video: role === "publisher",
+            audio: isBreakout || role === "publisher", // Full access in breakout
+            video: isBreakout || role === "publisher",
           },
         });
 
@@ -1228,7 +1372,7 @@ export default function NewLiveMeeting() {
     return () => {
       cancelled = true;
     };
-  }, [authToken, initMeeting, role]);
+  }, [authToken, initMeeting, role, isBreakout]);
 
   // ---------- MUST join Dyte room (custom UI doesn't auto-join) ----------
   useEffect(() => {
@@ -1360,12 +1504,12 @@ export default function NewLiveMeeting() {
     if (!dyteMeeting?.self) return;
     const handleRoomLeft = ({ state }) => {
       if (["left", "ended", "kicked", "rejected", "disconnected", "failed"].includes(state)) {
-        handleMeetingEnd(state);
+        if (!isBreakout) handleMeetingEnd(state);
       }
     };
     dyteMeeting.self.on("roomLeft", handleRoomLeft);
     return () => dyteMeeting.self.off?.("roomLeft", handleRoomLeft);
-  }, [dyteMeeting, handleMeetingEnd]);
+  }, [dyteMeeting, handleMeetingEnd, isBreakout]);
 
   // ---------- Detect host for audience (pin + waiting screen) ----------
   useEffect(() => {
@@ -1474,18 +1618,27 @@ export default function NewLiveMeeting() {
     return () => dyteMeeting.participants?.off?.("broadcastedMessage", handleBroadcast);
   }, [dyteMeeting, getJoinedParticipants]);
 
-  // ✅ If Host leaves, auto-end for everyone (audience auto leaves)
+  // ✅ If Host leaves MAIN MEETING, auto-end for everyone (audience auto leaves)
+  // NOTE: This should NOT trigger when host leaves a breakout room
   useEffect(() => {
     if (!dyteMeeting) return;
     if (isHost) return; // host doesn't need to auto-leave (already leaving)
+
+    // IMPORTANT: Only monitor for host leaving in the MAIN meeting, not breakouts
+    if (isBreakout) {
+      console.log("[LiveMeeting] In breakout room - not monitoring for host leave");
+      return;
+    }
 
     const onParticipantLeft = (p) => {
       const hostId = hostIdHint || pinnedHost?.id;
       if (!hostId || !p?.id) return;
 
-      // Host left => end meeting for audience
+      // Host left MAIN meeting => end meeting for audience
       if (p.id === hostId) {
         if (endHandledRef.current) return;
+
+        console.log("[LiveMeeting] Host left MAIN meeting - ending for all attendees");
 
         // optional: reflect UI state
         setDbStatus("ended");
@@ -1505,7 +1658,7 @@ export default function NewLiveMeeting() {
       dyteMeeting.participants?.off?.("participantLeft", onParticipantLeft);
       dyteMeeting?.off?.("participantLeft", onParticipantLeft);
     };
-  }, [dyteMeeting, isHost, hostIdHint, pinnedHost, handleMeetingEnd]);
+  }, [dyteMeeting, getJoinedParticipants, isHost, isBreakout, hostIdHint, pinnedHost, handleMeetingEnd]);
 
   // Host broadcasts presence so audience can pin
   useEffect(() => {
@@ -1553,6 +1706,12 @@ export default function NewLiveMeeting() {
 
   useEffect(() => {
     if (!dyteMeeting?.participants) return;
+
+    // Clear stale state when meeting changes
+    observedParticipantsRef.current.clear();
+    setPinnedHost(null);
+    setHostJoined(false);
+    setActiveScreenShareParticipant(null);
 
     const bump = () => setParticipantsTick((v) => v + 1);
     const upsert = (p) => {
@@ -1835,15 +1994,20 @@ export default function NewLiveMeeting() {
 
   // Pinned “host” view data
   const latestPinnedHost = useMemo(() => {
-    if (!pinnedHost) return null;
+    let p = pinnedHost;
+    // If in breakout and no official host pinned, fallback to first other person or self
+    if (!p && isBreakout) {
+      p = getJoinedParticipants().find(x => x.id !== dyteMeeting?.self?.id) || dyteMeeting?.self;
+    }
+    if (!p) return null;
 
     // 1. Try to find the exact same participant ID in the fresh list
     // This gets the version where videoEnabled is effectively 'true'
-    const fresh = getJoinedParticipants().find((p) => p.id === pinnedHost.id);
+    const fresh = getJoinedParticipants().find((x) => x.id === p.id);
 
     // 2. Return the fresh object if found, otherwise fallback to the state one
-    return fresh || pinnedHost;
-  }, [pinnedHost, participantsTick, getJoinedParticipants]);
+    return fresh || p;
+  }, [pinnedHost, participantsTick, getJoinedParticipants, isBreakout, dyteMeeting?.self]);
 
   // Pinned “host” view data
   const meetingMeta = useMemo(
@@ -1852,10 +2016,13 @@ export default function NewLiveMeeting() {
       live: dbStatus === "live",
       timer: joinElapsedLabel,
       recording: true,
-      roomLabel: "Pinned",
-      host: { name: latestPinnedHost?.name || "Host", role: "Host" },
+      roomLabel: isBreakout ? "Breakout" : "Pinned",
+      host: {
+        name: latestPinnedHost?.name || (isBreakout ? "Breakout Room" : "Host"),
+        role: (isBreakout && latestPinnedHost) ? "Member" : "Host"
+      },
     }),
-    [eventTitle, dbStatus, latestPinnedHost, joinElapsedLabel]
+    [eventTitle, dbStatus, latestPinnedHost, joinElapsedLabel, isBreakout]
   );
   const meeting = meetingMeta;
 
@@ -2685,7 +2852,14 @@ export default function NewLiveMeeting() {
   const APPBAR_H = 44;
 
   // Others only (Audience + Speaker), host is pinned already
-  const stageOthers = useMemo(() => participants.filter((p) => p.role !== "Host"), [participants]);
+  const stageOthers = useMemo(() => {
+    if (isBreakout) {
+      // In breakout, everyone is a peer. Hide only the person currently occupying the main stage.
+      return participants.filter((p) => p.id !== latestPinnedHost?.id);
+    }
+    // Main meeting: keep legacy behavior of hiding all hosts from the audience strip
+    return participants.filter((p) => p.role !== "Host");
+  }, [participants, isBreakout, latestPinnedHost]);
 
   // Strip should be only others (no host duplicate)
   const stageStrip = stageOthers;
@@ -4088,6 +4262,35 @@ export default function NewLiveMeeting() {
                   </span>
                 </Tooltip>
 
+                <Tooltip title="Social Lounge">
+                  <IconButton
+                    onClick={() => setLoungeOpen(true)}
+                    sx={{
+                      bgcolor: "rgba(255,255,255,0.06)",
+                      "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                      mx: 0.5
+                    }}
+                  >
+                    <AutoAwesomeIcon />
+                  </IconButton>
+                </Tooltip>
+
+                {isHost && (
+                  <Tooltip title="Breakout Control">
+                    <IconButton
+                      onClick={() => setIsBreakoutControlsOpen(true)}
+                      sx={{
+                        bgcolor: "rgba(255,255,255,0.06)",
+                        "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                        mx: 0.5,
+                        color: "#ff9800"
+                      }}
+                    >
+                      <ShuffleIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
+
                 <Tooltip title="Leave meeting">
                   <IconButton
                     onClick={async () => {
@@ -4218,6 +4421,94 @@ export default function NewLiveMeeting() {
           </DialogContent>
         </Dialog>
       </Box>
+
+      <LoungeOverlay
+        open={loungeOpen}
+        onClose={() => setLoungeOpen(false)}
+        eventId={eventId}
+        currentUserId={getMyUserIdFromJwt()}
+        isAdmin={isHost}
+        dyteMeeting={dyteMeeting}
+        onEnterBreakout={async (newToken) => {
+          if (newToken) {
+            console.log("[LiveMeeting] Transitioning to breakout room...");
+            console.log("[LiveMeeting] New breakout token received");
+            setIsBreakout(true);
+            setAuthToken(newToken);
+          } else if (mainAuthTokenRef.current) {
+            console.log("[LiveMeeting] Returning to main meeting...");
+            console.log("[LiveMeeting] Current state:", {
+              isBreakout,
+              hasMainToken: !!mainAuthTokenRef.current,
+              currentAuthToken: authToken?.substring(0, 20) + "...",
+              mainAuthToken: mainAuthTokenRef.current?.substring(0, 20) + "..."
+            });
+            // Wait a bit for cleanup to complete before switching tokens
+            await new Promise(resolve => setTimeout(resolve, 500));
+            console.log("[LiveMeeting] Switching back to main token");
+            setIsBreakout(false);
+            setAuthToken(mainAuthTokenRef.current);
+            console.log("[LiveMeeting] Successfully returned to main meeting");
+          } else {
+            console.warn("[LiveMeeting] No main token available to return to!");
+          }
+        }}
+      />
+
+      {/* ✅ Breakout Controls (Host Only) */}
+      <BreakoutControls
+        open={isBreakoutControlsOpen}
+        onClose={() => setIsBreakoutControlsOpen(false)}
+        onAction={(data) => {
+          if (mainSocketRef.current?.readyState === WebSocket.OPEN) {
+            mainSocketRef.current.send(JSON.stringify(data));
+          }
+        }}
+        onlineCount={onlineUsers.length}
+      />
+
+      {/* ✅ Global Announcement Notification */}
+      <Snackbar
+        open={showBreakoutAnnouncement}
+        autoHideDuration={6000}
+        onClose={() => setShowBreakoutAnnouncement(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setShowBreakoutAnnouncement(false)}
+          severity="info"
+          variant="filled"
+          sx={{ width: "100%", bgcolor: "#7b1fa2" }}
+        >
+          {breakoutAnnouncement}
+        </Alert>
+      </Snackbar>
+
+      {/* ✅ Global Room Timer Display */}
+      {breakoutTimer !== null && breakoutTimer > 0 && (
+        <Box
+          sx={{
+            position: "fixed",
+            top: 64,
+            left: "50%",
+            transform: "translateX(-50%)",
+            bgcolor: "rgba(0,0,0,0.8)",
+            px: 2,
+            py: 1,
+            borderRadius: 2,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            zIndex: 1400,
+            border: "1px solid rgba(255,255,255,0.2)",
+          }}
+        >
+          <AccessTimeRoundedIcon sx={{ color: breakoutTimer < 30 ? "#f44336" : "#4caf50" }} />
+          <Typography variant="h6" fontWeight={700}>
+            {Math.floor(breakoutTimer / 60)}:{(breakoutTimer % 60).toString().padStart(2, "0")}
+          </Typography>
+        </Box>
+      )}
     </DyteProvider>
 
   );
