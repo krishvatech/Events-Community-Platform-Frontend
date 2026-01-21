@@ -227,7 +227,11 @@ const shortPreview = (text, max = 25) => {
 const threadTitle = (t) =>
   t?.group?.name ||
   t?.display_title ||
-  (t?.chat_type === "dm" ? "Direct message" : "Conversation");
+  (t?.chat_type === "room"
+    ? "Room chat"
+    : t?.chat_type === "dm"
+      ? "Direct message"
+      : "Conversation");
 
 const threadAvatar = (t) =>
   t?.context_logo || t?.context_cover || t?.group_cover || t?.event_cover || "";

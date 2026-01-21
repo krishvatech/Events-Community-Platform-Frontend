@@ -1019,6 +1019,9 @@ export default function NewLiveMeeting() {
   const [dbStatus, setDbStatus] = useState("draft");
   const [eventTitle, setEventTitle] = useState("Live Meeting");
   const [isBreakout, setIsBreakout] = useState(false);
+  const [activeTableId, setActiveTableId] = useState(null);
+  const [activeTableName, setActiveTableName] = useState("");
+  const [loungeTables, setLoungeTables] = useState([]);
 
   const [scheduledLabel, setScheduledLabel] = useState("--");
   const [durationLabel, setDurationLabel] = useState("--");
@@ -1065,6 +1068,17 @@ export default function NewLiveMeeting() {
   const [pinnedHost, setPinnedHost] = useState(null);
   const [hostIdHint, setHostIdHint] = useState(null);
 
+  const resolveTableName = useCallback(
+    (tableId) => {
+      if (!tableId) return "";
+      const hit = (Array.isArray(loungeTables) ? loungeTables : []).find(
+        (t) => String(t?.id) === String(tableId)
+      );
+      return hit?.name || "";
+    },
+    [loungeTables]
+  );
+
 
   const handleEnterBreakout = async (tableId) => {
     if (!eventId || !tableId) return;
@@ -1082,6 +1096,8 @@ export default function NewLiveMeeting() {
           console.log("[LiveMeeting] Joining breakout room with token");
           setAuthToken(data.token);
           setIsBreakout(true);
+          setActiveTableId(tableId);
+          setActiveTableName(resolveTableName(tableId) || `Room ${tableId}`);
         }
       } else {
         console.error("[LiveMeeting] Failed to fetch breakout token:", res.status);
@@ -1297,11 +1313,19 @@ export default function NewLiveMeeting() {
           setShowBreakoutAnnouncement(true);
         } else if (msg.type === "lounge_state" || msg.type === "welcome") {
           if (msg.online_users) setOnlineUsers(msg.online_users);
+          const tableState =
+            msg.lounge_state || msg.state || msg.tables || msg.lounge_tables || [];
+          if (Array.isArray(tableState) && tableState.length) {
+            setLoungeTables(tableState);
+          }
         } else if (msg.type === "breakout_end") {
           console.log("[MainSocket] Breakout session ended by host.");
           // Return to main meeting
           setAuthToken(mainAuthTokenRef.current);
           setIsBreakout(false);
+          setActiveTableId(null);
+          setActiveTableName("");
+          setRoomChatConversationId(null);
         } else {
           console.log("[MainSocket] Other message type:", msg.type, msg);
         }
@@ -2230,6 +2254,7 @@ export default function NewLiveMeeting() {
 
   // -------- Live chat (messaging backend) ----------
   const [chatConversationId, setChatConversationId] = useState(null);
+  const [roomChatConversationId, setRoomChatConversationId] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatSending, setChatSending] = useState(false);
@@ -2243,6 +2268,9 @@ export default function NewLiveMeeting() {
   // ✅ Private chat unread (per user)
   const [privateUnreadByUserId, setPrivateUnreadByUserId] = useState({});
   const myUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
+  const isRoomChatActive = Boolean(isBreakout && activeTableId);
+  const activeRoomLabel =
+    activeTableName || (activeTableId ? `Room ${activeTableId}` : "");
 
   // refs so WS doesn't need to reconnect on every tab change
   const isQnaActiveRef = useRef(false);
@@ -2257,9 +2285,13 @@ export default function NewLiveMeeting() {
     myUserIdRef.current = myUserId;
   }, [myUserId]);
 
+  const activeChatConversationId = isRoomChatActive
+    ? roomChatConversationId
+    : chatConversationId;
+
   const fetchChatMessages = useCallback(
     async (conversationId) => {
-      const cid = conversationId || chatConversationId;
+      const cid = conversationId || activeChatConversationId;
       if (!cid) return;
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
         headers: { Accept: "application/json", ...authHeader() },
@@ -2268,7 +2300,7 @@ export default function NewLiveMeeting() {
       if (!res.ok) throw new Error(data?.detail || "Failed to load chat.");
       setChatMessages(Array.isArray(data) ? data : []);
     },
-    [chatConversationId]
+    [activeChatConversationId]
   );
 
   const ensureEventConversation = useCallback(async () => {
@@ -2288,9 +2320,31 @@ export default function NewLiveMeeting() {
     return cid;
   }, [eventId]);
 
+  const ensureLoungeConversation = useCallback(async () => {
+    if (!activeTableId) return null;
+    const res = await fetch(toApiUrl("messaging/conversations/ensure-lounge/"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ table_id: activeTableId, title: activeRoomLabel }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.detail || "Failed to open room chat.");
+    }
+    const cid = data?.id;
+    if (!cid) throw new Error("Room chat conversation missing.");
+    setRoomChatConversationId(cid);
+    return cid;
+  }, [activeRoomLabel, activeTableId]);
+
+  const ensureActiveConversation = useCallback(async () => {
+    if (isRoomChatActive) return ensureLoungeConversation();
+    return ensureEventConversation();
+  }, [ensureEventConversation, ensureLoungeConversation, isRoomChatActive]);
+
   const fetchChatUnread = useCallback(async () => {
     try {
-      const cid = chatConversationId || (await ensureEventConversation());
+      const cid = activeChatConversationId || (await ensureActiveConversation());
       if (!cid) return 0;
 
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/`), {
@@ -2304,10 +2358,10 @@ export default function NewLiveMeeting() {
     } catch {
       return 0;
     }
-  }, [chatConversationId, ensureEventConversation]);
+  }, [activeChatConversationId, ensureActiveConversation]);
 
   const markChatAllRead = useCallback(async (conversationId) => {
-    const cid = conversationId || chatConversationId;
+    const cid = conversationId || activeChatConversationId;
     if (!cid) return;
 
     try {
@@ -2317,7 +2371,7 @@ export default function NewLiveMeeting() {
       });
       setChatUnreadCount(0);
     } catch { }
-  }, [chatConversationId]);
+  }, [activeChatConversationId]);
 
   // ============ PRIVATE CHAT STATE ============
   const [privateChatUser, setPrivateChatUser] = useState(null);
@@ -2534,7 +2588,8 @@ export default function NewLiveMeeting() {
 
 
   useEffect(() => {
-    if (!eventId || !hostPerms.chat) return;
+    if (!hostPerms.chat) return;
+    if (!eventId && !activeTableId) return;
 
     let alive = true;
 
@@ -2545,7 +2600,7 @@ export default function NewLiveMeeting() {
 
       // If user is actively viewing chat, auto-refresh and clear unread
       if (isChatActive && unread > 0) {
-        const cid = chatConversationId || (await ensureEventConversation());
+        const cid = activeChatConversationId || (await ensureActiveConversation());
         if (cid) {
           await fetchChatMessages(cid);
           await markChatAllRead(cid);
@@ -2562,10 +2617,11 @@ export default function NewLiveMeeting() {
     };
   }, [
     eventId,
+    activeTableId,
     hostPerms.chat,
     isChatActive,
-    chatConversationId,
-    ensureEventConversation,
+    activeChatConversationId,
+    ensureActiveConversation,
     fetchChatMessages,
     fetchChatUnread,
     markChatAllRead,
@@ -2587,15 +2643,17 @@ export default function NewLiveMeeting() {
     setChatLoading(true);
     setChatError("");
     try {
-      const cid = await ensureEventConversation();
-      await fetchChatMessages(cid);
-      await markChatAllRead(cid);
+      const cid = await ensureActiveConversation();
+      if (cid) {
+        await fetchChatMessages(cid);
+        await markChatAllRead(cid);
+      }
     } catch (e) {
       setChatError(e?.message || "Unable to load chat.");
     } finally {
       setChatLoading(false);
     }
-  }, [ensureEventConversation, fetchChatMessages]);
+  }, [ensureActiveConversation, fetchChatMessages, markChatAllRead]);
 
   const sendChatMessage = useCallback(async () => {
     const text = chatInput.trim();
@@ -2603,7 +2661,7 @@ export default function NewLiveMeeting() {
     setChatSending(true);
     setChatError("");
     try {
-      const cid = chatConversationId || (await ensureEventConversation());
+      const cid = activeChatConversationId || (await ensureActiveConversation());
       if (!cid) throw new Error("Chat not ready.");
       const res = await fetch(toApiUrl(`messaging/conversations/${cid}/messages/`), {
         method: "POST",
@@ -2619,20 +2677,39 @@ export default function NewLiveMeeting() {
     } finally {
       setChatSending(false);
     }
-  }, [chatConversationId, chatInput, chatSending, ensureEventConversation]);
+  }, [activeChatConversationId, chatInput, chatSending, ensureActiveConversation]);
 
   useEffect(() => {
     if (eventId) {
       setChatConversationId(null);
+      setRoomChatConversationId(null);
       setChatMessages([]);
+      setActiveTableId(null);
+      setActiveTableName("");
+      setLoungeTables([]);
     }
   }, [eventId]);
 
   useEffect(() => {
+    setRoomChatConversationId(null);
+    setChatMessages([]);
+    setChatInput("");
+    setChatError("");
+  }, [activeTableId]);
+
+  useEffect(() => {
+    if (!activeTableId) return;
+    const name = resolveTableName(activeTableId);
+    if (name && name !== activeTableName) {
+      setActiveTableName(name);
+    }
+  }, [activeTableId, activeTableName, resolveTableName]);
+
+  useEffect(() => {
     const chatActive = hostPerms.chat && tab === 0 && isPanelOpen;
-    if (!chatActive || !eventId) return;
+    if (!chatActive || (!eventId && !activeTableId)) return;
     loadChatThread();
-  }, [hostPerms.chat, tab, isPanelOpen, eventId, loadChatThread]);
+  }, [hostPerms.chat, tab, isPanelOpen, eventId, activeTableId, loadChatThread]);
 
   useEffect(() => {
     if (!isChatActive) return;
@@ -2667,9 +2744,19 @@ export default function NewLiveMeeting() {
       "";
 
     const byId = senderKey
-      ? participants.find(
-        (p) => String(p?._raw?.customParticipantId || p?.id || "") === senderKey
-      )
+      ? participants.find((p) => {
+        const raw = p?._raw || {};
+        const pid =
+          raw?.customParticipantId ??
+          raw?.clientSpecificId ??
+          raw?.client_specific_id ??
+          raw?.client_specific_id_str ??
+          raw?.user_id ??
+          raw?.userId ??
+          p?.id ??
+          "";
+        return String(pid) === senderKey;
+      })
       : null;
 
     if (byId) return byId;
@@ -3106,7 +3193,10 @@ export default function NewLiveMeeting() {
             }}
           >
             <Typography sx={{ fontWeight: 700, fontSize: 16 }}>
-              {tab === 0 && "Public Chat"}
+              {tab === 0 &&
+                (isRoomChatActive
+                  ? `Room Chat${activeRoomLabel ? `: ${activeRoomLabel}` : ""}`
+                  : "Public Chat")}
               {tab === 1 && "Q&A"}
               {tab === 2 && "Polls"}
               {tab === 3 && "Participants"}
@@ -3123,6 +3213,11 @@ export default function NewLiveMeeting() {
             {hostPerms.chat && (
               <TabPanel value={tab} index={0}>
                 <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+                  {isRoomChatActive && (
+                    <Typography sx={{ fontSize: 12, opacity: 0.7, mb: 1 }}>
+                      Room chat is limited to people seated in {activeRoomLabel || "this room"}.
+                    </Typography>
+                  )}
                   {chatError && (
                     <Typography color="error" sx={{ mb: 1 }}>
                       {chatError}
@@ -4507,7 +4602,7 @@ export default function NewLiveMeeting() {
         currentUserId={getMyUserIdFromJwt()}
         isAdmin={isHost}
         dyteMeeting={dyteMeeting}
-        onEnterBreakout={async (newToken) => {
+        onEnterBreakout={async (newToken, tableId, tableName) => {
           if (newToken) {
             console.log("[LiveMeeting] Transitioning to breakout room...");
             // Switch Breakouts Fix: If already in a breakout, leave it explicitly first
@@ -4525,6 +4620,10 @@ export default function NewLiveMeeting() {
             console.log("[LiveMeeting] New breakout token received");
             setIsBreakout(true);
             setAuthToken(newToken);
+            if (tableId) {
+              setActiveTableId(tableId);
+              setActiveTableName(tableName || `Room ${tableId}`);
+            }
           } else if (mainAuthTokenRef.current) {
             console.log("[LiveMeeting] Returning to main meeting...");
 
@@ -4551,6 +4650,9 @@ export default function NewLiveMeeting() {
             console.log("[LiveMeeting] Switching back to main token");
             setIsBreakout(false);
             setAuthToken(mainAuthTokenRef.current);
+            setActiveTableId(null);
+            setActiveTableName("");
+            setRoomChatConversationId(null);
             console.log("[LiveMeeting] Successfully returned to main meeting");
           } else {
             console.warn("[LiveMeeting] No main token available to return to!");

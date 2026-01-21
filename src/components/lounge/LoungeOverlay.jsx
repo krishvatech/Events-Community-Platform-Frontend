@@ -161,7 +161,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         // 3. Signal to parent component to return to main meeting
         if (onEnterBreakout) {
             console.log("[Lounge] Signaling return to main meeting");
-            onEnterBreakout(null); // Signal return to main
+            onEnterBreakout(null, null, null); // Signal return to main
         }
     };
 
@@ -195,8 +195,10 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                 const data = await res.json();
                 console.log("[Lounge] Breakout join successful, token received:", data.token ? "YES" : "NO");
                 if (data.token && onEnterBreakout) {
+                    const table = tables.find((t) => String(t.id) === String(tableId));
+                    const tableName = table?.name || `Room ${tableId}`;
                     console.log("[Lounge] Joining breakout meeting with token");
-                    onEnterBreakout(data.token);
+                    onEnterBreakout(data.token, tableId, tableName);
                     onClose(); // Auto-close overlay after joining
                 }
             } else {

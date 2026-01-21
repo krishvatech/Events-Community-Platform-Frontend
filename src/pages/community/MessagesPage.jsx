@@ -797,6 +797,9 @@ const isDmThread = (thread) => {
   if (!thread) return false;
 
   // explicit chat_type flags
+  if (thread.chat_type === "room" || thread.is_lounge || thread.lounge_table) {
+    return false;
+  }
   if (
     thread.chat_type === "dm" ||
     thread.chat_type === "direct" ||
