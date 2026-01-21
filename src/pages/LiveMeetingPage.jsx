@@ -1942,6 +1942,41 @@ export default function NewLiveMeeting() {
         (pinnedHost?.id && p.id === pinnedHost.id) ||
         (isHost && dyteMeeting?.self?.id && p.id === dyteMeeting.self.id);
 
+      const raw = p?._raw || p || {};
+      const rawMeta =
+        raw.customParticipantData ||
+        raw.customParticipant ||
+        raw.customParticipantDetails ||
+        raw.metadata ||
+        raw.meta ||
+        raw.user ||
+        raw.profile ||
+        {};
+      let parsedMeta = {};
+      if (typeof rawMeta === "string") {
+        try {
+          parsedMeta = JSON.parse(rawMeta);
+        } catch {
+          parsedMeta = {};
+        }
+      } else if (typeof rawMeta === "object" && rawMeta) {
+        parsedMeta = rawMeta;
+      }
+      const metaProfilePicture =
+        typeof parsedMeta?.profilePicture === "object"
+          ? parsedMeta.profilePicture.displayImage || parsedMeta.profilePicture.url
+          : parsedMeta?.profilePicture;
+      const metaPicture =
+        parsedMeta?.picture ||
+        parsedMeta?.avatar ||
+        parsedMeta?.avatar_url ||
+        parsedMeta?.user_image_url ||
+        parsedMeta?.user_image ||
+        parsedMeta?.image ||
+        parsedMeta?.photo ||
+        metaProfilePicture ||
+        "";
+
       return {
         id: p.id,
         name: p.name || "User",
@@ -1950,7 +1985,7 @@ export default function NewLiveMeeting() {
         cam: Boolean(p.videoEnabled),
         active: Boolean(p.isSpeaking),
         joinedAtTs: participantJoinedAtRef.current.get(p.id),
-        picture: p.picture || p.avatar || p.profilePicture || p.customParticipantId || "", // ✅ Extract picture
+        picture: p.picture || p.avatar || p.profilePicture || metaPicture || "", // ✅ Extract picture
         _raw: p,
       };
     });
