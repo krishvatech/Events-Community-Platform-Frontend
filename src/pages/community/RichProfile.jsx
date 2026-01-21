@@ -2568,6 +2568,14 @@ export default function RichProfile() {
     return { ...fromUserText, ...fromUser, ...fromProfile };
   }, [profileLinks, userItem]);
 
+  const getVisibilityValue = (item) =>
+    item?.visibility ||
+    item?.visibility_level ||
+    item?.visibilityLevel ||
+    item?.access ||
+    item?.access_level ||
+    "";
+
   // --- Helper: Extract visible phone ---
   const visiblePhone = useMemo(() => {
     const contact = resolvedLinks?.contact || {};
@@ -2575,35 +2583,77 @@ export default function RichProfile() {
     const phones = Array.isArray(contact.phones) ? contact.phones : [];
 
     // Filter by visibility
-    const visible = phones.filter(p => canViewContactVisibility(p.visibility));
-    if (!visible.length) return null;
-
-    // Pick primary, else first
-    return visible.find(p => p.primary) || visible[0];
-  }, [resolvedLinks, friendStatus, isMe]);
-
-  // --- Helper: Check Email Visibility ---
-  const canSeeEmail = useMemo(() => {
-    // If it's me, I can always see it
-    if (isMe) return true;
-
-    // Check specific setting in contact.main_email
-    const contact = resolvedLinks?.contact || {};
-    const mainEmail = contact.main_email || {}; // { type, visibility }
-
-    // If explicit visibility is set, respect it
-    if (mainEmail.visibility) {
-      return canViewContactVisibility(mainEmail.visibility);
+    const visible = phones.filter(
+      (p) => p?.number && canViewContactVisibility(getVisibilityValue(p))
+    );
+    if (visible.length) {
+      return visible.find((p) => p.primary) || visible[0];
     }
 
-    // Default behavior if no setting found:
-    // Usually email is private by default in this system unless shared? 
-    // Or if "public" by default? 
-    // Based on user request "ensure email is completely hidden if invisible", 
-    // let's assume default is PRIVATE if not specified, or fallback to 'contacts' depending on your product logic.
-    // For safety per request: default to PRIVATE if missing config.
-    return false;
-  }, [resolvedLinks, friendStatus, isMe]);
+    // Fallbacks for older schemas
+    const directPhone =
+      (typeof contact.phone === "object" ? contact.phone.number : contact.phone) ||
+      (typeof contact.main_phone === "object"
+        ? contact.main_phone.number
+        : contact.main_phone) ||
+      userItem?.profile?.phone ||
+      userItem?.profile?.phone_number ||
+      userItem?.phone ||
+      userItem?.phone_number ||
+      "";
+
+    const directVisibility =
+      getVisibilityValue(contact.phone) || getVisibilityValue(contact.main_phone);
+
+    if (!directPhone) return null;
+    if (directVisibility && !canViewContactVisibility(directVisibility)) return null;
+
+    return { number: directPhone };
+  }, [resolvedLinks, friendStatus, isMe, userItem]);
+
+  // --- Helper: Extract visible email ---
+  const visibleEmail = useMemo(() => {
+    const contact = resolvedLinks?.contact || {};
+    const emails = Array.isArray(contact.emails) ? contact.emails : [];
+
+    const visible = emails.filter(
+      (e) => e?.email && canViewContactVisibility(getVisibilityValue(e))
+    );
+    if (visible.length) {
+      return visible.find((e) => e.primary) || visible[0];
+    }
+
+    const mainEmail = contact.main_email || {}; // { type, visibility }
+    const emailValue = (userItem?.email || "").trim();
+    const mainVisibility = getVisibilityValue(mainEmail);
+
+    if (emailValue && (isMe || (mainVisibility && canViewContactVisibility(mainVisibility)))) {
+      return { email: emailValue };
+    }
+
+    return null;
+  }, [resolvedLinks, friendStatus, isMe, userItem]);
+
+  // --- Helper: Extract visible location ---
+  const visibleLocation = useMemo(() => {
+    const contactLoc = resolvedLinks?.contact?.location;
+    const contactVisibility =
+      typeof contactLoc === "object" ? getVisibilityValue(contactLoc) : "";
+    const contactValue =
+      typeof contactLoc === "string"
+        ? contactLoc
+        : contactLoc?.value || contactLoc?.location || contactLoc?.label || "";
+
+    const fallback =
+      userItem?.profile?.location ||
+      userItem?.location ||
+      "";
+
+    const value = (contactValue || fallback || "").trim();
+    if (!value) return "";
+    if (contactVisibility && !canViewContactVisibility(contactVisibility)) return "";
+    return value;
+  }, [resolvedLinks, friendStatus, isMe, userItem]);
 
   const socialItems = useMemo(() => {
     const contactSocials =
@@ -2983,17 +3033,17 @@ export default function RichProfile() {
                         {/* About section */}
                         <Section title="About">
                           {/* EMAIL - conditionally rendered */}
-                          {canSeeEmail && (
+                          {visibleEmail?.email && (
                             <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
                               <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
                                 Email:
                               </Typography>
-                              <Typography variant="body2">{userItem?.email || "—"}</Typography>
+                              <Typography variant="body2">{visibleEmail.email}</Typography>
                             </Box>
                           )}
 
                           {/* PHONE - conditionally rendered */}
-                          {visiblePhone && (
+                          {visiblePhone?.number && (
                             <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
                               <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
                                 Phone:
@@ -3020,14 +3070,16 @@ export default function RichProfile() {
                               {currentExp?.position || titleFromRoster || "—"}
                             </Typography>
                           </Box>
-                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                              Location:
-                            </Typography>
-                            <Typography variant="body2">
-                              {userItem?.profile?.location || "—"}
-                            </Typography>
-                          </Box>
+                          {visibleLocation && (
+                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                                Location:
+                              </Typography>
+                              <Typography variant="body2">
+                                {visibleLocation}
+                              </Typography>
+                            </Box>
+                          )}
                         </Section>
 
                         {/* Current role section */}
