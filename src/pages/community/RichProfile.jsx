@@ -2869,7 +2869,7 @@ export default function RichProfile() {
                         <Box sx={{ textAlign: "center", py: 6 }}>
                           <Typography variant="h6" sx={{ mb: 0.5 }}>This account is private</Typography>
                           <Typography variant="body2" color="text.secondary">
-                            Add this member as a friend to see their posts.
+                            Add this member as a Contact to see their posts.
                           </Typography>
                           {(friendStatus || "").toLowerCase() === "none" && (
                             <Button
@@ -2879,7 +2879,7 @@ export default function RichProfile() {
                               disabled={friendSubmitting}
                               sx={{ mt: 2, textTransform: "none", borderRadius: 2 }}
                             >
-                              {friendSubmitting ? "Sending…" : "Add Friend"}
+                              {friendSubmitting ? "Sending…" : "Add as Contact"}
                             </Button>
                           )}
                         </Box>
