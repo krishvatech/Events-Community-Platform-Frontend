@@ -2649,6 +2649,38 @@ export default function NewLiveMeeting() {
     }
   };
 
+  const getParticipantFromMessage = useCallback((msg) => {
+    const senderId =
+      msg?.sender_id ??
+      (typeof msg?.sender === "object" ? msg?.sender?.id : msg?.sender) ??
+      msg?.user_id ??
+      (typeof msg?.user === "object" ? msg?.user?.id : msg?.user) ??
+      msg?.uid ??
+      "";
+
+    const senderKey = senderId ? String(senderId) : "";
+    const label =
+      msg?.sender_display ||
+      msg?.sender_name ||
+      msg?.user_name ||
+      msg?.user ||
+      "";
+
+    const byId = senderKey
+      ? participants.find(
+        (p) => String(p?._raw?.customParticipantId || p?.id || "") === senderKey
+      )
+      : null;
+
+    if (byId) return byId;
+
+    const normLabel = String(label || "").trim().toLowerCase();
+    if (!normLabel) return null;
+    return participants.find(
+      (p) => String(p?.name || "").trim().toLowerCase() === normLabel
+    );
+  }, [participants]);
+
   // -------- Q&A (real backend logic from LiveQnAPanel) ----------
   const [questions, setQuestions] = useState([]);
   const [qnaLoading, setQnaLoading] = useState(false);
@@ -3117,9 +3149,50 @@ export default function NewLiveMeeting() {
                           }}
                         >
                           <Stack direction="row" alignItems="center" justifyContent="space-between">
-                            <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
-                              {m.sender_display || m.sender_name || "User"}
-                            </Typography>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <Avatar
+                                src={
+                                  getParticipantFromMessage(m)?.picture ||
+                                  m.sender_avatar ||
+                                  m.sender_image ||
+                                  m.sender_profile_image ||
+                                  m.sender?.avatar ||
+                                  m.sender?.profile_image ||
+                                  ""
+                                }
+                                sx={{
+                                  width: 28,
+                                  height: 28,
+                                  fontSize: 12,
+                                  bgcolor: "rgba(255,255,255,0.12)",
+                                }}
+                              >
+                                {(m.sender_display || m.sender_name || "U").slice(0, 1)}
+                              </Avatar>
+                              <Typography
+                                onClick={() => {
+                                  const member = getParticipantFromMessage(m);
+                                  if (member) openMemberInfo(member);
+                                }}
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: 13,
+                                  cursor: "pointer",
+                                  "&:hover": { textDecoration: "underline" },
+                                }}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    const member = getParticipantFromMessage(m);
+                                    if (member) openMemberInfo(member);
+                                  }
+                                }}
+                              >
+                                {m.sender_display || m.sender_name || "User"}
+                              </Typography>
+                            </Stack>
                             <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
                               {formatChatTime(m.created_at)}
                             </Typography>
