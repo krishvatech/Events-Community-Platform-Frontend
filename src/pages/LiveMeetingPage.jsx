@@ -19,6 +19,7 @@ import {
   ListItemAvatar,
   ListItemText,
   CircularProgress,
+  Skeleton,
   Switch,
   Paper,
   Stack,
@@ -59,6 +60,7 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
 import ShuffleIcon from "@mui/icons-material/Shuffle";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
@@ -3444,11 +3446,11 @@ export default function NewLiveMeeting() {
                                   </Box>
                                 </Tooltip>
 
-                                <Tooltip title="User info">
+                                <Tooltip title="Participant info">
                                   <IconButton
                                     size="small"
                                     onClick={() => openMemberInfo(m)}
-                                    aria-label={`User info: ${m.name}{isSelfMember(m) ? " (You)" : ""}`}
+                                    aria-label={`Participant info: ${m.name}{isSelfMember(m) ? " (You)" : ""}`}
                                     sx={{
                                       bgcolor: "rgba(255,255,255,0.06)",
                                       "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
@@ -3522,7 +3524,7 @@ export default function NewLiveMeeting() {
                                 )}
                                 {/* ------------------------ */}
 
-                                <Tooltip title="User info">
+                                <Tooltip title="Participant info">
                                   <IconButton
                                     size="small"
                                     onClick={() => openMemberInfo(m)}
@@ -4407,7 +4409,7 @@ export default function NewLiveMeeting() {
         >
           {/* Header Title */}
           <DialogTitle sx={{ pb: 0, pt: 2, px: 2, fontWeight: 700, fontSize: 16 }}>
-            User Info
+            Participant Info
           </DialogTitle>
 
           <DialogContent sx={{ px: 2, pb: 2, pt: 1 }}>
@@ -4546,6 +4548,8 @@ export default function NewLiveMeeting() {
 function MemberInfoContent({ selectedMember, onClose }) {
   const [connStatus, setConnStatus] = useState("loading"); // "loading" | "none" | "friends" | "pending_outgoing" | "pending_incoming"
   const [connLoading, setConnLoading] = useState(false);
+  const [profileInfo, setProfileInfo] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // 1. Check friendship status on mount
   useEffect(() => {
@@ -4577,6 +4581,107 @@ function MemberInfoContent({ selectedMember, onClose }) {
     return () => { alive = false; };
   }, [selectedMember]);
 
+  // 1b. Fetch profile info for job title/company/location
+  useEffect(() => {
+    let alive = true;
+    const userId = selectedMember?._raw?.customParticipantId || selectedMember?.id;
+    if (!userId) {
+      setProfileInfo(null);
+      setProfileLoading(false);
+      return () => { };
+    }
+
+    const pickLocation = (data) => {
+      const profile = data?.profile || data?.user?.profile || {};
+      const city = profile.city || data?.city || data?.user?.city || "";
+      const country = profile.country || data?.country || data?.user?.country || "";
+      const joined = [city, country].filter(Boolean).join(", ");
+      return profile.location || data?.location || joined || "";
+    };
+
+    const pickJobAndCompany = (data) => {
+      const profile = data?.profile || data?.user?.profile || {};
+      const jobTitle =
+        profile.job_title ||
+        profile.jobTitle ||
+        data?.job_title ||
+        data?.jobTitle ||
+        data?.position_from_experience ||
+        data?.user?.position_from_experience ||
+        "";
+      const company =
+        profile.company ||
+        profile.company_name ||
+        profile.companyName ||
+        data?.company ||
+        data?.company_name ||
+        data?.company_from_experience ||
+        data?.user?.company_from_experience ||
+        data?.organization ||
+        "";
+      return { jobTitle, company };
+    };
+
+    const pickFromExperiences = (data) => {
+      const exps = Array.isArray(data?.experiences) ? data.experiences : [];
+      if (!exps.length) return {};
+      const sorted = [...exps].sort((a, b) => {
+        const aCurrent = Boolean(a?.currently_work_here ?? a?.is_current);
+        const bCurrent = Boolean(b?.currently_work_here ?? b?.is_current);
+        if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
+        const aStart = Date.parse(a?.start_date || a?.start || "") || 0;
+        const bStart = Date.parse(b?.start_date || b?.start || "") || 0;
+        return bStart - aStart;
+      });
+      const best = sorted[0] || {};
+      return {
+        jobTitle: best.position || best.title || "",
+        company: best.company || best.community_name || best.organization || "",
+        location: best.location || "",
+      };
+    };
+
+    const fetchProfile = async () => {
+      if (alive) setProfileLoading(true);
+      const headers = { accept: "application/json", ...authHeader() };
+      const urls = [
+        toApiUrl(`users/${userId}/profile/`),
+        toApiUrl(`profile/${userId}/`),
+      ];
+
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { headers });
+          if (!res.ok) continue;
+          const data = await res.json().catch(() => null);
+          if (!alive || !data) break;
+
+          const base = pickJobAndCompany(data);
+          const fromExp = pickFromExperiences(data);
+          const location = pickLocation(data) || fromExp.location || "";
+          const jobTitle = base.jobTitle || fromExp.jobTitle || "";
+          const company = base.company || fromExp.company || "";
+
+          setProfileInfo({
+            jobTitle: jobTitle || "",
+            company: company || "",
+            location: location || "",
+          });
+          break;
+        } catch (e) {
+          // try next URL
+        }
+      }
+      if (alive) setProfileLoading(false);
+    };
+
+    setProfileInfo(null);
+    fetchProfile();
+    return () => {
+      alive = false;
+    };
+  }, [selectedMember]);
+
   // 2. Send request
   const handleConnect = async () => {
     const userId = selectedMember._raw?.customParticipantId || selectedMember.id;
@@ -4603,6 +4708,56 @@ function MemberInfoContent({ selectedMember, onClose }) {
       setConnLoading(false);
     }
   };
+
+  const raw = selectedMember?._raw || {};
+  const rawMeta =
+    raw.customParticipantData ||
+    raw.customParticipant ||
+    raw.customParticipantDetails ||
+    raw.metadata ||
+    raw.meta ||
+    raw.user ||
+    raw.profile ||
+    {};
+  let parsedMeta = {};
+  if (typeof rawMeta === "string") {
+    try {
+      parsedMeta = JSON.parse(rawMeta);
+    } catch {
+      parsedMeta = {};
+    }
+  } else if (typeof rawMeta === "object" && rawMeta) {
+    parsedMeta = rawMeta;
+  }
+
+  const profileMeta = parsedMeta.profile || parsedMeta.user || parsedMeta || {};
+  const metaJobTitle =
+    profileMeta.job_title ||
+    profileMeta.jobTitle ||
+    raw.job_title ||
+    raw.jobTitle ||
+    selectedMember.job_title ||
+    "";
+  const metaCompanyName =
+    profileMeta.company ||
+    profileMeta.company_name ||
+    profileMeta.companyName ||
+    raw.company ||
+    raw.organization ||
+    selectedMember.company ||
+    "";
+  const locationParts = [profileMeta.city, profileMeta.country].filter(Boolean);
+  const metaLocationLabel =
+    profileMeta.location ||
+    raw.location ||
+    (locationParts.length ? locationParts.join(", ") : "") ||
+    "";
+
+  const jobTitle = profileInfo?.jobTitle || metaJobTitle || "";
+  const companyName = profileInfo?.company || metaCompanyName || "";
+  const locationLabel = profileInfo?.location || metaLocationLabel || "";
+
+  const hasProfileInfo = Boolean(jobTitle || companyName || locationLabel);
 
   const userId = selectedMember?._raw?.customParticipantId || selectedMember?.id;
   const profileLink = `/community/rich-profile/${userId}`;
@@ -4677,87 +4832,61 @@ function MemberInfoContent({ selectedMember, onClose }) {
         }}
       />
 
-      {/* 4. Info Card / Table */}
-      <Box
-        sx={{
-          mt: 3,
-          width: "100%",
-          bgcolor: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 3,
-          p: 2,
-          display: "flex",
-          flexDirection: "column",
-          gap: 2,
-        }}
-      >
-
-        {/* Row: Joined */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Joined</Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
-            {formatClockTime(selectedMember.joinedAtTs)}
-          </Typography>
+      {/* 4. Profile Details (under role chip) */}
+      {(hasProfileInfo || profileLoading) && (
+        <Box sx={{ mt: 2, textAlign: "center", width: "100%" }}>
+          {hasProfileInfo ? (
+            <>
+              {jobTitle && (
+                <Typography sx={{ fontWeight: 700, fontSize: 14, color: "rgba(255,255,255,0.95)" }}>
+                  {jobTitle}
+                </Typography>
+              )}
+              {companyName && (
+                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+                  {companyName}
+                </Typography>
+              )}
+              {locationLabel && (
+                <Stack
+                  direction="row"
+                  spacing={0.6}
+                  alignItems="center"
+                  justifyContent="center"
+                  sx={{ mt: 1 }}
+                >
+                  <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "rgba(255,255,255,0.7)" }} />
+                  <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+                    {locationLabel}
+                  </Typography>
+                </Stack>
+              )}
+            </>
+          ) : (
+            <>
+              <Skeleton
+                variant="text"
+                width={120}
+                height={20}
+                sx={{ bgcolor: "rgba(255,255,255,0.12)", mx: "auto" }}
+              />
+              <Skeleton
+                variant="text"
+                width={90}
+                height={18}
+                sx={{ bgcolor: "rgba(255,255,255,0.10)", mx: "auto", mt: 0.5 }}
+              />
+              <Skeleton
+                variant="text"
+                width={140}
+                height={18}
+                sx={{ bgcolor: "rgba(255,255,255,0.10)", mx: "auto", mt: 0.8 }}
+              />
+            </>
+          )}
         </Box>
+      )}
 
-        <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
-
-        {/* Row: Status */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Status</Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#22c55e" }}>In Meeting</Typography>
-        </Box>
-
-        <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
-
-        {/* Row: Microphone */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Microphone</Typography>
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            {selectedMember.mic ? (
-              <>
-                <MicIcon sx={{ fontSize: 14, color: "#fff" }} />
-                <Typography sx={{ fontSize: 13, fontWeight: 600 }}>On</Typography>
-              </>
-            ) : (
-              <>
-                <MicOffIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }} />
-                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Off</Typography>
-              </>
-            )}
-          </Stack>
-        </Box>
-
-        <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
-
-        {/* Row: Camera */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Camera</Typography>
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            {selectedMember.cam ? (
-              <>
-                <VideocamIcon sx={{ fontSize: 14, color: "#fff" }} />
-                <Typography sx={{ fontSize: 13, fontWeight: 600 }}>On</Typography>
-              </>
-            ) : (
-              <>
-                <VideocamOffIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }} />
-                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Off</Typography>
-              </>
-            )}
-          </Stack>
-        </Box>
-
-        <Divider sx={{ borderColor: "rgba(255,255,255,0.06)" }} />
-
-        {/* Row: Permissions */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Permissions</Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#facc15" }}>
-            {selectedMember.role === "Host" ? "Full Access" : "Attendee"}
-          </Typography>
-        </Box>
-      </Box>
 
       {/* 5. Actions: View Profile + Connect */}
       <Stack direction="row" spacing={1.5} sx={{ mt: 3, width: "100%" }}>
