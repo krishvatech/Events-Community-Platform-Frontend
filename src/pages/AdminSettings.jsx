@@ -1862,6 +1862,12 @@ export default function AdminSettings() {
     { key: "instagram", label: "Instagram", icon: <InstagramIcon fontSize="small" />, url: contactLinks.socials.instagram },
     { key: "github", label: "GitHub", icon: <GitHubIcon fontSize="small" />, url: contactLinks.socials.github },
   ];
+  const normalizeSocialUrl = (url) => {
+    if (!url) return "";
+    return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  };
+  const socialCount = socialItems.filter((item) => item.url).length;
+  const socialTitle = socialCount === 0 ? "No Social Profiles" : socialCount === 1 ? "Social Profile" : "Social Profiles";
 
   // Sync Work Form
   React.useEffect(() => {
@@ -3503,7 +3509,7 @@ export default function AdminSettings() {
                     </Stack>
                   </SectionCard>
 
-                  <SectionCard sx={{ mt: 2 }} title="Social Profiles" action={
+                  <SectionCard sx={{ mt: 2 }} title={socialTitle} action={
                     <Tooltip title="Edit">
                       <IconButton size="small" onClick={() => openContactEditor("socials")}>
                         <EditRoundedIcon fontSize="small" />
@@ -3511,12 +3517,12 @@ export default function AdminSettings() {
                     </Tooltip>
                   }>
                     <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                      {socialItems.filter((item) => item.url).length ? (
+                      {socialCount ? (
                         socialItems.filter((item) => item.url).map((item) => (
                           <Tooltip key={item.key} title={item.label}>
                             <Box
                               component="a"
-                              href={item.url}
+                              href={normalizeSocialUrl(item.url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               aria-label={`${item.label} profile`}

@@ -2383,6 +2383,12 @@ function AboutTab({
     { key: "instagram", label: "Instagram", icon: <InstagramIcon fontSize="small" />, url: contactLinks.socials.instagram },
     { key: "github", label: "GitHub", icon: <GitHubIcon fontSize="small" />, url: contactLinks.socials.github },
   ];
+  const normalizeSocialUrl = (url) => {
+    if (!url) return "";
+    return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  };
+  const socialCount = socialItems.filter((item) => item.url).length;
+  const socialTitle = socialCount === 0 ? "No Social Profiles" : socialCount === 1 ? "Social Profile" : "Social Profiles";
 
   // --- Trainings ---
   const [trainingOpen, setTrainingOpen] = React.useState(false);
@@ -3848,18 +3854,18 @@ function AboutTab({
             </Stack>
           </SectionCard>
 
-          <SectionCard title="Social Profiles" action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("socials")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
-            <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-              {socialItems.filter((item) => item.url).length ? (
-                socialItems.filter((item) => item.url).map((item) => (
-                  <Tooltip key={item.key} title={item.label}>
-                    <Box
-                      component="a"
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`${item.label} profile`}
-                      sx={{ color: "inherit", display: "flex" }}
+            <SectionCard title={socialTitle} action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("socials")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
+              <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
+                {socialCount ? (
+                  socialItems.filter((item) => item.url).map((item) => (
+                    <Tooltip key={item.key} title={item.label}>
+                      <Box
+                        component="a"
+                        href={normalizeSocialUrl(item.url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${item.label} profile`}
+                        sx={{ color: "inherit", display: "flex" }}
                     >
                       {item.icon}
                     </Box>
