@@ -145,16 +145,9 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     const handleLeaveTable = async (dyteMeeting) => {
         console.log("[Lounge] Starting leave table process...");
 
-        // 1. First, leave the Dyte room to properly clean up the connection
-        if (dyteMeeting) {
-            try {
-                console.log("[Lounge] Leaving Dyte room...");
-                await dyteMeeting.leaveRoom?.();
-                console.log("[Lounge] Successfully left Dyte room");
-            } catch (err) {
-                console.warn("[Lounge] Error leaving Dyte room:", err);
-            }
-        }
+        // 1. (Removed explicit leaveRoom to avoid exiting the main meeting too)
+        // The token switch in LiveMeetingPage will automatically handle the room switch.
+
 
         // 2. Send WebSocket message to update backend state
         const ws = socketRef.current;

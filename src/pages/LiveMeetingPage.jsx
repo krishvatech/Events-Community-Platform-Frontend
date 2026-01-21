@@ -1479,6 +1479,8 @@ export default function NewLiveMeeting() {
     }
   }, [initDone, role, updateLiveStatus]);
 
+  const ignoreRoomLeftRef = useRef(false);
+
   const handleMeetingEnd = useCallback(
     async (state) => {
       if (endHandledRef.current) return;
@@ -1503,6 +1505,7 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!dyteMeeting?.self) return;
     const handleRoomLeft = ({ state }) => {
+      if (ignoreRoomLeftRef.current) return;
       if (["left", "ended", "kicked", "rejected", "disconnected", "failed"].includes(state)) {
         if (!isBreakout) handleMeetingEnd(state);
       }
@@ -1876,7 +1879,7 @@ export default function NewLiveMeeting() {
 
     // Fallback: include any participants we observed via events even if SDK didn't expose them in collections
     observedParticipantsRef.current.forEach((p) => {
-      if (!list.some((x) => x?.id === p?.id)) list.push(p);
+      if (!list.some((x) => String(x?.id) === String(p?.id))) list.push(p);
     });
 
     // ensure self is included even if Dyte doesn't list it inside joined
@@ -4432,11 +4435,36 @@ export default function NewLiveMeeting() {
         onEnterBreakout={async (newToken) => {
           if (newToken) {
             console.log("[LiveMeeting] Transitioning to breakout room...");
+            // Switch Breakouts Fix: If already in a breakout, leave it explicitly first
+            if (isBreakout && dyteMeeting) {
+              console.log("[LiveMeeting] Switching tables: Leaving current room explicitly...");
+              ignoreRoomLeftRef.current = true;
+              try {
+                await dyteMeeting.leaveRoom();
+              } catch (e) {
+                console.warn("[LiveMeeting] Error leaving previous breakout:", e);
+              }
+              ignoreRoomLeftRef.current = false;
+            }
+
             console.log("[LiveMeeting] New breakout token received");
             setIsBreakout(true);
             setAuthToken(newToken);
           } else if (mainAuthTokenRef.current) {
             console.log("[LiveMeeting] Returning to main meeting...");
+
+            // Leave Breakout Fix: Explicitly leave the breakout room
+            if (dyteMeeting) {
+              console.log("[LiveMeeting] Leaving breakout room explicitly...");
+              ignoreRoomLeftRef.current = true;
+              try {
+                await dyteMeeting.leaveRoom();
+              } catch (e) {
+                console.warn("[LiveMeeting] Error leaving breakout:", e);
+              }
+              ignoreRoomLeftRef.current = false;
+            }
+
             console.log("[LiveMeeting] Current state:", {
               isBreakout,
               hasMainToken: !!mainAuthTokenRef.current,
