@@ -84,6 +84,10 @@ const KIND_LABEL = {
   system: "System",
   friend_request: "Requests",
   connection_request: "Requests",
+  join_request: "Group",
+  member_joined: "Group",
+  member_added: "Group",
+  group_created: "Group",
   name_change: "Identity",
   suggestion_digest: "Suggestions",
 };
@@ -145,6 +149,42 @@ async function fetchStandardNotifications(url) {
         eventId: n.data?.event_id || n.data?.eventId,
         postId: n.data?.post_id || n.data?.postId,
         groupSlug: n.data?.group_slug,
+      },
+    })),
+    next: j?.next || null
+  };
+}
+
+// 1b. Group Notifications (for group admins/mods)
+async function fetchGroupNotifications(url) {
+  const r = await fetch(url, {
+    headers: { ...tokenHeader(), Accept: "application/json" },
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error("Failed");
+  const j = await r.json();
+  const raw = Array.isArray(j) ? j : j?.results || [];
+
+  return {
+    items: raw.map((n) => ({
+      id: `group-${n.id}`,
+      source: "group",
+      kind: n.kind,
+      state: n.state || "",
+      title: n.title || "",
+      description: n.description || "",
+      created_at: n.created_at,
+      is_read: !!n.is_read,
+      data: n.data || {},
+      actor: {
+        id: n.actor?.id,
+        name: n.actor?.name || n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
+        avatar: n.actor?.avatar || n.actor?.avatar_url || "",
+      },
+      context: {
+        groupId: n.data?.group_id || n.group,
+        groupName: n.data?.group_name,
+        userId: n.data?.user_id,
       },
     })),
     next: j?.next || null
@@ -316,6 +356,54 @@ function NotificationRow({
             {cc} connections • {gc} groups
           </Typography>
         </>
+      );
+    }
+
+    if (item.kind === "join_request") {
+      return (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {item.actor?.name || "Someone"}
+          </Typography>
+          <Typography variant="body2">
+            requested to join
+          </Typography>
+          {item.context?.groupName && (
+            <Chip size="small" label={item.context.groupName} variant="outlined" />
+          )}
+        </Stack>
+      );
+    }
+
+    if (item.kind === "member_joined" || item.kind === "member_added") {
+      return (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {item.actor?.name || "Someone"}
+          </Typography>
+          <Typography variant="body2">
+            {item.kind === "member_added" ? "was added to" : "joined"}
+          </Typography>
+          {item.context?.groupName && (
+            <Chip size="small" label={item.context.groupName} variant="outlined" />
+          )}
+        </Stack>
+      );
+    }
+
+    if (item.kind === "group_created") {
+      return (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {item.actor?.name || "Someone"}
+          </Typography>
+          <Typography variant="body2">
+            created a group
+          </Typography>
+          {item.context?.groupName && (
+            <Chip size="small" label={item.context.groupName} variant="outlined" />
+          )}
+        </Stack>
       );
     }
 
@@ -597,6 +685,7 @@ export default function NotificationsPage({
       const k = kind.toLowerCase();
       const norm = {
         requests: ["friend_request", "connection_request"],
+        group: ["join_request", "member_joined", "member_added", "group_created"],
         follows: ["follow"],
         mentions: ["mention"],
         comments: ["comment"],
@@ -629,10 +718,17 @@ export default function NotificationsPage({
       const fetchingIdentity = !isAppend && (kind === "All" || kind === "Identity");
       if (fetchingIdentity) promises.push(loadMyIdentityRequests());
 
-      const [apiData, identityData] = await Promise.all(promises);
+      // ✅ Include group notifications only on initial load
+      const fetchingGroups = !isAppend && (kind === "All" || kind === "Group");
+      if (fetchingGroups) promises.push(fetchGroupNotifications(`${API_BASE}/groups/group-notifications/?page_size=50`));
+
+      const settled = await Promise.all(promises);
+      const apiData = settled[0];
+      const identityData = settled.find((x) => Array.isArray(x)) || [];
+      const groupData = settled.find((x) => x?.items && Array.isArray(x.items) && x.items[0]?.source === "group") || { items: [] };
 
       // ✅ Keep all API notifications (kind filter will handle display)
-      const newItems = [...(apiData.items || []), ...(identityData || [])];
+      const newItems = [...(apiData.items || []), ...(identityData || []), ...(groupData.items || [])];
 
       setItems(prev => {
         const combined = isAppend ? [...prev, ...newItems] : newItems;
@@ -707,12 +803,22 @@ export default function NotificationsPage({
       const next = curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i));
       return next;
     });
-    if (nowRead) {
+    if (nowRead && item?.source === "api") {
       try {
         await fetch(`${API_BASE}/notifications/mark-read/`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...tokenHeader() },
           body: JSON.stringify({ ids: [id] }),
+        });
+      } catch { }
+    }
+    if (nowRead && item?.source === "group") {
+      try {
+        const rawId = String(id).replace(/^group-/, "");
+        await fetch(`${API_BASE}/groups/group-notifications/mark-read/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...tokenHeader() },
+          body: JSON.stringify({ ids: [Number(rawId)] }),
         });
       } catch { }
     }
@@ -725,6 +831,10 @@ export default function NotificationsPage({
 
     // 2. API Items
     const apiIds = items.filter((i) => !i.is_read && i.source === 'api').map((i) => i.id);
+    const groupIds = items
+      .filter((i) => !i.is_read && i.source === 'group')
+      .map((i) => Number(String(i.id).replace(/^group-/, "")))
+      .filter((i) => Number.isFinite(i));
 
     // Update State
     setItems((curr) => curr.map((i) => ({ ...i, is_read: true })));
@@ -736,6 +846,15 @@ export default function NotificationsPage({
           method: "POST",
           headers: { "Content-Type": "application/json", ...tokenHeader() },
           body: JSON.stringify({ ids: apiIds }),
+        });
+      } catch { }
+    }
+    if (groupIds.length) {
+      try {
+        await fetch(`${API_BASE}/groups/group-notifications/mark-read/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...tokenHeader() },
+          body: JSON.stringify({ ids: groupIds }),
         });
       } catch { }
     }
@@ -769,6 +888,8 @@ export default function NotificationsPage({
       dest = `/feed/post/${ctx.postId}`;
     } else if (ctx.groupSlug) {
       dest = `/groups/${ctx.groupSlug}`;
+    } else if (ctx.groupId) {
+      dest = `/groups/${ctx.groupId}`;
     }
 
     // Only if there is a destination or logic, we mark read and go
@@ -839,6 +960,7 @@ export default function NotificationsPage({
                   <MenuItem value="System">System</MenuItem>
                   <MenuItem value="Identity">Identity</MenuItem>
                   <MenuItem value="Suggestions">Suggestions</MenuItem>
+                  <MenuItem value="Group">Group</MenuItem>
                 </Select>
                 <Button size="small" variant="outlined" startIcon={<DoneAllIcon />} onClick={handleMarkAllRead} sx={{ whiteSpace: "nowrap" }}>Mark all read</Button>
               </Stack>

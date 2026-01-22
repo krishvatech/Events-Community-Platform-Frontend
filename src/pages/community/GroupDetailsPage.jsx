@@ -1639,7 +1639,7 @@ export default function GroupDetailsPage() {
         const rCan = await fetch(toApiUrl(`groups/${groupId}/moderator/can-i/`), { headers: { Accept: "application/json", ...authHeaders() } });
         if (rCan.ok) {
           const can = await rCan.json();
-          setCanSeeRequests(Boolean(can?.is_moderator));
+          setCanSeeRequests(Boolean(can?.is_admin || can?.is_moderator));
           setCanApproveRequests(Boolean(can?.is_admin));
         } else {
           setCanSeeRequests(false);
