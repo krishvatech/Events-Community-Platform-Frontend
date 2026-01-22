@@ -2808,9 +2808,6 @@ function AboutTab({
       if (!(expForm.position || "").trim()) reqErrors.position = "Position is required";
       if (!(expForm.location || "").trim()) reqErrors.location = "Country is required";
       if (!(expForm.relationship_to_org || "").trim()) reqErrors.relationship_to_org = "Employment type is required";
-      if (!(expForm.work_schedule || "").trim()) reqErrors.work_schedule = "Work schedule is required.";
-      if (!(expForm.career_stage || "").trim()) reqErrors.career_stage = "Career stage is required.";
-      if (!(expForm.work_arrangement || "").trim()) reqErrors.work_arrangement = "Work arrangement is required.";
       if (!(expForm.start || "").trim()) reqErrors.start = "Start date is required";
       if (Object.values(reqErrors).some(Boolean)) {
         setExpReqErrors(reqErrors);
@@ -5106,7 +5103,7 @@ function AboutTab({
 
             <TextField
               select
-              label="Work schedule"
+              label="Work schedule (optional)"
               fullWidth
               value={expForm.work_schedule || ""}
               onChange={(e) =>
@@ -5125,7 +5122,7 @@ function AboutTab({
             <TextField
               select
               fullWidth
-              label="Career stage"
+              label="Career stage (optional)"
               value={expForm.career_stage || ""}
               onChange={(e) =>
                 setExpForm((prev) => ({
@@ -5146,7 +5143,7 @@ function AboutTab({
 
             <TextField
               select
-              label="Work arrangement"
+              label="Work arrangement (optional)"
               fullWidth
               value={expForm.work_arrangement || ""}
               onChange={(e) =>
