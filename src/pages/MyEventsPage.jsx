@@ -107,7 +107,7 @@ function statusChip(status) {
 }
 
 // ---------------------- Event Card (kept, with small MOD) ----------------------
-function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJoining }) {
+function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJoining, hideStatusChip }) {
   const status = computeStatus(ev);
   const chip = statusChip(status);
   const [imgFailed, setImgFailed] = useState(false);
@@ -118,8 +118,8 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
       className="flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
       sx={{
         borderRadius: 2,
-        // Let the card grow with content so buttons are always visible
-        height: "auto",
+        // Let the card grow to fill grid item height
+        height: "100%",
       }}
     >
       {/* SAME IMAGE SIZE for all cards: 16:9 area that always covers */}
@@ -160,7 +160,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 
 
       {/* Content area with fixed rhythm so cards line up */}
-      <Box sx={{ p: 1.75, display: "flex", flexDirection: "column", gap: 1 }}>
+      <Box sx={{ p: 1.75, display: "flex", flexDirection: "column", gap: 1, flexGrow: 1 }}>
         <div className="flex items-center justify-between gap-2">
           <Chip size="small" label={chip.label} className={`${chip.className} font-medium`} />
           {ev.category && <span className="text-[11px] text-slate-500">{ev.category}</span>}
@@ -293,6 +293,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
               reg={reg}
               onUnregistered={onUnregistered}
               onCancelRequested={onCancelRequested}
+              hideChip={hideStatusChip}
             />
           )}
 
@@ -392,6 +393,7 @@ export default function MyEventsPage() {
 
   // pagination state (MOD: added)
   const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Small helper for JSON GET
   async function fetchJSON(path) {
@@ -406,74 +408,95 @@ export default function MyEventsPage() {
     return res.json();
   }
 
+  // PAGINATION: reset to first page on filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [q, tab]);
+
+  // Helper map for tabs -> backend bucket
+  const statusTabMap = { 1: "upcoming", 2: "live", 3: "past" };
+
   useEffect(() => {
     let cancelled = false;
-
-    async function getMe() {
-      try {
-        const me = await fetchJSON("/users/me/");
-        return me;
-      } catch {
-        return null;
-      }
-    }
+    setLoading(true);
 
     async function load() {
-      setLoading(true);
       try {
-        const me = await getMe(); // for fallback query by id
+        const url = new URL(urlJoin(API_BASE, "/events/mine/"));
+        url.searchParams.set("limit", String(PAGE_SIZE));
+        url.searchParams.set("offset", String((page - 1) * PAGE_SIZE));
 
-        const candidates = [
-          "/events/mine/",
-          "/event-registrations/mine/",
-          "/registrations/mine/",
-          "/event-registrations/?user=me",
-          me?.id ? `/event-registrations/?user=${me.id}` : null,
-        ].filter(Boolean);
-
-        let raw = [];
-        for (const p of candidates) {
-          try {
-            const data = await fetchJSON(p);
-            const list = asList(data);
-            if (Array.isArray(list)) {
-              raw = list;
-              if (list.length > 0) break; // first non-empty wins
-            }
-          } catch {
-            // try next
-          }
+        // Search
+        if (q.trim()) {
+          url.searchParams.set("search", q.trim());
         }
 
-        // registrations -> events
-        let list = [];
+        // Bucket (Tab)
+        const bucket = statusTabMap[tab];
+        if (bucket) {
+          url.searchParams.set("bucket", bucket);
+        }
+
+        // 1) Fetch paginated events
+        const res = await fetch(url.toString(), {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const results = Array.isArray(data?.results) ? data.results : [];
+        const count = typeof data?.count === "number" ? data.count : 0;
+
+        if (cancelled) return;
+
+        // 2) Fetch registration details for these events (for Unregister/Cancel)
+        // We do this concurrently for the displayed page items.
         const newRegs = {};
-        if (raw.length > 0 && raw[0] && raw[0].event) {
-          list = raw.map((r) => {
-            if (r.event) {
-              newRegs[r.event.id] = r;
-              return r.event;
+        if (results.length > 0) {
+          await Promise.all(results.map(async (ev) => {
+            try {
+              // Filter specifically for *my* registration for this event
+              const regUrl = new URL(urlJoin(API_BASE, "/event-registrations/"));
+              regUrl.searchParams.set("event", String(ev.id));
+              // get_queryset on backend already filters by user=request.user
+              const rRes = await fetch(regUrl.toString(), {
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+              });
+              if (rRes.ok) {
+                const rData = await rRes.json();
+                const rList = asList(rData);
+                if (rList.length > 0) {
+                  newRegs[ev.id] = rList[0];
+                }
+              }
+            } catch (e) {
+              // ignore individual reg fetch failures
             }
-            return null;
-          }).filter(Boolean);
-        } else {
-          list = raw;
+          }));
         }
+
+        if (cancelled) return;
+
+        setEvents(results);
         setMyRegistrations(newRegs);
+        // We need a total count for pagination. 
+        // If the API returns count, great. If not (and we have results), we might guess, but DRF pagination usually returns count.
+        // We'll store it in a new state or repurpose logic.
+        // Let's rely on component derived state updates.
+        // Wait, the component currently computes `pageCount` from `filtered.length`.
+        // We need to store `totalCount` in state.
+        setTotalCount(count);
 
-        // de-dup
-        const seen = new Set();
-        const dedup = [];
-        for (const ev of list) {
-          const k = ev?.id ?? ev?.slug;
-          if (!k || seen.has(k)) continue;
-          seen.add(k);
-          dedup.push(ev);
+      } catch (e) {
+        if (!cancelled) {
+          setEvents([]);
+          setTotalCount(0);
         }
-
-        if (!cancelled) setEvents(dedup);
-      } catch {
-        if (!cancelled) setEvents([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -483,32 +506,18 @@ export default function MyEventsPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [page, tab, q, token]); // Re-run when page/tab/q changes
 
-  // PAGINATION: reset to first page on filter changes
-  useEffect(() => {
-    setPage(1);
-  }, [q, tab]);
-
-
-  const query = (q || "").trim().toLowerCase();
-  const filtered = events.filter((ev) => {
-    const searchHit =
-      !query ||
-      `${ev.title || ""} ${ev.category || ""} ${ev.location || ""}`.toLowerCase().includes(query);
-    if (!searchHit) return false;
-    const status = computeStatus(ev);
-    if (tab === 1) return status === "upcoming";
-    if (tab === 2) return status === "live";
-    if (tab === 3) return status === "past";
-    return true;
-  });
 
   // PAGINATION: derive current page slice
-  const total = filtered.length;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // With server-side pagination, 'events' IS the page slice.
+  // We need 'totalCount' logic.
+
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const startIndex = (page - 1) * PAGE_SIZE;
-  const paged = filtered.slice(startIndex, startIndex + PAGE_SIZE);
+  // With server-pagination, "events" IS the paged list.
+  const paged = events;
 
 
   // -----------------------------------------------------------------------------
@@ -625,7 +634,7 @@ export default function MyEventsPage() {
                   <Skeleton variant="rounded" width={220} height={36} />
                 </Box>
               </>
-            ) : filtered.length === 0 ? (
+            ) : events.length === 0 ? (
               <Paper elevation={0} className="rounded-2xl border border-slate-200">
                 <Box className="p-8 text-center">
                   <Typography variant="h6" className="font-semibold text-slate-700">
@@ -661,6 +670,7 @@ export default function MyEventsPage() {
                           reg={myRegistrations[ev.id]}
                           onJoinLive={handleJoinLive}
                           isJoining={joiningId === ev.id}
+                          hideStatusChip={true}
                           onUnregistered={(eventId) => {
                             setEvents(prev => prev.filter(e => e.id !== eventId));
                             setMyRegistrations(prev => {
@@ -682,10 +692,10 @@ export default function MyEventsPage() {
                 </Box>
 
 
-                {total > PAGE_SIZE && (
+                {totalCount > PAGE_SIZE && (
                   <Box className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 gap-3">
                     <Typography variant="body2" color="text.secondary">
-                      Showing {startIndex + 1}–{Math.min(startIndex + PAGE_SIZE, total)} of {total}
+                      Showing {startIndex + 1}–{Math.min(startIndex + PAGE_SIZE, totalCount)} of {totalCount}
                     </Typography>
                     <Pagination
                       count={pageCount}

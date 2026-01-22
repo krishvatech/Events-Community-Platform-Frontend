@@ -3,7 +3,7 @@ import { Button, Dialog, DialogActions, DialogContent, DialogContentText, Dialog
 import { toast } from "react-toastify";
 import { API_BASE, authConfig } from "../utils/api";
 
-export default function RegisteredActions({ ev, reg, onUnregistered, onCancelRequested }) {
+export default function RegisteredActions({ ev, reg, onUnregistered, onCancelRequested, hideChip = false }) {
 
     const [open, setOpen] = useState(false);
     const [actionType, setActionType] = useState(null); // 'unregister' | 'cancel_request'
@@ -67,14 +67,16 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
         <>
             {ev.is_free ? (
                 <div className="flex gap-2">
-                    <Button
-                        variant="outlined"
-                        size="large"
-                        disabled
-                        className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
-                    >
-                        Registered
-                    </Button>
+                    {!hideChip && (
+                        <Button
+                            variant="outlined"
+                            size="large"
+                            disabled
+                            className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
+                        >
+                            Registered
+                        </Button>
+                    )}
                     <Button
                         variant="text"
                         size="large"
@@ -99,14 +101,16 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
                         </Button>
                     ) : (
                         <>
-                            <Button
-                                variant="outlined"
-                                size="large"
-                                disabled
-                                className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
-                            >
-                                Registered
-                            </Button>
+                            {!hideChip && (
+                                <Button
+                                    variant="outlined"
+                                    size="large"
+                                    disabled
+                                    className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
+                                >
+                                    Registered
+                                </Button>
+                            )}
                             <Button
                                 variant="text"
                                 size="medium"
