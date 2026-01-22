@@ -3456,7 +3456,7 @@ function AboutTab({
                             color="text.secondary"
                             display="block"
                           >
-                            {dateRange(exp.start, exp.end, exp.current || !exp.end, "I currently work here")}
+                            {dateRange(exp.start, exp.end, exp.current || !exp.end, "present")}
                             {exp.location ? ` · ${exp.location}` : ""}
                           </Typography>
 
