@@ -212,6 +212,54 @@ function formatClockTime(ts) {
   }
 }
 
+function getParticipantUserKey(participant) {
+  if (!participant) return "";
+
+  const raw = participant?._raw || participant || {};
+  const directId =
+    raw.customParticipantId ??
+    raw.customParticipant_id ??
+    raw.userId ??
+    raw.user_id ??
+    raw.uid ??
+    raw.id ??
+    participant.id;
+
+  let meta =
+    raw.customParticipantData ||
+    raw.customParticipant ||
+    raw.customParticipantDetails ||
+    raw.metadata ||
+    raw.meta ||
+    raw.user ||
+    raw.profile ||
+    raw.profileData ||
+    raw.userData ||
+    null;
+
+  if (typeof meta === "string") {
+    try {
+      meta = JSON.parse(meta);
+    } catch {
+      meta = null;
+    }
+  }
+
+  const metaId =
+    meta?.user_id ??
+    meta?.userId ??
+    meta?.id ??
+    meta?.uid ??
+    meta?.pk ??
+    null;
+
+  const id = directId || metaId;
+  if (id) return `id:${String(id)}`;
+
+  const name = raw.name || participant.name || "";
+  return name ? `name:${String(name).toLowerCase()}` : "";
+}
+
 
 function ParticipantVideo({ participant, meeting, isSelf = false }) {
   const videoRef = useRef(null);
@@ -1811,6 +1859,12 @@ export default function NewLiveMeeting() {
     };
   }, [dyteMeeting]);
 
+  useEffect(() => {
+    // Reset fallback caches when switching between main and breakout rooms
+    observedParticipantsRef.current.clear();
+    participantJoinedAtRef.current.clear();
+  }, [authToken]);
+
   // Explicit poll via SDK helper (getAll) for SDK variants that don't expose collections
   useEffect(() => {
     if (!dyteMeeting?.participants) return;
@@ -1900,20 +1954,21 @@ export default function NewLiveMeeting() {
   const participants = useMemo(() => {
     const list = [];
 
-    // joined participants
+    // Prefer self, then joined, then fallback observed entries
+    if (dyteMeeting?.self) list.push(dyteMeeting.self);
     getJoinedParticipants().forEach((p) => list.push(p));
+    observedParticipantsRef.current.forEach((p) => list.push(p));
 
-    // Fallback: include any participants we observed via events even if SDK didn't expose them in collections
-    observedParticipantsRef.current.forEach((p) => {
-      if (!list.some((x) => String(x?.id) === String(p?.id))) list.push(p);
-    });
-
-    // ensure self is included even if Dyte doesn't list it inside joined
-    if (dyteMeeting?.self && !list.some((p) => p.id === dyteMeeting.self.id)) {
-      list.push(dyteMeeting.self);
+    const deduped = [];
+    const seenKeys = new Set();
+    for (const p of list) {
+      const key = getParticipantUserKey(p) || `id:${String(p?.id || "")}`;
+      if (!key || seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      deduped.push(p);
     }
 
-    list.forEach((pp) => {
+    deduped.forEach((pp) => {
       if (!pp?.id) return;
       if (participantJoinedAtRef.current.has(pp.id)) return;
 
@@ -1925,7 +1980,7 @@ export default function NewLiveMeeting() {
       }
     });
 
-    return list.map((p) => {
+    return deduped.map((p) => {
       // ✅ Determine role from preset first, then fall back to pinned host
       const preset = (p.presetName || "").toLowerCase();
       const isPublisherPreset =
