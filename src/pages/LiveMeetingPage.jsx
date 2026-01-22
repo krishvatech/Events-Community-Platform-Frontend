@@ -187,6 +187,13 @@ function initialsFromName(name = "") {
   return (a + b).toUpperCase();
 }
 
+function truncateDisplayName(name = "", maxChars = 5) {
+  const clean = String(name || "").trim().replace(/\s+/g, " ");
+  if (!clean) return "User";
+  if (clean.length <= maxChars) return clean;
+  return clean.slice(0, maxChars);
+}
+
 function formatElapsedTime(ms = 0) {
   const total = Math.max(0, Math.floor(ms / 1000));
   const hrs = Math.floor(total / 3600);
@@ -874,6 +881,7 @@ export default function NewLiveMeeting() {
     screenShare: true,
   });
   const [hostForceBlock, setHostForceBlock] = useState(false);
+  const [hostMediaLocks, setHostMediaLocks] = useState({ mic: false, cam: false });
 
   // ✅ Settings menu anchor
   const [permAnchorEl, setPermAnchorEl] = useState(null);
@@ -1261,6 +1269,96 @@ export default function NewLiveMeeting() {
     },
     [dyteMeeting, getAudienceParticipantIds, isHost]
   );
+
+  const forceMuteParticipant = useCallback(
+    async (participant) => {
+      if (!isHost || !dyteMeeting) return;
+      const raw = participant?._raw || participant;
+      const id = raw?.id || participant?.id;
+      if (!id) return;
+      try {
+        await dyteMeeting.participants.updatePermissions([id], {
+          canProduceAudio: "NOT_ALLOWED",
+          requestProduceAudio: false,
+        });
+      } catch (e) {
+        console.warn("Failed to lock mic for participant", e);
+      }
+      try {
+        await raw?.disableAudio?.();
+      } catch (e) {
+        console.warn("Failed to force mute participant", e);
+      }
+    },
+    [dyteMeeting, isHost]
+  );
+
+  const forceCameraOffParticipant = useCallback(
+    async (participant) => {
+      if (!isHost || !dyteMeeting) return;
+      const raw = participant?._raw || participant;
+      const id = raw?.id || participant?.id;
+      if (!id) return;
+      try {
+        await dyteMeeting.participants.updatePermissions([id], {
+          canProduceVideo: "NOT_ALLOWED",
+          requestProduceVideo: false,
+        });
+      } catch (e) {
+        console.warn("Failed to lock camera for participant", e);
+      }
+      try {
+        await raw?.disableVideo?.();
+      } catch (e) {
+        console.warn("Failed to force camera off for participant", e);
+      }
+    },
+    [dyteMeeting, isHost]
+  );
+
+  const forceMuteAll = useCallback(async () => {
+    if (!isHost || !dyteMeeting) return;
+    setHostMediaLocks((prev) => ({ ...prev, mic: true }));
+    const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+    const ids = participants.map((p) => p.id).filter(Boolean);
+    if (ids.length) {
+      try {
+        await dyteMeeting.participants.updatePermissions(ids, {
+          canProduceAudio: "NOT_ALLOWED",
+          requestProduceAudio: false,
+        });
+      } catch (e) {
+        console.warn("Failed to lock mic for all", e);
+      }
+    }
+    for (const p of participants) {
+      try {
+        await p?.disableAudio?.();
+      } catch (_) { }
+    }
+  }, [dyteMeeting, getJoinedParticipants, isHost]);
+
+  const forceCameraOffAll = useCallback(async () => {
+    if (!isHost || !dyteMeeting) return;
+    setHostMediaLocks((prev) => ({ ...prev, cam: true }));
+    const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+    const ids = participants.map((p) => p.id).filter(Boolean);
+    if (ids.length) {
+      try {
+        await dyteMeeting.participants.updatePermissions(ids, {
+          canProduceVideo: "NOT_ALLOWED",
+          requestProduceVideo: false,
+        });
+      } catch (e) {
+        console.warn("Failed to lock camera for all", e);
+      }
+    }
+    for (const p of participants) {
+      try {
+        await p?.disableVideo?.();
+      } catch (_) { }
+    }
+  }, [dyteMeeting, getJoinedParticipants, isHost]);
 
   // ---------- Read query params + fetch DB status ----------
   useEffect(() => {
@@ -1808,14 +1906,26 @@ export default function NewLiveMeeting() {
             private: { canSend: hostPerms.chat, text: hostPerms.chat, files: hostPerms.chat },
           },
           polls: { canCreate: hostPerms.polls, canVote: hostPerms.polls },
+          ...(hostMediaLocks.mic
+            ? { canProduceAudio: "NOT_ALLOWED", requestProduceAudio: false }
+            : {}),
+          ...(hostMediaLocks.cam
+            ? { canProduceVideo: "NOT_ALLOWED", requestProduceVideo: false }
+            : {}),
         });
       } catch (e) {
         console.warn("Failed to sync permissions", e);
       }
+      if (hostMediaLocks.mic) {
+        try { await participant?.disableAudio?.(); } catch { }
+      }
+      if (hostMediaLocks.cam) {
+        try { await participant?.disableVideo?.(); } catch { }
+      }
     };
     dyteMeeting.participants.joined.on("participantJoined", handleParticipantJoined);
     return () => dyteMeeting.participants.joined.off("participantJoined", handleParticipantJoined);
-  }, [dyteMeeting, hostPerms.chat, hostPerms.polls, hostPerms.screenShare, isHost]);
+  }, [dyteMeeting, hostPerms.chat, hostPerms.polls, hostPerms.screenShare, hostMediaLocks, isHost]);
 
   // ---------- Build participants list for your NEW UI ----------
   const [participantsTick, setParticipantsTick] = useState(0);
@@ -3745,7 +3855,7 @@ export default function NewLiveMeeting() {
                               <ListItemText
                                 primary={
                                   <Stack direction="row" spacing={1} alignItems="center">
-                                    <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>
+                                    <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>
                                     <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
                                   </Stack>
                                 }
@@ -3758,9 +3868,11 @@ export default function NewLiveMeeting() {
                   </Box>
 
                   <Box>
-                    <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8, mb: 1 }}>
-                      SPEAKERS ({groupedMembers.speakers.length})
-                    </Typography>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                      <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
+                        SPEAKERS ({groupedMembers.speakers.length})
+                      </Typography>
+                    </Stack>
                     <Paper
                       variant="outlined"
                       sx={{
@@ -3776,25 +3888,34 @@ export default function NewLiveMeeting() {
                             disablePadding
                             secondaryAction={
                               <Stack direction="row" spacing={0.75} alignItems="center">
+                                {isHost && !isSelfMember(m) && (
+                                  <>
+                                    <Tooltip title="Force mute">
+                                      <IconButton
+                                        size="small"
+                                        sx={{ color: "rgba(255,255,255,0.9)" }}
+                                        onClick={() => forceMuteParticipant(m)}
+                                      >
+                                        <MicOffIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Turn camera off">
+                                      <IconButton
+                                        size="small"
+                                        sx={{ color: "rgba(255,255,255,0.9)" }}
+                                        onClick={() => forceCameraOffParticipant(m)}
+                                      >
+                                        <VideocamOffIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </>
+                                )}
                                 <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
                                   <Box sx={{ opacity: 0.9 }}>
                                     {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
                                   </Box>
                                 </Tooltip>
 
-                                <Tooltip title="Participant info">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => openMemberInfo(m)}
-                                    aria-label={`Participant info: ${m.name}{isSelfMember(m) ? " (You)" : ""}`}
-                                    sx={{
-                                      bgcolor: "rgba(255,255,255,0.06)",
-                                      "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                                    }}
-                                  >
-                                    <InfoOutlinedIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
                               </Stack>
                             }
                           >
@@ -3805,7 +3926,7 @@ export default function NewLiveMeeting() {
                                 </Avatar>
                               </ListItemAvatar>
                               <ListItemText
-                                primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>}
+                                primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>}
                                 secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
                               />
                             </ListItemButton>
@@ -3816,9 +3937,25 @@ export default function NewLiveMeeting() {
                   </Box>
 
                   <Box>
-                    <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8, mb: 1 }}>
-                      AUDIENCE ({groupedMembers.audience.length})
-                    </Typography>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                      <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
+                        AUDIENCE ({groupedMembers.audience.length})
+                      </Typography>
+                      {isHost && (
+                        <Stack direction="row" spacing={0.75}>
+                          <Tooltip title="Mute all">
+                            <IconButton size="small" onClick={forceMuteAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
+                              <MicOffIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Camera off all">
+                            <IconButton size="small" onClick={forceCameraOffAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
+                              <VideocamOffIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      )}
+                    </Stack>
                     <Paper variant="outlined" sx={{ bgcolor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", borderRadius: 2 }}>
                       <List dense disablePadding>
                         {audienceMembersSorted.map((m, idx) => (
@@ -3827,6 +3964,28 @@ export default function NewLiveMeeting() {
                             disablePadding
                             secondaryAction={
                               <Stack direction="row" spacing={0.75} alignItems="center">
+                                {isHost && !isSelfMember(m) && (
+                                  <>
+                                    <Tooltip title="Force mute">
+                                      <IconButton
+                                        size="small"
+                                        sx={{ color: "rgba(255,255,255,0.9)" }}
+                                        onClick={() => forceMuteParticipant(m)}
+                                      >
+                                        <MicOffIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Turn camera off">
+                                      <IconButton
+                                        size="small"
+                                        sx={{ color: "rgba(255,255,255,0.9)" }}
+                                        onClick={() => forceCameraOffParticipant(m)}
+                                      >
+                                        <VideocamOffIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </>
+                                )}
                                 <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
                                   <Box sx={{ opacity: 0.9 }}>
                                     {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
@@ -3860,15 +4019,6 @@ export default function NewLiveMeeting() {
                                 )}
                                 {/* ------------------------ */}
 
-                                <Tooltip title="Participant info">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => openMemberInfo(m)}
-                                    sx={{ bgcolor: "rgba(255,255,255,0.06)", "&:hover": { bgcolor: "rgba(255,255,255,0.10)" } }}
-                                  >
-                                    <InfoOutlinedIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
                               </Stack>
                             }
                           >
@@ -3879,7 +4029,7 @@ export default function NewLiveMeeting() {
                                 </Avatar>
                               </ListItemAvatar>
                               <ListItemText
-                                primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>}
+                                primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>}
                                 secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
                               />
                             </ListItemButton>
