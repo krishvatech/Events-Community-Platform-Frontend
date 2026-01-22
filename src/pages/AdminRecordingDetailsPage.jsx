@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
     Box,
     Button,
@@ -57,6 +57,7 @@ const fmtDate = (iso) => {
 export default function AdminRecordingDetailsPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [event, setEvent] = useState(null);
     const [registrations, setRegistrations] = useState([]);
@@ -207,67 +208,30 @@ export default function AdminRecordingDetailsPage() {
         };
     }, [registrations]);
 
-    if (loading) {
-        return (
-            <Container maxWidth="xl" className="py-8">
-                {/* Header Skeleton */}
-                <Box className="flex items-center gap-4 mb-6">
-                    <Skeleton variant="circular" width={40} height={40} />
-                    <Box>
-                        <Skeleton variant="text" width={200} height={32} />
-                        <Skeleton variant="text" width={150} height={20} />
-                    </Box>
-                    <Box className="ml-auto">
-                        <Skeleton variant="rectangular" width={120} height={36} sx={{ borderRadius: 1 }} />
-                    </Box>
-                </Box>
-
-                <Grid container spacing={3}>
-                    {/* Left Col Skeleton */}
-                    <Grid item xs={12} md={7} lg={8}>
-                        <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 4, mb: 3 }} />
-                        <Box className="flex gap-4">
-                            <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 3, flex: 1 }} />
-                            <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 3, flex: 1 }} />
-                            <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 3, flex: 1 }} />
-                        </Box>
-                    </Grid>
-
-                    {/* Right Col Skeleton */}
-                    <Grid item xs={12} md={5} lg={4}>
-                        <Skeleton variant="rectangular" height={500} sx={{ borderRadius: 4 }} />
-                    </Grid>
-                </Grid>
-            </Container>
-        );
-    }
-
-    if (error) {
-        return (
-            <Container className="pt-10">
-                <Typography color="error" variant="h6">
-                    Error: {error}
-                </Typography>
-                <Button onClick={() => navigate(-1)} className="mt-4">
-                    Go Back
-                </Button>
-            </Container>
-        );
-    }
-
     const hasRec = !!event?.recording_url;
     const recordingSrc = hasRec
         ? `${S3_BUCKET_URL}/${event.recording_url}`
         : null;
 
+    const handleBack = () => {
+        if (location.state?.from === "admin") {
+            // Came from Admin Events page
+            navigate("/admin/events");
+        } else {
+            // Default behavior
+            navigate("/admin/recordings?scope=host");
+        }
+    };
+
     return (
         <Container maxWidth="xl" className="py-8">
             {/* Header */}
             <Box className="flex items-center gap-4 mb-6">
-                <IconButton onClick={() => navigate("/admin/recordings?scope=host")}>
+                <IconButton onClick={handleBack}>
                     <ArrowBackRoundedIcon />
                 </IconButton>
                 <Box>
+
                     <Typography variant="h5" className="font-bold">
                         {event?.title}
                     </Typography>

@@ -1597,8 +1597,7 @@ function AdminEventCard({
 
         <p
           className="text-sm text-slate-500 truncate"
-          title={`${fmtDateRange(ev.start_time, ev.end_time)}${ev.location ? ` • ${ev.location}` : ""
-            }`}
+          title={`${fmtDateRange(ev.start_time, ev.end_time)}${ev.location ? ` • ${ev.location}` : ""}`}
         >
           {fmtDateRange(ev.start_time, ev.end_time)}
           {ev.location ? ` • ${ev.location}` : ""}
@@ -1606,111 +1605,126 @@ function AdminEventCard({
 
         {/* Actions – stop click bubbling so buttons don't trigger card navigation */}
         <Box
-          className="mt-auto pt-1"
-          sx={{ display: "flex" }}
+          className="mt-auto pt-1 flex gap-2"
           onClick={(e) => e.stopPropagation()}
         >
           {isOwner ? (
             <>
-              {/* OWNER: single full-width button */}
+              {/* OWNER: Buttons row */}
               {isPast ? (
-                ev.recording_url ? (
-                  // Event ended & recording available → Watch Recording
+                <>
+                  {ev.recording_url ? (
+                    // Event ended & recording available → Watch Recording
+                    <Button
+                      component="a"
+                      href={ev.recording_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      variant="contained"
+                      className="rounded-xl flex-1"
+                      sx={{
+                        textTransform: "none",
+                        backgroundColor: "#10b8a6",
+                        "&:hover": { backgroundColor: "#0ea5a4" },
+                        minWidth: 0,
+                        px: 1,
+                      }}
+                    >
+                      <Box component="span" sx={{ display: { xs: "none", lg: "inline" }, whiteSpace: "nowrap" }}>
+                        Watch
+                      </Box>
+                      <Box component="span" sx={{ display: { xs: "inline", lg: "none" } }}>
+                        Watch
+                      </Box>
+                    </Button>
+                  ) : (
+                    // Event ended, no recording → disabled Event Ended
+                    <Button
+                      disabled
+                      variant="contained"
+                      className="rounded-xl flex-1"
+                      sx={{
+                        textTransform: "none",
+                        backgroundColor: "#CBD5E1",
+                        minWidth: 0,
+                        px: 1,
+                      }}
+                    >
+                      <Box component="span" sx={{ display: { xs: "none", lg: "inline" }, whiteSpace: "nowrap" }}>
+                        Ended
+                      </Box>
+                      <Box component="span" sx={{ display: { xs: "inline", lg: "none" } }}>
+                        Ended
+                      </Box>
+                    </Button>
+                  )}
+
+                  {/* Past -> View Details (Recording Details Page) */}
                   <Button
-                    component="a"
-                    href={ev.recording_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    component={Link}
+                    to={`/admin/recordings/${ev.id}`}
+                    state={{ from: "admin" }}
+                    variant="outlined"
+                    className="rounded-xl flex-1"
+                    sx={{
+                      textTransform: "none",
+                      minWidth: 0,
+                      px: 1,
+                      borderColor: "#cbd5e1",
+                      color: "#475569",
+                      "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
+                    }}
+                  >
+                    Details
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {/* Upcoming / Live → Host Now */}
+                  <Button
+                    onClick={() => onHost(ev)}
+                    startIcon={<LiveTvRoundedIcon />}
                     variant="contained"
-                    className="rounded-xl"
-                    fullWidth
+                    className="rounded-xl flex-1"
                     sx={{
                       textTransform: "none",
                       backgroundColor: "#10b8a6",
                       "&:hover": { backgroundColor: "#0ea5a4" },
+                      minWidth: 0,
+                      px: 1,
                     }}
+                    disabled={isHosting}
                   >
-                    <Box
-                      component="span"
-                      sx={{ display: { xs: "none", lg: "inline" } }}
-                    >
-                      Watch Recording
-                    </Box>
-                    <Box
-                      component="span"
-                      sx={{ display: { xs: "inline", lg: "none" } }}
-                    >
-                      Watch
-                    </Box>
-                  </Button>
-                ) : (
-                  // Event ended, no recording → disabled Event Ended
-                  <Button
-                    disabled
-                    variant="contained"
-                    className="rounded-xl"
-                    fullWidth
-                    sx={{
-                      textTransform: "none",
-                      backgroundColor: "#CBD5E1",
-                    }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{ display: { xs: "none", lg: "inline" } }}
-                    >
-                      Event Ended
-                    </Box>
-                    <Box
-                      component="span"
-                      sx={{ display: { xs: "inline", lg: "none" } }}
-                    >
-                      Ended
-                    </Box>
-                  </Button>
-                )
-              ) : (
-                // Upcoming / Live → Host Now
-                <Button
-                  onClick={() => onHost(ev)}
-                  startIcon={<LiveTvRoundedIcon />}
-                  variant="contained"
-                  className="rounded-xl"
-                  fullWidth
-                  sx={{
-                    textTransform: "none",
-                    backgroundColor: "#10b8a6",
-                    "&:hover": { backgroundColor: "#0ea5a4" },
-                  }}
-                  disabled={isHosting}
-                >
-                  {isHosting ? (
-                    <span className="flex items-center gap-2">
-                      <CircularProgress size={18} />
-                      <Box
-                        component="span"
-                        sx={{ display: { xs: "none", lg: "inline" } }}
-                      >
-                        Hosting…
-                      </Box>
-                    </span>
-                  ) : (
-                    <>
-                      <Box
-                        component="span"
-                        sx={{ display: { xs: "none", lg: "inline" } }}
-                      >
-                        Host Now
-                      </Box>
-                      <Box
-                        component="span"
-                        sx={{ display: { xs: "inline", lg: "none" } }}
-                      >
+                    {isHosting ? (
+                      <span className="flex items-center gap-2">
+                        <CircularProgress size={18} />
+                      </span>
+                    ) : (
+                      <Box component="span" sx={{ whiteSpace: "nowrap" }}>
                         Host
                       </Box>
-                    </>
-                  )}
-                </Button>
+                    )}
+                  </Button>
+
+                  {/* Upcoming/Live → View Details (Event Manage) */}
+                  <Button
+                    component={Link}
+                    to={`/admin/events/${ev.id}`}
+                    state={{ event: ev }}
+                    variant="outlined"
+                    className="rounded-xl flex-1"
+                    sx={{
+                      textTransform: "none",
+                      minWidth: 0,
+                      px: 1,
+                      borderColor: "#cbd5e1",
+                      color: "#475569",
+                      "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
+                    }}
+                  >
+                    Details
+                  </Button>
+                </>
               )}
             </>
           ) : (
@@ -1839,9 +1853,9 @@ function AdminEventCard({
               )}
             </>
           )}
-        </Box>
-      </Box>
-    </Paper>
+        </Box >
+      </Box >
+    </Paper >
   );
 }
 
