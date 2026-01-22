@@ -1601,14 +1601,19 @@ export default function NewLiveMeeting() {
         } catch { }
       }
 
+      try {
+        await dyteMeeting?.leaveRoom?.();
+        await dyteMeeting?.leave?.();
+      } catch { }
+
       if (role === "publisher") {
-        await updateLiveStatus("end");
+        updateLiveStatus("end");
         navigate("/admin/events");
       } else {
         navigate(-1);
       }
     },
-    [navigate, role, updateLiveStatus]
+    [navigate, role, updateLiveStatus, dyteMeeting]
   );
 
   useEffect(() => {
@@ -4628,7 +4633,6 @@ export default function NewLiveMeeting() {
                       }
 
                       await handleMeetingEnd("left");
-                      dyteMeeting?.leaveRoom?.();
                     }}
                     sx={{
                       bgcolor: "rgba(244,67,54,0.22)",
