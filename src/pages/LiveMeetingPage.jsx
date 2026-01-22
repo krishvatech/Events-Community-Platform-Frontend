@@ -2058,6 +2058,11 @@ export default function NewLiveMeeting() {
 
   // Pinned “host” view data
   const latestPinnedHost = useMemo(() => {
+    // ✅ FORCE for Host: Always use self as the pinned host source of truth
+    if (isHost && dyteMeeting?.self) {
+      return dyteMeeting.self;
+    }
+
     let p = pinnedHost;
     // If in breakout and no official host pinned, fallback to first other person or self
     if (!p && isBreakout) {
@@ -2065,13 +2070,18 @@ export default function NewLiveMeeting() {
     }
     if (!p) return null;
 
+    // ✅ FIX: If p is self, return the current dyteMeeting.self which is always fresh
+    if (dyteMeeting?.self?.id && p.id === dyteMeeting.self.id) {
+      return dyteMeeting.self;
+    }
+
     // 1. Try to find the exact same participant ID in the fresh list
     // This gets the version where videoEnabled is effectively 'true'
     const fresh = getJoinedParticipants().find((x) => x.id === p.id);
 
     // 2. Return the fresh object if found, otherwise fallback to the state one
     return fresh || p;
-  }, [pinnedHost, participantsTick, getJoinedParticipants, isBreakout, dyteMeeting?.self]);
+  }, [pinnedHost, participantsTick, getJoinedParticipants, isBreakout, dyteMeeting?.self, camOn, isHost]);
 
   // Pinned “host” view data
   const meetingMeta = useMemo(
