@@ -2934,7 +2934,7 @@ export default function RichProfile() {
                             disabled={friendSubmitting}
                             sx={{ textTransform: "none", borderRadius: 2 }}
                           >
-                            {friendSubmitting ? "Sending…" : "Add Contact"}
+                            {friendSubmitting ? "Sending…" : "Add as Contact"}
                           </Button>
                         )}
                       </Box>
