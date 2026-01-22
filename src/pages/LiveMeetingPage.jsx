@@ -942,7 +942,6 @@ export default function NewLiveMeeting() {
     handleCancelPoll();
   };
 
-
   const getFullscreenElement = () =>
     document.fullscreenElement || document.webkitFullscreenElement || null;
 
@@ -1088,6 +1087,42 @@ export default function NewLiveMeeting() {
     !roomJoined ||
     !canSelfScreenShare ||
     (isHost ? !hostPerms.screenShare : true);
+
+  const handleToggleMic = useCallback(async () => {
+    if (!dyteMeeting?.self) return;
+
+    try {
+      if (dyteMeeting.self.audioEnabled) {
+        await dyteMeeting.self.disableAudio?.();
+      } else {
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+          s.getTracks().forEach((t) => t.stop());
+        } catch { }
+
+        await dyteMeeting.self.enableAudio?.();
+      }
+
+      setMicOn(Boolean(dyteMeeting.self.audioEnabled));
+    } catch (e) {
+      console.warn("[LiveMeeting] mic toggle failed:", e);
+      setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
+    }
+  }, [dyteMeeting]);
+
+  const handleToggleCamera = useCallback(async () => {
+    if (!dyteMeeting?.self) return;
+
+    try {
+      if (camOn) {
+        await dyteMeeting.self.disableVideo();
+      } else {
+        await dyteMeeting.self.enableVideo();
+      }
+    } catch (e) {
+      console.error("Failed to toggle camera:", e);
+    }
+  }, [camOn, dyteMeeting]);
 
   const toggleScreenShareNow = useCallback(async () => {
     if (!dyteMeeting?.self) return;
@@ -4112,13 +4147,13 @@ export default function NewLiveMeeting() {
               {meeting.recording && <Chip size="small" label="Recording" sx={headerChipSx} />}
             </Stack>
 
-            <Tooltip title={isHost ? "Host permissions" : "Only host can change"}>
+            <Tooltip title={isHost ? "Host permissions" : "My controls"}>
               <span>
                 <IconButton
                   sx={headerIconBtnSx}
-                  aria-label="Host permissions"
-                  onClick={isHost ? openPermMenu : undefined}
-                  disabled={!isHost}
+                  aria-label={isHost ? "Host permissions" : "My controls"}
+                  onClick={openPermMenu}
+                  disabled={!dyteMeeting?.self}
                 >
                   <SettingsIcon fontSize="small" />
                 </IconButton>
@@ -4177,36 +4212,64 @@ export default function NewLiveMeeting() {
             },
           }}
         >
-          <MenuItem disabled sx={{ fontWeight: 800, opacity: 0.9 }}>
-            Host Permissions
-          </MenuItem>
+          {isHost ? (
+            <>
+              <MenuItem disabled sx={{ fontWeight: 800, opacity: 0.9 }}>
+                Host Permissions
+              </MenuItem>
 
-          <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
+              <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
 
-          <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
-            <ListItemIcon sx={{ minWidth: 34 }}>
-              <ChatBubbleOutlineIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="Chat" secondary="Hide chat tab + block chat panel" />
-            <Switch checked={hostPerms.chat} onChange={handleToggleChat} />
-          </MenuItem>
-          {false && (
-            <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
-              <ListItemIcon sx={{ minWidth: 34 }}>
-                <PollIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary="Polls" secondary="Show/hide Polls tab" />
-              <Switch checked={hostPerms.polls} onChange={handleTogglePolls} />
-            </MenuItem>
+              <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <ChatBubbleOutlineIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Chat" secondary="Hide chat tab + block chat panel" />
+                <Switch checked={hostPerms.chat} onChange={handleToggleChat} />
+              </MenuItem>
+              {false && (
+                <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+                  <ListItemIcon sx={{ minWidth: 34 }}>
+                    <PollIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Polls" secondary="Show/hide Polls tab" />
+                  <Switch checked={hostPerms.polls} onChange={handleTogglePolls} />
+                </MenuItem>
+              )}
+
+              <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <ScreenShareIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Screen share" secondary="Enable/disable screen sharing" />
+                <Switch checked={hostPerms.screenShare} onChange={handleToggleScreenShare} />
+              </MenuItem>
+            </>
+          ) : (
+            <>
+              <MenuItem disabled sx={{ fontWeight: 800, opacity: 0.9 }}>
+                My Controls
+              </MenuItem>
+
+              <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
+
+              <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <MicIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Microphone" secondary={micOn ? "On" : "Off"} />
+                <Switch checked={micOn} onChange={handleToggleMic} />
+              </MenuItem>
+
+              <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <VideocamIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Camera" secondary={camOn ? "On" : "Off"} />
+                <Switch checked={camOn} onChange={handleToggleCamera} />
+              </MenuItem>
+            </>
           )}
-
-          <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
-            <ListItemIcon sx={{ minWidth: 34 }}>
-              <ScreenShareIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="Screen share" secondary="Enable/disable screen sharing" />
-            <Switch checked={hostPerms.screenShare} onChange={handleToggleScreenShare} />
-          </MenuItem>
         </Menu>
 
         {/* Main Layout */}
@@ -4444,28 +4507,7 @@ export default function NewLiveMeeting() {
               >
                 <Tooltip title={micOn ? "Mute" : "Unmute"}>
                   <IconButton
-                    onClick={async () => {
-                      if (!dyteMeeting?.self) return;
-
-                      try {
-                        if (dyteMeeting.self.audioEnabled) {
-                          await dyteMeeting.self.disableAudio?.();
-                        } else {
-                          // ensures permission prompt happens on user click if needed
-                          try {
-                            const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-                            s.getTracks().forEach((t) => t.stop());
-                          } catch { }
-
-                          await dyteMeeting.self.enableAudio?.();
-                        }
-
-                        setMicOn(Boolean(dyteMeeting.self.audioEnabled));
-                      } catch (e) {
-                        console.warn("[LiveMeeting] mic toggle failed:", e);
-                        setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
-                      }
-                    }}
+                    onClick={handleToggleMic}
                     aria-label="Toggle mic"
                   >
                     {micOn ? <MicIcon /> : <MicOffIcon />}
@@ -4474,27 +4516,7 @@ export default function NewLiveMeeting() {
 
                 <Tooltip title={camOn ? "Turn camera off" : "Turn camera on"}>
                   <IconButton
-                    onClick={async () => {
-                      if (!dyteMeeting?.self) return;
-
-                      // 1. Disable the button temporarily if you want to prevent spamming
-                      // (Optional, but good practice)
-
-                      try {
-                        if (camOn) {
-                          // If currently ON, disable it
-                          await dyteMeeting.self.disableVideo();
-                        } else {
-                          // If currently OFF, enable it
-                          await dyteMeeting.self.enableVideo();
-                        }
-                        // No need to call setCamOn() manually here.
-                        // The 'videoUpdate' event listener in your useEffect will 
-                        // automatically fire and update the UI state correctly.
-                      } catch (e) {
-                        console.error("Failed to toggle camera:", e);
-                      }
-                    }}
+                    onClick={handleToggleCamera}
                     sx={{
                       bgcolor: "rgba(255,255,255,0.06)",
                       "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
