@@ -5086,12 +5086,12 @@ function MemberInfoContent({ selectedMember, onClose }) {
           {hasProfileInfo ? (
             <>
               {jobTitle && (
-                <Typography sx={{ fontWeight: 700, fontSize: 14, color: "rgba(255,255,255,0.95)" }}>
+                <Typography sx={{ fontWeight: 400, fontSize: 14, color: "rgba(255,255,255,0.95)" }}>
                   {jobTitle}
                 </Typography>
               )}
               {companyName && (
-                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+                <Typography sx={{ fontWeight: 700, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
                   {companyName}
                 </Typography>
               )}
