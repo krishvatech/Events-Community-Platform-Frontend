@@ -1362,6 +1362,87 @@ function MembersTab({ groupId }) {
   );
 }
 
+function RequestsTab({ groupId, canApprove, onApproved }) {
+  const [requests, setRequests] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+  const [actionBusy, setActionBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const r = await fetch(toApiUrl(`groups/${groupId}/member-requests/`), {
+          headers: { Accept: "application/json", ...authHeaders() },
+        });
+        if (!r.ok) {
+          const msg = r.status === 403 ? "Forbidden" : "Failed to load requests.";
+          throw new Error(msg);
+        }
+        const d = await r.json();
+        const rows = Array.isArray(d?.requests) ? d.requests : (Array.isArray(d) ? d : []);
+        if (mounted) setRequests(rows);
+      } catch (e) {
+        if (mounted) setError(e?.message || "Failed to load requests.");
+      }
+      if (mounted) setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, [groupId]);
+
+  if (loading) return <ListSkeleton count={4} type="short" />;
+  if (error) return <Typography color="error">{error}</Typography>;
+  if (!requests.length) return <Typography color="text.secondary">No pending requests.</Typography>;
+
+  const handleAction = async (userId, action) => {
+    if (!userId) return;
+    setActionBusy(true);
+    setError("");
+    try {
+      const url = toApiUrl(`groups/${groupId}/member-requests/${action}/${userId}/`);
+      const r = await fetch(url, { method: "POST", headers: { Accept: "application/json", ...authHeaders() } });
+      if (!r.ok) throw new Error("Request failed.");
+      setRequests(curr => curr.filter(req => (req.user?.id || req.user_id || req.id) !== userId));
+      if (action === "approve") onApproved?.(userId);
+    } catch (e) {
+      setError(e?.message || "Request failed.");
+    }
+    setActionBusy(false);
+  };
+
+  return (
+    <List>
+      {requests.map((req) => {
+        const u = req.user || req;
+        const uid = u.id || req.user_id || req.id;
+        return (
+          <ListItem key={req.id || u.id} sx={{ border: "1px solid #eee", borderRadius: 2, mb: 1 }}>
+            <ListItemAvatar><Avatar src={toMediaUrl(u.avatar || u.user_image)} /></ListItemAvatar>
+            <ListItemText
+              primary={u.name || u.full_name || u.username || u.email || "User"}
+              secondary={`Pending · ${formatWhen(req.joined_at || req.created_at || req.requested_at)}`}
+            />
+            {canApprove && (
+              <ListItemSecondaryAction>
+                <Stack direction="row" spacing={1}>
+                  <Button size="small" variant="outlined" disabled={actionBusy} onClick={() => handleAction(uid, "approve")}>
+                    Approve
+                  </Button>
+                  <Button size="small" color="error" variant="outlined" disabled={actionBusy} onClick={() => handleAction(uid, "reject")}>
+                    Reject
+                  </Button>
+                </Stack>
+              </ListItemSecondaryAction>
+            )}
+          </ListItem>
+        );
+      })}
+    </List>
+  );
+}
+
 function OverviewTab({ group }) {
   if (!group) return null;
   return (
@@ -1441,6 +1522,8 @@ export default function GroupDetailsPage() {
   const [group, setGroup] = React.useState(null);
   const [tab, setTab] = React.useState(0);
   const [me, setMe] = React.useState(null);
+  const [canSeeRequests, setCanSeeRequests] = React.useState(false);
+  const [canApproveRequests, setCanApproveRequests] = React.useState(false);
 
   // --- Global Lists State (Who Liked, Who Shared) ---
   const [likesTarget, setLikesTarget] = React.useState(null);
@@ -1553,9 +1636,46 @@ export default function GroupDetailsPage() {
         if (rMe.ok) setMe(await rMe.json());
         const rGroup = await fetch(toApiUrl(`groups/${groupId}/`), { headers: { Accept: "application/json", ...authHeaders() } });
         if (rGroup.ok) setGroup(await rGroup.json());
+        const rCan = await fetch(toApiUrl(`groups/${groupId}/moderator/can-i/`), { headers: { Accept: "application/json", ...authHeaders() } });
+        if (rCan.ok) {
+          const can = await rCan.json();
+          setCanSeeRequests(Boolean(can?.is_moderator));
+          setCanApproveRequests(Boolean(can?.is_admin));
+        } else {
+          setCanSeeRequests(false);
+          setCanApproveRequests(false);
+        }
       } catch { }
     })();
   }, [groupId]);
+
+  const tabDefs = React.useMemo(() => {
+    const items = [
+      { label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} /> },
+      { label: "MEMBERS", icon: <PeopleOutlineRoundedIcon />, render: () => <MembersTab groupId={groupId} /> },
+    ];
+    if (canSeeRequests) {
+      items.push({
+        label: "REQUESTS",
+        icon: <PeopleOutlineRoundedIcon />,
+        render: () => (
+          <RequestsTab
+            groupId={groupId}
+            canApprove={canApproveRequests}
+            onApproved={() =>
+              setGroup((prev) => prev ? { ...prev, member_count: Number(prev.member_count || 0) + 1 } : prev)
+            }
+          />
+        ),
+      });
+    }
+    items.push({ label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> });
+    return items;
+  }, [canApproveRequests, canSeeRequests, group, groupId]);
+
+  React.useEffect(() => {
+    if (tab >= tabDefs.length) setTab(0);
+  }, [tab, tabDefs.length]);
 
   // Filter Logic for Likes Dialog
   const likesFilteredUsers = likesFilter === "all" ? listUsers : listUsers.filter(u => u.reactionId === likesFilter);
@@ -1646,29 +1766,13 @@ export default function GroupDetailsPage() {
           >
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
               <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2 }}>
-                <Tab
-                  icon={<ArticleOutlinedIcon />}
-                  iconPosition="start"
-                  label="POSTS"
-                />
-                <Tab
-                  icon={<PeopleOutlineRoundedIcon />}
-                  iconPosition="start"
-                  label="MEMBERS"
-                />
-                <Tab
-                  icon={<InfoOutlinedIcon />}
-                  iconPosition="start"
-                  label="OVERVIEW"
-                />
-                {/* Chat Tab Removed Here */}
+                {tabDefs.map((t) => (
+                  <Tab key={t.label} icon={t.icon} iconPosition="start" label={t.label} />
+                ))}
               </Tabs>
             </Box>
             <CardContent sx={{ p: 3 }}>
-              {tab === 0 && <PostsTab groupId={groupId} />}
-              {tab === 1 && <MembersTab groupId={groupId} />}
-              {tab === 2 && <OverviewTab group={group} />}
-              {/* Chat Content Removed Here */}
+              {tabDefs[tab]?.render?.()}
             </CardContent>
           </Card>
         </Box>
