@@ -53,6 +53,7 @@ import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import VideocamOffIcon from "@mui/icons-material/VideocamOff";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
@@ -914,6 +915,19 @@ export default function NewLiveMeeting() {
   // ✅ Per-participant join clock time (for Member/User Info dialog)
   const participantJoinedAtRef = useRef(new Map()); // participantId -> timestamp(ms)
 
+  // ============ DEVICE SELECTION STATE ============
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [videoDevices, setVideoDevices] = useState([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState([]);
+  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState("");
+  const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState("");
+  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState("");
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+  const [deviceSwitchError, setDeviceSwitchError] = useState("");
+  const activeAudioStreamRef = useRef(null); // Track audio stream for device switching
+  const activeVideoStreamRef = useRef(null); // Track video stream for device switching
+  const remoteAudioRef = useRef(null); // Reference to remote audio element for output device selection
+
   // ============ POLL CREATION STATE ============
   const [isCreatingPoll, setIsCreatingPoll] = useState(false);
   const [createPollQuestion, setCreatePollQuestion] = useState("");
@@ -1095,6 +1109,173 @@ export default function NewLiveMeeting() {
     !roomJoined ||
     !canSelfScreenShare ||
     (isHost ? !hostPerms.screenShare : true);
+
+  // ============ DEVICE ENUMERATION & SWITCHING ============
+  
+  /**
+   * Enumerate all available audio and video devices
+   */
+  const enumerateDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      
+      const audio = devices.filter((d) => d.kind === "audioinput" && d.deviceId);
+      const video = devices.filter((d) => d.kind === "videoinput" && d.deviceId);
+      
+      setAudioDevices(audio);
+      setVideoDevices(video);
+      
+      // Set default devices if not already selected
+      if (audio.length > 0 && !selectedAudioDeviceId) {
+        setSelectedAudioDeviceId(audio[0].deviceId);
+      }
+      if (video.length > 0 && !selectedVideoDeviceId) {
+        setSelectedVideoDeviceId(video[0].deviceId);
+      }
+    } catch (err) {
+      console.warn("[LiveMeeting] Failed to enumerate devices:", err);
+    }
+  }, [selectedAudioDeviceId, selectedVideoDeviceId, selectedAudioOutputDeviceId]);
+
+  // Enumerate devices on mount and when permissions change
+  useEffect(() => {
+    enumerateDevices();
+    
+    // Listen for device changes (new device plugged in, etc.)
+    const handleDeviceChange = () => {
+      enumerateDevices();
+    };
+    
+    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+    
+    return () => {
+      navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+    };
+  }, [enumerateDevices]);
+
+  /**
+   * Switch to a different audio device
+   * Uses replaceTrack for smooth transition without reconnecting
+   */
+  const switchAudioDevice = useCallback(async (deviceId) => {
+    if (!deviceId || !dyteMeeting?.self) return;
+
+    try {
+      setDeviceSwitchError("");
+
+      // Get new audio stream from the selected device
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: { exact: deviceId } },
+      });
+
+      const newAudioTrack = newStream.getAudioTracks()[0];
+      if (!newAudioTrack) {
+        throw new Error("No audio track in new stream");
+      }
+
+      // Get sender from Dyte's WebRTC connection
+      const sender = dyteMeeting?.self?.peerConnection?.getSenders?.()?.find(
+        (s) => s.track?.kind === "audio"
+      );
+
+      if (sender) {
+        // Replace track smoothly without reconnecting
+        await sender.replaceTrack(newAudioTrack);
+      }
+
+      // Stop old audio tracks to free resources
+      if (activeAudioStreamRef.current) {
+        activeAudioStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+
+      // Store new stream reference for future switches
+      activeAudioStreamRef.current = newStream;
+      setSelectedAudioDeviceId(deviceId);
+
+      console.log("[LiveMeeting] Audio device switched to:", deviceId);
+    } catch (err) {
+      const errMsg = `Failed to switch audio device: ${err.message}`;
+      console.error("[LiveMeeting]", errMsg);
+      setDeviceSwitchError(errMsg);
+    }
+  }, [dyteMeeting]);
+
+  /**
+   * Switch to a different video device
+   * Uses replaceTrack for smooth transition without reconnecting
+   */
+  const switchVideoDevice = useCallback(async (deviceId) => {
+    if (!deviceId || !dyteMeeting?.self) return;
+
+    try {
+      setDeviceSwitchError("");
+
+      // Get new video stream from the selected device
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: deviceId } },
+      });
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (!newVideoTrack) {
+        throw new Error("No video track in new stream");
+      }
+
+      // Get sender from Dyte's WebRTC connection
+      const sender = dyteMeeting?.self?.peerConnection?.getSenders?.()?.find(
+        (s) => s.track?.kind === "video"
+      );
+
+      if (sender) {
+        // Replace track smoothly without reconnecting
+        await sender.replaceTrack(newVideoTrack);
+      }
+
+      // Stop old video tracks to free resources
+      if (activeVideoStreamRef.current) {
+        activeVideoStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+
+      // Store new stream reference for future switches
+      activeVideoStreamRef.current = newStream;
+      setSelectedVideoDeviceId(deviceId);
+
+      console.log("[LiveMeeting] Video device switched to:", deviceId);
+    } catch (err) {
+      const errMsg = `Failed to switch video device: ${err.message}`;
+      console.error("[LiveMeeting]", errMsg);
+      setDeviceSwitchError(errMsg);
+    }
+  }, [dyteMeeting]);
+
+  /**
+   * Switch audio output device (speakers/headphones)
+   * Note: Limited browser support - works on Chrome, Edge, some Firefox versions
+   */
+  const switchAudioOutputDevice = useCallback(async (deviceId) => {
+    if (!deviceId) return;
+
+    try {
+      setDeviceSwitchError("");
+
+      // Try to set sink ID on remote audio element
+      if (remoteAudioRef.current && typeof remoteAudioRef.current.setSinkId === "function") {
+        await remoteAudioRef.current.setSinkId(deviceId);
+        setSelectedAudioOutputDeviceId(deviceId);
+        console.log("[LiveMeeting] Audio output device switched to:", deviceId);
+      } else {
+        // Fallback: setSinkId not supported or not available yet
+        console.warn("[LiveMeeting] Audio output device selection not supported in this browser");
+        setDeviceSwitchError(
+          "Audio output device selection is limited in your browser. Some devices may not support this feature."
+        );
+        setSelectedAudioOutputDeviceId(deviceId);
+      }
+    } catch (err) {
+      const errMsg = `Failed to switch audio output device: ${err.message}`;
+      console.error("[LiveMeeting]", errMsg);
+      setDeviceSwitchError(errMsg);
+    }
+  }, []);
 
   const handleToggleMic = useCallback(async () => {
     if (!dyteMeeting?.self) return;
@@ -4399,6 +4580,35 @@ export default function NewLiveMeeting() {
                 <ListItemText primary="Screen share" secondary="Enable/disable screen sharing" />
                 <Switch checked={hostPerms.screenShare} onChange={handleToggleScreenShare} />
               </MenuItem>
+
+              <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
+              <MenuItem disabled sx={{ fontWeight: 800, opacity: 0.9, fontSize: 12 }}>
+                Host Device Controls
+              </MenuItem>
+              <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
+
+              <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <MicIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Microphone" secondary={micOn ? "On" : "Off"} />
+                <Switch checked={micOn} onChange={handleToggleMic} />
+              </MenuItem>
+
+              <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <VideocamIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Camera" secondary={camOn ? "On" : "Off"} />
+                <Switch checked={camOn} onChange={handleToggleCamera} />
+              </MenuItem>
+
+              <MenuItem onClick={() => { setShowDeviceSettings(true); closePermMenu(); }} sx={{ gap: 1.25, py: 1.1 }}>
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <SettingsIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Choose Devices" secondary="Mic, camera & speakers" />
+              </MenuItem>
             </>
           ) : (
             <>
@@ -4422,6 +4632,15 @@ export default function NewLiveMeeting() {
                 </ListItemIcon>
                 <ListItemText primary="Camera" secondary={camOn ? "On" : "Off"} />
                 <Switch checked={camOn} onChange={handleToggleCamera} />
+              </MenuItem>
+
+              <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
+
+              <MenuItem onClick={() => { setShowDeviceSettings(true); closePermMenu(); }} sx={{ gap: 1.25, py: 1.1 }}>
+                <ListItemIcon sx={{ minWidth: 34 }}>
+                  <SettingsIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Device Settings" secondary="Choose mic & camera" />
               </MenuItem>
             </>
           )}
@@ -4896,6 +5115,185 @@ export default function NewLiveMeeting() {
               </Box>
             )}
           </DialogContent>
+        </Dialog>
+
+        {/* Device Settings Dialog */}
+        <Dialog
+          open={showDeviceSettings}
+          onClose={() => setShowDeviceSettings(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              bgcolor: "#0b101a",
+              border: "1px solid rgba(255,255,255,0.10)",
+              borderRadius: 4,
+              boxShadow: "0px 20px 40px rgba(0,0,0,0.6)",
+              backdropFilter: "blur(14px)",
+              color: "#fff",
+              "& .MuiTypography-root": { color: "#fff" },
+            },
+          }}
+        >
+          <DialogTitle sx={{ pb: 1, pt: 2, px: 2, fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 1 }}>
+            <SettingsIcon fontSize="small" />
+            Device Settings
+          </DialogTitle>
+
+          <DialogContent sx={{ px: 2, py: 2, display: "flex", flexDirection: "column", gap: 2.5 }}>
+            {deviceSwitchError && (
+              <Alert severity="error" sx={{ bgcolor: "rgba(244,67,54,0.15)", border: "1px solid rgba(244,67,54,0.3)", color: "#ff6b6b" }}>
+                <Typography variant="body2">{deviceSwitchError}</Typography>
+              </Alert>
+            )}
+
+            {/* Microphone Selection */}
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                <MicIcon fontSize="small" />
+                Microphone
+              </Typography>
+              {audioDevices.length === 0 ? (
+                <Typography sx={{ fontSize: 12, opacity: 0.6, fontStyle: "italic" }}>
+                  No microphones found
+                </Typography>
+              ) : (
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={selectedAudioDeviceId}
+                  onChange={(e) => switchAudioDevice(e.target.value)}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      bgcolor: "rgba(255,255,255,0.05)",
+                      borderColor: "rgba(255,255,255,0.15)",
+                      color: "#fff",
+                      "& fieldset": { borderColor: "rgba(255,255,255,0.15)" },
+                      "&:hover fieldset": { borderColor: "rgba(255,255,255,0.25)" },
+                      "&.Mui-focused fieldset": { borderColor: "rgba(20,184,177,0.4)" },
+                    },
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "rgba(255,255,255,0.15)",
+                    },
+                  }}
+                >
+                  {audioDevices.map((device) => (
+                    <MenuItem key={device.deviceId} value={device.deviceId} sx={{ color: "#000" }}>
+                      <MicIcon sx={{ mr: 1.5, fontSize: 16, opacity: 0.7 }} />
+                      {device.label || `Microphone ${audioDevices.indexOf(device) + 1}`}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+            </Box>
+
+            {/* Camera Selection */}
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                <VideocamIcon fontSize="small" />
+                Camera
+              </Typography>
+              {videoDevices.length === 0 ? (
+                <Typography sx={{ fontSize: 12, opacity: 0.6, fontStyle: "italic" }}>
+                  No cameras found
+                </Typography>
+              ) : (
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={selectedVideoDeviceId}
+                  onChange={(e) => switchVideoDevice(e.target.value)}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      bgcolor: "rgba(255,255,255,0.05)",
+                      borderColor: "rgba(255,255,255,0.15)",
+                      color: "#fff",
+                      "& fieldset": { borderColor: "rgba(255,255,255,0.15)" },
+                      "&:hover fieldset": { borderColor: "rgba(255,255,255,0.25)" },
+                      "&.Mui-focused fieldset": { borderColor: "rgba(20,184,177,0.4)" },
+                    },
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "rgba(255,255,255,0.15)",
+                    },
+                  }}
+                >
+                  {videoDevices.map((device) => (
+                    <MenuItem key={device.deviceId} value={device.deviceId} sx={{ color: "#000" }}>
+                      <VideocamIcon sx={{ mr: 1.5, fontSize: 16, opacity: 0.7 }} />
+                      {device.label || `Camera ${videoDevices.indexOf(device) + 1}`}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+            </Box>
+
+            {/* Speaker/Headphone Selection - Limited Support */}
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                <VolumeUpIcon fontSize="small" />
+                Speaker/Headphone
+                <Chip label="Limited" size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,152,0,0.2)", color: "#ffb74d" }} />
+              </Typography>
+              {audioOutputDevices.length === 0 ? (
+                <Typography sx={{ fontSize: 12, opacity: 0.6, fontStyle: "italic" }}>
+                  No audio output devices found or not supported
+                </Typography>
+              ) : (
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={selectedAudioOutputDeviceId}
+                  onChange={(e) => switchAudioOutputDevice(e.target.value)}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      bgcolor: "rgba(255,255,255,0.05)",
+                      borderColor: "rgba(255,255,255,0.15)",
+                      color: "#fff",
+                      "& fieldset": { borderColor: "rgba(255,255,255,0.15)" },
+                      "&:hover fieldset": { borderColor: "rgba(255,255,255,0.25)" },
+                      "&.Mui-focused fieldset": { borderColor: "rgba(20,184,177,0.4)" },
+                    },
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "rgba(255,255,255,0.15)",
+                    },
+                  }}
+                >
+                  {audioOutputDevices.map((device) => (
+                    <MenuItem key={device.deviceId} value={device.deviceId} sx={{ color: "#000" }}>
+                      <VolumeUpIcon sx={{ mr: 1.5, fontSize: 16, opacity: 0.7 }} />
+                      {device.label || `Speaker ${audioOutputDevices.indexOf(device) + 1}`}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+            </Box>
+
+            {/* Info */}
+            <Box sx={{ p: 1.5, bgcolor: "rgba(33,150,243,0.10)", border: "1px solid rgba(33,150,243,0.2)", borderRadius: 2 }}>
+              <Typography sx={{ fontSize: 12, color: "rgba(100,200,255,0.9)", lineHeight: 1.5 }}>
+                💡 <strong>Tip:</strong> Switching devices will smoothly transition without dropping your call. New audio/video settings will take effect immediately. Speaker/Headphone selection has limited browser support.
+              </Typography>
+            </Box>
+          </DialogContent>
+
+          <DialogActions sx={{ px: 2, py: 2, gap: 1 }}>
+            <Button
+              onClick={() => setShowDeviceSettings(false)}
+              variant="outlined"
+              sx={{
+                borderColor: "rgba(255,255,255,0.2)",
+                color: "#fff",
+                textTransform: "none",
+                fontWeight: 600,
+                "&:hover": { bgcolor: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.3)" },
+              }}
+            >
+              Close
+            </Button>
+          </DialogActions>
         </Dialog>
       </Box>
 
