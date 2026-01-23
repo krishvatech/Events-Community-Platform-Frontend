@@ -3234,9 +3234,10 @@ export default function NewLiveMeeting() {
   const [newQuestion, setNewQuestion] = useState("");
   const [qnaError, setQnaError] = useState("");
 
-  const loadQuestions = useCallback(async () => {
+  const loadQuestions = useCallback(async (opts = {}) => {
     if (!eventId) return;
-    setQnaLoading(true);
+    const { silent = false } = opts;
+    if (!silent) setQnaLoading(true);
     setQnaError("");
 
     try {
@@ -3249,7 +3250,7 @@ export default function NewLiveMeeting() {
     } catch (e) {
       setQnaError(e.message || "Failed to load questions.");
     } finally {
-      setQnaLoading(false);
+      if (!silent) setQnaLoading(false);
     }
   }, [eventId]);
 
@@ -3358,6 +3359,9 @@ export default function NewLiveMeeting() {
             : q
         )
       );
+      if (isHost) {
+        await loadQuestions({ silent: true });
+      }
     } catch (e) {
       setQnaError(e.message || "Failed to update vote.");
     }
@@ -3821,6 +3825,7 @@ export default function NewLiveMeeting() {
                       const voters = q.upvoters ?? [];
                       const votes = q.upvote_count ?? voters.length;
                       const hasVoted = Boolean(q.user_upvoted);
+                      const canViewVoters = isHost;
 
                       // Check if self
                       const selfCsid = dyteMeeting?.self?.clientSpecificId;
@@ -3859,24 +3864,33 @@ export default function NewLiveMeeting() {
                               <Tooltip
                                 arrow
                                 placement="left"
+                                onOpen={() => {
+                                  if (isHost) loadQuestions({ silent: true });
+                                }}
                                 title={
-                                  <Box sx={{ p: 1 }}>
-                                    <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
-                                    {votes ? (
-                                      <Stack spacing={0.25}>
-                                        {voters.slice(0, 8).map((voter, idx) => (
-                                          <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
-                                            {voter?.name || voter?.username || voter?.id || "User"}
-                                          </Typography>
-                                        ))}
-                                        {votes > 8 && (
-                                          <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
-                                        )}
-                                      </Stack>
-                                    ) : (
-                                      <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
-                                    )}
-                                  </Box>
+                                  canViewVoters ? (
+                                    <Box sx={{ p: 1 }}>
+                                      <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
+                                      {votes ? (
+                                        <Stack spacing={0.25}>
+                                          {voters.slice(0, 8).map((voter, idx) => (
+                                            <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
+                                              {voter?.name || voter?.username || voter?.id || "User"}
+                                            </Typography>
+                                          ))}
+                                          {votes > 8 && (
+                                            <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
+                                          )}
+                                        </Stack>
+                                      ) : (
+                                        <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
+                                      )}
+                                    </Box>
+                                  ) : hasVoted ? (
+                                    "Remove your vote"
+                                  ) : (
+                                    "Vote for this question"
+                                  )
                                 }
                                 componentsProps={{
                                   tooltip: {
