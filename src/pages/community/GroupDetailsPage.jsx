@@ -7,7 +7,8 @@ import {
   Grid, IconButton, InputAdornment, List, ListItem, ListItemAvatar,
   ListItemText, ListItemButton, ListItemSecondaryAction, Pagination,
   Paper, Popover, Stack, Tab, Tabs, TextField, Tooltip, Typography,
-  CircularProgress, LinearProgress, Link, Checkbox, Skeleton
+  CircularProgress, LinearProgress, Link, Checkbox, Skeleton,
+  Snackbar, Alert
 } from "@mui/material";
 
 // Icons
@@ -1525,6 +1526,91 @@ export default function GroupDetailsPage() {
   const [canSeeRequests, setCanSeeRequests] = React.useState(false);
   const [canApproveRequests, setCanApproveRequests] = React.useState(false);
 
+  const [toast, setToast] = React.useState({ open: false, msg: "", type: "info" });
+  const [leaveDialogOpen, setLeaveDialogOpen] = React.useState(false);
+
+  // --- Actions ---
+  const fetchGroup = React.useCallback(async () => {
+    try {
+      const rMe = await fetch(toApiUrl("users/me/"), { headers: { Accept: "application/json", ...authHeaders() } });
+      if (rMe.ok) setMe(await rMe.json());
+
+      const rGroup = await fetch(toApiUrl(`groups/${groupId}/`), { headers: { Accept: "application/json", ...authHeaders() } });
+      if (rGroup.ok) setGroup(await rGroup.json());
+
+      const rCan = await fetch(toApiUrl(`groups/${groupId}/moderator/can-i/`), { headers: { Accept: "application/json", ...authHeaders() } });
+      if (rCan.ok) {
+        const can = await rCan.json();
+        setCanSeeRequests(Boolean(can?.is_admin || can?.is_moderator));
+        setCanApproveRequests(Boolean(can?.is_admin));
+      } else {
+        setCanSeeRequests(false);
+        setCanApproveRequests(false);
+      }
+    } catch { }
+  }, [groupId]);
+
+  React.useEffect(() => {
+    fetchGroup();
+  }, [fetchGroup]);
+
+  const handleJoin = async () => {
+    if (!group?.id) return;
+    try {
+      const res = await fetch(toApiUrl(`groups/${group.id}/join/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: "{}"
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setToast({ open: true, msg: data?.detail || "Failed to join group", type: "error" });
+        return;
+      }
+      setToast({ open: true, msg: "Joined successfully!", type: "success" });
+      fetchGroup();
+    } catch (e) {
+      setToast({ open: true, msg: e.message || "Error joining group", type: "error" });
+    }
+  };
+
+  const handleLeaveClick = () => {
+    setLeaveDialogOpen(true);
+  };
+
+  const confirmLeave = async () => {
+    setLeaveDialogOpen(false);
+    if (!group?.id) return;
+
+    // Capture role before leaving
+    const role = group?.current_user_role;
+
+    try {
+      const res = await fetch(toApiUrl(`groups/${group.id}/leave/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: "{}"
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setToast({ open: true, msg: data?.detail || "Failed to leave group", type: "error" });
+        return;
+      }
+      setToast({ open: true, msg: "Left group successfully.", type: "success" });
+
+      // Redirect if Member or Moderator (or generally anyone who leaves)
+      // User specifically asked for Member/Moderator redirect to feed.
+      if (role === "member" || role === "moderator") {
+        navigate("/community?view=feed");
+      } else {
+        // Fallback or for owners (though owners usually can't leave this way)
+        fetchGroup();
+      }
+    } catch (e) {
+      setToast({ open: true, msg: e.message || "Error leaving group", type: "error" });
+    }
+  };
+
   // --- Global Lists State (Who Liked, Who Shared) ---
   const [likesTarget, setLikesTarget] = React.useState(null);
   const [sharesTarget, setSharesTarget] = React.useState(null);
@@ -1629,25 +1715,7 @@ export default function GroupDetailsPage() {
     })();
   }, [sharesTarget]);
 
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const rMe = await fetch(toApiUrl("users/me/"), { headers: { Accept: "application/json", ...authHeaders() } });
-        if (rMe.ok) setMe(await rMe.json());
-        const rGroup = await fetch(toApiUrl(`groups/${groupId}/`), { headers: { Accept: "application/json", ...authHeaders() } });
-        if (rGroup.ok) setGroup(await rGroup.json());
-        const rCan = await fetch(toApiUrl(`groups/${groupId}/moderator/can-i/`), { headers: { Accept: "application/json", ...authHeaders() } });
-        if (rCan.ok) {
-          const can = await rCan.json();
-          setCanSeeRequests(Boolean(can?.is_admin || can?.is_moderator));
-          setCanApproveRequests(Boolean(can?.is_admin));
-        } else {
-          setCanSeeRequests(false);
-          setCanApproveRequests(false);
-        }
-      } catch { }
-    })();
-  }, [groupId]);
+
 
   const tabDefs = React.useMemo(() => {
     const items = [
@@ -1749,13 +1817,49 @@ export default function GroupDetailsPage() {
                   </Typography>
                 </Box>
               </Stack>
-              <Button
-                variant="outlined"
-                startIcon={<ChatBubbleOutlineRoundedIcon />}
-                onClick={() => navigate(`/community?view=messages`)} // Example route
-              >
-                Message
-              </Button>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="outlined"
+                  startIcon={<ChatBubbleOutlineRoundedIcon />}
+                  onClick={() => navigate(`/community?view=messages`)} // Example route
+                >
+                  Message
+                </Button>
+                {(() => {
+                  const status = group?.membership_status;
+                  const role = group?.current_user_role;
+                  const isMember = status === "active" || (role && role !== "none");
+                  const isPending = status === "pending";
+
+                  if (isMember) {
+                    return (
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={handleLeaveClick}
+                      >
+                        Leave
+                      </Button>
+                    );
+                  } else if (isPending) {
+                    return (
+                      <Button variant="outlined" disabled>
+                        Pending
+                      </Button>
+                    );
+                  } else {
+                    return (
+                      <Button
+                        variant="contained"
+                        onClick={handleJoin}
+                        sx={{ bgcolor: "#0ea5a4", "&:hover": { bgcolor: "#0d9488" } }}
+                      >
+                        Join Group
+                      </Button>
+                    );
+                  }
+                })()}
+              </Stack>
             </CardContent>
           </Card>
 
@@ -1833,6 +1937,32 @@ export default function GroupDetailsPage() {
         </DialogContent>
         <DialogActions><Button onClick={() => setSharesTarget(null)}>Close</Button></DialogActions>
       </Dialog>
-    </Box>
+
+      <Dialog open={leaveDialogOpen} onClose={() => setLeaveDialogOpen(false)}>
+        <DialogTitle>Leave Group?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to leave this group? You will no longer receive updates from it.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLeaveDialogOpen(false)}>Cancel</Button>
+          <Button onClick={confirmLeave} color="error" variant="contained">
+            Leave Group
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3000}
+        onClose={() => setToast(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert severity={toast.type} onClose={() => setToast(prev => ({ ...prev, open: false }))}>
+          {toast.msg}
+        </Alert>
+      </Snackbar>
+    </Box >
   );
 }
