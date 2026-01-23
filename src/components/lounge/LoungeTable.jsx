@@ -1,15 +1,41 @@
-import React from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Box, Paper, Typography, Button } from '@mui/material';
 import LoungeSeat from './LoungeSeat';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
-const LoungeTable = ({ table, onJoin, onLeave, currentUserId, myUsername }) => {
+const LoungeTable = ({ table, onJoin, onLeave, currentUserId, myUsername, isAdmin, onUpdateIcon }) => {
     const isUserAtThisTable = Object.values(table.participants || {}).some((p) => {
         return String(p.user_id) === String(currentUserId) || p.username === myUsername;
     });
+    const [iconUploading, setIconUploading] = useState(false);
+    const iconInputRef = useRef(null);
+
+    const iconSrc = useMemo(() => {
+        return (
+            table.icon_url ||
+            table.icon ||
+            table.logo_url ||
+            table.logo ||
+            ""
+        );
+    }, [table]);
 
     const handleJoin = (seatIndex) => {
         if (onJoin) onJoin(table.id, seatIndex);
+    };
+
+    const handleIconPick = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file || !onUpdateIcon) return;
+        setIconUploading(true);
+        try {
+            await onUpdateIcon(table.id, file);
+        } finally {
+            setIconUploading(false);
+            if (iconInputRef.current) {
+                iconInputRef.current.value = "";
+            }
+        }
     };
 
     return (
@@ -34,9 +60,33 @@ const LoungeTable = ({ table, onJoin, onLeave, currentUserId, myUsername }) => {
                 },
             }}
         >
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: 'white' }}>
-                {table.name}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: 'white' }}>
+                    {table.name}
+                </Typography>
+                {isAdmin && (
+                    <Button
+                        size="small"
+                        variant="text"
+                        component="label"
+                        disabled={iconUploading}
+                        sx={{
+                            textTransform: 'none',
+                            color: 'rgba(255,255,255,0.7)',
+                            minWidth: 'auto',
+                        }}
+                    >
+                        {iconUploading ? 'Uploading...' : (iconSrc ? 'Replace logo' : 'Upload logo')}
+                        <input
+                            ref={iconInputRef}
+                            type="file"
+                            hidden
+                            accept="image/*"
+                            onChange={handleIconPick}
+                        />
+                    </Button>
+                )}
+            </Box>
 
             {/* Table Visualization */}
             <Box
@@ -65,7 +115,22 @@ const LoungeTable = ({ table, onJoin, onLeave, currentUserId, myUsername }) => {
                         boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)',
                     }}
                 >
-                    <AutoAwesomeIcon sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 32 }} />
+                    {iconSrc ? (
+                        <Box
+                            component="img"
+                            src={iconSrc}
+                            alt={`${table.name} logo`}
+                            sx={{
+                                width: 56,
+                                height: 56,
+                                objectFit: 'contain',
+                                borderRadius: 2,
+                                bgcolor: 'rgba(0,0,0,0.2)',
+                            }}
+                        />
+                    ) : (
+                        <AutoAwesomeIcon sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 32 }} />
+                    )}
                 </Box>
 
                 {/* Seats around the table */}

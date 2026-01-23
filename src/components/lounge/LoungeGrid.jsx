@@ -3,7 +3,7 @@ import { Grid, Box, Typography, Button, Container } from '@mui/material';
 import LoungeTable from './LoungeTable';
 import AddIcon from '@mui/icons-material/Add';
 
-const LoungeGrid = ({ tables, onJoin, onLeave, currentUserId, myUsername, isAdmin, onCreateTable }) => {
+const LoungeGrid = ({ tables, onJoin, onLeave, currentUserId, myUsername, isAdmin, onCreateTable, onUpdateIcon }) => {
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
@@ -44,6 +44,8 @@ const LoungeGrid = ({ tables, onJoin, onLeave, currentUserId, myUsername, isAdmi
                             onLeave={onLeave}
                             currentUserId={currentUserId}
                             myUsername={myUsername}
+                            isAdmin={isAdmin}
+                            onUpdateIcon={onUpdateIcon}
                         />
                     </Grid>
                 ))}

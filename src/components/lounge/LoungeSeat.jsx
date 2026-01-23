@@ -26,10 +26,17 @@ const LoungeSeat = ({ participant, index, maxSeats }) => {
         );
     }
 
+    const avatarSrc =
+        participant.avatar_url ||
+        participant.user_image_url ||
+        participant.user_image ||
+        participant.avatar ||
+        "";
+
     return (
         <Tooltip title={participant.full_name || participant.username}>
             <Avatar
-                src={participant.avatar_url} // If available
+                src={avatarSrc}
                 sx={{
                     position: 'absolute',
                     top: `calc(50% + ${y}px)`,

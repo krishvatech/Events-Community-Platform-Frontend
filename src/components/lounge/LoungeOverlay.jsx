@@ -18,6 +18,8 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     const [createOpen, setCreateOpen] = useState(false);
     const [createName, setCreateName] = useState("Networking Table");
     const [createSaving, setCreateSaving] = useState(false);
+    const [createIconFile, setCreateIconFile] = useState(null);
+    const [createIconPreview, setCreateIconPreview] = useState("");
     const socketRef = useRef(null);
 
     useEffect(() => {
@@ -37,6 +39,46 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         }
     }, []);
 
+    const resolveMediaUrl = useCallback((url) => {
+        if (!url) return "";
+        if (/^https?:\/\//i.test(url)) return url;
+        if (url.startsWith("/")) {
+            const base = API_RAW.replace(/\/api\/?$/, "");
+            return `${base}${url}`;
+        }
+        return url;
+    }, []);
+
+    const normalizeTables = useCallback(
+        (list) => (Array.isArray(list) ? list : []).map((t) => {
+            const participants = t?.participants || {};
+            const normalizedParticipants = Object.fromEntries(
+                Object.entries(participants).map(([seat, p]) => {
+                    if (!p) return [seat, p];
+                    const avatar =
+                        p.avatar_url ||
+                        p.user_image_url ||
+                        p.user_image ||
+                        p.avatar ||
+                        "";
+                    return [
+                        seat,
+                        {
+                            ...p,
+                            avatar_url: resolveMediaUrl(avatar),
+                        },
+                    ];
+                })
+            );
+            return {
+                ...t,
+                icon_url: resolveMediaUrl(t?.icon_url),
+                participants: normalizedParticipants,
+            };
+        }),
+        [resolveMediaUrl]
+    );
+
     const fetchLoungeState = useCallback(async () => {
         if (!eventId) return;
         try {
@@ -47,13 +89,13 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             if (res.ok) {
                 const data = await res.json();
                 console.log("[Lounge] Fetched state:", data.tables);
-                setTables(data.tables || []);
+                setTables(normalizeTables(data.tables));
                 setLoading(false);
             }
         } catch (err) {
             console.error("[Lounge] Fetch error:", err);
         }
-    }, [eventId]);
+    }, [eventId, normalizeTables]);
 
     useEffect(() => {
         if (open) {
@@ -62,6 +104,16 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             return () => clearInterval(interval);
         }
     }, [open, fetchLoungeState]);
+
+    useEffect(() => {
+        if (!createIconFile) {
+            setCreateIconPreview("");
+            return;
+        }
+        const previewUrl = URL.createObjectURL(createIconFile);
+        setCreateIconPreview(previewUrl);
+        return () => URL.revokeObjectURL(previewUrl);
+    }, [createIconFile]);
 
     useEffect(() => {
         if (!open || !eventId) return;
@@ -101,7 +153,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     }
                     const newState = msg.lounge_state || msg.state || [];
                     console.log("[Lounge] Updating Tables:", newState);
-                    setTables(newState);
+                    setTables(normalizeTables(newState));
                     setLoading(false);
                 } else if (msg.type === "error") {
                     console.error("[Lounge] Backend Error:", msg.message);
@@ -218,22 +270,68 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         setCreateSaving(true);
         try {
             const url = `${API_RAW}/events/${eventId}/create-lounge-table/`.replace(/([^:]\/)\/+/g, "$1");
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getToken()}`
-                },
-                body: JSON.stringify({ name, max_seats: 4 })
-            });
+            let res;
+            if (createIconFile) {
+                const formData = new FormData();
+                formData.append("name", name);
+                formData.append("max_seats", 4);
+                formData.append("icon", createIconFile);
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: formData,
+                });
+            } else {
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({ name, max_seats: 4 })
+                });
+            }
             if (res.ok) {
                 // Broadcast will update the UI via WebSocket
                 setCreateOpen(false);
+                setCreateIconFile(null);
             }
         } catch (err) {
             console.error("Failed to create table", err);
         } finally {
             setCreateSaving(false);
+        }
+    };
+
+    const handleUpdateTableIcon = async (tableId, iconFile) => {
+        if (!eventId || !tableId || !iconFile) return;
+        try {
+            const url = `${API_RAW}/events/${eventId}/lounge-table-icon/`.replace(/([^:]\/)\/+/g, "$1");
+            const formData = new FormData();
+            formData.append("table_id", tableId);
+            formData.append("icon", iconFile);
+            const res = await fetch(url, {
+                method: "POST",
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                },
+                body: formData,
+            });
+            if (!res.ok) {
+                console.error("[Lounge] Failed to update table icon:", res.status);
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            if (data?.icon_url) {
+                const normalized = resolveMediaUrl(data.icon_url);
+                setTables((prev) => prev.map((t) => (
+                    String(t.id) === String(tableId) ? { ...t, icon_url: normalized } : t
+                )));
+            }
+        } catch (err) {
+            console.error("[Lounge] Failed to update table icon", err);
         }
     };
 
@@ -295,6 +393,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                             myUsername={myUsername}
                             isAdmin={isAdmin}
                             onCreateTable={() => setCreateOpen(true)}
+                            onUpdateIcon={handleUpdateTableIcon}
                         />
                         <Box sx={{ px: 4, pb: 2 }}>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)' }}>
@@ -308,7 +407,10 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
 
             <Dialog
                 open={createOpen}
-                onClose={() => setCreateOpen(false)}
+                onClose={() => {
+                    setCreateOpen(false);
+                    setCreateIconFile(null);
+                }}
                 maxWidth="xs"
                 fullWidth
                 PaperProps={{
@@ -350,10 +452,61 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                             },
                         }}
                     />
+                    <Box sx={{ mt: 2 }}>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)" }}>
+                            Table logo (optional)
+                        </Typography>
+                        <Box sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
+                            <Button
+                                variant="outlined"
+                                component="label"
+                                sx={{
+                                    textTransform: "none",
+                                    borderColor: "rgba(255,255,255,0.2)",
+                                    color: "#fff",
+                                }}
+                            >
+                                {createIconFile ? "Replace logo" : "Upload logo"}
+                                <input
+                                    type="file"
+                                    hidden
+                                    accept="image/*"
+                                    onChange={(e) => setCreateIconFile(e.target.files?.[0] || null)}
+                                />
+                            </Button>
+                            {createIconPreview && (
+                                <Box
+                                    component="img"
+                                    src={createIconPreview}
+                                    alt="Table logo preview"
+                                    sx={{
+                                        width: 48,
+                                        height: 48,
+                                        objectFit: "contain",
+                                        borderRadius: 1.5,
+                                        bgcolor: "rgba(255,255,255,0.05)",
+                                        border: "1px solid rgba(255,255,255,0.15)",
+                                    }}
+                                />
+                            )}
+                            {createIconFile && (
+                                <Button
+                                    size="small"
+                                    onClick={() => setCreateIconFile(null)}
+                                    sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+                                >
+                                    Remove
+                                </Button>
+                            )}
+                        </Box>
+                    </Box>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2 }}>
                     <Button
-                        onClick={() => setCreateOpen(false)}
+                        onClick={() => {
+                            setCreateOpen(false);
+                            setCreateIconFile(null);
+                        }}
                         sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
                     >
                         Cancel
