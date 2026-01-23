@@ -29,6 +29,7 @@ import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 
 
 // ---- API helpers (reuse same pattern as AdminGroups.jsx) ----
@@ -2814,6 +2815,7 @@ export default function GroupManagePage() {
     const [requestAddOpen, setRequestAddOpen] = React.useState(false);
     const [memMenuAnchor, setMemMenuAnchor] = React.useState(null);
     const [activeMember, setActiveMember] = React.useState(null);
+    const [exportingCSV, setExportingCSV] = React.useState(false);
     // Sub-groups state
     const [subgroups, setSubgroups] = React.useState([]);
     const [subLoading, setSubLoading] = React.useState(true);
@@ -3796,6 +3798,41 @@ export default function GroupManagePage() {
         }
     }, [idOrSlug, token]);
 
+    // Export members as CSV
+    const handleExportCSV = async () => {
+        if (!group?.id && !idOrSlug) return;
+        setExportingCSV(true);
+        try {
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/members/export-csv/`, {
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            
+            // Get the filename from the response header
+            const contentDisposition = res.headers.get("content-disposition");
+            let filename = `group_members.csv`;
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (match) filename = match[1];
+            }
+            
+            // Create blob and download
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (e) {
+            alert(`Failed to export CSV: ${e?.message || e}`);
+        } finally {
+            setExportingCSV(false);
+        }
+    };
+
     // Call members fetch when group is loaded/changed
     React.useEffect(() => { if (group) fetchMembers(); }, [group, fetchMembers]);
     // Auto-refresh when switching to Members tab
@@ -4013,14 +4050,26 @@ export default function GroupManagePage() {
                                         </Grid>
                                     </Grid>
                                 )}
-
                                 {tab === 1 && (
                                     <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                                        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-4">
                                             <Typography variant="h6" className="font-semibold">Members</Typography>
 
+                                            <Stack direction="row" spacing={1}>
+                                                {canAddMembersDirectly && (
+                                                    // Owner + Admin → Export CSV
+                                                    <Button
+                                                        variant="outlined"
+                                                        className="rounded-xl"
+                                                        startIcon={<FileDownloadRoundedIcon />}
+                                                        disabled={exportingCSV}
+                                                        sx={{ textTransform: "none", borderColor: "#10b8a6", color: "#10b8a6" }}
+                                                        onClick={handleExportCSV}
+                                                    >
+                                                        {exportingCSV ? "Exporting..." : "Export CSV"}
+                                                    </Button>
+                                                )}
 
-                                            <>
                                                 {canAddMembersDirectly && (
                                                     // Owner + Admin → real "Add members" (opens dialog)
                                                     <Button
@@ -4047,7 +4096,7 @@ export default function GroupManagePage() {
                                                         Request to add members
                                                     </Button>
                                                 )}
-                                            </>
+                                            </Stack>
 
                                         </Stack>
 
@@ -4092,9 +4141,21 @@ export default function GroupManagePage() {
                                                                     <Avatar src={toAbs(m.user.avatar)}>{(m.user.name || "U").slice(0, 1).toUpperCase()}</Avatar>
                                                                     <Box sx={{ flex: 1 }}>
                                                                         <Typography className="font-medium">{m.user.name || m.user.email || m.user.id}</Typography>
-                                                                        {m.user.email && (
-                                                                            <Typography variant="caption" className="text-slate-500">{m.user.email}</Typography>
-                                                                        )}
+                                                                        <Stack direction="row" spacing={2}>
+                                                                            {m.user.email && (
+                                                                                <Typography variant="caption" className="text-slate-500">{m.user.email}</Typography>
+                                                                            )}
+                                                                            {m.joined_at && (
+                                                                                <Typography variant="caption" className="text-slate-500">
+                                                                                    Joined: {new Date(m.joined_at).toLocaleDateString()}
+                                                                                </Typography>
+                                                                            )}
+                                                                            {m.left_at && (
+                                                                                <Typography variant="caption" className="text-red-600">
+                                                                                    Left: {new Date(m.left_at).toLocaleDateString()}
+                                                                                </Typography>
+                                                                            )}
+                                                                        </Stack>
                                                                     </Box>
 
                                                                     <RoleBadge role={role} />
