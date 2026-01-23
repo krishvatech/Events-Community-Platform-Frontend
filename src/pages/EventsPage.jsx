@@ -67,6 +67,20 @@ function authHeaders() {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+async function fetchMyRegistrationForEvent(eventId) {
+  try {
+    const url = new URL(`${API_BASE}/event-registrations/`);
+    url.searchParams.set("event", String(eventId));
+    const res = await fetch(url.toString(), { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const list = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+    return list[0] || null;
+  } catch {
+    return null;
+  }
+}
+
 async function addToCart(eventId, qty = 1) {
   try {
     const res = await fetch(`${API_BASE}/cart/items/`, {
@@ -248,7 +262,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 
       // locally mark as registered and bump the shown count
       // We expect the backend to return the created registration, but if not we make a mock one
-      const newReg = { id: (await res.clone().json().catch(() => ({})))?.id, event: ev, status: 'registered' };
+      const created = await res.clone().json().catch(() => ({}));
+      const regFromApi = created?.id ? created : await fetchMyRegistrationForEvent(ev.id);
+      const newReg = { ...(regFromApi || {}), event: ev, status: regFromApi?.status || "registered" };
       setMyRegistrations(prev => ({ ...prev, [ev.id]: newReg }));
       setRawEvents(prev =>
         (prev || []).map(e =>
@@ -470,7 +486,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 
       toast.success("Thank you very much for registering for this event.");
 
-      const newReg = { id: (await res.clone().json().catch(() => ({})))?.id, event: ev, status: 'registered' };
+      const created = await res.clone().json().catch(() => ({}));
+      const regFromApi = created?.id ? created : await fetchMyRegistrationForEvent(ev.id);
+      const newReg = { ...(regFromApi || {}), event: ev, status: regFromApi?.status || "registered" };
       setMyRegistrations(prev => ({ ...prev, [ev.id]: newReg }));
       setRawEvents(prev =>
         (prev || []).map(e =>
