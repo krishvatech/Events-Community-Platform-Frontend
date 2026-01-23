@@ -1,9 +1,21 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Box, Paper, Typography, Button } from '@mui/material';
+import { Box, Paper, Typography, Button, IconButton } from '@mui/material';
 import LoungeSeat from './LoungeSeat';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 
-const LoungeTable = ({ table, onJoin, onLeave, currentUserId, myUsername, isAdmin, onUpdateIcon }) => {
+const LoungeTable = ({
+    table,
+    onJoin,
+    onLeave,
+    currentUserId,
+    myUsername,
+    isAdmin,
+    onUpdateIcon,
+    onEditTable,
+    onDeleteTable,
+}) => {
     const isUserAtThisTable = Object.values(table.participants || {}).some((p) => {
         return String(p.user_id) === String(currentUserId) || p.username === myUsername;
     });
@@ -65,26 +77,42 @@ const LoungeTable = ({ table, onJoin, onLeave, currentUserId, myUsername, isAdmi
                     {table.name}
                 </Typography>
                 {isAdmin && (
-                    <Button
-                        size="small"
-                        variant="text"
-                        component="label"
-                        disabled={iconUploading}
-                        sx={{
-                            textTransform: 'none',
-                            color: 'rgba(255,255,255,0.7)',
-                            minWidth: 'auto',
-                        }}
-                    >
-                        {iconUploading ? 'Uploading...' : (iconSrc ? 'Replace logo' : 'Upload logo')}
-                        <input
-                            ref={iconInputRef}
-                            type="file"
-                            hidden
-                            accept="image/*"
-                            onChange={handleIconPick}
-                        />
-                    </Button>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Button
+                            size="small"
+                            variant="text"
+                            component="label"
+                            disabled={iconUploading}
+                            sx={{
+                                textTransform: 'none',
+                                color: 'rgba(255,255,255,0.7)',
+                                minWidth: 'auto',
+                            }}
+                        >
+                            {iconUploading ? 'Uploading...' : (iconSrc ? 'Replace logo' : 'Upload logo')}
+                            <input
+                                ref={iconInputRef}
+                                type="file"
+                                hidden
+                                accept="image/*"
+                                onChange={handleIconPick}
+                            />
+                        </Button>
+                        <IconButton
+                            size="small"
+                            onClick={() => onEditTable && onEditTable(table)}
+                            sx={{ color: 'rgba(255,255,255,0.7)' }}
+                        >
+                            <EditRoundedIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                            size="small"
+                            onClick={() => onDeleteTable && onDeleteTable(table)}
+                            sx={{ color: 'rgba(255,255,255,0.7)' }}
+                        >
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                        </IconButton>
+                    </Box>
                 )}
             </Box>
 

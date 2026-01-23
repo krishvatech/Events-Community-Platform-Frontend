@@ -1,5 +1,5 @@
 // src/pages/EventManagePage.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import RegisteredActions from "../components/RegisteredActions";
@@ -56,6 +56,9 @@ import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ArrowDropDownRoundedIcon from "@mui/icons-material/ArrowDropDownRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
+import AddIcon from "@mui/icons-material/Add";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
@@ -135,8 +138,8 @@ const fmtDateRange = (start, end) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Resources"];
-const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
+const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Resources", "Breakout Rooms"];
+const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms"];
 const MEMBERS_PER_PAGE = 5;
 const RESOURCES_PER_PAGE = 5;
 
@@ -175,7 +178,29 @@ export default function EventManagePage() {
   const [resourceSort, setResourceSort] = useState("newest");
   const [resourcePage, setResourcePage] = useState(1);
 
+  const [loungeTables, setLoungeTables] = useState([]);
+  const [loungeLoading, setLoungeLoading] = useState(false);
+  const [loungeError, setLoungeError] = useState("");
+  const [loungeCreateOpen, setLoungeCreateOpen] = useState(false);
+  const [loungeCreateName, setLoungeCreateName] = useState("Networking Table");
+  const [loungeCreateSeats, setLoungeCreateSeats] = useState(4);
+  const [loungeCreateSaving, setLoungeCreateSaving] = useState(false);
+  const [loungeCreateIcon, setLoungeCreateIcon] = useState(null);
+  const [loungeCreatePreview, setLoungeCreatePreview] = useState("");
+  const [loungeEditOpen, setLoungeEditOpen] = useState(false);
+  const [loungeEditTarget, setLoungeEditTarget] = useState(null);
+  const [loungeEditName, setLoungeEditName] = useState("");
+  const [loungeEditSeats, setLoungeEditSeats] = useState(4);
+  const [loungeEditSaving, setLoungeEditSaving] = useState(false);
+  const [loungeEditIcon, setLoungeEditIcon] = useState(null);
+  const [loungeEditPreview, setLoungeEditPreview] = useState("");
+  const [loungeDeleteOpen, setLoungeDeleteOpen] = useState(false);
+  const [loungeDeleteTarget, setLoungeDeleteTarget] = useState(null);
+  const [loungeDeleteSaving, setLoungeDeleteSaving] = useState(false);
+
   const isOwner = isOwnerUser();
+  const isStaff = isStaffUser();
+  const canManageLounge = isOwner || isStaff;
   const [myReg, setMyReg] = useState(null); // New state for my registration
   const resources = event?.resources || [];
   const tabLabels = isOwner ? EVENT_TAB_LABELS : STAFF_EVENT_TAB_LABELS;
@@ -315,6 +340,209 @@ export default function EventManagePage() {
     };
     loadMyReg();
   }, [eventId, isOwner]);
+
+  useEffect(() => {
+    if (!loungeCreateIcon) {
+      setLoungeCreatePreview("");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(loungeCreateIcon);
+    setLoungeCreatePreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [loungeCreateIcon]);
+
+  useEffect(() => {
+    if (!loungeEditIcon) {
+      setLoungeEditPreview("");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(loungeEditIcon);
+    setLoungeEditPreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [loungeEditIcon]);
+
+  const clampSeats = useCallback((value) => Math.max(2, Math.min(30, value || 0)), []);
+
+  const normalizeLoungeTables = useCallback(
+    (tables) =>
+      (Array.isArray(tables) ? tables : []).map((t) => ({
+        ...t,
+        icon_url: toAbs(t?.icon_url),
+      })),
+    []
+  );
+
+  const fetchLoungeTables = useCallback(async () => {
+    if (!eventId || !canManageLounge) return;
+    setLoungeLoading(true);
+    setLoungeError("");
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/lounge-state/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+      setLoungeTables(normalizeLoungeTables(json?.tables || []));
+    } catch (e) {
+      setLoungeError(e?.message || "Unable to load lounge tables");
+    } finally {
+      setLoungeLoading(false);
+    }
+  }, [eventId, canManageLounge, normalizeLoungeTables]);
+
+  useEffect(() => {
+    fetchLoungeTables();
+  }, [fetchLoungeTables]);
+
+  const handleCreateLoungeTable = async () => {
+    const name = (loungeCreateName || "").trim();
+    if (!name || !eventId || loungeCreateSaving) return;
+    setLoungeCreateSaving(true);
+    try {
+      const token = getToken();
+      const url = `${API_ROOT}/events/${eventId}/create-lounge-table/`;
+      let res;
+      const seatsValue = clampSeats(loungeCreateSeats);
+      if (loungeCreateIcon) {
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("max_seats", String(seatsValue));
+        formData.append("icon", loungeCreateIcon);
+        res = await fetch(url, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        });
+      } else {
+        res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ name, max_seats: seatsValue }),
+        });
+      }
+      if (!res.ok) {
+        const msg = await res.json().catch(() => ({}));
+        throw new Error(msg?.detail || `HTTP ${res.status}`);
+      }
+      setLoungeCreateOpen(false);
+      setLoungeCreateName("Networking Table");
+      setLoungeCreateSeats(4);
+      setLoungeCreateIcon(null);
+      fetchLoungeTables();
+    } catch (e) {
+      setLoungeError(e?.message || "Failed to create lounge table");
+    } finally {
+      setLoungeCreateSaving(false);
+    }
+  };
+
+  const handleOpenEditLoungeTable = (table) => {
+    setLoungeEditTarget(table);
+    setLoungeEditName(table?.name || "");
+    setLoungeEditSeats(clampSeats(table?.max_seats || 4));
+    setLoungeEditIcon(null);
+    setLoungeEditPreview(table?.icon_url || "");
+    setLoungeEditOpen(true);
+  };
+
+  const handleUpdateLoungeTable = async () => {
+    if (!eventId || !loungeEditTarget || loungeEditSaving) return;
+    const name = (loungeEditName || "").trim();
+    if (!name) return;
+    setLoungeEditSaving(true);
+    try {
+      const token = getToken();
+      const url = `${API_ROOT}/events/${eventId}/lounge-table-update/`;
+      let res;
+      const seatsValue = clampSeats(loungeEditSeats);
+      if (loungeEditIcon) {
+        const formData = new FormData();
+        formData.append("table_id", String(loungeEditTarget.id));
+        formData.append("name", name);
+        formData.append("max_seats", String(seatsValue));
+        formData.append("icon", loungeEditIcon);
+        res = await fetch(url, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        });
+      } else {
+        res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            table_id: loungeEditTarget.id,
+            name,
+            max_seats: seatsValue,
+          }),
+        });
+      }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+      setLoungeTables((prev) =>
+        prev.map((t) =>
+          String(t.id) === String(loungeEditTarget.id)
+            ? {
+                ...t,
+                name: json.name || name,
+                max_seats: json.max_seats || seatsValue,
+                icon_url: toAbs(json.icon_url || t.icon_url),
+              }
+            : t
+        )
+      );
+      setLoungeEditOpen(false);
+    } catch (e) {
+      setLoungeError(e?.message || "Failed to update lounge table");
+    } finally {
+      setLoungeEditSaving(false);
+    }
+  };
+
+  const handleOpenDeleteLoungeTable = (table) => {
+    setLoungeDeleteTarget(table);
+    setLoungeDeleteOpen(true);
+  };
+
+  const handleDeleteLoungeTable = async () => {
+    if (!eventId || !loungeDeleteTarget || loungeDeleteSaving) return;
+    setLoungeDeleteSaving(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/lounge-table-delete/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ table_id: loungeDeleteTarget.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+      setLoungeTables((prev) =>
+        prev.filter((t) => String(t.id) !== String(loungeDeleteTarget.id))
+      );
+      setLoungeDeleteOpen(false);
+      setLoungeDeleteTarget(null);
+    } catch (e) {
+      setLoungeError(e?.message || "Failed to delete lounge table");
+    } finally {
+      setLoungeDeleteSaving(false);
+    }
+  };
 
   // MOD: Handle Member Actions with Dialog
   const openDialog = (action, reg) => {
@@ -729,6 +957,135 @@ export default function EventManagePage() {
           </Paper>
         </Grid>
       </Grid >
+    );
+  };
+
+  const renderBreakoutRooms = () => {
+    if (!canManageLounge) return null;
+
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+          p: { xs: 2, sm: 3 },
+          bgcolor: "background.paper",
+        }}
+      >
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          spacing={1.5}
+          sx={{ mb: 2 }}
+        >
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.25 }}>
+              Social Lounge Tables
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Set up lounge tables before the event goes live.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              onClick={fetchLoungeTables}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+            >
+              Sync
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setLoungeCreateOpen(true)}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+            >
+              Create table
+            </Button>
+          </Stack>
+        </Stack>
+
+        <TableContainer
+          sx={{
+            borderRadius: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            overflow: "hidden",
+          }}
+        >
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: "grey.50" }}>
+                <TableCell>Logo</TableCell>
+                <TableCell>Table</TableCell>
+                <TableCell>Seats</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loungeLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4}>
+                    <LinearProgress />
+                  </TableCell>
+                </TableRow>
+              ) : loungeTables.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    <Typography variant="body2" sx={{ color: "text.secondary", py: 2 }}>
+                      No lounge tables yet.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                loungeTables.map((t) => (
+                  <TableRow key={t.id} hover>
+                    <TableCell>
+                      <Avatar
+                        src={t.icon_url || ""}
+                        variant="rounded"
+                        sx={{ width: 32, height: 32, bgcolor: "grey.100" }}
+                      >
+                        {(t.name || "T")[0]}
+                      </Avatar>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {t.name || `Table ${t.id}`}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {t.max_seats || 4}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenEditLoungeTable(t)}
+                        >
+                          <EditRoundedIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleOpenDeleteLoungeTable(t)}
+                        >
+                          <DeleteOutlineRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
     );
   };
 
@@ -1405,11 +1762,13 @@ export default function EventManagePage() {
                   {tab === 0 && renderOverview()}
                   {tab === 1 && renderMembers()}
                   {tab === 2 && renderResources()}
+                  {tab === 3 && renderBreakoutRooms()}
                 </>
               ) : (
                 <>
                   {tab === 0 && renderOverview()}
                   {tab === 1 && renderResources()}
+                  {tab === 2 && renderBreakoutRooms()}
                 </>
               )}
             </Box>
@@ -1496,6 +1855,241 @@ export default function EventManagePage() {
             {registrationsError}
           </Alert>
         </Snackbar>
+
+        <Snackbar
+          open={!!loungeError}
+          autoHideDuration={4000}
+          onClose={() => setLoungeError("")}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
+            onClose={() => setLoungeError("")}
+            severity="error"
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            {loungeError}
+          </Alert>
+        </Snackbar>
+
+        <Dialog
+          open={loungeCreateOpen}
+          onClose={() => {
+            setLoungeCreateOpen(false);
+            setLoungeCreateIcon(null);
+          }}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              p: 1,
+            },
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>Create Lounge Table</DialogTitle>
+          <DialogContent sx={{ pt: 1 }}>
+            <Stack spacing={2}>
+              <TextField
+                label="Table name"
+                value={loungeCreateName}
+                onChange={(e) => setLoungeCreateName(e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Seats"
+                type="number"
+                inputProps={{ min: 2, max: 30 }}
+                value={loungeCreateSeats}
+                onChange={(e) => setLoungeCreateSeats(clampSeats(Number(e.target.value)))}
+                fullWidth
+              />
+              <Box>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Table logo (optional)
+                </Typography>
+                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1 }}>
+                  <Button variant="outlined" component="label" sx={{ textTransform: "none" }}>
+                    {loungeCreateIcon ? "Replace logo" : "Upload logo"}
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={(e) => setLoungeCreateIcon(e.target.files?.[0] || null)}
+                    />
+                  </Button>
+                  {loungeCreatePreview && (
+                    <Avatar
+                      src={loungeCreatePreview}
+                      variant="rounded"
+                      sx={{ width: 40, height: 40, bgcolor: "grey.100" }}
+                    />
+                  )}
+                  {loungeCreateIcon && (
+                    <Button
+                      size="small"
+                      onClick={() => setLoungeCreateIcon(null)}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </Stack>
+              </Box>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => {
+                setLoungeCreateOpen(false);
+                setLoungeCreateIcon(null);
+              }}
+              sx={{ textTransform: "none" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleCreateLoungeTable}
+              disabled={!loungeCreateName.trim() || loungeCreateSaving}
+              sx={{ textTransform: "none" }}
+            >
+              {loungeCreateSaving ? "Creating..." : "Create"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={loungeEditOpen}
+          onClose={() => {
+            setLoungeEditOpen(false);
+            setLoungeEditIcon(null);
+            setLoungeEditTarget(null);
+          }}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              p: 1,
+            },
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>Edit Lounge Table</DialogTitle>
+          <DialogContent sx={{ pt: 1 }}>
+            <Stack spacing={2}>
+              <TextField
+                label="Table name"
+                value={loungeEditName}
+                onChange={(e) => setLoungeEditName(e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Seats"
+                type="number"
+                inputProps={{ min: 2, max: 30 }}
+                value={loungeEditSeats}
+                onChange={(e) => setLoungeEditSeats(clampSeats(Number(e.target.value)))}
+                fullWidth
+              />
+              <Box>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Table logo (optional)
+                </Typography>
+                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1 }}>
+                  <Button variant="outlined" component="label" sx={{ textTransform: "none" }}>
+                    {loungeEditIcon ? "Replace logo" : "Upload logo"}
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={(e) => setLoungeEditIcon(e.target.files?.[0] || null)}
+                    />
+                  </Button>
+                  {(loungeEditPreview || loungeEditTarget?.icon_url) && (
+                    <Avatar
+                      src={loungeEditPreview || loungeEditTarget?.icon_url || ""}
+                      variant="rounded"
+                      sx={{ width: 40, height: 40, bgcolor: "grey.100" }}
+                    />
+                  )}
+                  {loungeEditIcon && (
+                    <Button
+                      size="small"
+                      onClick={() => setLoungeEditIcon(null)}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </Stack>
+              </Box>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => {
+                setLoungeEditOpen(false);
+                setLoungeEditIcon(null);
+                setLoungeEditTarget(null);
+              }}
+              sx={{ textTransform: "none" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleUpdateLoungeTable}
+              disabled={!loungeEditName.trim() || loungeEditSaving}
+              sx={{ textTransform: "none" }}
+            >
+              {loungeEditSaving ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={loungeDeleteOpen}
+          onClose={() => {
+            setLoungeDeleteOpen(false);
+            setLoungeDeleteTarget(null);
+          }}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              p: 1,
+            },
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>Delete Lounge Table?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              This will remove the table "{loungeDeleteTarget?.name || "Table"}" and clear its seats.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => {
+                setLoungeDeleteOpen(false);
+                setLoungeDeleteTarget(null);
+              }}
+              sx={{ textTransform: "none" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={handleDeleteLoungeTable}
+              disabled={loungeDeleteSaving}
+              sx={{ textTransform: "none" }}
+            >
+              {loungeDeleteSaving ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Dialog
           open={dialogOpen}

@@ -18,8 +18,19 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     const [createOpen, setCreateOpen] = useState(false);
     const [createName, setCreateName] = useState("Networking Table");
     const [createSaving, setCreateSaving] = useState(false);
+    const [createSeats, setCreateSeats] = useState(4);
     const [createIconFile, setCreateIconFile] = useState(null);
     const [createIconPreview, setCreateIconPreview] = useState("");
+    const [editOpen, setEditOpen] = useState(false);
+    const [editTarget, setEditTarget] = useState(null);
+    const [editName, setEditName] = useState("");
+    const [editSeats, setEditSeats] = useState(4);
+    const [editSaving, setEditSaving] = useState(false);
+    const [editIconFile, setEditIconFile] = useState(null);
+    const [editIconPreview, setEditIconPreview] = useState("");
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleteSaving, setDeleteSaving] = useState(false);
     const socketRef = useRef(null);
 
     useEffect(() => {
@@ -114,6 +125,16 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         setCreateIconPreview(previewUrl);
         return () => URL.revokeObjectURL(previewUrl);
     }, [createIconFile]);
+
+    useEffect(() => {
+        if (!editIconFile) {
+            setEditIconPreview("");
+            return;
+        }
+        const previewUrl = URL.createObjectURL(editIconFile);
+        setEditIconPreview(previewUrl);
+        return () => URL.revokeObjectURL(previewUrl);
+    }, [editIconFile]);
 
     useEffect(() => {
         if (!open || !eventId) return;
@@ -264,6 +285,8 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         }
     };
 
+    const clampSeats = (value) => Math.max(2, Math.min(30, value || 0));
+
     const handleCreateTable = async () => {
         const name = (createName || "").trim();
         if (!name || !eventId || createSaving) return;
@@ -274,7 +297,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             if (createIconFile) {
                 const formData = new FormData();
                 formData.append("name", name);
-                formData.append("max_seats", 4);
+                formData.append("max_seats", clampSeats(createSeats));
                 formData.append("icon", createIconFile);
                 res = await fetch(url, {
                     method: 'POST',
@@ -290,13 +313,14 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${getToken()}`
                     },
-                    body: JSON.stringify({ name, max_seats: 4 })
+                    body: JSON.stringify({ name, max_seats: clampSeats(createSeats) })
                 });
             }
             if (res.ok) {
                 // Broadcast will update the UI via WebSocket
                 setCreateOpen(false);
                 setCreateIconFile(null);
+                setCreateSeats(4);
             }
         } catch (err) {
             console.error("Failed to create table", err);
@@ -332,6 +356,107 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             }
         } catch (err) {
             console.error("[Lounge] Failed to update table icon", err);
+        }
+    };
+
+    const handleOpenEditTable = (table) => {
+        if (!table) return;
+        setEditTarget(table);
+        setEditName(table?.name || "");
+        setEditSeats(clampSeats(table?.max_seats || 4));
+        setEditIconFile(null);
+        setEditIconPreview(table?.icon_url || "");
+        setEditOpen(true);
+    };
+
+    const handleUpdateTable = async () => {
+        if (!eventId || !editTarget || editSaving) return;
+        const name = (editName || "").trim();
+        if (!name) return;
+        setEditSaving(true);
+        try {
+            const url = `${API_RAW}/events/${eventId}/lounge-table-update/`.replace(/([^:]\/)\/+/g, "$1");
+            let res;
+            if (editIconFile) {
+                const formData = new FormData();
+                formData.append("table_id", String(editTarget.id));
+                formData.append("name", name);
+                formData.append("max_seats", String(clampSeats(editSeats)));
+                formData.append("icon", editIconFile);
+                res = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: formData,
+                });
+            } else {
+                res = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({
+                        table_id: editTarget.id,
+                        name,
+                        max_seats: clampSeats(editSeats),
+                    }),
+                });
+            }
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                console.error("[Lounge] Failed to update table:", res.status);
+                return;
+            }
+            setTables((prev) => prev.map((t) => (
+                String(t.id) === String(editTarget.id)
+                    ? {
+                        ...t,
+                        name: data.name || name,
+                        max_seats: data.max_seats || clampSeats(editSeats),
+                        icon_url: resolveMediaUrl(data.icon_url || t.icon_url),
+                    }
+                    : t
+            )));
+            setEditOpen(false);
+        } catch (err) {
+            console.error("[Lounge] Failed to update table", err);
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    const handleOpenDeleteTable = (table) => {
+        if (!table) return;
+        setDeleteTarget(table);
+        setDeleteOpen(true);
+    };
+
+    const handleDeleteTable = async () => {
+        if (!eventId || !deleteTarget || deleteSaving) return;
+        setDeleteSaving(true);
+        try {
+            const url = `${API_RAW}/events/${eventId}/lounge-table-delete/`.replace(/([^:]\/)\/+/g, "$1");
+            const res = await fetch(url, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getToken()}`
+                },
+                body: JSON.stringify({ table_id: deleteTarget.id }),
+            });
+            if (!res.ok) {
+                console.error("[Lounge] Failed to delete table:", res.status);
+                return;
+            }
+            setTables((prev) => prev.filter((t) => String(t.id) !== String(deleteTarget.id)));
+            setDeleteOpen(false);
+            setDeleteTarget(null);
+        } catch (err) {
+            console.error("[Lounge] Failed to delete table", err);
+        } finally {
+            setDeleteSaving(false);
         }
     };
 
@@ -394,6 +519,8 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                             isAdmin={isAdmin}
                             onCreateTable={() => setCreateOpen(true)}
                             onUpdateIcon={handleUpdateTableIcon}
+                            onEditTable={handleOpenEditTable}
+                            onDeleteTable={handleOpenDeleteTable}
                         />
                         <Box sx={{ px: 4, pb: 2 }}>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)' }}>
@@ -442,6 +569,27 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         InputLabelProps={{ sx: { color: "rgba(255,255,255,0.7)" } }}
                         sx={{
                             mt: 1,
+                            "& .MuiOutlinedInput-root": {
+                                color: "#fff",
+                                bgcolor: "rgba(255,255,255,0.04)",
+                                borderRadius: 2,
+                            },
+                            "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: "rgba(255,255,255,0.2)",
+                            },
+                        }}
+                    />
+                    <TextField
+                        fullWidth
+                        label="Seats"
+                        type="number"
+                        inputProps={{ min: 2, max: 30 }}
+                        value={createSeats}
+                        onChange={(e) => setCreateSeats(clampSeats(Number(e.target.value)))}
+                        variant="outlined"
+                        InputLabelProps={{ sx: { color: "rgba(255,255,255,0.7)" } }}
+                        sx={{
+                            mt: 2,
                             "& .MuiOutlinedInput-root": {
                                 color: "#fff",
                                 bgcolor: "rgba(255,255,255,0.04)",
@@ -506,6 +654,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         onClick={() => {
                             setCreateOpen(false);
                             setCreateIconFile(null);
+                            setCreateSeats(4);
                         }}
                         sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
                     >
@@ -522,6 +671,191 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         }}
                     >
                         {createSaving ? "Creating..." : "Create"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={editOpen}
+                onClose={() => {
+                    setEditOpen(false);
+                    setEditIconFile(null);
+                    setEditTarget(null);
+                }}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: "#0b101a",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: 3,
+                        color: "#fff",
+                    },
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
+                    Edit Table
+                </DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        label="Table name"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        variant="outlined"
+                        InputLabelProps={{ sx: { color: "rgba(255,255,255,0.7)" } }}
+                        sx={{
+                            mt: 1,
+                            "& .MuiOutlinedInput-root": {
+                                color: "#fff",
+                                bgcolor: "rgba(255,255,255,0.04)",
+                                borderRadius: 2,
+                            },
+                            "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: "rgba(255,255,255,0.2)",
+                            },
+                        }}
+                    />
+                    <TextField
+                        fullWidth
+                        label="Seats"
+                        type="number"
+                        inputProps={{ min: 2, max: 30 }}
+                        value={editSeats}
+                        onChange={(e) => setEditSeats(clampSeats(Number(e.target.value)))}
+                        variant="outlined"
+                        InputLabelProps={{ sx: { color: "rgba(255,255,255,0.7)" } }}
+                        sx={{
+                            mt: 2,
+                            "& .MuiOutlinedInput-root": {
+                                color: "#fff",
+                                bgcolor: "rgba(255,255,255,0.04)",
+                                borderRadius: 2,
+                            },
+                            "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: "rgba(255,255,255,0.2)",
+                            },
+                        }}
+                    />
+                    <Box sx={{ mt: 2 }}>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)" }}>
+                            Table logo (optional)
+                        </Typography>
+                        <Box sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
+                            <Button
+                                variant="outlined"
+                                component="label"
+                                sx={{
+                                    textTransform: "none",
+                                    borderColor: "rgba(255,255,255,0.2)",
+                                    color: "#fff",
+                                }}
+                            >
+                                {editIconFile ? "Replace logo" : "Upload logo"}
+                                <input
+                                    type="file"
+                                    hidden
+                                    accept="image/*"
+                                    onChange={(e) => setEditIconFile(e.target.files?.[0] || null)}
+                                />
+                            </Button>
+                            {(editIconPreview || editTarget?.icon_url) && (
+                                <Box
+                                    component="img"
+                                    src={editIconPreview || editTarget?.icon_url}
+                                    alt="Table logo preview"
+                                    sx={{
+                                        width: 48,
+                                        height: 48,
+                                        objectFit: "contain",
+                                        borderRadius: 1.5,
+                                        bgcolor: "rgba(255,255,255,0.05)",
+                                        border: "1px solid rgba(255,255,255,0.15)",
+                                    }}
+                                />
+                            )}
+                            {editIconFile && (
+                                <Button
+                                    size="small"
+                                    onClick={() => setEditIconFile(null)}
+                                    sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+                                >
+                                    Remove
+                                </Button>
+                            )}
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button
+                        onClick={() => {
+                            setEditOpen(false);
+                            setEditIconFile(null);
+                            setEditTarget(null);
+                        }}
+                        sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleUpdateTable}
+                        disabled={!editName.trim() || editSaving}
+                        sx={{
+                            textTransform: "none",
+                            bgcolor: "#14b8b1",
+                            "&:hover": { bgcolor: "#0e8e88" },
+                        }}
+                    >
+                        {editSaving ? "Saving..." : "Save"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={deleteOpen}
+                onClose={() => {
+                    setDeleteOpen(false);
+                    setDeleteTarget(null);
+                }}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: "#0b101a",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: 3,
+                        color: "#fff",
+                    },
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
+                    Delete Table?
+                </DialogTitle>
+                <DialogContent>
+                    <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
+                        This will remove the table "{deleteTarget?.name || "Table"}".
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button
+                        onClick={() => {
+                            setDeleteOpen(false);
+                            setDeleteTarget(null);
+                        }}
+                        sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={handleDeleteTable}
+                        disabled={deleteSaving}
+                        sx={{ textTransform: "none" }}
+                    >
+                        {deleteSaving ? "Deleting..." : "Delete"}
                     </Button>
                 </DialogActions>
             </Dialog>
