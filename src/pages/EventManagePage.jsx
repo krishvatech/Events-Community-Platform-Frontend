@@ -856,7 +856,7 @@ export default function EventManagePage() {
                     <TableCell>Email</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                      Purchased at
+                      Registered at
                     </TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>

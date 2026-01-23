@@ -168,6 +168,7 @@ function toCard(ev) {
   // map backend fields to the fields your UI already uses
   return {
     id: ev.id,
+    slug: ev.slug,
     title: ev.title,
     description: ev.description,
     image: ev.preview_image,                 // URLField on your model
@@ -178,8 +179,36 @@ function toCard(ev) {
     attendees: Math.max(1, Number(ev.registrations_count ?? ev.attending_count ?? 0)),
     price: ev.price,
     is_free: ev.is_free || false,
+    status: ev.status,
+    is_live: ev.is_live,
     registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
   };
+}
+
+function computeStatus(ev) {
+  const now = Date.now();
+  const s = ev.start ? new Date(ev.start).getTime() : 0;
+  const e = ev.end ? new Date(ev.end).getTime() : 0;
+
+  if (ev.status === "ended") return "past";
+  if (ev.is_live && ev.status !== "ended") return "live";
+  if (s && e && now >= s && now <= e && ev.status !== "ended") return "live";
+  if (s && now < s) return "upcoming";
+  if (e && now > e) return "past";
+  return "upcoming";
+}
+
+function canJoinEarly(ev, minutes = 15) {
+  if (!ev?.start) return false;
+
+  const startMs = new Date(ev.start).getTime();
+  if (!Number.isFinite(startMs)) return false;
+
+  const now = Date.now();
+  const diff = startMs - now;
+  const windowMs = minutes * 60 * 1000;
+
+  return diff > 0 && diff <= windowMs;
 }
 // ————————————————————————————————————————
 // Card (thumbnail view)
@@ -187,6 +216,11 @@ function toCard(ev) {
 function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
   const navigate = useNavigate();
   const owner = isOwnerUser();
+  const reg = myRegistrations?.[ev.id];
+  const status = computeStatus(ev);
+  const isLive = status === "live" && ev.status !== "ended";
+  const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
 
   const handleRegisterCard = async () => {
     const token =
@@ -241,6 +275,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 
       // ✅ DO NOT redirect anywhere
     }
+  };
+
+  const handleJoinCard = () => {
+    const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+    navigate(livePath, { state: { event: ev }, replace: false });
   };
 
   return (
@@ -334,14 +373,50 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
         {/* Hide register button for owner users */}
         {!owner && (
           ev.isRegistered ? (
-            <Button
-              variant="outlined"
-              size="large"
-              disabled
-              className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
-            >
-              Registered
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="contained"
+                size="large"
+                onClick={handleJoinCard}
+                disabled={!canShowActiveJoin}
+                className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
+              >
+                {canShowActiveJoin ? (isLive ? "Join Live" : "Join") : "Join (Not Live Yet)"}
+              </Button>
+              {reg && ev.is_free && (
+                <RegisteredActions
+                  ev={ev}
+                  reg={reg}
+                  hideChip={true}
+                  onUnregistered={(eventId) => {
+                    setMyRegistrations((prev) => {
+                      const next = { ...prev };
+                      delete next[eventId];
+                      return next;
+                    });
+                    setRawEvents((prev) =>
+                      (prev || []).map((e) =>
+                        e.id === eventId
+                          ? {
+                            ...e,
+                            registrations_count: Math.max(
+                              0,
+                              Number(e?.registrations_count ?? e?.attending_count ?? 0) - 1
+                            ),
+                          }
+                          : e
+                      )
+                    );
+                  }}
+                  onCancelRequested={(eventId, updatedReg) => {
+                    setMyRegistrations((prev) => ({
+                      ...prev,
+                      [eventId]: updatedReg,
+                    }));
+                  }}
+                />
+              )}
+            </div>
           ) : (
             <Button
               variant="contained"
@@ -366,6 +441,11 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 // ————————————————————————————————————————
 function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
   const navigate = useNavigate();
+  const reg = myRegistrations?.[ev.id];
+  const status = computeStatus(ev);
+  const isLive = status === "live" && ev.status !== "ended";
+  const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
 
   const handleRegisterRow = async () => {
     const token =
@@ -411,6 +491,11 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 
       // ✅ DO NOT redirect anywhere
     }
+  };
+
+  const handleJoinRow = () => {
+    const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+    navigate(livePath, { state: { event: ev }, replace: false });
   };
 
   const startDate = new Date(ev.start);
@@ -507,14 +592,50 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
               {/* Hide register button for owner users (assuming generic 'owner' check logic same as Card) */}
               {isOwnerUser() ? null : (
                 ev.isRegistered ? (
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    disabled
-                    className="normal-case rounded-full px-5 text-emerald-600 border-emerald-200 bg-emerald-50"
-                  >
-                    Registered
-                  </Button>
+                  <div className="flex flex-col items-end gap-2">
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={handleJoinRow}
+                      disabled={!canShowActiveJoin}
+                      className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
+                    >
+                      {canShowActiveJoin ? (isLive ? "Join Live" : "Join") : "Join (Not Live Yet)"}
+                    </Button>
+                    {reg && ev.is_free && (
+                      <RegisteredActions
+                        ev={ev}
+                        reg={reg}
+                        hideChip={true}
+                        onUnregistered={(eventId) => {
+                          setMyRegistrations((prev) => {
+                            const next = { ...prev };
+                            delete next[eventId];
+                            return next;
+                          });
+                          setRawEvents((prev) =>
+                            (prev || []).map((e) =>
+                              e.id === eventId
+                                ? {
+                                  ...e,
+                                  registrations_count: Math.max(
+                                    0,
+                                    Number(e?.registrations_count ?? e?.attending_count ?? 0) - 1
+                                  ),
+                                }
+                                : e
+                            )
+                          );
+                        }}
+                        onCancelRequested={(eventId, updatedReg) => {
+                          setMyRegistrations((prev) => ({
+                            ...prev,
+                            [eventId]: updatedReg,
+                          }));
+                        }}
+                      />
+                    )}
+                  </div>
                 ) : (
                   <Button
                     variant="contained"
@@ -751,7 +872,7 @@ export default function EventsPage() {
 
     // if not logged-in, clear any old state
     if (!token) {
-      setRegisteredIds(new Set());
+      setMyRegistrations({});
       return;
     }
 
