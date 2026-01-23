@@ -62,6 +62,9 @@ import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
 import ShuffleIcon from "@mui/icons-material/Shuffle";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
@@ -2692,6 +2695,11 @@ export default function NewLiveMeeting() {
   const [chatError, setChatError] = useState("");
   const [chatInput, setChatInput] = useState("");
   const chatBottomRef = useRef(null);
+  const [chatEditId, setChatEditId] = useState(null);
+  const [chatEditBody, setChatEditBody] = useState("");
+  const [chatEditSaving, setChatEditSaving] = useState(false);
+  const [chatDeleteOpen, setChatDeleteOpen] = useState(false);
+  const [chatDeleteTarget, setChatDeleteTarget] = useState(null);
 
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [qnaUnreadCount, setQnaUnreadCount] = useState(0);
@@ -3030,7 +3038,7 @@ export default function NewLiveMeeting() {
       const unread = await fetchChatUnread();
 
       // If user is actively viewing chat, auto-refresh and clear unread
-      if (isChatActive && unread > 0) {
+      if (isChatActive) {
         const cid = activeChatConversationId || (await ensureActiveConversation());
         if (cid) {
           await fetchChatMessages(cid);
@@ -3109,6 +3117,85 @@ export default function NewLiveMeeting() {
       setChatSending(false);
     }
   }, [activeChatConversationId, chatInput, chatSending, ensureActiveConversation]);
+
+  const updateChatMessage = useCallback(
+    async (messageId, body) => {
+      const cid = activeChatConversationId;
+      if (!cid || !messageId) return;
+      const trimmed = String(body || "").trim();
+      if (!trimmed) return;
+      setChatEditSaving(true);
+      try {
+        const res = await fetch(
+          toApiUrl(`messaging/conversations/${cid}/messages/${messageId}/`),
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", ...authHeader() },
+            body: JSON.stringify({ body: trimmed }),
+          }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.detail || "Failed to edit message.");
+        setChatMessages((prev) =>
+          prev.map((m) => (String(m.id) === String(messageId) ? { ...m, body: data.body } : m))
+        );
+        await fetchChatMessages(cid);
+        setChatEditId(null);
+        setChatEditBody("");
+      } catch (e) {
+        setChatError(e?.message || "Failed to edit message.");
+      } finally {
+        setChatEditSaving(false);
+      }
+    },
+    [activeChatConversationId, fetchChatMessages]
+  );
+
+  const deleteChatMessage = useCallback(
+    async (messageId) => {
+      const cid = activeChatConversationId;
+      if (!cid || !messageId) return;
+      const res = await fetch(
+        toApiUrl(`messaging/conversations/${cid}/messages/${messageId}/`),
+        {
+          method: "DELETE",
+          headers: { ...authHeader() },
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setChatError(data?.detail || "Failed to delete message.");
+        return;
+      }
+      setChatMessages((prev) => prev.filter((m) => String(m.id) !== String(messageId)));
+      await fetchChatMessages(cid);
+    },
+    [activeChatConversationId, fetchChatMessages]
+  );
+
+  const flagChatMessage = useCallback(
+    async (messageId) => {
+      const cid = activeChatConversationId;
+      if (!cid || !messageId) return;
+      const res = await fetch(
+        toApiUrl(`messaging/conversations/${cid}/messages/${messageId}/flag/`),
+        {
+          method: "POST",
+          headers: { ...authHeader() },
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setChatError(data?.detail || "Failed to flag message.");
+        return;
+      }
+      setChatMessages((prev) =>
+        prev.map((m) => (String(m.id) === String(messageId) ? { ...m, is_flagged_by_me: true } : m))
+      );
+      await fetchChatMessages(cid);
+    },
+    [activeChatConversationId, fetchChatMessages]
+  );
 
   useEffect(() => {
     if (eventId) {
@@ -3673,8 +3760,8 @@ export default function NewLiveMeeting() {
           {/* Body */}
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {/* CHAT */}
-            {hostPerms.chat && (
-              <TabPanel value={tab} index={0}>
+      {hostPerms.chat && (
+        <TabPanel value={tab} index={0}>
                 <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
                   {isRoomChatActive && (
                     <Typography sx={{ fontSize: 12, opacity: 0.7, mb: 1 }}>
@@ -3751,11 +3838,105 @@ export default function NewLiveMeeting() {
                                 {m.sender_display || m.sender_name || "User"}
                               </Typography>
                             </Stack>
-                            <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
-                              {formatChatTime(m.created_at)}
-                            </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
+                                {formatChatTime(m.created_at)}
+                              </Typography>
+                              <Stack direction="row" spacing={0.5} alignItems="center">
+                                {isHost && m.is_flagged && (
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Flagged message"
+                                    sx={{ color: "#f59e0b" }}
+                                  >
+                                    <FlagOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                                {(m.mine || isHost) && (
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Edit message"
+                                    onClick={() => {
+                                      setChatEditId(m.id);
+                                      setChatEditBody(m.body || "");
+                                    }}
+                                  >
+                                    <EditRoundedIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                                {(m.mine || isHost) && (
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Delete message"
+                                    onClick={() => {
+                                      setChatDeleteTarget(m.id);
+                                      setChatDeleteOpen(true);
+                                    }}
+                                  >
+                                    <DeleteOutlineRoundedIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                                {!isHost && !m.mine && (
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Flag message"
+                                    onClick={() => flagChatMessage(m.id)}
+                                    sx={{
+                                      color: m.is_flagged_by_me ? "#f59e0b" : "inherit",
+                                      fontWeight: m.is_flagged_by_me ? 700 : 400,
+                                    }}
+                                  >
+                                    <FlagOutlinedIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                              </Stack>
+                            </Stack>
                           </Stack>
-                          <Typography sx={{ mt: 0.5, fontSize: 13, opacity: 0.9 }}>{m.body}</Typography>
+                          {chatEditId === m.id ? (
+                            <Box sx={{ mt: 1 }}>
+                              <TextField
+                                fullWidth
+                                size="small"
+                                value={chatEditBody}
+                                onChange={(e) => setChatEditBody(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    updateChatMessage(m.id, chatEditBody);
+                                  }
+                                }}
+                                sx={{
+                                  "& .MuiOutlinedInput-root": {
+                                    bgcolor: "rgba(255,255,255,0.03)",
+                                    borderRadius: 2,
+                                  },
+                                }}
+                              />
+                              <Stack direction="row" spacing={1} sx={{ mt: 1 }} justifyContent="flex-end">
+                                <Button
+                                  size="small"
+                                  onClick={() => {
+                                    setChatEditId(null);
+                                    setChatEditBody("");
+                                  }}
+                                  sx={{ textTransform: "none" }}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => updateChatMessage(m.id, chatEditBody)}
+                                  disabled={chatEditSaving || !chatEditBody.trim()}
+                                  sx={{ textTransform: "none" }}
+                                >
+                                  {chatEditSaving ? "Saving..." : "Save"}
+                                </Button>
+                              </Stack>
+                            </Box>
+                          ) : (
+                            <Typography sx={{ mt: 0.5, fontSize: 13, opacity: 0.9 }}>{m.body}</Typography>
+                          )}
                         </Paper>
                       ))}
                     </Stack>
@@ -3801,8 +3982,56 @@ export default function NewLiveMeeting() {
                     }}
                   />
                 </Box>
-              </TabPanel>
-            )}
+        </TabPanel>
+      )}
+
+      <Dialog
+        open={chatDeleteOpen}
+        onClose={() => {
+          setChatDeleteOpen(false);
+          setChatDeleteTarget(null);
+        }}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: "#0b101a",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 3,
+            color: "#fff",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete message?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => {
+              setChatDeleteOpen(false);
+              setChatDeleteTarget(null);
+            }}
+            sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => {
+              if (chatDeleteTarget) deleteChatMessage(chatDeleteTarget);
+              setChatDeleteOpen(false);
+              setChatDeleteTarget(null);
+            }}
+            sx={{ textTransform: "none" }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
