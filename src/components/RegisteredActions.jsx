@@ -85,7 +85,7 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
                         disabled={loading}
                         className="normal-case rounded-full px-4 hover:bg-red-50"
                     >
-                        Leave
+                        Cancel Registration
                     </Button>
                 </div>
             ) : (
