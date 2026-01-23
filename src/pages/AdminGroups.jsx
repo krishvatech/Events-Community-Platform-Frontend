@@ -714,18 +714,42 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
         )}
 
         <Box className="mt-auto flex items-center gap-1.5 pt-1">
-          <Button
-            onClick={() => onOpen?.(g)}
-            variant="contained"
-            className="rounded-xl"
-            sx={{
-              textTransform: "none",
-              backgroundColor: "#10b8a6",
-              "&:hover": { backgroundColor: "#0ea5a4" },
-            }}
-          >
-            Open
-          </Button>
+          {g.membership_status === "active" || g._am_member || g._joined ? (
+            <Button
+              onClick={() => onOpen?.(g)}
+              variant="contained"
+              className="rounded-xl"
+              sx={{
+                textTransform: "none",
+                backgroundColor: "#10b8a6",
+                "&:hover": { backgroundColor: "#0ea5a4" },
+              }}
+            >
+              Open
+            </Button>
+          ) : g.membership_status === "pending" ? (
+            <Button
+              disabled
+              variant="outlined"
+              className="rounded-xl"
+              sx={{ textTransform: "none" }}
+            >
+              Pending
+            </Button>
+          ) : (
+            <Button
+              onClick={() => onOpen?.(g)}
+              variant="contained"
+              className="rounded-xl"
+              sx={{
+                textTransform: "none",
+                backgroundColor: "#0ea5a4",
+                "&:hover": { backgroundColor: "#0d9488" }
+              }}
+            >
+              Join
+            </Button>
+          )}
 
           {/* Only show Edit for owner/admin, not staff */}
           {canEdit && (
@@ -787,9 +811,10 @@ export default function AdminGroups() {
         const owner = isOwnerUser();
         const staff = isStaffUser();
 
-        const url = owner
-          ? `${API_ROOT}/groups/?created_by=me`
-          : `${API_ROOT}/groups/?page_size=200`;
+        // FIX: User wants to see ONLY groups they are a member of, 
+        // even if they are platform_admin.
+        // So we use /groups/joined-groups/ which returns Active + Pending memberships.
+        const url = `${API_ROOT}/groups/joined-groups/?page_size=200`;
 
         const res = await fetch(url, {
           headers: {

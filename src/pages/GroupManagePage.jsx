@@ -5,7 +5,7 @@ import {
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
     TextField, Typography, Switch, FormControlLabel, CircularProgress,
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup, Badge,
-    IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip
+    IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
@@ -28,6 +28,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 
 
 // ---- API helpers (reuse same pattern as AdminGroups.jsx) ----
@@ -3204,6 +3205,20 @@ export default function GroupManagePage() {
     const [removeMemberOpen, setRemoveMemberOpen] = React.useState(false);
     const [removeMemberTarget, setRemoveMemberTarget] = React.useState(null);
 
+    // Group Actions Menu
+    const [groupMenuAnchor, setGroupMenuAnchor] = React.useState(null);
+    const [leaveGroupOpen, setLeaveGroupOpen] = React.useState(false);
+
+    // Snackbar state for modern messages
+    const [snack, setSnack] = React.useState({ open: false, message: "", severity: "info" });
+    const showMessage = (message, severity = "success") => {
+        setSnack({ open: true, message, severity });
+    };
+    const handleSnackClose = (event, reason) => {
+        if (reason === 'clickaway') return;
+        setSnack((prev) => ({ ...prev, open: false }));
+    };
+
     // Who am I? (prefer backend, fallback to localStorage user)
     const currentUserId = React.useMemo(() => {
         const fromPayload = group?.current_user?.id ?? group?.current_user_id ?? null;
@@ -3567,10 +3582,10 @@ export default function GroupManagePage() {
 
 
     // Owner id (used to lock Owner row)
-    const ownerId = group?.created_by?.id ?? null;
+    const ownerId = group?.owner?.id ?? null;
 
     // Owner user (from the group payload)
-    const ownerUser = group?.created_by || null;
+    const ownerUser = group?.owner || null;
 
     // Members + an "owner" row (if the owner isn't already in /members/)
     const membersWithOwner = React.useMemo(() => {
@@ -3664,6 +3679,34 @@ export default function GroupManagePage() {
         } finally {
             setBusyUserId(null);
             closeMemberMenu();
+        }
+    };
+
+    // Leave Group
+    const handleLeaveGroup = async () => {
+        if (!group?.id) return;
+        try {
+            const res = await fetch(`${API_ROOT}/groups/${group.id}/leave/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: "{}"
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                // Modern error message
+                showMessage(data?.detail || "Failed to leave group.", "error");
+                setLeaveGroupOpen(false); // Close dialog so they can see the error
+                return;
+            }
+
+            // Success
+            navigate("/admin/groups");
+        } catch (e) {
+            showMessage(e?.message || "Failed to leave group.", "error");
+            setLeaveGroupOpen(false);
+        } finally {
+            setGroupMenuAnchor(null);
         }
     };
 
@@ -3823,6 +3866,15 @@ export default function GroupManagePage() {
                                         justifyContent: { xs: "flex-start", sm: "flex-end" },
                                     }}
                                 >
+                                    <Button
+                                        onClick={() => navigate(-1)}
+                                        variant="outlined"
+                                        className="rounded-xl"
+                                        sx={{ textTransform: "none", color: "#0ea5a4", borderColor: "#0ea5a4" }}
+                                    >
+                                        Back
+                                    </Button>
+
                                     {canEditGroup && (
                                         <Button
                                             startIcon={<EditNoteRoundedIcon />}
@@ -3835,13 +3887,16 @@ export default function GroupManagePage() {
                                         </Button>
                                     )}
 
+                                    {/* Leave Group Button */}
                                     <Button
-                                        onClick={() => navigate(-1)}
+                                        startIcon={<LogoutRoundedIcon />}
+                                        onClick={() => setLeaveGroupOpen(true)}
                                         variant="outlined"
+                                        color="error"
                                         className="rounded-xl"
-                                        sx={{ textTransform: "none", color: "#0ea5a4", borderColor: "#0ea5a4" }}
+                                        sx={{ textTransform: "none" }}
                                     >
-                                        Back
+                                        Leave
                                     </Button>
                                 </Stack>
                             </Stack>
@@ -5348,6 +5403,41 @@ export default function GroupManagePage() {
                     onClose={() => setEditOpen(false)}
                     onUpdated={onUpdated}
                 />
+
+                <Dialog open={leaveGroupOpen} onClose={() => setLeaveGroupOpen(false)}>
+                    <DialogTitle>Leave Group?</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            Are you sure you want to leave <b>{group?.name}</b>?<br /><br />
+                            {myRole === "owner" && "Ownership will be transferred to the longest-serving Admin. If no other Admins exist, you cannot leave until you promote someone."}
+                            {myRole === "admin" && "If you are the last Admin, you must promote another member before leaving."}
+                            {myRole !== "owner" && myRole !== "admin" && "You can rejoin later if the group is public or by request."}
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setLeaveGroupOpen(false)}>Cancel</Button>
+                        <Button onClick={handleLeaveGroup} color="error" variant="contained">
+                            Confirm Leave
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Modern Snackbar for messages */}
+                <Snackbar
+                    open={snack.open}
+                    autoHideDuration={6000}
+                    onClose={handleSnackClose}
+                    anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+                >
+                    <Alert
+                        onClose={handleSnackClose}
+                        severity={snack.severity}
+                        sx={{ width: "100%", borderRadius: 2 }}
+                        variant="filled"
+                    >
+                        {snack.message}
+                    </Alert>
+                </Snackbar>
             </div>
         </div>
     );
