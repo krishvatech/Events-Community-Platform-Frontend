@@ -3989,9 +3989,43 @@ export default function NewLiveMeeting() {
                             disablePadding
                             secondaryAction={
                               <Stack direction="row" spacing={0.75} alignItems="center">
+                                {/* MIC ICON - GREEN when ON, RED when OFF - Read Only */}
                                 <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
-                                  <IconButton size="small" sx={{ color: m.mic ? "#fff" : "rgba(255,255,255,0.5)" }}>
+                                  <IconButton 
+                                    size="small" 
+                                    disabled
+                                    sx={{ 
+                                      bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                      border: "1px solid",
+                                      borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                      color: m.mic ? "#22c55e" : "#ef4444",
+                                      padding: "6px",
+                                      "&:hover": { 
+                                        bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                      }
+                                    }}
+                                  >
                                     {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                                  </IconButton>
+                                </Tooltip>
+
+                                {/* CAMERA ICON - GREEN when ON, RED when OFF - Read Only */}
+                                <Tooltip title={m.cam ? "Camera on" : "Camera off"}>
+                                  <IconButton 
+                                    size="small" 
+                                    disabled
+                                    sx={{ 
+                                      bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                      border: "1px solid",
+                                      borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                      color: m.cam ? "#22c55e" : "#ef4444",
+                                      padding: "6px",
+                                      "&:hover": { 
+                                        bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                      }
+                                    }}
+                                  >
+                                    {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
                                   </IconButton>
                                 </Tooltip>
 
@@ -4069,32 +4103,48 @@ export default function NewLiveMeeting() {
                             disablePadding
                             secondaryAction={
                               <Stack direction="row" spacing={0.75} alignItems="center">
-                                {isHost && !isSelfMember(m) && (
-                                  <>
-                                    <Tooltip title="Force mute">
-                                      <IconButton
-                                        size="small"
-                                        sx={{ color: "rgba(255,255,255,0.9)" }}
-                                        onClick={() => forceMuteParticipant(m)}
-                                      >
-                                        <MicOffIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Turn camera off">
-                                      <IconButton
-                                        size="small"
-                                        sx={{ color: "rgba(255,255,255,0.9)" }}
-                                        onClick={() => forceCameraOffParticipant(m)}
-                                      >
-                                        <VideocamOffIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </>
-                                )}
-                                <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
-                                  <Box sx={{ opacity: 0.9 }}>
+                                {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
+                                <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
+                                  <IconButton 
+                                    size="small" 
+                                    onClick={isHost && !isSelfMember(m) ? () => forceMuteParticipant(m) : undefined}
+                                    disabled={!isHost || isSelfMember(m)}
+                                    sx={{ 
+                                      bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                      border: "1px solid",
+                                      borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                      color: m.mic ? "#22c55e" : "#ef4444",
+                                      padding: "6px",
+                                      cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                      "&:hover": { 
+                                        bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                      }
+                                    }}
+                                  >
                                     {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
-                                  </Box>
+                                  </IconButton>
+                                </Tooltip>
+
+                                {/* CAMERA ICON - GREEN when ON, RED when OFF - Clickable for Host */}
+                                <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
+                                  <IconButton 
+                                    size="small" 
+                                    onClick={isHost && !isSelfMember(m) ? () => forceCameraOffParticipant(m) : undefined}
+                                    disabled={!isHost || isSelfMember(m)}
+                                    sx={{ 
+                                      bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                      border: "1px solid",
+                                      borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                      color: m.cam ? "#22c55e" : "#ef4444",
+                                      padding: "6px",
+                                      cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                      "&:hover": { 
+                                        bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                      }
+                                    }}
+                                  >
+                                    {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
+                                  </IconButton>
                                 </Tooltip>
 
                               </Stack>
@@ -4145,35 +4195,52 @@ export default function NewLiveMeeting() {
                             disablePadding
                             secondaryAction={
                               <Stack direction="row" spacing={0.75} alignItems="center">
-                                {isHost && !isSelfMember(m) && (
-                                  <>
-                                    <Tooltip title="Force mute">
-                                      <IconButton
-                                        size="small"
-                                        sx={{ color: "rgba(255,255,255,0.9)" }}
-                                        onClick={() => forceMuteParticipant(m)}
-                                      >
-                                        <MicOffIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Turn camera off">
-                                      <IconButton
-                                        size="small"
-                                        sx={{ color: "rgba(255,255,255,0.9)" }}
-                                        onClick={() => forceCameraOffParticipant(m)}
-                                      >
-                                        <VideocamOffIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </>
-                                )}
-                                <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
-                                  <Box sx={{ opacity: 0.9 }}>
+                                {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
+                                <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
+                                  <IconButton 
+                                    size="small" 
+                                    onClick={isHost && !isSelfMember(m) ? () => forceMuteParticipant(m) : undefined}
+                                    disabled={!isHost || isSelfMember(m)}
+                                    sx={{ 
+                                      bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                      border: "1px solid",
+                                      borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                      color: m.mic ? "#22c55e" : "#ef4444",
+                                      padding: "6px",
+                                      cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                      "&:hover": { 
+                                        bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                      }
+                                    }}
+                                  >
                                     {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
-                                  </Box>
+                                  </IconButton>
                                 </Tooltip>
 
-                                {/* --- NEW MESSAGE ICON --- */}
+                                {/* CAMERA ICON - GREEN when ON, RED when OFF - Read-only for self, Clickable for Host on others */}
+                                <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
+                                  <IconButton 
+                                    size="small" 
+                                    onClick={(isHost && !isSelfMember(m)) ? () => forceCameraOffParticipant(m) : undefined}
+                                    disabled={!isHost || isSelfMember(m)}
+                                    sx={{ 
+                                      bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                      border: "1px solid",
+                                      borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                      color: m.cam ? "#22c55e" : "#ef4444",
+                                      padding: "6px",
+                                      cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                      opacity: isSelfMember(m) ? 0.6 : 1,
+                                      "&:hover": { 
+                                        bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                      }
+                                    }}
+                                  >
+                                    {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
+                                  </IconButton>
+                                </Tooltip>
+
+                                {/* MESSAGE ICON */}
                                 {!isSelfMember(m) && (
                                   <Tooltip title="Send Message">
                                     <IconButton size="small" sx={{ color: "#fff" }} onClick={() => handleOpenPrivateChat(m)}>
@@ -4198,7 +4265,6 @@ export default function NewLiveMeeting() {
                                     </IconButton>
                                   </Tooltip>
                                 )}
-                                {/* ------------------------ */}
 
                               </Stack>
                             }
