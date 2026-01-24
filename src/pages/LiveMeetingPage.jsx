@@ -1114,26 +1114,31 @@ export default function NewLiveMeeting() {
     (isHost ? !hostPerms.screenShare : true);
 
   // ============ DEVICE ENUMERATION & SWITCHING ============
-  
+
   /**
    * Enumerate all available audio and video devices
    */
   const enumerateDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      
+
       const audio = devices.filter((d) => d.kind === "audioinput" && d.deviceId);
       const video = devices.filter((d) => d.kind === "videoinput" && d.deviceId);
-      
+      const speakers = devices.filter((d) => d.kind === "audiooutput" && d.deviceId);
+
       setAudioDevices(audio);
       setVideoDevices(video);
-      
+      setAudioOutputDevices(speakers);
+
       // Set default devices if not already selected
       if (audio.length > 0 && !selectedAudioDeviceId) {
         setSelectedAudioDeviceId(audio[0].deviceId);
       }
       if (video.length > 0 && !selectedVideoDeviceId) {
         setSelectedVideoDeviceId(video[0].deviceId);
+      }
+      if (speakers.length > 0 && !selectedAudioOutputDeviceId) {
+        setSelectedAudioOutputDeviceId(speakers[0].deviceId);
       }
     } catch (err) {
       console.warn("[LiveMeeting] Failed to enumerate devices:", err);
@@ -1143,14 +1148,14 @@ export default function NewLiveMeeting() {
   // Enumerate devices on mount and when permissions change
   useEffect(() => {
     enumerateDevices();
-    
+
     // Listen for device changes (new device plugged in, etc.)
     const handleDeviceChange = () => {
       enumerateDevices();
     };
-    
+
     navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
-    
+
     return () => {
       navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange);
     };
@@ -1260,23 +1265,39 @@ export default function NewLiveMeeting() {
     try {
       setDeviceSwitchError("");
 
-      // Try to set sink ID on remote audio element
-      if (remoteAudioRef.current && typeof remoteAudioRef.current.setSinkId === "function") {
-        await remoteAudioRef.current.setSinkId(deviceId);
-        setSelectedAudioOutputDeviceId(deviceId);
-        console.log("[LiveMeeting] Audio output device switched to:", deviceId);
-      } else {
-        // Fallback: setSinkId not supported or not available yet
+      // 1. Check if browser supports setSinkId
+      if (typeof HTMLMediaElement.prototype.setSinkId !== "function") {
         console.warn("[LiveMeeting] Audio output device selection not supported in this browser");
         setDeviceSwitchError(
-          "Audio output device selection is limited in your browser. Some devices may not support this feature."
+          "Audio output device selection is limited in your browser. Please change your system default output."
         );
-        setSelectedAudioOutputDeviceId(deviceId);
+        setSelectedAudioOutputDeviceId(deviceId); // Optimistically update UI
+        return;
       }
+
+      // 2. Find all audio elements (Dyte renders multiple audio tags)
+      const container = remoteAudioRef.current;
+      if (!container) return;
+
+      const audioElements = container.querySelectorAll("audio");
+      const promises = [];
+
+      for (const el of audioElements) {
+        promises.push(el.setSinkId(deviceId));
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+        console.log(`[LiveMeeting] Switched output to ${deviceId} for ${promises.length} audio/video elements`);
+      } else {
+        console.log("[LiveMeeting] No audio elements found to switch yet (will apply to future participants automatically if Dyte supports it, otherwise reload needed)");
+      }
+
+      setSelectedAudioOutputDeviceId(deviceId);
     } catch (err) {
       const errMsg = `Failed to switch audio output device: ${err.message}`;
       console.error("[LiveMeeting]", errMsg);
-      setDeviceSwitchError(errMsg);
+      setDeviceSwitchError("Unable to switch output device. Please check your browser permissions.");
     }
   }, []);
 
@@ -3760,8 +3781,8 @@ export default function NewLiveMeeting() {
           {/* Body */}
           <Box sx={{ flex: 1, minHeight: 0 }}>
             {/* CHAT */}
-      {hostPerms.chat && (
-        <TabPanel value={tab} index={0}>
+            {hostPerms.chat && (
+              <TabPanel value={tab} index={0}>
                 <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
                   {isRoomChatActive && (
                     <Typography sx={{ fontSize: 12, opacity: 0.7, mb: 1 }}>
@@ -3982,56 +4003,56 @@ export default function NewLiveMeeting() {
                     }}
                   />
                 </Box>
-        </TabPanel>
-      )}
+              </TabPanel>
+            )}
 
-      <Dialog
-        open={chatDeleteOpen}
-        onClose={() => {
-          setChatDeleteOpen(false);
-          setChatDeleteTarget(null);
-        }}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: "#0b101a",
-            border: "1px solid rgba(255,255,255,0.12)",
-            borderRadius: 3,
-            color: "#fff",
-          },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete message?</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
-            This action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            onClick={() => {
-              setChatDeleteOpen(false);
-              setChatDeleteTarget(null);
-            }}
-            sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={() => {
-              if (chatDeleteTarget) deleteChatMessage(chatDeleteTarget);
-              setChatDeleteOpen(false);
-              setChatDeleteTarget(null);
-            }}
-            sx={{ textTransform: "none" }}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <Dialog
+              open={chatDeleteOpen}
+              onClose={() => {
+                setChatDeleteOpen(false);
+                setChatDeleteTarget(null);
+              }}
+              maxWidth="xs"
+              fullWidth
+              PaperProps={{
+                sx: {
+                  bgcolor: "#0b101a",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 3,
+                  color: "#fff",
+                },
+              }}
+            >
+              <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete message?</DialogTitle>
+              <DialogContent>
+                <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
+                  This action cannot be undone.
+                </Typography>
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button
+                  onClick={() => {
+                    setChatDeleteOpen(false);
+                    setChatDeleteTarget(null);
+                  }}
+                  sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  color="error"
+                  onClick={() => {
+                    if (chatDeleteTarget) deleteChatMessage(chatDeleteTarget);
+                    setChatDeleteOpen(false);
+                    setChatDeleteTarget(null);
+                  }}
+                  sx={{ textTransform: "none" }}
+                >
+                  Delete
+                </Button>
+              </DialogActions>
+            </Dialog>
 
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
@@ -4234,16 +4255,16 @@ export default function NewLiveMeeting() {
                               <Stack direction="row" spacing={0.75} alignItems="center">
                                 {/* MIC ICON - GREEN when ON, RED when OFF - Read Only */}
                                 <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
-                                  <IconButton 
-                                    size="small" 
+                                  <IconButton
+                                    size="small"
                                     disabled
-                                    sx={{ 
+                                    sx={{
                                       bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                       border: "1px solid",
                                       borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                       color: m.mic ? "#22c55e" : "#ef4444",
                                       padding: "6px",
-                                      "&:hover": { 
+                                      "&:hover": {
                                         bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                       }
                                     }}
@@ -4254,16 +4275,16 @@ export default function NewLiveMeeting() {
 
                                 {/* CAMERA ICON - GREEN when ON, RED when OFF - Read Only */}
                                 <Tooltip title={m.cam ? "Camera on" : "Camera off"}>
-                                  <IconButton 
-                                    size="small" 
+                                  <IconButton
+                                    size="small"
                                     disabled
-                                    sx={{ 
+                                    sx={{
                                       bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                       border: "1px solid",
                                       borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                       color: m.cam ? "#22c55e" : "#ef4444",
                                       padding: "6px",
-                                      "&:hover": { 
+                                      "&:hover": {
                                         bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                       }
                                     }}
@@ -4348,18 +4369,18 @@ export default function NewLiveMeeting() {
                               <Stack direction="row" spacing={0.75} alignItems="center">
                                 {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
                                 <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
-                                  <IconButton 
-                                    size="small" 
+                                  <IconButton
+                                    size="small"
                                     onClick={isHost && !isSelfMember(m) ? () => forceMuteParticipant(m) : undefined}
                                     disabled={!isHost || isSelfMember(m)}
-                                    sx={{ 
+                                    sx={{
                                       bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                       border: "1px solid",
                                       borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                       color: m.mic ? "#22c55e" : "#ef4444",
                                       padding: "6px",
                                       cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                      "&:hover": { 
+                                      "&:hover": {
                                         bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                       }
                                     }}
@@ -4370,18 +4391,18 @@ export default function NewLiveMeeting() {
 
                                 {/* CAMERA ICON - GREEN when ON, RED when OFF - Clickable for Host */}
                                 <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
-                                  <IconButton 
-                                    size="small" 
+                                  <IconButton
+                                    size="small"
                                     onClick={isHost && !isSelfMember(m) ? () => forceCameraOffParticipant(m) : undefined}
                                     disabled={!isHost || isSelfMember(m)}
-                                    sx={{ 
+                                    sx={{
                                       bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                       border: "1px solid",
                                       borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                       color: m.cam ? "#22c55e" : "#ef4444",
                                       padding: "6px",
                                       cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                      "&:hover": { 
+                                      "&:hover": {
                                         bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                       }
                                     }}
@@ -4440,18 +4461,18 @@ export default function NewLiveMeeting() {
                               <Stack direction="row" spacing={0.75} alignItems="center">
                                 {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
                                 <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
-                                  <IconButton 
-                                    size="small" 
+                                  <IconButton
+                                    size="small"
                                     onClick={isHost && !isSelfMember(m) ? () => forceMuteParticipant(m) : undefined}
                                     disabled={!isHost || isSelfMember(m)}
-                                    sx={{ 
+                                    sx={{
                                       bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                       border: "1px solid",
                                       borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                       color: m.mic ? "#22c55e" : "#ef4444",
                                       padding: "6px",
                                       cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                      "&:hover": { 
+                                      "&:hover": {
                                         bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                       }
                                     }}
@@ -4462,11 +4483,11 @@ export default function NewLiveMeeting() {
 
                                 {/* CAMERA ICON - GREEN when ON, RED when OFF - Read-only for self, Clickable for Host on others */}
                                 <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
-                                  <IconButton 
-                                    size="small" 
+                                  <IconButton
+                                    size="small"
                                     onClick={(isHost && !isSelfMember(m)) ? () => forceCameraOffParticipant(m) : undefined}
                                     disabled={!isHost || isSelfMember(m)}
-                                    sx={{ 
+                                    sx={{
                                       bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                       border: "1px solid",
                                       borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
@@ -4474,7 +4495,7 @@ export default function NewLiveMeeting() {
                                       padding: "6px",
                                       cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
                                       opacity: isSelfMember(m) ? 0.6 : 1,
-                                      "&:hover": { 
+                                      "&:hover": {
                                         bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                       }
                                     }}
@@ -4686,10 +4707,13 @@ export default function NewLiveMeeting() {
 
   return (
     <DyteProvider value={dyteMeeting}>
-      <DyteParticipantsAudio
-        meeting={dyteMeeting}
+      {/* Wrap audio in a ref to capture all participant audio elements */}
+      <div
+        ref={remoteAudioRef}
         style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
-      />
+      >
+        <DyteParticipantsAudio meeting={dyteMeeting} />
+      </div>
       <Box
         ref={rootRef}
         sx={{
@@ -5538,45 +5562,52 @@ export default function NewLiveMeeting() {
               )}
             </Box>
 
-            {/* Speaker/Headphone Selection - Limited Support */}
+            {/* Speaker/Headphone Selection */}
             <Box>
               <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
                 <VolumeUpIcon fontSize="small" />
                 Speaker/Headphone
-                <Chip label="Limited" size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,152,0,0.2)", color: "#ffb74d" }} />
+                {audioOutputDevices.length === 0 && (
+                  <Chip label="Limited" size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,152,0,0.2)", color: "#ffb74d" }} />
+                )}
               </Typography>
               {audioOutputDevices.length === 0 ? (
-                <Typography sx={{ fontSize: 12, opacity: 0.6, fontStyle: "italic" }}>
-                  No audio output devices found or not supported
+                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.4, bgcolor: "rgba(255,152,0,0.1)", p: 1.5, borderRadius: 2, border: "1px solid rgba(255,152,0,0.2)" }}>
+                  Speaker selection is limited in your browser. Please set your headset as system default output and refresh.
                 </Typography>
               ) : (
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  value={selectedAudioOutputDeviceId}
-                  onChange={(e) => switchAudioOutputDevice(e.target.value)}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      bgcolor: "rgba(255,255,255,0.05)",
-                      borderColor: "rgba(255,255,255,0.15)",
-                      color: "#fff",
-                      "& fieldset": { borderColor: "rgba(255,255,255,0.15)" },
-                      "&:hover fieldset": { borderColor: "rgba(255,255,255,0.25)" },
-                      "&.Mui-focused fieldset": { borderColor: "rgba(20,184,177,0.4)" },
-                    },
-                    "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: "rgba(255,255,255,0.15)",
-                    },
-                  }}
-                >
-                  {audioOutputDevices.map((device) => (
-                    <MenuItem key={device.deviceId} value={device.deviceId} sx={{ color: "#000" }}>
-                      <VolumeUpIcon sx={{ mr: 1.5, fontSize: 16, opacity: 0.7 }} />
-                      {device.label || `Speaker ${audioOutputDevices.indexOf(device) + 1}`}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                <>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    value={selectedAudioOutputDeviceId}
+                    onChange={(e) => switchAudioOutputDevice(e.target.value)}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        bgcolor: "rgba(255,255,255,0.05)",
+                        borderColor: "rgba(255,255,255,0.15)",
+                        color: "#fff",
+                        "& fieldset": { borderColor: "rgba(255,255,255,0.15)" },
+                        "&:hover fieldset": { borderColor: "rgba(255,255,255,0.25)" },
+                        "&.Mui-focused fieldset": { borderColor: "rgba(20,184,177,0.4)" },
+                      },
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "rgba(255,255,255,0.15)",
+                      },
+                    }}
+                  >
+                    {audioOutputDevices.map((device) => (
+                      <MenuItem key={device.deviceId} value={device.deviceId} sx={{ color: "#000" }}>
+                        <VolumeUpIcon sx={{ mr: 1.5, fontSize: 16, opacity: 0.7 }} />
+                        {device.label || `Speaker ${audioOutputDevices.indexOf(device) + 1}`}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <Typography sx={{ mt: 1, fontSize: 11, color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>
+                    Output will switch when audio starts playing.
+                  </Typography>
+                </>
               )}
             </Box>
 
