@@ -142,6 +142,11 @@ function GroupGridCard({ g, onJoin, onOpen, hideJoin }) {
         <Typography variant="body2" color="text.secondary" noWrap>
           {g.category || g.topic || g.description || g.name}
         </Typography>
+        {g.parent_group && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+            Subgroup of <b>{g.parent_group.name}</b>
+          </Typography>
+        )}
       </CardContent>
 
       <CardActions sx={{ pt: 0, pb: 1, px: 1 }}>
@@ -690,7 +695,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
               </Typography>
             </Paper>
           )}
-          
+
           {/* Pagination */}
           {!loading && totalPages > 1 && (
             <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>

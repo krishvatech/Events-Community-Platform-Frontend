@@ -1455,6 +1455,11 @@ function OverviewTab({ group }) {
       <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 2 }}>
         <Typography variant="h6" gutterBottom>Details</Typography>
         <Typography variant="body2">Visibility: {group.visibility}</Typography>
+        {group.parent_group && (
+          <Typography variant="body2">
+            Parent Group: <b>{group.parent_group.name}</b>
+          </Typography>
+        )}
         <Typography variant="body2">Created: {new Date(group.created_at).toLocaleDateString()}</Typography>
       </Card>
     </Stack>
@@ -1814,6 +1819,18 @@ export default function GroupDetailsPage() {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {group?.member_count || 0} Members
+                    {group?.parent_group && (
+                      <>
+                        {" • Subgroup of "}
+                        <Link
+                          component={RouterLink}
+                          to={`/community/groups/${group.parent_group.id}`}
+                          sx={{ fontWeight: 600, color: "inherit", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                        >
+                          {group.parent_group.name}
+                        </Link>
+                      </>
+                    )}
                   </Typography>
                 </Box>
               </Stack>

@@ -3807,7 +3807,7 @@ export default function GroupManagePage() {
                 headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            
+
             // Get the filename from the response header
             const contentDisposition = res.headers.get("content-disposition");
             let filename = `group_members.csv`;
@@ -3815,7 +3815,7 @@ export default function GroupManagePage() {
                 const match = contentDisposition.match(/filename="?([^"]+)"?/);
                 if (match) filename = match[1];
             }
-            
+
             // Create blob and download
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
@@ -4042,6 +4042,12 @@ export default function GroupManagePage() {
                                                 <Typography variant="h6" className="font-semibold mb-2">Details</Typography>
                                                 <Stack spacing={1} className="text-slate-600">
                                                     <div><b>Visibility:</b> {group.visibility}</div>
+                                                    {group.parent_group && (
+                                                        <div>
+                                                            <b>Parent Group: </b>
+                                                            {group.parent_group.name}
+                                                        </div>
+                                                    )}
                                                     {group.created_by?.name && <div><b>Owner:</b> {group.created_by.name}</div>}
                                                     {group.created_at && <div><b>Created:</b> {new Date(group.created_at).toLocaleString()}</div>}
                                                     {group.updated_at && <div><b>Updated:</b> {new Date(group.updated_at).toLocaleString()}</div>}
