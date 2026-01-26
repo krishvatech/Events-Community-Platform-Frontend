@@ -3299,6 +3299,13 @@ export default function GroupManagePage() {
     const [removeMemberOpen, setRemoveMemberOpen] = React.useState(false);
     const [removeMemberTarget, setRemoveMemberTarget] = React.useState(null);
 
+    // Settings Tab State
+    const [visibilitySetting, setVisibilitySetting] = React.useState("public");
+    const [joinPolicySetting, setJoinPolicySetting] = React.useState("open");
+    const [saveSettingsLoading, setSaveSettingsLoading] = React.useState(false);
+    const [parentVis, setParentVis] = React.useState(""); // robust parent visibility
+    const isSubgroup = !!(group?.parent_id || group?.parent?.id || group?.parent);
+
     // Group Actions Menu
     const [groupMenuAnchor, setGroupMenuAnchor] = React.useState(null);
     const [leaveGroupOpen, setLeaveGroupOpen] = React.useState(false);
@@ -3804,6 +3811,38 @@ export default function GroupManagePage() {
         }
     };
 
+    const saveGroupSettings = async () => {
+        if (!group) return;
+        setSaveSettingsLoading(true);
+        try {
+            const fd = new FormData();
+            // Allow "public" or "private"
+            fd.append("visibility", visibilitySetting);
+            // Enforce policy rules
+            let validPolicy = joinPolicySetting;
+            if (visibilitySetting === "private") validPolicy = "invite";
+            else if (visibilitySetting === "public" && parentVis === "private") validPolicy = "approval";
+
+            fd.append("join_policy", validPolicy);
+
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
+                method: "PATCH",
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: fd,
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+
+            setGroup(json); // Update local state
+            setJoinPolicySetting(validPolicy); // Ensure local state matches forced rules
+            showMessage("Group settings updated successfully.", "success");
+        } catch (e) {
+            showMessage(`Failed to update settings: ${e.message}`, "error");
+        } finally {
+            setSaveSettingsLoading(false);
+        }
+    };
+
     // For moderators: only send "requests" (now wired to promotion endpoints)
     const requestMemberChange = async (action, member) => {
         const label = member?.user?.name || member?.user?.email || "this member";
@@ -3870,6 +3909,42 @@ export default function GroupManagePage() {
     }, [idOrSlug, token]);
 
     React.useEffect(() => { fetchGroup(); }, [fetchGroup]);
+
+    // Sync settings state when group loads
+    React.useEffect(() => {
+        if (group) {
+            setVisibilitySetting(group.visibility || "public");
+            setJoinPolicySetting(group.join_policy || "open");
+        }
+    }, [group]);
+
+    // Robustly determine parent visibility (for settings validation)
+    React.useEffect(() => {
+        if (!group || !isSubgroup) {
+            setParentVis("");
+            return;
+        }
+        // 1. If parent object is fully loaded
+        const pv = group.parent?.visibility;
+        if (pv) {
+            setParentVis(pv.toLowerCase());
+            return;
+        }
+        // 2. Fetch if missing
+        const pid = group.parent_id || group.parent?.id || (typeof group.parent === "object" ? null : group.parent);
+        if (!pid) return;
+
+        let active = true;
+        fetch(`${API_ROOT}/groups/${pid}/`, {
+            headers: { Authorization: token ? `Bearer ${token}` : undefined }
+        })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                if (active && d?.visibility) setParentVis(d.visibility.toLowerCase());
+            })
+            .catch(() => { });
+        return () => { active = false; };
+    }, [group, isSubgroup, token]);
 
 
     const fetchMembers = React.useCallback(async () => {
@@ -4428,9 +4503,73 @@ export default function GroupManagePage() {
                                 {tab === 3 && (
                                     <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                         <Typography variant="h6" className="font-semibold mb-1">Settings</Typography>
-                                        <Typography className="text-slate-500 mb-3">
-                                            Update visibility, manage tags/subgroups, or delete the group (wire endpoints as needed).
+                                        <Typography className="text-slate-500 mb-4">
+                                            Manage group visibility and permissions.
                                         </Typography>
+
+                                        {/* Visibility & Join Policy Controls */}
+                                        <Grid container spacing={3} className="mb-6">
+                                            <Grid item xs={12} md={6}>
+                                                <CustomSelect
+                                                    label="Visibility"
+                                                    value={visibilitySetting}
+                                                    onChange={(val) => {
+                                                        setVisibilitySetting(val);
+                                                        // Auto-adjust join policy based on rules
+                                                        if (val === "private") {
+                                                            setJoinPolicySetting("invite");
+                                                        }
+                                                        if (val === "public" && parentVis === "private") {
+                                                            setJoinPolicySetting("approval");
+                                                        }
+                                                    }}
+                                                    options={[
+                                                        { label: "Public (anyone can find & request to join)", value: "public" },
+                                                        { label: "Private (invite-only)", value: "private" }
+                                                    ]}
+                                                    helperText={
+                                                        (parentVis === "private" && visibilitySetting === "public")
+                                                            ? "Public subgroups of private groups will require approval to join."
+                                                            : (visibilitySetting === "private" ? "Private groups are always invite-only." : "")
+                                                    }
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <CustomSelect
+                                                    label="Join Policy"
+                                                    value={joinPolicySetting}
+                                                    onChange={(val) => setJoinPolicySetting(val)}
+                                                    disabled={visibilitySetting === "private"} // Private is always invite-only
+                                                    options={
+                                                        visibilitySetting === "public"
+                                                            ? (
+                                                                (parentVis === "private")
+                                                                    ? [{ label: "Approval required", value: "approval" }]
+                                                                    : [
+                                                                        { label: "Open (join instantly)", value: "open" },
+                                                                        { label: "Approval required", value: "approval" }
+                                                                    ]
+                                                            )
+                                                            : [
+                                                                { label: "Invite only", value: "invite" }
+                                                            ]
+                                                    }
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12}>
+                                                <Button
+                                                    variant="contained"
+                                                    disabled={saveSettingsLoading}
+                                                    onClick={saveGroupSettings}
+                                                    className="rounded-xl"
+                                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                >
+                                                    {saveSettingsLoading ? "Saving..." : "Save Changes"}
+                                                </Button>
+                                            </Grid>
+                                        </Grid>
+
+                                        <Divider className="mb-4" />
                                         {/* Chat toggle */}
                                         <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                             <div>
