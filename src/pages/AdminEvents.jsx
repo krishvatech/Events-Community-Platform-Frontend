@@ -51,6 +51,7 @@ import MyRecordingsPage from "./MyRecordingsPage.jsx"
 import AdminNotificationsPage from "./AdminNotificationsPage.jsx";
 import AdminSettings from "./AdminSettings.jsx"
 import AdminSidebar from "../components/AdminSidebar.jsx";
+import RegisteredActions from "../components/RegisteredActions.jsx";
 import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -1498,6 +1499,9 @@ function AdminEventCard({
   isJoining,
   isOwner,
   onEdit,
+  reg,
+  onUnregistered,
+  onCancelRequested,
 }) {
   const navigate = useNavigate();
 
@@ -1853,6 +1857,19 @@ function AdminEventCard({
               )}
             </>
           )}
+
+
+          {/* Cancellation / Unregistration Actions (for Staff side) */}
+          {!isOwner && !isPast && reg && (
+            <RegisteredActions
+              ev={ev}
+              reg={reg}
+              onUnregistered={onUnregistered}
+              onCancelRequested={onCancelRequested}
+              hideChip={true}
+            />
+          )}
+
         </Box >
       </Box >
     </Paper >
@@ -1875,6 +1892,7 @@ function EventsPage() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [myRegistrations, setMyRegistrations] = useState({}); // ✅ Stores user's registration per event
 
   // Pagination & Filtering
   const PAGE_SIZE = 6;
@@ -1953,6 +1971,38 @@ function EventsPage() {
           const count = typeof data?.count === "number" ? data.count : 0;
           setEvents(results);
           setTotalCount(count);
+
+          // 🔹 NEW: Fetch registrations for these events if not owner
+          // (Owners don't register for their own events usually, but staff do)
+          if (!isOwner && results.length > 0) {
+            const newRegs = {};
+            await Promise.all(results.map(async (ev) => {
+              try {
+                const regUrl = new URL(urlJoin(API_BASE, "/event-registrations/"));
+                regUrl.searchParams.set("event", String(ev.id));
+                const rRes = await fetch(regUrl.toString(), {
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                  },
+                });
+                if (rRes.ok) {
+                  const rData = await rRes.json();
+                  const rList = asList(rData);
+                  // user sees their own registration
+                  if (rList.length > 0) {
+                    newRegs[ev.id] = rList[0];
+                  }
+                }
+              } catch (e) {
+                // ignore
+              }
+            }));
+            if (!cancelled) {
+              setMyRegistrations(newRegs);
+            }
+          }
+
           setLoading(false);
         }
       } catch (e) {
@@ -2134,6 +2184,28 @@ function EventsPage() {
                     isJoining={joiningId === (ev.id ?? null)}
                     isOwner={isOwner}
                     onEdit={handleEditEvent}
+                    // ✅ Pass registration data & handlers
+                    reg={myRegistrations[ev.id]}
+                    onUnregistered={(eventId) => {
+                      // Remove from local registration map
+                      setMyRegistrations(prev => {
+                        const next = { ...prev };
+                        delete next[eventId];
+                        return next;
+                      });
+                      // Remove from events list immediately (since this is "my events" view)
+                      setEvents(prev => prev.filter(e => e.id !== eventId));
+                      setTotalCount(prev => Math.max(0, prev - 1));
+
+                      navigate("/admin/events");
+                    }}
+                    onCancelRequested={(eventId, updatedReg) => {
+                      // Update local registration map
+                      setMyRegistrations(prev => ({
+                        ...prev,
+                        [eventId]: updatedReg
+                      }));
+                    }}
                   />
                 </Grid>
               ))}
