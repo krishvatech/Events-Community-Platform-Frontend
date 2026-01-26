@@ -17,6 +17,8 @@ import {
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import ThumbUpAltIcon from "@mui/icons-material/ThumbUpAlt";
 import CloseIcon from "@mui/icons-material/Close";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 
 // --- same API pattern as other pages ---
 const API_ROOT = (
@@ -56,6 +58,8 @@ export default function LiveQnAPanel({
   meeting,      // kept for future, not used right now
   activeTab,    // ignored, we always show Q&A
   onChangeTab,  // ignored
+  isHost = false, // <--- NEW PROP
+  currentUserId,  // <--- NEW PROP
 }) {
   // --- Q&A state ---
   const [questions, setQuestions] = useState([]);
@@ -63,6 +67,10 @@ export default function LiveQnAPanel({
   const [submitting, setSubmitting] = useState(false);
   const [newQuestion, setNewQuestion] = useState("");
   const [error, setError] = useState("");
+
+  // Editing state
+  const [editingId, setEditingId] = useState(null);
+  const [editContent, setEditContent] = useState("");
 
   const loadQuestions = useCallback(async () => {
     if (!eventId) return;
@@ -87,7 +95,7 @@ export default function LiveQnAPanel({
         try {
           const data = await res.json();
           msg = data.detail || data.error || msg;
-        } catch (_) {}
+        } catch (_) { }
         throw new Error(msg);
       }
 
@@ -136,10 +144,10 @@ export default function LiveQnAPanel({
             prev.map((q) =>
               q.id === msg.question_id
                 ? {
-                    ...q,
-                    upvote_count: msg.upvote_count,
-                    upvoters: msg.upvoters ?? q.upvoters,
-                  }
+                  ...q,
+                  upvote_count: msg.upvote_count,
+                  upvoters: msg.upvoters ?? q.upvoters,
+                }
                 : q
             )
           );
@@ -159,6 +167,20 @@ export default function LiveQnAPanel({
             };
             return [newQ, ...prev];
           });
+        }
+
+        if (msg.type === "qna.update") {
+          setQuestions((prev) =>
+            prev.map((q) =>
+              q.id === msg.question_id
+                ? { ...q, content: msg.content }
+                : q
+            )
+          );
+        }
+
+        if (msg.type === "qna.delete") {
+          setQuestions((prev) => prev.filter((q) => q.id !== msg.question_id));
         }
       } catch (e) {
         console.warn("Failed to parse QnA WS message", e);
@@ -206,7 +228,7 @@ export default function LiveQnAPanel({
         try {
           const data = await res.json();
           msg = data.detail || data.error || msg;
-        } catch (_) {}
+        } catch (_) { }
         throw new Error(msg);
       }
 
@@ -241,7 +263,7 @@ export default function LiveQnAPanel({
         try {
           const data = await res.json();
           msg = data.detail || data.error || msg;
-        } catch (_) {}
+        } catch (_) { }
         throw new Error(msg);
       }
 
@@ -251,16 +273,53 @@ export default function LiveQnAPanel({
         prev.map((q) =>
           q.id === data.question_id
             ? {
-                ...q,
-                upvote_count: data.upvote_count,
-                user_upvoted: data.upvoted,
-              }
+              ...q,
+              upvote_count: data.upvote_count,
+              user_upvoted: data.upvoted,
+            }
             : q
         )
       );
     } catch (e) {
       console.error(e);
       setError(e.message || "Failed to update vote.");
+    }
+  };
+
+  const handleEditSubmit = async (qId) => {
+    if (!editContent.trim()) return;
+
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${qId}/`), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify({ content: editContent.trim() }),
+      });
+
+      if (!res.ok) throw new Error("Failed to edit");
+
+      setEditingId(null);
+      setEditContent("");
+    } catch (e) {
+      console.error(e);
+      setError("Failed to edit question");
+    }
+  };
+
+  const handleDelete = async (qId) => {
+    if (!window.confirm("Delete this question?")) return;
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${qId}/`), {
+        method: "DELETE",
+        headers: { ...authHeader() },
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+    } catch (e) {
+      console.error(e);
+      setError("Failed to delete question");
     }
   };
 
@@ -423,112 +482,181 @@ export default function LiveQnAPanel({
                   },
                 }}
               >
-                {questions.map((q) => (
-                  <ListItem key={q.id} disableGutters sx={{ mb: 0.5 }}>
-                    <Paper
-                      variant="outlined"
-                      sx={{
-                        p: 1,
-                        width: "100%",
-                        borderRadius: 2,
-                        bgcolor: "rgba(255,255,255,0.04)",
-                        borderColor: "rgba(255,255,255,0.12)",
-                      }}
-                    >
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        justifyContent="space-between"
-                        alignItems="flex-start"
+                {questions.map((q) => {
+                  const isEditing = editingId === q.id;
+                  const canManage = isHost || (currentUserId && q.user_id === currentUserId);
+
+                  return (
+                    <ListItem key={q.id} disableGutters sx={{ mb: 0.5 }}>
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 1,
+                          width: "100%",
+                          borderRadius: 2,
+                          bgcolor: "rgba(255,255,255,0.04)",
+                          borderColor: "rgba(255,255,255,0.12)",
+                        }}
                       >
-                        <ListItemText
-                          primary={q.content}
-                          secondary={
-                            q.created_at
-                              ? new Date(q.created_at).toLocaleTimeString()
-                              : null
-                          }
-                          primaryTypographyProps={{
-                            variant: "body2",
-                            sx: { color: "#fff" },
-                          }}
-                          secondaryTypographyProps={{
-                            variant: "caption",
-                            sx: { color: "rgba(255,255,255,0.6)" },
-                          }}
-                        />
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            minWidth: 40,
-                          }}
-                        >
-                          <Tooltip
-                            arrow
-                            placement="left"
-                            title={
-                              q.upvoters && q.upvoters.length > 0 ? (
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                  }}
-                                >
-                                  {q.upvoters.slice(0, 5).map((u) => (
-                                    <Typography
-                                      key={u.id}
-                                      variant="caption"
-                                      sx={{ display: "block" }}
-                                    >
-                                      {u.name ||
-                                        u.username ||
-                                        `User ${u.id}`}
-                                    </Typography>
-                                  ))}
-                                  {q.upvoters.length > 5 && (
-                                    <Typography
-                                      variant="caption"
-                                      sx={{ mt: 0.5 }}
-                                    >
-                                      +{q.upvoters.length - 5} more
-                                    </Typography>
-                                  )}
-                                </Box>
-                              ) : (
-                                "No votes yet"
-                              )
-                            }
-                          >
-                            <IconButton
+                        {isEditing ? (
+                          // --- EDIT MODE ---
+                          <Box component="form" onSubmit={(e) => { e.preventDefault(); handleEditSubmit(q.id); }}>
+                            <TextField
+                              fullWidth
                               size="small"
-                              onClick={() => handleUpvote(q.id)}
+                              autoFocus
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") {
+                                  setEditingId(null);
+                                }
+                              }}
                               sx={{
-                                color: q.user_upvoted
-                                  ? "#4dabf5"
-                                  : "rgba(255,255,255,0.7)",
+                                mb: 1,
+                                "& .MuiOutlinedInput-root": {
+                                  color: "#fff",
+                                  bgcolor: "rgba(255,255,255,0.1)",
+                                  "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                                }
+                              }}
+                            />
+                            <Stack direction="row" spacing={1} justifyContent="flex-end">
+                              <Button
+                                size="small"
+                                onClick={() => setEditingId(null)}
+                                sx={{ color: "rgba(255,255,255,0.7)" }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button type="submit" size="small" variant="contained">
+                                Save
+                              </Button>
+                            </Stack>
+                          </Box>
+                        ) : (
+                          // --- VIEW MODE ---
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            justifyContent="space-between"
+                            alignItems="flex-start"
+                          >
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <ListItemText
+                                primary={q.content}
+                                secondary={
+                                  q.created_at
+                                    ? new Date(q.created_at).toLocaleTimeString()
+                                    : null
+                                }
+                                primaryTypographyProps={{
+                                  variant: "body2",
+                                  sx: { color: "#fff", whiteSpace: "pre-wrap", wordBreak: "break-word" },
+                                }}
+                                secondaryTypographyProps={{
+                                  variant: "caption",
+                                  sx: { color: "rgba(255,255,255,0.6)" },
+                                }}
+                              />
+                              {/* Edit/Delete Actions */}
+                              {canManage && (
+                                <Stack direction="row" spacing={0} sx={{ mt: 0.5 }}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                      setEditingId(q.id);
+                                      setEditContent(q.content);
+                                    }}
+                                    sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                  >
+                                    <EditRoundedIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleDelete(q.id)}
+                                    sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                  >
+                                    <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Stack>
+                              )}
+                            </Box>
+
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                minWidth: 40,
                               }}
                             >
-                              {q.user_upvoted ? (
-                                <ThumbUpAltIcon fontSize="small" />
-                              ) : (
-                                <ThumbUpAltOutlinedIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                          </Tooltip>
+                              <Tooltip
+                                arrow
+                                placement="left"
+                                title={
+                                  q.upvoters && q.upvoters.length > 0 ? (
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                      }}
+                                    >
+                                      {q.upvoters.slice(0, 5).map((u) => (
+                                        <Typography
+                                          key={u.id}
+                                          variant="caption"
+                                          sx={{ display: "block" }}
+                                        >
+                                          {u.name ||
+                                            u.username ||
+                                            `User ${u.id}`}
+                                        </Typography>
+                                      ))}
+                                      {q.upvoters.length > 5 && (
+                                        <Typography
+                                          variant="caption"
+                                          sx={{ mt: 0.5 }}
+                                        >
+                                          +{q.upvoters.length - 5} more
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  ) : (
+                                    "No votes yet"
+                                  )
+                                }
+                              >
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleUpvote(q.id)}
+                                  sx={{
+                                    color: q.user_upvoted
+                                      ? "#4dabf5"
+                                      : "rgba(255,255,255,0.7)",
+                                  }}
+                                >
+                                  {q.user_upvoted ? (
+                                    <ThumbUpAltIcon fontSize="small" />
+                                  ) : (
+                                    <ThumbUpAltOutlinedIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </Tooltip>
 
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "rgba(255,255,255,0.8)" }}
-                          >
-                            {q.upvote_count ?? 0}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </Paper>
-                  </ListItem>
-                ))}
+                              <Typography
+                                variant="caption"
+                                sx={{ color: "rgba(255,255,255,0.8)" }}
+                              >
+                                {q.upvote_count ?? 0}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        )}
+                      </Paper>
+                    </ListItem>
+                  );
+                })}
               </List>
             )}
           </Box>

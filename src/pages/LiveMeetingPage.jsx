@@ -3342,6 +3342,13 @@ export default function NewLiveMeeting() {
   const [newQuestion, setNewQuestion] = useState("");
   const [qnaError, setQnaError] = useState("");
 
+  // Editing state
+  const [qnaEditingId, setQnaEditingId] = useState(null);
+  const [qnaEditContent, setQnaEditContent] = useState("");
+
+  // Delete confirmation
+  const [qnaDeleteId, setQnaDeleteId] = useState(null);
+
   const loadQuestions = useCallback(async (opts = {}) => {
     if (!eventId) return;
     const { silent = false } = opts;
@@ -3421,6 +3428,21 @@ export default function NewLiveMeeting() {
             return [newQ, ...prev];
           });
         }
+
+        if (msg.type === "qna.update") {
+          setQuestions((prev) =>
+            prev.map((q) =>
+              q.id === msg.question_id
+                ? { ...q, content: msg.content }
+                : q
+            )
+          );
+        }
+
+        if (msg.type === "qna.delete") {
+          setQuestions((prev) => prev.filter((q) => q.id !== msg.question_id));
+        }
+
       } catch { }
     };
 
@@ -3447,6 +3469,43 @@ export default function NewLiveMeeting() {
       setQnaError(e.message || "Failed to create question.");
     } finally {
       setQnaSubmitting(false);
+    }
+  };
+
+  const handleQnaEditSubmit = async (qId) => {
+    if (!qnaEditContent.trim()) return;
+
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${qId}/`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ content: qnaEditContent.trim() }),
+      });
+
+      if (!res.ok) throw new Error("Failed to edit");
+
+      setQnaEditingId(null);
+      setQnaEditContent("");
+    } catch (e) {
+      setQnaError("Failed to edit question");
+    }
+  };
+
+  const handleQnaDelete = (qId) => {
+    setQnaDeleteId(qId);
+  };
+
+  const confirmQnaDelete = async () => {
+    if (!qnaDeleteId) return;
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${qnaDeleteId}/`), {
+        method: "DELETE",
+        headers: { ...authHeader() },
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      setQnaDeleteId(null);
+    } catch (e) {
+      setQnaError("Failed to delete question");
     }
   };
 
@@ -4054,6 +4113,43 @@ export default function NewLiveMeeting() {
               </DialogActions>
             </Dialog>
 
+            {/* Q&A Delete Dialog */}
+            <Dialog
+              open={Boolean(qnaDeleteId)}
+              onClose={() => setQnaDeleteId(null)}
+              PaperProps={{
+                sx: {
+                  bgcolor: "#1e293b",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 3,
+                  color: "#fff",
+                },
+              }}
+            >
+              <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete question?</DialogTitle>
+              <DialogContent>
+                <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
+                  This action cannot be undone.
+                </Typography>
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button
+                  onClick={() => setQnaDeleteId(null)}
+                  sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  color="error"
+                  onClick={confirmQnaDelete}
+                  sx={{ textTransform: "none" }}
+                >
+                  Delete
+                </Button>
+              </DialogActions>
+            </Dialog>
+
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
               <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
@@ -4078,8 +4174,16 @@ export default function NewLiveMeeting() {
                       const canViewVoters = isHost;
 
                       // Check if self
-                      const selfCsid = dyteMeeting?.self?.clientSpecificId;
-                      const isSelfQuestion = selfCsid && String(selfCsid) === String(q.user_id);
+                      const self = dyteMeeting?.self;
+                      const selfCsid = self?.clientSpecificId || self?.customParticipantId;
+                      // Fallback to myUserIdRef if CSID not available/matching
+                      const meId = myUserIdRef.current;
+
+                      // API returns 'user' (int or obj), WS returns 'user_id' (int/str)
+                      let qUserId = q.user_id ?? q.user;
+                      if (typeof qUserId === 'object' && qUserId) qUserId = qUserId.id;
+
+                      const isSelfQuestion = (selfCsid && String(selfCsid) === String(qUserId)) || (meId && String(meId) === String(qUserId));
 
                       const askedBy = isSelfQuestion
                         ? "You"
@@ -4096,6 +4200,9 @@ export default function NewLiveMeeting() {
 
                       const timeLabel = q.created_at ? new Date(q.created_at).toLocaleTimeString() : "";
 
+                      const canManage = isHost || isSelfQuestion;
+                      const isEditing = qnaEditingId === q.id;
+
                       return (
                         <Paper
                           key={q.id}
@@ -4107,76 +4214,137 @@ export default function NewLiveMeeting() {
                             borderRadius: 2,
                           }}
                         >
-                          <Stack direction="row" alignItems="center" justifyContent="space-between">
-                            <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
+                          {isEditing ? (
+                            <Box component="form" onSubmit={(e) => { e.preventDefault(); handleQnaEditSubmit(q.id); }}>
+                              <TextField
+                                fullWidth
+                                size="small"
+                                autoFocus
+                                value={qnaEditContent}
+                                onChange={(e) => setQnaEditContent(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Escape") {
+                                    setQnaEditingId(null);
+                                  }
+                                }}
+                                sx={{
+                                  mb: 1,
+                                  "& .MuiOutlinedInput-root": {
+                                    color: "#fff",
+                                    bgcolor: "rgba(255,255,255,0.1)",
+                                    "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                                  }
+                                }}
+                              />
+                              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                <Button
+                                  size="small"
+                                  onClick={() => setQnaEditingId(null)}
+                                  sx={{ color: "rgba(255,255,255,0.7)" }}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button type="submit" size="small" variant="contained">
+                                  Save
+                                </Button>
+                              </Stack>
+                            </Box>
+                          ) : (
+                            <>
+                              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                <Typography sx={{ fontWeight: 800, fontSize: 13 }}>Question</Typography>
 
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Tooltip
-                                arrow
-                                placement="left"
-                                onOpen={() => {
-                                  if (isHost) loadQuestions({ silent: true });
-                                }}
-                                title={
-                                  canViewVoters ? (
-                                    <Box sx={{ p: 1 }}>
-                                      <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
-                                      {votes ? (
-                                        <Stack spacing={0.25}>
-                                          {voters.slice(0, 8).map((voter, idx) => (
-                                            <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
-                                              {voter?.name || voter?.username || voter?.id || "User"}
-                                            </Typography>
-                                          ))}
-                                          {votes > 8 && (
-                                            <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
-                                          )}
-                                        </Stack>
-                                      ) : (
-                                        <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
-                                      )}
-                                    </Box>
-                                  ) : hasVoted ? (
-                                    "Remove your vote"
-                                  ) : (
-                                    "Vote for this question"
-                                  )
-                                }
-                                componentsProps={{
-                                  tooltip: {
-                                    sx: {
-                                      bgcolor: "rgba(0,0,0,0.92)",
-                                      border: "1px solid rgba(255,255,255,0.10)",
-                                      borderRadius: 2,
-                                    },
-                                  },
-                                }}
-                              >
-                                <Box>
-                                  <Chip
-                                    size="small"
-                                    clickable
-                                    onClick={() => upvoteQuestion(q.id)}
-                                    icon={hasVoted ? <ThumbUpAltIcon fontSize="small" /> : <ThumbUpAltOutlinedIcon fontSize="small" />}
-                                    label={votes}
-                                    sx={{
-                                      bgcolor: hasVoted ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                                      border: "1px solid rgba(255,255,255,0.10)",
-                                      "&:hover": { bgcolor: hasVoted ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Tooltip
+                                    arrow
+                                    placement="left"
+                                    onOpen={() => {
+                                      if (isHost) loadQuestions({ silent: true });
                                     }}
-                                  />
-                                </Box>
-                              </Tooltip>
+                                    title={
+                                      canViewVoters ? (
+                                        <Box sx={{ p: 1 }}>
+                                          <Typography sx={{ fontWeight: 800, fontSize: 12, mb: 0.5 }}>Voted by</Typography>
+                                          {votes ? (
+                                            <Stack spacing={0.25}>
+                                              {voters.slice(0, 8).map((voter, idx) => (
+                                                <Typography key={`${voter?.id || idx}`} sx={{ fontSize: 12, opacity: 0.9 }}>
+                                                  {voter?.name || voter?.username || voter?.id || "User"}
+                                                </Typography>
+                                              ))}
+                                              {votes > 8 && (
+                                                <Typography sx={{ fontSize: 12, opacity: 0.7 }}>+{votes - 8} more</Typography>
+                                              )}
+                                            </Stack>
+                                          ) : (
+                                            <Typography sx={{ fontSize: 12, opacity: 0.7 }}>No votes yet</Typography>
+                                          )}
+                                        </Box>
+                                      ) : hasVoted ? (
+                                        "Remove your vote"
+                                      ) : (
+                                        "Vote for this question"
+                                      )
+                                    }
+                                    componentsProps={{
+                                      tooltip: {
+                                        sx: {
+                                          bgcolor: "rgba(0,0,0,0.92)",
+                                          border: "1px solid rgba(255,255,255,0.10)",
+                                          borderRadius: 2,
+                                        },
+                                      },
+                                    }}
+                                  >
+                                    <Box>
+                                      <Chip
+                                        size="small"
+                                        clickable
+                                        onClick={() => upvoteQuestion(q.id)}
+                                        icon={hasVoted ? <ThumbUpAltIcon fontSize="small" /> : <ThumbUpAltOutlinedIcon fontSize="small" />}
+                                        label={votes}
+                                        sx={{
+                                          bgcolor: hasVoted ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                                          border: "1px solid rgba(255,255,255,0.10)",
+                                          "&:hover": { bgcolor: hasVoted ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                                        }}
+                                      />
+                                    </Box>
+                                  </Tooltip>
 
-                              <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
-                            </Stack>
-                          </Stack>
+                                  <Typography sx={{ fontSize: 12, opacity: 0.7 }}>{timeLabel}</Typography>
+                                </Stack>
+                              </Stack>
 
-                          <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92 }}>{q.content}</Typography>
+                              <Typography sx={{ mt: 0.75, fontSize: 13, opacity: 0.92, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{q.content}</Typography>
 
-                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-                            <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
-                          </Stack>
+                              <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+                                <Chip size="small" label={`Asked by ${askedBy}`} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+
+                                {canManage && (
+                                  <Stack direction="row" spacing={0}>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        setQnaEditingId(q.id);
+                                        setQnaEditContent(q.content);
+                                      }}
+                                      sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                    >
+                                      <EditRoundedIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleQnaDelete(q.id)}
+                                      sx={{ color: "rgba(255,255,255,0.5)", p: 0.5 }}
+                                    >
+                                      <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </Stack>
+                                )}
+                              </Stack>
+                            </>
+                          )}
                         </Paper>
                       );
                     })}
