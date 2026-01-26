@@ -45,6 +45,8 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import SettingsIcon from "@mui/icons-material/Settings";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import SendIcon from "@mui/icons-material/Send";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import AddIcon from "@mui/icons-material/Add";
@@ -891,9 +893,13 @@ export default function NewLiveMeeting() {
   // ✅ Settings menu anchor
   const [permAnchorEl, setPermAnchorEl] = useState(null);
   const permMenuOpen = Boolean(permAnchorEl);
+  const [quickSwitchAnchorEl, setQuickSwitchAnchorEl] = useState(null);
+  const quickSwitchOpen = Boolean(quickSwitchAnchorEl);
 
   const openPermMenu = (e) => setPermAnchorEl(e.currentTarget);
   const closePermMenu = () => setPermAnchorEl(null);
+  const openQuickSwitchMenu = (e) => setQuickSwitchAnchorEl(e.currentTarget);
+  const closeQuickSwitchMenu = () => setQuickSwitchAnchorEl(null);
 
   // ✅ Breakout Orchestration State
   const [breakoutTimer, setBreakoutTimer] = useState(null);
@@ -1376,6 +1382,65 @@ export default function NewLiveMeeting() {
     [loungeTables]
   );
 
+  const applyBreakoutToken = useCallback(
+    async (newToken, tableId, tableName) => {
+      if (newToken) {
+        console.log("[LiveMeeting] Transitioning to breakout room...");
+        if (isBreakout && dyteMeeting) {
+          console.log("[LiveMeeting] Switching tables: Leaving current room explicitly...");
+          ignoreRoomLeftRef.current = true;
+          try {
+            await dyteMeeting.leaveRoom();
+          } catch (e) {
+            console.warn("[LiveMeeting] Error leaving previous breakout:", e);
+          }
+          ignoreRoomLeftRef.current = false;
+        }
+
+        console.log("[LiveMeeting] New breakout token received");
+        setIsBreakout(true);
+        setAuthToken(newToken);
+        if (tableId) {
+          setActiveTableId(tableId);
+          setActiveTableName(tableName || `Room ${tableId}`);
+        }
+        return;
+      }
+
+      if (mainAuthTokenRef.current) {
+        console.log("[LiveMeeting] Returning to main meeting...");
+        if (dyteMeeting) {
+          console.log("[LiveMeeting] Leaving breakout room explicitly...");
+          ignoreRoomLeftRef.current = true;
+          try {
+            await dyteMeeting.leaveRoom();
+          } catch (e) {
+            console.warn("[LiveMeeting] Error leaving breakout:", e);
+          }
+          ignoreRoomLeftRef.current = false;
+        }
+
+        console.log("[LiveMeeting] Current state:", {
+          isBreakout,
+          hasMainToken: !!mainAuthTokenRef.current,
+          currentAuthToken: authToken?.substring(0, 20) + "...",
+          mainAuthToken: mainAuthTokenRef.current?.substring(0, 20) + "...",
+        });
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        console.log("[LiveMeeting] Switching back to main token");
+        setIsBreakout(false);
+        setAuthToken(mainAuthTokenRef.current);
+        setActiveTableId(null);
+        setActiveTableName("");
+        setRoomChatConversationId(null);
+        console.log("[LiveMeeting] Successfully returned to main meeting");
+      } else {
+        console.warn("[LiveMeeting] No main token available to return to!");
+      }
+    },
+    [authToken, dyteMeeting, isBreakout]
+  );
+
 
   const handleEnterBreakout = async (tableId) => {
     if (!eventId || !tableId) return;
@@ -1391,10 +1456,8 @@ export default function NewLiveMeeting() {
         const data = await res.json();
         if (data.token) {
           console.log("[LiveMeeting] Joining breakout room with token");
-          setAuthToken(data.token);
-          setIsBreakout(true);
-          setActiveTableId(tableId);
-          setActiveTableName(resolveTableName(tableId) || `Room ${tableId}`);
+          const tableName = resolveTableName(tableId) || `Room ${tableId}`;
+          await applyBreakoutToken(data.token, tableId, tableName);
         }
       } else {
         console.error("[LiveMeeting] Failed to fetch breakout token:", res.status);
@@ -2546,6 +2609,23 @@ export default function NewLiveMeeting() {
     [eventTitle, dbStatus, latestPinnedHost, joinElapsedLabel, isBreakout]
   );
   const meeting = meetingMeta;
+
+  const currentRoomLabel = useMemo(() => {
+    if (!isBreakout) return "Main Room";
+    if (activeTableName) return activeTableName;
+    if (activeTableId) return `Room ${activeTableId}`;
+    return "Breakout Room";
+  }, [activeTableId, activeTableName, isBreakout]);
+
+  const handleQuickSwitch = async (targetId) => {
+    closeQuickSwitchMenu();
+    if (targetId === "main") {
+      if (isBreakout) await handleLeaveBreakout();
+      return;
+    }
+    if (targetId && String(targetId) === String(activeTableId) && isBreakout) return;
+    await handleEnterBreakout(targetId);
+  };
 
   // ✅ Use 'latestPinnedHost' instead of 'pinnedHost'
   const pinnedRaw = latestPinnedHost?._raw || latestPinnedHost || null;
@@ -5021,6 +5101,55 @@ export default function NewLiveMeeting() {
               {meeting.title}
             </Typography>
 
+            {isHost && (
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mr: 0.5 }}>
+                <Chip
+                  size="small"
+                  label={`Room: ${currentRoomLabel}`}
+                  sx={{
+                    bgcolor: isBreakout ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    "& .MuiChip-label": { fontWeight: 700, fontSize: 11 },
+                    maxWidth: 180,
+                  }}
+                />
+
+                <Button
+                  size="small"
+                  variant="outlined"
+                  endIcon={<KeyboardArrowDownIcon />}
+                  onClick={openQuickSwitchMenu}
+                  sx={{
+                    textTransform: "none",
+                    borderColor: "rgba(255,255,255,0.2)",
+                    color: "#fff",
+                    minWidth: 0,
+                    px: 1.2,
+                    "&:hover": { borderColor: "rgba(255,255,255,0.35)" },
+                  }}
+                >
+                  Quick Switch
+                </Button>
+
+                {isBreakout && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<HomeRoundedIcon />}
+                    onClick={handleLeaveBreakout}
+                    sx={{
+                      textTransform: "none",
+                      bgcolor: "#14b8b1",
+                      fontWeight: 700,
+                      "&:hover": { bgcolor: "#0e8e88" },
+                    }}
+                  >
+                    Return to Main
+                  </Button>
+                )}
+              </Stack>
+            )}
+
             <Stack direction="row" spacing={1} alignItems="center" sx={{ pr: 0.5 }}>
               {meeting.live && (
                 <Chip
@@ -5205,6 +5334,59 @@ export default function NewLiveMeeting() {
                 <ListItemText primary="Device Settings" secondary="Choose mic & camera" />
               </MenuItem>
             </>
+          )}
+        </Menu>
+
+        <Menu
+          anchorEl={quickSwitchAnchorEl}
+          open={quickSwitchOpen}
+          onClose={closeQuickSwitchMenu}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
+          PaperProps={{
+            sx: {
+              mt: 1,
+              minWidth: 220,
+              bgcolor: "rgba(0,0,0,0.92)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              borderRadius: 2.5,
+              overflow: "hidden",
+              backdropFilter: "blur(12px)",
+              color: "#fff",
+              "& .MuiListItemText-primary": { color: "#fff" },
+              "& .MuiListItemText-secondary": { color: "rgba(255,255,255,0.65)" },
+            },
+          }}
+          MenuListProps={{
+            sx: {
+              "& .MuiMenuItem-root:hover": { bgcolor: "rgba(255,255,255,0.06)" },
+            },
+          }}
+        >
+          <MenuItem onClick={() => handleQuickSwitch("main")}>
+            <ListItemText
+              primary="Main Room"
+              secondary={!isBreakout ? "You are here" : "Return to main"}
+            />
+          </MenuItem>
+          <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
+          {loungeTables.length === 0 ? (
+            <MenuItem disabled>
+              <ListItemText primary="No breakout rooms yet" />
+            </MenuItem>
+          ) : (
+            loungeTables.map((table) => (
+              <MenuItem
+                key={table.id}
+                onClick={() => handleQuickSwitch(table.id)}
+                selected={isBreakout && String(activeTableId) === String(table.id)}
+              >
+                <ListItemText
+                  primary={table.name || `Room ${table.id}`}
+                  secondary={isBreakout && String(activeTableId) === String(table.id) ? "You are here" : null}
+                />
+              </MenuItem>
+            ))
           )}
         </Menu>
 
@@ -5896,60 +6078,7 @@ export default function NewLiveMeeting() {
         isAdmin={isHost}
         dyteMeeting={dyteMeeting}
         onEnterBreakout={async (newToken, tableId, tableName) => {
-          if (newToken) {
-            console.log("[LiveMeeting] Transitioning to breakout room...");
-            // Switch Breakouts Fix: If already in a breakout, leave it explicitly first
-            if (isBreakout && dyteMeeting) {
-              console.log("[LiveMeeting] Switching tables: Leaving current room explicitly...");
-              ignoreRoomLeftRef.current = true;
-              try {
-                await dyteMeeting.leaveRoom();
-              } catch (e) {
-                console.warn("[LiveMeeting] Error leaving previous breakout:", e);
-              }
-              ignoreRoomLeftRef.current = false;
-            }
-
-            console.log("[LiveMeeting] New breakout token received");
-            setIsBreakout(true);
-            setAuthToken(newToken);
-            if (tableId) {
-              setActiveTableId(tableId);
-              setActiveTableName(tableName || `Room ${tableId}`);
-            }
-          } else if (mainAuthTokenRef.current) {
-            console.log("[LiveMeeting] Returning to main meeting...");
-
-            // Leave Breakout Fix: Explicitly leave the breakout room
-            if (dyteMeeting) {
-              console.log("[LiveMeeting] Leaving breakout room explicitly...");
-              ignoreRoomLeftRef.current = true;
-              try {
-                await dyteMeeting.leaveRoom();
-              } catch (e) {
-                console.warn("[LiveMeeting] Error leaving breakout:", e);
-              }
-              ignoreRoomLeftRef.current = false;
-            }
-
-            console.log("[LiveMeeting] Current state:", {
-              isBreakout,
-              hasMainToken: !!mainAuthTokenRef.current,
-              currentAuthToken: authToken?.substring(0, 20) + "...",
-              mainAuthToken: mainAuthTokenRef.current?.substring(0, 20) + "..."
-            });
-            // Wait a bit for cleanup to complete before switching tokens
-            await new Promise(resolve => setTimeout(resolve, 500));
-            console.log("[LiveMeeting] Switching back to main token");
-            setIsBreakout(false);
-            setAuthToken(mainAuthTokenRef.current);
-            setActiveTableId(null);
-            setActiveTableName("");
-            setRoomChatConversationId(null);
-            console.log("[LiveMeeting] Successfully returned to main meeting");
-          } else {
-            console.warn("[LiveMeeting] No main token available to return to!");
-          }
+          await applyBreakoutToken(newToken, tableId, tableName);
         }}
       />
 
