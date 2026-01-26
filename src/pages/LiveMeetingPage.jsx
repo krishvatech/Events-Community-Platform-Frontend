@@ -56,6 +56,7 @@ import VideocamOffIcon from "@mui/icons-material/VideocamOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
+import LogoutIcon from "@mui/icons-material/Logout"; // <--- ADDED for Leave Table
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
@@ -2399,7 +2400,43 @@ export default function NewLiveMeeting() {
         _raw: p,
       };
     });
-  }, [dyteMeeting, initDone, participantsTick, getJoinedParticipants, pinnedHost, isHost]);
+  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, participantsTick]);
+
+  // ✅ Leave Breakout / Table logic
+  const handleLeaveBreakout = useCallback(async () => {
+    // 1. Notify backend via MAIN socket (same endpoint as lounge)
+    if (mainSocketRef.current?.readyState === WebSocket.OPEN) {
+      console.log("[LiveMeeting] Sending leave_table via main socket");
+      mainSocketRef.current.send(JSON.stringify({ action: "leave_table" }));
+    }
+
+    // 2. Perform local switch back to main meeting
+    if (dyteMeeting) {
+      try {
+        await dyteMeeting.leaveRoom();
+      } catch (e) {
+        console.warn("Error leaving breakout room:", e);
+      }
+    }
+
+    // Delay for cleanup
+    await new Promise((r) => setTimeout(r, 500));
+
+    if (mainAuthTokenRef.current) {
+      console.log("[LiveMeeting] verify: switching to main token");
+      setIsBreakout(false);
+      setAuthToken(mainAuthTokenRef.current);
+      setActiveTableId(null);
+      setActiveTableName("");
+      // Force reset any chat/overlay state if needed
+      if (typeof setRoomChatConversationId === "function") {
+        setRoomChatConversationId(null);
+      }
+    } else {
+      console.warn("No main token found, reloading page...");
+      window.location.reload();
+    }
+  }, [dyteMeeting]);
 
   // Debug: log what Dyte exposes so we can see why audience is missing
   useEffect(() => {
@@ -5537,6 +5574,28 @@ export default function NewLiveMeeting() {
                     <CallEndIcon />
                   </IconButton>
                 </Tooltip>
+
+                {/* ✅ Leave Table Button (Only in Breakout) - Moved to right end with Label */}
+                {isBreakout && (
+                  <Button
+                    variant="contained"
+                    onClick={handleLeaveBreakout}
+                    startIcon={<LogoutIcon />}
+                    sx={{
+                      ml: 1,
+                      bgcolor: "#ef4444",
+                      color: "white",
+                      borderRadius: 10,
+                      textTransform: "none",
+                      fontWeight: 700,
+                      px: 2,
+                      "&:hover": { bgcolor: "#dc2626" },
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    Leave Table
+                  </Button>
+                )}
               </Paper>
             </Box>
           </Box>
