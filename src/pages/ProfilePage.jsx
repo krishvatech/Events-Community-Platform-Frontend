@@ -3215,9 +3215,9 @@ export default function ProfilePage() {
                                   primary={<Typography variant="body2" fontWeight={500}>{e.degree || "Degree"} — {e.school || "School"}</Typography>}
                                   secondary={
                                     <Stack component="span" spacing={0.5}>
+                                      {e.field_of_study && <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>{e.field_of_study}</Typography>}
                                       <Typography variant="body2" color="text.secondary">
                                         {[(e.start_date || "").slice(0, 4), (e.end_date || "").slice(0, 4)].filter(Boolean).join(" - ")}
-                                        {e.field_of_study ? ` · ${e.field_of_study}` : ""}
                                         {e.grade ? ` · Grade: ${e.grade}` : ""}
                                       </Typography>
 

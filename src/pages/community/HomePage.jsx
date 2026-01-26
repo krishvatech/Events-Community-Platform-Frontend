@@ -3527,8 +3527,9 @@ function AboutTab({
                       primary={<Typography variant="body2" fontWeight={600}>{edu.degree} — {edu.school}</Typography>}
                       secondary={
                         <Stack component="span" spacing={0.5}>
-                          <Typography variant="caption" color="text.secondary">
-                            {edu.start?.slice(0, 4)} - {edu.end?.slice(0, 4)}
+                          {edu.field && <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>{edu.field}</Typography>}
+                          <Typography variant="body2" color="text.secondary">
+                            {[(edu.start || "").slice(0, 4), (edu.end || "").slice(0, 4)].filter(Boolean).join(" - ")}
                           </Typography>
 
                           {/* --- NEW: Display Documents Chips --- */}

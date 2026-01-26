@@ -3182,8 +3182,9 @@ export default function AdminSettings() {
                               primary={<Typography variant="body2" sx={{ fontWeight: 600 }}>{e.degree} - {e.school}</Typography>}
                               secondary={
                                 <Stack component="span" spacing={0.5}>
+                                  {e.field_of_study && <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>{e.field_of_study}</Typography>}
                                   <Typography variant="body2" color="text.secondary">
-                                    {rangeLinkedIn(e.start_date, e.end_date, false)}
+                                    {[(e.start_date || "").slice(0, 4), (e.end_date || "").slice(0, 4)].filter(Boolean).join(" - ")}
                                   </Typography>
                                   {/* --- NEW: Display Document Chips --- */}
                                   {e.documents && e.documents.length > 0 && (

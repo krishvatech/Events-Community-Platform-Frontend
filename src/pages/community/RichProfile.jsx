@@ -3155,10 +3155,12 @@ export default function RichProfile() {
                                       </Typography>
                                     }
                                     secondary={
-                                      <Typography variant="caption" color="text.secondary">
-                                        {rangeText(e.start_date, e.end_date, false)}
-                                        {e.field_of_study ? ` · ${e.field_of_study}` : ""}
-                                      </Typography>
+                                      <Stack component="span" spacing={0.5}>
+                                        {e.field_of_study && <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400 }}>{e.field_of_study}</Typography>}
+                                        <Typography variant="caption" color="text.secondary">
+                                          {[(e.start_date || "").slice(0, 4), (e.end_date || "").slice(0, 4)].filter(Boolean).join(" - ")}
+                                        </Typography>
+                                      </Stack>
                                     }
                                   />
                                 </ListItem>
