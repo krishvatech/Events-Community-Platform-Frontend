@@ -54,6 +54,7 @@ import FacebookIcon from "@mui/icons-material/Facebook";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import LanguageIcon from "@mui/icons-material/Language";
+import EventIcon from "@mui/icons-material/Event";
 
 
 
@@ -90,6 +91,56 @@ function normalizeUrl(value) {
   if (!v) return "";
   if (/^https?:\/\//i.test(v)) return v;
   return `https://${v}`;
+}
+
+// Helper to get country flag emoji from phone number
+function getCountryFlag(phoneNumber) {
+  if (!phoneNumber) return null;
+  const num = String(phoneNumber).replace(/\D/g, '');
+
+  // Common country codes
+  const countryFlags = {
+    '1': '🇺🇸',      // US/Canada
+    '44': '🇬🇧',     // UK
+    '91': '🇮🇳',     // India
+    '86': '🇨🇳',     // China
+    '81': '🇯🇵',     // Japan
+    '49': '🇩🇪',     // Germany
+    '33': '🇫🇷',     // France
+    '39': '🇮🇹',     // Italy
+    '34': '🇪🇸',     // Spain
+    '61': '🇦🇺',     // Australia
+    '55': '🇧🇷',     // Brazil
+    '7': '🇷🇺',      // Russia
+    '82': '🇰🇷',     // South Korea
+    '52': '🇲🇽',     // Mexico
+    '31': '🇳🇱',     // Netherlands
+    '46': '🇸🇪',     // Sweden
+    '47': '🇳🇴',     // Norway
+    '45': '🇩🇰',     // Denmark
+    '48': '🇵🇱',     // Poland
+    '90': '🇹🇷',     // Turkey
+    '27': '🇿🇦',     // South Africa
+    '20': '🇪🇬',     // Egypt
+    '971': '🇦🇪',    // UAE
+    '966': '🇸🇦',    // Saudi Arabia
+    '65': '🇸🇬',     // Singapore
+    '60': '🇲🇾',     // Malaysia
+    '62': '🇮🇩',     // Indonesia
+    '63': '🇵🇭',     // Philippines
+    '66': '🇹🇭',     // Thailand
+    '84': '🇻🇳',     // Vietnam
+  };
+
+  // Try to match country code (1-3 digits)
+  for (let len = 3; len >= 1; len--) {
+    const code = num.substring(0, len);
+    if (countryFlags[code]) {
+      return countryFlags[code];
+    }
+  }
+
+  return '🌐'; // Default globe icon
 }
 
 const POST_REACTIONS = [
@@ -2577,17 +2628,31 @@ export default function RichProfile() {
     "";
 
   // --- Helper: Extract visible phone ---
-  const visiblePhone = useMemo(() => {
+  const visiblePhones = useMemo(() => {
     const contact = resolvedLinks?.contact || {};
     // "phones" is usually an array: [{ number: "+123...", type:"mobile", visibility:"public", primary:true }, ...]
     const phones = Array.isArray(contact.phones) ? contact.phones : [];
 
-    // Filter by visibility
+    console.log('🔍 DEBUG visiblePhones:', {
+      resolvedLinks,
+      contact,
+      phones,
+      isMe,
+      friendStatus
+    });
+
+    // Filter by visibility - return ALL visible phones
     const visible = phones.filter(
-      (p) => p?.number && canViewContactVisibility(getVisibilityValue(p))
+      (p) => {
+        const vis = getVisibilityValue(p);
+        const canView = canViewContactVisibility(vis);
+        console.log('📞 Phone filter:', { number: p?.number, visibility: vis, canView });
+        return p?.number && canView;
+      }
     );
+
     if (visible.length) {
-      return visible.find((p) => p.primary) || visible[0];
+      return visible;
     }
 
     // Fallbacks for older schemas
@@ -2605,33 +2670,57 @@ export default function RichProfile() {
     const directVisibility =
       getVisibilityValue(contact.phone) || getVisibilityValue(contact.main_phone);
 
-    if (!directPhone) return null;
-    if (directVisibility && !canViewContactVisibility(directVisibility)) return null;
+    if (!directPhone) return [];
+    if (directVisibility && !canViewContactVisibility(directVisibility)) return [];
 
-    return { number: directPhone };
+    return [{ number: directPhone, type: "phone" }];
   }, [resolvedLinks, friendStatus, isMe, userItem]);
 
-  // --- Helper: Extract visible email ---
-  const visibleEmail = useMemo(() => {
+  // --- Helper: Extract visible emails (ALL public emails) ---
+  const visibleEmails = useMemo(() => {
     const contact = resolvedLinks?.contact || {};
     const emails = Array.isArray(contact.emails) ? contact.emails : [];
 
+    console.log('🔍 DEBUG visibleEmails:', {
+      resolvedLinks,
+      contact,
+      emails,
+      isMe,
+      friendStatus
+    });
+
+    // Filter by visibility - return ALL visible emails
     const visible = emails.filter(
-      (e) => e?.email && canViewContactVisibility(getVisibilityValue(e))
+      (e) => {
+        const vis = getVisibilityValue(e);
+        const canView = canViewContactVisibility(vis);
+        console.log('📧 Email filter:', { email: e?.email, visibility: vis, canView });
+        return e?.email && canView;
+      }
     );
-    if (visible.length) {
-      return visible.find((e) => e.primary) || visible[0];
+
+    console.log('✅ Visible emails result:', visible);
+
+    // Always include main email from User model if not already in the list
+    const mainEmailValue = (userItem?.email || "").trim();
+    if (mainEmailValue) {
+      const alreadyIncluded = visible.some(e => e.email?.toLowerCase() === mainEmailValue.toLowerCase());
+      if (!alreadyIncluded) {
+        // Check if main_email has visibility settings
+        const mainEmail = contact.main_email || {};
+        const mainVisibility = getVisibilityValue(mainEmail);
+
+        if (isMe || !mainVisibility || canViewContactVisibility(mainVisibility)) {
+          visible.unshift({
+            email: mainEmailValue,
+            type: mainEmail.type || "Main",
+            primary: true
+          });
+        }
+      }
     }
 
-    const mainEmail = contact.main_email || {}; // { type, visibility }
-    const emailValue = (userItem?.email || "").trim();
-    const mainVisibility = getVisibilityValue(mainEmail);
-
-    if (emailValue && (isMe || (mainVisibility && canViewContactVisibility(mainVisibility)))) {
-      return { email: emailValue };
-    }
-
-    return null;
+    return visible;
   }, [resolvedLinks, friendStatus, isMe, userItem]);
 
   // --- Helper: Extract visible location ---
@@ -2718,6 +2807,30 @@ export default function RichProfile() {
     }
 
     return out;
+  }, [resolvedLinks, friendStatus, isMe]);
+
+  // --- Helper: Extract visible scheduler ---
+  const visibleScheduler = useMemo(() => {
+    const scheduler = resolvedLinks?.contact?.scheduler;
+    if (!scheduler) return null;
+
+    const schedulerUrl = typeof scheduler === "string"
+      ? scheduler
+      : scheduler?.url || scheduler?.link || "";
+    const schedulerLabel = typeof scheduler === "object"
+      ? scheduler?.label || "Schedule a meeting"
+      : "Schedule a meeting";
+    const schedulerVisibility = typeof scheduler === "object"
+      ? getVisibilityValue(scheduler)
+      : "public";
+
+    if (!schedulerUrl) return null;
+    if (!canViewContactVisibility(schedulerVisibility)) return null;
+
+    return {
+      url: normalizeUrl(schedulerUrl),
+      label: schedulerLabel
+    };
   }, [resolvedLinks, friendStatus, isMe]);
 
   /* =========================
@@ -3032,26 +3145,66 @@ export default function RichProfile() {
                       <Stack spacing={2.5}>
                         {/* About section */}
                         <Section title="About">
-                          {/* EMAIL - conditionally rendered */}
-                          {visibleEmail?.email && (
+                          {/* EMAILS - display ALL public emails */}
+                          {visibleEmails.length > 0 && (
                             <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
                               <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                                Email:
+                                Email{visibleEmails.length > 1 ? "s" : ""}:
                               </Typography>
-                              <Typography variant="body2">{visibleEmail.email}</Typography>
+                              <Stack spacing={0.5}>
+                                {visibleEmails.map((emailObj, idx) => (
+                                  <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Typography variant="body2">{emailObj.email}</Typography>
+                                    {emailObj.type && (
+                                      <Chip
+                                        label={emailObj.type}
+                                        size="small"
+                                        sx={{ height: 18, fontSize: 10 }}
+                                      />
+                                    )}
+                                    {emailObj.primary && (
+                                      <Chip
+                                        label="Primary"
+                                        size="small"
+                                        color="primary"
+                                        sx={{ height: 18, fontSize: 10 }}
+                                      />
+                                    )}
+                                  </Box>
+                                ))}
+                              </Stack>
                             </Box>
                           )}
 
-                          {/* PHONE - conditionally rendered */}
-                          {visiblePhone?.number && (
+                          {/* PHONES - display ALL public phones */}
+                          {visiblePhones.length > 0 && (
                             <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
                               <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                                Phone:
+                                Phone{visiblePhones.length > 1 ? "s" : ""}:
                               </Typography>
-                              <Typography variant="body2">
-                                {visiblePhone.number}
-                                {/* Optional: show type or primary badge */}
-                              </Typography>
+                              <Stack spacing={0.5}>
+                                {visiblePhones.map((phoneObj, idx) => (
+                                  <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <span style={{ fontSize: 18 }}>{getCountryFlag(phoneObj.number)}</span>
+                                    <Typography variant="body2">{phoneObj.number}</Typography>
+                                    {phoneObj.type && (
+                                      <Chip
+                                        label={phoneObj.type}
+                                        size="small"
+                                        sx={{ height: 18, fontSize: 10 }}
+                                      />
+                                    )}
+                                    {phoneObj.primary && (
+                                      <Chip
+                                        label="Primary"
+                                        size="small"
+                                        color="primary"
+                                        sx={{ height: 18, fontSize: 10 }}
+                                      />
+                                    )}
+                                  </Box>
+                                ))}
+                              </Stack>
                             </Box>
                           )}
                           <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
@@ -3078,6 +3231,52 @@ export default function RichProfile() {
                               <Typography variant="body2">
                                 {visibleLocation}
                               </Typography>
+                            </Box>
+                          )}
+
+                          {/* Social Profiles */}
+                          {socialItems.length > 0 && (
+                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                                Social:
+                              </Typography>
+                              <Stack direction="row" spacing={1} flexWrap="wrap">
+                                {socialItems.map((social) => (
+                                  <IconButton
+                                    key={social.key}
+                                    size="small"
+                                    component="a"
+                                    href={social.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={social.label}
+                                    sx={{ color: "primary.main" }}
+                                  >
+                                    {social.icon}
+                                  </IconButton>
+                                ))}
+                              </Stack>
+                            </Box>
+                          )}
+
+                          {/* Scheduler */}
+                          {visibleScheduler && (
+                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                                Schedule:
+                              </Typography>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                component="a"
+                                href={visibleScheduler.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                startIcon={<EventIcon />}
+                                sx={{ textTransform: "none", borderRadius: 2 }}
+                              >
+                                {visibleScheduler.label}
+                              </Button>
                             </Box>
                           )}
                         </Section>
