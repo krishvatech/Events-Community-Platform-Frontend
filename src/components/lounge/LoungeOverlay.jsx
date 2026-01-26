@@ -9,7 +9,7 @@ function getToken() {
     return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
 }
 
-const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, dyteMeeting }) => {
+const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, dyteMeeting, onParticipantClick }) => {
     const [tables, setTables] = useState([]);
     const [loading, setLoading] = useState(true);
     const [wsStatus, setWsStatus] = useState('connecting'); // 'connecting', 'open', 'closed'
@@ -521,6 +521,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                             onUpdateIcon={handleUpdateTableIcon}
                             onEditTable={handleOpenEditTable}
                             onDeleteTable={handleOpenDeleteTable}
+                            onParticipantClick={onParticipantClick}
                         />
                         <Box sx={{ px: 4, pb: 2 }}>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)' }}>

@@ -15,10 +15,12 @@ const LoungeTable = ({
     onUpdateIcon,
     onEditTable,
     onDeleteTable,
+    onParticipantClick,
 }) => {
     const isUserAtThisTable = Object.values(table.participants || {}).some((p) => {
         return String(p.user_id) === String(currentUserId) || p.username === myUsername;
     });
+    const maxSeats = table.max_seats || 4;
     const [iconUploading, setIconUploading] = useState(false);
     const iconInputRef = useRef(null);
 
@@ -119,65 +121,134 @@ const LoungeTable = ({
             {/* Table Visualization */}
             <Box
                 sx={{
-                    position: 'relative',
-                    width: 140,
-                    height: 140,
                     mx: 'auto',
                     my: 2,
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                 }}
             >
-                {/* The Table itself */}
                 <Box
                     sx={{
-                        width: 80,
-                        height: 80,
-                        borderRadius: 3,
-                        bgcolor: 'rgba(255, 255, 255, 0.1)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        position: 'relative',
+                        width: 140,
+                        height: 140,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)',
                     }}
                 >
-                    {iconSrc ? (
-                        <Box
-                            component="img"
-                            src={iconSrc}
-                            alt={`${table.name} logo`}
-                            sx={{
-                                width: 56,
-                                height: 56,
-                                objectFit: 'contain',
-                                borderRadius: 2,
-                                bgcolor: 'rgba(0,0,0,0.2)',
-                            }}
-                        />
-                    ) : (
-                        <AutoAwesomeIcon sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 32 }} />
-                    )}
+                    {/* The Table itself */}
+                    <Box
+                        sx={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: 3,
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)',
+                        }}
+                    >
+                        {iconSrc ? (
+                            <Box
+                                component="img"
+                                src={iconSrc}
+                                alt={`${table.name} logo`}
+                                sx={{
+                                    width: 56,
+                                    height: 56,
+                                    objectFit: 'contain',
+                                    borderRadius: 2,
+                                    bgcolor: 'rgba(0,0,0,0.2)',
+                                }}
+                            />
+                        ) : (
+                            <AutoAwesomeIcon sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 32 }} />
+                        )}
+                    </Box>
+
+                    {/* Seats around the table (display up to 5 without overlap) */}
+                    {(() => {
+                        const entries = Object.entries(table.participants || {})
+                            .map(([seat, participant]) => ({
+                                seat: Number(seat),
+                                participant,
+                            }))
+                            .filter((item) => Number.isFinite(item.seat) && item.participant)
+                            .sort((a, b) => a.seat - b.seat);
+                        const displayLimit = 5;
+                        const displayParticipants = entries.slice(0, displayLimit);
+                        const displayCount = Math.min(
+                            displayLimit,
+                            Math.max(maxSeats, displayParticipants.length, 1)
+                        );
+                        const availableSeatIndices = [];
+                        for (let i = 0; i < maxSeats; i++) {
+                            if (!table.participants?.[i] && !table.participants?.[String(i)]) {
+                                availableSeatIndices.push(i);
+                            }
+                        }
+                        const slots = [];
+                        for (let i = 0; i < displayCount; i++) {
+                            const occupant = displayParticipants[i];
+                            if (occupant) {
+                                slots.push({ participant: occupant.participant, seatIndex: occupant.seat });
+                            } else {
+                                slots.push({ participant: null, seatIndex: availableSeatIndices.shift() });
+                            }
+                        }
+
+                        return slots.map((slot, i) => (
+                            <Box
+                                key={`seat-${i}`}
+                                onClick={() =>
+                                    !slot.participant &&
+                                    !isUserAtThisTable &&
+                                    slot.seatIndex !== undefined &&
+                                    handleJoin(slot.seatIndex)
+                                }
+                                sx={{
+                                    cursor:
+                                        !slot.participant &&
+                                        !isUserAtThisTable &&
+                                        slot.seatIndex !== undefined
+                                            ? 'pointer'
+                                            : 'default',
+                                }}
+                            >
+                                <LoungeSeat
+                                    index={i}
+                                    maxSeats={displayCount}
+                                    participant={slot.participant}
+                                    onParticipantClick={slot.participant ? onParticipantClick : undefined}
+                                />
+                            </Box>
+                        ));
+                    })()}
                 </Box>
 
-                {/* Seats around the table */}
-                {[...Array(table.max_seats || 4)].map((_, i) => {
-                    const participant = table.participants?.[i] || table.participants?.[String(i)];
+                {(() => {
+                    const totalParticipants = Object.values(table.participants || {}).filter(Boolean).length;
+                    const extraCount = Math.max(0, totalParticipants - 5);
+                    if (extraCount <= 0) return null;
                     return (
-                        <Box
-                            key={i}
-                            onClick={() => !participant && !isUserAtThisTable && handleJoin(i)}
-                            sx={{ cursor: !participant && !isUserAtThisTable ? 'pointer' : 'default' }}
+                        <Typography
+                            sx={{
+                                mt: 1,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: 'rgba(255,255,255,0.75)',
+                                letterSpacing: '0.02em',
+                            }}
                         >
-                            <LoungeSeat
-                                index={i}
-                                maxSeats={table.max_seats || 4}
-                                participant={participant}
-                            />
-                        </Box>
+                            +{extraCount} more
+                        </Typography>
                     );
-                })}
+                })()}
             </Box>
 
             {isUserAtThisTable ? (
@@ -197,7 +268,6 @@ const LoungeTable = ({
                     disabled={Object.keys(table.participants || {}).length >= table.max_seats}
                     onClick={() => {
                         // Find first available seat index
-                        const maxSeats = table.max_seats || 4;
                         const participants = table.participants || {};
                         for (let i = 0; i < maxSeats; i++) {
                             if (!participants[i]) {

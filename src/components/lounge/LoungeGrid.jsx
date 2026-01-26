@@ -14,6 +14,7 @@ const LoungeGrid = ({
     onUpdateIcon,
     onEditTable,
     onDeleteTable,
+    onParticipantClick,
 }) => {
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -59,6 +60,7 @@ const LoungeGrid = ({
                             onUpdateIcon={onUpdateIcon}
                             onEditTable={onEditTable}
                             onDeleteTable={onDeleteTable}
+                            onParticipantClick={onParticipantClick}
                         />
                     </Grid>
                 ))}

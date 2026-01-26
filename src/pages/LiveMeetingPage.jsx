@@ -1073,15 +1073,53 @@ export default function NewLiveMeeting() {
   const [memberInfoOpen, setMemberInfoOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
 
-  const openMemberInfo = (member) => {
+  const openMemberInfo = useCallback((member) => {
     setSelectedMember(member);
     setMemberInfoOpen(true);
-  };
+  }, []);
 
-  const closeMemberInfo = () => {
+  const closeMemberInfo = useCallback(() => {
     setMemberInfoOpen(false);
     setSelectedMember(null);
-  };
+  }, []);
+
+  const openLoungeParticipantInfo = useCallback(
+    (participant) => {
+      if (!participant) return;
+      const userId =
+        participant.user_id ||
+        participant.userId ||
+        participant.id ||
+        participant.uid ||
+        participant.pk ||
+        null;
+      const name =
+        participant.full_name ||
+        participant.name ||
+        participant.username ||
+        "User";
+      const picture =
+        participant.avatar_url ||
+        participant.user_image_url ||
+        participant.user_image ||
+        participant.avatar ||
+        "";
+      const roleLabel = String(participant.role || participant.user_role || "Audience");
+
+      openMemberInfo({
+        id: userId || participant.username || name,
+        name,
+        picture,
+        role: roleLabel.toLowerCase().includes("host") ? "Host" : "Audience",
+        job_title: participant.job_title || participant.title || participant.designation || "",
+        company: participant.company || participant.organization || participant.company_name || "",
+        location: participant.location || participant.city || participant.country || "",
+        username: participant.username,
+        _raw: { customParticipantId: userId || participant.user_id || participant.id || null },
+      });
+    },
+    [openMemberInfo]
+  );
 
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -6077,6 +6115,7 @@ export default function NewLiveMeeting() {
         currentUserId={getMyUserIdFromJwt()}
         isAdmin={isHost}
         dyteMeeting={dyteMeeting}
+        onParticipantClick={openLoungeParticipantInfo}
         onEnterBreakout={async (newToken, tableId, tableName) => {
           await applyBreakoutToken(newToken, tableId, tableName);
         }}
