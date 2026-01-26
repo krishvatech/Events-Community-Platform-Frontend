@@ -4940,8 +4940,32 @@ export default function NewLiveMeeting() {
               minHeight: 44,          // ✅ smaller header height
               px: 1.25,               // ✅ left/right padding
               py: 0.25,               // ✅ small vertical padding
+              position: "relative",    // ✅ For absolute centering of timer
             }}
           >
+            {/* ✅ Breakout Timer Centered in Header */}
+            {breakoutTimer !== null && breakoutTimer > 0 && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  bgcolor: "rgba(0,0,0,0.6)", // Subtle background for contrast
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 2,
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                <AccessTimeRoundedIcon sx={{ fontSize: 16, color: breakoutTimer < 30 ? "#f44336" : "#4caf50" }} />
+                <Typography variant="body2" fontWeight={700} sx={{ color: "white", fontVariantNumeric: "tabular-nums", minWidth: 40, textAlign: "center" }}>
+                  {Math.floor(breakoutTimer / 60).toString().padStart(2, "0")}:{(breakoutTimer % 60).toString().padStart(2, "0")}
+                </Typography>
+              </Box>
+            )}
             <IconButton sx={headerIconBtnSx} aria-label="Back" onClick={handleBack}>
               <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
             </IconButton>
@@ -5900,30 +5924,7 @@ export default function NewLiveMeeting() {
       </Snackbar>
 
       {/* ✅ Global Room Timer Display */}
-      {breakoutTimer !== null && breakoutTimer > 0 && (
-        <Box
-          sx={{
-            position: "fixed",
-            top: 64,
-            left: "50%",
-            transform: "translateX(-50%)",
-            bgcolor: "rgba(0,0,0,0.8)",
-            px: 2,
-            py: 1,
-            borderRadius: 2,
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            zIndex: 1400,
-            border: "1px solid rgba(255,255,255,0.2)",
-          }}
-        >
-          <AccessTimeRoundedIcon sx={{ color: breakoutTimer < 30 ? "#f44336" : "#4caf50" }} />
-          <Typography variant="h6" fontWeight={700}>
-            {Math.floor(breakoutTimer / 60)}:{(breakoutTimer % 60).toString().padStart(2, "0")}
-          </Typography>
-        </Box>
-      )}
+
     </DyteProvider>
 
   );
