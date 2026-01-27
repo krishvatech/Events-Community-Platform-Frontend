@@ -11,7 +11,7 @@ import TimerIcon from '@mui/icons-material/Timer';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import StopIcon from '@mui/icons-material/Stop';
 
-export default function BreakoutControls({ open, onClose, onAction, onlineCount = 0 }) {
+export default function BreakoutControls({ open, onClose, onAction, onlineCount = 0, debugMessage = "" }) {
     const [perRoom, setPerRoom] = useState(4);
     const [duration, setDuration] = useState(10);
     const [message, setMessage] = useState("");
@@ -64,6 +64,12 @@ export default function BreakoutControls({ open, onClose, onAction, onlineCount 
                     ) : (
                         <Alert severity="success" sx={{ mb: 2, bgcolor: 'rgba(76, 175, 80, 0.1)', color: '#4caf50', border: '1px solid rgba(76, 175, 80, 0.2)' }}>
                             {onlineCount} attendee{onlineCount > 1 ? 's' : ''} online and ready.
+                        </Alert>
+                    )}
+
+                    {debugMessage && (
+                        <Alert severity="info" sx={{ mb: 2, bgcolor: 'rgba(3, 169, 244, 0.1)', color: '#03a9f4', border: '1px solid rgba(3, 169, 244, 0.2)' }}>
+                            {debugMessage}
                         </Alert>
                     )}
 

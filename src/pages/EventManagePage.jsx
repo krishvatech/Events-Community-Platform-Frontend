@@ -40,6 +40,8 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import { EditEventDialog } from "./AdminEvents.jsx";
@@ -138,7 +140,7 @@ const fmtDateRange = (start, end) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Resources", "Breakout Rooms"];
+const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Resources", "Breakout Rooms", "Lounge Settings"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms"];
 const MEMBERS_PER_PAGE = 5;
 const RESOURCES_PER_PAGE = 5;
@@ -198,6 +200,17 @@ export default function EventManagePage() {
   const [loungeDeleteTarget, setLoungeDeleteTarget] = useState(null);
   const [loungeDeleteSaving, setLoungeDeleteSaving] = useState(false);
 
+  // Lounge Settings State
+  const [loungeSettingsSaving, setLoungeSettingsSaving] = useState(false);
+  const [loungeSettings, setLoungeSettings] = useState({
+    lounge_enabled_before: false,
+    lounge_before_buffer: 30,
+    lounge_enabled_during: true,
+    lounge_enabled_breaks: false,
+    lounge_enabled_after: false,
+    lounge_after_buffer: 30,
+  });
+
   const isOwner = isOwnerUser();
   const isStaff = isStaffUser();
   const canManageLounge = isOwner || isStaff;
@@ -248,6 +261,20 @@ export default function EventManagePage() {
     load();
     return () => controller.abort();
   }, [eventId, initialEvent]);
+
+  // Sync lounge settings from event
+  useEffect(() => {
+    if (event) {
+      setLoungeSettings({
+        lounge_enabled_before: event.lounge_enabled_before ?? false,
+        lounge_before_buffer: event.lounge_before_buffer ?? 30,
+        lounge_enabled_during: event.lounge_enabled_during ?? true,
+        lounge_enabled_breaks: event.lounge_enabled_breaks ?? false,
+        lounge_enabled_after: event.lounge_enabled_after ?? false,
+        lounge_after_buffer: event.lounge_after_buffer ?? 30,
+      });
+    }
+  }, [event]);
 
   // ---- load registrations (owner only) ----
   useEffect(() => {
@@ -494,11 +521,11 @@ export default function EventManagePage() {
         prev.map((t) =>
           String(t.id) === String(loungeEditTarget.id)
             ? {
-                ...t,
-                name: json.name || name,
-                max_seats: json.max_seats || seatsValue,
-                icon_url: toAbs(json.icon_url || t.icon_url),
-              }
+              ...t,
+              name: json.name || name,
+              max_seats: json.max_seats || seatsValue,
+              icon_url: toAbs(json.icon_url || t.icon_url),
+            }
             : t
         )
       );
@@ -1085,6 +1112,215 @@ export default function EventManagePage() {
             </TableBody>
           </Table>
         </TableContainer>
+      </Paper>
+    );
+  };
+
+  const handleSaveLoungeSettings = async () => {
+    if (!eventId || loungeSettingsSaving) return;
+    setLoungeSettingsSaving(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(loungeSettings),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+      setEvent((prev) => ({ ...prev, ...loungeSettings }));
+      toast.success("Lounge settings saved successfully!");
+    } catch (e) {
+      toast.error(e?.message || "Failed to save lounge settings");
+    } finally {
+      setLoungeSettingsSaving(false);
+    }
+  };
+
+  const renderLoungeSettings = () => {
+    if (!isOwner) return null;
+
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+          p: { xs: 2, sm: 3 },
+          bgcolor: "background.paper",
+        }}
+      >
+        <Stack spacing={3}>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+              Social Lounge Availability
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Control when participants can access the Social Lounge for networking.
+            </Typography>
+          </Box>
+
+          <Divider />
+
+          {/* Before Event */}
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={loungeSettings.lounge_enabled_before}
+                  onChange={(e) =>
+                    setLoungeSettings((prev) => ({
+                      ...prev,
+                      lounge_enabled_before: e.target.checked,
+                    }))
+                  }
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Open Before Event
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Allow networking before the event starts
+                  </Typography>
+                </Box>
+              }
+            />
+            {loungeSettings.lounge_enabled_before && (
+              <TextField
+                type="number"
+                label="Minutes before start"
+                value={loungeSettings.lounge_before_buffer}
+                onChange={(e) =>
+                  setLoungeSettings((prev) => ({
+                    ...prev,
+                    lounge_before_buffer: Math.max(0, parseInt(e.target.value) || 0),
+                  }))
+                }
+                size="small"
+                sx={{ mt: 1, ml: 5, width: 200 }}
+                InputProps={{ inputProps: { min: 0 } }}
+              />
+            )}
+          </Box>
+
+          {/* During Event */}
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={loungeSettings.lounge_enabled_during}
+                  onChange={(e) =>
+                    setLoungeSettings((prev) => ({
+                      ...prev,
+                      lounge_enabled_during: e.target.checked,
+                    }))
+                  }
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Open During Event
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Allow networking while the event is live
+                  </Typography>
+                </Box>
+              }
+            />
+          </Box>
+
+          {/* During Breaks */}
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={loungeSettings.lounge_enabled_breaks}
+                  onChange={(e) =>
+                    setLoungeSettings((prev) => ({
+                      ...prev,
+                      lounge_enabled_breaks: e.target.checked,
+                    }))
+                  }
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Open During Breaks
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Allow networking when the event is on break
+                  </Typography>
+                </Box>
+              }
+            />
+          </Box>
+
+          {/* After Event */}
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={loungeSettings.lounge_enabled_after}
+                  onChange={(e) =>
+                    setLoungeSettings((prev) => ({
+                      ...prev,
+                      lounge_enabled_after: e.target.checked,
+                    }))
+                  }
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Open After Event
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Allow networking after the event ends
+                  </Typography>
+                </Box>
+              }
+            />
+            {loungeSettings.lounge_enabled_after && (
+              <TextField
+                type="number"
+                label="Minutes after end"
+                value={loungeSettings.lounge_after_buffer}
+                onChange={(e) =>
+                  setLoungeSettings((prev) => ({
+                    ...prev,
+                    lounge_after_buffer: Math.max(0, parseInt(e.target.value) || 0),
+                  }))
+                }
+                size="small"
+                sx={{ mt: 1, ml: 5, width: 200 }}
+                InputProps={{ inputProps: { min: 0 } }}
+              />
+            )}
+          </Box>
+
+          <Divider />
+
+          <Stack direction="row" spacing={2} justifyContent="flex-end">
+            <Button
+              variant="contained"
+              onClick={handleSaveLoungeSettings}
+              disabled={loungeSettingsSaving}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+            >
+              {loungeSettingsSaving ? "Saving..." : "Save Settings"}
+            </Button>
+          </Stack>
+        </Stack>
       </Paper>
     );
   };
@@ -1763,6 +1999,7 @@ export default function EventManagePage() {
                   {tab === 1 && renderMembers()}
                   {tab === 2 && renderResources()}
                   {tab === 3 && renderBreakoutRooms()}
+                  {tab === 4 && renderLoungeSettings()}
                 </>
               ) : (
                 <>

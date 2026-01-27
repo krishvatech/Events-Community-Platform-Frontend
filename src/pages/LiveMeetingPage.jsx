@@ -84,7 +84,7 @@ import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
 import { DyteParticipantsAudio } from "@dytesdk/react-ui-kit";
 import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
 import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
-
+import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
 
 
 // ================ API Helper ================
@@ -233,6 +233,8 @@ function getParticipantUserKey(participant) {
   const directId =
     raw.customParticipantId ??
     raw.customParticipant_id ??
+    raw.clientSpecificId ??
+    raw.client_specific_id ??
     raw.userId ??
     raw.user_id ??
     raw.uid ??
@@ -907,7 +909,9 @@ export default function NewLiveMeeting() {
   const [showBreakoutAnnouncement, setShowBreakoutAnnouncement] = useState(false);
   const [isBreakoutControlsOpen, setIsBreakoutControlsOpen] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [serverDebugMessage, setServerDebugMessage] = useState("");
   const mainSocketRef = useRef(null);
+  const lastLoungeFetchRef = useRef(0);
 
   // ✅ Fullscreen support
   const rootRef = useRef(null);
@@ -1139,6 +1143,17 @@ export default function NewLiveMeeting() {
   const [activeTableId, setActiveTableId] = useState(null);
   const [activeTableName, setActiveTableName] = useState("");
   const [loungeTables, setLoungeTables] = useState([]);
+  const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
+
+  const loungeOnlyTables = useMemo(() =>
+    loungeTables.filter(t => t.category === 'LOUNGE' || !t.category),
+    [loungeTables]
+  );
+
+  const breakoutOnlyTables = useMemo(() =>
+    loungeTables.filter(t => t.category === 'BREAKOUT'),
+    [loungeTables]
+  );
 
   const [scheduledLabel, setScheduledLabel] = useState("--");
   const [durationLabel, setDurationLabel] = useState("--");
@@ -1147,6 +1162,11 @@ export default function NewLiveMeeting() {
   const [dyteMeeting, initMeeting] = useDyteClient();
   const [initDone, setInitDone] = useState(false);
   const selfPermissions = useDytePermissions(dyteMeeting);
+
+  // Dual connection for main room peek
+  const [mainDyteMeeting, initMainMeeting] = useDyteClient();
+  const [mainRoomAuthToken, setMainRoomAuthToken] = useState(null);
+  const [isInBreakoutRoom, setIsInBreakoutRoom] = useState(false);
 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
@@ -1411,12 +1431,10 @@ export default function NewLiveMeeting() {
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
 
   const resolveTableName = useCallback(
-    (tableId) => {
-      if (!tableId) return "";
-      const hit = (Array.isArray(loungeTables) ? loungeTables : []).find(
-        (t) => String(t?.id) === String(tableId)
-      );
-      return hit?.name || "";
+    (tid) => {
+      const table = loungeTables.find((t) => String(t.id) === String(tid));
+      if (!table) return "";
+      return table.name || `Room ${tid}`;
     },
     [loungeTables]
   );
@@ -1425,24 +1443,54 @@ export default function NewLiveMeeting() {
     async (newToken, tableId, tableName) => {
       if (newToken) {
         console.log("[LiveMeeting] Transitioning to breakout room...");
-        if (isBreakout && dyteMeeting) {
-          console.log("[LiveMeeting] Switching tables: Leaving current room explicitly...");
+
+        // 1. If currently in a meeting, leave it first
+        if (dyteMeeting) {
+          console.log("[LiveMeeting] Switching rooms: Leaving current room explicitly...");
           ignoreRoomLeftRef.current = true;
           try {
             await dyteMeeting.leaveRoom();
+            // Wait a bit for SDK to clean up
+            await new Promise(r => setTimeout(r, 800));
           } catch (e) {
-            console.warn("[LiveMeeting] Error leaving previous breakout:", e);
+            console.warn("[LiveMeeting] Error leaving previous room:", e);
           }
           ignoreRoomLeftRef.current = false;
         }
 
-        console.log("[LiveMeeting] New breakout token received");
+        // 2. Clear state before re-initializing
+        setAuthToken(null);
+        setInitDone(false);
+        setRoomJoined(false);
+        joinedOnceRef.current = false;
+
+        console.log("[LiveMeeting] Applying new breakout token");
+
+        // Initialize main room connection if not already done (lazy init)
+        if (mainRoomAuthToken && !mainDyteMeeting) {
+          console.log("[LiveMeeting] Lazy-initializing main room connection for peek");
+          try {
+            await initMainMeeting({
+              authToken: mainRoomAuthToken,
+              defaults: {
+                audio: false, // Muted to prevent echo
+                video: true,  // Enable to receive video streams
+              },
+            });
+          } catch (e) {
+            console.error("[LiveMeeting] Failed to initialize main room:", e);
+          }
+        }
+
         setIsBreakout(true);
         setAuthToken(newToken);
         if (tableId) {
           setActiveTableId(tableId);
           setActiveTableName(tableName || `Room ${tableId}`);
         }
+
+        // Auto-switch to Room Chat (Tab 0) when entering breakout
+        setTab(0);
         return;
       }
 
@@ -1453,20 +1501,19 @@ export default function NewLiveMeeting() {
           ignoreRoomLeftRef.current = true;
           try {
             await dyteMeeting.leaveRoom();
+            await new Promise(r => setTimeout(r, 800));
           } catch (e) {
             console.warn("[LiveMeeting] Error leaving breakout:", e);
           }
           ignoreRoomLeftRef.current = false;
         }
 
-        console.log("[LiveMeeting] Current state:", {
-          isBreakout,
-          hasMainToken: !!mainAuthTokenRef.current,
-          currentAuthToken: authToken?.substring(0, 20) + "...",
-          mainAuthToken: mainAuthTokenRef.current?.substring(0, 20) + "...",
-        });
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        console.log("[LiveMeeting] Switching back to main token");
+        console.log("[LiveMeeting] Resetting to main meeting state");
+        setAuthToken(null);
+        setInitDone(false);
+        setRoomJoined(false);
+        joinedOnceRef.current = false;
+
         setIsBreakout(false);
         setAuthToken(mainAuthTokenRef.current);
         setActiveTableId(null);
@@ -1477,7 +1524,7 @@ export default function NewLiveMeeting() {
         console.warn("[LiveMeeting] No main token available to return to!");
       }
     },
-    [authToken, dyteMeeting, isBreakout]
+    [dyteMeeting, isBreakout, mainRoomAuthToken, mainDyteMeeting, initMainMeeting]
   );
 
 
@@ -1771,6 +1818,39 @@ export default function NewLiveMeeting() {
     })();
   }, [eventId, role, isBreakout]);
 
+  // Fallback: fetch lounge state periodically in case websocket updates are missed
+  const fetchLoungeState = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
+        headers: { ...authHeader() },
+      });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      const tables = data?.tables || data?.lounge_state || data?.state || [];
+      if (Array.isArray(tables)) {
+        setLoungeTables(tables);
+      }
+      if (data?.lounge_open_status) {
+        setLoungeOpenStatus(data.lounge_open_status);
+      }
+    } catch (e) {
+      // ignore transient errors
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    fetchLoungeState();
+    const interval = setInterval(() => {
+      // Avoid too-frequent fetches if other updates already happened
+      if (Date.now() - lastLoungeFetchRef.current > 8000) {
+        fetchLoungeState();
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [eventId, fetchLoungeState]);
+
   // ---------- Persistent Main Event WebSocket (for Force Join, Timer, Broadcast) ----------
   useEffect(() => {
     if (!eventId) return;
@@ -1795,7 +1875,13 @@ export default function NewLiveMeeting() {
           // 1. Join the table via API to get token
           handleEnterBreakout(msg.table_id);
         } else if (msg.type === "server_debug") {
-          // Silent in production
+          // Show a toast or console log if host
+          if (isHost) {
+            console.log("[SERVER_DEBUG]", msg.message);
+            setServerDebugMessage(msg.message);
+            // Clear message after 10 seconds
+            setTimeout(() => setServerDebugMessage(""), 10000);
+          }
         } else if (msg.type === "breakout_timer") {
           setBreakoutTimer(msg.duration);
         } else if (msg.type === "breakout_announcement") {
@@ -1807,6 +1893,10 @@ export default function NewLiveMeeting() {
             msg.lounge_state || msg.state || msg.tables || msg.lounge_tables || [];
           if (Array.isArray(tableState) && tableState.length) {
             setLoungeTables(tableState);
+            lastLoungeFetchRef.current = Date.now();
+          }
+          if (msg.lounge_open_status) {
+            setLoungeOpenStatus(msg.lounge_open_status);
           }
         } else if (msg.type === "breakout_end") {
           console.log("[MainSocket] Breakout session ended by host.");
@@ -1871,6 +1961,13 @@ export default function NewLiveMeeting() {
         joinedOnceRef.current = false;
         setRoomJoined(false);
 
+        // Store main room token if this is the initial connection (not a breakout)
+        // We'll initialize the main connection lazily when entering breakout
+        if (!isBreakout && !mainRoomAuthToken) {
+          setMainRoomAuthToken(authToken);
+        }
+
+        // Initialize active meeting (main or breakout)
         await initMeeting({
           authToken,
           defaults: {
@@ -1878,6 +1975,9 @@ export default function NewLiveMeeting() {
             video: isBreakout || role === "publisher",
           },
         });
+
+        // Update breakout status
+        setIsInBreakoutRoom(isBreakout);
 
         if (!cancelled) setInitDone(true);
       } catch (e) {
@@ -1888,7 +1988,38 @@ export default function NewLiveMeeting() {
     return () => {
       cancelled = true;
     };
-  }, [authToken, initMeeting, role, isBreakout]);
+  }, [authToken, initMeeting, role, isBreakout, mainRoomAuthToken]);
+
+  // ---------- Join main room (for peek functionality) ----------
+  useEffect(() => {
+    if (!mainDyteMeeting?.self || !mainRoomAuthToken) return;
+
+    (async () => {
+      if (mainDyteMeeting.self.roomJoined) return;
+
+      try {
+        await mainDyteMeeting.join();
+        console.log("[MainRoom] Joined main room for peek");
+      } catch (e) {
+        console.error("[MainRoom] Failed to join:", e);
+      }
+    })();
+  }, [mainDyteMeeting, mainRoomAuthToken]);
+
+  // ---------- Audio routing: Mute main room when in breakout ----------
+  useEffect(() => {
+    if (!mainDyteMeeting?.self) return;
+
+    if (isInBreakoutRoom) {
+      // Mute main room to prevent echo
+      mainDyteMeeting.self.disableAudio();
+      console.log("[MainRoom] Muted audio (in breakout)");
+    } else {
+      // Restore main room audio when back in main
+      mainDyteMeeting.self.enableAudio();
+      console.log("[MainRoom] Enabled audio (back in main)");
+    }
+  }, [isInBreakoutRoom, mainDyteMeeting]);
 
   // ---------- MUST join Dyte room (custom UI doesn't auto-join) ----------
   useEffect(() => {
@@ -2453,6 +2584,13 @@ export default function NewLiveMeeting() {
   }, [dyteMeeting]);
 
   const participants = useMemo(() => {
+    const loungeOccupantIds = new Set();
+    loungeTables.forEach((t) => {
+      Object.values(t.participants || {}).forEach((p) => {
+        if (p.user_id) loungeOccupantIds.add(String(p.user_id));
+      });
+    });
+
     const list = [];
 
     // Prefer self, then joined, then fallback observed entries
@@ -2460,13 +2598,50 @@ export default function NewLiveMeeting() {
     getJoinedParticipants().forEach((p) => list.push(p));
     observedParticipantsRef.current.forEach((p) => list.push(p));
 
+    const joinedIds = new Set(getJoinedParticipants().map(p => p.id));
+    if (dyteMeeting?.self?.id) joinedIds.add(dyteMeeting.self.id);
+
     const deduped = [];
     const seenKeys = new Set();
+    let idx = 0;
     for (const p of list) {
       const key = getParticipantUserKey(p) || `id:${String(p?.id || "")}`;
       if (!key || seenKeys.has(key)) continue;
       seenKeys.add(key);
+
+      // Attach inMeeting flag
+      p.inMeeting = joinedIds.has(p.id);
+
+      // Attach lounge occupancy info
+      const userKey = getParticipantUserKey(p);
+      const userIdFromKey = userKey.startsWith("id:") ? userKey.replace("id:", "") : null;
+
+      const raw = p?._raw || p || {};
+      const clientSpecificId = String(
+        userIdFromKey ||
+        raw.clientSpecificId ||
+        raw.client_specific_id ||
+        p.clientSpecificId ||
+        p.userId ||
+        p.customId ||
+        raw.userId ||
+        raw.clientSpecificId ||
+        raw.client_specific_id ||
+        raw.customParticipantId ||
+        raw.uid ||
+        p.id ||
+        ""
+      );
+
+      const isOccupied = loungeOccupantIds.has(clientSpecificId);
+      p.isOccupyingLounge = isOccupied;
+
+      if (isHost && idx % 10 === 0 && participantsTick % 10 === 0) {
+        console.log(`[LoungeIsolation] ${p.name}: key=${userKey}, extractedID=${clientSpecificId}, inLounge=${isOccupied}`);
+      }
+
       deduped.push(p);
+      idx++;
     }
 
     deduped.forEach((pp) => {
@@ -2542,10 +2717,12 @@ export default function NewLiveMeeting() {
         active: Boolean(p.isSpeaking),
         joinedAtTs: participantJoinedAtRef.current.get(p.id),
         picture: p.picture || p.avatar || p.profilePicture || metaPicture || "", // ✅ Extract picture
+        inMeeting: Boolean(p.inMeeting),
+        isOccupyingLounge: Boolean(p.isOccupyingLounge),
         _raw: p,
       };
     });
-  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, participantsTick]);
+  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, participantsTick, loungeTables]);
 
   // ✅ Leave Breakout / Table logic
   const handleLeaveBreakout = useCallback(async () => {
@@ -2645,8 +2822,9 @@ export default function NewLiveMeeting() {
     if (typeof window !== "undefined") {
       window.__dyteMeeting = dyteMeeting;
       window.__dyteParticipantsSnapshot = snapshot;
+      window.__loungeTables = loungeTables;
     }
-  }, [dyteMeeting, getJoinedParticipants, participantsTick]);
+  }, [dyteMeeting, getJoinedParticipants, participantsTick, loungeTables]);
 
   // Pinned “host” view data
   const latestPinnedHost = useMemo(() => {
@@ -3141,6 +3319,7 @@ export default function NewLiveMeeting() {
 
     const tick = async () => {
       if (!alive) return;
+      if (!getToken()) return;
 
       try {
         const res = await fetch(toApiUrl("messaging/conversations/"), {
@@ -3196,6 +3375,7 @@ export default function NewLiveMeeting() {
 
     const tick = async () => {
       if (!alive) return;
+      if (!getToken()) return;
 
       try {
         // 1) Check unread for THIS DM
@@ -3254,6 +3434,7 @@ export default function NewLiveMeeting() {
 
     const tick = async () => {
       if (!alive) return;
+      if (!getToken()) return;
 
       const unread = await fetchChatUnread();
 
@@ -3771,15 +3952,15 @@ export default function NewLiveMeeting() {
     const hostId = pinnedHost?.id || (isHost ? dyteMeeting?.self?.id : null);
 
     const host = hostId
-      ? participants.filter((p) => p.id === hostId)
-      : participants.filter((p) => p.role === "Host");
+      ? participants.filter((p) => p.id === hostId && p.inMeeting)
+      : participants.filter((p) => p.role === "Host" && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
 
     const audience = hostId
-      ? participants.filter((p) => p.id !== hostId) // ✅ all others go to audience
-      : participants.filter((p) => p.role !== "Host");
+      ? participants.filter((p) => p.id !== hostId && p.inMeeting && (isBreakout || !p.isOccupyingLounge)) // ✅ filter lounge occupants out of main room
+      : participants.filter((p) => p.role !== "Host" && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
 
     return { host, speakers: [], audience };
-  }, [participants, pinnedHost, isHost, dyteMeeting?.self?.id]);
+  }, [participants, pinnedHost, isHost, dyteMeeting?.self?.id, isBreakout]);
 
   // --- Self helpers for Members UI ---
   const selfDyteId = dyteMeeting?.self?.id || null;
@@ -3808,10 +3989,12 @@ export default function NewLiveMeeting() {
   const stageOthers = useMemo(() => {
     if (isBreakout) {
       // In breakout, everyone is a peer. Hide only the person currently occupying the main stage.
-      return participants.filter((p) => p.id !== latestPinnedHost?.id);
+      return participants.filter((p) => p.id !== latestPinnedHost?.id && p.inMeeting);
     }
     // Main meeting: keep legacy behavior of hiding all hosts from the audience strip
-    return participants.filter((p) => p.role !== "Host");
+    // PLUS filter out anybody not actually in the meeting (e.g. they are in a breakout room)
+    // PLUS filter out anybody currently in the Social Lounge
+    return participants.filter((p) => p.role !== "Host" && p.inMeeting && !p.isOccupyingLounge);
   }, [participants, isBreakout, latestPinnedHost]);
 
   // Strip should be only others (no host duplicate)
@@ -4227,39 +4410,45 @@ export default function NewLiveMeeting() {
                 <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
 
                 <Box sx={{ p: 2 }}>
-                  <TextField
-                    fullWidth
-                    placeholder="Type a message..."
-                    size="small"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        sendChatMessage();
-                      }
-                    }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            size="small"
-                            aria-label="Send message"
-                            onClick={sendChatMessage}
-                            disabled={chatSending || !chatInput.trim()}
-                          >
-                            {chatSending ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        bgcolor: "rgba(255,255,255,0.03)",
-                        borderRadius: 2,
-                      },
-                    }}
-                  />
+                  {isBreakout && !isRoomChatActive ? (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      Public chat is disabled while you are in a breakout room. Return to the main room to participate.
+                    </Alert>
+                  ) : (
+                    <TextField
+                      fullWidth
+                      placeholder={isRoomChatActive ? "Type to room..." : "Type a message..."}
+                      size="small"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          sendChatMessage();
+                        }
+                      }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              size="small"
+                              aria-label="Send message"
+                              onClick={sendChatMessage}
+                              disabled={chatSending || !chatInput.trim()}
+                            >
+                              {chatSending ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          bgcolor: "rgba(255,255,255,0.03)",
+                          borderRadius: 2,
+                        },
+                      }}
+                    />
+                  )}
                 </Box>
               </TabPanel>
             )}
@@ -5454,21 +5643,45 @@ export default function NewLiveMeeting() {
           <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
           {loungeTables.length === 0 ? (
             <MenuItem disabled>
-              <ListItemText primary="No breakout rooms yet" />
+              <ListItemText primary="No rooms yet" />
             </MenuItem>
           ) : (
-            loungeTables.map((table) => (
-              <MenuItem
-                key={table.id}
-                onClick={() => handleQuickSwitch(table.id)}
-                selected={isBreakout && String(activeTableId) === String(table.id)}
-              >
-                <ListItemText
-                  primary={table.name || `Room ${table.id}`}
-                  secondary={isBreakout && String(activeTableId) === String(table.id) ? "You are here" : null}
-                />
-              </MenuItem>
-            ))
+            <>
+              {breakoutOnlyTables.length > 0 && (
+                <MenuItem disabled sx={{ opacity: "1 !important" }}>
+                  <Typography variant="caption" sx={{ color: "#14b8b1", fontWeight: 800 }}>BREAKOUT SESSIONS</Typography>
+                </MenuItem>
+              )}
+              {breakoutOnlyTables.map((table) => (
+                <MenuItem
+                  key={table.id}
+                  onClick={() => handleQuickSwitch(table.id)}
+                  selected={isBreakout && String(activeTableId) === String(table.id)}
+                >
+                  <ListItemText
+                    primary={table.name}
+                    secondary={isBreakout && String(activeTableId) === String(table.id) ? "You are here" : null}
+                  />
+                </MenuItem>
+              ))}
+              {loungeOnlyTables.length > 0 && (
+                <MenuItem disabled sx={{ opacity: "1 !important", mt: 1 }}>
+                  <Typography variant="caption" sx={{ color: "#5a78ff", fontWeight: 800 }}>NETWORKING</Typography>
+                </MenuItem>
+              )}
+              {loungeOnlyTables.map((table) => (
+                <MenuItem
+                  key={table.id}
+                  onClick={() => handleQuickSwitch(table.id)}
+                  selected={!isBreakout && String(activeTableId) === String(table.id)}
+                >
+                  <ListItemText
+                    primary={table.name}
+                    secondary={!isBreakout && String(activeTableId) === String(table.id) ? "You are here" : null}
+                  />
+                </MenuItem>
+              ))}
+            </>
           )}
         </Menu>
 
@@ -6248,7 +6461,24 @@ export default function NewLiveMeeting() {
           }
         }}
         onlineCount={onlineUsers.length}
+        debugMessage={serverDebugMessage}
       />
+
+      {/* ✅ Main Room Peek (when seated at a lounge table) */}
+      {activeTableId && dyteMeeting && (
+        <Box
+          sx={{
+            position: "fixed",
+            bottom: 20,
+            right: 20,
+            zIndex: 1300,
+            width: 280,
+            height: 180,
+          }}
+        >
+          <MainRoomPeek mainDyteMeeting={mainDyteMeeting} isInBreakout={isInBreakoutRoom} />
+        </Box>
+      )}
 
       {/* ✅ Global Announcement Notification */}
       <Snackbar

@@ -15,37 +15,48 @@ const LoungeGrid = ({
     onEditTable,
     onDeleteTable,
     onParticipantClick,
+    title,
+    description,
+    showCreateButton = true,
 }) => {
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: 'white', mb: 1 }}>
-                        Social Lounge
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                        Meet and greet while we prepare to go live. Take a seat to join a conversation.
-                    </Typography>
+            {(title || description || (isAdmin && showCreateButton)) && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                    {(title || description) && (
+                        <Box>
+                            {title && (
+                                <Typography variant="h4" sx={{ fontWeight: 800, color: 'white', mb: 1 }}>
+                                    {title}
+                                </Typography>
+                            )}
+                            {description && (
+                                <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                                    {description}
+                                </Typography>
+                            )}
+                        </Box>
+                    )}
+                    {isAdmin && showCreateButton && (
+                        <Button
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={onCreateTable}
+                            sx={{
+                                borderRadius: 3,
+                                px: 3,
+                                py: 1.5,
+                                bgcolor: '#5a78ff',
+                                '&:hover': { bgcolor: '#4a68ef' },
+                                textTransform: 'none',
+                                fontWeight: 700
+                            }}
+                        >
+                            Create new table
+                        </Button>
+                    )}
                 </Box>
-                {isAdmin && (
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={onCreateTable}
-                        sx={{
-                            borderRadius: 3,
-                            px: 3,
-                            py: 1.5,
-                            bgcolor: '#5a78ff',
-                            '&:hover': { bgcolor: '#4a68ef' },
-                            textTransform: 'none',
-                            fontWeight: 700
-                        }}
-                    >
-                        Create new table
-                    </Button>
-                )}
-            </Box>
+            )}
 
             <Grid container spacing={3}>
                 {tables.map((table) => (
@@ -74,7 +85,7 @@ const LoungeGrid = ({
                             border: '1px dashed rgba(255,255,255,0.1)'
                         }}>
                             <Typography sx={{ color: 'rgba(255,255,255,0.4)' }}>
-                                No tables available in this lounge yet.
+                                No tables available yet.
                             </Typography>
                         </Box>
                     </Grid>

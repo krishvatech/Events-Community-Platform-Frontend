@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography, CircularProgress, Backdrop, Button, TextField } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import LoungeGrid from './LoungeGrid';
+import MainRoomPeek from './MainRoomPeek';
 
 const API_RAW = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 const WS_ROOT = API_RAW.replace(/^http/, "ws").replace(/\/api\/?$/, "");
@@ -11,8 +12,10 @@ function getToken() {
 
 const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, dyteMeeting, onParticipantClick }) => {
     const [tables, setTables] = useState([]);
+    const [breakoutTables, setBreakoutTables] = useState([]);
     const [loading, setLoading] = useState(true);
     const [wsStatus, setWsStatus] = useState('connecting'); // 'connecting', 'open', 'closed'
+    const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
     const [myInternalId, setMyInternalId] = useState(null);
     const [myUsername, setMyUsername] = useState(null);
     const [createOpen, setCreateOpen] = useState(false);
@@ -100,7 +103,13 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             if (res.ok) {
                 const data = await res.json();
                 console.log("[Lounge] Fetched state:", data.tables);
-                setTables(normalizeTables(data.tables));
+                const loungeOnly = (data.tables || []).filter(t => t.category === 'LOUNGE' || !t.category);
+                const breakoutOnly = (data.tables || []).filter(t => t.category === 'BREAKOUT');
+                setTables(normalizeTables(loungeOnly));
+                setBreakoutTables(normalizeTables(breakoutOnly));
+                if (data.lounge_open_status) {
+                    setLoungeOpenStatus(data.lounge_open_status);
+                }
                 setLoading(false);
             }
         } catch (err) {
@@ -174,7 +183,13 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     }
                     const newState = msg.lounge_state || msg.state || [];
                     console.log("[Lounge] Updating Tables:", newState);
-                    setTables(normalizeTables(newState));
+                    const loungeOnly = newState.filter(t => t.category === 'LOUNGE' || !t.category);
+                    const breakoutOnly = newState.filter(t => t.category === 'BREAKOUT');
+                    setTables(normalizeTables(loungeOnly));
+                    setBreakoutTables(normalizeTables(breakoutOnly));
+                    if (msg.lounge_open_status) {
+                        setLoungeOpenStatus(msg.lounge_open_status);
+                    }
                     setLoading(false);
                 } else if (msg.type === "error") {
                     console.error("[Lounge] Backend Error:", msg.message);
@@ -297,6 +312,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             if (createIconFile) {
                 const formData = new FormData();
                 formData.append("name", name);
+                formData.append("category", "LOUNGE");
                 formData.append("max_seats", clampSeats(createSeats));
                 formData.append("icon", createIconFile);
                 res = await fetch(url, {
@@ -313,7 +329,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${getToken()}`
                     },
-                    body: JSON.stringify({ name, max_seats: clampSeats(createSeats) })
+                    body: JSON.stringify({ name, category: "LOUNGE", max_seats: clampSeats(createSeats) })
                 });
             }
             if (res.ok) {
@@ -476,61 +492,141 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     }
                 }}
             >
-            <Box sx={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
-                        <Box sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            bgcolor: wsStatus === 'open' ? '#22c55e' : (wsStatus === 'closed' ? '#ef4444' : '#f59e0b')
-                        }} />
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                            {wsStatus === 'open' ? 'Live Refresh Active' : (wsStatus === 'closed' ? 'Connection Failed (Check Console)' : 'Connecting to Server...')}
-                        </Typography>
-                        <Button
-                            size="small"
-                            onClick={fetchLoungeState}
-                            sx={{ ml: 2, color: '#5a78ff', textTransform: 'none', fontSize: '0.7rem' }}
-                        >
-                            Sync Now
-                        </Button>
-                    </Box>
-                    <IconButton onClick={onClose} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.05)' }}>
-                        <CloseIcon />
-                    </IconButton>
-                </Box>
-
-                {loading ? (
-                    <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <CircularProgress />
-                    </Box>
-                ) : (
-                    <Box sx={{ flex: 1, overflowY: 'auto' }}>
-                        <LoungeGrid
-                            tables={tables}
-                            onJoin={(tableId, seatIndex) => {
-                                handleJoinTable(tableId, seatIndex);
-                                handleEnterBreakout(tableId);
-                            }}
-                            onLeave={() => handleLeaveTable(dyteMeeting)}
-                            currentUserId={myInternalId || currentUserId}
-                            myUsername={myUsername}
-                            isAdmin={isAdmin}
-                            onCreateTable={() => setCreateOpen(true)}
-                            onUpdateIcon={handleUpdateTableIcon}
-                            onEditTable={handleOpenEditTable}
-                            onDeleteTable={handleOpenDeleteTable}
-                            onParticipantClick={onParticipantClick}
-                        />
-                        <Box sx={{ px: 4, pb: 2 }}>
-                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                                Debug Info: My ID (JWT): {currentUserId} | My ID (Backend): {myInternalId || 'Waiting...'} | Username: {myUsername || '...'}
+                <Box sx={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ ml: 2 }}>
+                            <Typography variant="h5" sx={{ color: 'white', fontWeight: 700 }}>
+                                Social Lounge & Networking
                             </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                <Box sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: '50%',
+                                    bgcolor: wsStatus === 'open' ? '#22c55e' : (wsStatus === 'closed' ? '#ef4444' : '#f59e0b')
+                                }} />
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                                    {wsStatus === 'open' ? 'Live Refresh Active' : (wsStatus === 'closed' ? 'Connection Failed' : 'Connecting...')}
+                                </Typography>
+                            </Box>
                         </Box>
+                        <IconButton onClick={onClose} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.05)' }}>
+                            <CloseIcon />
+                        </IconButton>
                     </Box>
-                )}
-            </Box>
+
+                    {loading ? (
+                        <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : (
+                        <Box sx={{
+                            flex: 1,
+                            overflowY: 'auto',
+                            // Custom scrollbar styling
+                            '&::-webkit-scrollbar': {
+                                width: '8px',
+                            },
+                            '&::-webkit-scrollbar-track': {
+                                background: 'rgba(255,255,255,0.05)',
+                                borderRadius: '10px',
+                            },
+                            '&::-webkit-scrollbar-thumb': {
+                                background: 'rgba(90,120,255,0.3)',
+                                borderRadius: '10px',
+                                '&:hover': {
+                                    background: 'rgba(90,120,255,0.5)',
+                                },
+                            },
+                            // Firefox scrollbar styling
+                            scrollbarWidth: 'thin',
+                            scrollbarColor: 'rgba(90,120,255,0.3) rgba(255,255,255,0.05)',
+                        }}>
+                            {loungeOpenStatus && (
+                                <Box sx={{
+                                    mx: 3, mt: 2, mb: 1, p: 2,
+                                    bgcolor: loungeOpenStatus.status === 'OPEN' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                                    border: `1px solid ${loungeOpenStatus.status === 'OPEN' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                                    borderRadius: 3,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 2
+                                }}>
+                                    <Box sx={{
+                                        width: 10, height: 10, borderRadius: '50%',
+                                        bgcolor: loungeOpenStatus.status === 'OPEN' ? '#22c55e' : '#ef4444',
+                                        boxShadow: loungeOpenStatus.status === 'OPEN' ? '0 0 10px rgba(34,197,94,0.5)' : 'none'
+                                    }} />
+                                    <Box>
+                                        <Typography sx={{ color: 'white', fontWeight: 600, fontSize: 13, lineHeight: 1.2 }}>
+                                            Lounge is {loungeOpenStatus.status}
+                                        </Typography>
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, mt: 0.3 }}>
+                                            {loungeOpenStatus.reason}
+                                            {loungeOpenStatus.next_change && ` • Changes at ${new Date(loungeOpenStatus.next_change).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            )}
+
+                            <LoungeGrid
+                                tables={tables}
+                                title="Social Lounge"
+                                description="Meet and greet while we prepare to go live. Take a seat to join a conversation."
+                                onJoin={(tableId, seatIndex) => {
+                                    if (loungeOpenStatus?.status === 'CLOSED' && !isAdmin) {
+                                        alert("The lounge is currently closed.");
+                                        return;
+                                    }
+                                    handleJoinTable(tableId, seatIndex);
+                                    handleEnterBreakout(tableId);
+                                }}
+                                onLeave={() => handleLeaveTable(dyteMeeting)}
+                                currentUserId={myInternalId || currentUserId}
+                                myUsername={myUsername}
+                                isAdmin={isAdmin}
+                                onCreateTable={() => setCreateOpen(true)}
+                                onUpdateIcon={handleUpdateTableIcon}
+                                onEditTable={handleOpenEditTable}
+                                onDeleteTable={handleOpenDeleteTable}
+                                onParticipantClick={onParticipantClick}
+                            />
+
+                            {breakoutTables.length > 0 && (
+                                <Box sx={{ mt: 2 }}>
+                                    <Box sx={{ px: 4, py: 2, bgcolor: 'rgba(255,255,255,0.03)', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <Typography sx={{ color: '#5a78ff', fontWeight: 800, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>
+                                            Active Breakout Rooms
+                                        </Typography>
+                                    </Box>
+                                    <LoungeGrid
+                                        tables={breakoutTables}
+                                        showCreateButton={false}
+                                        onJoin={(tableId, seatIndex) => {
+                                            handleJoinTable(tableId, seatIndex);
+                                            handleEnterBreakout(tableId);
+                                        }}
+                                        onLeave={() => handleLeaveTable(dyteMeeting)}
+                                        currentUserId={myInternalId || currentUserId}
+                                        myUsername={myUsername}
+                                        isAdmin={isAdmin}
+                                        onUpdateIcon={handleUpdateTableIcon}
+                                        onEditTable={handleOpenEditTable}
+                                        onDeleteTable={handleOpenDeleteTable}
+                                        onParticipantClick={onParticipantClick}
+                                    />
+                                </Box>
+                            )}
+                            <Box sx={{ px: 4, pb: 2 }}>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                    Debug Info: My ID (JWT): {currentUserId} | My ID (Backend): {myInternalId || 'Waiting...'} | Username: {myUsername || '...'}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    )}
+
+                    <MainRoomPeek dyteMeeting={dyteMeeting} />
+                </Box>
             </Dialog>
 
             <Dialog
