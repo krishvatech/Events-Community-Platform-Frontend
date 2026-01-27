@@ -1408,6 +1408,7 @@ export default function NewLiveMeeting() {
   const [hostJoined, setHostJoined] = useState(false);
   const [pinnedHost, setPinnedHost] = useState(null);
   const [hostIdHint, setHostIdHint] = useState(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
 
   const resolveTableName = useCallback(
     (tableId) => {
@@ -1722,6 +1723,7 @@ export default function NewLiveMeeting() {
     })();
   }, [slug]);
 
+
   // ---------- Join Dyte via your backend ----------
   useEffect(() => {
     if (!eventId) return;
@@ -1996,7 +1998,8 @@ export default function NewLiveMeeting() {
   const ignoreRoomLeftRef = useRef(false);
 
   const handleMeetingEnd = useCallback(
-    async (state) => {
+    async (state, options = {}) => {
+      const { explicitEnd = false } = options;
       if (endHandledRef.current) return;
       endHandledRef.current = true;
 
@@ -2012,7 +2015,7 @@ export default function NewLiveMeeting() {
       } catch { }
 
       if (role === "publisher") {
-        updateLiveStatus("end");
+        if (explicitEnd) updateLiveStatus("end");
         navigate("/admin/events");
       } else {
         navigate(-1);
@@ -2020,6 +2023,34 @@ export default function NewLiveMeeting() {
     },
     [navigate, role, updateLiveStatus, dyteMeeting]
   );
+
+  // Poll event status so clients exit when backend ends the meeting
+  useEffect(() => {
+    if (!eventId) return;
+    let cancelled = false;
+
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/`), { headers: authHeader() });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.status) setDbStatus(data.status);
+        if (data?.status === "ended" && !endHandledRef.current) {
+          handleMeetingEnd("ended");
+        }
+      } catch {
+        // ignore transient errors
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [eventId, handleMeetingEnd]);
 
   useEffect(() => {
     if (!dyteMeeting?.self) return;
@@ -2140,7 +2171,7 @@ export default function NewLiveMeeting() {
     return () => dyteMeeting.participants?.off?.("broadcastedMessage", handleBroadcast);
   }, [dyteMeeting, getJoinedParticipants]);
 
-  // ✅ If Host leaves MAIN MEETING, auto-end for everyone (audience auto leaves)
+  // ✅ If Host leaves MAIN MEETING, show waiting state for audience
   // NOTE: This should NOT trigger when host leaves a breakout room
   useEffect(() => {
     if (!dyteMeeting) return;
@@ -2156,18 +2187,11 @@ export default function NewLiveMeeting() {
       const hostId = hostIdHint || pinnedHost?.id;
       if (!hostId || !p?.id) return;
 
-      // Host left MAIN meeting => end meeting for audience
+      // Host left MAIN meeting => show waiting state (do not end)
       if (p.id === hostId) {
-        if (endHandledRef.current) return;
-
-        console.log("[LiveMeeting] Host left MAIN meeting - ending for all attendees");
-
-        // optional: reflect UI state
-        setDbStatus("ended");
-
-        // leave + exit screen
-        dyteMeeting.leaveRoom?.();
-        handleMeetingEnd("ended");
+        console.log("[LiveMeeting] Host left MAIN meeting - waiting for host to return");
+        setHostJoined(false);
+        setPinnedHost(null);
       }
     };
 
@@ -2181,6 +2205,26 @@ export default function NewLiveMeeting() {
       dyteMeeting?.off?.("participantLeft", onParticipantLeft);
     };
   }, [dyteMeeting, getJoinedParticipants, isHost, isBreakout, hostIdHint, pinnedHost, handleMeetingEnd]);
+
+  // If pinned host is no longer present, clear pinned state
+  useEffect(() => {
+    if (!pinnedHost) return;
+    const current = getJoinedParticipants().find((p) => p?.id === pinnedHost?.id);
+    if (current) return;
+
+    try {
+      pinnedHost.unpin?.();
+    } catch { }
+    try {
+      dyteMeeting?.participants?.unpin?.(pinnedHost);
+    } catch { }
+    try {
+      dyteMeeting?.participants?.unpin?.(pinnedHost?.id);
+    } catch { }
+
+    setHostJoined(false);
+    setPinnedHost(null);
+  }, [dyteMeeting, getJoinedParticipants, pinnedHost]);
 
   // Host broadcasts presence so audience can pin
   useEffect(() => {
@@ -2640,8 +2684,8 @@ export default function NewLiveMeeting() {
       recording: true,
       roomLabel: isBreakout ? "Breakout" : "Pinned",
       host: {
-        name: latestPinnedHost?.name || (isBreakout ? "Breakout Room" : "Host"),
-        role: (isBreakout && latestPinnedHost) ? "Member" : "Host"
+        name: latestPinnedHost?.name || (isBreakout ? "Breakout Room" : "Waiting for host"),
+        role: latestPinnedHost ? (isBreakout ? "Member" : "Host") : (isBreakout ? "Member" : "Disconnected"),
       },
     }),
     [eventTitle, dbStatus, latestPinnedHost, joinElapsedLabel, isBreakout]
@@ -2823,7 +2867,7 @@ export default function NewLiveMeeting() {
   const stageHasVideo = pinnedHasVideo || hasScreenshare;
 
   // If audience and host not live yet
-  const shouldShowMeeting = role === "publisher" || hostJoined || dbStatus === "live";
+  const shouldShowMeeting = role === "publisher" || roomJoined || hostJoined || dbStatus === "live";
 
   // Back behavior (same as old intent)
   const handleBack = () => {
@@ -5514,20 +5558,43 @@ export default function NewLiveMeeting() {
               >
                 {!stageHasVideo && (
                   <>
-                    <Avatar
-                      src={pinnedRaw?.picture} // ✅ Use pinned host picture
-                      sx={{
-                        width: 76,
-                        height: 76,
-                        fontSize: 22,
-                        bgcolor: "rgba(255,255,255,0.12)",
-                      }}
-                    >
-                      {initialsFromName(meeting.host.name)}
-                    </Avatar>
+                    {latestPinnedHost ? (
+                      <>
+                        <Avatar
+                          src={pinnedRaw?.picture} // ✅ Use pinned host picture
+                          sx={{
+                            width: 76,
+                            height: 76,
+                            fontSize: 22,
+                            bgcolor: "rgba(255,255,255,0.12)",
+                          }}
+                        >
+                          {initialsFromName(meeting.host.name)}
+                        </Avatar>
 
-                    <Typography sx={{ fontWeight: 800, fontSize: 18 }}>{meeting.host.name}</Typography>
-                    <Typography sx={{ opacity: 0.7, fontSize: 13 }}>{meeting.host.role}</Typography>
+                        <Typography sx={{ fontWeight: 800, fontSize: 18 }}>{meeting.host.name}</Typography>
+                        <Typography sx={{ opacity: 0.7, fontSize: 13 }}>{meeting.host.role}</Typography>
+                      </>
+                    ) : (
+                      <>
+                        <Avatar
+                          sx={{
+                            width: 76,
+                            height: 76,
+                            fontSize: 22,
+                            bgcolor: "rgba(255,255,255,0.08)",
+                          }}
+                        >
+                          H
+                        </Avatar>
+                        <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
+                          Host disconnected
+                        </Typography>
+                        <Typography sx={{ opacity: 0.7, fontSize: 13 }}>
+                          Waiting for host to return
+                        </Typography>
+                      </>
+                    )}
                   </>
                 )}
 
@@ -5773,16 +5840,10 @@ export default function NewLiveMeeting() {
                 <Tooltip title="Leave meeting">
                   <IconButton
                     onClick={async () => {
-                      // ✅ tell everyone the host ended it
                       if (isHost) {
-                        const myId = dyteMeeting?.self?.id;
-                        if (myId) {
-                          try {
-                            dyteMeeting?.participants?.broadcastMessage?.("meeting-ended", { hostId: myId });
-                          } catch { }
-                        }
+                        setLeaveDialogOpen(true);
+                        return;
                       }
-
                       await handleMeetingEnd("left");
                     }}
                     sx={{
@@ -5919,6 +5980,62 @@ export default function NewLiveMeeting() {
               </Box>
             )}
           </DialogContent>
+        </Dialog>
+
+        {/* Host Leave / End Dialog */}
+        <Dialog
+          open={leaveDialogOpen}
+          onClose={() => setLeaveDialogOpen(false)}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              bgcolor: "#0b101a",
+              border: "1px solid rgba(255,255,255,0.10)",
+              borderRadius: 4,
+              boxShadow: "0px 20px 40px rgba(0,0,0,0.6)",
+              backdropFilter: "blur(14px)",
+              color: "#fff",
+              "& .MuiTypography-root": { color: "#fff" },
+            },
+          }}
+        >
+          <DialogTitle sx={{ pb: 0, pt: 2, px: 2, fontWeight: 700, fontSize: 16 }}>
+            Leave or end meeting?
+          </DialogTitle>
+          <DialogContent sx={{ px: 2, pb: 2, pt: 1 }}>
+            <Typography variant="body2" sx={{ opacity: 0.8 }}>
+              Leaving keeps the event running for attendees. Ending will close it for everyone.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 2, pb: 2, gap: 1 }}>
+            <Button
+              variant="outlined"
+              onClick={async () => {
+                setLeaveDialogOpen(false);
+                await handleMeetingEnd("left");
+              }}
+              sx={{ borderColor: "rgba(255,255,255,0.2)", color: "#fff" }}
+            >
+              Leave
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={async () => {
+                setLeaveDialogOpen(false);
+                const myId = dyteMeeting?.self?.id;
+                if (myId) {
+                  try {
+                    dyteMeeting?.participants?.broadcastMessage?.("meeting-ended", { hostId: myId });
+                  } catch { }
+                }
+                await handleMeetingEnd("ended", { explicitEnd: true });
+              }}
+            >
+              End for all
+            </Button>
+          </DialogActions>
         </Dialog>
 
         {/* Device Settings Dialog */}
