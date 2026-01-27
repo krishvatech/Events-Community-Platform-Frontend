@@ -276,7 +276,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [title, setTitle] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [location, setLocation] = React.useState("");
+  const [location, setLocation] = React.useState("Germany");
   const [category, setCategory] = React.useState("Workshop");
   const [format, setFormat] = React.useState("virtual");
   const [price, setPrice] = React.useState();
@@ -347,7 +347,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setTitle("");
     setSlug("");
     setDescription("");
-    setLocation("");
+    setLocation("Germany");
     setCategory("Workshop");
     setFormat("virtual");
     setPrice(0);
