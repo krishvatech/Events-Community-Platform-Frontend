@@ -110,6 +110,15 @@ function extractCountryFromLocation(raw) {
   return last;
 }
 
+function extractCityFromLocation(raw) {
+  if (!raw) return "";
+  const parts = String(raw)
+    .split(/,|\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!parts.length) return "";
+  return parts[0];
+}
 
 function resolveCountryCode(user) {
   const code =
@@ -133,6 +142,17 @@ function resolveCountryCode(user) {
   const name = extractCountryFromLocation(rawName) || rawName;
   const iso2 = name ? isoCountries.getAlpha2Code(String(name), "en") : "";
   return iso2 ? String(iso2).toUpperCase() : "";
+}
+
+function resolveCityName(user) {
+  const direct =
+    user?.profile?.location_city ||
+    user?.profile?.city ||
+    user?.city ||
+    user?.location_city;
+  if (direct) return String(direct).trim();
+  const loc = user?.profile?.location || user?.location || "";
+  return extractCityFromLocation(loc);
 }
 
 function displayCountry(user) {
@@ -727,6 +747,8 @@ export default function MembersPage() {
   const isCompact = useMediaQuery("(max-width:900px)");
   const [mapOverlayOpen, setMapOverlayOpen] = useState(false);
   const getCenterForISO2 = useCountryCentroids(geoUrl);
+  const cityCentersRef = useRef({});
+  const [cityCenters, setCityCenters] = useState({});
 
   // state
   const [loading, setLoading] = useState(true);
@@ -1039,18 +1061,77 @@ export default function MembersPage() {
     return () => { alive = false; };
   }, [filtered.map((u) => u.id).join("|")]);
 
+  const cityKeyEntries = useMemo(() => {
+    const map = new Map();
+    for (const u of filtered) {
+      const city = resolveCityName(u);
+      if (!city) continue;
+      const code = resolveCountryCode(u);
+      const key = `${String(city).trim().toLowerCase()}|${String(code || "").trim().toUpperCase()}`;
+      if (!map.has(key)) map.set(key, { city, countryCode: code });
+    }
+    return Array.from(map.entries()).map(([key, val]) => ({ key, ...val }));
+  }, [filtered]);
+
+  useEffect(() => {
+    let alive = true;
+    const missing = cityKeyEntries.filter(
+      (e) => !Object.prototype.hasOwnProperty.call(cityCentersRef.current, e.key)
+    );
+    if (!missing.length) return () => { };
+
+    const MAX_CITY_LOOKUPS = 60;
+    const batch = missing.slice(0, MAX_CITY_LOOKUPS);
+
+    (async () => {
+      const updates = {};
+      await Promise.all(
+        batch.map(async ({ key, city, countryCode }) => {
+          try {
+            const url = `${API_BASE}/auth/cities/search/?q=${encodeURIComponent(city)}&limit=1${
+              countryCode ? `&country=${encodeURIComponent(countryCode)}` : ""
+            }`;
+            const res = await fetch(url, { headers: tokenHeader() });
+            if (!res.ok) { updates[key] = null; return; }
+            const data = await res.json();
+            const hit = (data?.results || [])[0];
+            if (hit?.lat != null && hit?.lng != null) {
+              updates[key] = [hit.lng, hit.lat];
+            } else {
+              updates[key] = null;
+            }
+          } catch {
+            updates[key] = null;
+          }
+        })
+      );
+      if (!alive) return;
+      if (Object.keys(updates).length) {
+        Object.assign(cityCentersRef.current, updates);
+        setCityCenters((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+
+    return () => { alive = false; };
+  }, [cityKeyEntries]);
+
   const liveMarkers = useMemo(() => {
-    const byCountry = {};
+    const byCity = {};
     for (const u of filtered) {
       const code = resolveCountryCode(u).toLowerCase();
-      const center = getCenterForISO2(code);
+      const city = resolveCityName(u);
+      const key = city
+        ? `${String(city).trim().toLowerCase()}|${String(code || "").trim().toUpperCase()}`
+        : "";
+      const center = (key && cityCenters[key]) || getCenterForISO2(code);
       if (!center) continue;
       const isFriend = (friendStatusByUser[u.id] || "").toLowerCase() === "friends";
-      if (!byCountry[code]) byCountry[code] = [];
-      byCountry[code].push({ center, isFriend, user: u });
+      const bucket = key || code;
+      if (!byCity[bucket]) byCity[bucket] = [];
+      byCity[bucket].push({ center, isFriend, user: u });
     }
     const out = [];
-    Object.entries(byCountry).forEach(([code, arr]) => {
+    Object.entries(byCity).forEach(([code, arr]) => {
       const base = arr[0].center;
       arr.forEach((item, idx) => {
         const angle = ((idx * 40) % 360) * (Math.PI / 180);
@@ -1068,7 +1149,7 @@ export default function MembersPage() {
       });
     });
     return out;
-  }, [filtered, friendStatusByUser]);
+  }, [filtered, friendStatusByUser, cityCenters, getCenterForISO2]);
 
   const countryAgg = useMemo(() => {
     const map = {};
