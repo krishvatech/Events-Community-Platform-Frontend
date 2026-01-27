@@ -1354,7 +1354,11 @@ function MembersTab({ groupId }) {
         const u = m.user || m;
         return (
           <ListItem key={u.id} sx={{ border: "1px solid #eee", borderRadius: 2, mb: 1 }}>
-            <ListItemAvatar><Avatar src={toMediaUrl(u.avatar || u.user_image)} /></ListItemAvatar>
+            <ListItemAvatar>
+              <Avatar src={toMediaUrl(u.avatar)} sx={{ width: 40, height: 40 }}>
+                {(u.name || u.full_name || u.username || "U")[0]}
+              </Avatar>
+            </ListItemAvatar>
             <ListItemText primary={u.name || u.full_name || u.username} secondary={m.role || "Member"} />
           </ListItem>
         );
