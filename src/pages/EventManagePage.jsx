@@ -140,8 +140,8 @@ const fmtDateRange = (start, end) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Resources", "Breakout Rooms", "Lounge Settings"];
-const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms"];
+const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Resources", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings"];
+const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms Tables", "Social Lounge"];
 const MEMBERS_PER_PAGE = 5;
 const RESOURCES_PER_PAGE = 5;
 
@@ -184,6 +184,7 @@ export default function EventManagePage() {
   const [loungeLoading, setLoungeLoading] = useState(false);
   const [loungeError, setLoungeError] = useState("");
   const [loungeCreateOpen, setLoungeCreateOpen] = useState(false);
+  const [loungeCreateCategory, setLoungeCreateCategory] = useState("LOUNGE"); // 'LOUNGE' | 'BREAKOUT'
   const [loungeCreateName, setLoungeCreateName] = useState("Networking Table");
   const [loungeCreateSeats, setLoungeCreateSeats] = useState(4);
   const [loungeCreateSaving, setLoungeCreateSaving] = useState(false);
@@ -436,6 +437,7 @@ export default function EventManagePage() {
       if (loungeCreateIcon) {
         const formData = new FormData();
         formData.append("name", name);
+        formData.append("category", loungeCreateCategory);
         formData.append("max_seats", String(seatsValue));
         formData.append("icon", loungeCreateIcon);
         res = await fetch(url, {
@@ -450,7 +452,7 @@ export default function EventManagePage() {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ name, max_seats: seatsValue }),
+          body: JSON.stringify({ name, category: loungeCreateCategory, max_seats: seatsValue }),
         });
       }
       if (!res.ok) {
@@ -987,8 +989,19 @@ export default function EventManagePage() {
     );
   };
 
-  const renderBreakoutRooms = () => {
+  /*
+   * Reusable render method for both "Breakout Rooms" (category="BREAKOUT")
+   * and "Social Lounge" (category="LOUNGE").
+   */
+  const renderLoungeTables = (targetCategory, title, description) => {
     if (!canManageLounge) return null;
+
+    // 1) Filter tables by this category
+    //    (If any table has NO category or non-matching, hide it from this view)
+    const tables = loungeTables.filter((t) => {
+      const cat = (t.category || "LOUNGE").toUpperCase();
+      return cat === targetCategory;
+    });
 
     return (
       <Paper
@@ -1010,10 +1023,10 @@ export default function EventManagePage() {
         >
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.25 }}>
-              Social Lounge Tables
+              {title}
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Set up lounge tables before the event goes live.
+              {description}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1}>
@@ -1024,14 +1037,20 @@ export default function EventManagePage() {
             >
               Sync
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setLoungeCreateOpen(true)}
-              sx={{ textTransform: "none", borderRadius: 2 }}
-            >
-              Create table
-            </Button>
+
+            {targetCategory !== "BREAKOUT" && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  setLoungeCreateCategory(targetCategory);
+                  setLoungeCreateOpen(true);
+                }}
+                sx={{ textTransform: "none", borderRadius: 2 }}
+              >
+                Create {targetCategory === 'BREAKOUT' ? 'Room' : 'Table'}
+              </Button>
+            )}
           </Stack>
         </Stack>
 
@@ -1047,7 +1066,7 @@ export default function EventManagePage() {
             <TableHead>
               <TableRow sx={{ bgcolor: "grey.50" }}>
                 <TableCell>Logo</TableCell>
-                <TableCell>Table</TableCell>
+                <TableCell>Name</TableCell>
                 <TableCell>Seats</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -1059,16 +1078,16 @@ export default function EventManagePage() {
                     <LinearProgress />
                   </TableCell>
                 </TableRow>
-              ) : loungeTables.length === 0 ? (
+              ) : tables.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} align="center">
                     <Typography variant="body2" sx={{ color: "text.secondary", py: 2 }}>
-                      No lounge tables yet.
+                      No {targetCategory === 'BREAKOUT' ? 'rooms' : 'tables'} found.
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                loungeTables.map((t) => (
+                tables.map((t) => (
                   <TableRow key={t.id} hover>
                     <TableCell>
                       <Avatar
@@ -1998,14 +2017,16 @@ export default function EventManagePage() {
                   {tab === 0 && renderOverview()}
                   {tab === 1 && renderMembers()}
                   {tab === 2 && renderResources()}
-                  {tab === 3 && renderBreakoutRooms()}
-                  {tab === 4 && renderLoungeSettings()}
+                  {tab === 3 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                  {tab === 4 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                  {tab === 5 && renderLoungeSettings()}
                 </>
               ) : (
                 <>
                   {tab === 0 && renderOverview()}
                   {tab === 1 && renderResources()}
-                  {tab === 2 && renderBreakoutRooms()}
+                  {tab === 2 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                  {tab === 3 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
                 </>
               )}
             </Box>
