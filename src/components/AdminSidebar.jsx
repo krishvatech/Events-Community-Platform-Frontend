@@ -25,6 +25,7 @@ import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
+import { apiClient } from "../utils/api";
 
 
 const TEAL = "#14b8b1";
@@ -33,27 +34,12 @@ const HOVER_BG = "#e6f7f6";
 const CARD_BG = "#ffffff";
 const CARD_BORDER = "#e5e7eb";
 
-// Always resolve to the Django API (e.g., http://localhost:8000/api)
-const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
-const API_ROOT = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
-
-const tokenHeader = () => {
-  const t =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("access") ||
-    localStorage.getItem("jwt");
-  return t ? { Authorization: `Bearer ${t}` } : {};
-};
-
+// Helper uses apiClient to benefit from interceptors
 async function countFromPaginated(url) {
   try {
-    const r = await fetch(url, {
-      headers: { ...tokenHeader(), Accept: "application/json" },
-      credentials: "include",
-    });
-    if (!r.ok) return 0;
-    const j = await r.json().catch(() => ({}));
+    // apiClient already handles Authorization & Refresh
+    const res = await apiClient.get(url);
+    const j = res.data;
     if (typeof j.count === "number") return j.count;
     const arr = Array.isArray(j) ? j : j?.results || [];
     return arr.length;
@@ -63,28 +49,23 @@ async function countFromPaginated(url) {
 }
 
 async function getUnreadGroupNotifCount(kind) {
+  // Use relative URL so apiClient uses baseURL
   return countFromPaginated(
-    `${API_ROOT}/group-notifications/?unread=1&kind=${encodeURIComponent(kind)}&page_size=1`
+    `/group-notifications/?unread=1&kind=${encodeURIComponent(kind)}&page_size=1`
   );
 }
 
 async function getPendingNameRequestsCount() {
-  // ✅ IMPORTANT: Avoid calling admin-only API for staff users
   if (!isOwnerUser()) return 0;
-
   return countFromPaginated(
-    `${API_ROOT}/auth/admin/name-requests/?status=pending&page_size=1`
+    `/auth/admin/name-requests/?status=pending&page_size=1`
   );
 }
 
 async function getPendingJoinRequestsCount() {
   try {
-    const r = await fetch(`${API_ROOT}/groups/?page_size=200`, {
-      headers: { ...tokenHeader(), Accept: "application/json" },
-      credentials: "include",
-    });
-    if (!r.ok) return 0;
-    const j = await r.json().catch(() => ({}));
+    const r = await apiClient.get(`/groups/?page_size=200`);
+    const j = r.data;
     const groups = Array.isArray(j) ? j : j?.results || [];
 
     const manageable = groups.filter((g) =>
@@ -94,12 +75,8 @@ async function getPendingJoinRequestsCount() {
     const counts = await Promise.all(
       manageable.map(async (g) => {
         try {
-          const rr = await fetch(`${API_ROOT}/groups/${g.id}/member-requests/`, {
-            headers: { ...tokenHeader(), Accept: "application/json" },
-            credentials: "include",
-          });
-          if (!rr.ok) return 0;
-          const jj = await rr.json().catch(() => ({}));
+          const rr = await apiClient.get(`/groups/${g.id}/member-requests/`);
+          const jj = rr.data;
           if (typeof jj.count === "number") return jj.count;
           return Array.isArray(jj.requests) ? jj.requests.length : 0;
         } catch {
@@ -121,7 +98,7 @@ async function getAdminNotificationsBadgeCount() {
       getPendingJoinRequestsCount(),
       getUnreadGroupNotifCount("member_joined"),
       getUnreadGroupNotifCount("group_created"),
-      getPendingNameRequestsCount(), // if you DON'T want identity requests in Notifications badge → remove this line
+      getPendingNameRequestsCount(),
     ]);
 
   return (joinPending || 0) + (memberJoinedUnread || 0) + (groupCreatedUnread || 0) + (namePending || 0);
@@ -194,13 +171,10 @@ export default function AdminSidebar({
     // Helper to get total unread messages across all conversations
     const getUnreadMessageCount = async () => {
       try {
-        const res = await fetch(`${API_ROOT}/messaging/conversations/`, {
-          headers: { ...tokenHeader(), Accept: "application/json" },
-        });
-        const raw = await res.json().catch(() => ([]));
+        const res = await apiClient.get(`/messaging/conversations/`);
+        const raw = res.data;
         const data = Array.isArray(raw) ? raw : (raw?.results || []);
 
-        // Sum up unread_count from each conversation
         const total = data.reduce((acc, curr) => acc + (curr.unread_count || 0), 0);
         return total;
       } catch (e) {

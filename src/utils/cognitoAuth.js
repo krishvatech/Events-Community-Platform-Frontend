@@ -2,6 +2,7 @@ import {
   CognitoUserPool,
   CognitoUser,
   AuthenticationDetails,
+  CognitoRefreshToken,
 } from "amazon-cognito-identity-js";
 
 const region = import.meta.env.VITE_COGNITO_REGION;
@@ -80,6 +81,7 @@ export function cognitoForgotPassword({ usernameOrEmail }) {
   });
 }
 
+
 // ✅ Confirm Forgot Password: submit OTP + new password
 export function cognitoConfirmForgotPassword({ usernameOrEmail, code, newPassword }) {
   return new Promise((resolve, reject) => {
@@ -91,3 +93,22 @@ export function cognitoConfirmForgotPassword({ usernameOrEmail, code, newPasswor
     });
   });
 }
+
+// ✅ Refresh Session: use Refresh Token to get new Access/Id tokens
+export function cognitoRefreshSession({ username, refreshToken }) {
+  return new Promise((resolve, reject) => {
+    const user = new CognitoUser({ Username: username, Pool: pool });
+    const token = new CognitoRefreshToken({ RefreshToken: refreshToken });
+
+    user.refreshSession(token, (err, session) => {
+      if (err) return reject(err);
+      resolve({
+        idToken: session.getIdToken().getJwtToken(),
+        accessToken: session.getAccessToken().getJwtToken(),
+        // refresh token usually stays the same, but good to be safe if rotated
+        refreshToken: session.getRefreshToken().getToken(),
+      });
+    });
+  });
+}
+

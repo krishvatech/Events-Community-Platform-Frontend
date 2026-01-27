@@ -1,4 +1,5 @@
 // src/main.jsx
+import './utils/fetchInterceptor';
 import './setupPolyfills';
 import React from 'react';
 import ReactDOM from 'react-dom/client';

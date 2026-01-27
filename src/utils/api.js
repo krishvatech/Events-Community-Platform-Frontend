@@ -1,4 +1,21 @@
 import axios from "axios";
+import { cognitoRefreshSession } from "./cognitoAuth";
+import { getUserName, clearAuth } from "./authStorage";
+
+// Refresh queue controls
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
 
 export const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").trim().replace(/\/+$/, "");
@@ -106,18 +123,97 @@ apiClient.interceptors.response.use(
   async (error) => {
     const original = error?.config;
 
-    // if no response or not 401, reject
-    if (!error?.response || error.response.status !== 401) {
+    // if no response or not 401/403, reject
+    const status = error?.response?.status;
+    if (!status || (status !== 401 && status !== 403)) {
       return Promise.reject(error);
     }
 
-    // Cognito-only: no refresh flow here. Clear auth and reject.
+    // prevent infinite loop
+    if (original._retry) {
+      return Promise.reject(error);
+    }
+
+    // Try refresh
     try {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      window.dispatchEvent(new Event("auth:changed"));
-    } catch { }
-    return Promise.reject(error);
+      if (!isRefreshing) {
+        isRefreshing = true;
+        original._retry = true;
+
+        const refreshToken = getRefreshToken();
+        let username = getUserName();
+
+        console.log("[Auth] 401/403 detected. Attempting refresh...");
+
+        // Fallback 1: Try getting username from localStorage 'user' object
+        if (!username) {
+          try {
+            const u = JSON.parse(localStorage.getItem("user") || "{}");
+            username = u.username || u.email || "";
+          } catch { }
+        }
+
+        // Fallback 2: Decode the expired token to find a username/sub
+        if (!username) {
+          const t = getToken();
+          if (t) {
+            try {
+              const parts = t.split('.');
+              if (parts.length === 3) {
+                const payload = JSON.parse(atob(parts[1]));
+                username = payload.username || payload['cognito:username'] || payload.sub;
+              }
+            } catch { }
+          }
+        }
+
+        if (!refreshToken || !username) {
+          console.error("[Auth] Missing refresh token or username. Logging out.");
+          throw new Error("No refresh token or username available");
+        }
+
+        console.log(`[Auth] Refreshing session for user: ${username}`);
+
+        // Call our new helper
+        const { idToken, refreshToken: newRefresh } = await cognitoRefreshSession({
+          username,
+          refreshToken,
+        });
+
+        // Save new tokens
+        localStorage.setItem("access_token", idToken);
+        if (newRefresh) {
+          localStorage.setItem("refresh_token", newRefresh);
+        }
+
+        // Process queue
+        processQueue(null, idToken);
+        isRefreshing = false;
+
+        // Retry original
+        original.headers.Authorization = `Bearer ${idToken}`;
+        return apiClient(original);
+
+      } else {
+        // If already refreshing, queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            original.headers.Authorization = `Bearer ${token}`;
+            return apiClient(original);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+    } catch (refreshErr) {
+      processQueue(refreshErr, null);
+      isRefreshing = false;
+
+      // Clear auth and redirect
+      clearAuth();
+      return Promise.reject(refreshErr);
+    }
   }
 );
 
