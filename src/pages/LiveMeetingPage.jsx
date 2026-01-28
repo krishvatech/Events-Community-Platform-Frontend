@@ -479,7 +479,7 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82 }) {
   const showVideo = Boolean(p?.cam && raw);
 
   return (
-    <Tooltip title={p?.name || ""} arrow placement="top">
+    <Tooltip title={""} arrow placement="top">
       <Paper
         variant="outlined"
         sx={{

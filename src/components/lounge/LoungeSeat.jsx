@@ -3,7 +3,20 @@ import { Avatar, Tooltip, Box, Typography } from '@mui/material';
 
 const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
     // Calculate position based on index and maxSeats (display count)
-    const angle = (index / maxSeats) * 2 * Math.PI;
+    // Special positioning for first 3 users for better balance
+    let angle;
+    if (maxSeats <= 3) {
+        // For 1-3 users, use balanced positions
+        const positions = [
+            0,                    // 1st user: right
+            Math.PI,              // 2nd user: left (opposite)
+            Math.PI / 2,          // 3rd user: bottom
+        ];
+        angle = positions[index] || (index / maxSeats) * 2 * Math.PI;
+    } else {
+        // For 4+ users, use circular distribution
+        angle = (index / maxSeats) * 2 * Math.PI;
+    }
     const radius = 60; // distance from center of table
     const x = Math.cos(angle) * radius;
     const y = Math.sin(angle) * radius;
