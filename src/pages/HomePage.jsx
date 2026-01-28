@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import Header from "../components/Header.jsx";
 import { apiClient } from "../utils/api";
 
 // MUI (structure only; Tailwind keeps the visual look)
@@ -257,7 +256,7 @@ const HomePage = () => {
   return (
     <>
       {/* Header */}
-      <Header />
+      {/* Header handled by App.jsx */}
 
       {/* HERO (shorter on phones, taller on desktop) */}
       <section

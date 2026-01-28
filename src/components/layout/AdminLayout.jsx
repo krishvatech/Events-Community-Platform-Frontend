@@ -1,40 +1,12 @@
 // src/components/layout/AdminLayout.jsx
 import * as React from "react";
-import { Box, Container, IconButton, Typography } from "@mui/material";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import AdminSidebar from "../AdminSidebar";
-import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
-import { isStaffUser } from "../../utils/adminRole.js";
+import { Box, Container } from "@mui/material";
+import { Outlet, useNavigate } from "react-router-dom";
 import { clearAuth } from "../../utils/authStorage";
-import { createWagtailSession, getSaleorDashboardUrl } from "../../utils/api";
-import { isOwnerUser } from "../../utils/adminRole";
 
-
-function resolveActiveKey(pathname) {
-  if (pathname === "/admin" || pathname === "/admin/") return "resources"; // default tab for /admin
-  if (pathname.startsWith("/admin/events")) return "events";
-  if (pathname.startsWith("/admin/resources")) return "resources";
-  if (pathname.startsWith("/admin/recordings")) return "recordings";
-  if (pathname.startsWith("/admin/community/groups")) return "groups";
-  if (pathname.startsWith("/admin/groups")) return "groups";
-  if (pathname.startsWith("/admin/posts")) return "posts";
-  if (pathname.startsWith("/admin/carts")) return "carts";
-  if (pathname.startsWith("/admin/notifications")) return "notifications";
-  if (pathname.startsWith("/admin/messages")) return "messages";
-  if (pathname.startsWith("/admin/settings")) return "settings";
-  if (pathname.startsWith("/admin/staff")) return "staff";
-  if (pathname.startsWith("/admin/name-requests")) return "name-requests";
-  return "resources";
-}
 
 export default function AdminLayout() {
-  const staff = isStaffUser();
-  const sidebarTitle = staff ? "Staff" : "Admin";
-
-  const location = useLocation();
   const navigate = useNavigate();
-
-  const [mobileOpen, setMobileOpen] = React.useState(false);
 
   React.useEffect(() => {
     const IDLE_MIN = 20; // ✅ choose 15–30
@@ -64,120 +36,12 @@ export default function AdminLayout() {
     };
   }, [navigate]);
 
-  const active = React.useMemo(
-    () => resolveActiveKey(location.pathname),
-    [location.pathname]
-  );
-
-  const handleSelect = async (key) => {
-    if (!key) return;
-
-    if (key === "cms") {
-      try {
-        if (!isOwnerUser()) {
-          alert("CMS is only for platform_admin.");
-          return;
-        }
-        const cmsUrl = await createWagtailSession();
-        window.open(cmsUrl, "_blank");
-      } catch (e) {
-        alert("CMS login failed. Check token / backend logs.");
-      } finally {
-        setMobileOpen(false);
-      }
-      return;
-    }
-
-    if (key === "saleor") {
-      if (!isOwnerUser()) { alert("Saleor Dashboard is only for platform_admin."); return; }
-      try {
-        const { url } = await getSaleorDashboardUrl(); // new util in api.js
-        window.open(url, "_blank");
-      } catch (e) {
-        alert("Saleor access failed. Please login again.");
-      } finally {
-        setMobileOpen(false);
-      }
-      return;
-    }
-
-    const map = {
-      resources: "/admin/resources",
-      recordings: "/admin/recordings",
-      groups: "/admin/groups",
-      events: "/admin/events",
-      posts: "/admin/posts",
-      carts: "/admin/carts",
-      notifications: "/admin/notifications",
-      messages: "/admin/messages",
-      settings: "/admin/settings",
-      staff: "/admin/staff",
-      "name-requests": "/admin/name-requests",
-    };
-
-    navigate(map[key] ?? `/admin/${key}`);
-    setMobileOpen(false);
-  };
-
-  const handleOpenMobileSidebar = () => setMobileOpen(true);
-  const handleCloseMobileSidebar = () => setMobileOpen(false);
-
   return (
     <Box sx={{ py: 3 }}>
       <Container maxWidth="xl">
-        {/* Mobile header: title + hamburger button */}
-        <Box
-          sx={{
-            display: { xs: "flex", md: "none" },
-            alignItems: "center",
-            justifyContent: "space-between",
-            mb: 2,
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            {sidebarTitle}
-          </Typography>
-          <IconButton
-            edge="start"
-            onClick={handleOpenMobileSidebar}
-            aria-label="open admin navigation"
-          >
-            <MenuRoundedIcon />
-          </IconButton>
-        </Box>
-
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "280px 1fr" },
-            gap: 2,
-          }}
-        >
-          {/* DESKTOP sidebar (static) */}
-          <Box sx={{ display: { xs: "none", md: "block" } }}>
-            <AdminSidebar
-              active={active}
-              onSelect={handleSelect}
-              title={sidebarTitle}
-            />
-          </Box>
-
-          {/* Main content */}
-          <Box>
-            {/* IMPORTANT: Without Outlet, /admin renders blank */}
-            <Outlet />
-          </Box>
-        </Box>
-
-        {/* MOBILE drawer instance (uses existing Drawer logic in AdminSidebar) */}
-        <Box sx={{ display: { xs: "block", md: "none" } }}>
-          <AdminSidebar
-            active={active}
-            onSelect={handleSelect}
-            title={sidebarTitle}
-            mobileOpen={mobileOpen}
-            onMobileClose={handleCloseMobileSidebar}
-          />
+        <Box>
+          {/* IMPORTANT: Without Outlet, /admin renders blank */}
+          <Outlet />
         </Box>
       </Container>
     </Box>

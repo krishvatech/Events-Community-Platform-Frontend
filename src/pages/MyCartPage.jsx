@@ -34,7 +34,6 @@ import {
   CircularProgress,
   Skeleton,
 } from "@mui/material";
-import AccountSidebar from "../components/AccountSidebar.jsx";
 // Icons
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
@@ -400,12 +399,8 @@ export default function MyCartPage() {
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
-          <aside className="col-span-12 lg:col-span-3">
-            <AccountSidebar />
-          </aside>
-
           {/* MAIN */}
-          <main className="col-span-12 lg:col-span-9">
+          <main className="col-span-12">
             {/* Tabs row (Cart | Orders | Addresses | Account details) */}
             <Paper
               elevation={0}

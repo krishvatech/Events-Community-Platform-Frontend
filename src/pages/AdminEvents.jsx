@@ -50,7 +50,6 @@ import AdminPostsPage from "./AdminPostsPage.jsx";
 import MyRecordingsPage from "./MyRecordingsPage.jsx"
 import AdminNotificationsPage from "./AdminNotificationsPage.jsx";
 import AdminSettings from "./AdminSettings.jsx"
-import AdminSidebar from "../components/AdminSidebar.jsx";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";

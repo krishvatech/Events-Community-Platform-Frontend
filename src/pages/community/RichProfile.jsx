@@ -1,5 +1,5 @@
 // src/pages/RichProfile.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react"; // Verified file access
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Avatar,
@@ -37,10 +37,10 @@ import {
   Skeleton,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
-import CommunitySidebar from "../../components/CommunitySideBar.jsx";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -2958,28 +2958,30 @@ export default function RichProfile() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" sx={{ py: 3 }}>
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 md:gap-6">
-          <aside>
-            {/* Community sidebar */}
-            <CommunitySidebar
-              stickyTop={96}
-              view="members"
-              onChangeView={(key) => {
-                // keys emitted by CommunitySideBar: 'home' | 'live' | 'notify' | 'messages' | 'feed' | 'members'
-                const to =
-                  key === "home"
-                    ? "/community"
-                    : `/community?view=${key}`;
-                navigate(to);
-              }}
-            />
-          </aside>
-
-          <main>
+        <div className="flex flex-col gap-4 md:gap-6">
+          <main className="w-full">
             {loadingBase && <LinearProgress />}
 
             {!loadingBase && (
               <Stack spacing={2.5}>
+                {/* Back Button */}
+                  <Box sx={{ display: 'flex' }}> 
+                    <Button
+                      startIcon={<ArrowBackRoundedIcon />}
+                      onClick={() => navigate("/community?view=members")}
+                      sx={{ 
+                        textTransform: "none", 
+                        color: "text.primary",
+                        fontWeight: 600,
+                        minWidth: "auto",
+                        px: 1,
+                        "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                      }}
+                    >
+                      Back to Explore Members
+                    </Button>
+                  </Box>
+
                 {/* Header Card */}
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                   <Box className="flex items-center gap-3">

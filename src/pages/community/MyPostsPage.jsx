@@ -1731,9 +1731,9 @@ export default function MyPostsPage() {
 
 
   return (
-    <Box sx={{ width: "100%", p: { xs: 1, md: 3 } }}>
+    <Box sx={{ width: "100%", pl: 0, pt: 0, pr: 1, pb: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={700}>My Posts</Typography>
+        <Typography variant="h4">My Posts</Typography>
         <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreateOpen(true)}>Create Post</Button>
       </Stack>
 

@@ -12,7 +12,6 @@ import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineR
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import PlaceIcon from "@mui/icons-material/Place";
-import AccountSidebar from "../components/AccountSidebar.jsx";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
 const API = RAW_API.endsWith("/api") ? RAW_API : `${RAW_API}/api`;
@@ -218,14 +217,10 @@ export default function MyRecordingsPage() {
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4">
-          <aside className="col-span-12 lg:col-span-3">
-            <AccountSidebar activeKey="recordings" />
-          </aside>
-
-          <main className="col-span-12 lg:col-span-9">
+          <main className="col-span-12">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div>
-                <Typography variant="h5" className="font-semibold tracking-tight">My Recordings</Typography>
+                <Typography variant="h4">My Recordings</Typography>
                 <Typography variant="body2" color="text.secondary">
                   Watch or download recordings from your past events.
                 </Typography>

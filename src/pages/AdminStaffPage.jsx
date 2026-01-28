@@ -11,7 +11,6 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import PersonRemoveRoundedIcon from "@mui/icons-material/PersonRemoveRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
-import AdminSidebar from "../components/AdminSidebar";
 import { listAdminUsers, patchStaff, bulkSetStaff } from "../utils/api";
 import { useLocation } from "react-router-dom";
 

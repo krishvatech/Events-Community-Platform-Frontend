@@ -20,7 +20,6 @@ import {
   Skeleton
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
-import AccountSidebar from "../components/AccountSidebar.jsx";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 
 // ---------------------- API base + helpers (kept) ----------------------
@@ -132,7 +131,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
         }}
       >
         {ev.preview_image && !imgFailed ? (
-          <Link to={`/events/${ev.slug || ev.id}`} state={{ event: ev }}>
+          <Link to={`/events/${ev.slug || ev.id}?ref=my_events`} state={{ event: ev }}>
             <img
               src={toAbs(ev.preview_image)}
               alt={ev.title}
@@ -300,7 +299,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
           <Button
             size="small"
             component={Link}
-            to={`/events/${ev.slug || ev.id}`}
+            to={`/events/${ev.slug || ev.id}?ref=my_events`}
             state={{ event: ev }}
             variant="outlined"
             sx={{ textTransform: "none", py: 0.5, px: 1.25, borderRadius: 2 }}
@@ -557,13 +556,10 @@ export default function MyEventsPage() {
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
-          <aside className="col-span-12 lg:col-span-3">
-            <AccountSidebar />
-          </aside>
-          <main className="col-span-12 lg:col-span-9">
+          <main className="col-span-12">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div>
-                <Typography variant="h5" className="font-semibold tracking-tight">
+                <Typography variant="h4">
                   My Events
                 </Typography>
                 <Typography variant="body2" color="text.secondary">

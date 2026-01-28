@@ -8,7 +8,6 @@ import {
   IconButton, FormControl, Select, MenuItem, Button, useTheme, useMediaQuery, Menu,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import AccountSidebar from "../components/AccountSidebar.jsx";
 
 // Icons
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -240,32 +239,6 @@ export default function MyResourcesPage() {
     }
   };
 
-  // const getresourcesIcon = (resource) => {
-  //   // Reuse the same icon logic as resources tab
-  //   return getResourceIcon(resource.type);
-  // };
-
-  // const getresourcesText = (resource) => {
-  //   // Try to derive uploader name safely
-  //   let actor = "Someone";
-
-  //   const uploader = resource.uploaded_by;
-  //   if (uploader && typeof uploader === "object") {
-  //     actor =
-  //       uploader.full_name ||
-  //       uploader.name ||
-  //       uploader.username ||
-  //       "Someone";
-  //   } else if (typeof uploader === "string") {
-  //     actor = uploader;
-  //   }
-
-  //   const resourceType = resource.type || "resource";
-  //   const title = resource.title || "Untitled resource";
-
-  //   return `${actor} uploaded ${resourceType}: "${title}"`;
-  // };
-
   const getResourceUrl = (resource) => {
     if (resource.type === "file") return resource.file;
     if (resource.type === "link") return resource.link_url;
@@ -303,7 +276,7 @@ export default function MyResourcesPage() {
   const handleDetails = (resource, e) => {
     e.preventDefault();
     e.stopPropagation();
-    navigate(`/resource/${resource.id}`);
+    navigate(`/resource/${resource.id}?ref=my_resources`);
   };
 
   const totalPages = Math.ceil(resourcesTotal / itemsPerPage);
@@ -313,12 +286,8 @@ export default function MyResourcesPage() {
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4">
-          <aside className="col-span-12 lg:col-span-3">
-            <AccountSidebar activeKey="resources" onNavigate={(k) => console.log(k)} />
-          </aside>
-
-          <main className="col-span-12 lg:col-span-9">
-            <Typography variant="h4" sx={{ mb: 1 }}>My resources</Typography>
+          <main className="col-span-12">
+            <Typography variant="h4" sx={{ mb: 1 }}>My Resources</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Access resources from your registered events
             </Typography>

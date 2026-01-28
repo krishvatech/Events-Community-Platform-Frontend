@@ -6,8 +6,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Link, useNavigate } from "react-router-dom";
-import Header from "../components/Header.jsx";
-import Footer from "../components/Footer.jsx";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import {
   Box,
@@ -1233,7 +1231,6 @@ export default function EventsPage() {
 
   return (
     <>
-      <Header />
       {/* Hero (background image) */}
       <section className="relative">
         <div

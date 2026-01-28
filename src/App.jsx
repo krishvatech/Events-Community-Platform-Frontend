@@ -1,11 +1,15 @@
 // src/App.jsx
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { Toolbar } from "@mui/material";
+import { Toolbar, Box, IconButton, useMediaQuery, useTheme } from "@mui/material";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded"; // Mobile toggle
+
 import { isOwnerUser, isStaffUser } from "./utils/adminRole";
 import KYCNotification from "./components/KYCNotification";
 import Header from "./components/Header.jsx";
+import UnifiedSidebar from "./components/UnifiedSidebar.jsx"; // [NEW]
+
 import HomePage from "./pages/HomePage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
 import SignUpPage from "./pages/SignUpPage.jsx";
@@ -58,8 +62,35 @@ function RedirectGroupDetailsToAdmin() {
   return <Navigate to={`/admin/community/groups/${groupId}`} replace />;
 }
 
+// Auth helper
+const getAccessToken = () => localStorage.getItem("access_token");
+const isAuthed = () => !!getAccessToken();
+
 const AppShell = () => {
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
+  const [authed, setAuthed] = useState(isAuthed());
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Sync auth state
+  useEffect(() => {
+    const syncAuth = () => setAuthed(isAuthed());
+    window.addEventListener("storage", syncAuth);
+    window.addEventListener("auth:changed", syncAuth);
+    return () => {
+      window.removeEventListener("storage", syncAuth);
+      window.removeEventListener("auth:changed", syncAuth);
+    };
+  }, []);
+
+  // Sync auth on location change (sometimes needed)
+  useEffect(() => {
+    setAuthed(isAuthed());
+    setMobileOpen(false); // Close mobile drawer on nav
+  }, [location.pathname]);
+
 
   // Hide header & footer on auth pages and live meeting routes
   const hideChrome =
@@ -71,79 +102,114 @@ const AppShell = () => {
     location.pathname === "/live" ||
     location.pathname.startsWith("/live/");
 
+  const showSidebar = authed && !hideChrome;
+  const showHeader = !authed && !hideChrome;
+
   return (
-    <>
-      {!hideChrome && (
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+
+      {/* 1. Unauthorized User -> Header */}
+      {showHeader && (
         <>
           <Header />
-          {/* Spacer under fixed header */}
           <Toolbar />
+        </>
+      )}
+
+      {/* 2. Authorized User -> Sidebar */}
+      {showSidebar && (
+        <>
+          <UnifiedSidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+
+          {/* Mobile Handburger for Authed User */}
+          {isMobile && (
+            <Box sx={{ position: "fixed", top: 12, left: 12, zIndex: 1200 }}>
+              <IconButton
+                onClick={() => setMobileOpen(true)}
+                sx={{ bgcolor: "white", boxShadow: 1, "&:hover": { bgcolor: "#f9fafb" } }}
+              >
+                <MenuRoundedIcon />
+              </IconButton>
+            </Box>
+          )}
         </>
       )}
 
       <KYCNotification />
 
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/cms" element={<RequireAuth><CmsBridge /></RequireAuth>} />
-        <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
-        <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
-        <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
-        <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
-        <Route path="/oauth/callback" element={<SocialOAuthCallback />} />
-        <Route path="/cognito/callback" element={<CognitoOAuthCallback />} />
-        {/* Admin area driven by AdminSidebar */}
-        <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
-          <Route index element={<AdminResources />} />
+      {/* Main Content Wrapper */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          width: showSidebar && !isMobile ? "calc(100% - 280px)" : "100%",
+          ml: showSidebar && !isMobile ? "280px" : 0,
+          pt: isMobile && showSidebar ? 6 : 0, // spacing for mobile hamburger?
+        }}
+      >
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/cms" element={<RequireAuth><CmsBridge /></RequireAuth>} />
+          <Route path="/signin" element={<GuestOnly><SignInPage /></GuestOnly>} />
+          <Route path="/signup" element={<GuestOnly><SignUpPage /></GuestOnly>} />
+          <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+          <Route path="/AdminEvents" element={<RequireAuth><AdminEvents /></RequireAuth>} />
+          <Route path="/oauth/callback" element={<SocialOAuthCallback />} />
+          <Route path="/cognito/callback" element={<CognitoOAuthCallback />} />
 
-          {/* main admin pages */}
-          <Route path="events" element={<AdminEvents />} />
-          <Route path="resources" element={<AdminResources />} />
-          <Route path="posts" element={<AdminPostsPage />} />
-          <Route path="groups" element={<AdminGroups />} />
-          <Route path="messages" element={<AdminMessagesPage />} />
-          <Route path="notifications" element={<AdminNotificationsPage />} />
-          <Route path="settings" element={<AdminSettings />} />
-          <Route path="name-requests" element={<AdminNameRequestsPage />} />
-          <Route path="/admin/events/:eventId" element={<EventManagePage />} />
-          {/* keep your recordings behavior same as before */}
-          <Route path="recordings" element={<AdminRecordingsPage />} />
-          <Route path="recordings/:id" element={<AdminRecordingDetailsPage />} />
-          <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
-          <Route path="carts" element={<AdminCarts />} />
-          <Route path="staff" element={<AdminStaffPage />} />
-        </Route>
-        <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
-        <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/:id" element={<EventDetailsPage />} />
-        <Route path="/account/cart" element={<MyCartPage />} />
-        <Route path="/community" element={<CommunityHubPage />} />
-        <Route path="/groups/:idOrSlug" element={<RequireAuth><RedirectGroupToAdmin /></RequireAuth>} />
+          {/* Admin routes - Layout is handled globally now, so AdminLayout just renders Outlet? */}
+          <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
+            <Route index element={<AdminResources />} />
 
-        {/* My Events list and details */}
-        <Route path="/account/events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
-        <Route path="/account/events/:id" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
+            {/* main admin pages */}
+            <Route path="events" element={<AdminEvents />} />
+            <Route path="resources" element={<AdminResources />} />
+            <Route path="posts" element={<AdminPostsPage />} />
+            <Route path="groups" element={<AdminGroups />} />
+            <Route path="messages" element={<AdminMessagesPage />} />
+            <Route path="notifications" element={<AdminNotificationsPage />} />
+            <Route path="settings" element={<AdminSettings />} />
+            <Route path="name-requests" element={<AdminNameRequestsPage />} />
+            <Route path="/admin/events/:eventId" element={<EventManagePage />} />
+            {/* keep your recordings behavior same as before */}
+            <Route path="recordings" element={<AdminRecordingsPage />} />
+            <Route path="recordings/:id" element={<AdminRecordingDetailsPage />} />
+            <Route path="groups/:idOrSlug" element={<GroupManagePage />} />
+            <Route path="carts" element={<AdminCarts />} />
+            <Route path="staff" element={<AdminStaffPage />} />
+          </Route>
+          <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
+          <Route path="/events" element={<EventsPage />} />
+          <Route path="/events/:id" element={<EventDetailsPage />} />
+          <Route path="/account/cart" element={<MyCartPage />} />
+          <Route path="/community" element={<CommunityHubPage />} />
+          <Route path="/groups/:idOrSlug" element={<RequireAuth><RedirectGroupToAdmin /></RequireAuth>} />
 
-        {/* LIVE meeting page — no header/footer */}
-        <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />
+          {/* My Events list and details */}
+          <Route path="/account/events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
+          <Route path="/account/events/:id" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
 
-        <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
-        <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
-        <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
+          {/* LIVE meeting page — no header/footer */}
+          <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />
 
-        {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
-        <Route path="/resource/:id" element={<RequireAuth><ResourceDetailsPage /></RequireAuth>} />
-        {/* ADD THIS ROUTE FOR RICH PROFILE */}
-        {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
-        <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
-        <Route path="/community/groups/:groupId" element={<RequireAuth><RedirectGroupDetailsToAdmin /></RequireAuth>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-        <Route path="/kyc/callback" element={<KYCCallbackPage />} />
-      </Routes>
+          <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
+          <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+          <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
 
-      {!hideChrome && typeof Footer !== "undefined" && <Footer />}
-    </>
+          {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
+          <Route path="/resource/:id" element={<RequireAuth><ResourceDetailsPage /></RequireAuth>} />
+          {/* ADD THIS ROUTE FOR RICH PROFILE */}
+          {/* <Route path="/account/members/:id" element={<RequireAuth><RichProfile /></RequireAuth>} /> */}
+          <Route path="/community/rich-profile/:userId" element={<RichProfile />} />
+          <Route path="/community/groups/:groupId" element={<RequireAuth><RedirectGroupDetailsToAdmin /></RequireAuth>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/kyc/callback" element={<KYCCallbackPage />} />
+        </Routes>
+      </Box>
+
+      {!hideChrome && !authed && typeof Footer !== "undefined" && <Footer />}
+    </Box>
   );
 };
 

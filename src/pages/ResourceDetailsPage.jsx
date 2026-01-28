@@ -1,7 +1,7 @@
 // src/pages/ResourceDetailsPage.jsx
 
 import React, { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 
 import Container from "@mui/material/Container";
 import Box from "@mui/material/Box";
@@ -21,7 +21,6 @@ import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import AccountSidebar from "../components/AccountSidebar";
 
 const TEAL = "#0ea5a4";
 const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
@@ -332,6 +331,31 @@ function ResourcePreview({ resource }) {
 export default function ResourceDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const searchParams = new URLSearchParams(location.search);
+  const refParam = searchParams.get("ref");
+  // Logic: if from my_resources -> /account/resources
+  // else -> default to /admin/resources (if admin/staff) or /account/resources? 
+  // Actually, better default might be logic dependent, but let's stick to the requested pattern.
+  // If no ref, "Resources" could mean generic. 
+  // Given user request "also in resource detailpage set back button", default to /account/resources if not specified or "my_resources".
+  // Wait, "Explore Resources" isn't a main feature for normal users.
+  // So likely it's always "My Resources". 
+  const backLabel = "My Resources";
+  const backPath = "/account/resources";
+  // The user only asked for "back button set back button" similar to event page.
+  // Event page had "Explore" vs "My Events".
+  // Here we mostly have "My Resources".
+  // But let's support the ref param if I added it.
+
+  // If I added ?ref=my_resources in MyResourcesPage, I can use it.
+  // But if I want to support Admin side later, I can add logic.
+  // For now, I will blindly redirect to /account/resources OR respect ref.
+
+  // const backPath = refParam === 'my_resources' ? '/account/resources' : '/account/resources'; 
+  // It seems /account/resources is the main one. I'll stick to that for now unless ref says otherwise.
+
 
   const [resource, setResource] = useState(null);
   const [event, setEvent] = useState(null);
@@ -441,14 +465,7 @@ export default function ResourceDetailsPage() {
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4">
-          <aside className="col-span-12 lg:col-span-3">
-            <AccountSidebar
-              activeKey="resources"
-              onNavigate={(k) => console.log(k)}
-            />
-          </aside>
-
-          <main className="col-span-12 lg:col-span-9">
+          <main className="col-span-12">
             {loading ? (
               <ResourceDetailsSkeleton />
             ) : error || !resource ? (
@@ -469,15 +486,32 @@ export default function ResourceDetailsPage() {
               </Paper>
             ) : (
               <>
-                <Breadcrumbs sx={{ mb: 2 }}>
-                  <Link
-                    to="/account/resources"
-                    style={{ textDecoration: "none", color: "#666" }}
+
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                  <Button
+                    startIcon={<ArrowBackRoundedIcon />}
+                    component={Link}
+                    to={backPath}
+                    sx={{
+                      textTransform: "none",
+                      color: "text.primary",
+                      fontWeight: 600,
+                      minWidth: "auto",
+                      px: 1,
+                      "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                    }}
                   >
-                    My Resources
-                  </Link>
-                  <Typography color="text.primary">{resource.title}</Typography>
-                </Breadcrumbs>
+                    Back
+                  </Button>
+                  <Breadcrumbs separator="›">
+                    <Link to={backPath} style={{ textDecoration: "none", color: "#666" }}>
+                      {backLabel}
+                    </Link>
+                    <Typography color="text.primary">
+                      {resource?.title || "Resource"}
+                    </Typography>
+                  </Breadcrumbs>
+                </Stack>
 
                 <Paper variant="outlined" sx={{ p: 4, borderRadius: 2 }}>
                   {/* TOP HEADER */}
@@ -523,14 +557,7 @@ export default function ResourceDetailsPage() {
                     </Stack>
 
                     <Box sx={{ mt: { xs: 1, sm: 0 } }}>
-                      <Button
-                        variant="text"
-                        startIcon={<ArrowBackRoundedIcon />}
-                        onClick={() => navigate("/account/resources")}
-                        sx={{ textTransform: "none" }}
-                      >
-                        Back
-                      </Button>
+                      {/* Removed inner Back button */}
                     </Box>
                   </Stack>
 

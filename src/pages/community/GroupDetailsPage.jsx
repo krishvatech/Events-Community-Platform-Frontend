@@ -26,8 +26,8 @@ import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
-import CommunitySidebar from "../../components/CommunitySideBar.jsx";
 
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS & API HELPERS
@@ -1773,26 +1773,25 @@ export default function GroupDetailsPage() {
         }}
       >
         {/* LEFT: Community sidebar (same as other community pages) */}
-        <Box
-          sx={{
-            width: 280,
-            display: { xs: "none", md: "block" },
-            position: "sticky",
-            top: 88,
-            height: "fit-content",
-            flexShrink: 0,
-          }}
-        >
-          <CommunitySidebar
-            view="groups"
-            onChangeView={(k) =>
-              navigate(k === "home" ? "/community" : `/community?view=${k}`)
-            }
-          />
-        </Box>
         {/* LEFT: Main group content (full-width like Groups page) */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {/* Group header */}
+          <Box sx={{ mb: 2 }}>
+            <Button
+              startIcon={<ArrowBackRoundedIcon />}
+              onClick={() => navigate("/community?view=feed")}
+              sx={{
+                textTransform: "none",
+                color: "text.primary",
+                fontWeight: 600,
+                minWidth: "auto",
+                px: 1,
+                "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+              }}
+            >
+              Back to Explore Groups
+            </Button>
+          </Box>
           <Card
             variant="outlined"
             sx={{ borderRadius: 3, borderColor: BORDER, mb: 3 }}

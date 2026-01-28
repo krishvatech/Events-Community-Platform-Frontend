@@ -12,7 +12,7 @@ import {
   Breadcrumbs,
   Skeleton,
 } from "@mui/material";
-import AccountSidebar from "../components/AccountSidebar.jsx";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -80,11 +80,7 @@ function EventDetailsSkeleton() {
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
-          <aside className="col-span-12 lg:col-span-3">
-            <AccountSidebar />
-          </aside>
-
-          <main className="col-span-12 lg:col-span-9">
+          <main className="col-span-12">
             <div className="flex flex-col gap-6">
               <Breadcrumbs sx={{ mb: 2 }}>
                 <Link to="/account/events" style={{ textDecoration: "none", color: "#666" }}>
@@ -247,27 +243,45 @@ export default function EventDetailsPage() {
   const canWatch = isPast && !!event.recording_url;
   const desc = event?.description ?? "";
 
+  const searchParams = new URLSearchParams(location.search);
+  const refParam = searchParams.get("ref");
+  const backLabel = refParam === "my_events" ? "My Events" : "Explore Events";
+  const backPath = refParam === "my_events" ? "/account/events" : "/events";
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* BODY with LEFT NAV + MAIN */}
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
-          {/* LEFT SIDEBAR */}
-          <aside className="col-span-12 lg:col-span-3">
-            <AccountSidebar />
-          </aside>
-          {/* MAIN */}
-          <main className="col-span-12 lg:col-span-9">
+          <main className="col-span-12">
             {/* Stack vertically so Attend appears AFTER the event card */}
             <div className="flex flex-col gap-6">
-              <Breadcrumbs sx={{ mb: 2 }}>
-                <Link to="/account/events" style={{ textDecoration: "none", color: "#666" }}>
-                  My Events
-                </Link>
-                <Typography color="text.primary">
-                  {event?.title || "Event"}
-                </Typography>
-              </Breadcrumbs>
+
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                <Button
+                  startIcon={<ArrowBackRoundedIcon />}
+                  component={Link}
+                  to={backPath}
+                  sx={{
+                    textTransform: "none",
+                    color: "text.primary",
+                    fontWeight: 600,
+                    minWidth: "auto",
+                    px: 1,
+                    "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                  }}
+                >
+                  Back
+                </Button>
+                <Breadcrumbs separator="›">
+                  <Link to={backPath} style={{ textDecoration: "none", color: "#666" }}>
+                    {backLabel}
+                  </Link>
+                  <Typography color="text.primary">
+                    {event?.title || "Event"}
+                  </Typography>
+                </Breadcrumbs>
+              </Stack>
               {/* EVENT CARD */}
               <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
                 {event.preview_image ? (

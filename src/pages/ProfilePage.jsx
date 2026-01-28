@@ -25,7 +25,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import EmailIcon from "@mui/icons-material/Email";
 import PlaceIcon from "@mui/icons-material/Place";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import AccountSidebar from "../components/AccountSidebar.jsx";
+import AccountCircleRoundedIcon from "@mui/icons-material/AccountCircleRounded";
 import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -943,7 +943,10 @@ function AvatarUploadDialog({ open, file, preview, currentUrl, saving, onPick, o
     const newUrl = await uploadAvatarApi(file);
     setSaving(false);
     if (!newUrl) { alert("Could not update photo."); return; }
-    onSaved(`${newUrl}${newUrl.includes("?") ? "&" : "?"}_=${Date.now()}`);
+    const finalUrl = `${newUrl}${newUrl.includes("?") ? "&" : "?"}_=${Date.now()}`;
+    // Dispatch event so Sidebar updates immediately
+    window.dispatchEvent(new CustomEvent("profile:avatar-updated", { detail: { avatar: finalUrl } }));
+    onSaved(finalUrl);
   };
   return (
     <Dialog open={!!open} onClose={onClose} fullWidth maxWidth="xs">
@@ -2830,11 +2833,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
         <div className="grid grid-cols-12 gap-3 md:gap-4">
-          <aside className="col-span-12 lg:col-span-3">
-            <AccountSidebar stickyTop={96} />
-          </aside>
-
-          <main className="col-span-12 lg:col-span-9">
+          <main className="col-span-12">
             {mode === "preview" && (
               loading ? (
                 // ================= SKELETON VIEW (LIKE HOME PAGE) ================
@@ -3530,28 +3529,28 @@ export default function ProfilePage() {
                         </Stack>
                       </SectionCard>
 
-                        <SectionCard
-                          sx={{ mt: 2 }}
-                          title={socialTitle}
-                          action={
-                            <Tooltip title="Edit">
-                              <IconButton size="small" onClick={() => openContactEditor("socials")}>
-                                <EditRoundedIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          }
-                        >
-                          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                            {socialCount ? (
-                              socialItems.filter((item) => item.url).map((item) => (
-                                <Tooltip key={item.key} title={item.label}>
-                                  <Box
-                                    component="a"
-                                    href={normalizeSocialUrl(item.url)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label={`${item.label} profile`}
-                                    sx={{ color: "inherit", display: "flex" }}
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title={socialTitle}
+                        action={
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => openContactEditor("socials")}>
+                              <EditRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                          {socialCount ? (
+                            socialItems.filter((item) => item.url).map((item) => (
+                              <Tooltip key={item.key} title={item.label}>
+                                <Box
+                                  component="a"
+                                  href={normalizeSocialUrl(item.url)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`${item.label} profile`}
+                                  sx={{ color: "inherit", display: "flex" }}
                                 >
                                   {item.icon}
                                 </Box>

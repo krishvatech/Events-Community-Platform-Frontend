@@ -157,38 +157,47 @@ async function fetchStandardNotifications(url) {
 
 // 1b. Group Notifications (for group admins/mods)
 async function fetchGroupNotifications(url) {
-  const r = await fetch(url, {
-    headers: { ...tokenHeader(), Accept: "application/json" },
-    credentials: "include",
-  });
-  if (!r.ok) throw new Error("Failed");
-  const j = await r.json();
-  const raw = Array.isArray(j) ? j : j?.results || [];
+  try {
+    const r = await fetch(url, {
+      headers: { ...tokenHeader(), Accept: "application/json" },
+      credentials: "include",
+    });
+    if (!r.ok) {
+      // If feature not enabled or permission denied, just return empty
+      console.warn("Group notifications fetch failed", r.status);
+      return { items: [] };
+    }
+    const j = await r.json();
+    const raw = Array.isArray(j) ? j : j?.results || [];
 
-  return {
-    items: raw.map((n) => ({
-      id: `group-${n.id}`,
-      source: "group",
-      kind: n.kind,
-      state: n.state || "",
-      title: n.title || "",
-      description: n.description || "",
-      created_at: n.created_at,
-      is_read: !!n.is_read,
-      data: n.data || {},
-      actor: {
-        id: n.actor?.id,
-        name: n.actor?.name || n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
-        avatar: n.actor?.avatar || n.actor?.avatar_url || "",
-      },
-      context: {
-        groupId: n.data?.group_id || n.group,
-        groupName: n.data?.group_name,
-        userId: n.data?.user_id,
-      },
-    })),
-    next: j?.next || null
-  };
+    return {
+      items: raw.map((n) => ({
+        id: `group-${n.id}`,
+        source: "group",
+        kind: n.kind,
+        state: n.state || "",
+        title: n.title || "",
+        description: n.description || "",
+        created_at: n.created_at,
+        is_read: !!n.is_read,
+        data: n.data || {},
+        actor: {
+          id: n.actor?.id,
+          name: n.actor?.name || n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
+          avatar: n.actor?.avatar || n.actor?.avatar_url || "",
+        },
+        context: {
+          groupId: n.data?.group_id || n.group,
+          groupName: n.data?.group_name,
+          userId: n.data?.user_id,
+        },
+      })),
+      next: j?.next || null
+    };
+  } catch (e) {
+    console.warn("Group notifications network error", e);
+    return { items: [] };
+  }
 }
 
 // 2. Identity Requests (Direct Fetch)
