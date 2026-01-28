@@ -11,7 +11,13 @@ import TimerIcon from '@mui/icons-material/Timer';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import StopIcon from '@mui/icons-material/Stop';
 
-export default function BreakoutControls({ open, onClose, onAction, onlineCount = 0, debugMessage = "" }) {
+export default function BreakoutControls({
+    open,
+    onClose,
+    onAction,
+    onlineCount = 0,
+    debugMessage = ""
+}) {
     const [perRoom, setPerRoom] = useState(4);
     const [duration, setDuration] = useState(10);
     const [message, setMessage] = useState("");

@@ -63,7 +63,8 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
-import ShuffleIcon from "@mui/icons-material/Shuffle";
+import ShuffleIcon from "@mui/icons-material/Shuffle"; // Keep this if used elsewhere
+import Diversity3Icon from "@mui/icons-material/Diversity3"; // New icon for Networking
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -85,6 +86,7 @@ import { DyteParticipantsAudio } from "@dytesdk/react-ui-kit";
 import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
 import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
+import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
 
 
 // ================ API Helper ================
@@ -910,8 +912,13 @@ export default function NewLiveMeeting() {
   const [isBreakoutControlsOpen, setIsBreakoutControlsOpen] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [serverDebugMessage, setServerDebugMessage] = useState("");
+  const [speedNetworkingActive, setSpeedNetworkingActive] = useState(false);
+  const [speedNetworkingRound, setSpeedNetworkingRound] = useState(0);
+  const [speedNetworkingTotalRounds, setSpeedNetworkingTotalRounds] = useState(0);
+  const [speedNetworkingDurationMinutes, setSpeedNetworkingDurationMinutes] = useState(0);
   const mainSocketRef = useRef(null);
   const lastLoungeFetchRef = useRef(0);
+  const speedNetworkingTimeoutRef = useRef(null);
 
   // ✅ Fullscreen support
   const rootRef = useRef(null);
@@ -1028,6 +1035,8 @@ export default function NewLiveMeeting() {
   // Desktop right panel toggle
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [loungeOpen, setLoungeOpen] = useState(false);
+  const [showSpeedNetworking, setShowSpeedNetworking] = useState(false);
+  const [lastMessage, setLastMessage] = useState(null);
   const isPanelOpen = isMdUp ? rightPanelOpen : rightOpen;
   const isChatActive = isPanelOpen && tab === 0 && hostPerms.chat;
   const isQnaActive = isPanelOpen && tab === 1;
@@ -1869,6 +1878,7 @@ export default function NewLiveMeeting() {
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
+        setLastMessage(msg);
         console.log("[MainSocket] Received:", msg.type, msg);
 
         if (msg.type === "force_join_breakout") {
@@ -1931,6 +1941,86 @@ export default function NewLiveMeeting() {
       if (ws.readyState <= WebSocket.OPEN) ws.close();
     };
   }, [eventId]);
+
+  const sendMainSocketAction = useCallback((payload) => {
+    const ws = mainSocketRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
+      return true;
+    }
+    console.warn("[MainSocket] Unable to send action; socket not open", payload);
+    return false;
+  }, []);
+
+  const clearSpeedNetworkingTimer = useCallback(() => {
+    if (speedNetworkingTimeoutRef.current) {
+      clearTimeout(speedNetworkingTimeoutRef.current);
+      speedNetworkingTimeoutRef.current = null;
+    }
+  }, []);
+
+  const stopSpeedNetworking = useCallback((options = {}) => {
+    clearSpeedNetworkingTimer();
+    setSpeedNetworkingActive(false);
+    setSpeedNetworkingRound(0);
+    setSpeedNetworkingTotalRounds(0);
+    setSpeedNetworkingDurationMinutes(0);
+
+    if (!isHost) return;
+
+    if (options.sendEnd !== false) {
+      sendMainSocketAction({ action: "end_all_breakouts" });
+    }
+    if (options.announce) {
+      sendMainSocketAction({
+        action: "broadcast_announcement",
+        message: "Speed networking ended. Thanks for joining!",
+      });
+    }
+  }, [clearSpeedNetworkingTimer, isHost, sendMainSocketAction]);
+
+  const runSpeedNetworkingRound = useCallback((roundNumber, totalRounds, durationMinutes) => {
+    if (!isHost) return;
+
+    const durationSeconds = Math.max(1, Math.round(durationMinutes * 60));
+
+    setSpeedNetworkingActive(true);
+    setSpeedNetworkingRound(roundNumber);
+    setSpeedNetworkingTotalRounds(totalRounds);
+    setSpeedNetworkingDurationMinutes(durationMinutes);
+
+    sendMainSocketAction({ action: "random_assign", per_room: 2 });
+    sendMainSocketAction({ action: "start_timer", duration: durationSeconds });
+    sendMainSocketAction({
+      action: "broadcast_announcement",
+      message: `Speed networking: Round ${roundNumber}/${totalRounds} (${durationMinutes} min)`,
+    });
+
+    clearSpeedNetworkingTimer();
+    if (roundNumber < totalRounds) {
+      speedNetworkingTimeoutRef.current = setTimeout(() => {
+        runSpeedNetworkingRound(roundNumber + 1, totalRounds, durationMinutes);
+      }, durationSeconds * 1000 + 1000);
+    } else {
+      speedNetworkingTimeoutRef.current = setTimeout(() => {
+        stopSpeedNetworking({ announce: true });
+      }, durationSeconds * 1000 + 1000);
+    }
+  }, [clearSpeedNetworkingTimer, isHost, sendMainSocketAction, stopSpeedNetworking]);
+
+  const startSpeedNetworking = useCallback((roundDurationMinutes, totalRounds) => {
+    if (!isHost || speedNetworkingActive) return;
+    const durationMinutes = Math.max(1, Math.min(20, Number(roundDurationMinutes) || 0));
+    const rounds = Math.max(1, Math.min(50, Number(totalRounds) || 0));
+
+    runSpeedNetworkingRound(1, rounds, durationMinutes);
+  }, [isHost, runSpeedNetworkingRound, speedNetworkingActive]);
+
+  useEffect(() => {
+    return () => {
+      clearSpeedNetworkingTimer();
+    };
+  }, [clearSpeedNetworkingTimer]);
 
   // Timer countdown logic
   useEffect(() => {
@@ -3991,10 +4081,9 @@ export default function NewLiveMeeting() {
       // In breakout, everyone is a peer. Hide only the person currently occupying the main stage.
       return participants.filter((p) => p.id !== latestPinnedHost?.id && p.inMeeting);
     }
-    // Main meeting: keep legacy behavior of hiding all hosts from the audience strip
-    // PLUS filter out anybody not actually in the meeting (e.g. they are in a breakout room)
-    // PLUS filter out anybody currently in the Social Lounge
-    return participants.filter((p) => p.role !== "Host" && p.inMeeting && !p.isOccupyingLounge);
+    // Main meeting: Show everyone else in the strip EXCEPT the person pinned on stage
+    // (So if there are multiple hosts, they show up here)
+    return participants.filter((p) => p.id !== latestPinnedHost?.id && p.inMeeting && !p.isOccupyingLounge);
   }, [participants, isBreakout, latestPinnedHost]);
 
   // Strip should be only others (no host duplicate)
@@ -5218,6 +5307,23 @@ export default function NewLiveMeeting() {
           <Badge variant="dot" color="error" invisible={!showMembersDot}>
             <GroupIcon />
           </Badge>
+        </IconButton>
+      </Tooltip>
+      {/* Speed Networking Icon (New) */}
+      <Tooltip title="Networking" placement="left" arrow>
+        <IconButton
+          onClick={() => setShowSpeedNetworking(true)}
+          sx={{
+            width: 44,
+            height: 44,
+            bgcolor: showSpeedNetworking ? "rgba(20,184,177,0.15)" : "transparent",
+            color: showSpeedNetworking ? "#14b8b1" : "rgba(255,255,255,0.55)",
+            border: showSpeedNetworking ? "1px solid rgba(20,184,177,0.3)" : "1px solid transparent",
+            "&:hover": { bgcolor: "rgba(20,184,177,0.08)", color: "#fff" },
+            transition: "all 0.2s",
+          }}
+        >
+          <Diversity3Icon />
         </IconButton>
       </Tooltip>
     </Box>
@@ -6456,13 +6562,43 @@ export default function NewLiveMeeting() {
         open={isBreakoutControlsOpen}
         onClose={() => setIsBreakoutControlsOpen(false)}
         onAction={(data) => {
-          if (mainSocketRef.current?.readyState === WebSocket.OPEN) {
-            mainSocketRef.current.send(JSON.stringify(data));
+          if (data?.action === "speed_networking_start") {
+            // Legacy/confusing call - redirecting or ignoring. 
+            // Ideally we shouldn't receive this from current UI anymore.
+            console.warn("Received legacy speed networking start action");
+            return;
           }
+          if (data?.action === "speed_networking_stop") {
+            stopSpeedNetworking({ announce: true }); // We can keep stop functionality just in case
+            return;
+          }
+          sendMainSocketAction(data);
         }}
         onlineCount={onlineUsers.length}
         debugMessage={serverDebugMessage}
+      // Removing these props from passing down as they are no longer handled by BreakoutControls UI
+      // speedNetworkingActive={speedNetworkingActive}
+      // speedNetworkingRound={speedNetworkingRound}
+      // speedNetworkingTotalRounds={speedNetworkingTotalRounds}
+      // speedNetworkingDurationMinutes={speedNetworkingDurationMinutes}
       />
+
+      {/* ✅ Speed Networking Dialog */}
+      <Dialog
+        fullScreen
+        open={showSpeedNetworking}
+        onClose={() => setShowSpeedNetworking(false)}
+        sx={{ zIndex: 1250 }} // Above lounge but below snackbars
+      >
+        <SpeedNetworkingZone
+          eventId={eventId}
+          isAdmin={isHost}
+          onClose={() => setShowSpeedNetworking(false)}
+          dyteMeeting={dyteMeeting}
+          // Passing down the last WebSocket message to handle matching events
+          lastMessage={lastMessage}
+        />
+      </Dialog>
 
       {/* ✅ Main Room Peek (when seated at a lounge table) */}
       {activeTableId && dyteMeeting && (
