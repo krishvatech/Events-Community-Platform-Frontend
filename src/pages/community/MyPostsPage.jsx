@@ -133,6 +133,9 @@ function mapFeedItemRowToUiPost(row) {
     raw_metadata: { ...m, community_id: communityId },
     community_id: communityId,
     target_object_id: row.target_object_id,
+    moderation_status: row.moderation_status || m.moderation_status || row.moderationStatus || m.moderationStatus || row.status || m.status || null,
+    is_removed: row.is_removed || m.is_removed || (row.moderation_status === "removed") || (m.moderationStatus === "removed") || (m.status === "removed") || (row.status === "removed") || false,
+    is_under_review: row.is_under_review || m.is_under_review || (row.moderation_status === "under_review") || (m.moderationStatus === "under_review") || false,
   };
 
   if (type === "text") return { ...base, content: m.text || "" };
@@ -534,114 +537,125 @@ function PostCard({
           </Stack>
         }
       />
-      <CardContent sx={{ pt: 0 }}>
-        {post.content && <ClampedText text={post.content} maxLines={5} />}
+      {/* Body */}
+      <Box sx={{ mb: 2 }}>
+        {post.is_removed || post.moderation_status === "removed" ? (
+          <Typography color="text.secondary" sx={{ fontStyle: "italic", py: 2 }}>
+            This content was removed by moderators.
+          </Typography>
+        ) : (
+          <>
+            {post.type === "text" && (
+              <ClampedText text={post.content} maxLines={5} />
+            )}
 
-        {post.type === "link" && post.link && (
-          <Button
-            size="small"
-            href={post.link}
-            target="_blank"
-            rel="noreferrer"
-            sx={{ mt: 1, textTransform: "none" }}
-          >
-            {post.link}
-          </Button>
-        )}
+            {post.type === "link" && post.link && (
+              <Button
+                size="small"
+                href={post.link}
+                target="_blank"
+                rel="noreferrer"
+                sx={{ mt: 1, textTransform: "none" }}
+              >
+                {post.link}
+              </Button>
+            )}
 
-        {post.type === "image" && post.images?.length > 0 && (
-          <Grid container spacing={1} sx={{ mt: 1 }}>
-            {post.images.map((src, i) => (
-              <Grid key={i} item xs={12} sm={6}>
-                <img
-                  src={src}
-                  alt="post"
-                  style={{
-                    width: "100%",
-                    maxHeight: 300,
-                    objectFit: "cover",
-                    borderRadius: 8,
-                  }}
-                />
+            {post.type === "image" && post.images?.length > 0 && (
+              <Grid container spacing={1} sx={{ mt: 1 }}>
+                {post.images.map((src, i) => (
+                  <Grid key={i} item xs={12} sm={6}>
+                    <img
+                      src={src}
+                      alt="post"
+                      style={{
+                        width: "100%",
+                        maxHeight: 300,
+                        objectFit: "cover",
+                        borderRadius: 8,
+                      }}
+                    />
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
-        )}
+            )}
 
-        {post.type === "poll" && post.options?.length > 0 && (
-          <Box sx={{ mt: 2 }}>
-            {post.options.map((opt, i) => {
-              const label =
-                typeof opt === "string"
-                  ? opt
-                  : opt.text || opt.label || `Option ${i + 1}`;
-              const votes =
-                typeof opt === "object" ? opt.vote_count || 0 : 0;
-              const pct =
-                totalVotes > 0
-                  ? Math.round((votes / totalVotes) * 100)
-                  : 0;
-              const oid = opt.id || opt.option_id;
-              const hasVotes = votes > 0;
-              return (
-                <Box
-                  key={i}
-                  sx={{ mb: 1.5 }}
-                >
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    sx={{ mb: 0.5 }}
-                  >
+            {post.type === "poll" && post.options?.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                {post.options.map((opt, i) => {
+                  const label =
+                    typeof opt === "string"
+                      ? opt
+                      : opt.text || opt.label || `Option ${i + 1}`;
+                  const votes =
+                    typeof opt === "object" ? opt.vote_count || 0 : 0;
+                  const pct =
+                    totalVotes > 0
+                      ? Math.round((votes / totalVotes) * 100)
+                      : 0;
+                  const oid = opt.id || opt.option_id;
+                  const hasVotes = votes > 0;
+                  return (
                     <Box
-                      onClick={() => !userHasVoted && oid && onVote(post.id, oid)}
-                      sx={{ cursor: (!userHasVoted && oid) ? "pointer" : "default", flex: 1 }}
+                      key={i}
+                      sx={{ mb: 1.5 }}
                     >
-                      <Typography variant="body2">
-                        {label}
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        sx={{ mb: 0.5 }}
+                      >
+                        <Box
+                          onClick={() => !userHasVoted && oid && onVote(post.id, oid)}
+                          sx={{ cursor: (!userHasVoted && oid) ? "pointer" : "default", flex: 1 }}
+                        >
+                          <Typography variant="body2">
+                            {label}
+                          </Typography>
+                        </Box>
+
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                          >
+                            {pct}%
+                          </Typography>
+                          {hasVotes && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              sx={{ py: 0, px: 1, minWidth: "auto", height: 24, fontSize: "0.7rem", textTransform: "none" }}
+                              onClick={(e) => { e.stopPropagation(); handleOpenVoters(opt); }}
+                            >
+                              Voters
+                            </Button>
+                          )}
+                        </Stack>
+                      </Stack>
+                      <LinearProgress
+                        variant="determinate"
+                        value={pct}
+                        sx={{ height: 10, borderRadius: 5, cursor: (!userHasVoted && oid) ? "pointer" : "default" }}
+                        onClick={() => !userHasVoted && oid && onVote(post.id, oid)}
+                      />
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                      >
+                        {votes} vote{votes !== 1 ? "s" : ""}
                       </Typography>
                     </Box>
-
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Typography
-                        variant="body2"
-                        fontWeight={600}
-                      >
-                        {pct}%
-                      </Typography>
-                      {hasVotes && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          sx={{ py: 0, px: 1, minWidth: "auto", height: 24, fontSize: "0.7rem", textTransform: "none" }}
-                          onClick={(e) => { e.stopPropagation(); handleOpenVoters(opt); }}
-                        >
-                          Voters
-                        </Button>
-                      )}
-                    </Stack>
-                  </Stack>
-                  <LinearProgress
-                    variant="determinate"
-                    value={pct}
-                    sx={{ height: 10, borderRadius: 5, cursor: (!userHasVoted && oid) ? "pointer" : "default" }}
-                    onClick={() => !userHasVoted && oid && onVote(post.id, oid)}
-                  />
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    {votes} vote{votes !== 1 ? "s" : ""}
-                  </Typography>
-                </Box>
-              );
-            })}
-            <Typography variant="caption" color="text.secondary">
-              Total: {totalVotes} votes
-            </Typography>
-          </Box>
+                  );
+                })}
+                <Typography variant="caption" color="text.secondary">
+                  Total: {totalVotes} votes
+                </Typography>
+              </Box>
+            )}
+          </>
         )}
-      </CardContent>
+      </Box>
 
       <CardActions sx={{ px: 2, pb: 1, display: "block" }}>
         {(likeCount > 0 || shareCount > 0) && (

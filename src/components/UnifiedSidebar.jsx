@@ -35,6 +35,7 @@ import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import PersonIcon from "@mui/icons-material/Person"; // Profile
 import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded"; // Identity Verification
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded"; // Staff
+import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
@@ -180,6 +181,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
         adminItems = [
+            { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
             { label: "Identity Verification", to: "/admin/name-requests", icon: BadgeRoundedIcon },
             { label: "Staff", to: "/admin/staff", icon: AdminPanelSettingsRoundedIcon },
             { label: "Saleor Dashboard", action: "saleor", icon: ShoppingCartRoundedIcon },
@@ -193,6 +195,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Resources", to: "/admin/resources", icon: LibraryBooksRoundedIcon },
             { label: "My Recordings", to: "/admin/recordings", icon: OndemandVideoRoundedIcon },
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
+            { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
             { label: "My Orders", to: "/admin/carts", icon: ShoppingCartRoundedIcon }, // "AdminCarts.jsx"
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" }, // Staff uses Community Notifications per prompt ("Community/NotificationsPage.jsx")

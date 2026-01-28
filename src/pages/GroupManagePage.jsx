@@ -206,6 +206,8 @@ function mapFeedPollToPost(row) {
         hidden: !!(row.is_hidden ?? m.is_hidden),
         is_hidden: !!(row.is_hidden ?? m.is_hidden),
         group_id: gid,
+        moderation_status: row.moderation_status ?? m.moderation_status ?? row.moderationStatus ?? m.moderationStatus ?? row.status ?? m.status ?? null,
+        is_removed: row.is_removed ?? m.is_removed ?? (row.moderation_status === "removed") ?? (m.moderationStatus === "removed") ?? (m.status === "removed") ?? (row.status === "removed") ?? false,
     };
 }
 
@@ -3276,6 +3278,7 @@ export default function GroupManagePage() {
     const [posts, setPosts] = React.useState([]);
     const [postsLoading, setPostsLoading] = React.useState(true);
     const [postsError, setPostsError] = React.useState("");
+    const [postsMeta, setPostsMeta] = React.useState(null);
 
     // Compose state
     const [postType, setPostType] = React.useState("text"); // text | image | link | poll
@@ -3523,7 +3526,11 @@ export default function GroupManagePage() {
             const postsJson = await resPosts.json().catch(() => ([]));
             if (!resPosts.ok) throw new Error(postsJson?.detail || `HTTP ${resPosts.status}`);
 
-            let postsArr = Array.isArray(postsJson) ? postsJson : [];
+            // Backend now returns {results, meta} format
+            let postsArr = Array.isArray(postsJson?.results) ? postsJson.results : (Array.isArray(postsJson) ? postsJson : []);
+            const postsMetaData = postsJson?.meta || null;
+            setPostsMeta(postsMetaData);
+
             // drop polls if backend mixes them here; we'll pull them from Activity Feed
             postsArr = postsArr.filter(p => {
                 const t = (p?.type || "").toLowerCase();
@@ -4763,66 +4770,83 @@ export default function GroupManagePage() {
                                             ) : postsError ? (
                                                 <Alert severity="error">{postsError}</Alert>
                                             ) : posts.length === 0 ? (
-                                                <Typography className="text-slate-500">No posts yet.</Typography>
+                                                <Typography className="text-slate-500" sx={{ fontStyle: (postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0)) ? 'italic' : 'normal' }}>
+                                                    {(postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0))
+                                                        ? "This content was removed by moderators."
+                                                        : "No posts yet."}
+                                                </Typography>
                                             ) : (
                                                 <Stack spacing={2}>
-                                                    {posts.map((p) => (
-                                                        <Paper key={postKey(p)} elevation={0} className="rounded-xl border border-slate-200 p-3">
-                                                            <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
-                                                                <Chip size="small" label={String(p.type || "text").toUpperCase()} />
-                                                                <Typography variant="caption" className="text-slate-500">
-                                                                    {p.created_by?.name || p.created_by?.email || "User"} • {p.created_at ? new Date(p.created_at).toLocaleString() : ""}
-                                                                </Typography>
-                                                            </Stack>
+                                                    {posts.map((p) => {
+                                                        const m = p.metadata || {};
+                                                        const isRemoved = p.is_removed || (p.moderation_status === "removed") || (p.status === "removed") || (m.status === "removed") || (m.moderationStatus === "removed") || (p.moderationStatus === "removed");
 
-                                                            {/* Render by type */}
-                                                            {/* footer actions at end of post — show for ALL types if we can moderate and item has an id */}
-                                                            {canModerate && Number.isInteger(Number(p.feed_item_id ?? p.id)) && (
-                                                                <Stack direction="row" justifyContent="flex-end" className="mt-2">
-                                                                    <IconButton size="small" onClick={(e) => openPostMenu(e, p)} title="More">
-                                                                        <MoreVertRoundedIcon fontSize="small" />
-                                                                    </IconButton>
+                                                        return (
+                                                            <Paper key={postKey(p)} elevation={0} className="rounded-xl border border-slate-200 p-3">
+                                                                <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
+                                                                    <Chip size="small" label={String(p.type || "text").toUpperCase()} />
+                                                                    <Typography variant="caption" className="text-slate-500">
+                                                                        {p.created_by?.name || p.created_by?.email || "User"} • {p.created_at ? new Date(p.created_at).toLocaleString() : ""}
+                                                                    </Typography>
                                                                 </Stack>
-                                                            )}
 
-                                                            {p.type === "image" ? (
-                                                                <>
-                                                                    {p.text && <ClampedText text={p.text} sx={{ mb: 1 }} />}
-                                                                    {p.image && (
-                                                                        <img
-                                                                            alt="post"
-                                                                            src={toAbs(p.image)}
-                                                                            style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12 }}
-                                                                        />
-                                                                    )}
-                                                                </>
-                                                            ) : p.type === "link" ? (
-                                                                <>
-                                                                    {p.text && <ClampedText text={p.text} sx={{ mb: 0.5 }} />}
-                                                                    {p.url && (
-                                                                        <a
-                                                                            href={toAbs(p.url)}
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                            style={{ color: "#0ea5a4", wordBreak: "break-word" }}
-                                                                        >
-                                                                            <LinkRoundedIcon fontSize="small" /> {p.url}
-                                                                        </a>
-                                                                    )}
-                                                                </>
-                                                            ) : p.type === "poll" ? (
-                                                                <PollResultsBlock post={p} />
+                                                                {/* Render by type */}
+                                                                {/* footer actions at end of post — show for ALL types if we can moderate and item has an id */}
+                                                                {canModerate && Number.isInteger(Number(p.feed_item_id ?? p.id)) && (
+                                                                    <Stack direction="row" justifyContent="flex-end" className="mt-2">
+                                                                        <IconButton size="small" onClick={(e) => openPostMenu(e, p)} title="More">
+                                                                            <MoreVertRoundedIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    </Stack>
+                                                                )}
 
-                                                            ) : (
-                                                                <ClampedText text={p.text || ""} />
-                                                            )}
-                                                            <GroupPostSocialBar
-                                                                groupIdOrSlug={idOrSlug}
-                                                                groupOwnerId={group?.created_by?.id}
-                                                                post={p}
-                                                            />
-                                                        </Paper>
-                                                    ))}
+                                                                {isRemoved ? (
+                                                                    <Typography color="text.secondary" sx={{ fontStyle: "italic", py: 2 }}>
+                                                                        This content was removed by moderators.
+                                                                    </Typography>
+                                                                ) : (
+                                                                    <>
+                                                                        {p.type === "image" ? (
+                                                                            <>
+                                                                                {p.text && <ClampedText text={p.text} sx={{ mb: 1 }} />}
+                                                                                {p.image && (
+                                                                                    <img
+                                                                                        alt="post"
+                                                                                        src={toAbs(p.image)}
+                                                                                        style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12 }}
+                                                                                    />
+                                                                                )}
+                                                                            </>
+                                                                        ) : p.type === "link" ? (
+                                                                            <>
+                                                                                {p.text && <ClampedText text={p.text} sx={{ mb: 0.5 }} />}
+                                                                                {p.url && (
+                                                                                    <a
+                                                                                        href={toAbs(p.url)}
+                                                                                        target="_blank"
+                                                                                        rel="noreferrer"
+                                                                                        style={{ color: "#0ea5a4", wordBreak: "break-word" }}
+                                                                                    >
+                                                                                        <LinkRoundedIcon fontSize="small" /> {p.url}
+                                                                                    </a>
+                                                                                )}
+                                                                            </>
+                                                                        ) : p.type === "poll" ? (
+                                                                            <PollResultsBlock post={p} />
+
+                                                                        ) : (
+                                                                            <ClampedText text={p.text || ""} />
+                                                                        )}
+                                                                    </>
+                                                                )}
+                                                                <GroupPostSocialBar
+                                                                    groupIdOrSlug={idOrSlug}
+                                                                    groupOwnerId={group?.created_by?.id}
+                                                                    post={p}
+                                                                />
+                                                            </Paper>
+                                                        );
+                                                    })}
                                                 </Stack>
                                             )}
                                         </Stack>

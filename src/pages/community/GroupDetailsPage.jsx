@@ -206,9 +206,16 @@ function mapFeedItem(item) {
     },
     user_has_liked: !!(item.liked_by_me ?? item.user_has_liked ?? false),
     my_reaction: item.my_reaction || (item.liked_by_me ? "like" : null),
+    moderation_status: item.moderation_status ?? m.moderation_status ?? item.moderationStatus ?? m.moderationStatus ?? item.status ?? m.status ?? null,
+    is_removed: item.is_removed ?? m.is_removed ?? (item.moderation_status === "removed") ?? (m.moderationStatus === "removed") ?? (m.status === "removed") ?? (item.status === "removed") ?? false,
+    is_under_review: item.is_under_review ?? m.is_under_review ?? (item.moderation_status === "under_review") ?? (m.moderationStatus === "under_review") ?? false,
+    can_engage: item.can_engage ?? null,
   };
 
-  if (m.is_hidden || m.is_deleted) return null;
+  // Filter out soft-deleted posts, but NOT moderation-removed posts
+  // Moderation-removed posts should show "This content was removed by moderators." message
+  const isModeratedRemoved = base.is_removed || base.moderation_status === "removed";
+  if ((m.is_hidden || m.is_deleted) && !isModeratedRemoved) return null;
 
   let t = (m.type || m.post_type || item.type || "text").toLowerCase();
 
@@ -1011,6 +1018,12 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
 
   React.useEffect(() => { setLocal(post); }, [post]);
 
+  // Moderation status checks
+  const moderationStatus = local.moderation_status || (local.is_under_review ? "under_review" : (local.is_removed ? "removed" : null));
+  const isUnderReview = local.is_under_review ?? (moderationStatus === "under_review");
+  const isRemoved = local.is_removed ?? (moderationStatus === "removed");
+  const canEngage = local.can_engage ?? (!isUnderReview && !isRemoved);
+
   const myReactionId = local.my_reaction || (local.liked_by_me ? "like" : null);
   const myReactionDef = POST_REACTIONS.find(r => r.id === myReactionId);
   const likeBtnLabel = myReactionDef?.label || "Like";
@@ -1019,6 +1032,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
 
   // Optimistic update wrapper
   const handleReactionClick = async (reactionId) => {
+    if (!canEngage) return; // Don't allow reactions on removed/under review posts
     setAnchorEl(null);
     const oldReaction = local.my_reaction;
     const isSame = oldReaction === reactionId;
@@ -1059,42 +1073,51 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
       </Stack>
 
       {/* Body */}
+      {/* Body */}
       <Box sx={{ mb: 2 }}>
-        {local.type === "text" && (
-          <ExpandableText text={local.text} maxLines={5} />
-        )}
-
-        {local.type === "resource" && <ResourceBlock post={local} />}
-
-        {local.type === "image" && (
+        {local.is_removed || local.moderation_status === "removed" ? (
+          <Typography color="text.secondary" sx={{ fontStyle: "italic", py: 2 }}>
+            This content was removed by moderators.
+          </Typography>
+        ) : (
           <>
-            <ExpandableText text={local.text} maxLines={5} wrapperSx={{ mb: 1 }} />
-            <Box
-              component="img"
-              src={toMediaUrl(local.image_url)}
-              sx={{ width: "100%", borderRadius: 2, maxHeight: 500, objectFit: "cover" }}
-            />
+            {local.type === "text" && (
+              <ExpandableText text={local.text} maxLines={5} />
+            )}
+
+            {local.type === "resource" && <ResourceBlock post={local} />}
+
+            {local.type === "image" && (
+              <>
+                <ExpandableText text={local.text} maxLines={5} wrapperSx={{ mb: 1 }} />
+                <Box
+                  component="img"
+                  src={toMediaUrl(local.image_url)}
+                  sx={{ width: "100%", borderRadius: 2, maxHeight: 500, objectFit: "cover" }}
+                />
+              </>
+            )}
+
+            {local.type === "poll" && <PollBlock post={local} onVote={(oid) => onPollVote(local, oid)} />}
+
+            {local.type === "event" && <EventBlock post={local} onOpen={() => onOpenEvent?.(local.event?.id || local.id)} />}
+
+            {local.type === "link" && (
+              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#fafafa" }}>
+                <ExpandableText text={local.text} maxLines={5} wrapperSx={{ mb: 0.5 }} />
+                <Link href={local.url} target="_blank" fontWeight={600}>
+                  {local.url_title || local.url}
+                </Link>
+                <ExpandableText
+                  text={local.url_desc}
+                  variant="caption"
+                  color="text.secondary"
+                  maxLines={5}
+                  wrapperSx={{ mt: 0.5 }}
+                />
+              </Paper>
+            )}
           </>
-        )}
-
-        {local.type === "poll" && <PollBlock post={local} onVote={(oid) => onPollVote(local, oid)} />}
-
-        {local.type === "event" && <EventBlock post={local} onOpen={() => onOpenEvent?.(local.event?.id || local.id)} />}
-
-        {local.type === "link" && (
-          <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#fafafa" }}>
-            <ExpandableText text={local.text} maxLines={5} wrapperSx={{ mb: 0.5 }} />
-            <Link href={local.url} target="_blank" fontWeight={600}>
-              {local.url_title || local.url}
-            </Link>
-            <ExpandableText
-              text={local.url_desc}
-              variant="caption"
-              color="text.secondary"
-              maxLines={5}
-              wrapperSx={{ mt: 0.5 }}
-            />
-          </Paper>
         )}
       </Box>
 
@@ -1126,7 +1149,8 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
         <Button
           startIcon={<span style={{ fontSize: 18 }}>{likeBtnEmoji}</span>}
           sx={{ color: hasReaction ? "primary.main" : "text.secondary", fontWeight: hasReaction ? 600 : 400 }}
-          onClick={(e) => setAnchorEl(e.currentTarget)}
+          onClick={(e) => canEngage && setAnchorEl(e.currentTarget)}
+          disabled={!canEngage}
         >
           {likeBtnLabel}
         </Button>
@@ -1134,15 +1158,17 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
           startIcon={<ChatBubbleOutlineIcon />}
           color="inherit"
           onClick={() => {
+            if (!canEngage) return;
             setCommentsOpen(prev => {
               if (!prev) setTimeout(() => commentInputRef.current?.focus(), 0);
               return !prev;
             });
           }}
+          disabled={!canEngage}
         >
           Comment
         </Button>
-        <Button startIcon={<IosShareIcon />} color="inherit" onClick={() => setShareOpen(true)}>Share</Button>
+        <Button startIcon={<IosShareIcon />} color="inherit" onClick={() => canEngage && setShareOpen(true)} disabled={!canEngage}>Share</Button>
       </Stack>
 
       <Popover
@@ -1196,6 +1222,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
 function PostsTab({ groupId }) {
   const [posts, setPosts] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [postsMeta, setPostsMeta] = React.useState(null);
 
   const fetchPosts = React.useCallback(async () => {
     setLoading(true);
@@ -1203,12 +1230,27 @@ function PostsTab({ groupId }) {
       // 1. Fetch Posts
       const res = await fetch(toApiUrl(`groups/${groupId}/posts/`), { headers: { Accept: "application/json", ...authHeaders() } });
       const data = res.ok ? await res.json() : [];
+
+      // Extract metadata from response (backend now returns {results, meta})
       const postsArrRaw = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      const meta = data?.meta || null;
+      setPostsMeta(meta);
+
+      // Debug: Log posts from backend
+      console.log('[GroupDetails] Posts from backend:', postsArrRaw.length, 'posts');
+      console.log('[GroupDetails] Meta:', meta);
+      const removedPosts = postsArrRaw.filter(p => p.is_removed || p.moderation_status === 'removed');
+      if (removedPosts.length) {
+        console.log('[GroupDetails] Found removed posts:', removedPosts);
+      }
+
       const numericGroupId = Number(groupId);
       const postsArr = postsArrRaw
-        .filter(p => {
-          const gid = Number(p?.group_id ?? p?.group?.id ?? p?.groupId ?? p?.groupID ?? null);
-          return Number.isFinite(numericGroupId) && numericGroupId ? gid === numericGroupId : true;
+
+        .map(p => {
+          // Trust the endpoint: these posts belong to this group. Ensure ID is attached.
+          const existingId = p.group_id ?? p.group?.id ?? p.groupId ?? p.groupID;
+          return { ...p, group_id: existingId ? Number(existingId) : numericGroupId };
         })
         // Drop polls/events if backend mixes them in this endpoint.
         .filter(p => {
@@ -1224,10 +1266,15 @@ function PostsTab({ groupId }) {
 
       // 3. Merge & Dedupe (prefer feed item if collision)
       const allRaw = [...postsArr, ...pollsFeed];
+      console.log('[GroupDetails] Before mapFeedItem:', allRaw.length, 'items');
+
       const mapped = allRaw.map(mapFeedItem).filter(Boolean);
+      console.log('[GroupDetails] After mapFeedItem + filter(Boolean):', mapped.length, 'items');
+
       const scopedMapped = Number.isFinite(numericGroupId) && numericGroupId
         ? mapped.filter(p => Number(p.group_id) === numericGroupId)
         : mapped;
+      console.log('[GroupDetails] After scope filter:', scopedMapped.length, 'items');
 
       const seenIds = new Set();
       const uniqueMapped = [];
@@ -1240,6 +1287,7 @@ function PostsTab({ groupId }) {
 
       // Sort by created_at desc
       uniqueMapped.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      console.log('[GroupDetails] After dedupe:', uniqueMapped.length, 'unique posts');
 
       // 4. Hydrate with metrics
       const ids = uniqueMapped.map(p => p.id).filter(id => Number.isInteger(id));
@@ -1257,8 +1305,14 @@ function PostsTab({ groupId }) {
           // Attach group_id explicitly
           return { ...base, group_id: numericGroupId };
         });
+        console.log('[GroupDetails] Final posts with metrics:', hydrated.length);
+        const removedInFinal = hydrated.filter(p => p.is_removed || p.moderation_status === 'removed');
+        if (removedInFinal.length) {
+          console.log('[GroupDetails] Removed posts in final array:', removedInFinal.length);
+        }
         setPosts(hydrated);
       } else {
+        console.log('[GroupDetails] Final posts without metrics:', uniqueMapped.length);
         setPosts(uniqueMapped.map(p => ({ ...p, group_id: numericGroupId })));
       }
     } catch (e) {
@@ -1313,7 +1367,21 @@ function PostsTab({ groupId }) {
       </Box>
     );
   }
-  if (!posts.length) return <Typography color="text.secondary" align="center" py={4}>No posts in this group yet.</Typography>;
+
+  // Empty state: differentiate between "no posts" and "posts removed by moderation"
+  if (!posts.length) {
+    const hasRemovedPosts = postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0);
+
+    return (
+      <Paper sx={{ p: 3, border: `1px solid ${BORDER}`, borderRadius: 3, textAlign: "center" }}>
+        <Typography color="text.secondary" sx={{ fontStyle: hasRemovedPosts ? "italic" : "normal" }}>
+          {hasRemovedPosts
+            ? "This content was removed by moderators."
+            : "No posts in this group yet."}
+        </Typography>
+      </Paper>
+    );
+  }
 
   return (
     <Box>

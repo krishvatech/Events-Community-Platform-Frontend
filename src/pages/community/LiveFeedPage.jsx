@@ -3,7 +3,8 @@ import * as React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Avatar, AvatarGroup, Box, Button, Chip, Grid, IconButton, LinearProgress, Link,
-  Paper, Stack, TextField, Typography, InputAdornment, Popover, Tooltip, Skeleton
+  Paper, Stack, TextField, Typography, InputAdornment, Popover, Tooltip, Skeleton,
+  Menu, MenuItem, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio
 } from "@mui/material";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -19,6 +20,8 @@ import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineR
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText,
   CircularProgress, List, ListItem, ListItemAvatar, ListItemText, Divider
@@ -38,6 +41,15 @@ const POST_REACTIONS = [
   { id: "debatable", emoji: "🤷", label: "Debatable" },
 ];
 
+const REPORT_REASONS = [
+  { id: "spam", label: "Spam" },
+  { id: "harassment", label: "Harassment" },
+  { id: "hate_speech", label: "Hate speech" },
+  { id: "false_info", label: "False information" },
+  { id: "violence", label: "Violence" },
+  { id: "sexual_content", label: "Sexual content" },
+  { id: "other", label: "Other" },
+];
 
 
 const NOOP = () => { };
@@ -710,6 +722,36 @@ function mapFeedItem(item) {
       comments: Number(m.comments ?? 0),
       shares: Number(m.shares ?? 0),
     },
+    moderation_status:
+      item.moderation_status ??
+      m.moderation_status ??
+      item.moderationStatus ??
+      m.moderationStatus ??
+      item.status ??
+      m.status ??
+      null,
+    is_under_review:
+      item.is_under_review ??
+      m.is_under_review ??
+      (item.moderation_status === "under_review") ??
+      (m.moderationStatus === "under_review") ??
+      false,
+    is_removed:
+      item.is_removed ??
+      m.is_removed ??
+      (item.moderation_status === "removed") ??
+      (m.moderationStatus === "removed") ??
+      (item.status === "removed") ??
+      (m.status === "removed") ??
+      false,
+    can_engage:
+      item.can_engage ??
+      m.can_engage ??
+      null,
+    is_blurred:
+      item.is_blurred ??
+      m.is_blurred ??
+      null,
   };
 
   if (m.is_hidden || m.is_deleted) return null;
@@ -1245,11 +1287,30 @@ function normalizeCommentRow(c) {
     c.author_avatar || c.avatar || c.avatar_url || c.user_image || c.user_image_url || c.image || c.photo || ""
   );
 
+  const moderation_status =
+    c.moderation_status ??
+    c.moderationStatus ??
+    null;
+  const is_under_review =
+    c.is_under_review ??
+    (moderation_status === "under_review");
+  const is_removed =
+    c.is_removed ??
+    (moderation_status === "removed");
+  const can_engage =
+    c.can_engage ??
+    (!is_under_review && !is_removed);
+
   return {
     ...c,
     parent_id,
     author_id,
     author: { id: author_id, name, avatar },
+    moderation_status,
+    is_under_review,
+    is_removed,
+    can_engage,
+    is_blurred: c.is_blurred ?? false,
   };
 }
 
@@ -1262,7 +1323,10 @@ function CommentsDialog({
   inline = false,
   initialCount = 3,
   inputRef = null,
-  target
+  target,
+  canEngage = true,
+  reportable = true,
+  onReport
 }) {
   const [loading, setLoading] = React.useState(false);
   const [me, setMe] = React.useState(null);
@@ -1452,6 +1516,7 @@ function CommentsDialog({
   }, [items]);
 
   async function createComment(body, parentId = null) {
+    if (!canEngage) return;
     if (!body.trim()) return;
     try {
       // build the correct payload (FeedItem fallback, or content.Resource if present)
@@ -1492,6 +1557,7 @@ function CommentsDialog({
   }
 
   async function toggleCommentLike(commentId) {
+    if (!canEngage) return;
     // 1) optimistic update
     setItems((curr) => {
       const i = curr.findIndex((c) => c.id === commentId);
@@ -1562,12 +1628,43 @@ function CommentsDialog({
     });
   }
 
+  function markCommentUnderReview(commentId) {
+    setItems((curr) =>
+      curr.map((c) =>
+        c.id === commentId
+          ? {
+            ...c,
+            moderation_status: "under_review",
+            is_under_review: true,
+            is_removed: false,
+            can_engage: false,
+            is_blurred: !isAdmin && c.author_id !== myId,
+          }
+          : c
+      )
+    );
+  }
+
+  function reportComment(comment) {
+    if (!onReport) return;
+    onReport({
+      target_type: "comment",
+      target_id: comment.id,
+      label: "comment",
+      onSuccess: () => markCommentUnderReview(comment.id),
+    });
+  }
+
   //
   // MOVE THIS COMPONENT OUTSIDE of CommentsDialog
   // It needs to receive 'myId' and 'isAdmin' as props now.
 
   const CommentItem = ({ c, depth = 0, myId, isAdmin, onToggleLike, onReply, onDelete }) => {
     const canDelete = c?.author_id === myId;
+    const canInteract = canEngage && !(c.is_under_review || c.is_removed);
+    const canReport = reportable && myId && c?.author_id !== myId;
+    const [menuAnchor, setMenuAnchor] = React.useState(null);
+    const menuOpen = Boolean(menuAnchor);
 
     return (
       <Box
@@ -1592,24 +1689,69 @@ function CommentsDialog({
           <Typography variant="caption" color="text.secondary">
             {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
           </Typography>
+          {c.is_under_review && (
+            <Chip size="small" label="Under Review" variant="outlined" />
+          )}
+          {c.is_removed && (
+            <Chip size="small" color="warning" label="Removed" variant="outlined" />
+          )}
+          {canReport && (
+            <>
+              <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
+                <MoreVertRoundedIcon fontSize="small" />
+              </IconButton>
+              <Menu
+                open={menuOpen}
+                anchorEl={menuAnchor}
+                onClose={() => setMenuAnchor(null)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+              >
+                <MenuItem
+                  onClick={() => {
+                    setMenuAnchor(null);
+                    reportComment(c);
+                  }}
+                >
+                  <FlagOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
+                  Report comment
+                </MenuItem>
+              </Menu>
+            </>
+          )}
         </Stack>
 
-        <Typography sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{c.text}</Typography>
+        <Typography
+          sx={{
+            mt: 0.5,
+            whiteSpace: "pre-wrap",
+            filter: c.is_blurred ? "blur(4px)" : "none",
+            opacity: c.is_removed ? 0.5 : 1,
+          }}
+        >
+          {c.text}
+        </Typography>
 
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
           <Button
             size="small"
             startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
-            onClick={() => onToggleLike(c.id)}
+            onClick={() => canInteract && onToggleLike?.(c.id)}
+            disabled={!canInteract}
             sx={{ color: c.user_has_liked ? "teal" : "inherit" }}
           >
             {c.like_count ?? 0}
           </Button>
-          <Button size="small" startIcon={<ReplyRoundedIcon fontSize="small" />} onClick={() => onReply(c)}>
+          <Button
+            size="small"
+            startIcon={<ReplyRoundedIcon fontSize="small" />}
+            onClick={() => canInteract && onReply?.(c)}
+            disabled={!canInteract}
+          >
             Reply
           </Button>
           {canDelete && (
-            <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => onDelete(c)}>
+            <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => onDelete?.(c)}>
               Delete
             </Button>
           )}
@@ -1656,6 +1798,11 @@ function CommentsDialog({
           </Stack>
         )}
 
+        {!canEngage && (
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+            Engagement is disabled while this content is under review.
+          </Typography>
+        )}
         {/* Always show comment input */}
         <Stack direction="row" spacing={1}>
           <TextField
@@ -1666,16 +1813,18 @@ function CommentsDialog({
             onChange={(e) => setText(e.target.value)}
             inputRef={inputRef || undefined}
             onKeyDown={(e) => {
+              if (!canEngage) return;
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 createComment(text, replyTo?.id || null);
               }
             }}
+            disabled={!canEngage}
           />
           <Button
             variant="contained"
             onClick={() => createComment(text, replyTo?.id || null)}
-            disabled={loading || !text.trim()}
+            disabled={!canEngage || loading || !text.trim()}
           >
             Post
           </Button>
@@ -1741,6 +1890,11 @@ function CommentsDialog({
         </DialogContent>
         <Divider />
         <Box sx={{ px: 2, py: 1.5 }}>
+          {!canEngage && (
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+              Engagement is disabled while this content is under review.
+            </Typography>
+          )}
           {replyTo && (
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <Typography variant="caption" color="text.secondary">Replying to {replyTo.author?.name || `#${replyTo.author_id}`}</Typography>
@@ -1754,8 +1908,9 @@ function CommentsDialog({
               placeholder={replyTo ? "Write a reply…" : "Write a comment…"}
               value={text}
               onChange={(e) => setText(e.target.value)}
+              disabled={!canEngage}
             />
-            <Button variant="contained" onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
+            <Button variant="contained" disabled={!canEngage} onClick={() => createComment(text, replyTo?.id || null)}>Post</Button>
           </Stack>
         </Box>
       </Dialog>
@@ -1994,10 +2149,69 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
   );
 }
 
+function ReportDialog({ open, onClose, onSubmit, loading, targetLabel }) {
+  const [reason, setReason] = React.useState("spam");
+  const [notes, setNotes] = React.useState("");
+
+  React.useEffect(() => {
+    if (open) {
+      setReason("spam");
+      setNotes("");
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Report {targetLabel || "content"}</DialogTitle>
+      <DialogContent dividers>
+        <FormControl component="fieldset" fullWidth>
+          <FormLabel component="legend">Reason</FormLabel>
+          <RadioGroup
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          >
+            {REPORT_REASONS.map((r) => (
+              <FormControlLabel
+                key={r.id}
+                value={r.id}
+                control={<Radio />}
+                label={r.label}
+              />
+            ))}
+          </RadioGroup>
+        </FormControl>
+        <TextField
+          label="Additional notes (optional)"
+          placeholder="Share any context that can help moderators."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          fullWidth
+          multiline
+          minRows={3}
+          sx={{ mt: 2 }}
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+          Reports are anonymous. Our moderators will review this content.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button
+          variant="contained"
+          onClick={() => onSubmit?.(reason, notes)}
+          disabled={loading}
+        >
+          {loading ? "Submitting…" : "Submit report"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 
 
 // ---- POST CARD ----
-function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
+function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId, viewerIsStaff, onReport }) {
   const [local, setLocal] = React.useState(post);
   const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
@@ -2107,6 +2321,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
   }, [post.id]);
 
   async function toggleLike() {
+    if (!canEngage) return;
     try {
       const target = engageTargetOf(post);
       const payload = { target_id: target.id, reaction: "like" }; // field name is 'reaction', not 'kind'
@@ -2155,6 +2370,17 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
           : (post.visibility === "community"
             ? (post.community || (post.community_id ? `Community #${post.community_id}` : "—"))
             : (post.author?.name || "—"));
+
+  const moderationStatus = post.moderation_status || (post.is_under_review ? "under_review" : (post.is_removed ? "removed" : null));
+  const isUnderReview = post.is_under_review ?? (moderationStatus === "under_review");
+  const isRemoved = post.is_removed ?? (moderationStatus === "removed");
+  const canEngage = post.can_engage ?? (!isUnderReview && !isRemoved);
+  const isReportable = post.type !== "event" && post.type !== "resource";
+  const canReport = isReportable && viewerId && viewerId !== post.author_id;
+  const shouldBlur = post.is_blurred ?? (isUnderReview && !(viewerIsStaff || viewerId === post.author_id));
+  const [menuAnchor, setMenuAnchor] = React.useState(null);
+  const menuOpen = Boolean(menuAnchor);
+
   return (
     <Paper
       key={post.id}
@@ -2211,87 +2437,134 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
             variant="outlined"
           />
         )}
+        {isUnderReview && <Chip size="small" label="Under Review" variant="outlined" />}
+        {isRemoved && <Chip size="small" color="warning" label="Removed" variant="outlined" />}
+        {canReport && (
+          <>
+            <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
+              <MoreVertRoundedIcon fontSize="small" />
+            </IconButton>
+            <Menu
+              open={menuOpen}
+              anchorEl={menuAnchor}
+              onClose={() => setMenuAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+            >
+              <MenuItem
+                onClick={() => {
+                  setMenuAnchor(null);
+                  onReport?.(post);
+                }}
+              >
+                <FlagOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
+                Report post
+              </MenuItem>
+            </Menu>
+          </>
+        )}
       </Stack>
 
       {/* Body */}
-      <Box sx={{ mt: 1.25 }}>
-        {post.type === "text" && (
-          <ClampedText text={post.text} maxLines={5} />
+      <Box sx={{ mt: 1.25, position: "relative" }}>
+        {!canEngage && isUnderReview && (
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+            Engagement is disabled while this content is under review.
+          </Typography>
         )}
-
-        {post.type === "resource" && (
-          <ResourceBlock post={post} onOpenEvent={onOpenEvent} />
-        )}
-
-        {post.type === "image" && (
-          <>
-            {post.text && (
-              <Box sx={{ mb: 1 }}>
-                <ClampedText text={post.text} maxLines={5} />
-              </Box>
-            )}
-            <Box
-              component="img"
-              src={toMediaUrl(post.image_url)}
-              alt={post.text || "post image"}
-              sx={{
-                width: "100%",
-                maxWidth: { xs: "100%", md: 640 },
-                maxHeight: 420,
-                objectFit: "cover",
-                borderRadius: 2,
-                border: `1px solid ${BORDER}`,
-                display: "block",
-                mx: "auto",
-              }}
-            />
-          </>
-        )}
-
-        {post.type === "link" && (
-          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
-            {post.text && (
-              <Box sx={{ mb: 1 }}>
-                <ClampedText text={post.text} maxLines={5} />
-              </Box>
-            )}
-
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-              <Link href={post.url} target="_blank" rel="noreferrer">
-                {post.url_title || post.url}
-              </Link>
+        <Box
+          sx={{
+            filter: shouldBlur ? "blur(4px)" : "none",
+            opacity: isRemoved ? 1 : 1, // Keep opacity 1 so message is readable
+            pointerEvents: shouldBlur ? "none" : "auto",
+          }}
+        >
+          {isRemoved ? (
+            <Typography color="text.secondary" sx={{ fontStyle: "italic", py: 2 }}>
+              This content was removed by moderators.
             </Typography>
+          ) : (
+            <>
+              {post.type === "text" && (
+                <ClampedText text={post.text} maxLines={5} />
+              )}
 
-            {post.url_desc && (
-              <ClampedText
-                text={post.url_desc}
-                maxLines={5}
-                variant="caption"
-                color="text.secondary"
-                mt={0.5}
-              />
-            )}
-          </Paper>
-        )}
+              {post.type === "resource" && (
+                <ResourceBlock post={post} onOpenEvent={onOpenEvent} />
+              )}
 
-        {post.type === "poll" && (
-          <PollBlock post={local} onVote={(optionId, meta) => onPollVote?.(post, optionId, meta)} />
-        )}
+              {post.type === "image" && (
+                <>
+                  {post.text && (
+                    <Box sx={{ mb: 1 }}>
+                      <ClampedText text={post.text} maxLines={5} />
+                    </Box>
+                  )}
+                  <Box
+                    component="img"
+                    src={toMediaUrl(post.image_url)}
+                    alt={post.text || "post image"}
+                    sx={{
+                      width: "100%",
+                      maxWidth: { xs: "100%", md: 640 },
+                      maxHeight: 420,
+                      objectFit: "cover",
+                      borderRadius: 2,
+                      border: `1px solid ${BORDER}`,
+                      display: "block",
+                      mx: "auto",
+                    }}
+                  />
+                </>
+              )}
 
-        {post.type === "event" && (
-          <EventBlock
-            post={post}
-            onOpen={() => {
-              const eventId =
-                post?.engage?.id ??
-                post?.event?.id ??
-                post?.event_id ??
-                post?.eventId ??
-                post?.id;
-              onOpenEvent?.(eventId);
-            }}
-          />
-        )}
+              {post.type === "link" && (
+                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+                  {post.text && (
+                    <Box sx={{ mb: 1 }}>
+                      <ClampedText text={post.text} maxLines={5} />
+                    </Box>
+                  )}
+
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                    <Link href={post.url} target="_blank" rel="noreferrer">
+                      {post.url_title || post.url}
+                    </Link>
+                  </Typography>
+
+                  {post.url_desc && (
+                    <ClampedText
+                      text={post.url_desc}
+                      maxLines={5}
+                      variant="caption"
+                      color="text.secondary"
+                      mt={0.5}
+                    />
+                  )}
+                </Paper>
+              )}
+
+              {post.type === "poll" && (
+                <PollBlock post={local} onVote={(optionId, meta) => onPollVote?.(post, optionId, meta)} />
+              )}
+
+              {post.type === "event" && (
+                <EventBlock
+                  post={post}
+                  onOpen={() => {
+                    const eventId =
+                      post?.engage?.id ??
+                      post?.event?.id ??
+                      post?.event_id ??
+                      post?.eventId ??
+                      post?.id;
+                    onOpenEvent?.(eventId);
+                  }}
+                />
+              )}
+            </>
+          )}
+        </Box>
       </Box>
 
       {/* Actions */}
@@ -2337,7 +2610,8 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
       <Stack direction="row" justifyContent="space-around" alignItems="center" sx={{ px: 0.5, pb: 0.5 }}>
         <Button
           size="small"
-          onClick={handleOpenPicker}
+          onClick={canEngage ? handleOpenPicker : undefined}
+          disabled={!canEngage}
           sx={{
             textTransform: "none",
             color: hasReaction ? "primary.main" : "text.secondary",
@@ -2355,7 +2629,9 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         <Button
           size="small"
           startIcon={<ChatBubbleOutlineIcon />}
+          disabled={!canEngage}
           onClick={() => {
+            if (!canEngage) return;
             setCommentsOpen((v) => {
               const next = !v;
               if (!v) setTimeout(() => commentInputRef.current?.focus?.(), 0); // focus when opening
@@ -2370,7 +2646,8 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
         <Button
           size="small"
           startIcon={<IosShareIcon />}
-          onClick={() => setShareOpen(true)}
+          disabled={!canEngage}
+          onClick={() => canEngage && setShareOpen(true)}
         >
           SHARE
         </Button>
@@ -2431,6 +2708,9 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent }) {
           target={engageTargetOf(post)}
           onBumpCount={bumpCommentCount}
           inputRef={commentInputRef}
+          canEngage={canEngage}
+          reportable={isReportable}
+          onReport={onReport}
         />
       )}
 
@@ -2659,6 +2939,7 @@ export default function LiveFeedPage({
   const [hasMore, setHasMore] = React.useState(true);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [me, setMe] = React.useState(null);
   const [focusPostId, setFocusPostId] = React.useState(null);
   const focusHandledRef = React.useRef(false);
   // Composer (kept off per your UI; uncomment if needed)
@@ -2676,6 +2957,24 @@ export default function LiveFeedPage({
   const [sharesTarget, setSharesTarget] = React.useState(null);
   const [sharesLoading, setSharesLoading] = React.useState(false);
   const [sharesUsers, setSharesUsers] = React.useState([]);
+  // --- Report modal state ---
+  const [reportOpen, setReportOpen] = React.useState(false);
+  const [reportTarget, setReportTarget] = React.useState(null);
+  const [reportBusy, setReportBusy] = React.useState(false);
+
+  const viewerId = me?.id || me?.user?.id || null;
+  const viewerIsStaff = !!(me?.is_staff || me?.is_superuser || me?.isAdmin || me?.role === "admin");
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const meJson = await getMeCached();
+        setMe(meJson || null);
+      } catch {
+        setMe(null);
+      }
+    })();
+  }, []);
 
   // 🔼 Show "scroll to top" button after user scrolls down
   const [showScrollTop, setShowScrollTop] = React.useState(false);
@@ -2706,6 +3005,10 @@ export default function LiveFeedPage({
   // 🔹 Multi-reaction handler (Like / Intriguing / Spot On / etc.)
   async function handleReact(postId, reactionId) {
     if (!postId || !reactionId) return;
+    const currentPost = posts.find((p) => p.id === postId);
+    if (currentPost && (currentPost.can_engage === false || currentPost.is_under_review || currentPost.is_removed)) {
+      return;
+    }
 
     // 1) Optimistic update in local state (same feel as My Posts)
     setPosts((curr) =>
@@ -2827,6 +3130,85 @@ export default function LiveFeedPage({
     if (typeof window === "undefined") return;
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const openReport = React.useCallback((payload) => {
+    setReportTarget(payload);
+    setReportOpen(true);
+  }, []);
+
+  const closeReport = () => {
+    if (reportBusy) return;
+    setReportOpen(false);
+    setReportTarget(null);
+  };
+
+  async function submitReport(reason, notes) {
+    if (!reportTarget?.target_type || !reportTarget?.target_id) return;
+    setReportBusy(true);
+    try {
+      const res = await fetch(toApiUrl("moderation/reports/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          target_type: reportTarget.target_type,
+          target_id: reportTarget.target_id,
+          reason,
+          notes,
+        }),
+      });
+
+      if (res.status === 409) {
+        alert("You already reported this content.");
+        setReportBusy(false);
+        return;
+      }
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || `HTTP ${res.status}`);
+      }
+
+      const payload = await res.json();
+      reportTarget.onSuccess?.(payload);
+      setReportOpen(false);
+      setReportTarget(null);
+    } catch (e) {
+      alert("Could not submit report. Please try again.");
+    } finally {
+      setReportBusy(false);
+    }
+  }
+
+  const handleReport = React.useCallback((payload) => {
+    if (!payload) return;
+    if (payload.target_type && payload.target_id) {
+      openReport(payload);
+      return;
+    }
+    const post = payload;
+    if (!post?.id || !Number.isInteger(Number(post.id))) return;
+    const blurred = !(viewerIsStaff || viewerId === post.author_id);
+    openReport({
+      target_type: "activity_feed.feeditem",
+      target_id: Number(post.id),
+      label: "post",
+      onSuccess: () => {
+        setPosts((curr) =>
+          curr.map((p) =>
+            p.id === post.id
+              ? {
+                ...p,
+                moderation_status: "under_review",
+                is_under_review: true,
+                is_removed: false,
+                can_engage: false,
+                is_blurred: blurred,
+              }
+              : p
+          )
+        );
+      },
+    });
+  }, [openReport, setPosts, viewerId, viewerIsStaff]);
 
 
   // Install a global opener used by PostCard ("liked by X and N others" click)
@@ -3427,6 +3809,9 @@ export default function LiveFeedPage({
                       onReact={handleReact}
                       onOpenEvent={openEvent}
                       onPollVote={(post, optionId, meta) => voteOnPoll(post, optionId, meta)}
+                      viewerId={viewerId}
+                      viewerIsStaff={viewerIsStaff}
+                      onReport={handleReport}
                     />
                   </Box>
                   {/* After 4 posts: mutual connections */}
@@ -3550,6 +3935,13 @@ export default function LiveFeedPage({
             )}
           </DialogContent>
         </Dialog>
+        <ReportDialog
+          open={reportOpen}
+          onClose={closeReport}
+          onSubmit={submitReport}
+          loading={reportBusy}
+          targetLabel={reportTarget?.label}
+        />
 
 
       </Grid>

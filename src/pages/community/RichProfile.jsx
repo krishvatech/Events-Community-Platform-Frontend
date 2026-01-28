@@ -55,6 +55,10 @@ import InstagramIcon from "@mui/icons-material/Instagram";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import LanguageIcon from "@mui/icons-material/Language";
 import EventIcon from "@mui/icons-material/Event";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import FlagIcon from "@mui/icons-material/Flag";
+import ReportProfileDialog from "../../components/ReportProfileDialog.jsx";
+import { Menu, MenuItem } from "@mui/material";
 
 
 
@@ -606,149 +610,157 @@ function RichPostCard({
         subheader={timeAgo(post.created_at)}
       />
       <CardContent sx={{ pt: 0 }}>
-        {post.content && (
-          <Typography sx={{ whiteSpace: "pre-wrap" }}>{post.content}</Typography>
-        )}
-        {post.link && (
-          <Button
-            size="small"
-            href={post.link}
-            target="_blank"
-            rel="noreferrer"
-            sx={{ mt: 1 }}
-          >
-            {post.link}
-          </Button>
-        )}
-        {Array.isArray(post.images) && post.images.length > 0 && (
-          <Stack spacing={1} direction="row" sx={{ mt: 1 }} flexWrap="wrap">
-            {post.images.map((src, idx) => (
-              <Box key={idx} sx={{ width: "100%", maxWidth: 200, borderRadius: 1, overflow: "hidden" }}>
-                <img
-                  src={src}
-                  alt={`post-img-${idx}`}
-                  style={{ width: "100%", height: "auto", display: "block" }}
-                />
-              </Box>
-            ))}
-          </Stack>
-        )}
-        {post.type === "poll" &&
-          Array.isArray(post.options) &&
-          post.options.length > 0 &&
-          (() => {
-            // Normalise options and compute totals (same logic style as HomePage)
-            const normalized = post.options.map((opt, idx) => {
-              const optionId =
-                typeof opt === "object"
-                  ? opt.id ?? opt.option_id ?? null
-                  : null;
+        {post.is_removed || post.moderation_status === "removed" ? (
+          <Typography color="text.secondary" sx={{ fontStyle: "italic", py: 2 }}>
+            This content was removed by moderators.
+          </Typography>
+        ) : (
+          <>
+            {post.content && (
+              <Typography sx={{ whiteSpace: "pre-wrap" }}>{post.content}</Typography>
+            )}
+            {post.link && (
+              <Button
+                size="small"
+                href={post.link}
+                target="_blank"
+                rel="noreferrer"
+                sx={{ mt: 1 }}
+              >
+                {post.link}
+              </Button>
+            )}
+            {Array.isArray(post.images) && post.images.length > 0 && (
+              <Stack spacing={1} direction="row" sx={{ mt: 1 }} flexWrap="wrap">
+                {post.images.map((src, idx) => (
+                  <Box key={idx} sx={{ width: "100%", maxWidth: 200, borderRadius: 1, overflow: "hidden" }}>
+                    <img
+                      src={src}
+                      alt={`post-img-${idx}`}
+                      style={{ width: "100%", height: "auto", display: "block" }}
+                    />
+                  </Box>
+                ))}
+              </Stack>
+            )}
+            {post.type === "poll" &&
+              Array.isArray(post.options) &&
+              post.options.length > 0 &&
+              (() => {
+                // Normalise options and compute totals (same logic style as HomePage)
+                const normalized = post.options.map((opt, idx) => {
+                  const optionId =
+                    typeof opt === "object"
+                      ? opt.id ?? opt.option_id ?? null
+                      : null;
 
-              const label =
-                typeof opt === "string"
-                  ? opt
-                  : opt?.text ??
-                  opt?.label ??
-                  opt?.option ??
-                  opt?.value ??
-                  `Option ${idx + 1}`;
+                  const label =
+                    typeof opt === "string"
+                      ? opt
+                      : opt?.text ??
+                      opt?.label ??
+                      opt?.option ??
+                      opt?.value ??
+                      `Option ${idx + 1}`;
 
-              const votes =
-                typeof opt === "object"
-                  ? (typeof opt.vote_count === "number"
-                    ? opt.vote_count
-                    : typeof opt.votes === "number"
-                      ? opt.votes
-                      : 0)
-                  : 0;
-
-              return { idx, optionId, label, votes };
-            });
-
-            const totalVotes = normalized.reduce(
-              (sum, o) => sum + (o.votes || 0),
-              0
-            );
-
-            return (
-              <Box sx={{ mt: 2 }}>
-                {normalized.map(({ idx, optionId, label, votes }) => {
-                  const pct =
-                    totalVotes > 0
-                      ? Math.round((votes / totalVotes) * 100)
+                  const votes =
+                    typeof opt === "object"
+                      ? (typeof opt.vote_count === "number"
+                        ? opt.vote_count
+                        : typeof opt.votes === "number"
+                          ? opt.votes
+                          : 0)
                       : 0;
 
-                  return (
-                    <Box
-                      key={optionId ?? idx}
-                      sx={{
-                        mb: 1.5,
-                        cursor: optionId ? "pointer" : "default",
-                      }}
-                      onClick={() => {
-                        if (!optionId) return;
-                        if (
-                          typeof window !== "undefined" &&
-                          window.__votePollOption
-                        ) {
-                          window.__votePollOption(post.id, optionId);
-                        }
-                      }}
-                    >
-                      <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        sx={{ mb: 0.5 }}
-                      >
-                        <Typography variant="body2">{label}</Typography>
-                        <Typography variant="body2" fontWeight={600}>
-                          {pct}%
-                        </Typography>
-                      </Stack>
+                  return { idx, optionId, label, votes };
+                });
 
-                      <LinearProgress
-                        variant="determinate"
-                        value={pct}
-                        sx={{
-                          height: 10,
-                          borderRadius: 5,
-                          "& .MuiLinearProgress-bar": {
-                            borderRadius: 5,
-                          },
-                        }}
-                      />
+                const totalVotes = normalized.reduce(
+                  (sum, o) => sum + (o.votes || 0),
+                  0
+                );
 
-                      <Button
-                        size="small"
-                        sx={{ mt: 0.5, pl: 0 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!optionId) return;
-                          if (
-                            typeof window !== "undefined" &&
-                            window.__openPollVotes
-                          ) {
-                            window.__openPollVotes(
-                              post.id,
-                              optionId,
-                              label
-                            )?.();
-                          }
-                        }}
-                      >
-                        {votes} {votes === 1 ? "vote" : "votes"}
-                      </Button>
-                    </Box>
-                  );
-                })}
+                return (
+                  <Box sx={{ mt: 2 }}>
+                    {normalized.map(({ idx, optionId, label, votes }) => {
+                      const pct =
+                        totalVotes > 0
+                          ? Math.round((votes / totalVotes) * 100)
+                          : 0;
 
-                <Typography variant="caption" color="text.secondary">
-                  Total: {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
-                </Typography>
-              </Box>
-            );
-          })()}
+                      return (
+                        <Box
+                          key={optionId ?? idx}
+                          sx={{
+                            mb: 1.5,
+                            cursor: optionId ? "pointer" : "default",
+                          }}
+                          onClick={() => {
+                            if (!optionId) return;
+                            if (
+                              typeof window !== "undefined" &&
+                              window.__votePollOption
+                            ) {
+                              window.__votePollOption(post.id, optionId);
+                            }
+                          }}
+                        >
+                          <Stack
+                            direction="row"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            sx={{ mb: 0.5 }}
+                          >
+                            <Typography variant="body2">{label}</Typography>
+                            <Typography variant="body2" fontWeight={600}>
+                              {pct}%
+                            </Typography>
+                          </Stack>
+
+                          <LinearProgress
+                            variant="determinate"
+                            value={pct}
+                            sx={{
+                              height: 10,
+                              borderRadius: 5,
+                              "& .MuiLinearProgress-bar": {
+                                borderRadius: 5,
+                              },
+                            }}
+                          />
+
+                          <Button
+                            size="small"
+                            sx={{ mt: 0.5, pl: 0 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!optionId) return;
+                              if (
+                                typeof window !== "undefined" &&
+                                window.__openPollVotes
+                              ) {
+                                window.__openPollVotes(
+                                  post.id,
+                                  optionId,
+                                  label
+                                )?.();
+                              }
+                            }}
+                          >
+                            {votes} {votes === 1 ? "vote" : "votes"}
+                          </Button>
+                        </Box>
+                      );
+                    })}
+
+                    <Typography variant="caption" color="text.secondary">
+                      Total: {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
+                    </Typography>
+                  </Box>
+                );
+              })()}
+          </>
+        )}
       </CardContent>
       {/* Meta strip: likes bubble + shares count (same style as HomePage) */}
       {(likeCount > 0 || shareCount > 0) && (
@@ -2041,6 +2053,32 @@ export default function RichProfile() {
   const [connFriendStatus, setConnFriendStatus] = useState({}); // { [userId]: "friends" | "pending_outgoing" | "pending_incoming" | "none" }
   const [connSubmitting, setConnSubmitting] = useState({});     // { [userId]: boolean }
 
+  // --- REPORTING ---
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState(null);
+
+  const handleReportProfile = async (payload) => {
+    setReportBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/moderation/reports/profile/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.detail || "Report failed");
+      }
+      alert("Profile reported successfully. Our team will review it.");
+      setReportOpen(false);
+    } catch (error) {
+      alert(`Failed to report profile: ${error.message}`);
+    } finally {
+      setReportBusy(false);
+    }
+  };
+
   React.useEffect(() => {
     // 🔹 Global helper used by the poll UI in RichProfile
     window.__votePollOption = async (postId, optionId) => {
@@ -2324,7 +2362,10 @@ export default function RichProfile() {
       like_count,
       comment_count,
       share_count,
+      share_count,
       liked_by_me,
+      moderation_status: row.moderation_status ?? m.moderation_status ?? row.moderationStatus ?? m.moderationStatus ?? row.status ?? m.status ?? null,
+      is_removed: row.is_removed ?? m.is_removed ?? (row.moderation_status === "removed") ?? (m.moderationStatus === "removed") ?? (m.status === "removed") ?? (row.status === "removed") ?? false,
     };
   }
 
@@ -2965,22 +3006,22 @@ export default function RichProfile() {
             {!loadingBase && (
               <Stack spacing={2.5}>
                 {/* Back Button */}
-                  <Box sx={{ display: 'flex' }}> 
-                    <Button
-                      startIcon={<ArrowBackRoundedIcon />}
-                      onClick={() => navigate("/community?view=members")}
-                      sx={{ 
-                        textTransform: "none", 
-                        color: "text.primary",
-                        fontWeight: 600,
-                        minWidth: "auto",
-                        px: 1,
-                        "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
-                      }}
-                    >
-                      Back to Explore Members
-                    </Button>
-                  </Box>
+                <Box sx={{ display: 'flex' }}>
+                  <Button
+                    startIcon={<ArrowBackRoundedIcon />}
+                    onClick={() => navigate("/community?view=members")}
+                    sx={{
+                      textTransform: "none",
+                      color: "text.primary",
+                      fontWeight: 600,
+                      minWidth: "auto",
+                      px: 1,
+                      "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                    }}
+                  >
+                    Back to Explore Members
+                  </Button>
+                </Box>
 
                 {/* Header Card */}
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
@@ -3009,6 +3050,28 @@ export default function RichProfile() {
                     {/* Right-side actions */}
                     {!isMe && (
                       <Box sx={{ mt: 1.5, display: "flex", justifyContent: "flex-end", ml: "auto", gap: 1 }}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => setMenuAnchor(e.currentTarget)}
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                        <Menu
+                          anchorEl={menuAnchor}
+                          open={Boolean(menuAnchor)}
+                          onClose={() => setMenuAnchor(null)}
+                        >
+                          <MenuItem
+                            onClick={() => {
+                              setMenuAnchor(null);
+                              setReportOpen(true);
+                            }}
+                          >
+                            <FlagIcon fontSize="small" sx={{ mr: 1.5 }} />
+                            Report Profile
+                          </MenuItem>
+                        </Menu>
+
                         {friendLoading && (
                           <Button variant="outlined" size="small" disabled>Loading…</Button>
                         )}
@@ -3514,6 +3577,18 @@ export default function RichProfile() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ReportProfileDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        onSubmit={handleReportProfile}
+        loading={reportBusy}
+        targetUser={{
+          id: userId,
+          full_name: fullName,
+          username: userItem?.username
+        }}
+      />
     </div>
   );
 }

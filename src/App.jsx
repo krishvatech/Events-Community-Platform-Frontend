@@ -39,6 +39,8 @@ import AdminSettings from "./pages/AdminSettings.jsx";
 import AdminStaffPage from "./pages/AdminStaffPage.jsx"
 import AdminRecordingsPage from "./pages/AdminRecordingsPage.jsx";
 import AdminMessagesPage from "./pages/AdminMessagesPage.jsx";
+import AdminModerationPage from "./pages/AdminModerationPage.jsx";
+import AdminProfileModerationPage from "./pages/AdminProfileModerationPage.jsx";
 import EventManagePage from "./pages/EventManagePage.jsx";
 import AdminCarts from "./pages/AdminCarts.jsx";
 import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
@@ -170,6 +172,8 @@ const AppShell = () => {
             <Route path="messages" element={<AdminMessagesPage />} />
             <Route path="notifications" element={<AdminNotificationsPage />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="moderation" element={<AdminModerationPage />} />
+            <Route path="moderation/profiles" element={<AdminProfileModerationPage />} />
             <Route path="name-requests" element={<AdminNameRequestsPage />} />
             <Route path="/admin/events/:eventId" element={<EventManagePage />} />
             {/* keep your recordings behavior same as before */}
