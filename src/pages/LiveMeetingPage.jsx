@@ -6127,6 +6127,56 @@ export default function NewLiveMeeting() {
                   </span>
                 </Tooltip>
 
+                <Tooltip title={isQnaActive ? "Close Q&A" : "Open Q&A"}>
+                  <IconButton
+                    onClick={() => {
+                      // toggle behavior: if Q&A is open on tab=1, close panel
+                      if (isQnaActive) closeRightPanel();
+                      else toggleRightPanel(1);
+                    }}
+                    sx={{
+                      bgcolor: isQnaActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                      "&:hover": { bgcolor: isQnaActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                    }}
+                    aria-label="Q&A"
+                  >
+                    <Badge
+                      variant="dot"
+                      color="error"
+                      overlap="circular"
+                      invisible={!(qnaUnreadCount > 0 && !isQnaActive)}
+                      anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                    >
+                      <QuestionAnswerIcon />
+                    </Badge>
+                  </IconButton>
+                </Tooltip>
+
+                <Tooltip title={isPanelOpen && tab === 3 ? "Close Participants" : "Open Participants"}>
+                  <IconButton
+                    onClick={() => {
+                      // toggle behavior: if Participants is open on tab=3, close panel
+                      if (isPanelOpen && tab === 3) closeRightPanel();
+                      else toggleRightPanel(3);
+                    }}
+                    sx={{
+                      bgcolor: (isPanelOpen && tab === 3) ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                      "&:hover": { bgcolor: (isPanelOpen && tab === 3) ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                    }}
+                    aria-label="Participants"
+                  >
+                    <Badge
+                      variant="dot"
+                      color="error"
+                      overlap="circular"
+                      invisible={!showMembersDot}
+                      anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                    >
+                      <GroupIcon />
+                    </Badge>
+                  </IconButton>
+                </Tooltip>
+
                 <Tooltip title="Social Lounge">
                   <IconButton
                     onClick={() => setLoungeOpen(true)}
