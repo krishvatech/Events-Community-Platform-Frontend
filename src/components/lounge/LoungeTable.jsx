@@ -180,7 +180,8 @@ const LoungeTable = ({
                             }))
                             .filter((item) => Number.isFinite(item.seat) && item.participant)
                             .sort((a, b) => a.seat - b.seat);
-                        const displayLimit = 5;
+                        // ✅ FIXED SEAT LIMIT: Only 4 seats available (Right, Left, Top, Bottom)
+                        const displayLimit = 4;
                         const displayParticipants = entries.slice(0, displayLimit);
                         const displayCount = Math.min(
                             displayLimit,
@@ -233,20 +234,43 @@ const LoungeTable = ({
 
                 {(() => {
                     const totalParticipants = Object.values(table.participants || {}).filter(Boolean).length;
-                    const extraCount = Math.max(0, totalParticipants - 5);
+                    // ✅ Show "+more" when there are more than 4 users (fixed seat limit)
+                    const extraCount = Math.max(0, totalParticipants - 4);
                     if (extraCount <= 0) return null;
                     return (
-                        <Typography
+                        <Box
                             sx={{
-                                mt: 1,
-                                fontSize: 12,
-                                fontWeight: 700,
-                                color: 'rgba(255,255,255,0.75)',
-                                letterSpacing: '0.02em',
+                                mt: 1.5,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                px: 1.5,
+                                py: 0.75,
+                                borderRadius: 1.5,
+                                bgcolor: 'rgba(90, 120, 255, 0.15)',
+                                border: '1px solid rgba(90, 120, 255, 0.3)',
+                                backdropFilter: 'blur(4px)',
+                                transition: 'all 0.2s ease-in-out',
+                                '&:hover': {
+                                    bgcolor: 'rgba(90, 120, 255, 0.25)',
+                                    borderColor: 'rgba(90, 120, 255, 0.5)',
+                                    boxShadow: '0 0 12px rgba(90, 120, 255, 0.2)',
+                                },
+                                cursor: 'default',
                             }}
+                            title={`${extraCount} more participant${extraCount !== 1 ? 's' : ''} at this table`}
                         >
-                            +{extraCount} more
-                        </Typography>
+                            <Typography
+                                sx={{
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    color: 'rgba(255,255,255,0.85)',
+                                    letterSpacing: '0.02em',
+                                }}
+                            >
+                                +{extraCount} more
+                            </Typography>
+                        </Box>
                     );
                 })()}
             </Box>

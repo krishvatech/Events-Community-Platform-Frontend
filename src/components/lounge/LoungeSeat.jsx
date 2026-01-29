@@ -2,24 +2,32 @@ import React from 'react';
 import { Avatar, Tooltip, Box, Typography } from '@mui/material';
 
 const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
-    // Calculate position based on index and maxSeats (display count)
-    // Special positioning for first 3 users for better balance
-    let angle;
-    if (maxSeats <= 3) {
-        // For 1-3 users, use balanced positions
-        const positions = [
-            0,                    // 1st user: right
-            Math.PI,              // 2nd user: left (opposite)
-            Math.PI / 2,          // 3rd user: bottom
-        ];
-        angle = positions[index] || (index / maxSeats) * 2 * Math.PI;
-    } else {
-        // For 4+ users, use circular distribution
-        angle = (index / maxSeats) * 2 * Math.PI;
-    }
-    const radius = 60; // distance from center of table
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
+    // ✅ FIXED SEAT POSITIONING BASED ON JOIN ORDER
+    // Ensures consistent, balanced, and predictable placement
+    // Seats are assigned in fixed order: RIGHT → LEFT → TOP → BOTTOM
+    // This prevents overlapping and maintains visual balance
+    //
+    // Seat Positions:
+    // - 1st user (index 0): RIGHT (0°)
+    // - 2nd user (index 1): LEFT (180°) - opposite to 1st for balance
+    // - 3rd user (index 2): TOP (270°)
+    // - 4th user (index 3): BOTTOM (90°)
+    // - 5+ users: Not placed (shown via "+more" indicator)
+
+    const fixedSeats = [
+        0,                      // 1st user: RIGHT (0°)
+        Math.PI,                // 2nd user: LEFT (180°)
+        (3 * Math.PI) / 2,      // 3rd user: TOP (270°)
+        Math.PI / 2,            // 4th user: BOTTOM (90°)
+    ];
+
+    // Get angle from fixed seat, return 0 if beyond 4 users
+    const angle = fixedSeats[index] !== undefined ? fixedSeats[index] : null;
+
+    const radius = 60; // distance from center of table (pixels)
+    // Only calculate position if angle is defined (user 1-4)
+    const x = angle !== null ? Math.cos(angle) * radius : 0;
+    const y = angle !== null ? Math.sin(angle) * radius : 0;
 
     if (!participant) {
         return (
