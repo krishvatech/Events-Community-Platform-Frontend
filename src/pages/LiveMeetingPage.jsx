@@ -919,6 +919,11 @@ export default function NewLiveMeeting() {
   const [bannedDialogOpen, setBannedDialogOpen] = useState(false);
   const [isBanned, setIsBanned] = useState(false);
 
+  // Custom Confirmation State
+  const [kickConfirmOpen, setKickConfirmOpen] = useState(false);
+  const [banConfirmOpen, setBanConfirmOpen] = useState(false);
+  const [actionTargetUser, setActionTargetUser] = useState(null);
+
   const [isBreakoutControlsOpen, setIsBreakoutControlsOpen] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [serverDebugMessage, setServerDebugMessage] = useState("");
@@ -1582,15 +1587,21 @@ export default function NewLiveMeeting() {
     setParticipantMenuTarget(null);
   };
 
-  const handleKickParticipant = async () => {
+  const handleKickParticipant = () => {
     const p = participantMenuTarget;
     handleCloseParticipantMenu();
     if (!p) return;
+    setActionTargetUser(p);
+    setKickConfirmOpen(true);
+  };
+
+  const executeKick = async () => {
+    const p = actionTargetUser;
+    if (!p) return;
+    setKickConfirmOpen(false); // Close dialog
 
     console.log("[Kick] Target participant object:", p);
 
-    // Fallback logic to find Django ID if possible:
-    // IMPORTANT: clientSpecificId MUST match the Django User ID set during token generation
     let targetDjangoId = p.clientSpecificId || p._raw?.clientSpecificId || p.customParticipantId || p._raw?.customParticipantId;
 
     console.log("[Kick] Resolved targetDjangoId:", targetDjangoId);
@@ -1601,8 +1612,6 @@ export default function NewLiveMeeting() {
         console.warn("[Kick] Warning: using Dyte ID as fallback:", targetDjangoId);
       } catch (e) { }
     }
-
-    if (!confirm(`Are you sure you want to kick ${p.name || "this user"} (ID: ${targetDjangoId})?`)) return;
 
     try {
       console.log(`[Kick] Sending POST to events/${eventId}/kick/ with user_id:`, targetDjangoId);
@@ -1635,10 +1644,18 @@ export default function NewLiveMeeting() {
     }
   };
 
-  const handleBanParticipant = async () => {
+  const handleBanParticipant = () => {
     const p = participantMenuTarget;
     handleCloseParticipantMenu();
     if (!p) return;
+    setActionTargetUser(p);
+    setBanConfirmOpen(true);
+  };
+
+  const executeBan = async () => {
+    const p = actionTargetUser;
+    if (!p) return;
+    setBanConfirmOpen(false); // Close dialog
 
     console.log("[Ban] Target participant object:", p);
 
@@ -1649,8 +1666,6 @@ export default function NewLiveMeeting() {
     if (!targetDjangoId) {
       targetDjangoId = p.id;
     }
-
-    if (!confirm(`Are you sure you want to BAN ${p.name || "this user"} (ID: ${targetDjangoId})?`)) return;
 
     try {
       console.log(`[Ban] Sending POST to events/${eventId}/ban/ with user_id:`, targetDjangoId);
@@ -1681,6 +1696,7 @@ export default function NewLiveMeeting() {
       alert("Error banning user: " + e.message);
     }
   };
+
 
   const getJoinedParticipants = useCallback(() => {
     const participantsObj = dyteMeeting?.participants;
@@ -2685,6 +2701,14 @@ export default function NewLiveMeeting() {
     dyteMeeting?.on?.("participantLeft", remove);
     dyteMeeting?.on?.("participantUpdated", upsert);
 
+    // ✅ Fix Audience Icons: Listen for specific audio/video events
+    dyteMeeting.participants.joined?.on?.("audioUpdate", bump);
+    dyteMeeting.participants.joined?.on?.("videoUpdate", bump);
+    dyteMeeting.participants?.on?.("audioUpdate", bump);
+    dyteMeeting.participants?.on?.("videoUpdate", bump);
+    dyteMeeting?.on?.("audioUpdate", bump);
+    dyteMeeting?.on?.("videoUpdate", bump);
+
     // Initial sync
     bump();
 
@@ -2712,6 +2736,13 @@ export default function NewLiveMeeting() {
       dyteMeeting?.off?.("participantJoined", upsert);
       dyteMeeting?.off?.("participantLeft", remove);
       dyteMeeting?.off?.("participantUpdated", upsert);
+
+      dyteMeeting.participants.joined?.off?.("audioUpdate", bump);
+      dyteMeeting.participants.joined?.off?.("videoUpdate", bump);
+      dyteMeeting.participants?.off?.("audioUpdate", bump);
+      dyteMeeting.participants?.off?.("videoUpdate", bump);
+      dyteMeeting?.off?.("audioUpdate", bump);
+      dyteMeeting?.off?.("videoUpdate", bump);
 
       clearInterval(poll);
     };
@@ -4218,7 +4249,7 @@ export default function NewLiveMeeting() {
 
   const isSelfMember = (m) => Boolean(selfDyteId && m?.id === selfDyteId);
 
-  const RIGHT_PANEL_W = 400;
+  const RIGHT_PANEL_W = 460;
   const APPBAR_H = 44;
 
   // Others only (Audience + Speaker), host is pinned already
@@ -5290,7 +5321,7 @@ export default function NewLiveMeeting() {
                                     border: "1px solid",
                                     borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                     color: m.mic ? "#22c55e" : "#ef4444",
-                                    padding: "6px",
+                                    padding: "4px",
                                     cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
                                     "&:hover": {
                                       bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
@@ -5312,7 +5343,7 @@ export default function NewLiveMeeting() {
                                     border: "1px solid",
                                     borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                     color: m.cam ? "#22c55e" : "#ef4444",
-                                    padding: "6px",
+                                    padding: "4px",
                                     cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
                                     opacity: isSelfMember(m) ? 0.6 : 1,
                                     "&:hover": {
@@ -5364,15 +5395,15 @@ export default function NewLiveMeeting() {
                             </Stack>
                           }
                         >
-                          <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1 }}>
+                          <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, pr: 14 }}>
                             <ListItemAvatar>
                               <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
                                 {initialsFromName(m.name)}
                               </Avatar>
                             </ListItemAvatar>
                             <ListItemText
-                              primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>}
-                              secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
+                              primary={<Typography noWrap sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>}
+                              secondary={<Typography noWrap sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
                             />
                           </ListItemButton>
                         </ListItem>
@@ -6861,100 +6892,171 @@ export default function NewLiveMeeting() {
           open={bannedDialogOpen}
           onClose={() => setBannedDialogOpen(false)}
           eventId={eventId}
+          setOnlineUsers={setOnlineUsers}
         />
-      </Box>
 
-      <LoungeOverlay
-        open={loungeOpen}
-        onClose={() => setLoungeOpen(false)}
-        eventId={eventId}
-        currentUserId={getMyUserIdFromJwt()}
-        isAdmin={isHost}
-        dyteMeeting={dyteMeeting}
-        onParticipantClick={openLoungeParticipantInfo}
-        onEnterBreakout={async (newToken, tableId, tableName) => {
-          await applyBreakoutToken(newToken, tableId, tableName);
-        }}
-      />
-
-      {/* ✅ Breakout Controls (Host Only) */}
-      <BreakoutControls
-        open={isBreakoutControlsOpen}
-        onClose={() => setIsBreakoutControlsOpen(false)}
-        onAction={(data) => {
-          if (data?.action === "speed_networking_start") {
-            // Legacy/confusing call - redirecting or ignoring. 
-            // Ideally we shouldn't receive this from current UI anymore.
-            console.warn("Received legacy speed networking start action");
-            return;
-          }
-          if (data?.action === "speed_networking_stop") {
-            stopSpeedNetworking({ announce: true }); // We can keep stop functionality just in case
-            return;
-          }
-          sendMainSocketAction(data);
-        }}
-        onlineCount={onlineUsers.length}
-        debugMessage={serverDebugMessage}
-      // Removing these props from passing down as they are no longer handled by BreakoutControls UI
-      // speedNetworkingActive={speedNetworkingActive}
-      // speedNetworkingRound={speedNetworkingRound}
-      // speedNetworkingTotalRounds={speedNetworkingTotalRounds}
-      // speedNetworkingDurationMinutes={speedNetworkingDurationMinutes}
-      />
-
-      {/* ✅ Speed Networking Dialog */}
-      <Dialog
-        fullScreen
-        open={showSpeedNetworking}
-        onClose={() => setShowSpeedNetworking(false)}
-        sx={{ zIndex: 1250 }} // Above lounge but below snackbars
-      >
-        <SpeedNetworkingZone
-          eventId={eventId}
-          isAdmin={isHost}
-          onClose={() => setShowSpeedNetworking(false)}
-          dyteMeeting={dyteMeeting}
-          // Passing down the last WebSocket message to handle matching events
-          lastMessage={lastMessage}
-        />
-      </Dialog>
-
-      {/* ✅ Main Room Peek (when seated at a lounge table) */}
-      {activeTableId && dyteMeeting && (
-        <Box
-          sx={{
-            position: "fixed",
-            bottom: 20,
-            right: 20,
-            zIndex: 1300,
-            width: 280,
-            height: 180,
+        {/* Kick Confirmation Dialog */}
+        <Dialog
+          open={kickConfirmOpen}
+          onClose={() => setKickConfirmOpen(false)}
+          PaperProps={{
+            sx: {
+              bgcolor: "#0b101a",
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 2
+            }
           }}
         >
-          <MainRoomPeek mainDyteMeeting={mainDyteMeeting} isInBreakout={isInBreakoutRoom} />
-        </Box>
-      )}
+          <DialogTitle sx={{ fontWeight: 700 }}>Confirm Kick</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to kick <strong>{actionTargetUser?.name || "this user"}</strong>?
+            </Typography>
+            {actionTargetUser?.id && (
+              <Typography variant="caption" sx={{ opacity: 0.5, display: "block", mt: 1 }}>
+                ID: {actionTargetUser.id}
+              </Typography>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setKickConfirmOpen(false)} sx={{ color: "rgba(255,255,255,0.7)" }}>
+              Cancel
+            </Button>
+            <Button onClick={executeKick} variant="contained" color="error">
+              Kick User
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* ✅ Global Announcement Notification */}
-      <Snackbar
-        open={showBreakoutAnnouncement}
-        autoHideDuration={6000}
-        onClose={() => setShowBreakoutAnnouncement(false)}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert
-          onClose={() => setShowBreakoutAnnouncement(false)}
-          severity="info"
-          variant="filled"
-          sx={{ width: "100%", bgcolor: "#7b1fa2" }}
+        {/* Ban Confirmation Dialog */}
+        <Dialog
+          open={banConfirmOpen}
+          onClose={() => setBanConfirmOpen(false)}
+          PaperProps={{
+            sx: {
+              bgcolor: "#0b101a",
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 2
+            }
+          }}
         >
-          {breakoutAnnouncement}
-        </Alert>
-      </Snackbar>
+          <DialogTitle sx={{ fontWeight: 700 }}>Confirm Ban</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to BAN <strong>{actionTargetUser?.name || "this user"}</strong>?
+            </Typography>
+            <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+              Banned users cannot rejoin this meeting.
+            </Typography>
+            {actionTargetUser?.id && (
+              <Typography variant="caption" sx={{ opacity: 0.5, display: "block", mt: 1 }}>
+                ID: {actionTargetUser.id}
+              </Typography>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setBanConfirmOpen(false)} sx={{ color: "rgba(255,255,255,0.7)" }}>
+              Cancel
+            </Button>
+            <Button onClick={executeBan} variant="contained" color="error">
+              Ban User
+            </Button>
+          </DialogActions>
+        </Dialog>
+        <LoungeOverlay
+          open={loungeOpen}
+          onClose={() => setLoungeOpen(false)}
+          eventId={eventId}
+          currentUserId={getMyUserIdFromJwt()}
+          isAdmin={isHost}
+          dyteMeeting={dyteMeeting}
+          onParticipantClick={openLoungeParticipantInfo}
+          onEnterBreakout={async (newToken, tableId, tableName) => {
+            await applyBreakoutToken(newToken, tableId, tableName);
+          }}
+        />
 
-      {/* ✅ Global Room Timer Display */}
+        {/* ✅ Breakout Controls (Host Only) */}
+        <BreakoutControls
+          open={isBreakoutControlsOpen}
+          onClose={() => setIsBreakoutControlsOpen(false)}
+          onAction={(data) => {
+            if (data?.action === "speed_networking_start") {
+              // Legacy/confusing call - redirecting or ignoring. 
+              // Ideally we shouldn't receive this from current UI anymore.
+              console.warn("Received legacy speed networking start action");
+              return;
+            }
+            if (data?.action === "speed_networking_stop") {
+              stopSpeedNetworking({ announce: true }); // We can keep stop functionality just in case
+              return;
+            }
+            sendMainSocketAction(data);
+          }}
+          onlineCount={onlineUsers.length}
+          debugMessage={serverDebugMessage}
+        // Removing these props from passing down as they are no longer handled by BreakoutControls UI
+        // speedNetworkingActive={speedNetworkingActive}
+        // speedNetworkingRound={speedNetworkingRound}
+        // speedNetworkingTotalRounds={speedNetworkingTotalRounds}
+        // speedNetworkingDurationMinutes={speedNetworkingDurationMinutes}
+        />
 
+        {/* ✅ Speed Networking Dialog */}
+        <Dialog
+          fullScreen
+          open={showSpeedNetworking}
+          onClose={() => setShowSpeedNetworking(false)}
+          sx={{ zIndex: 1250 }} // Above lounge but below snackbars
+        >
+          <SpeedNetworkingZone
+            eventId={eventId}
+            isAdmin={isHost}
+            onClose={() => setShowSpeedNetworking(false)}
+            dyteMeeting={dyteMeeting}
+            // Passing down the last WebSocket message to handle matching events
+            lastMessage={lastMessage}
+          />
+        </Dialog>
+
+        {/* ✅ Main Room Peek (when seated at a lounge table) */}
+        {activeTableId && dyteMeeting && (
+          <Box
+            sx={{
+              position: "fixed",
+              bottom: 20,
+              right: 20,
+              zIndex: 1300,
+              width: 280,
+              height: 180,
+            }}
+          >
+            <MainRoomPeek mainDyteMeeting={mainDyteMeeting} isInBreakout={isInBreakoutRoom} />
+          </Box>
+        )}
+
+        {/* ✅ Global Announcement Notification */}
+        <Snackbar
+          open={showBreakoutAnnouncement}
+          autoHideDuration={6000}
+          onClose={() => setShowBreakoutAnnouncement(false)}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
+            onClose={() => setShowBreakoutAnnouncement(false)}
+            severity="info"
+            variant="filled"
+            sx={{ width: "100%", bgcolor: "#7b1fa2" }}
+          >
+            {breakoutAnnouncement}
+          </Alert>
+        </Snackbar>
+
+        {/* ✅ Global Room Timer Display */}
+
+      </Box>
     </DyteProvider>
 
   );
