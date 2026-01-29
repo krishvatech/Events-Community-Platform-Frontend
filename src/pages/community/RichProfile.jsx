@@ -2362,7 +2362,6 @@ export default function RichProfile() {
       like_count,
       comment_count,
       share_count,
-      share_count,
       liked_by_me,
       moderation_status: row.moderation_status ?? m.moderation_status ?? row.moderationStatus ?? m.moderationStatus ?? row.status ?? m.status ?? null,
       is_removed: row.is_removed ?? m.is_removed ?? (row.moderation_status === "removed") ?? (m.moderationStatus === "removed") ?? (m.status === "removed") ?? (row.status === "removed") ?? false,

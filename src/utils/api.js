@@ -123,9 +123,9 @@ apiClient.interceptors.response.use(
   async (error) => {
     const original = error?.config;
 
-    // if no response or not 401/403, reject
+    // if no response or not 401, reject. (403 is Forbidden, not Unauthorized, so let caller handle it)
     const status = error?.response?.status;
-    if (!status || (status !== 401 && status !== 403)) {
+    if (!status || status !== 401) {
       return Promise.reject(error);
     }
 
@@ -143,7 +143,7 @@ apiClient.interceptors.response.use(
         const refreshToken = getRefreshToken();
         let username = getUserName();
 
-        console.log("[Auth] 401/403 detected. Attempting refresh...");
+        console.log("[Auth] 401 detected. Attempting refresh...");
 
         // Fallback 1: Try getting username from localStorage 'user' object
         if (!username) {

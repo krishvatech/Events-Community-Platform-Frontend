@@ -78,7 +78,9 @@ import MenuIcon from "@mui/icons-material/Menu";
 
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import ThumbUpAltIcon from "@mui/icons-material/ThumbUpAlt";
-import ViewSidebarIcon from "@mui/icons-material/ViewSidebar"; // <--- ADDED for Sidebar Toggle
+import ViewSidebarIcon from "@mui/icons-material/ViewSidebar";
+import DirectionsWalkIcon from "@mui/icons-material/DirectionsWalk";
+import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 
 import { useNavigate, useParams } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
@@ -88,7 +90,7 @@ import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
 import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
-
+import BannedParticipantsDialog from "../components/live-meeting/BannedParticipantsDialog.jsx";
 
 // ================ API Helper ================
 const API_ROOT = (
@@ -910,6 +912,13 @@ export default function NewLiveMeeting() {
   const [breakoutTimer, setBreakoutTimer] = useState(null);
   const [breakoutAnnouncement, setBreakoutAnnouncement] = useState("");
   const [showBreakoutAnnouncement, setShowBreakoutAnnouncement] = useState(false);
+
+  // Participant Menu (Kick/Ban)
+  const [participantMenuAnchor, setParticipantMenuAnchor] = useState(null);
+  const [participantMenuTarget, setParticipantMenuTarget] = useState(null);
+  const [bannedDialogOpen, setBannedDialogOpen] = useState(false);
+  const [isBanned, setIsBanned] = useState(false);
+
   const [isBreakoutControlsOpen, setIsBreakoutControlsOpen] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [serverDebugMessage, setServerDebugMessage] = useState("");
@@ -1563,6 +1572,116 @@ export default function NewLiveMeeting() {
     }
   };
 
+  const handleOpenParticipantMenu = (event, member) => {
+    setParticipantMenuAnchor(event.currentTarget);
+    setParticipantMenuTarget(member);
+  };
+
+  const handleCloseParticipantMenu = () => {
+    setParticipantMenuAnchor(null);
+    setParticipantMenuTarget(null);
+  };
+
+  const handleKickParticipant = async () => {
+    const p = participantMenuTarget;
+    handleCloseParticipantMenu();
+    if (!p) return;
+
+    console.log("[Kick] Target participant object:", p);
+
+    // Fallback logic to find Django ID if possible:
+    // IMPORTANT: clientSpecificId MUST match the Django User ID set during token generation
+    let targetDjangoId = p.clientSpecificId || p._raw?.clientSpecificId || p.customParticipantId || p._raw?.customParticipantId;
+
+    console.log("[Kick] Resolved targetDjangoId:", targetDjangoId);
+
+    if (!targetDjangoId) {
+      try {
+        targetDjangoId = p.id;
+        console.warn("[Kick] Warning: using Dyte ID as fallback:", targetDjangoId);
+      } catch (e) { }
+    }
+
+    if (!confirm(`Are you sure you want to kick ${p.name || "this user"} (ID: ${targetDjangoId})?`)) return;
+
+    try {
+      console.log(`[Kick] Sending POST to events/${eventId}/kick/ with user_id:`, targetDjangoId);
+      const res = await fetch(toApiUrl(`events/${eventId}/kick/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ user_id: targetDjangoId })
+      });
+
+      console.log("[Kick] API Response status:", res.status);
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("[Kick] API Error:", err);
+        alert(`Failed to kick: ${JSON.stringify(err)}`);
+      } else {
+        const data = await res.json();
+        console.log("[Kick] Success:", data);
+        if (dyteMeeting?.participants?.kick) {
+          try {
+            console.log("[Kick] Executing Dyte kick on:", p.id);
+            dyteMeeting.participants.kick(p.id);
+          } catch (e) { console.warn("Dyte kick failed", e); }
+        }
+        setParticipantMenuTarget(null);
+      }
+    } catch (e) {
+      console.error("[Kick] Exception:", e);
+      alert("Error kicking user: " + e.message);
+    }
+  };
+
+  const handleBanParticipant = async () => {
+    const p = participantMenuTarget;
+    handleCloseParticipantMenu();
+    if (!p) return;
+
+    console.log("[Ban] Target participant object:", p);
+
+    let targetDjangoId = p.clientSpecificId || p._raw?.clientSpecificId || p.customParticipantId || p._raw?.customParticipantId;
+
+    console.log("[Ban] Resolved targetDjangoId:", targetDjangoId);
+
+    if (!targetDjangoId) {
+      targetDjangoId = p.id;
+    }
+
+    if (!confirm(`Are you sure you want to BAN ${p.name || "this user"} (ID: ${targetDjangoId})?`)) return;
+
+    try {
+      console.log(`[Ban] Sending POST to events/${eventId}/ban/ with user_id:`, targetDjangoId);
+      const res = await fetch(toApiUrl(`events/${eventId}/ban/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ user_id: targetDjangoId })
+      });
+
+      console.log("[Ban] API Response status:", res.status);
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("[Ban] API Error:", err);
+        alert(`Failed to ban: ${JSON.stringify(err)}`);
+      } else {
+        const data = await res.json();
+        console.log("[Ban] Success:", data);
+        if (dyteMeeting?.participants?.kick) {
+          try {
+            console.log("[Ban] Executing Dyte kick (for ban) on:", p.id);
+            dyteMeeting.participants.kick(p.id);
+          } catch (e) { console.warn("Dyte ban-kick failed", e); }
+        }
+      }
+    } catch (e) {
+      console.error("[Ban] Exception:", e);
+      alert("Error banning user: " + e.message);
+    }
+  };
+
   const getJoinedParticipants = useCallback(() => {
     const participantsObj = dyteMeeting?.participants;
     if (!participantsObj) return [];
@@ -1812,7 +1931,15 @@ export default function NewLiveMeeting() {
           body: JSON.stringify({ role }),
         });
 
-        if (!res.ok) throw new Error("Failed to join live meeting.");
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          if (errData.error === "banned" || res.status === 403) {
+            setIsBanned(true);
+            setLoadingJoin(false);
+            return; // Stop execution
+          }
+          throw new Error(errData.detail || "Failed to join live meeting.");
+        }
         const data = await res.json();
 
         console.log("[LiveMeeting] Received initial Dyte token");
@@ -1909,14 +2036,19 @@ export default function NewLiveMeeting() {
           if (msg.lounge_open_status) {
             setLoungeOpenStatus(msg.lounge_open_status);
           }
-        } else if (msg.type === "breakout_end") {
-          console.log("[MainSocket] Breakout session ended by host.");
-          // Return to main meeting
-          setAuthToken(mainAuthTokenRef.current);
-          setIsBreakout(false);
           setActiveTableId(null);
           setActiveTableName("");
           setRoomChatConversationId(null);
+        } else if (msg.type === "message" && msg.data) {
+          // Handle broadcast messages (kick/ban)
+          const payload = msg.data;
+          if (payload.type === "kicked") {
+            alert("You have been kicked from the meeting by the host.");
+            navigate(`/community/${currentCommunitySlug}/events/${eventId}`);
+          } else if (payload.type === "banned") {
+            setIsBanned(true);
+            if (dyteMeeting) dyteMeeting.leaveRoom();
+          }
         } else {
           console.log("[MainSocket] Other message type:", msg.type, msg);
         }
@@ -2221,6 +2353,9 @@ export default function NewLiveMeeting() {
 
   const handleMeetingEnd = useCallback(
     async (state, options = {}) => {
+      // If user is banned, do NOT navigate away. We want to show the banned screen.
+      if (isBanned) return;
+
       const { explicitEnd = false } = options;
       if (endHandledRef.current) return;
       endHandledRef.current = true;
@@ -2243,7 +2378,7 @@ export default function NewLiveMeeting() {
         navigate(-1);
       }
     },
-    [navigate, role, updateLiveStatus, dyteMeeting]
+    [navigate, role, updateLiveStatus, dyteMeeting, isBanned]
   );
 
   // Poll event status so clients exit when backend ends the meeting
@@ -2664,12 +2799,22 @@ export default function NewLiveMeeting() {
       if (type === "presence") upsertPresence(payload);
     };
 
+    const handleParticipantLeft = (participant) => {
+      if (participant?.id) {
+        observedParticipantsRef.current.delete(participant.id);
+        setParticipantsTick((v) => v + 1);
+      }
+    };
+
     dyteMeeting.participants?.on?.("broadcastedMessage", onBroadcast);
+    dyteMeeting.participants?.joined?.on?.("participantLeft", handleParticipantLeft);
+
     broadcastPresence();
     const interval = setInterval(broadcastPresence, 4000);
 
     return () => {
       dyteMeeting.participants?.off?.("broadcastedMessage", onBroadcast);
+      dyteMeeting.participants?.joined?.off?.("participantLeft", handleParticipantLeft);
       clearInterval(interval);
     };
   }, [dyteMeeting]);
@@ -5057,6 +5202,17 @@ export default function NewLiveMeeting() {
                                   </IconButton>
                                 </Tooltip>
 
+                                {/* KICK/BAN MENU for Host */}
+                                {isHost && !isSelfMember(m) && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleOpenParticipantMenu(e, m)}
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}
+                                  >
+                                    <MoreVertIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+
                               </Stack>
                             }
                           >
@@ -5077,124 +5233,152 @@ export default function NewLiveMeeting() {
                     </Paper>
                   </Box>
 
-                  <Box>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-                      <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
-                        AUDIENCE ({groupedMembers.audience.length})
-                      </Typography>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
+                      AUDIENCE ({groupedMembers.audience.length})
+                    </Typography>
+                    <Stack direction="row" spacing={1}>
                       {isHost && (
-                        <Stack direction="row" spacing={0.75}>
-                          <Tooltip title="Mute all">
-                            <IconButton size="small" onClick={forceMuteAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
-                              <MicOffIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Camera off all">
-                            <IconButton size="small" onClick={forceCameraOffAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
-                              <VideocamOffIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
+                        <>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setBannedDialogOpen(true)}
+                            sx={{
+                              fontSize: 10,
+                              color: "rgba(255,255,255,0.7)",
+                              borderColor: "rgba(255,255,255,0.2)",
+                              py: 0.2,
+                              minWidth: "auto",
+                              height: 24
+                            }}
+                          >
+                            Bans
+                          </Button>
+                          <Stack direction="row" spacing={0.75}>
+                            <Tooltip title="Mute all">
+                              <IconButton size="small" onClick={forceMuteAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
+                                <MicOffIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Camera off all">
+                              <IconButton size="small" onClick={forceCameraOffAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
+                                <VideocamOffIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </>
                       )}
                     </Stack>
-                    <Paper variant="outlined" sx={{ bgcolor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", borderRadius: 2 }}>
-                      <List dense disablePadding>
-                        {audienceMembersSorted.map((m, idx) => (
-                          <ListItem
-                            key={idx}
-                            disablePadding
-                            secondaryAction={
-                              <Stack direction="row" spacing={0.75} alignItems="center">
-                                {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
-                                  <IconButton
-                                    size="small"
-                                    onClick={isHost && !isSelfMember(m) ? () => forceMuteParticipant(m) : undefined}
-                                    disabled={!isHost || isSelfMember(m)}
-                                    sx={{
-                                      bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                      border: "1px solid",
-                                      borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                      color: m.mic ? "#22c55e" : "#ef4444",
-                                      padding: "6px",
-                                      cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                      "&:hover": {
-                                        bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                  </Stack>
+                  <Paper variant="outlined" sx={{ bgcolor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                    <List dense disablePadding>
+                      {audienceMembersSorted.map((m, idx) => (
+                        <ListItem
+                          key={idx}
+                          disablePadding
+                          secondaryAction={
+                            <Stack direction="row" spacing={0.75} alignItems="center">
+                              {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
+                              <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
+                                <IconButton
+                                  size="small"
+                                  onClick={isHost && !isSelfMember(m) ? () => forceMuteParticipant(m) : undefined}
+                                  disabled={!isHost || isSelfMember(m)}
+                                  sx={{
+                                    bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                    border: "1px solid",
+                                    borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                    color: m.mic ? "#22c55e" : "#ef4444",
+                                    padding: "6px",
+                                    cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                    "&:hover": {
+                                      bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                    }
+                                  }}
+                                >
+                                  {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                                </IconButton>
+                              </Tooltip>
+
+                              {/* CAMERA ICON - GREEN when ON, RED when OFF - Read-only for self, Clickable for Host on others */}
+                              <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
+                                <IconButton
+                                  size="small"
+                                  onClick={(isHost && !isSelfMember(m)) ? () => forceCameraOffParticipant(m) : undefined}
+                                  disabled={!isHost || isSelfMember(m)}
+                                  sx={{
+                                    bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                    border: "1px solid",
+                                    borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                    color: m.cam ? "#22c55e" : "#ef4444",
+                                    padding: "6px",
+                                    cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                    opacity: isSelfMember(m) ? 0.6 : 1,
+                                    "&:hover": {
+                                      bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                    }
+                                  }}
+                                >
+                                  {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
+                                </IconButton>
+                              </Tooltip>
+
+                              {/* MESSAGE ICON */}
+                              {!isSelfMember(m) && (
+                                <Tooltip title="Send Message">
+                                  <IconButton size="small" sx={{ color: "#fff" }} onClick={() => handleOpenPrivateChat(m)}>
+                                    <Badge
+                                      variant="dot"
+                                      color="error"
+                                      overlap="circular"
+                                      invisible={
+                                        !privateUnreadByUserId[
+                                        String(
+                                          m.clientSpecificId ||
+                                          m._raw?.clientSpecificId ||
+                                          m._raw?.client_specific_id ||
+                                          m._raw?.customParticipantId ||
+                                          m.id
+                                        )
+                                        ] && !privateUnreadByUserId[String(m.id)]
                                       }
-                                    }}
-                                  >
-                                    {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                                    >
+                                      <ChatBubbleOutlineIcon fontSize="small" />
+                                    </Badge>
                                   </IconButton>
                                 </Tooltip>
+                              )}
 
-                                {/* CAMERA ICON - GREEN when ON, RED when OFF - Read-only for self, Clickable for Host on others */}
-                                <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(isHost && !isSelfMember(m)) ? () => forceCameraOffParticipant(m) : undefined}
-                                    disabled={!isHost || isSelfMember(m)}
-                                    sx={{
-                                      bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                      border: "1px solid",
-                                      borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                      color: m.cam ? "#22c55e" : "#ef4444",
-                                      padding: "6px",
-                                      cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                      opacity: isSelfMember(m) ? 0.6 : 1,
-                                      "&:hover": {
-                                        bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                                      }
-                                    }}
-                                  >
-                                    {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
-                                  </IconButton>
-                                </Tooltip>
+                              {/* KICK/BAN MENU for Host */}
+                              {isHost && !isSelfMember(m) && (
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => handleOpenParticipantMenu(e, m)}
+                                  sx={{ color: "rgba(255,255,255,0.7)" }}
+                                >
+                                  <MoreVertIcon fontSize="small" />
+                                </IconButton>
+                              )}
 
-                                {/* MESSAGE ICON */}
-                                {!isSelfMember(m) && (
-                                  <Tooltip title="Send Message">
-                                    <IconButton size="small" sx={{ color: "#fff" }} onClick={() => handleOpenPrivateChat(m)}>
-                                      <Badge
-                                        variant="dot"
-                                        color="error"
-                                        overlap="circular"
-                                        invisible={
-                                          !privateUnreadByUserId[
-                                          String(
-                                            m.clientSpecificId ||
-                                            m._raw?.clientSpecificId ||
-                                            m._raw?.client_specific_id ||
-                                            m._raw?.customParticipantId ||
-                                            m.id
-                                          )
-                                          ] && !privateUnreadByUserId[String(m.id)]
-                                        }
-                                      >
-                                        <ChatBubbleOutlineIcon fontSize="small" />
-                                      </Badge>
-                                    </IconButton>
-                                  </Tooltip>
-                                )}
-
-                              </Stack>
-                            }
-                          >
-                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1 }}>
-                              <ListItemAvatar>
-                                <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
-                                  {initialsFromName(m.name)}
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText
-                                primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>}
-                                secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
-                              />
-                            </ListItemButton>
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Paper>
-                  </Box>
+                            </Stack>
+                          }
+                        >
+                          <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1 }}>
+                            <ListItemAvatar>
+                              <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+                                {initialsFromName(m.name)}
+                              </Avatar>
+                            </ListItemAvatar>
+                            <ListItemText
+                              primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>}
+                              secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
+                            />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Paper>
                 </Stack>
               </Box>
             </TabPanel>
@@ -5337,6 +5521,22 @@ export default function NewLiveMeeting() {
     </Box>
   );
 
+  if (isBanned) {
+    return (
+      <Box sx={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#070A10", color: "#fff", flexDirection: "column", gap: 2 }}>
+        <Typography variant="h4" fontWeight={700} color="error">
+          You are banned
+        </Typography>
+        <Typography variant="body1" sx={{ opacity: 0.7 }}>
+          You have been banned from this meeting by the host.
+        </Typography>
+        <Button variant="outlined" color="inherit" onClick={() => navigate(-1)}>
+          Go Back
+        </Button>
+      </Box>
+    );
+  }
+
   if (loadingJoin) {
     return <JoiningMeetingScreen onBack={handleBack} />;
   }
@@ -5352,9 +5552,13 @@ export default function NewLiveMeeting() {
     );
   }
 
+
+
   if (!initDone || !dyteMeeting) {
     return <JoiningMeetingScreen onBack={handleBack} />;
   }
+
+
 
   if (!shouldShowMeeting) {
     return (
@@ -5631,6 +5835,12 @@ export default function NewLiveMeeting() {
                 </ListItemIcon>
                 <ListItemText primary="Chat" secondary="Hide chat tab + block chat panel" />
                 <Switch checked={hostPerms.chat} onChange={handleToggleChat} />
+              </MenuItem>
+              <MenuItem onClick={handleKickParticipant}>
+                <ListItemIcon>
+                  <DirectionsWalkIcon fontSize="small" sx={{ color: "warning.main" }} />
+                </ListItemIcon>
+                <ListItemText>Kick User (Temp)</ListItemText>
               </MenuItem>
               {false && (
                 <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
@@ -6612,6 +6822,46 @@ export default function NewLiveMeeting() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Participant Action Menu */}
+        <Menu
+          anchorEl={participantMenuAnchor}
+          open={Boolean(participantMenuAnchor)}
+          onClose={handleCloseParticipantMenu}
+          PaperProps={{
+            sx: {
+              bgcolor: "#1e293b",
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.1)",
+              "& .MuiMenuItem-root": {
+                fontSize: 13,
+                py: 1.5
+              },
+              "& .MuiSvgIcon-root": {
+                fontSize: 18
+              }
+            }
+          }}
+        >
+          <MenuItem onClick={handleKickParticipant}>
+            <ListItemIcon>
+              <DirectionsWalkIcon fontSize="small" sx={{ color: "#f59e0b" }} />
+            </ListItemIcon>
+            <ListItemText>Kick User (Temp)</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={handleBanParticipant}>
+            <ListItemIcon>
+              <PersonRemoveIcon fontSize="small" sx={{ color: "#ef4444" }} />
+            </ListItemIcon>
+            <ListItemText>Ban User (Perm)</ListItemText>
+          </MenuItem>
+        </Menu>
+
+        <BannedParticipantsDialog
+          open={bannedDialogOpen}
+          onClose={() => setBannedDialogOpen(false)}
+          eventId={eventId}
+        />
       </Box>
 
       <LoungeOverlay

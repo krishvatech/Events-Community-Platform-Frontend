@@ -30,8 +30,8 @@ window.fetch = async (...args) => {
         return Promise.reject(error);
     }
 
-    // 2. Check for 401 or 403 (Expired Token)
-    if (response.status === 401 || response.status === 403) {
+    // 2. Check for 401 (Expired Token). 403 is Forbidden (e.g. banned), let app handle it.
+    if (response.status === 401) {
         // Check if we are already refreshing
         if (isRefreshing) {
             return new Promise((resolve, reject) => {
@@ -118,8 +118,8 @@ window.fetch = async (...args) => {
             newConfig.headers["Authorization"] = `Bearer ${idToken}`;
             const retryResponse = await originalFetch(resource, newConfig);
 
-            // If it fails AGAIN with 403/401, it means the user is likely suspended or token is bad
-            if (retryResponse.status === 401 || retryResponse.status === 403) {
+            // If it fails AGAIN with 401, it means the user is likely suspended or token is bad
+            if (retryResponse.status === 401) {
                 console.error("[Global Fetch] Retry failed with 401/403. Likely suspended.");
                 clearAuth();
                 // window.location.href = "/signin"; 
