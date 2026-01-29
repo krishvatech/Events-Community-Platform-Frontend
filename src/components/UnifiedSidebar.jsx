@@ -18,7 +18,12 @@ import {
     Paper,
     Avatar,
     IconButton,
-    Tooltip
+    Tooltip,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions
 } from "@mui/material";
 
 // Icons
@@ -278,6 +283,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
 
 
     // --- Actions ---
+    const [openLogoutDialog, setOpenLogoutDialog] = useState(false);
+
     const handleAction = async (action) => {
         if (action === "saleor") {
             try {
@@ -292,7 +299,12 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         }
     };
 
-    const handleLogout = async () => {
+    const handleLogoutClick = () => {
+        setOpenLogoutDialog(true);
+    };
+
+    const handleLogoutConfirm = async () => {
+        setOpenLogoutDialog(false);
         // Copied from Header.jsx
         const access = localStorage.getItem("access_token");
         const refresh = localStorage.getItem("refresh_token");
@@ -615,7 +627,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
 
                     <Tooltip title="Logout">
                         <IconButton
-                            onClick={handleLogout}
+                            onClick={handleLogoutClick}
                             color="error"
                             sx={{
                                 bgcolor: "rgba(211, 47, 47, 0.04)",
@@ -627,7 +639,43 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     </Tooltip>
                 </Box>
             </Box>
-        </Box>
+
+
+            {/* Logout Confirmation Dialog */}
+            <Dialog
+                open={openLogoutDialog}
+                onClose={() => setOpenLogoutDialog(false)}
+                PaperProps={{
+                    sx: { borderRadius: 3, p: 1, minWidth: 320 }
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>
+                    Are you leaving our system?
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        You are about to log out. We'll miss you!
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setOpenLogoutDialog(false)}
+                        sx={{ borderRadius: 2, textTransform: "none", color: "text.secondary" }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleLogoutConfirm}
+                        variant="contained"
+                        color="error"
+                        sx={{ borderRadius: 2, textTransform: "none", boxShadow: "none" }}
+                        autoFocus
+                    >
+                        Yes, Logout
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box >
     );
 
     return isMobile ? (
