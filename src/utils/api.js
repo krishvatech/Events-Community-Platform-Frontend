@@ -123,9 +123,10 @@ apiClient.interceptors.response.use(
   async (error) => {
     const original = error?.config;
 
-    // if no response or not 401, reject. (403 is Forbidden, not Unauthorized, so let caller handle it)
+    // Handle 401 (Unauthorized Token) or 403 (Forbidden - might be expired token or actual ban)
+    // We attempt refresh for both statuses. If 403 persists after refresh, it's a real ban.
     const status = error?.response?.status;
-    if (!status || status !== 401) {
+    if (!status || (status !== 401 && status !== 403)) {
       return Promise.reject(error);
     }
 
@@ -143,7 +144,7 @@ apiClient.interceptors.response.use(
         const refreshToken = getRefreshToken();
         let username = getUserName();
 
-        console.log("[Auth] 401 detected. Attempting refresh...");
+        console.log(`[Auth] ${status} detected. Attempting token refresh...`);
 
         // Fallback 1: Try getting username from localStorage 'user' object
         if (!username) {
@@ -192,7 +193,15 @@ apiClient.interceptors.response.use(
 
         // Retry original
         original.headers.Authorization = `Bearer ${idToken}`;
-        return apiClient(original);
+        const retryResponse = await apiClient(original);
+
+        // Check retry response for persistent auth issues
+        if (retryResponse.status === 401 || retryResponse.status === 403) {
+          console.warn("[Auth] Request still failed with auth error after refresh. User access denied (banned/restricted).");
+          clearAuth();
+        }
+
+        return retryResponse;
 
       } else {
         // If already refreshing, queue this request
@@ -207,6 +216,7 @@ apiClient.interceptors.response.use(
       }
 
     } catch (refreshErr) {
+      console.error("[Auth] Token refresh failed:", refreshErr);
       processQueue(refreshErr, null);
       isRefreshing = false;
 

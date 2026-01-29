@@ -30,8 +30,9 @@ window.fetch = async (...args) => {
         return Promise.reject(error);
     }
 
-    // 2. Check for 401 (Expired Token). 403 is Forbidden (e.g. banned), let app handle it.
-    if (response.status === 401) {
+    // 2. Check for 401 (Unauthorized Token) or 403 (Forbidden - might be expired token or actual ban).
+    // We attempt refresh for both statuses. If 403 persists after refresh, it's a real ban.
+    if (response.status === 401 || response.status === 403) {
         // Check if we are already refreshing
         if (isRefreshing) {
             return new Promise((resolve, reject) => {
@@ -50,7 +51,8 @@ window.fetch = async (...args) => {
 
         // Start Refresh Process
         isRefreshing = true;
-        console.log("[Global Fetch] 401/403 detected. Attempting refresh...");
+        const statusCode = response.status;
+        console.log(`[Global Fetch] ${statusCode} detected. Attempting token refresh...`);
 
         try {
             const refreshToken = getRefreshToken();
@@ -90,7 +92,7 @@ window.fetch = async (...args) => {
             }
 
             if (!refreshToken || !username) {
-                console.error("[Global Fetch] Missing refresh token or username.");
+                console.error("[Global Fetch] Missing refresh token or username. Cannot refresh.");
                 throw new Error("No refresh token or username");
             }
 
@@ -101,7 +103,7 @@ window.fetch = async (...args) => {
                 refreshToken,
             });
 
-            console.log("[Global Fetch] Refresh successful!");
+            console.log("[Global Fetch] Token refresh successful!");
 
             // Update LocalStorage
             localStorage.setItem("access_token", idToken);
@@ -113,27 +115,31 @@ window.fetch = async (...args) => {
             processQueue(null, idToken);
             isRefreshing = false;
 
-            // Retry Original Request
+            // Retry Original Request with new token
             const newConfig = { ...config, headers: { ...config?.headers } };
             newConfig.headers["Authorization"] = `Bearer ${idToken}`;
             const retryResponse = await originalFetch(resource, newConfig);
 
-            // If it fails AGAIN with 401, it means the user is likely suspended or token is bad
+            // Check retry response
             if (retryResponse.status === 401) {
-                console.error("[Global Fetch] Retry failed with 401/403. Likely suspended.");
+                // 401 after refresh = token is bad or user is suspended
+                console.error("[Global Fetch] Retry failed with 401 after refresh. User likely suspended.");
                 clearAuth();
-                // window.location.href = "/signin"; 
+            } else if (retryResponse.status === 403) {
+                // 403 after refresh = actual permission/ban issue, not token expiry
+                console.warn("[Global Fetch] Retry failed with 403 after refresh. User access denied (banned/restricted).");
+                clearAuth();
             }
+
             return retryResponse;
 
         } catch (refreshError) {
-            console.error("[Global Fetch] Refresh failed:", refreshError);
+            console.error("[Global Fetch] Token refresh failed:", refreshError);
             processQueue(refreshError, null);
             isRefreshing = false;
-            clearAuth(); // Log out
-            // You might want to redirect here or despatch an event
-            // window.location.href = "/signin"; 
-            return response; // Return the original 401/403 response so the app knows it failed
+            clearAuth(); // Log out user
+            // window.location.href = "/signin";
+            return response; // Return the original error response
         }
     }
 

@@ -81,6 +81,8 @@ import ThumbUpAltIcon from "@mui/icons-material/ThumbUpAlt";
 import ViewSidebarIcon from "@mui/icons-material/ViewSidebar";
 import DirectionsWalkIcon from "@mui/icons-material/DirectionsWalk";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import { useNavigate, useParams } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
@@ -4008,7 +4010,16 @@ export default function NewLiveMeeting() {
       });
       if (!res.ok) throw new Error("Failed to load questions.");
       const data = await res.json();
-      setQuestions(data || []);
+
+      // Map questions and ensure visibility fields are present
+      const mapped = (data || []).map(q => ({
+        ...q,
+        is_hidden: q.is_hidden || false,
+        hidden_by: q.hidden_by || null,
+        hidden_at: q.hidden_at || null
+      }));
+
+      setQuestions(mapped);
     } catch (e) {
       setQnaError(e.message || "Failed to load questions.");
     } finally {
@@ -4088,6 +4099,18 @@ export default function NewLiveMeeting() {
 
         if (msg.type === "qna.delete") {
           setQuestions((prev) => prev.filter((q) => q.id !== msg.question_id));
+        }
+
+        if (msg.type === "qna.visibility_change") {
+          const { question_id, is_hidden, hidden_by, hidden_at } = msg;
+          console.log("[WS] Question visibility changed:", question_id, is_hidden);
+          setQuestions((prev) =>
+            prev.map((q) =>
+              q.id === question_id
+                ? { ...q, is_hidden, hidden_by, hidden_at }
+                : q
+            )
+          );
         }
 
       } catch { }
@@ -4181,12 +4204,47 @@ export default function NewLiveMeeting() {
     }
   };
 
+  const toggleQuestionVisibility = async (questionId) => {
+    setQnaError("");
+    try {
+      const res = await fetch(toApiUrl(`interactions/questions/${questionId}/toggle_visibility/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err?.detail || "Failed to toggle visibility.");
+      }
+      const updated = await res.json();
+      console.log("[Q&A] Visibility toggled:", updated);
+
+      // Update local state optimistically
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === questionId
+            ? { ...q, is_hidden: updated.is_hidden, hidden_by: updated.hidden_by, hidden_at: updated.hidden_at }
+            : q
+        )
+      );
+    } catch (e) {
+      setQnaError("Error toggling visibility: " + (e.message || "Unknown error"));
+    }
+  };
+
   // Sort: highest votes on top, then newest
+  // Filter: hide hidden questions for non-hosts
   const qaSorted = useMemo(() => {
-    const arr = [...questions];
+    let arr = [...questions];
+
+    // Filter hidden questions for non-hosts
+    if (!isHost) {
+      arr = arr.filter((q) => !q.is_hidden);
+    }
+
+    // Sort by upvotes first, then by timestamp
     arr.sort((a, b) => (b.upvote_count ?? 0) - (a.upvote_count ?? 0) || (new Date(b.created_at || 0) - new Date(a.created_at || 0)));
     return arr;
-  }, [questions]);
+  }, [questions, isHost]);
 
   const polls = useMemo(
     () => [
@@ -4863,9 +4921,30 @@ export default function NewLiveMeeting() {
                           variant="outlined"
                           sx={{
                             p: 1.5,
-                            bgcolor: "rgba(255,255,255,0.03)",
-                            borderColor: "rgba(255,255,255,0.08)",
+                            bgcolor: q.is_hidden
+                              ? "rgba(251, 191, 36, 0.08)"
+                              : "rgba(255,255,255,0.03)",
+                            borderColor: q.is_hidden
+                              ? "rgba(251, 191, 36, 0.3)"
+                              : "rgba(255,255,255,0.08)",
                             borderRadius: 2,
+                            position: "relative",
+                            ...(q.is_hidden && {
+                              "&::before": {
+                                content: '"HIDDEN"',
+                                position: "absolute",
+                                top: 8,
+                                right: 8,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: "#fbbf24",
+                                bgcolor: "rgba(251, 191, 36, 0.15)",
+                                px: 1,
+                                py: 0.25,
+                                borderRadius: 1,
+                                border: "1px solid rgba(251, 191, 36, 0.3)"
+                              }
+                            })
                           }}
                         >
                           {isEditing ? (
@@ -4987,6 +5066,23 @@ export default function NewLiveMeeting() {
                                     >
                                       <EditRoundedIcon sx={{ fontSize: 16 }} />
                                     </IconButton>
+                                    {isHost && (
+                                      <Tooltip title={q.is_hidden ? "Unhide Question" : "Hide Question"}>
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => toggleQuestionVisibility(q.id)}
+                                          sx={{
+                                            color: q.is_hidden ? "rgba(251, 191, 36, 0.7)" : "rgba(255,255,255,0.5)",
+                                            p: 0.5,
+                                            "&:hover": {
+                                              color: q.is_hidden ? "#fbbf24" : "rgba(255,255,255,0.9)"
+                                            }
+                                          }}
+                                        >
+                                          {q.is_hidden ? <VisibilityIcon sx={{ fontSize: 16 }} /> : <VisibilityOffIcon sx={{ fontSize: 16 }} />}
+                                        </IconButton>
+                                      </Tooltip>
+                                    )}
                                     <IconButton
                                       size="small"
                                       onClick={() => handleQnaDelete(q.id)}
