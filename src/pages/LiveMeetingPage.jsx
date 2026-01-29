@@ -78,6 +78,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import ThumbUpAltIcon from "@mui/icons-material/ThumbUpAlt";
+import ViewSidebarIcon from "@mui/icons-material/ViewSidebar"; // <--- ADDED for Sidebar Toggle
 
 import { useNavigate, useParams } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
@@ -6099,20 +6100,19 @@ export default function NewLiveMeeting() {
                   </Tooltip>
                 )}
 
-                <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : (isChatActive ? "Close Sidebar" : "Open Sidebar")}>
+                <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : "Chat"}>
                   <span>
                     <IconButton
                       onClick={() => {
-                        // toggle behavior: if chat is open on tab=0, close panel
-                        if (hostPerms.chat && isChatActive) closeRightPanel();
-                        else toggleRightPanel(hostPerms.chat ? 0 : 1);
+                        // ✅ CHAT ICON: Only open Chat (never close panel)
+                        toggleRightPanel(0);
                       }}
                       sx={{
                         bgcolor: isChatActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
                         "&:hover": { bgcolor: isChatActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
                         opacity: hostPerms.chat ? 1 : 0.7,
                       }}
-                      aria-label="Chat / panel"
+                      aria-label="Chat"
                     >
                       <Badge
                         variant="dot"
@@ -6125,6 +6125,24 @@ export default function NewLiveMeeting() {
                       </Badge>
                     </IconButton>
                   </span>
+                </Tooltip>
+
+                {/* ✅ NEW: Separate Side Panel Toggle */}
+                <Tooltip title={isPanelOpen ? "Close Sidebar" : "Open Sidebar"}>
+                  <IconButton
+                    onClick={() => {
+                      if (isPanelOpen) closeRightPanel();
+                      else toggleRightPanel(tab); // Open to last used tab
+                    }}
+                    sx={{
+                      bgcolor: isPanelOpen ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                      "&:hover": { bgcolor: isPanelOpen ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                      mx: 0.5
+                    }}
+                    aria-label="Toggle Sidebar"
+                  >
+                    <ViewSidebarIcon />
+                  </IconButton>
                 </Tooltip>
 
                 <Tooltip title={isQnaActive ? "Close Q&A" : "Open Q&A"}>
