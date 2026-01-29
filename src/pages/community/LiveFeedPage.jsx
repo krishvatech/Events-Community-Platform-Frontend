@@ -1314,6 +1314,155 @@ function normalizeCommentRow(c) {
   };
 }
 
+// CommentItem moved OUTSIDE CommentsDialog to prevent re-creation on every render
+// which was causing the menu to close unexpectedly
+function CommentItem({
+  c,
+  depth = 0,
+  myId,
+  isAdmin,
+  onToggleLike,
+  onReply,
+  onDelete,
+  onReport,
+  canEngage,
+  reportable
+}) {
+  const canDeleteComment = c?.author_id === myId;
+  const canInteract = canEngage && !(c.is_under_review || c.is_removed);
+  const canReport = reportable && myId && c?.author_id !== myId;
+  const [menuAnchor, setMenuAnchor] = React.useState(null);
+  const menuOpen = Boolean(menuAnchor);
+
+  const handleMenuOpen = React.useCallback((e) => {
+    e.stopPropagation();
+    setMenuAnchor(e.currentTarget);
+  }, []);
+
+  const handleMenuClose = React.useCallback(() => {
+    setMenuAnchor(null);
+  }, []);
+
+  const handleReport = React.useCallback(() => {
+    setMenuAnchor(null);
+    onReport?.(c);
+  }, [onReport, c]);
+
+  return (
+    <Box
+      sx={{
+        pl: depth ? 2 : 0,
+        borderLeft: depth ? "2px solid #e2e8f0" : "none",
+        ml: depth ? 1.5 : 0,
+        mt: depth ? 1 : 0
+      }}
+    >
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Avatar
+          src={c.author?.avatar}
+          sx={{ width: 28, height: 28 }}
+          imgProps={{ loading: "lazy", decoding: "async" }}
+        >
+          {(c.author?.name || "U").slice(0, 1)}
+        </Avatar>
+        <Typography variant="subtitle2">
+          {c.author?.name || c.author?.username || "User"}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+        </Typography>
+        {c.is_under_review && (
+          <Chip size="small" label="Under Review" variant="outlined" />
+        )}
+        {c.is_removed && (
+          <Chip size="small" color="warning" label="Removed" variant="outlined" />
+        )}
+        {canReport && (
+          <>
+            <IconButton size="small" onClick={handleMenuOpen}>
+              <MoreVertRoundedIcon fontSize="small" />
+            </IconButton>
+            <Menu
+              open={menuOpen}
+              anchorEl={menuAnchor}
+              onClose={handleMenuClose}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+              // Prevent menu from closing due to parent re-renders
+              disablePortal={false}
+              keepMounted
+            >
+              <MenuItem onClick={handleReport}>
+                <FlagOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
+                Report comment
+              </MenuItem>
+            </Menu>
+          </>
+        )}
+      </Stack>
+
+      <Typography
+        sx={{
+          mt: 0.5,
+          whiteSpace: "pre-wrap",
+          filter: c.is_blurred ? "blur(4px)" : "none",
+          opacity: c.is_removed ? 0.5 : 1,
+        }}
+      >
+        {c.text}
+      </Typography>
+
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+        <Button
+          size="small"
+          startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+          onClick={() => canInteract && onToggleLike?.(c.id)}
+          disabled={!canInteract}
+          sx={{ color: c.user_has_liked ? "teal" : "inherit" }}
+        >
+          {c.like_count ?? 0}
+        </Button>
+        <Button
+          size="small"
+          startIcon={<ReplyRoundedIcon fontSize="small" />}
+          onClick={() => canInteract && onReply?.(c)}
+          disabled={!canInteract}
+        >
+          Reply
+        </Button>
+        {canDeleteComment && (
+          <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => onDelete?.(c)}>
+            Delete
+          </Button>
+        )}
+      </Stack>
+
+      {/* Recursive rendering of child comments */}
+      {!!c.children?.length && (
+        <Stack spacing={1} sx={{ mt: 1 }}>
+          {c.children
+            .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0)))
+            .map(child => (
+              <CommentItem
+                key={child.id}
+                c={child}
+                depth={depth + 1}
+                myId={myId}
+                isAdmin={isAdmin}
+                onToggleLike={onToggleLike}
+                onReply={onReply}
+                onDelete={onDelete}
+                onReport={onReport}
+                canEngage={canEngage}
+                reportable={reportable}
+              />
+            ))}
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
 function CommentsDialog({
   open,
   onClose,
@@ -1628,7 +1777,7 @@ function CommentsDialog({
     });
   }
 
-  function markCommentUnderReview(commentId) {
+  const markCommentUnderReview = React.useCallback((commentId) => {
     setItems((curr) =>
       curr.map((c) =>
         c.id === commentId
@@ -1643,9 +1792,10 @@ function CommentsDialog({
           : c
       )
     );
-  }
+  }, [isAdmin, myId]);
 
-  function reportComment(comment) {
+  // Helper function to handle comment reporting
+  const handleReportComment = React.useCallback((comment) => {
     if (!onReport) return;
     onReport({
       target_type: "comment",
@@ -1653,132 +1803,7 @@ function CommentsDialog({
       label: "comment",
       onSuccess: () => markCommentUnderReview(comment.id),
     });
-  }
-
-  //
-  // MOVE THIS COMPONENT OUTSIDE of CommentsDialog
-  // It needs to receive 'myId' and 'isAdmin' as props now.
-
-  const CommentItem = ({ c, depth = 0, myId, isAdmin, onToggleLike, onReply, onDelete }) => {
-    const canDelete = c?.author_id === myId;
-    const canInteract = canEngage && !(c.is_under_review || c.is_removed);
-    const canReport = reportable && myId && c?.author_id !== myId;
-    const [menuAnchor, setMenuAnchor] = React.useState(null);
-    const menuOpen = Boolean(menuAnchor);
-
-    return (
-      <Box
-        sx={{
-          pl: depth ? 2 : 0,
-          borderLeft: depth ? "2px solid #e2e8f0" : "none",
-          ml: depth ? 1.5 : 0,
-          mt: depth ? 1 : 0
-        }}
-      >
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Avatar
-            src={c.author?.avatar}
-            sx={{ width: 28, height: 28 }}
-            imgProps={{ loading: "lazy", decoding: "async" }} // Helps with blinking
-          >
-            {(c.author?.name || "U").slice(0, 1)}
-          </Avatar>
-          <Typography variant="subtitle2">
-            {c.author?.name || c.author?.username || "User"}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
-          </Typography>
-          {c.is_under_review && (
-            <Chip size="small" label="Under Review" variant="outlined" />
-          )}
-          {c.is_removed && (
-            <Chip size="small" color="warning" label="Removed" variant="outlined" />
-          )}
-          {canReport && (
-            <>
-              <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
-                <MoreVertRoundedIcon fontSize="small" />
-              </IconButton>
-              <Menu
-                open={menuOpen}
-                anchorEl={menuAnchor}
-                onClose={() => setMenuAnchor(null)}
-                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                transformOrigin={{ vertical: "top", horizontal: "right" }}
-              >
-                <MenuItem
-                  onClick={() => {
-                    setMenuAnchor(null);
-                    reportComment(c);
-                  }}
-                >
-                  <FlagOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
-                  Report comment
-                </MenuItem>
-              </Menu>
-            </>
-          )}
-        </Stack>
-
-        <Typography
-          sx={{
-            mt: 0.5,
-            whiteSpace: "pre-wrap",
-            filter: c.is_blurred ? "blur(4px)" : "none",
-            opacity: c.is_removed ? 0.5 : 1,
-          }}
-        >
-          {c.text}
-        </Typography>
-
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
-          <Button
-            size="small"
-            startIcon={c.user_has_liked ? <FavoriteRoundedIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
-            onClick={() => canInteract && onToggleLike?.(c.id)}
-            disabled={!canInteract}
-            sx={{ color: c.user_has_liked ? "teal" : "inherit" }}
-          >
-            {c.like_count ?? 0}
-          </Button>
-          <Button
-            size="small"
-            startIcon={<ReplyRoundedIcon fontSize="small" />}
-            onClick={() => canInteract && onReply?.(c)}
-            disabled={!canInteract}
-          >
-            Reply
-          </Button>
-          {canDelete && (
-            <Button size="small" color="error" startIcon={<DeleteOutlineRoundedIcon fontSize="small" />} onClick={() => onDelete?.(c)}>
-              Delete
-            </Button>
-          )}
-        </Stack>
-
-        {/* RECURSIVE CALL: Must pass all props down */}
-        {!!c.children?.length && (
-          <Stack spacing={1} sx={{ mt: 1 }}>
-            {c.children
-              .sort((a, b) => (new Date(a.created_at || 0)) - (new Date(b.created_at || 0)))
-              .map(child => (
-                <CommentItem
-                  key={child.id}
-                  c={child}
-                  depth={depth + 1}
-                  myId={myId}
-                  isAdmin={isAdmin}
-                  onToggleLike={onToggleLike}
-                  onReply={onReply}
-                  onDelete={onDelete}
-                />
-              ))}
-          </Stack>
-        )}
-      </Box>
-    );
-  };
+  }, [onReport, markCommentUnderReview]);
 
   // --------- INLINE RENDER (Instagram/LinkedIn style) ----------
   if (inline) {
@@ -1843,12 +1868,14 @@ function CommentsDialog({
                 <CommentItem
                   key={c.id}
                   c={c}
-                  // Pass the missing data down:
                   myId={myId}
                   isAdmin={isAdmin}
                   onToggleLike={toggleCommentLike}
                   onReply={setReplyTo}
                   onDelete={deleteComment}
+                  onReport={handleReportComment}
+                  canEngage={canEngage}
+                  reportable={reportable}
                 />
               ))}
             </Stack>
@@ -1884,7 +1911,20 @@ function CommentsDialog({
             <Typography color="text.secondary">No comments yet.</Typography>
           ) : (
             <Stack spacing={2}>
-              {roots.map(c => <CommentItem key={c.id} c={c} />)}
+              {roots.map(c => (
+                <CommentItem
+                  key={c.id}
+                  c={c}
+                  myId={myId}
+                  isAdmin={isAdmin}
+                  onToggleLike={toggleCommentLike}
+                  onReply={setReplyTo}
+                  onDelete={deleteComment}
+                  onReport={handleReportComment}
+                  canEngage={canEngage}
+                  reportable={reportable}
+                />
+              ))}
             </Stack>
           )}
         </DialogContent>
