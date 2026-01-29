@@ -296,9 +296,17 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       : TIMEZONE_OPTIONS;
   }, [timezone]);
 
-  // Image
-  const [imageFile, setImageFile] = React.useState(null);
-  const [localImagePreview, setLocalImagePreview] = React.useState("");
+  // Image - Update Logo / Picture (original branding image)
+  const [logoImageFile, setLogoImageFile] = React.useState(null);
+  const [localLogoImagePreview, setLocalLogoImagePreview] = React.useState("");
+
+  // Image - Cover Image (displayed when host disconnected or event not live)
+  const [coverImageFile, setCoverImageFile] = React.useState(null);
+  const [localCoverImagePreview, setLocalCoverImagePreview] = React.useState("");
+
+  // Image - Waiting Room Image (replaces clock in waiting room if uploaded)
+  const [waitingRoomImageFile, setWaitingRoomImageFile] = React.useState(null);
+  const [localWaitingRoomImagePreview, setLocalWaitingRoomImagePreview] = React.useState("");
 
   // Resources
   const [resourceType, setResourceType] = React.useState("file"); // 'file' | 'link' | 'video'
@@ -359,8 +367,12 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setEndTime(sch.endTime);
     setTimezone(getBrowserTimezone());
 
-    setImageFile(null);
-    setLocalImagePreview("");
+    setLogoImageFile(null);
+    setLocalLogoImagePreview("");
+    setCoverImageFile(null);
+    setLocalCoverImagePreview("");
+    setWaitingRoomImageFile(null);
+    setLocalWaitingRoomImagePreview("");
 
     setResourceType("file");
     setResFiles([]);
@@ -433,7 +445,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("end_time", toUTCISO(endDate, endTime, timezone));
     fd.append("recording_url", "");
 
-    if (imageFile) fd.append("preview_image", imageFile, imageFile.name);
+    if (logoImageFile) fd.append("preview_image", logoImageFile, logoImageFile.name);
+    if (coverImageFile) fd.append("cover_image", coverImageFile, coverImageFile.name);
+    if (waitingRoomImageFile) fd.append("waiting_room_image", waitingRoomImageFile, waitingRoomImageFile.name);
     fd.append("publish_resources_immediately", resourcesPublishNow ? "true" : "false");
     if (!resourcesPublishNow) {
       const publishISO = iso(resPublishDate, resPublishTime);
@@ -558,88 +572,87 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               </MenuItem>
             ))}
           </TextField>
+        </Paper>
 
-          <Grid
-            container
-            spacing={2}
-            alignItems="flex-start"
-            sx={{ flexWrap: { xs: "wrap", sm: "nowrap" } }}
-          >
-            {/* Left */}
-            <Grid item xs={12} sm={6} sx={{ minWidth: 0 }}>
-              {format === "virtual" ? (
-                <Autocomplete
-                  size="small"
-                  fullWidth
-                  options={COUNTRY_OPTIONS}
-                  autoHighlight
-                  value={getSelectedCountry({ location })}
-                  getOptionLabel={(opt) => opt?.label ?? ""}
-                  isOptionEqualToValue={(o, v) => o.code === v.code}
-                  onChange={(_, newVal) => {
-                    setLocation(newVal ? newVal.label : "");
-                    setErrors((prev) => ({ ...prev, location: "" }));
-                  }}
-                  ListboxProps={{
-                    style: {
-                      maxHeight: 36 * 7,
-                      overflowY: "auto",
-                      paddingTop: 0,
-                      paddingBottom: 0,
-                    },
-                  }}
-                  renderOption={(props, option) => (
-                    <li {...props} key={option.code}>
-                      <span style={{ marginRight: 8 }}>{option.emoji}</span>
-                      {option.label}
-                    </li>
-                  )}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Country"
-                      placeholder="Select country"
-                      fullWidth
-                      error={!!errors.location}
-                      helperText={errors.location}
-                      inputProps={{
-                        ...params.inputProps,
-                        autoComplete: "new-password",
-                      }}
-                      sx={{ mb: 2 }}
-                    />
-                  )}
-                />
-              ) : (
+        {/* Country Field */}
+        <Box sx={{ mb: 2 }}>
+          {format === "virtual" ? (
+            <Autocomplete
+              fullWidth
+              options={COUNTRY_OPTIONS}
+              autoHighlight
+              value={getSelectedCountry({ location })}
+              getOptionLabel={(opt) => opt?.label ?? ""}
+              isOptionEqualToValue={(o, v) => o.code === v.code}
+              onChange={(_, newVal) => {
+                setLocation(newVal ? newVal.label : "");
+                setErrors((prev) => ({ ...prev, location: "" }));
+              }}
+              ListboxProps={{
+                style: {
+                  maxHeight: 36 * 7,
+                  overflowY: "auto",
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                },
+              }}
+              renderOption={(props, option) => (
+                <li {...props} key={option.code}>
+                  <span style={{ marginRight: 8 }}>{option.emoji}</span>
+                  {option.label}
+                </li>
+              )}
+              renderInput={(params) => (
                 <TextField
-                  label="Location *"
-                  value={location}
-                  onChange={(e) => {
-                    setLocation(e.target.value);
-                    setErrors((prev) => ({ ...prev, location: "" }));
-                  }}
+                  {...params}
+                  label="Country"
+                  placeholder="Select country"
                   fullWidth
                   error={!!errors.location}
-                  helperText={errors.location || "City & country, or full address"}
-                  sx={{ mb: 2 }}
+                  helperText={errors.location}
+                  inputProps={{
+                    ...params.inputProps,
+                    autoComplete: "new-password",
+                  }}
                 />
               )}
+            />
+          ) : (
+            <TextField
+              label="Location *"
+              value={location}
+              onChange={(e) => {
+                setLocation(e.target.value);
+                setErrors((prev) => ({ ...prev, location: "" }));
+              }}
+              fullWidth
+              error={!!errors.location}
+              helperText={errors.location || "City & country, or full address"}
+            />
+          )}
+        </Box>
 
-              <TextField
-                label="Category"
-                select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                fullWidth
-                sx={{ mt: 1 }}
-              >
-                {categories.map((c) => (
-                  <MenuItem key={c} value={c}>
-                    {c}
-                  </MenuItem>
-                ))}
-              </TextField>
+        {/* Category Field */}
+        <Box sx={{ mb: 3 }}>
+          <TextField
+            label="Category"
+            select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            fullWidth
+          >
+            {categories.map((c) => (
+              <MenuItem key={c} value={c}>
+                {c}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
 
+        {/* Row 2: Price & Free Event */}
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            {/* Price Field */}
+            <Grid item xs={12} sm={6}>
               <TextField
                 label="Price ($)"
                 type="number"
@@ -650,24 +663,28 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 error={!!errors.price}
                 helperText={errors.price}
                 disabled={isFree}
-                sx={{ mt: 3 }}
               />
-
-              <Box sx={{ mt: 1.5, mb: 1 }}>
-                <FormControlLabel
-                  control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
-                  label="Free Event (all users can register)"
-                />
-              </Box>
-
-              {/* hidden slug */}
-              <Box sx={{ display: "none" }}>
-                <TextField label="Slug *" value={slug} onChange={(e) => setSlug(slugifyLocal(e.target.value))} />
-              </Box>
             </Grid>
 
-            {/* Right: Image */}
-            <Grid item xs={12} sm={6} sx={{ minWidth: 0, mt: { xs: 2, sm: 0 } }}>
+            {/* Free Event Checkbox */}
+            <Grid item xs={12} sm={6} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
+              <FormControlLabel
+                control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
+                label="Free Event"
+                sx={{ width: "100%", m: 0 }}
+              />
+            </Grid>
+          </Grid>
+
+          {/* hidden slug */}
+          <Box sx={{ display: "none" }}>
+            <TextField label="Slug *" value={slug} onChange={(e) => setSlug(slugifyLocal(e.target.value))} />
+          </Box>
+
+          {/* Images Row - Three Equal Columns */}
+          <Grid container spacing={2} sx={{ mt: 3 }}>
+            {/* Update Logo / Picture */}
+            <Grid item xs={12} sm={4}>
               <Typography variant="subtitle1" className="font-semibold">Update Logo / Picture</Typography>
               <Typography variant="caption" className="text-slate-500 block mb-2">
                 Recommended 650x365px - Max 50 MB
@@ -675,51 +692,159 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
               <Box
                 className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                sx={{ height: 200, position: "relative", overflow: "hidden" }}
+                sx={{ height: 150, position: "relative", overflow: "hidden" }}
               >
-                {localImagePreview ? (
+                {localLogoImagePreview ? (
                   <img
-                    src={localImagePreview}
-                    alt="preview"
+                    src={localLogoImagePreview}
+                    alt="logo preview"
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 ) : (
                   <Stack alignItems="center" spacing={1}>
                     <ImageRoundedIcon />
-                    <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
+                    <Typography variant="body2" className="text-slate-600">Logo / Picture</Typography>
                   </Stack>
                 )}
 
                 <input
-                  id="ev-image-file"
+                  id="ev-logo-image-file"
                   type="file"
                   accept="image/*"
                   style={{ display: "none" }}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    setImageFile(f);
+                    setLogoImageFile(f);
                     const r = new FileReader();
                     r.onload = (ev) =>
-                      setLocalImagePreview(String(ev.target?.result || ""));
+                      setLocalLogoImagePreview(String(ev.target?.result || ""));
                     r.readAsDataURL(f);
                   }}
                 />
               </Box>
 
-              <label htmlFor="ev-image-file">
+              <label htmlFor="ev-logo-image-file">
                 <Button
                   component="span"
                   size="small"
                   variant="outlined"
                   startIcon={<InsertPhotoRoundedIcon />}
+                  sx={{ mt: 1 }}
                 >
-                  Upload
+                  Upload Logo
+                </Button>
+              </label>
+            </Grid>
+
+            {/* Cover Image */}
+            <Grid item xs={12} sm={4}>
+              <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+              <Typography variant="caption" className="text-slate-500 block mb-2">
+                Recommended 650x365px - Max 50 MB
+              </Typography>
+
+              <Box
+                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 150, position: "relative", overflow: "hidden" }}
+              >
+                {localCoverImagePreview ? (
+                  <img
+                    src={localCoverImagePreview}
+                    alt="cover preview"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <Stack alignItems="center" spacing={1}>
+                    <ImageRoundedIcon />
+                    <Typography variant="body2" className="text-slate-600">Cover Image</Typography>
+                  </Stack>
+                )}
+
+                <input
+                  id="ev-cover-image-file"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setCoverImageFile(f);
+                    const r = new FileReader();
+                    r.onload = (ev) =>
+                      setLocalCoverImagePreview(String(ev.target?.result || ""));
+                    r.readAsDataURL(f);
+                  }}
+                />
+              </Box>
+
+              <label htmlFor="ev-cover-image-file">
+                <Button
+                  component="span"
+                  size="small"
+                  variant="outlined"
+                  startIcon={<InsertPhotoRoundedIcon />}
+                  sx={{ mt: 1 }}
+                >
+                  Upload Cover
+                </Button>
+              </label>
+            </Grid>
+
+            {/* Waiting Room Image */}
+            <Grid item xs={12} sm={4}>
+              <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
+              <Typography variant="caption" className="text-slate-500 block mb-2">
+                Recommended 650x365px - Max 50 MB
+              </Typography>
+
+              <Box
+                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 150, position: "relative", overflow: "hidden" }}
+              >
+                {localWaitingRoomImagePreview ? (
+                  <img
+                    src={localWaitingRoomImagePreview}
+                    alt="waiting room preview"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <Stack alignItems="center" spacing={1}>
+                    <ImageRoundedIcon />
+                    <Typography variant="body2" className="text-slate-600">Waiting Room</Typography>
+                  </Stack>
+                )}
+
+                <input
+                  id="ev-waiting-room-image-file"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setWaitingRoomImageFile(f);
+                    const r = new FileReader();
+                    r.onload = (ev) =>
+                      setLocalWaitingRoomImagePreview(String(ev.target?.result || ""));
+                    r.readAsDataURL(f);
+                  }}
+                />
+              </Box>
+
+              <label htmlFor="ev-waiting-room-image-file">
+                <Button
+                  component="span"
+                  size="small"
+                  variant="outlined"
+                  startIcon={<InsertPhotoRoundedIcon />}
+                  sx={{ mt: 1 }}
+                >
+                  Upload Waiting Room
                 </Button>
               </label>
             </Grid>
           </Grid>
-        </Paper>
 
         {/* ===== Schedule ===== */}
         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
@@ -1057,10 +1182,20 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ open: false, type: "success", msg: "" });
 
-  // image handling
-  const [imageFile, setImageFile] = useState(null);
-  const [localImagePreview, setLocalImagePreview] = useState("");
-  const previewImage = event?.preview_image ? toAbs(event.preview_image) : "";
+  // image handling - Update Logo / Picture (original branding image)
+  const [logoImageFile, setLogoImageFile] = useState(null);
+  const [localLogoImagePreview, setLocalLogoImagePreview] = useState("");
+  const logoImage = event?.preview_image ? toAbs(event.preview_image) : "";
+
+  // image handling - Cover Image (displayed when host disconnected or event not live)
+  const [coverImageFile, setCoverImageFile] = useState(null);
+  const [localCoverImagePreview, setLocalCoverImagePreview] = useState("");
+  const coverImage = event?.cover_image ? toAbs(event.cover_image) : "";
+
+  // image handling - Waiting Room Image (replaces clock in waiting room if uploaded)
+  const [waitingRoomImageFile, setWaitingRoomImageFile] = useState(null);
+  const [localWaitingRoomImagePreview, setLocalWaitingRoomImagePreview] = useState("");
+  const waitingRoomImage = event?.waiting_room_image ? toAbs(event.waiting_room_image) : "";
 
   useEffect(() => {
     if (!open) return;
@@ -1084,8 +1219,12 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     setStartTime(start.format("HH:mm"));
     setEndTime(end.format("HH:mm"));
 
-    setImageFile(null);
-    setLocalImagePreview("");
+    setLogoImageFile(null);
+    setLocalLogoImagePreview("");
+    setCoverImageFile(null);
+    setLocalCoverImagePreview("");
+    setWaitingRoomImageFile(null);
+    setLocalWaitingRoomImagePreview("");
     setErrors({});
   }, [open, event?.id]);
 
@@ -1128,11 +1267,27 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     return Object.keys(e).length === 0;
   };
 
-  const onPickFile = (file) => {
+  const onPickLogoImage = (file) => {
     if (!file) return;
-    setImageFile(file);
+    setLogoImageFile(file);
     const reader = new FileReader();
-    reader.onload = (e) => setLocalImagePreview(String(e.target?.result || ""));
+    reader.onload = (e) => setLocalLogoImagePreview(String(e.target?.result || ""));
+    reader.readAsDataURL(file);
+  };
+
+  const onPickCoverImage = (file) => {
+    if (!file) return;
+    setCoverImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setLocalCoverImagePreview(String(e.target?.result || ""));
+    reader.readAsDataURL(file);
+  };
+
+  const onPickWaitingRoomImage = (file) => {
+    if (!file) return;
+    setWaitingRoomImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setLocalWaitingRoomImagePreview(String(e.target?.result || ""));
     reader.readAsDataURL(file);
   };
 
@@ -1154,7 +1309,9 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     fd.append("start_time", combineToISO(startDate, startTime));
     fd.append("end_time", combineToISO(endDate, endTime));
 
-    if (imageFile) fd.append("preview_image", imageFile, imageFile.name);
+    if (logoImageFile) fd.append("preview_image", logoImageFile, logoImageFile.name);
+    if (coverImageFile) fd.append("cover_image", coverImageFile, coverImageFile.name);
+    if (waitingRoomImageFile) fd.append("waiting_room_image", waitingRoomImageFile, waitingRoomImageFile.name);
 
     try {
       const res = await fetch(`${API_ROOT}/events/${event.id}/`, {
@@ -1331,36 +1488,99 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
               </Box>
             </Grid>
 
-            {/* Right: Image */}
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Typography variant="subtitle1" className="font-semibold">Update Logo / Picture</Typography>
-              <Typography variant="caption" className="text-slate-500 block mb-2">
-                Recommended 650×365px • Max 50 MB
-              </Typography>
+            {/* Images Row - Three Equal Columns */}
+            <Grid size={{ xs: 12 }} sx={{ mt: 3 }}>
+              <Grid container spacing={2}>
+                {/* Update Logo / Picture */}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Typography variant="subtitle1" className="font-semibold">Update Logo / Picture</Typography>
+                  <Typography variant="caption" className="text-slate-500 block mb-2">
+                    Recommended 650x365px - Max 50 MB
+                  </Typography>
 
-              <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                sx={{ height: 200, position: "relative", overflow: "hidden" }}>
-                {localImagePreview ? (
-                  <img src={localImagePreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : previewImage ? (
-                  <img src={previewImage} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <Stack alignItems="center" spacing={1}>
-                    <ImageRoundedIcon />
-                    <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
-                  </Stack>
-                )}
-                <input id="edit-ev-image-file" type="file" accept="image/*" style={{ display: "none" }}
-                  onChange={(e) => onPickFile(e.target.files?.[0])} />
-              </Box>
+                  <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                    sx={{ height: 150, position: "relative", overflow: "hidden" }}>
+                    {localLogoImagePreview ? (
+                      <img src={localLogoImagePreview} alt="logo preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : logoImage ? (
+                      <img src={logoImage} alt="logo preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <Stack alignItems="center" spacing={1}>
+                        <ImageRoundedIcon />
+                        <Typography variant="body2" className="text-slate-600">Logo / Picture</Typography>
+                      </Stack>
+                    )}
+                    <input id="edit-ev-logo-image-file" type="file" accept="image/*" style={{ display: "none" }}
+                      onChange={(e) => onPickLogoImage(e.target.files?.[0])} />
+                  </Box>
 
-              <Stack direction="row" spacing={1} className="mt-2">
-                <label htmlFor="edit-ev-image-file">
-                  <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
-                    Upload
-                  </Button>
-                </label>
-              </Stack>
+                  <label htmlFor="edit-ev-logo-image-file">
+                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />} sx={{ mt: 1 }}>
+                      Upload Logo
+                    </Button>
+                  </label>
+                </Grid>
+
+                {/* Cover Image */}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+                  <Typography variant="caption" className="text-slate-500 block mb-2">
+                    Recommended 650x365px - Max 50 MB
+                  </Typography>
+
+                  <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                    sx={{ height: 150, position: "relative", overflow: "hidden" }}>
+                    {localCoverImagePreview ? (
+                      <img src={localCoverImagePreview} alt="cover preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : coverImage ? (
+                      <img src={coverImage} alt="cover preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <Stack alignItems="center" spacing={1}>
+                        <ImageRoundedIcon />
+                        <Typography variant="body2" className="text-slate-600">Cover Image</Typography>
+                      </Stack>
+                    )}
+                    <input id="edit-ev-cover-image-file" type="file" accept="image/*" style={{ display: "none" }}
+                      onChange={(e) => onPickCoverImage(e.target.files?.[0])} />
+                  </Box>
+
+                  <label htmlFor="edit-ev-cover-image-file">
+                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />} sx={{ mt: 1 }}>
+                      Upload Cover
+                    </Button>
+                  </label>
+                </Grid>
+
+                {/* Waiting Room Image */}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
+                  <Typography variant="caption" className="text-slate-500 block mb-2">
+                    Recommended 650x365px - Max 50 MB
+                  </Typography>
+
+                  <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                    sx={{ height: 150, position: "relative", overflow: "hidden" }}>
+                    {localWaitingRoomImagePreview ? (
+                      <img src={localWaitingRoomImagePreview} alt="waiting room preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : waitingRoomImage ? (
+                      <img src={waitingRoomImage} alt="waiting room preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <Stack alignItems="center" spacing={1}>
+                        <ImageRoundedIcon />
+                        <Typography variant="body2" className="text-slate-600">Waiting Room</Typography>
+                      </Stack>
+                    )}
+                    <input id="edit-ev-waiting-room-image-file" type="file" accept="image/*" style={{ display: "none" }}
+                      onChange={(e) => onPickWaitingRoomImage(e.target.files?.[0])} />
+                  </Box>
+
+                  <label htmlFor="edit-ev-waiting-room-image-file">
+                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />} sx={{ mt: 1 }}>
+                      Upload Waiting Room
+                    </Button>
+                  </label>
+                </Grid>
+              </Grid>
             </Grid>
 
             {/* Dates */}

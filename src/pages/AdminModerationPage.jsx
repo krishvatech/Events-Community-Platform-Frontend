@@ -19,7 +19,6 @@ import {
   Tab,
 } from "@mui/material";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 
@@ -239,14 +238,7 @@ export default function AdminModerationPage() {
                   )}
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <Button
-                    size="small"
-                    startIcon={<EditRoundedIcon />}
-                    onClick={() => openEdit(item)}
-                    disabled={actionBusy}
-                  >
-                    Edit
-                  </Button>
+                  {/* ✅ Edit button removed - Use "Remove Content" option in dialog instead */}
                   <Button
                     size="small"
                     startIcon={<CheckCircleOutlineRoundedIcon />}

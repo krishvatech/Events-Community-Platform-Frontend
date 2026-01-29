@@ -344,6 +344,20 @@ function ParticipantVideo({ participant, meeting, isSelf = false }) {
   );
 }
 
+// ✅ Common Modern Modal Style
+const MODAL_PAPER_PROPS = {
+  sx: {
+    bgcolor: "#0b101a",
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 4,
+    boxShadow: "0px 20px 40px rgba(0,0,0,0.6)",
+    backdropFilter: "blur(14px)",
+    color: "#fff",
+    "& .MuiTypography-root": { color: "#fff" },
+  },
+};
+
+
 
 function ScreenShareVideo({ participant, meeting }) {
   const videoRef = useRef(null);
@@ -691,6 +705,8 @@ function WaitingForHost({
   scheduled = "--",
   duration = "--",
   roleLabel = "Audience",
+  waitingRoomImage = null,
+  timezone = null,
 }) {
   return (
     <Box
@@ -764,23 +780,48 @@ function WaitingForHost({
           boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
         }}
       >
-        {/* Icon circle */}
-        <Box
-          sx={{
-            width: 72,
-            height: 72,
-            mx: "auto",
-            mb: 2,
-            borderRadius: "999px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            bgcolor: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.12)",
-          }}
-        >
-          <AccessTimeRoundedIcon sx={{ fontSize: 34, color: "rgba(255,255,255,0.70)" }} />
-        </Box>
+        {/* Icon circle or waiting room image */}
+        {waitingRoomImage ? (
+          <Box
+            sx={{
+              width: "100%",
+              maxWidth: 400,
+              height: 250,
+              mx: "auto",
+              mb: 2,
+              borderRadius: 2,
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            <img
+              src={waitingRoomImage}
+              alt="Waiting room"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              width: 72,
+              height: 72,
+              mx: "auto",
+              mb: 2,
+              borderRadius: "999px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            <AccessTimeRoundedIcon sx={{ fontSize: 34, color: "rgba(255,255,255,0.70)" }} />
+          </Box>
+        )}
 
         <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 0.8, color: "rgba(255,255,255,0.92)" }}>
           Waiting for host to start the meeting
@@ -811,6 +852,14 @@ function WaitingForHost({
             <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Scheduled</Typography>
             <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
               {scheduled}
+              {timezone && (
+                <Typography
+                  component="span"
+                  sx={{ fontSize: 11, color: "rgba(255,255,255,0.65)", ml: 0.5 }}
+                >
+                  ({timezone})
+                </Typography>
+              )}
             </Typography>
           </Stack>
 
@@ -884,6 +933,22 @@ function WaitingForHost({
 
 
 export default function NewLiveMeeting() {
+  // ✅ Global Snackbar State
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info", // "error" | "warning" | "info" | "success"
+  });
+
+  const showSnackbar = (message, severity = "info") => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === "clickaway") return;
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
+
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up("md"));
 
@@ -1169,6 +1234,7 @@ export default function NewLiveMeeting() {
   const [activeTableId, setActiveTableId] = useState(null);
   const [activeTableName, setActiveTableName] = useState("");
   const [activeTableLogoUrl, setActiveTableLogoUrl] = useState(""); // ✅ Store table logo
+  const [eventData, setEventData] = useState(null); // ✅ Store full event data (images, timezone, etc.)
   const [loungeTables, setLoungeTables] = useState([]);
   const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
 
@@ -1648,7 +1714,7 @@ export default function NewLiveMeeting() {
       }
     } catch (e) {
       console.error("[Kick] Exception:", e);
-      alert("Error kicking user: " + e.message);
+      showSnackbar("Error kicking user: " + e.message, "error");
     }
   };
 
@@ -1701,7 +1767,7 @@ export default function NewLiveMeeting() {
       }
     } catch (e) {
       console.error("[Ban] Exception:", e);
-      alert("Error banning user: " + e.message);
+      showSnackbar("Error banning user: " + e.message, "error");
     }
   };
 
@@ -1890,6 +1956,7 @@ export default function NewLiveMeeting() {
         const res = await fetch(toApiUrl(`events/${idFromQuery}/`), { headers: authHeader() });
         if (res.ok) {
           const data = await res.json();
+          setEventData(data); // ✅ Store full event data for access to images and timezone
           if (data?.status) setDbStatus(data.status);
           if (data?.title) setEventTitle(data.title);
           const start =
@@ -2067,7 +2134,8 @@ export default function NewLiveMeeting() {
           // Handle broadcast messages (kick/ban)
           const payload = msg.data;
           if (payload.type === "kicked") {
-            alert("You have been kicked from the meeting by the host.");
+            // alert("You have been kicked from the meeting by the host."); // Removed intrusive alert
+            showSnackbar("You have been kicked from the meeting by the host.", "error");
             navigate(`/community/${currentCommunitySlug}/events/${eventId}`);
           } else if (payload.type === "banned") {
             setIsBanned(true);
@@ -4797,14 +4865,7 @@ export default function NewLiveMeeting() {
               }}
               maxWidth="xs"
               fullWidth
-              PaperProps={{
-                sx: {
-                  bgcolor: "#0b101a",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: 3,
-                  color: "#fff",
-                },
-              }}
+              PaperProps={MODAL_PAPER_PROPS}
             >
               <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete message?</DialogTitle>
               <DialogContent>
@@ -4841,14 +4902,7 @@ export default function NewLiveMeeting() {
             <Dialog
               open={Boolean(qnaDeleteId)}
               onClose={() => setQnaDeleteId(null)}
-              PaperProps={{
-                sx: {
-                  bgcolor: "#1e293b",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 3,
-                  color: "#fff",
-                },
-              }}
+              PaperProps={MODAL_PAPER_PROPS}
             >
               <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete question?</DialogTitle>
               <DialogContent>
@@ -5707,6 +5761,8 @@ export default function NewLiveMeeting() {
         scheduled={scheduledLabel}
         duration={durationLabel}
         roleLabel={role === "publisher" ? "Host" : "Audience"}
+        waitingRoomImage={eventData?.waiting_room_image || null}
+        timezone={eventData?.timezone || null}
       />
     );
   }
@@ -6294,16 +6350,44 @@ export default function NewLiveMeeting() {
                       </>
                     ) : (
                       <>
-                        <Avatar
-                          sx={{
-                            width: 76,
-                            height: 76,
-                            fontSize: 22,
-                            bgcolor: "rgba(255,255,255,0.08)",
-                          }}
-                        >
-                          H
-                        </Avatar>
+                        {eventData?.cover_image ? (
+                          <Box
+                            sx={{
+                              width: 200,
+                              height: 150,
+                              borderRadius: 2,
+                              overflow: "hidden",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              bgcolor: "rgba(255,255,255,0.06)",
+                              border: "1px solid rgba(255,255,255,0.12)",
+                              mb: 2,
+                            }}
+                          >
+                            <Box
+                              component="img"
+                              src={eventData.cover_image}
+                              alt="Event cover"
+                              sx={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          </Box>
+                        ) : (
+                          <Avatar
+                            sx={{
+                              width: 76,
+                              height: 76,
+                              fontSize: 22,
+                              bgcolor: "rgba(255,255,255,0.08)",
+                            }}
+                          >
+                            H
+                          </Avatar>
+                        )}
                         <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
                           Host disconnected
                         </Typography>
@@ -6734,18 +6818,7 @@ export default function NewLiveMeeting() {
           onClose={closeMemberInfo}
           maxWidth="xs"
           fullWidth
-          PaperProps={{
-            sx: {
-              bgcolor: "#0b101a", // Deep dark blue/black background
-              border: "1px solid rgba(255,255,255,0.10)",
-              borderRadius: 4,
-              boxShadow: "0px 20px 40px rgba(0,0,0,0.6)",
-              backdropFilter: "blur(14px)",
-              p: 1,
-              color: "#fff",
-              "& .MuiTypography-root": { color: "#fff" },
-            },
-          }}
+          PaperProps={MODAL_PAPER_PROPS}
         >
           {/* Header Title */}
           <DialogTitle sx={{ pb: 0, pt: 2, px: 2, fontWeight: 700, fontSize: 16 }}>
@@ -6772,17 +6845,7 @@ export default function NewLiveMeeting() {
           onClose={() => setLeaveDialogOpen(false)}
           maxWidth="xs"
           fullWidth
-          PaperProps={{
-            sx: {
-              bgcolor: "#0b101a",
-              border: "1px solid rgba(255,255,255,0.10)",
-              borderRadius: 4,
-              boxShadow: "0px 20px 40px rgba(0,0,0,0.6)",
-              backdropFilter: "blur(14px)",
-              color: "#fff",
-              "& .MuiTypography-root": { color: "#fff" },
-            },
-          }}
+          PaperProps={MODAL_PAPER_PROPS}
         >
           <DialogTitle sx={{ pb: 0, pt: 2, px: 2, fontWeight: 700, fontSize: 16 }}>
             Leave or end meeting?
@@ -6830,17 +6893,7 @@ export default function NewLiveMeeting() {
           onClose={() => setShowDeviceSettings(false)}
           maxWidth="sm"
           fullWidth
-          PaperProps={{
-            sx: {
-              bgcolor: "#0b101a",
-              border: "1px solid rgba(255,255,255,0.10)",
-              borderRadius: 4,
-              boxShadow: "0px 20px 40px rgba(0,0,0,0.6)",
-              backdropFilter: "blur(14px)",
-              color: "#fff",
-              "& .MuiTypography-root": { color: "#fff" },
-            },
-          }}
+          PaperProps={MODAL_PAPER_PROPS}
         >
           <DialogTitle sx={{ pb: 1, pt: 2, px: 2, fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 1 }}>
             <SettingsIcon fontSize="small" />
@@ -7055,14 +7108,7 @@ export default function NewLiveMeeting() {
         <Dialog
           open={kickConfirmOpen}
           onClose={() => setKickConfirmOpen(false)}
-          PaperProps={{
-            sx: {
-              bgcolor: "#0b101a",
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 2
-            }
-          }}
+          PaperProps={MODAL_PAPER_PROPS}
         >
           <DialogTitle sx={{ fontWeight: 700 }}>Confirm Kick</DialogTitle>
           <DialogContent>
@@ -7089,14 +7135,7 @@ export default function NewLiveMeeting() {
         <Dialog
           open={banConfirmOpen}
           onClose={() => setBanConfirmOpen(false)}
-          PaperProps={{
-            sx: {
-              bgcolor: "#0b101a",
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 2
-            }
-          }}
+          PaperProps={MODAL_PAPER_PROPS}
         >
           <DialogTitle sx={{ fontWeight: 700 }}>Confirm Ban</DialogTitle>
           <DialogContent>
@@ -7211,6 +7250,23 @@ export default function NewLiveMeeting() {
         </Snackbar>
 
         {/* ✅ Global Room Timer Display */}
+
+        {/* ✅ Global App Snackbar for Alerts */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity={snackbar.severity}
+            variant="filled"
+            sx={{ width: "100%", boxShadow: 3 }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
 
       </Box>
     </DyteProvider>

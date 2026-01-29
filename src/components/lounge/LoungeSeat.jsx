@@ -78,11 +78,6 @@ const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
                         <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
                             {displayName}
                         </Typography>
-                        {participant.username && (
-                            <Typography sx={{ fontSize: 12, opacity: 0.8 }}>
-                                @{participant.username}
-                            </Typography>
-                        )}
                     </Box>
                 </Box>
             }
