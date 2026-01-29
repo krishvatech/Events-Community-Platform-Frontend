@@ -15,7 +15,11 @@ import {
   Alert,
   Collapse,
   Divider,
+  Checkbox,
+  Box,
 } from "@mui/material";
+
+// ... (existing code)
 
 const PROFILE_REPORT_REASONS = [
   {
@@ -80,7 +84,7 @@ export default function ReportProfileDialog({
   const [proofUrls, setProofUrls] = React.useState("");
 
   // Correction-specific fields
-  const [correctionFields, setCorrectionFields] = React.useState("");
+  const [correctionFields, setCorrectionFields] = React.useState({}); // Object, made user-friendly
   const [correctionReason, setCorrectionReason] = React.useState("");
 
   // Illegal content fields
@@ -97,7 +101,7 @@ export default function ReportProfileDialog({
       setObituaryUrl("");
       setImpersonatedName("");
       setProofUrls("");
-      setCorrectionFields("");
+      setCorrectionFields({});
       setCorrectionReason("");
       setIllegalDescription("");
       setIllegalLocation("");
@@ -129,15 +133,10 @@ export default function ReportProfileDialog({
           .filter(Boolean),
       };
     } else if (reason === "profile_correction") {
-      try {
-        payload.metadata = {
-          correction_fields: JSON.parse(correctionFields || "{}"),
-          correction_reason: correctionReason,
-        };
-      } catch (e) {
-        alert("Invalid JSON format for correction fields");
-        return;
-      }
+      payload.metadata = {
+        correction_fields: correctionFields, // Already an object
+        correction_reason: correctionReason,
+      };
     } else if (reason === "profile_illegal") {
       payload.metadata = {
         illegal_content_description: illegalDescription,
@@ -159,7 +158,7 @@ export default function ReportProfileDialog({
       return false;
     }
 
-    if (reason === "profile_correction" && !correctionFields.trim()) {
+    if (reason === "profile_correction" && Object.keys(correctionFields).length === 0) {
       return false;
     }
 
@@ -283,17 +282,52 @@ export default function ReportProfileDialog({
                 Please specify which fields need correction and the correct values.
               </Alert>
 
-              <TextField
-                label="Fields needing correction (JSON format)"
-                fullWidth
-                multiline
-                minRows={3}
-                required
-                value={correctionFields}
-                onChange={(e) => setCorrectionFields(e.target.value)}
-                placeholder='{"full_name": "Correct Name", "company": "Correct Company"}'
-                helperText='Format: {"field_name": "correct_value"}'
-              />
+              {/* Standard Fields Selection */}
+              <Stack spacing={1}>
+                <Typography variant="body2" fontWeight={600}>Select fields to correct:</Typography>
+                {["Full Name", "Job Title", "Company", "Location", "Bio"].map((field) => {
+                  const key = field.toLowerCase().replace(" ", "_"); // full_name, job_title...
+                  const isSelected = correctionFields[key] !== undefined;
+
+                  return (
+                    <div key={key}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={(e) => {
+                              const newFields = { ...correctionFields };
+                              if (e.target.checked) {
+                                newFields[key] = ""; // Init empty
+                              } else {
+                                delete newFields[key];
+                              }
+                              setCorrectionFields(newFields);
+                            }}
+                          />
+                        }
+                        label={field}
+                      />
+                      {isSelected && (
+                        <Box sx={{ ml: 4, mt: 1 }}>
+                          <TextField
+                            size="small"
+                            fullWidth
+                            placeholder={`Correct ${field}`}
+                            value={correctionFields[key]}
+                            onChange={(e) => {
+                              setCorrectionFields({
+                                ...correctionFields,
+                                [key]: e.target.value
+                              });
+                            }}
+                          />
+                        </Box>
+                      )}
+                    </div>
+                  );
+                })}
+              </Stack>
 
               <TextField
                 label="Reason for corrections"

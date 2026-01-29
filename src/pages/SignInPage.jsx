@@ -300,8 +300,36 @@ const SignInPage = () => {
 
       await updateTimezone(accessTokenForBackend);
 
-      const backendUser =
-        accessTokenForBackend ? await resolveBackendUser(accessTokenForBackend) : null;
+      /* 
+       * 🔔 STRICT SUSPENSION CHECK 
+       * Even if Cognito auth succeeded, the BACKEND middleware might block this user (suspended).
+       * We must verify access to 'me' endpoint BEFORE navigating.
+       */
+      let backendUser = null;
+      try {
+        if (accessTokenForBackend) {
+          backendUser = await resolveBackendUser(accessTokenForBackend);
+        }
+      } catch (err) {
+        // Should catch 403 if your fetch wrapper throws, but fetchWithManyAuthStyles suppresses errors.
+      }
+
+      // If resolveBackendUser returns null but we HAVE a token, it might mean 403/Suspended.
+      // Let's force a direct check if we are unsure.
+      if (accessTokenForBackend && !backendUser) {
+        // Double check: if the token is valid but backend rejects it, it's suspension.
+        // We can't easily distinguish 403 from network error in 'resolveBackendUser' (it returns null).
+        // But for safety, if we can't resolve the backend user, we should be cautious.
+        // However, to be precise, let's try one explicit fetch if backendUser is null.
+        const checkRes = await fetch(`${API_BASE}/users/me/`, {
+          headers: { Authorization: `Bearer ${accessTokenForBackend}` }
+        });
+        if (checkRes.status === 403) {
+          console.error("Backend blocked login (Suspended user).");
+          throw new Error("Your account has been suspended. Please contact support.");
+        }
+      }
+
       let userObj = backendUser || data?.user || null;
 
       // Always prefer server /me for Cognito (it includes is_staff/is_superuser)
@@ -374,7 +402,24 @@ const SignInPage = () => {
       // return;
 
     } catch (err) {
-      toast.error(`❌ ${err.message || 'Login failed. Please try again.'}`);
+      console.error("Login error:", err);
+      let msg = err.message || 'Login failed. Please try again.';
+
+      if (err.code === 'UserDisabledException') {
+        msg = 'Your account has been suspended. Please contact support.';
+      } else if (err.code === 'NotAuthorizedException') {
+        msg = 'Incorrect username or password.';
+      }
+
+      toast.error(`❌ ${msg}`);
+
+      // ✅ Vital: Clear any partial state so we don't end up half-logged-in
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("cognito_access_token");
+      localStorage.removeItem("id_token");
+      localStorage.removeItem("user");
+
     } finally {
       setLoading(false);
     }

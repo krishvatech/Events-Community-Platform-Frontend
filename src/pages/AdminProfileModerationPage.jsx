@@ -261,11 +261,11 @@ export default function AdminProfileModerationPage() {
                         label={item.user?.profile_status || "active"}
                         color={
                           item.user?.profile_status === "suspended" ||
-                          item.user?.profile_status === "deceased"
+                            item.user?.profile_status === "deceased"
                             ? "error"
                             : item.user?.profile_status === "under_review"
-                            ? "warning"
-                            : "default"
+                              ? "warning"
+                              : "default"
                         }
                       />
                     </Stack>
@@ -386,10 +386,23 @@ export default function AdminProfileModerationPage() {
 
                     {item.sample_metadata.correction_fields &&
                       Object.keys(item.sample_metadata.correction_fields).length > 0 && (
-                        <Typography variant="body2">
-                          <strong>Corrections needed:</strong>{" "}
-                          {JSON.stringify(item.sample_metadata.correction_fields)}
-                        </Typography>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            Corrections needed:
+                          </Typography>
+                          <Stack spacing={0.5} sx={{ pl: 2, mt: 0.5, borderLeft: "2px solid", borderColor: "primary.main" }}>
+                            {Object.entries(item.sample_metadata.correction_fields).map(([key, value]) => (
+                              <Box key={key}>
+                                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
+                                  {key.replace(/_/g, " ")}
+                                </Typography>
+                                <Typography variant="body2">
+                                  {value || <i>(Remove/Empty)</i>}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Stack>
+                        </Box>
                       )}
 
                     {item.sample_metadata.correction_reason && (
@@ -519,8 +532,8 @@ export default function AdminProfileModerationPage() {
               actionType === "clear"
                 ? "primary"
                 : actionType === "suspend"
-                ? "warning"
-                : "error"
+                  ? "warning"
+                  : "error"
             }
           >
             {actionBusy ? "Processing..." : "Confirm"}

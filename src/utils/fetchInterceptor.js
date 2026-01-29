@@ -116,7 +116,15 @@ window.fetch = async (...args) => {
             // Retry Original Request
             const newConfig = { ...config, headers: { ...config?.headers } };
             newConfig.headers["Authorization"] = `Bearer ${idToken}`;
-            return originalFetch(resource, newConfig);
+            const retryResponse = await originalFetch(resource, newConfig);
+
+            // If it fails AGAIN with 403/401, it means the user is likely suspended or token is bad
+            if (retryResponse.status === 401 || retryResponse.status === 403) {
+                console.error("[Global Fetch] Retry failed with 401/403. Likely suspended.");
+                clearAuth();
+                // window.location.href = "/signin"; 
+            }
+            return retryResponse;
 
         } catch (refreshError) {
             console.error("[Global Fetch] Refresh failed:", refreshError);
