@@ -6377,20 +6377,9 @@ export default function NewLiveMeeting() {
               Leaving keeps the event running for attendees. Ending will close it for everyone.
             </Typography>
           </DialogContent>
-          <DialogActions sx={{ px: 2, pb: 2, gap: 1 }}>
+          <DialogActions sx={{ px: 2, pb: 2, gap: 1, justifyContent: "space-between" }}>
             <Button
-              variant="outlined"
-              onClick={async () => {
-                setLeaveDialogOpen(false);
-                await handleMeetingEnd("left");
-              }}
-              sx={{ borderColor: "rgba(255,255,255,0.2)", color: "#fff" }}
-            >
-              Leave
-            </Button>
-            <Button
-              variant="contained"
-              color="error"
+              variant="text"
               onClick={async () => {
                 setLeaveDialogOpen(false);
                 const myId = dyteMeeting?.self?.id;
@@ -6401,8 +6390,21 @@ export default function NewLiveMeeting() {
                 }
                 await handleMeetingEnd("ended", { explicitEnd: true });
               }}
+              sx={{ color: "rgba(255,255,255,0.4)", "&:hover": { color: "#ef5350" } }}
             >
               End for all
+            </Button>
+
+            <Button
+              variant="contained"
+              color="error"
+              onClick={async () => {
+                setLeaveDialogOpen(false);
+                await handleMeetingEnd("left");
+              }}
+              sx={{ flex: 1, fontWeight: 700 }}
+            >
+              Leave Meeting
             </Button>
           </DialogActions>
         </Dialog>
