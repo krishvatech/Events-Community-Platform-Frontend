@@ -288,8 +288,9 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                 if (data.token && onEnterBreakout) {
                     const table = tables.find((t) => String(t.id) === String(tableId));
                     const tableName = table?.name || `Room ${tableId}`;
+                    const logoUrl = table?.icon_url || ""; // ✅ Get table logo URL
                     console.log("[Lounge] Joining breakout meeting with token");
-                    onEnterBreakout(data.token, tableId, tableName);
+                    onEnterBreakout(data.token, tableId, tableName, logoUrl); // ✅ Pass logo URL
                     onClose(); // Auto-close overlay after joining
                 }
             } else {

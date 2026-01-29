@@ -1168,6 +1168,7 @@ export default function NewLiveMeeting() {
   const [isBreakout, setIsBreakout] = useState(false);
   const [activeTableId, setActiveTableId] = useState(null);
   const [activeTableName, setActiveTableName] = useState("");
+  const [activeTableLogoUrl, setActiveTableLogoUrl] = useState(""); // ✅ Store table logo
   const [loungeTables, setLoungeTables] = useState([]);
   const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
 
@@ -1466,7 +1467,7 @@ export default function NewLiveMeeting() {
   );
 
   const applyBreakoutToken = useCallback(
-    async (newToken, tableId, tableName) => {
+    async (newToken, tableId, tableName, logoUrl) => {
       if (newToken) {
         console.log("[LiveMeeting] Transitioning to breakout room...");
 
@@ -1513,6 +1514,7 @@ export default function NewLiveMeeting() {
         if (tableId) {
           setActiveTableId(tableId);
           setActiveTableName(tableName || `Room ${tableId}`);
+          setActiveTableLogoUrl(logoUrl || ""); // ✅ Store the logo URL
         }
 
         // Auto-switch to Room Chat (Tab 0) when entering breakout
@@ -1544,6 +1546,7 @@ export default function NewLiveMeeting() {
         setAuthToken(mainAuthTokenRef.current);
         setActiveTableId(null);
         setActiveTableName("");
+        setActiveTableLogoUrl(""); // ✅ Clear logo when returning to main meeting
         setRoomChatConversationId(null);
         console.log("[LiveMeeting] Successfully returned to main meeting");
       } else {
@@ -1569,7 +1572,10 @@ export default function NewLiveMeeting() {
         if (data.token) {
           console.log("[LiveMeeting] Joining breakout room with token");
           const tableName = resolveTableName(tableId) || `Room ${tableId}`;
-          await applyBreakoutToken(data.token, tableId, tableName);
+          // ✅ Get logo URL from loungeTables
+          const table = loungeTables.find((t) => String(t.id) === String(tableId));
+          const logoUrl = table?.icon_url || "";
+          await applyBreakoutToken(data.token, tableId, tableName, logoUrl);
         }
       } else {
         console.error("[LiveMeeting] Failed to fetch breakout token:", res.status);
@@ -3019,6 +3025,7 @@ export default function NewLiveMeeting() {
       setAuthToken(mainAuthTokenRef.current);
       setActiveTableId(null);
       setActiveTableName("");
+      setActiveTableLogoUrl(""); // ✅ Clear logo
       // Force reset any chat/overlay state if needed
       if (typeof setRoomChatConversationId === "function") {
         setRoomChatConversationId(null);
@@ -3103,9 +3110,14 @@ export default function NewLiveMeeting() {
     }
 
     let p = pinnedHost;
-    // If in breakout and no official host pinned, fallback to first other person or self
+    // If in breakout and no official host pinned, find first other person
     if (!p && isBreakout) {
-      p = getJoinedParticipants().find(x => x.id !== dyteMeeting?.self?.id) || dyteMeeting?.self;
+      // ✅ FIX: Only show other participants if they exist. If alone, return null for welcome screen.
+      const otherParticipants = getJoinedParticipants().filter(x => x.id !== dyteMeeting?.self?.id);
+      if (otherParticipants.length > 0) {
+        p = otherParticipants[0];
+      }
+      // If no other participants, p remains null - will trigger welcome/placeholder UI
     }
     if (!p) return null;
 
@@ -6215,7 +6227,55 @@ export default function NewLiveMeeting() {
               >
                 {!stageHasVideo && (
                   <>
-                    {latestPinnedHost ? (
+                    {/* ✅ FIRST PARTICIPANT WELCOME SCREEN: Show when alone in breakout room */}
+                    {isBreakout && !latestPinnedHost ? (
+                      <>
+                        {/* Show logo if available, otherwise show waving hand */}
+                        {activeTableLogoUrl ? (
+                          <Box
+                            sx={{
+                              width: 76,
+                              height: 76,
+                              borderRadius: "50%",
+                              bgcolor: "rgba(255,255,255,0.08)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              overflow: "hidden",
+                              border: "2px solid rgba(255,255,255,0.12)",
+                            }}
+                          >
+                            <Box
+                              component="img"
+                              src={activeTableLogoUrl}
+                              alt="Social Lounge Logo"
+                              sx={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          </Box>
+                        ) : (
+                          <Avatar
+                            sx={{
+                              width: 76,
+                              height: 76,
+                              fontSize: 22,
+                              bgcolor: "rgba(255,255,255,0.12)",
+                            }}
+                          >
+                            👋
+                          </Avatar>
+                        )}
+                        <Typography sx={{ fontWeight: 800, fontSize: 18, textAlign: "center" }}>
+                          Welcome to {activeTableName || "Social Lounge"}
+                        </Typography>
+                        <Typography sx={{ opacity: 0.7, fontSize: 13, textAlign: "center", maxWidth: "70%" }}>
+                          You're the first one here. More participants may join you soon.
+                        </Typography>
+                      </>
+                    ) : latestPinnedHost ? (
                       <>
                         <Avatar
                           src={pinnedRaw?.picture} // ✅ Use pinned host picture
@@ -7069,8 +7129,8 @@ export default function NewLiveMeeting() {
           isAdmin={isHost}
           dyteMeeting={dyteMeeting}
           onParticipantClick={openLoungeParticipantInfo}
-          onEnterBreakout={async (newToken, tableId, tableName) => {
-            await applyBreakoutToken(newToken, tableId, tableName);
+          onEnterBreakout={async (newToken, tableId, tableName, logoUrl) => {
+            await applyBreakoutToken(newToken, tableId, tableName, logoUrl); // ✅ Pass logo URL
           }}
         />
 
