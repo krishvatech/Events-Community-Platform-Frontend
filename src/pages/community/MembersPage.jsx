@@ -1088,9 +1088,8 @@ export default function MembersPage() {
       await Promise.all(
         batch.map(async ({ key, city, countryCode }) => {
           try {
-            const url = `${API_BASE}/auth/cities/search/?q=${encodeURIComponent(city)}&limit=1${
-              countryCode ? `&country=${encodeURIComponent(countryCode)}` : ""
-            }`;
+            const url = `${API_BASE}/auth/cities/search/?q=${encodeURIComponent(city)}&limit=1${countryCode ? `&country=${encodeURIComponent(countryCode)}` : ""
+              }`;
             const res = await fetch(url, { headers: tokenHeader() });
             if (!res.ok) { updates[key] = null; return; }
             const data = await res.json();
@@ -1133,10 +1132,22 @@ export default function MembersPage() {
     const out = [];
     Object.entries(byCity).forEach(([code, arr]) => {
       const base = arr[0].center;
+      // If only one person is in this city/country, put them EXACTLY at the center
+      if (arr.length === 1) {
+        out.push({
+          coordinates: base,
+          isFriend: arr[0].isFriend,
+          userName: userDisplayName(arr[0].user),
+          countryCode: code,
+          user: arr[0].user,
+        });
+        return;
+      }
+
       arr.forEach((item, idx) => {
         const angle = ((idx * 40) % 360) * (Math.PI / 180);
         const ring = Math.floor(idx / 9) + 1;
-        const r = 0.4 * ring;
+        const r = 0.03 * ring;
         const dx = r * Math.cos(angle);
         const dy = r * Math.sin(angle);
         out.push({
