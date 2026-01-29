@@ -42,6 +42,7 @@ import {
   DialogActions,
   Switch,
   FormControlLabel,
+  Autocomplete,
 } from "@mui/material";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import { EditEventDialog } from "./AdminEvents.jsx";
@@ -142,7 +143,7 @@ const fmtDateRange = (start, end) => {
 // ---- Tabs / pagination ----
 const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Resources", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms Tables", "Social Lounge"];
-const MEMBERS_PER_PAGE = 5;
+const MEMBERS_PER_PAGE = 10;
 const RESOURCES_PER_PAGE = 5;
 
 
@@ -200,6 +201,18 @@ export default function EventManagePage() {
   const [loungeDeleteOpen, setLoungeDeleteOpen] = useState(false);
   const [loungeDeleteTarget, setLoungeDeleteTarget] = useState(null);
   const [loungeDeleteSaving, setLoungeDeleteSaving] = useState(false);
+
+  // Add Participant Dialog State
+  const [addParticipantOpen, setAddParticipantOpen] = useState(false);
+  const [addParticipantEmail, setAddParticipantEmail] = useState("");
+  const [addParticipantLoading, setAddParticipantLoading] = useState(false);
+  const [regsRefresh, setRegsRefresh] = useState(0);
+
+  // User Search State
+  const [userOptions, setUserOptions] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // Lounge Settings State
   const [loungeSettingsSaving, setLoungeSettingsSaving] = useState(false);
@@ -321,8 +334,9 @@ export default function EventManagePage() {
     };
 
     loadRegs();
+    loadRegs();
     return () => controller.abort();
-  }, [eventId, isOwner]);
+  }, [eventId, isOwner, regsRefresh]);
 
   // ---- load MY registration (for staff/attendee view) ----
   useEffect(() => {
@@ -626,6 +640,83 @@ export default function EventManagePage() {
       alert(e.message);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Debounced User Search
+  useEffect(() => {
+    if (!addParticipantOpen) return;
+
+    const timer = setTimeout(async () => {
+      if (!searchQuery || searchQuery.length < 2) {
+        setUserOptions([]);
+        return;
+      }
+      setSearchLoading(true);
+      try {
+        const token = getToken();
+        // Use 'search' param as supported by SearchFilter
+        const res = await fetch(`${API_ROOT}/users/?search=${encodeURIComponent(searchQuery)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          // json might be paginated { count: ..., results: ... } or array depending on config
+          // DRF DefaultPagination returns { results: [...] }
+          const results = Array.isArray(json) ? json : (json.results || []);
+          setUserOptions(results);
+        }
+      } catch (err) {
+        console.error("User search failed", err);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, addParticipantOpen]);
+
+  const handleAddParticipant = async () => {
+    if (!eventId) return;
+
+    // Validate: Need either a selected user OR a typed email
+    const emailToUse = selectedUser ? selectedUser.email : addParticipantEmail;
+    const userIdToUse = selectedUser ? selectedUser.id : null;
+
+    if (!emailToUse && !userIdToUse) {
+      toast.error("Please select a user or enter an email.");
+      return;
+    }
+
+    setAddParticipantLoading(true);
+    try {
+      const token = getToken();
+      const payload = {};
+      if (userIdToUse) payload.user_id = userIdToUse;
+      if (emailToUse) payload.email = emailToUse;
+
+      const res = await fetch(`${API_ROOT}/events/${eventId}/add-participant/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || "Failed to add participant");
+
+      toast.success("Participant added successfully");
+      setAddParticipantOpen(false);
+      setAddParticipantEmail("");
+      setSelectedUser(null);
+      setSearchQuery("");
+      setUserOptions([]);
+      setRegsRefresh(prev => prev + 1);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setAddParticipantLoading(false);
     }
   };
 
@@ -1397,11 +1488,22 @@ export default function EventManagePage() {
               People who have purchased this event.
             </Typography>
           </Box>
-          <Chip
-            size="small"
-            label={registrations.length}
-            sx={{ bgcolor: "grey.100", color: "text.secondary" }}
-          />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Chip
+              size="small"
+              label={registrations.length}
+              sx={{ bgcolor: "grey.100", color: "text.secondary" }}
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => setAddParticipantOpen(true)}
+              sx={{ textTransform: "none", borderColor: "divider", color: "text.primary" }}
+            >
+              Add Member
+            </Button>
+          </Stack>
         </Stack>
 
         {/* search + sort */}
@@ -1540,15 +1642,13 @@ export default function EventManagePage() {
                           </TableCell>
                           <TableCell align="right">
                             <Stack direction="row" justifyContent="flex-end" spacing={1}>
-                              {(Number(event?.price) === 0 || event?.is_free) && (
-                                <Button
-                                  size="small"
-                                  color="error"
-                                  onClick={() => openDialog("deregister", r)}
-                                >
-                                  Deregister
-                                </Button>
-                              )}
+                              <Button
+                                size="small"
+                                color="error"
+                                onClick={() => openDialog("deregister", r)}
+                              >
+                                Deregister
+                              </Button>
 
                               {!(Number(event?.price) === 0 || event?.is_free) && (
                                 <>
@@ -2384,6 +2484,110 @@ export default function EventManagePage() {
               autoFocus
             >
               {actionLoading ? "Processing..." : "Confirm"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        <Dialog
+          open={addParticipantOpen}
+          onClose={() => setAddParticipantOpen(false)}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              p: 1,
+            },
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>Add Participant</DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 2 }}>
+              Search for an existing user or enter an email address.
+            </DialogContentText>
+            <Autocomplete
+              id="user-search-autocomplete"
+              freeSolo
+              options={userOptions}
+              loading={searchLoading}
+              getOptionLabel={(option) => {
+                // Handle both object (selected user) and string (free input)
+                if (typeof option === "string") return option;
+                return `${option.first_name || ""} ${option.last_name || ""} (${option.email})`;
+              }}
+              filterOptions={(x) => x} // Disable client-side filtering since we do server-side
+              inputValue={searchQuery}
+              onInputChange={(event, newInputValue) => {
+                setSearchQuery(newInputValue);
+                // If user clears input, clear selection too
+                if (!newInputValue) setSelectedUser(null);
+              }}
+              onChange={(event, newValue) => {
+                if (typeof newValue === "string") {
+                  // User typed free text and hit enter
+                  setAddParticipantEmail(newValue);
+                  setSelectedUser(null);
+                } else {
+                  // User selected an object
+                  setSelectedUser(newValue);
+                  // If they selected an object, we can opt to clear manual email or keep it sync
+                  setAddParticipantEmail(newValue?.email || "");
+                }
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="User Search or Email"
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <React.Fragment>
+                        {searchLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                        {params.InputProps.endAdornment}
+                      </React.Fragment>
+                    ),
+                  }}
+                />
+              )}
+              renderOption={(props, option) => {
+                const { key, ...optionProps } = props;
+                return (
+                  <li key={key} {...optionProps}>
+                    <Grid container alignItems="center">
+                      <Grid item sx={{ display: 'flex', width: 44 }}>
+                        <Avatar
+                          src={option.profile?.user_image_url || option.profile?.avatar || ""}
+                          alt={option.username}
+                          sx={{ width: 30, height: 30 }}
+                        />
+                      </Grid>
+                      <Grid item sx={{ width: 'calc(100% - 44px)', wordWrap: 'break-word' }}>
+                        <Box component="span" sx={{ fontWeight: 'bold' }}>
+                          {option.first_name} {option.last_name}
+                        </Box>
+                        <Typography variant="body2" color="text.secondary">
+                          {option.email}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </li>
+                );
+              }}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setAddParticipantOpen(false)} sx={{ textTransform: "none" }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddParticipant}
+              variant="contained"
+              disabled={addParticipantLoading}
+              sx={{ textTransform: "none" }}
+            >
+              {addParticipantLoading ? "Adding..." : "Add"}
             </Button>
           </DialogActions>
         </Dialog>
