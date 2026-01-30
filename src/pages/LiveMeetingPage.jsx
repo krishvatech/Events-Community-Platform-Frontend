@@ -6585,8 +6585,9 @@ export default function NewLiveMeeting() {
                   <span>
                     <IconButton
                       onClick={() => {
-                        // ✅ CHAT ICON: Only open Chat (never close panel)
-                        toggleRightPanel(0);
+                        // ✅ CHAT ICON: Toggle chat open/close
+                        if (isChatActive) closeRightPanel();
+                        else toggleRightPanel(0);
                       }}
                       sx={{
                         bgcolor: isChatActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
@@ -6606,24 +6607,6 @@ export default function NewLiveMeeting() {
                       </Badge>
                     </IconButton>
                   </span>
-                </Tooltip>
-
-                {/* ✅ NEW: Separate Side Panel Toggle */}
-                <Tooltip title={isPanelOpen ? "Close Sidebar" : "Open Sidebar"}>
-                  <IconButton
-                    onClick={() => {
-                      if (isPanelOpen) closeRightPanel();
-                      else toggleRightPanel(tab); // Open to last used tab
-                    }}
-                    sx={{
-                      bgcolor: isPanelOpen ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                      "&:hover": { bgcolor: isPanelOpen ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
-                      mx: 0.5
-                    }}
-                    aria-label="Toggle Sidebar"
-                  >
-                    <ViewSidebarIcon />
-                  </IconButton>
                 </Tooltip>
 
                 <Tooltip title={isQnaActive ? "Close Q&A" : "Open Q&A"}>
@@ -6685,7 +6668,7 @@ export default function NewLiveMeeting() {
                       mx: 0.5
                     }}
                   >
-                    <AutoAwesomeIcon />
+                    <Diversity3Icon />
                   </IconButton>
                 </Tooltip>
 
@@ -6704,6 +6687,24 @@ export default function NewLiveMeeting() {
                     </IconButton>
                   </Tooltip>
                 )}
+
+                {/* ✅ Separate Side Panel Toggle */}
+                <Tooltip title={isPanelOpen ? "Close Sidebar" : "Open Sidebar"}>
+                  <IconButton
+                    onClick={() => {
+                      if (isPanelOpen) closeRightPanel();
+                      else toggleRightPanel(tab); // Open to last used tab
+                    }}
+                    sx={{
+                      bgcolor: isPanelOpen ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                      "&:hover": { bgcolor: isPanelOpen ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                      mx: 0.5
+                    }}
+                    aria-label="Toggle Sidebar"
+                  >
+                    <ViewSidebarIcon />
+                  </IconButton>
+                </Tooltip>
 
                 <Tooltip title="Leave meeting">
                   <IconButton
