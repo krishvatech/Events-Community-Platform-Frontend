@@ -8,9 +8,11 @@ import {
     IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
+import { isOwnerUser } from "../utils/adminRole";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
+import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
@@ -772,6 +774,121 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     }}
                 >
                     Save
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
+// ---- Image-only Dialog ----
+function GroupImageDialog({ open, group, onClose, onUpdated }) {
+    const token = getToken();
+    const [imageFile, setImageFile] = React.useState(null);
+    const [localPreview, setLocalPreview] = React.useState("");
+    const [submitting, setSubmitting] = React.useState(false);
+    const [error, setError] = React.useState("");
+
+    React.useEffect(() => {
+        if (!open || !group) return;
+        setImageFile(null);
+        setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
+        setError("");
+    }, [open, group]);
+
+    const onPickFile = (file) => {
+        if (!file) return;
+        setImageFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => setLocalPreview(String(e.target?.result || ""));
+        reader.readAsDataURL(file);
+    };
+
+    const submit = async () => {
+        if (!group || !imageFile) {
+            setError("Please choose an image.");
+            return;
+        }
+        setSubmitting(true);
+        setError("");
+        try {
+            const fd = new FormData();
+            fd.append("cover_image", imageFile, imageFile.name);
+            const idOrSlug = group.slug || group.id;
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
+                method: "PATCH",
+                headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: fd,
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const msg =
+                    json?.detail ||
+                    Object.entries(json)
+                        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+                        .join(" | ") ||
+                    `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+            onUpdated?.({ ...json, _cache: Date.now() });
+            onClose?.();
+        } catch (e) {
+            setError(String(e?.message || e));
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    if (!group) return null;
+
+    return (
+        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" PaperProps={{ className: "rounded-2xl" }}>
+            <DialogTitle className="font-extrabold">Group Icon</DialogTitle>
+            <DialogContent dividers>
+                {error && (
+                    <Alert severity="error" className="mb-3">
+                        {error}
+                    </Alert>
+                )}
+
+                <Stack spacing={2}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                        <Avatar
+                            sx={{ width: 56, height: 56, bgcolor: "#10b8a6" }}
+                            src={localPreview || undefined}
+                        >
+                            {(group?.name || "G").slice(0, 1).toUpperCase()}
+                        </Avatar>
+                        <Box>
+                            <Typography variant="subtitle2">Upload a new group icon</Typography>
+                            <Typography variant="body2" className="text-slate-500">
+                                PNG or JPG. Recommended square image.
+                            </Typography>
+                        </Box>
+                    </Stack>
+
+                    <input
+                        id="group-icon-file"
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={(e) => onPickFile(e.target.files?.[0] || null)}
+                    />
+                    <label htmlFor="group-icon-file">
+                        <Button component="span" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                            Choose image
+                        </Button>
+                    </label>
+                </Stack>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose} disabled={submitting}>Cancel</Button>
+                <Button
+                    onClick={submit}
+                    variant="contained"
+                    disabled={submitting || !imageFile}
+                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                >
+                    {submitting ? "Saving..." : "Save"}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -2847,11 +2964,16 @@ export default function GroupManagePage() {
 
     // 👇 already there
     const [editOpen, setEditOpen] = React.useState(false);
+    const [imageOnlyOpen, setImageOnlyOpen] = React.useState(false);
 
     // 👇 ADD THIS HELPER
     const handleOpenEditDialog = () => {
         if (!group) return;
         setEditOpen(true);
+    };
+    const handleOpenImageOnly = () => {
+        if (!group) return;
+        setImageOnlyOpen(true);
     };
 
     const [isStaffUser, setIsStaffUser] = React.useState(false);
@@ -3339,6 +3461,7 @@ export default function GroupManagePage() {
     const isOwnerRole = myRole === "owner";
     const isAdminRole = myRole === "admin";
     const isModeratorRole = myRole === "moderator";
+    const isPlatformAdmin = isOwnerUser();
 
     // ---- Which sub-groups should be visible to this user? ----
     // Owner/Admin → see ALL sub-groups
@@ -3374,7 +3497,7 @@ export default function GroupManagePage() {
         });
     }, [subgroups, isOwnerRole, isAdminRole, currentUserId]);
 
-    const canEditGroup = isOwnerRole || isAdminRole;
+    const canEditGroup = isOwnerRole || isAdminRole || isPlatformAdmin;
     const canReviewRequests = isOwnerRole || isAdminRole;
 
     // ✅ Strong member management (only owner + admin can remove/change roles)
@@ -4039,13 +4162,39 @@ export default function GroupManagePage() {
                                     spacing={2}
                                     sx={{ width: { xs: "100%", sm: "auto" } }}
                                 >
-                                    <Avatar
-                                        sx={{ width: 64, height: 64, bgcolor: "#10b8a6", border: "3px solid white" }}
-                                        src={group?.cover_image ? bust(group.cover_image, group.updated_at || group._cache) : undefined}
-                                        alt={group?.name || "Group"}
-                                    >
-                                        {(group?.name || "G").slice(0, 1).toUpperCase()}
-                                    </Avatar>
+                                    <Box sx={{ position: "relative", display: "inline-flex" }}>
+                                        <Avatar
+                                            sx={{
+                                                width: 64,
+                                                height: 64,
+                                                bgcolor: "#10b8a6",
+                                                border: "3px solid white",
+                                            }}
+                                            src={group?.cover_image ? bust(group.cover_image, group.updated_at || group._cache) : undefined}
+                                            alt={group?.name || "Group"}
+                                        >
+                                            {(group?.name || "G").slice(0, 1).toUpperCase()}
+                                        </Avatar>
+                                        {canEditGroup && (
+                                            <Tooltip title="Change group icon">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={handleOpenImageOnly}
+                                                    sx={{
+                                                        position: "absolute",
+                                                        right: -6,
+                                                        bottom: -6,
+                                                        bgcolor: "white",
+                                                        border: "1px solid #e2e8f0",
+                                                        boxShadow: 1,
+                                                        "&:hover": { bgcolor: "#f8fafc" },
+                                                    }}
+                                                >
+                                                    <PhotoCameraRoundedIcon fontSize="inherit" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                    </Box>
 
                                     <Box sx={{ minWidth: 0 }}>
                                         <Typography
@@ -4612,6 +4761,17 @@ export default function GroupManagePage() {
                                                     onClick={handleOpenEditDialog}
                                                 >
                                                     Edit Details
+                                                </Button>
+                                            )}
+                                            {canEditGroup && (
+                                                <Button
+                                                    variant="outlined"
+                                                    className="rounded-xl"
+                                                    startIcon={<PhotoCameraRoundedIcon fontSize="small" />}
+                                                    sx={{ textTransform: "none" }}
+                                                    onClick={handleOpenImageOnly}
+                                                >
+                                                    Edit Group Icon
                                                 </Button>
                                             )}
                                             {canEditGroup && (
@@ -5723,6 +5883,12 @@ export default function GroupManagePage() {
                     open={editOpen}
                     group={group}
                     onClose={() => setEditOpen(false)}
+                    onUpdated={onUpdated}
+                />
+                <GroupImageDialog
+                    open={imageOnlyOpen}
+                    group={group}
+                    onClose={() => setImageOnlyOpen(false)}
                     onUpdated={onUpdated}
                 />
 

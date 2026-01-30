@@ -2088,7 +2088,7 @@ export default function GroupDetailsPage() {
             >
               <Stack direction="row" spacing={2} alignItems="center">
                 <Avatar
-                  src={toMediaUrl(group?.avatar)}
+                  src={toMediaUrl(group?.cover_image || group?.avatar || group?.photo || group?.image)}
                   sx={{
                     width: 80,
                     height: 80,
