@@ -37,6 +37,7 @@ import {
   ListItemButton,
   Snackbar,
   Alert,
+  SvgIcon,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -93,6 +94,36 @@ import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
 import BannedParticipantsDialog from "../components/live-meeting/BannedParticipantsDialog.jsx";
+
+// ================ Custom Lounge Icon ================
+const SocialLoungeIcon = (props) => (
+  <SvgIcon {...props} viewBox="0 0 24 24">
+    {/* Horizontal Sofa/Couch - Large Bold Design */}
+
+    {/* Left arm */}
+    <rect x="2" y="8" width="2.2" height="6" rx="0.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+
+    {/* Right arm */}
+    <rect x="19.8" y="8" width="2.2" height="6" rx="0.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+
+    {/* Main seat - horizontal line */}
+    <line x1="4.2" y1="13.5" x2="19.8" y2="13.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+
+    {/* Backrest - curved line */}
+    <path d="M 4.2 8 Q 12 4.5 19.8 8" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+
+    {/* Seat cushion dividers */}
+    <line x1="8.5" y1="13.5" x2="8.5" y2="15.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <line x1="12" y1="13.5" x2="12" y2="15.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <line x1="15.5" y1="13.5" x2="15.5" y2="15.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+
+    {/* Front legs - left */}
+    <line x1="4.5" y1="15.5" x2="4.5" y2="18.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+
+    {/* Front legs - right */}
+    <line x1="19.5" y1="15.5" x2="19.5" y2="18.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+  </SvgIcon>
+);
 
 // ================ API Helper ================
 const API_ROOT = (
@@ -6668,7 +6699,7 @@ export default function NewLiveMeeting() {
                       mx: 0.5
                     }}
                   >
-                    <Diversity3Icon />
+                    <SocialLoungeIcon />
                   </IconButton>
                 </Tooltip>
 
