@@ -8,7 +8,7 @@ import {
   ListItemText, ListItemButton, ListItemSecondaryAction, Pagination,
   Paper, Popover, Stack, Tab, Tabs, TextField, Tooltip, Typography,
   CircularProgress, LinearProgress, Link, Checkbox, Skeleton,
-  Snackbar, Alert
+  Snackbar, Alert, Menu, MenuItem, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio
 } from "@mui/material";
 
 // Icons
@@ -27,6 +27,8 @@ import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 // -----------------------------------------------------------------------------
@@ -40,6 +42,16 @@ const POST_REACTIONS = [
   { id: "spot_on", emoji: "🎯", label: "Spot On" },
   { id: "validated", emoji: "🧠", label: "Validated" },
   { id: "debatable", emoji: "🤷", label: "Debatable" },
+];
+
+const REPORT_REASONS = [
+  { id: "spam", label: "Spam" },
+  { id: "harassment", label: "Harassment" },
+  { id: "hate_speech", label: "Hate speech" },
+  { id: "false_info", label: "False information" },
+  { id: "violence", label: "Violence" },
+  { id: "sexual_content", label: "Sexual content" },
+  { id: "other", label: "Other" },
 ];
 
 const RAW_BASE =
@@ -1004,12 +1016,76 @@ function ExpandableText({
 
 
 // -----------------------------------------------------------------------------
+// 5. REPORT DIALOG
+// -----------------------------------------------------------------------------
+function ReportDialog({ open, onClose, onSubmit, loading, targetLabel }) {
+  const [reason, setReason] = React.useState("spam");
+  const [notes, setNotes] = React.useState("");
+
+  React.useEffect(() => {
+    if (open) {
+      setReason("spam");
+      setNotes("");
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Report {targetLabel || "content"}</DialogTitle>
+      <DialogContent dividers>
+        <FormControl component="fieldset" fullWidth>
+          <FormLabel component="legend">Reason</FormLabel>
+          <RadioGroup
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          >
+            {REPORT_REASONS.map((r) => (
+              <FormControlLabel
+                key={r.id}
+                value={r.id}
+                control={<Radio />}
+                label={r.label}
+              />
+            ))}
+          </RadioGroup>
+        </FormControl>
+        <TextField
+          label="Additional notes (optional)"
+          placeholder="Share any context that can help moderators."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          fullWidth
+          multiline
+          minRows={3}
+          sx={{ mt: 2 }}
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+          Reports are anonymous. Our moderators will review this content.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button
+          variant="contained"
+          onClick={() => onSubmit?.(reason, notes)}
+          disabled={loading}
+        >
+          {loading ? "Submitting…" : "Submit report"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// -----------------------------------------------------------------------------
 // 6. POST CARD
 // -----------------------------------------------------------------------------
-function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
+function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, viewerId, viewerIsStaff }) {
   const [local, setLocal] = React.useState(post);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
+  const [menuAnchor, setMenuAnchor] = React.useState(null);
+  const menuOpen = Boolean(menuAnchor);
   const commentInputRef = React.useRef(null);
 
   // Reaction Picker
@@ -1029,6 +1105,9 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
   const likeBtnLabel = myReactionDef?.label || "Like";
   const likeBtnEmoji = myReactionDef?.emoji || "👍";
   const hasReaction = !!myReactionId;
+
+  // Check if user can report this post
+  const canReport = !!(viewerId && viewerId !== local.author_id && viewerId !== local.author?.id);
 
   // Optimistic update wrapper
   const handleReactionClick = async (reactionId) => {
@@ -1070,6 +1149,30 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent }) {
           <Typography variant="caption" color="text.secondary">{formatWhen(local.created_at)}</Typography>
         </Box>
         {local.type !== 'text' && <Chip size="small" label={local.type.toUpperCase()} variant="outlined" />}
+        {canReport && (
+          <>
+            <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
+              <MoreVertRoundedIcon fontSize="small" />
+            </IconButton>
+            <Menu
+              open={menuOpen}
+              anchorEl={menuAnchor}
+              onClose={() => setMenuAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+            >
+              <MenuItem
+                onClick={() => {
+                  setMenuAnchor(null);
+                  onReport?.(local);
+                }}
+              >
+                <FlagOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
+                Report post
+              </MenuItem>
+            </Menu>
+          </>
+        )}
       </Stack>
 
       {/* Body */}
@@ -1224,6 +1327,12 @@ function PostsTab({ groupId }) {
   const [loading, setLoading] = React.useState(true);
   const [postsMeta, setPostsMeta] = React.useState(null);
 
+  // Report state management
+  const [reportOpen, setReportOpen] = React.useState(false);
+  const [reportTarget, setReportTarget] = React.useState(null);
+  const [reportBusy, setReportBusy] = React.useState(false);
+  const [me, setMe] = React.useState(null);
+
   const fetchPosts = React.useCallback(async () => {
     setLoading(true);
     try {
@@ -1356,6 +1465,101 @@ function PostsTab({ groupId }) {
     } catch (e) { console.error(e); }
   };
 
+  // Fetch current user info
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const meJson = await getMeCached();
+        setMe(meJson || null);
+      } catch {
+        setMe(null);
+      }
+    })();
+  }, []);
+
+  const viewerId = me?.id || me?.user?.id || null;
+  const viewerIsStaff = !!(me?.is_staff || me?.is_superuser || me?.isAdmin || me?.role === "admin");
+
+  // Report dialog handlers
+  const openReport = React.useCallback((payload) => {
+    setReportTarget(payload);
+    setReportOpen(true);
+  }, []);
+
+  const closeReport = () => {
+    if (reportBusy) return;
+    setReportOpen(false);
+    setReportTarget(null);
+  };
+
+  async function submitReport(reason, notes) {
+    if (!reportTarget?.target_type || !reportTarget?.target_id) return;
+    setReportBusy(true);
+    try {
+      const res = await fetch(toApiUrl("moderation/reports/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          target_type: reportTarget.target_type,
+          target_id: reportTarget.target_id,
+          reason,
+          notes,
+        }),
+      });
+
+      if (res.status === 409) {
+        alert("You already reported this content.");
+        setReportBusy(false);
+        return;
+      }
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || `HTTP ${res.status}`);
+      }
+
+      const payload = await res.json();
+      reportTarget.onSuccess?.(payload);
+      setReportOpen(false);
+      setReportTarget(null);
+    } catch (e) {
+      alert("Could not submit report. Please try again.");
+    } finally {
+      setReportBusy(false);
+    }
+  }
+
+  const handleReport = React.useCallback((payload) => {
+    if (!payload) return;
+    if (payload.target_type && payload.target_id) {
+      openReport(payload);
+      return;
+    }
+    const post = payload;
+    if (!post?.id || !Number.isInteger(Number(post.id))) return;
+    const blurred = !(viewerIsStaff || viewerId === post.author_id);
+    openReport({
+      target_type: "activity_feed.feeditem",
+      target_id: Number(post.id),
+      label: "post",
+      onSuccess: () => {
+        setPosts((curr) =>
+          curr.map((p) =>
+            p.id === post.id
+              ? {
+                ...p,
+                moderation_status: "under_review",
+                is_under_review: true,
+                is_removed: false,
+                can_engage: false,
+                is_blurred: blurred,
+              }
+              : p
+          )
+        );
+      },
+    });
+  }, [openReport, viewerId, viewerIsStaff]);
+
   // Inside PostsTab function
   if (loading) {
     return (
@@ -1391,8 +1595,18 @@ function PostsTab({ groupId }) {
           post={p}
           onReact={handleReact}
           onPollVote={(post, optId) => handlePollVote(post, optId)}
+          onReport={handleReport}
+          viewerId={viewerId}
+          viewerIsStaff={viewerIsStaff}
         />
       ))}
+      <ReportDialog
+        open={reportOpen}
+        onClose={closeReport}
+        onSubmit={submitReport}
+        loading={reportBusy}
+        targetLabel={reportTarget?.label}
+      />
     </Box>
   );
 }
