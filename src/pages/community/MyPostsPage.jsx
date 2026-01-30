@@ -538,7 +538,7 @@ function PostCard({
         }
       />
       {/* Body */}
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 2, px: 2 }}>
         {post.is_removed || post.moderation_status === "removed" ? (
           <Typography color="text.secondary" sx={{ fontStyle: "italic", py: 2 }}>
             This content was removed by moderators.
@@ -1336,7 +1336,7 @@ function ShareToFriendDialog({ open, onClose, postId }) {
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Share with friends</DialogTitle>
+      <DialogTitle>Share with Contacts</DialogTitle>
       <DialogContent dividers sx={{ p: 0 }}>
         <Box sx={{ p: 2, pb: 1 }}>
           <TextField
