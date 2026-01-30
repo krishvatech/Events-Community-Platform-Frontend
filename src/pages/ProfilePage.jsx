@@ -3664,17 +3664,17 @@ export default function ProfilePage() {
                           </Tooltip>
                         }
                       >
-                        <Stack spacing={1}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <PlaceIcon fontSize="small" />
-                            <Typography variant="body2">
-                              City: {parsedLocation.city || "\u2014"}
+                        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                          <PlaceIcon fontSize="small" sx={{ mt: 0.5 }} />
+                          <Box>
+                            <Typography variant="body2" display="block">
+                              {parsedLocation.city || "\u2014"}
+                            </Typography>
+                            <Typography variant="body2" display="block">
+                              {parsedLocation.country || "\u2014"}
                             </Typography>
                           </Box>
-                          <Typography variant="body2" sx={{ pl: 3 }}>
-                            Country: {parsedLocation.country || "\u2014"}
-                          </Typography>
-                        </Stack>
+                        </Box>
                       </SectionCard>
 
                       <SectionCard
