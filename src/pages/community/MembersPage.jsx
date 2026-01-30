@@ -80,7 +80,7 @@ const isAbort = (e) =>
   /aborted|aborterror|signal is aborted/i.test(e?.message || "");
 
 const MIN_ZOOM = 1;
-const MAX_ZOOM = 8;
+const MAX_ZOOM = 18;
 const ZOOM_STEP = 1.35;
 const LINKEDIN_COMPANY_SIZES = [
   "1-10",
@@ -545,7 +545,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
       // If only one marker, zoom in strongly on it
       if (markers.length === 1) {
         const [lng, lat] = markers[0].coordinates;
-        map.flyTo([lat, lng], 6, { duration: 0.8 }); // zoom 6 = closer
+        map.flyTo([lat, lng], 12, { duration: 0.8 }); // zoom 12 = closer
         return;
       }
 
@@ -558,7 +558,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
       const bounds = L.latLngBounds(latLngs);
       map.fitBounds(bounds, {
         padding: [40, 40],
-        maxZoom: 4, // more zoom than before, but not too tight
+        maxZoom: 10, // more zoom than before, but not too tight
       });
     }, [markers, map]);
 
@@ -583,7 +583,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
       const heat = L.heatLayer(points, {
         radius: 38,      // size of each hotspot
         blur: 32,        // softness of edges
-        maxZoom: 7,
+        maxZoom: 18,
         minOpacity: 0.25,
         // Snapchat-style gradient: green → yellow → orange → red
         gradient: {
@@ -633,7 +633,7 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
           center={center}
           zoom={3}
           minZoom={2}
-          maxZoom={7}
+          maxZoom={18}
           style={{ width: "100%", height: "100%" }}
           scrollWheelZoom
           worldCopyJump
