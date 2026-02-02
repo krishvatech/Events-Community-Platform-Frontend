@@ -692,7 +692,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
                     <Grid xs={12} md={5}>
                         <Typography variant="subtitle1" className="font-semibold">
-                            Cover Image
+                            Logo / Icon
                         </Typography>
                         <Typography variant="caption" className="text-slate-500 block mb-2">
                             Recommended 650×365px • Max 50 MB

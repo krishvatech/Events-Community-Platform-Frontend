@@ -285,7 +285,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
             </div>
 
             <div className="col-span-12 md:col-span-5">
-              <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+              <Typography variant="subtitle1" className="font-semibold">Logo / Icon</Typography>
               <Typography variant="caption" className="text-slate-500 block mb-2">
                 Recommended 650×365px • Max 50 MB
               </Typography>
@@ -563,7 +563,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
           </div>
 
           <div className="col-span-12 md:col-span-5">
-            <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+            <Typography variant="subtitle1" className="font-semibold">Logo / Icon</Typography>
             <Typography variant="caption" className="text-slate-500 block mb-2">
               Recommended 650×365px • Max 50 MB
             </Typography>
