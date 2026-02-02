@@ -1397,52 +1397,52 @@ export default function NewLiveMeeting() {
     }
   }, [dyteMeeting]);
 
+  const handleToggleMic = useCallback(async () => {
+    if (!dyteMeeting?.self) return;
+
+    try {
+      if (dyteMeeting.self.audioEnabled) {
+        await dyteMeeting.self.disableAudio?.();
+      } else {
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+          s.getTracks().forEach((t) => t.stop());
+        } catch { }
+
+        await dyteMeeting.self.enableAudio?.();
+      }
+
+      setMicOn(Boolean(dyteMeeting.self.audioEnabled));
+    } catch (e) {
+      console.warn("[LiveMeeting] mic toggle failed:", e);
+      setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
+    }
+  }, [dyteMeeting]);
+
   /**
    * Switch to a different video device
-   * Uses replaceTrack for smooth transition without reconnecting
+   * Uses Dyte's official SDK method setDevice for reliable switching
    */
   const switchVideoDevice = useCallback(async (deviceId) => {
     if (!deviceId || !dyteMeeting?.self) return;
 
     try {
       setDeviceSwitchError("");
+      const videoDevice = videoDevices.find((d) => d.deviceId === deviceId);
 
-      // Get new video stream from the selected device
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: deviceId } },
-      });
+      if (videoDevice) {
+        console.log("[LiveMeeting] Switching video device to:", deviceId);
+        // Use the official Dyte SDK method to switch device
+        // This handles stopping old tracks and starting new ones internally
+        await dyteMeeting.self.setDevice(videoDevice);
 
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      if (!newVideoTrack) {
-        throw new Error("No video track in new stream");
+        setSelectedVideoDeviceId(deviceId);
       }
-
-      // Get sender from Dyte's WebRTC connection
-      const sender = dyteMeeting?.self?.peerConnection?.getSenders?.()?.find(
-        (s) => s.track?.kind === "video"
-      );
-
-      if (sender) {
-        // Replace track smoothly without reconnecting
-        await sender.replaceTrack(newVideoTrack);
-      }
-
-      // Stop old video tracks to free resources
-      if (activeVideoStreamRef.current) {
-        activeVideoStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
-
-      // Store new stream reference for future switches
-      activeVideoStreamRef.current = newStream;
-      setSelectedVideoDeviceId(deviceId);
-
-      console.log("[LiveMeeting] Video device switched to:", deviceId);
     } catch (err) {
-      const errMsg = `Failed to switch video device: ${err.message}`;
-      console.error("[LiveMeeting]", errMsg);
-      setDeviceSwitchError(errMsg);
+      console.error("[LiveMeeting] Failed to switch video device:", err);
+      setDeviceSwitchError("Failed to switch camera. Please try again.");
     }
-  }, [dyteMeeting]);
+  }, [dyteMeeting, videoDevices]);
 
   /**
    * Switch audio output device (speakers/headphones)
@@ -1490,27 +1490,7 @@ export default function NewLiveMeeting() {
     }
   }, []);
 
-  const handleToggleMic = useCallback(async () => {
-    if (!dyteMeeting?.self) return;
 
-    try {
-      if (dyteMeeting.self.audioEnabled) {
-        await dyteMeeting.self.disableAudio?.();
-      } else {
-        try {
-          const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-          s.getTracks().forEach((t) => t.stop());
-        } catch { }
-
-        await dyteMeeting.self.enableAudio?.();
-      }
-
-      setMicOn(Boolean(dyteMeeting.self.audioEnabled));
-    } catch (e) {
-      console.warn("[LiveMeeting] mic toggle failed:", e);
-      setMicOn(Boolean(dyteMeeting?.self?.audioEnabled));
-    }
-  }, [dyteMeeting]);
 
   const handleToggleCamera = useCallback(async () => {
     if (!dyteMeeting?.self) return;
