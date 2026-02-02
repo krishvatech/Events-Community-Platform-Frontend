@@ -1534,8 +1534,15 @@ export default function ProfilePage() {
     organization_name: "",
     role_type: "",
     start_month: "",
+    start_month: "",
     end_month: "",
   });
+
+  // --- Email Verification State ---
+  const [emailVerificationOpen, setEmailVerificationOpen] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [pendingNewEmail, setPendingNewEmail] = useState("");
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
 
   // Helpers
   const latestExp = useMemo(() => expList.length > 0 ? expList[0] : null, [expList]);
@@ -2273,6 +2280,64 @@ export default function ProfilePage() {
       showNotification("success", successMsg);
       closeContactEditor();
     } catch (e) { showNotification("error", e?.message || "Save failed"); } finally { setSaving(false); }
+  }
+
+  // --- Email Verification Handlers ---
+  async function handleMakePrimary(email) {
+    if (!email) return;
+    try {
+      setVerifyingEmail(true);
+      const r = await fetch(`${API_BASE}/users/me/email/initiate/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        body: JSON.stringify({ new_email: email }),
+      });
+
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || "Failed to initiate email change");
+
+      setPendingNewEmail(email);
+      setVerificationCode("");
+      setEmailVerificationOpen(true);
+      if (data.detail) showNotification("success", data.detail);
+
+    } catch (e) {
+      showNotification("error", e.message);
+    } finally {
+      setVerifyingEmail(false);
+    }
+  }
+
+  async function onVerifyCode() {
+    if (!verificationCode || verificationCode.length !== 6) {
+      showNotification("error", "Please enter a valid 6-digit code");
+      return;
+    }
+    try {
+      setVerifyingEmail(true);
+      const r = await fetch(`${API_BASE}/users/me/email/confirm/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        body: JSON.stringify({ new_email: pendingNewEmail, code: verificationCode }),
+      });
+
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || "Verification failed");
+
+      showNotification("success", "Your account Main Email Changed Successfully.");
+
+      // Close dialogs
+      setEmailVerificationOpen(false);
+      setContactOpen(false);
+
+      // Reload profile to reflect changes
+      await loadMeExtras();
+
+    } catch (e) {
+      showNotification("error", e.message);
+    } finally {
+      setVerifyingEmail(false);
+    }
   }
 
   async function saveLocation() {
@@ -3950,6 +4015,41 @@ export default function ProfilePage() {
         <DialogActions><Button onClick={() => setWorkOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAboutWork} disabled={saving || !latestExp}>Save</Button></DialogActions>
       </Dialog>
 
+      {/* --- Email Verification Dialog --- */}
+      <Dialog open={emailVerificationOpen} onClose={() => setEmailVerificationOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Verify Email</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            A verification code has been sent to <strong>{pendingNewEmail}</strong>.
+            Please enter it below to set this as your primary email.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            margin="normal"
+            label="6-Digit Code"
+            value={verificationCode}
+            onChange={(e) => setVerificationCode(e.target.value)}
+            disabled={verifyingEmail}
+            inputProps={{ maxLength: 6, style: { fontSize: 24, letterSpacing: 4, textAlign: 'center' } }}
+          />
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Changing your primary email will update your login credentials.
+            You will need to use <strong>{pendingNewEmail}</strong> to log in.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEmailVerificationOpen(false)} disabled={verifyingEmail}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={onVerifyCode}
+            disabled={verifyingEmail || verificationCode.length !== 6}
+          >
+            {verifyingEmail ? "Verifying..." : "Verify & Change"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* --- Other Dialogs (Contact, Education, Experience, etc.) --- */}
       <Dialog open={contactOpen} onClose={closeContactEditor} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 700 }}>
@@ -4092,9 +4192,21 @@ export default function ProfilePage() {
                         </TextField>
                       </Grid>
                       <Grid item xs={1} sm={1}>
-                        <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <Tooltip title="Set as Primary">
+                            <IconButton
+                              onClick={() => handleMakePrimary(item.email)}
+                              color="primary"
+                              size="small"
+                              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+                            >
+                              <VerifiedRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </Grid>
                     </Grid>
                   ))}
