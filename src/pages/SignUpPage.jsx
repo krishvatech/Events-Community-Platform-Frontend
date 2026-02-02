@@ -41,7 +41,7 @@ const SignUpPage = () => {
     email: "",
     password: "",
     confirmPassword: "",
-    username: "", // auto-filled on submit if empty
+    // username: "", // auto-generated
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -74,9 +74,9 @@ const SignUpPage = () => {
 
   const validate = () => {
     const next = {};
-    if (!/^[A-Za-z0-9]{3,20}$/.test(formData.username || "")) {
-      next.username = "3–20 letters/numbers, no spaces";
-    }
+    // if (!/^[A-Za-z0-9]{3,20}$/.test(formData.username || "")) {
+    //   next.username = "3–20 letters/numbers, no spaces";
+    // }
     if (!/^[A-Za-z]{2,}$/.test(formData.firstName || "")) {
       next.firstName = "First name must be at least 2 letters";
     }
@@ -221,7 +221,7 @@ const SignUpPage = () => {
                 Authorization: `Bearer ${session.idToken}`,
               },
               body: JSON.stringify({
-                username: (formData.username || "").trim().toLowerCase(),
+                username: pendingUsername, // Send the generated username
                 email: (formData.email || "").trim().toLowerCase(),
                 firstName: (formData.firstName || "").trim(),
                 lastName: (formData.lastName || "").trim(),
@@ -261,9 +261,11 @@ const SignUpPage = () => {
 
     setLoading(true);
     try {
-      const username =
-        (formData.username && formData.username.toLowerCase().trim()) ||
-        `${(formData.firstName || "user").toLowerCase()}${Date.now()}`;
+      // Auto-generate username from email prefix + random suffix
+      let emailPrefix = (formData.email || "").split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+      if (!emailPrefix) emailPrefix = "user";
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000); // 4-digit random number
+      const username = `${emailPrefix}${randomSuffix}`;
 
       await cognitoSignUp({
         username,
@@ -370,33 +372,7 @@ const SignUpPage = () => {
             <Box component="form" noValidate onSubmit={handleSubmit}>
               <Stack spacing={1.5}>
                 {/* Username */}
-                <Box>
-                  <Typography variant="caption" sx={{ mb: 0.25, fontWeight: 600, color: "#374151", fontSize: 12 }}>
-                    Username
-                  </Typography>
-                  <TextField
-                    label="Username"
-                    name="username"
-                    placeholder="username"
-                    value={formData.username}
-                    onChange={handleChange}
-                    size="small"
-                    error={Boolean(errors.username)}
-                    helperText={errors.username}
-                    fullWidth
-                    sx={{
-                      ...inputSx,
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 0.5,
-                        "& fieldset": { borderColor: "#d1d5db" },       // default
-                        "&:hover fieldset": { borderColor: "#155dfc" }, // hover
-                        "&.Mui-focused fieldset": { borderColor: "#155dfc" }, // focus
-                      },
-                      "& .MuiInputBase-input": { paddingTop: "8px", paddingBottom: "8px", fontSize: 14 },
-                      "& .MuiFormHelperText-root": { fontSize: 11, mt: 0.5 },
-                    }}
-                  />
-                </Box>
+                {/* Username field removed - auto-generated from email */}
 
                 {/* First/Last name row */}
                 <Box
