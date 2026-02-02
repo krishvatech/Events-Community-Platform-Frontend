@@ -1001,6 +1001,20 @@ export default function EventManagePage() {
                 {event.description || "No description provided."}
               </Typography>
 
+              {/* Replay Info Badge - similar to EventDetailsPage */}
+              {event.replay_available && (
+                <Box sx={{ mt: 2, mb: 1, p: 2, bgcolor: "rgba(99, 102, 241, 0.08)", borderRadius: 2, border: "1px solid rgba(99, 102, 241, 0.2)" }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "indigo.main" }}>
+                    Replay will be available
+                  </Typography>
+                  {event.replay_availability_duration && (
+                    <Typography variant="caption" sx={{ color: "indigo.dark", display: "block", mt: 0.5 }}>
+                      Accessible for: {event.replay_availability_duration}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
               {/* Self-Management Actions (Leave / Cancel Request) */}
               {myReg && (
                 <Box sx={{ mt: 3, mb: 1 }}>

@@ -265,6 +265,28 @@ export default function MyRecordingsPage() {
                 >
                   {paged.map((ev) => {
                     const hasRec = !!ev.recording_url;
+
+                    // Check availability
+                    const isReplayAllowed = ev.replay_available;
+
+                    // Check expiration
+                    let isExpired = false;
+                    if (isReplayAllowed && ev.replay_availability_duration && ev.replay_availability_duration !== "Unlimited") {
+                      const days = parseInt(ev.replay_availability_duration);
+                      if (!isNaN(days) && days > 0) {
+                        // End time of event
+                        const endTime = ev.end_time ? new Date(ev.end_time).getTime() : (ev.live_ended_at ? new Date(ev.live_ended_at).getTime() : 0);
+                        if (endTime > 0) {
+                          const expiryTime = endTime + (days * 24 * 60 * 60 * 1000);
+                          if (Date.now() > expiryTime) {
+                            isExpired = true;
+                          }
+                        }
+                      }
+                    }
+
+                    const canWatch = hasRec && isReplayAllowed && !isExpired;
+
                     return (
                       <Grid
                         key={ev.id}
@@ -288,10 +310,10 @@ export default function MyRecordingsPage() {
                               position: "relative",
                               width: "100%",
                               aspectRatio: "16/9",
-                              background: hasRec ? "#0b1220" : "#E5E7EB",
+                              background: canWatch ? "#0b1220" : "#E5E7EB",
                             }}
                           >
-                            {hasRec ? (
+                            {canWatch ? (
                               <video
                                 src={`${S3_BUCKET_URL}/${ev.recording_url}`}
                                 controls
@@ -315,10 +337,16 @@ export default function MyRecordingsPage() {
                                   color: "text.secondary",
                                   fontSize: 14,
                                   textAlign: "center",
+                                  flexDirection: "column",
                                   px: 2,
+                                  gap: 1
                                 }}
                               >
-                                Recording not available yet
+                                <span>
+                                  {!hasRec ? "Recording not uploaded"
+                                    : !isReplayAllowed ? "Replay unavailable"
+                                      : "Replay has expired"}
+                                </span>
                               </Box>
                             )}
                           </div>
@@ -347,6 +375,19 @@ export default function MyRecordingsPage() {
                               </Box>
                             )}
 
+                            {/* Duration Badge if applicable */}
+                            {isReplayAllowed && hasRec && ev.replay_availability_duration && (
+                              <Box className="mt-2">
+                                <Chip
+                                  size="small"
+                                  label={isExpired ? "Expired" : `Available for ${ev.replay_availability_duration}`}
+                                  color={isExpired ? "default" : "primary"}
+                                  variant="outlined"
+                                  className="text-xs"
+                                />
+                              </Box>
+                            )}
+
                             <Divider className="my-3" />
 
                             <Box
@@ -359,7 +400,7 @@ export default function MyRecordingsPage() {
                                 alignItems: { xs: "stretch", sm: "center" },
                               }}
                             >
-                              {hasRec ? (
+                              {canWatch ? (
                                 <>
                                   <Button
                                     size="small"
@@ -395,7 +436,7 @@ export default function MyRecordingsPage() {
                               ) : (
                                 <Chip
                                   size="small"
-                                  label="No recording yet"
+                                  label={!hasRec ? "No recording" : "Unavailable"}
                                   sx={{
                                     width: { xs: "100%", sm: "auto" },
                                     textAlign: "center",

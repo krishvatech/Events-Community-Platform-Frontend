@@ -356,6 +356,20 @@ export default function EventDetailsPage() {
                     {event.is_free ? "Free" : priceStr(event.price)}
                   </Typography>
                   <div className="mt-3 flex flex-col gap-2">
+                    {/* Replay Info Badge */}
+                    {event.replay_available && (
+                      <Box className="mt-2 mb-3 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
+                        <Typography variant="subtitle2" className="text-indigo-800 font-semibold">
+                          Replay will be available
+                        </Typography>
+                        {event.replay_availability_duration && (
+                          <Typography variant="caption" className="text-indigo-600 block mt-0.5">
+                            Accessible for: {event.replay_availability_duration}
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+
                     {canShowActiveJoin ? (
                       <Button
                         component={Link}
