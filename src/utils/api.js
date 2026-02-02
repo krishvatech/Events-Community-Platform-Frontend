@@ -169,6 +169,13 @@ apiClient.interceptors.response.use(
         }
 
         if (!refreshToken || !username) {
+          // If 403 (Forbidden) without refresh token, it's likely a permission error, not expired session.
+          // Do not logout, just fail the request.
+          if (status === 403) {
+            console.warn("[Auth] 403 Forbidden and no refresh token available. Treating as permission denied.");
+            return Promise.reject(error);
+          }
+
           console.error("[Auth] Missing refresh token or username. Logging out.");
           throw new Error("No refresh token or username available");
         }
