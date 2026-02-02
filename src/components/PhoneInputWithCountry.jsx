@@ -14,8 +14,13 @@ export default function PhoneInputWithCountry({
     error,
     helperText,
     disabled,
-    viewMode = false
+    viewMode = false,
+    size = "medium" // "medium" | "small"
 }) {
+    const isSmall = size === "small";
+    const height = isSmall ? "40px" : "auto"; // 40px matches MUI 'small' input default
+    const fontSize = isSmall ? "0.875rem" : "1rem";
+
     return (
         <Box sx={{ width: "100%" }}>
             {viewMode ? (
@@ -72,9 +77,12 @@ export default function PhoneInputWithCountry({
                         // MUI default outlined input height is roughly 56px
                         // The library's material theme handles some of this, but we reinforce it.
                         borderColor: error ? "#d32f2f" : undefined,
+                        height: height,
+                        fontSize: fontSize,
                     }}
                     containerStyle={{
                         width: "100%",
+                        height: height,
                     }}
                     dropdownStyle={{
                         zIndex: 1300, // Ensure it sits above dialogs

@@ -4122,9 +4122,27 @@ export default function ProfilePage() {
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Phones</Typography>
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {contactForm.phones.map((item, idx) => (
-                    <Grid container spacing={1} alignItems="flex-start" key={`phone-row-${idx}`}>
-                      <Grid item xs={12} sm={3}>
+                    <Stack direction="row" spacing={1} alignItems="center" key={`phone-row-${idx}`} sx={{ width: '100%' }}>
+                      <Tooltip title="Set as primary">
+                        <Radio
+                          size="small"
+                          checked={!!item.primary}
+                          onChange={() =>
+                            setContactForm((prev) => ({
+                              ...prev,
+                              phones: prev.phones.map((row, i) => ({ ...row, primary: i === idx })),
+                            }))
+                          }
+                          value="primary"
+                          name="primary-phone-radio"
+                          inputProps={{ 'aria-label': 'Primary Phone' }}
+                          sx={{ p: 0.5 }}
+                        />
+                      </Tooltip>
+
+                      <Box sx={{ flex: 1.5, minWidth: '140px' }}>
                         <PhoneInputWithCountry
+                          size="small"
                           label="Number"
                           value={item.number}
                           error={!!phoneErrors[idx]}
@@ -4139,10 +4157,12 @@ export default function ProfilePage() {
                             }
                           }}
                         />
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
+                      </Box>
+
+                      <Box sx={{ flex: 1, minWidth: '100px' }}>
                         <TextField
                           select
+                          size="small"
                           label="Type"
                           fullWidth
                           value={item.type}
@@ -4152,15 +4172,19 @@ export default function ProfilePage() {
                               phones: prev.phones.map((row, i) => (i === idx ? { ...row, type: e.target.value } : row)),
                             }))
                           }
+                          InputProps={{ style: { fontSize: "0.875rem" } }}
+                          InputLabelProps={{ style: { fontSize: "0.875rem" } }}
                         >
                           {CONTACT_PHONE_TYPES.map((opt) => (
-                            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                            <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: "0.875rem" }}>{opt.label}</MenuItem>
                           ))}
                         </TextField>
-                      </Grid>
-                      <Grid item xs={6} sm={3}>
+                      </Box>
+
+                      <Box sx={{ flex: 1, minWidth: '100px' }}>
                         <TextField
                           select
+                          size="small"
                           label="Visibility"
                           fullWidth
                           value={item.visibility}
@@ -4170,34 +4194,19 @@ export default function ProfilePage() {
                               phones: prev.phones.map((row, i) => (i === idx ? { ...row, visibility: e.target.value } : row)),
                             }))
                           }
+                          InputProps={{ style: { fontSize: "0.875rem" } }}
+                          InputLabelProps={{ style: { fontSize: "0.875rem" } }}
                         >
                           {CONTACT_VISIBILITY_OPTIONS.map((opt) => (
-                            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                            <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: "0.875rem" }}>{opt.label}</MenuItem>
                           ))}
                         </TextField>
-                      </Grid>
-                      <Grid item xs={8} sm={2}>
-                        <FormControlLabel
-                          control={
-                            <Radio
-                              checked={!!item.primary}
-                              onChange={() =>
-                                setContactForm((prev) => ({
-                                  ...prev,
-                                  phones: prev.phones.map((row, i) => ({ ...row, primary: i === idx })),
-                                }))
-                              }
-                            />
-                          }
-                          label="Primary"
-                        />
-                      </Grid>
-                      <Grid item xs={4} sm={1}>
-                        <IconButton onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                      </Grid>
-                    </Grid>
+                      </Box>
+
+                      <IconButton size="small" onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
                   ))}
                   <Button
                     variant="outlined"
