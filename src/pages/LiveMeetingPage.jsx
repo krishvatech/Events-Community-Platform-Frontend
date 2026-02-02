@@ -2547,15 +2547,29 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!mainDyteMeeting?.self) return;
 
-    if (isInBreakoutRoom) {
-      // Mute main room to prevent echo
-      mainDyteMeeting.self.disableAudio();
-      console.log("[MainRoom] Muted audio (in breakout)");
-    } else {
-      // Restore main room audio when back in main
-      mainDyteMeeting.self.enableAudio();
-      console.log("[MainRoom] Enabled audio (back in main)");
-    }
+    let isMounted = true;
+
+    (async () => {
+      try {
+        if (isInBreakoutRoom) {
+          // Mute main room to prevent echo
+          await mainDyteMeeting.self.disableAudio?.();
+          if (isMounted) console.log("[MainRoom] Muted audio (in breakout)");
+        } else {
+          // Restore main room audio when back in main
+          await mainDyteMeeting.self.enableAudio?.();
+          if (isMounted) console.log("[MainRoom] Enabled audio (back in main)");
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.warn("[MainRoom] Failed to toggle audio:", error?.message || error);
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
   }, [isInBreakoutRoom, mainDyteMeeting]);
 
   // ---------- MUST join Dyte room (custom UI doesn't auto-join) ----------
@@ -3901,8 +3915,37 @@ export default function NewLiveMeeting() {
     return cid;
   }, [eventId]);
 
+  const ensureSeatedInLounge = useCallback(async () => {
+    if (!eventId) return null;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/lounge/ensure-seated/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ table_id: activeTableId || undefined }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        console.warn("[LoungeSeat] Failed to ensure seated:", data?.detail || "Unknown error");
+        throw new Error(data?.detail || "Failed to seat in lounge.");
+      }
+      console.log("[LoungeSeat] User seated:", data);
+      return data;
+    } catch (error) {
+      console.warn("[LoungeSeat] Error ensuring seated:", error?.message || error);
+      throw error;
+    }
+  }, [eventId, activeTableId]);
+
   const ensureLoungeConversation = useCallback(async () => {
     if (!activeTableId) return null;
+
+    // First ensure user is seated in the lounge
+    try {
+      await ensureSeatedInLounge();
+    } catch (error) {
+      throw new Error("Must be seated in lounge to access chat.");
+    }
+
     const res = await fetch(toApiUrl("messaging/conversations/ensure-lounge/"), {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeader() },
@@ -3916,7 +3959,7 @@ export default function NewLiveMeeting() {
     if (!cid) throw new Error("Room chat conversation missing.");
     setRoomChatConversationId(cid);
     return cid;
-  }, [activeRoomLabel, activeTableId]);
+  }, [activeRoomLabel, activeTableId, ensureSeatedInLounge]);
 
   const ensureActiveConversation = useCallback(async () => {
     if (isRoomChatActive) return ensureLoungeConversation();
@@ -4180,15 +4223,29 @@ export default function NewLiveMeeting() {
       if (!alive) return;
       if (!getToken()) return;
 
-      const unread = await fetchChatUnread();
+      try {
+        const unread = await fetchChatUnread();
 
-      // If user is actively viewing chat, auto-refresh and clear unread
-      if (isChatActive) {
-        const cid = activeChatConversationId || (await ensureActiveConversation());
-        if (cid) {
-          await fetchChatMessages(cid);
-          await markChatAllRead(cid);
+        // If user is actively viewing chat, auto-refresh and clear unread
+        if (isChatActive) {
+          try {
+            const cid = activeChatConversationId || (await ensureActiveConversation());
+            if (cid) {
+              await fetchChatMessages(cid);
+              await markChatAllRead(cid);
+            }
+          } catch (error) {
+            // Handle "not seated in room" error gracefully - user may still be joining the lounge
+            if (error?.message?.includes("not seated")) {
+              console.debug("[ChatSync] User not yet seated in lounge, skipping chat sync");
+              return; // Skip this tick, will retry next time
+            }
+            // Log other errors but don't crash
+            console.warn("[ChatSync] Failed to ensure conversation:", error?.message || error);
+          }
         }
+      } catch (error) {
+        console.warn("[ChatSync] Tick failed:", error?.message || error);
       }
     };
 
