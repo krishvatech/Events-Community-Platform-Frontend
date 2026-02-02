@@ -126,9 +126,9 @@ window.fetch = async (...args) => {
                 console.error("[Global Fetch] Retry failed with 401 after refresh. User likely suspended.");
                 clearAuth();
             } else if (retryResponse.status === 403) {
-                // 403 after refresh = actual permission/ban issue, not token expiry
-                console.warn("[Global Fetch] Retry failed with 403 after refresh. User access denied (banned/restricted).");
-                clearAuth();
+                // 403 after refresh = permission denied for this specific resource, not a token issue
+                // Keep user logged in and let frontend handle the permission error
+                console.warn("[Global Fetch] Retry failed with 403 after refresh. User lacks permission for this resource.");
             }
 
             return retryResponse;

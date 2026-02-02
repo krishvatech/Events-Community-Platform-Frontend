@@ -7,18 +7,18 @@ export function saveLoginPayload(data, { email, firstName } = {}) {
     data?.first_name ||
     data?.profile?.first_name ||
     "";
-  // Fallbacks if backend didn’t send a name:
+  // Fallbacks if backend didn't send a name:
   if (!name) name = firstName || "";               // from your login form (if you have it)
   if (!name && email) name = email.split("@")[0];  // use email prefix as last resort
   // Save what you need
   const access = data?.access_token || data?.id_token || data?.access || data?.token || "";
   if (access) localStorage.setItem("access_token", access);
   if (data?.refresh) localStorage.setItem("refresh_token", data.refresh);
-  sessionStorage.setItem("user_name", name || "");
+  localStorage.setItem("user_name", name || "");
   if (data?.user) sessionStorage.setItem("user", JSON.stringify(data.user));
 }
 export function getUserName() {
-  return sessionStorage.getItem("user_name") || "";
+  return localStorage.getItem("user_name") || sessionStorage.getItem("user_name") || "";
 }
 export function clearLogin() {
   sessionStorage.clear();
@@ -29,6 +29,7 @@ export function clearAuth() {
     // localStorage variants you use
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user_name");
     localStorage.removeItem("user");
     localStorage.removeItem("loginPayload");
     localStorage.removeItem("unread_messages");
@@ -36,6 +37,7 @@ export function clearAuth() {
 
     // sessionStorage variants you use
     sessionStorage.removeItem("user");
+    sessionStorage.removeItem("user_name");
     sessionStorage.removeItem("refresh");
   } catch { }
 
