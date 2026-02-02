@@ -94,6 +94,9 @@ import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
 import BannedParticipantsDialog from "../components/live-meeting/BannedParticipantsDialog.jsx";
+import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
+import { getRefreshToken } from "../utils/api.js";
+import { getUserName } from "../utils/authStorage.js";
 
 // ================ Custom Lounge Icon ================
 const SocialLoungeIcon = (props) => (
@@ -315,12 +318,22 @@ function getParticipantUserKey(participant) {
 }
 
 
-function ParticipantVideo({ participant, meeting, isSelf = false }) {
+function ParticipantVideo({ participant, meeting, isSelf = false, expectedUserId = null }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el || !participant || !meeting) return;
+
+    console.log(
+      "[ParticipantVideo] Registering participant:",
+      participant?.id,
+      "(",
+      participant?.name,
+      ")",
+      "isSelf:",
+      isSelf
+    );
 
     let cleanup = () => { };
 
@@ -329,27 +342,77 @@ function ParticipantVideo({ participant, meeting, isSelf = false }) {
     el.playsInline = true;
     el.muted = true; // always mute video elements; audio comes from DyteParticipantsAudio
 
+    // Track ownership verification
+    if (expectedUserId && !isSelf) {
+      const participantUserId = getParticipantUserKey(participant);
+      const expectedKey = `id:${expectedUserId}`;
+
+      if (participantUserId && participantUserId !== expectedKey) {
+        console.warn(
+          `[ParticipantVideo] Mismatch! Expected ${expectedKey}, got ${participantUserId}`
+        );
+        return () => {}; // Don't bind
+      }
+
+      console.log(`[ParticipantVideo] Verified: ${participantUserId}`);
+    }
 
     try {
-      // ✅ BEST for self (official API on meeting.self) :contentReference[oaicite:0]{index=0}
+      // ✅ BEST for self (official API on meeting.self)
       if (isSelf && typeof meeting.self?.registerVideoElement === "function") {
+        console.log("[ParticipantVideo] Using meeting.self.registerVideoElement");
         meeting.self.registerVideoElement(el);
-        cleanup = () => meeting.self?.deregisterVideoElement?.(el);
+        cleanup = () => {
+          console.log(
+            "[ParticipantVideo] Deregistering self video element"
+          );
+          meeting.self?.deregisterVideoElement?.(el);
+        };
       }
       // ✅ Some SDK versions expose registerVideoElement on participant too
       else if (typeof participant.registerVideoElement === "function") {
+        console.log(
+          "[ParticipantVideo] Using participant.registerVideoElement for",
+          participant?.name,
+          "videoEnabled:",
+          participant.videoEnabled
+        );
         participant.registerVideoElement(el);
-        cleanup = () => participant.deregisterVideoElement?.(el);
+        cleanup = () => {
+          console.log(
+            "[ParticipantVideo] Deregistering participant video element for",
+            participant?.name
+          );
+          participant.deregisterVideoElement?.(el);
+        };
       }
       // ✅ Fallback: use videoTrack style APIs if available
       else {
         const track = participant.videoTrack || participant.video;
         if (track?.play) {
+          console.log("[ParticipantVideo] Using track.play for", participant?.name);
           track.play(el);
-          cleanup = () => track.stop?.(el);
+          cleanup = () => {
+            console.log("[ParticipantVideo] Stopping track for", participant?.name);
+            track.stop?.(el);
+          };
         } else if (track?.attach) {
+          console.log("[ParticipantVideo] Using track.attach for", participant?.name);
           track.attach(el);
-          cleanup = () => track.detach?.(el);
+          cleanup = () => {
+            console.log(
+              "[ParticipantVideo] Detaching track for",
+              participant?.name
+            );
+            track.detach?.(el);
+          };
+        } else {
+          console.warn(
+            "[ParticipantVideo] No video track available for",
+            participant?.name,
+            "Participant object keys:",
+            Object.keys(participant || {}).join(", ")
+          );
         }
       }
     } catch (e) {
@@ -357,9 +420,16 @@ function ParticipantVideo({ participant, meeting, isSelf = false }) {
     }
 
     return () => {
+      console.log(
+        "[ParticipantVideo] Cleanup for participant:",
+        participant?.id,
+        "(",
+        participant?.name,
+        ")"
+      );
       try { cleanup(); } catch { }
     };
-  }, [participant, meeting, isSelf]);
+  }, [participant, meeting, isSelf, expectedUserId]);
 
   return (
     <Box
@@ -1123,6 +1193,56 @@ export default function NewLiveMeeting() {
     }
   };
 
+  // ✅ Proactive Token Refresh: Keep Cognito tokens alive during live meeting
+  // This prevents auto-logout due to token expiration during long meetings
+  useEffect(() => {
+    const TOKEN_REFRESH_INTERVAL = 15 * 60 * 1000; // Refresh every 15 minutes (Cognito tokens are typically 1 hour)
+
+    const refreshTokenProactively = async () => {
+      try {
+        const refreshToken = getRefreshToken();
+        let username = getUserName();
+
+        // Fallback: Try getting username from localStorage 'user' object
+        if (!username) {
+          try {
+            const u = JSON.parse(localStorage.getItem("user") || "{}");
+            username = u.username || u.email || "";
+          } catch { }
+        }
+
+        if (!refreshToken || !username) {
+          console.log("[LiveMeeting] Cannot refresh token: missing refresh token or username");
+          return;
+        }
+
+        console.log("[LiveMeeting] Proactively refreshing Cognito token...");
+
+        const { idToken, refreshToken: newRefresh } = await cognitoRefreshSession({
+          username,
+          refreshToken,
+        });
+
+        // Update localStorage with new tokens
+        localStorage.setItem("access_token", idToken);
+        if (newRefresh) {
+          localStorage.setItem("refresh_token", newRefresh);
+        }
+
+        console.log("[LiveMeeting] Token refresh successful! Next refresh in 15 minutes.");
+      } catch (error) {
+        console.error("[LiveMeeting] Token refresh failed:", error);
+        // If refresh fails, user will be redirected on next API call
+      }
+    };
+
+    // Refresh immediately on mount, then refresh every 15 minutes
+    refreshTokenProactively();
+    const refreshInterval = setInterval(refreshTokenProactively, TOKEN_REFRESH_INTERVAL);
+
+    return () => clearInterval(refreshInterval);
+  }, []);
+
   // keep icon state in sync (Esc key, browser UI, etc.)
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(Boolean(getFullscreenElement()));
@@ -1350,6 +1470,38 @@ export default function NewLiveMeeting() {
     };
   }, [enumerateDevices]);
 
+  // Device state reconciliation
+  useEffect(() => {
+    if (!dyteMeeting || !initDone) return;
+
+    const reconcile = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasVideo = devices.some((d) => d.kind === "videoinput");
+        const dyteEnabled = dyteMeeting.self?.videoEnabled || false;
+
+        if (!hasVideo && dyteEnabled) {
+          console.warn("[DeviceState] Mismatch: Video on but no cameras");
+          await dyteMeeting.self.disableVideo();
+          console.log("[DeviceState] Auto-disabled video");
+        }
+
+        console.log("[DeviceState]", { hasVideo, dyteEnabled });
+      } catch (err) {
+        console.error("[DeviceState] Reconciliation failed:", err);
+      }
+    };
+
+    reconcile();
+
+    const handler = () => reconcile();
+    dyteMeeting.self.on("videoUpdate", handler);
+
+    return () => {
+      dyteMeeting.self.off("videoUpdate", handler);
+    };
+  }, [dyteMeeting, initDone]);
+
   /**
    * Switch to a different audio device
    * Uses replaceTrack for smooth transition without reconnecting
@@ -1554,8 +1706,12 @@ export default function NewLiveMeeting() {
           ignoreRoomLeftRef.current = true;
           try {
             await dyteMeeting.leaveRoom();
+            // Clear video elements
+            document.querySelectorAll("video").forEach((v) => {
+              if (v.srcObject) v.srcObject = null;
+            });
             // Wait a bit for SDK to clean up
-            await new Promise(r => setTimeout(r, 800));
+            await new Promise((r) => setTimeout(r, 100));
           } catch (e) {
             console.warn("[LiveMeeting] Error leaving previous room:", e);
           }
@@ -1606,7 +1762,11 @@ export default function NewLiveMeeting() {
           ignoreRoomLeftRef.current = true;
           try {
             await dyteMeeting.leaveRoom();
-            await new Promise(r => setTimeout(r, 800));
+            // Clear video elements
+            document.querySelectorAll("video").forEach((v) => {
+              if (v.srcObject) v.srcObject = null;
+            });
+            await new Promise((r) => setTimeout(r, 100));
           } catch (e) {
             console.warn("[LiveMeeting] Error leaving breakout:", e);
           }
@@ -2945,6 +3105,11 @@ export default function NewLiveMeeting() {
       });
     });
 
+    // Debug: Log lounge occupants
+    if (loungeOccupantIds.size > 0 && participantsTick % 5 === 0) {
+      console.log(`[LoungeSync] Lounge occupants detected: ${Array.from(loungeOccupantIds).join(", ")}`);
+    }
+
     const list = [];
 
     // Prefer self, then joined, then fallback observed entries
@@ -2990,7 +3155,8 @@ export default function NewLiveMeeting() {
       const isOccupied = loungeOccupantIds.has(clientSpecificId);
       p.isOccupyingLounge = isOccupied;
 
-      if (isHost && idx % 10 === 0 && participantsTick % 10 === 0) {
+      // Log for everyone (not just host) to debug lounge sync
+      if (idx % 3 === 0 && participantsTick % 5 === 0) {
         console.log(`[LoungeIsolation] ${p.name}: key=${userKey}, extractedID=${clientSpecificId}, inLounge=${isOccupied}`);
       }
 
@@ -3184,20 +3350,157 @@ export default function NewLiveMeeting() {
   // Pinned “host” view data
   const latestPinnedHost = useMemo(() => {
     // ✅ FORCE for Host: Always use self as the pinned host source of truth
+    // UNLESS the host is occupying the lounge, then pin another participant instead
     if (isHost && dyteMeeting?.self) {
+      const selfParticipant = participants.find(x => x.id === dyteMeeting.self.id);
+
+      // If host is in lounge, find another participant to pin instead
+      if (selfParticipant?.isOccupyingLounge) {
+        console.log("[LoungePinning] Host is in lounge, looking for alternative participant from main room...", {
+          selfId: selfParticipant.id,
+          selfName: selfParticipant.name
+        });
+
+        // ✅ FIX: Filter out lounge participants using isOccupyingLounge flag
+        // Don't show lounge participants in main area, only main area participants
+        const mainAreaParticipants = participants.filter(
+          x =>
+            x.id !== dyteMeeting.self.id &&  // Exclude self (host in lounge)
+            !x.isOccupyingLounge &&           // Only show main area participants
+            x.id                              // Must have valid ID
+        );
+        console.log("[LoungePinning] Main area participants available:", mainAreaParticipants.map(p => ({
+          id: p.id,
+          name: p.name,
+          isOccupyingLounge: p.isOccupyingLounge
+        })));
+
+        if (mainAreaParticipants.length > 0) {
+          console.log("[LoungePinning] Host in lounge: pinning main area participant:", mainAreaParticipants[0].name);
+          return mainAreaParticipants[0];
+        }
+        // If no main area participants available, return null (show welcome screen)
+        console.log("[LoungePinning] Host in lounge: no main area participants available, showing welcome screen");
+        return null;
+      }
       return dyteMeeting.self;
     }
 
     let p = pinnedHost;
-    // If in breakout and no official host pinned, find first other person
-    if (!p && isBreakout) {
-      // ✅ FIX: Only show other participants if they exist. If alone, return null for welcome screen.
-      const otherParticipants = getJoinedParticipants().filter(x => x.id !== dyteMeeting?.self?.id);
-      if (otherParticipants.length > 0) {
-        p = otherParticipants[0];
+
+    // ✅ NEW: If pinned host is occupying lounge, find another participant to show audience instead
+    if (p && !isHost) {
+      const pinnedHostParticipant = participants.find(x => x.id === p.id);
+
+      if (pinnedHostParticipant?.isOccupyingLounge) {
+        console.log("[LoungePinning-Audience] Pinned host IS in lounge, finding alternative...");
+
+        // ✅ Use participants array instead of getJoinedParticipants() to access all observed participants
+        // Filter to:
+        // 1. Exclude participants who are occupying lounge (not in main room)
+        // 2. Exclude pinned host and self
+        // This shows participants who are in the main room and observable
+
+        // Debug: Log all available participants and their lounge status
+        console.log("[LoungePinning-Audience] All available participants:", participants.map(x => ({
+          id: x.id,
+          name: x.name,
+          isOccupyingLounge: x.isOccupyingLounge,
+          isSelf: x.id === dyteMeeting?.self?.id,
+          isPinned: x.id === p.id
+        })));
+
+        // First, try to find participants who are NOT self and NOT in lounge
+        const alternativeParticipants = participants.filter(
+          x =>
+            x.id !== p.id &&
+            x.id !== dyteMeeting?.self?.id &&
+            !x.isOccupyingLounge && // Don't show lounge participants in main area
+            x.id // Must have valid id
+        );
+
+        console.log("[LoungePinning] Filtered alternative participants:", alternativeParticipants.map(x => ({
+          id: x.id,
+          name: x.name
+        })));
+
+        if (alternativeParticipants.length > 0) {
+          console.log("[LoungePinning] Audience: Pinning alternative participant:", alternativeParticipants[0].name);
+          p = alternativeParticipants[0];
+        } else {
+          // Fallback: If all other participants are in lounge, show self (the viewer) if available in main room
+          const selfParticipant = participants.find(x => x.id === dyteMeeting?.self?.id);
+          if (selfParticipant && !selfParticipant.isOccupyingLounge) {
+            console.log("[LoungePinning] Audience: No other participants in main room, showing self:", selfParticipant.name);
+            p = selfParticipant;
+          } else {
+            console.log("[LoungePinning] Audience: No participants in main room available (all are lounge occupants), showing welcome screen");
+            return null;
+          }
+        }
+      } else {
+        console.log("[LoungePinning-Audience] Pinned host is NOT in lounge or not found:", {
+          pinnedHostFound: !!pinnedHostParticipant,
+          pinnedHostInLounge: pinnedHostParticipant?.isOccupyingLounge
+        });
       }
-      // If no other participants, p remains null - will trigger welcome/placeholder UI
     }
+
+    // If in breakout and no official host pinned, find first other person from main area
+    if (!p && isBreakout) {
+      // ✅ FIX: Only show main area participants (not occupying lounge)
+      const mainAreaParticipants = getJoinedParticipants().filter(
+        x =>
+          x.id !== dyteMeeting?.self?.id &&
+          !participants.find(p => p.id === x.id)?.isOccupyingLounge
+      );
+      if (mainAreaParticipants.length > 0) {
+        console.log("[LoungePinning] Breakout fallback: Found main area participant:", mainAreaParticipants[0].name);
+        p = mainAreaParticipants[0];
+      } else {
+        // No main area participants available, will show welcome screen
+        console.log("[LoungePinning] Breakout fallback: No main area participants available");
+      }
+      // If no main area participants, p remains null - will trigger welcome/placeholder UI
+    }
+
+    // ✅ NEW: If pinned participant is self and in lounge/breakout, show someone else instead
+    if (p && isBreakout && p.id === dyteMeeting?.self?.id) {
+      console.log("[LoungePinning] Breakout: Self is pinned, looking for main area participant...", {
+        selfId: dyteMeeting?.self?.id,
+        selfName: dyteMeeting?.self?.name,
+        pinnedId: p.id,
+        isBreakout
+      });
+
+      // First, try to find participants in the main area (not occupying lounge)
+      // Use participants array which has lounge status information
+      const mainAreaParticipants = participants.filter(
+        x =>
+          x.id !== dyteMeeting?.self?.id &&
+          !x.isOccupyingLounge && // Show only main area participants
+          x.id
+      );
+
+      console.log("[LoungePinning] Breakout: Main area participants available:", mainAreaParticipants.map(x => ({ id: x.id, name: x.name })));
+
+      if (mainAreaParticipants.length > 0) {
+        console.log("[LoungePinning] Breakout: Switching from self to main area participant:", mainAreaParticipants[0].name);
+        p = mainAreaParticipants[0];
+      } else {
+        // No main area participants - fallback to other lounge participants
+        const otherLoungeParticipants = getJoinedParticipants().filter(x => x.id !== dyteMeeting?.self?.id);
+        console.log("[LoungePinning] Breakout: No main area participants, other lounge participants:", otherLoungeParticipants.map(x => ({ id: x.id, name: x.name })));
+        if (otherLoungeParticipants.length > 0) {
+          console.log("[LoungePinning] Breakout: Showing other lounge participant:", otherLoungeParticipants[0].name);
+          p = otherLoungeParticipants[0];
+        } else {
+          console.log("[LoungePinning] Breakout: No other participants available, keeping self");
+          // Keep showing self if no other participants available
+        }
+      }
+    }
+
     if (!p) return null;
 
     // ✅ FIX: If p is self, return the current dyteMeeting.self which is always fresh
@@ -3210,8 +3513,25 @@ export default function NewLiveMeeting() {
     const fresh = getJoinedParticipants().find((x) => x.id === p.id);
 
     // 2. Return the fresh object if found, otherwise fallback to the state one
-    return fresh || p;
-  }, [pinnedHost, participantsTick, getJoinedParticipants, isBreakout, dyteMeeting?.self, camOn, isHost]);
+    const result = fresh || p;
+
+    // Debug: Log what we're about to return
+    if (fresh) {
+      console.log("[latestPinnedHost] Using fresh version:", {
+        id: fresh.id,
+        name: fresh.name,
+        videoEnabled: fresh.videoEnabled,
+      });
+    } else {
+      console.log("[latestPinnedHost] Using fallback (no fresh version):", {
+        id: p.id,
+        name: p.name,
+        videoEnabled: p.videoEnabled,
+      });
+    }
+
+    return result;
+  }, [pinnedHost, participantsTick, getJoinedParticipants, isBreakout, dyteMeeting?.self, camOn, isHost, participants]);
 
   // Pinned “host” view data
   const meetingMeta = useMemo(
@@ -3254,6 +3574,19 @@ export default function NewLiveMeeting() {
 
   // ✅ Now this will correctly see 'true' when the host turns the camera on
   const pinnedHasVideo = Boolean(pinnedRaw?.videoEnabled);
+
+  // Debug: Log when pinnedRaw changes
+  useEffect(() => {
+    console.log(
+      "[pinnedRaw] Changed to:",
+      pinnedRaw?.id,
+      "(",
+      pinnedRaw?.name,
+      ")",
+      "videoEnabled:",
+      pinnedRaw?.videoEnabled
+    );
+  }, [pinnedRaw?.id, pinnedRaw?.name, pinnedRaw?.videoEnabled]);
 
 
 
@@ -6271,6 +6604,7 @@ export default function NewLiveMeeting() {
                     />
                   ) : (
                     <ParticipantVideo
+                      key={pinnedRaw?.id}
                       participant={pinnedRaw}
                       meeting={dyteMeeting}
                       isSelf={pinnedIsSelf}
@@ -7240,7 +7574,12 @@ export default function NewLiveMeeting() {
               height: 180,
             }}
           >
-            <MainRoomPeek mainDyteMeeting={mainDyteMeeting} isInBreakout={isInBreakoutRoom} />
+            <MainRoomPeek
+              mainDyteMeeting={mainDyteMeeting}
+              isInBreakout={isInBreakoutRoom}
+              pinnedParticipantId={pinnedRaw?.id}
+              loungeParticipantsData={participants.filter(p => p.isOccupyingLounge)}
+            />
           </Box>
         )}
 

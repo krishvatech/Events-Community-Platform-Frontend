@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 
-export default function MainRoomPeek({ mainDyteMeeting, isInBreakout }) {
+export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedParticipantId, loungeParticipantsData }) {
     const [primaryParticipant, setPrimaryParticipant] = useState(null);
     const videoRef = useRef(null);
 
@@ -9,36 +9,79 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout }) {
         if (!mainDyteMeeting?.participants) return;
 
         const updatePrimaryParticipant = () => {
-            // Try to find the active speaker first
+            const allParticipants = mainDyteMeeting.participants.joined.toArray();
+
+            // ✅ PRIORITY 1: Use pinned participant if available and in main room
+            if (pinnedParticipantId) {
+                console.log('[MainRoomPeek] Looking for pinned participant:', pinnedParticipantId);
+                const pinnedParticipant = allParticipants.find(p => p.id === pinnedParticipantId);
+                if (pinnedParticipant) {
+                    console.log('[MainRoomPeek] Found pinned participant:', pinnedParticipant.name);
+                    setPrimaryParticipant(pinnedParticipant);
+                    return;
+                } else {
+                    console.log('[MainRoomPeek] Pinned participant not in main room, falling back to next priority');
+                }
+            }
+
+            // ✅ PRIORITY 2: Find first participant NOT in lounge (main area participants only)
+            if (loungeParticipantsData && loungeParticipantsData.length > 0) {
+                console.log('[MainRoomPeek] Filtering out lounge participants:', loungeParticipantsData);
+                const loungeIds = new Set(loungeParticipantsData.map(p => p.id));
+                const mainAreaParticipant = allParticipants.find(p => !loungeIds.has(p.id));
+                if (mainAreaParticipant) {
+                    console.log('[MainRoomPeek] Found main area participant:', mainAreaParticipant.name);
+                    setPrimaryParticipant(mainAreaParticipant);
+                    return;
+                }
+            }
+
+            // ✅ PRIORITY 3: Try to find the active speaker
             const activeSpeaker = mainDyteMeeting.participants.activeSpeaker;
             if (activeSpeaker) {
+                console.log('[MainRoomPeek] Using active speaker:', activeSpeaker.name);
                 setPrimaryParticipant(activeSpeaker);
                 return;
             }
 
-            // Otherwise, find the host/admin
-            const host = mainDyteMeeting.participants.joined.toArray().find(p =>
-                p.presetName?.toLowerCase().includes('host') ||
-                p.presetName?.toLowerCase().includes('admin') ||
-                p.presetName?.toLowerCase().includes('webinar_presenter') ||
-                p.presetName?.toLowerCase().includes('publisher')
+            // ✅ PRIORITY 4: Find the host/admin (only if not in lounge)
+            const loungeIds = loungeParticipantsData ? new Set(loungeParticipantsData.map(p => p.id)) : new Set();
+            const host = allParticipants.find(p =>
+                !loungeIds.has(p.id) &&
+                (p.presetName?.toLowerCase().includes('host') ||
+                    p.presetName?.toLowerCase().includes('admin') ||
+                    p.presetName?.toLowerCase().includes('webinar_presenter') ||
+                    p.presetName?.toLowerCase().includes('publisher'))
             );
 
             if (host) {
+                console.log('[MainRoomPeek] Using host:', host.name);
                 setPrimaryParticipant(host);
                 return;
             }
 
-            // Fallback to first participant with video enabled
-            const videoParticipant = mainDyteMeeting.participants.joined.toArray().find(p => p.videoEnabled);
+            // ✅ PRIORITY 5: Fallback to first participant with video enabled (not in lounge)
+            const videoParticipant = allParticipants.find(p =>
+                !loungeIds.has(p.id) && p.videoEnabled
+            );
             if (videoParticipant) {
+                console.log('[MainRoomPeek] Using video participant:', videoParticipant.name);
                 setPrimaryParticipant(videoParticipant);
                 return;
             }
 
-            // Last resort: any participant
-            const anyParticipant = mainDyteMeeting.participants.joined.toArray()[0];
-            setPrimaryParticipant(anyParticipant || null);
+            // ✅ PRIORITY 6: Last resort: any main area participant
+            const anyParticipant = allParticipants.find(p => !loungeIds.has(p.id));
+            if (anyParticipant) {
+                console.log('[MainRoomPeek] Using any main area participant:', anyParticipant.name);
+                setPrimaryParticipant(anyParticipant);
+                return;
+            }
+
+            // If only lounge participants, show them as fallback
+            const fallbackParticipant = allParticipants[0];
+            console.log('[MainRoomPeek] Fallback to first available:', fallbackParticipant?.name);
+            setPrimaryParticipant(fallbackParticipant || null);
         };
 
         updatePrimaryParticipant();
@@ -60,7 +103,7 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout }) {
             mainDyteMeeting.participants.removeListener('activeSpeakerChanged', handleActiveSpeakerChanged);
             mainDyteMeeting.participants.joined.removeListener('videoUpdate', handleVideoUpdate);
         };
-    }, [mainDyteMeeting]);
+    }, [mainDyteMeeting, pinnedParticipantId, loungeParticipantsData]);
 
     // Attach video track or screen share to video element
     useEffect(() => {
