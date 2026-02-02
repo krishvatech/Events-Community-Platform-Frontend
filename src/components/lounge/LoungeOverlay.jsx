@@ -191,6 +191,12 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         setLoungeOpenStatus(msg.lounge_open_status);
                     }
                     setLoading(false);
+                } else if (msg.type === "breakout_end") {
+                    // Host has ended all breakouts - refresh lounge state
+                    console.log("[Lounge] Received breakout_end - refreshing table state");
+                    setBreakoutTables([]); // Clear all breakout tables
+                    // Trigger a fresh fetch to ensure consistency
+                    fetchLoungeState();
                 } else if (msg.type === "error") {
                     console.error("[Lounge] Backend Error:", msg.message);
                 }

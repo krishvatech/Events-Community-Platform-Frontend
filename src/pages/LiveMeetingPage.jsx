@@ -351,7 +351,7 @@ function ParticipantVideo({ participant, meeting, isSelf = false, expectedUserId
         console.warn(
           `[ParticipantVideo] Mismatch! Expected ${expectedKey}, got ${participantUserId}`
         );
-        return () => {}; // Don't bind
+        return () => { }; // Don't bind
       }
 
       console.log(`[ParticipantVideo] Verified: ${participantUserId}`);
@@ -1383,6 +1383,7 @@ export default function NewLiveMeeting() {
   const [eventTitle, setEventTitle] = useState("Live Meeting");
   const [isBreakout, setIsBreakout] = useState(false);
   const [activeTableId, setActiveTableId] = useState(null);
+  const activeTableIdRef = useRef(null); // ✅ Ref for socket access
   const [activeTableName, setActiveTableName] = useState("");
   const [activeTableLogoUrl, setActiveTableLogoUrl] = useState(""); // ✅ Store table logo
   const [eventData, setEventData] = useState(null); // ✅ Store full event data (images, timezone, etc.)
@@ -1399,6 +1400,7 @@ export default function NewLiveMeeting() {
     [loungeTables]
   );
 
+
   const [scheduledLabel, setScheduledLabel] = useState("--");
   const [durationLabel, setDurationLabel] = useState("--");
 
@@ -1411,6 +1413,7 @@ export default function NewLiveMeeting() {
   const [mainDyteMeeting, initMainMeeting] = useDyteClient();
   const [mainRoomAuthToken, setMainRoomAuthToken] = useState(null);
   const [isInBreakoutRoom, setIsInBreakoutRoom] = useState(false);
+  const isInBreakoutRoomRef = useRef(false); // ✅ Ref for socket access
 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
@@ -1695,6 +1698,8 @@ export default function NewLiveMeeting() {
     [loungeTables]
   );
 
+  const applyBreakoutTokenRef = useRef(null);
+
   const applyBreakoutToken = useCallback(
     async (newToken, tableId, tableName, logoUrl) => {
       if (newToken) {
@@ -1786,12 +1791,37 @@ export default function NewLiveMeeting() {
         setActiveTableLogoUrl(""); // ✅ Clear logo when returning to main meeting
         setRoomChatConversationId(null);
         console.log("[LiveMeeting] Successfully returned to main meeting");
+
+        // ✅ Force refresh of video subscriptions for all participants
+        // This ensures all returned participants' streams are properly subscribed
+        if (dyteMeeting && typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
+          console.log("[LiveMeeting] Forcing video stream refresh after returning to main");
+          try {
+            await dyteMeeting.participants.videoSubscribed.refresh();
+            console.log("[LiveMeeting] Video streams refreshed successfully");
+          } catch (e) {
+            console.warn("[LiveMeeting] Video subscription refresh failed (non-critical):", e?.message);
+          }
+        }
       } else {
         console.warn("[LiveMeeting] No main token available to return to!");
       }
     },
     [dyteMeeting, isBreakout, mainRoomAuthToken, mainDyteMeeting, initMainMeeting]
   );
+
+  // ✅ Keep refs in sync for WebSocket handlers to avoid stale closures
+  useEffect(() => {
+    isInBreakoutRoomRef.current = isInBreakoutRoom;
+  }, [isInBreakoutRoom]);
+
+  useEffect(() => {
+    activeTableIdRef.current = activeTableId;
+  }, [activeTableId]);
+
+  useEffect(() => {
+    applyBreakoutTokenRef.current = applyBreakoutToken;
+  }, [applyBreakoutToken]);
 
 
   const handleEnterBreakout = async (tableId) => {
@@ -2287,6 +2317,26 @@ export default function NewLiveMeeting() {
         } else if (msg.type === "breakout_announcement") {
           setBreakoutAnnouncement(msg.message);
           setShowBreakoutAnnouncement(true);
+        } else if (msg.type === "breakout_end") {
+          // Host has ended all breakouts - return to main room
+          console.log("[MainSocket] Received breakout_end - host ended all breakouts");
+          // Check both isInBreakoutRoom state AND if user has an active table assigned
+          // ✅ Use Refs to access current state inside stale closure
+          const inBreakout = isInBreakoutRoomRef.current;
+          const userTable = activeTableIdRef.current;
+
+          if (inBreakout || userTable) {
+            console.log(`[MainSocket] User was in breakout (isInBreakoutRoom=${inBreakout}, activeTableId=${userTable}) - returning to main room`);
+            // Asynchronously return to main room with proper stream re-subscription
+            // ✅ Use function Ref to ensure we call the latest version with fresh closures
+            if (applyBreakoutTokenRef.current) {
+              applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+                console.error("[MainSocket] Error returning to main room:", e);
+              });
+            }
+          } else {
+            console.log("[MainSocket] Not in breakout, refreshing lounge state");
+          }
         } else if (msg.type === "lounge_state" || msg.type === "welcome") {
           if (msg.online_users) setOnlineUsers(msg.online_users);
           const tableState =
@@ -2453,6 +2503,10 @@ export default function NewLiveMeeting() {
           setMainRoomAuthToken(authToken);
         }
 
+        // Update breakout status IMMEDIATELY so UI reflects the change
+        // before waiting for the potentially slow Dyte init
+        setIsInBreakoutRoom(isBreakout);
+
         // Initialize active meeting (main or breakout)
         await initMeeting({
           authToken,
@@ -2461,9 +2515,6 @@ export default function NewLiveMeeting() {
             video: isBreakout || role === "publisher",
           },
         });
-
-        // Update breakout status
-        setIsInBreakoutRoom(isBreakout);
 
         if (!cancelled) setInitDone(true);
       } catch (e) {
