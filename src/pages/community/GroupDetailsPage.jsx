@@ -29,6 +29,10 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
+import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 // -----------------------------------------------------------------------------
@@ -1752,6 +1756,278 @@ function OverviewTab({ group }) {
   );
 }
 
+function SettingsTab({ group, onUpdate }) {
+  const token = authHeaders().Authorization;
+  const [name, setName] = React.useState(group?.name || "");
+  const [description, setDescription] = React.useState(group?.description || "");
+  // Default to public if missing, but respect parent visibility logic handled in backend/manage page
+  const [visibility, setVisibility] = React.useState(group?.visibility || "public");
+  // Default to open. If private, backend/UI usually forces invite.
+  const [joinPolicy, setJoinPolicy] = React.useState(group?.join_policy || "open");
+
+  const [loading, setLoading] = React.useState(false);
+  const [logoFile, setLogoFile] = React.useState(null);
+  const [logoPreview, setLogoPreview] = React.useState(group?.logo ? toMediaUrl(group.logo) : "");
+  const [coverFile, setCoverFile] = React.useState(null);
+  const [coverPreview, setCoverPreview] = React.useState(group?.cover_image ? toMediaUrl(group.cover_image) : "");
+
+  // Update local state when group changes (e.g. re-fetch)
+  React.useEffect(() => {
+    if (group) {
+      setName(group.name || "");
+      setDescription(group.description || "");
+      setVisibility(group.visibility || "public");
+      setJoinPolicy(group.join_policy || "open");
+      setLogoPreview(group.logo ? toMediaUrl(group.logo) : "");
+      setCoverPreview(group.cover_image ? toMediaUrl(group.cover_image) : "");
+    }
+  }, [group]);
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => setLogoPreview(ev.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCoverChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCoverFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => setCoverPreview(ev.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("name", name.trim());
+      fd.append("description", description.trim());
+      fd.append("visibility", visibility);
+      fd.append("join_policy", joinPolicy);
+
+      if (logoFile) {
+        fd.append("logo", logoFile);
+      }
+      if (coverFile) {
+        fd.append("cover_image", coverFile);
+      }
+
+      const res = await fetch(toApiUrl(`groups/${group.id}/`), {
+        method: "PATCH",
+        headers: { Authorization: token }, // FormData doesn't need Content-Type header
+        body: fd,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to update settings");
+      }
+
+      const updatedGroup = await res.json();
+      onUpdate?.(updatedGroup);
+      alert("Settings updated successfully!");
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isParentPrivate = group?.parent_group?.visibility === "private";
+
+  return (
+    <Stack spacing={3} maxWidth="md">
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
+        <Typography variant="h6" gutterBottom fontWeight={700}>
+          General Settings
+        </Typography>
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <TextField
+              label="Group Name"
+              fullWidth
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              label="Description"
+              fullWidth
+              multiline
+              minRows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth>
+              <TextField
+                select
+                label="Visibility"
+                value={visibility}
+                onChange={(e) => {
+                  setVisibility(e.target.value);
+                  if (e.target.value === 'private') setJoinPolicy('invite');
+                  if (e.target.value === 'public' && isParentPrivate) setJoinPolicy('approval');
+                }}
+                helperText={isParentPrivate ? "Public subgroups of private groups require approval." : "Private groups are invite-only."}
+              >
+                <MenuItem value="public">Public</MenuItem>
+                <MenuItem value="private">Private</MenuItem>
+              </TextField>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth>
+              <TextField
+                select
+                label="Join Policy"
+                value={joinPolicy}
+                onChange={(e) => setJoinPolicy(e.target.value)}
+                disabled={visibility === 'private'}
+              >
+                <MenuItem value="open" disabled={visibility === 'private' || isParentPrivate}>Open (Join Instantly)</MenuItem>
+                <MenuItem value="approval" disabled={visibility === 'private'}>Approval Required</MenuItem>
+                <MenuItem value="invite" disabled={visibility === 'public'}>Invite Only</MenuItem>
+              </TextField>
+            </FormControl>
+          </Grid>
+        </Grid>
+      </Card>
+
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
+        <Typography variant="h6" gutterBottom fontWeight={700}>
+          Group Visuals
+        </Typography>
+        <Stack spacing={4}>
+          {/* Logo Section */}
+          <Stack direction="row" spacing={3} alignItems="center">
+            <Box
+              sx={{
+                width: 100,
+                height: 100,
+                borderRadius: "50%",
+                overflow: "hidden",
+                border: `1px solid ${BORDER}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: "grey.100",
+              }}
+            >
+              {logoPreview ? (
+                <Box component="img" src={logoPreview} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <ImageRoundedIcon sx={{ color: "grey.400", fontSize: 40 }} />
+              )}
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Group Icon</Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Recommended 200x200px. Max 5MB.
+              </Typography>
+              <Stack direction="row" spacing={2}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<InsertPhotoRoundedIcon />}
+                >
+                  Upload Icon
+                  <input type="file" hidden accept="image/*" onChange={handleLogoChange} />
+                </Button>
+                {logoPreview && (
+                  <Button
+                    color="error"
+                    onClick={() => {
+                      setLogoFile(null);
+                      setLogoPreview("");
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </Stack>
+            </Box>
+          </Stack>
+
+          <Divider />
+
+          {/* Cover Image Section */}
+          <Stack spacing={2}>
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>Cover Image</Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Recommended 800x400px. Max 5MB.
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                width: "100%",
+                height: 200,
+                borderRadius: 2,
+                overflow: "hidden",
+                border: `1px solid ${BORDER}`,
+                bgcolor: "grey.100",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+            >
+              {coverPreview ? (
+                <Box component="img" src={coverPreview} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <ImageRoundedIcon sx={{ color: "grey.400", fontSize: 60 }} />
+              )}
+            </Box>
+            <Stack direction="row" spacing={2}>
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<InsertPhotoRoundedIcon />}
+              >
+                Upload Cover
+                <input type="file" hidden accept="image/*" onChange={handleCoverChange} />
+              </Button>
+              {coverPreview && (
+                <Button
+                  color="error"
+                  onClick={() => {
+                    setCoverFile(null);
+                    setCoverPreview("");
+                  }}
+                >
+                  Remove
+                </Button>
+              )}
+            </Stack>
+          </Stack>
+        </Stack>
+      </Card>
+
+      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+        <Button
+          variant="contained"
+          size="large"
+          onClick={handleSave}
+          disabled={loading}
+          sx={{ minWidth: 150 }}
+        >
+          {loading ? "Saving..." : "Save Changes"}
+        </Button>
+      </Box>
+    </Stack>
+  );
+}
+
 // -----------------------------------------------------------------------------
 // SKELETON COMPONENTS
 // -----------------------------------------------------------------------------
@@ -2026,6 +2302,14 @@ export default function GroupDetailsPage() {
             }
           />
         ),
+      });
+    }
+    // New Settings Tab
+    if (canApproveRequests) { // Owners/Admins
+      items.push({
+        label: "SETTINGS",
+        icon: <SettingsRoundedIcon />,
+        render: () => <SettingsTab group={group} onUpdate={setGroup} />,
       });
     }
     items.push({ label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> });
