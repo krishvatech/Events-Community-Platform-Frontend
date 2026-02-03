@@ -59,6 +59,14 @@ const toAbsolute = (u) =>
       : `${import.meta.env.VITE_MEDIA_BASE_URL || API_ORIGIN}${u.startsWith("/") ? "" : "/"
       }${u}`;
 
+const bust = (url, key) => {
+  if (!url) return url;
+  const u = toAbsolute(url);
+  const sep = u.includes("?") ? "&" : "?";
+  const k = key ?? Date.now();
+  return `${u}${sep}v=${encodeURIComponent(k)}`;
+};
+
 function authHeader() {
   const token =
     localStorage.getItem("access") ||
@@ -97,7 +105,7 @@ function GroupGridCard({ g, onJoin, onOpen, hideJoin }) {
         overflow: "hidden",
         borderColor: BORDER,
         height: 280,
-        display: "flex",
+        display: "flex", // Keep flex layout
         flexDirection: "column",
       }}
     >
@@ -115,11 +123,37 @@ function GroupGridCard({ g, onJoin, onOpen, hideJoin }) {
           backgroundSize: "cover",
           backgroundPosition: "center",
           cursor: "pointer",
+          position: "relative", // Needed for alignment
         }}
-      />
+      >
+        {/* Logo overlay */}
+        {g.logo && (
+          <Box
+            sx={{
+              position: "absolute",
+              bottom: -24,
+              left: 16,
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              overflow: "hidden",
+              border: "3px solid white",
+              backgroundColor: "white",
+              zIndex: 2,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+            }}
+          >
+            <img
+              src={bust(g.logo, g._cache || g.updated_at)}
+              alt="logo"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </Box>
+        )}
+      </Box>
 
       <CardContent
-        sx={{ flexGrow: 1, pb: 1, cursor: "pointer" }}
+        sx={{ flexGrow: 1, pb: 1, cursor: "pointer", pt: g.logo ? 4 : 2 }} // Added pt padding if logo exists
         onClick={() => onOpen?.(g)}
       >
         <Stack
@@ -132,7 +166,7 @@ function GroupGridCard({ g, onJoin, onOpen, hideJoin }) {
             {isPrivate ? "Private" : "Public"}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {members} Member
+            {members} Member{members !== 1 ? "s" : ""}
           </Typography>
         </Stack>
 
@@ -329,9 +363,36 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
                 : "none",
             backgroundSize: "cover",
             backgroundPosition: "center",
+            position: "relative",
           }}
-        />
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
+        >
+          {/* Logo overlay */}
+          {group.logo && (
+            <Box
+              sx={{
+                position: "absolute",
+                bottom: -28,
+                left: 20,
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                overflow: "hidden",
+                border: "4px solid white",
+                backgroundColor: "white",
+                zIndex: 2,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+              }}
+            >
+              <img
+                src={bust(group.logo, group._cache || group.updated_at)}
+                alt="logo"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </Box>
+          )}
+        </Box>
+
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1, pt: group.logo ? 4 : 1 }}>
           <Typography variant="caption" color="text.secondary">
             {isPrivate ? "Private" : "Public"}
           </Typography>

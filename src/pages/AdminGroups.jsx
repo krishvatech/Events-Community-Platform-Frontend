@@ -134,6 +134,8 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
   const [joinPolicy, setJoinPolicy] = React.useState("open");
   const [imageFile, setImageFile] = React.useState(null);
   const [localPreview, setLocalPreview] = React.useState("");
+  const [logoFile, setLogoFile] = React.useState(null);
+  const [logoPreview, setLogoPreview] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
   const [errors, setErrors] = React.useState({});
@@ -170,6 +172,14 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
     reader.readAsDataURL(file);
   };
 
+  const onPickLogo = (file) => {
+    if (!file) return;
+    setLogoFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setLogoPreview(String(e.target?.result || ""));
+    reader.readAsDataURL(file);
+  };
+
   const submit = async () => {
     if (!validate()) return;
     setSubmitting(true);
@@ -181,6 +191,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
       fd.append("visibility", visibility);
       fd.append("join_policy", visibility === "private" ? "invite" : joinPolicy);
       if (imageFile) fd.append("cover_image", imageFile, imageFile.name);
+      if (logoFile) fd.append("logo", logoFile, logoFile.name);
 
       const res = await fetch(`${API_ROOT}/groups/`, {
         method: "POST",
@@ -203,6 +214,7 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
       setName(""); setSlug(""); setDescription(""); setVisibility("public");
       setJoinPolicy("open");
       setImageFile(null); setLocalPreview("");
+      setLogoFile(null); setLogoPreview("");
     } catch (e) {
       setToast({ open: true, type: "error", msg: String(e?.message || e) });
     } finally {
@@ -284,40 +296,80 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
               </Box>
             </div>
 
-            <div className="col-span-12 md:col-span-5">
-              <Typography variant="subtitle1" className="font-semibold">Logo / Icon</Typography>
-              <Typography variant="caption" className="text-slate-500 block mb-2">
-                Recommended 650×365px • Max 50 MB
-              </Typography>
+            <div className="col-span-12 md:col-span-5 flex flex-col gap-4">
+              {/* Logo Upload */}
+              <div>
+                <Typography variant="subtitle1" className="font-semibold">Logo / Icon</Typography>
+                <Typography variant="caption" className="text-slate-500 block mb-2">
+                  Recommended 200×200px (Square)
+                </Typography>
 
-              <Box
-                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                sx={{ height: 200, position: "relative", overflow: "hidden" }}
-              >
-                {localPreview ? (
-                  <img src={localPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <Stack alignItems="center" spacing={1}>
-                    <ImageRoundedIcon />
-                    <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
-                  </Stack>
-                )}
-                <input
-                  id="group-image-file"
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={(e) => onPickFile(e.target.files?.[0])}
-                />
-              </Box>
+                <Box className="flex items-center gap-4">
+                  <Box
+                    className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center overflow-hidden"
+                    sx={{ width: 100, height: 100, position: "relative" }}
+                  >
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <Stack alignItems="center" spacing={0.5}>
+                        <ImageRoundedIcon fontSize="small" />
+                        <Typography variant="caption" className="text-slate-600 text-[10px]">Icon</Typography>
+                      </Stack>
+                    )}
+                    <input
+                      id="group-logo-file"
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => onPickLogo(e.target.files?.[0])}
+                    />
+                  </Box>
 
-              <Stack direction="row" spacing={1} className="mt-2">
-                <label htmlFor="group-image-file">
-                  <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
-                    Upload
-                  </Button>
-                </label>
-              </Stack>
+                  <label htmlFor="group-logo-file">
+                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                      Upload Icon
+                    </Button>
+                  </label>
+                </Box>
+              </div>
+
+              {/* Cover Image Upload */}
+              <div>
+                <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+                <Typography variant="caption" className="text-slate-500 block mb-2">
+                  Recommended 650×365px • Max 50 MB
+                </Typography>
+
+                <Box
+                  className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                  sx={{ height: 160, position: "relative", overflow: "hidden" }}
+                >
+                  {localPreview ? (
+                    <img src={localPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <Stack alignItems="center" spacing={1}>
+                      <ImageRoundedIcon />
+                      <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
+                    </Stack>
+                  )}
+                  <input
+                    id="group-image-file"
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={(e) => onPickFile(e.target.files?.[0])}
+                  />
+                </Box>
+
+                <Stack direction="row" spacing={1} className="mt-2">
+                  <label htmlFor="group-image-file">
+                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                      Upload Cover
+                    </Button>
+                  </label>
+                </Stack>
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -362,6 +414,11 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
   const [imageFile, setImageFile] = React.useState(null);
   const [localPreview, setLocalPreview] = React.useState("");
   const [removeImage, setRemoveImage] = React.useState(false);
+
+  const [logoFile, setLogoFile] = React.useState(null);
+  const [logoPreview, setLogoPreview] = React.useState("");
+  const [removeLogo, setRemoveLogo] = React.useState(false);
+
   const [submitting, setSubmitting] = React.useState(false);
   const [errors, setErrors] = React.useState({});
 
@@ -381,6 +438,10 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
     setImageFile(null);
     setRemoveImage(false);
+
+    setLogoPreview(group.logo ? toAbs(group.logo) : "");
+    setLogoFile(null);
+    setRemoveLogo(false);
     setErrors({});
   }, [group]);
 
@@ -424,6 +485,9 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
       if (imageFile && !removeImage) fd.append("cover_image", imageFile, imageFile.name);
       if (removeImage) fd.append("remove_cover_image", "1");
 
+      if (logoFile && !removeLogo) fd.append("logo", logoFile, logoFile.name);
+      if (removeLogo) fd.append("remove_logo", "1");
+
       const idOrSlug = group.slug || group.id;
 
       const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
@@ -463,7 +527,9 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
       const merged = {
         ...group,
         ...updated,
+        ...updated,
         cover_image: updated?.cover_image ?? (removeImage ? null : group.cover_image),
+        logo: updated?.logo ?? (removeLogo ? null : group.logo),
         _cache: Date.now(),
       };
 
@@ -473,6 +539,10 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
       setImageFile(null);
       setRemoveImage(false);
       setLocalPreview(merged.cover_image ? toAbs(merged.cover_image) : "");
+
+      setLogoFile(null);
+      setRemoveLogo(false);
+      setLogoPreview(merged.logo ? toAbs(merged.logo) : "");
     } catch (e) {
       setErrors((prev) => ({ ...prev, __all__: String(e?.message || e) }));
     } finally {
@@ -562,47 +632,99 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
             </TextField>
           </div>
 
-          <div className="col-span-12 md:col-span-5">
-            <Typography variant="subtitle1" className="font-semibold">Logo / Icon</Typography>
-            <Typography variant="caption" className="text-slate-500 block mb-2">
-              Recommended 650×365px • Max 50 MB
-            </Typography>
+          <div className="col-span-12 md:col-span-5 flex flex-col gap-4">
 
-            <Box
-              className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-              sx={{ height: 200, position: "relative", overflow: "hidden" }}
-            >
-              {localPreview ? (
-                <img src={localPreview} alt="cover" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <Stack alignItems="center" spacing={1}>
-                  <ImageRoundedIcon />
-                  <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
-                </Stack>
-              )}
-              <input
-                id="group-edit-image-file"
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(e) => onPickFile(e.target.files?.[0])}
-              />
-            </Box>
+            {/* Logo Upload */}
+            <div>
+              <Typography variant="subtitle1" className="font-semibold">Logo / Icon</Typography>
+              <Typography variant="caption" className="text-slate-500 block mb-2">
+                Recommended 200×200px (Square)
+              </Typography>
 
-            <Stack direction="row" spacing={1} className="mt-2">
-              <label htmlFor="group-edit-image-file">
-                <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
-                  Upload
-                </Button>
-              </label>
-              <Button
-                size="small"
-                variant="text"
-                onClick={() => { setRemoveImage(true); setImageFile(null); setLocalPreview(""); }}
+              <Box className="flex items-center gap-4">
+                <Box
+                  className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center overflow-hidden"
+                  sx={{ width: 100, height: 100, position: "relative" }}
+                >
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <Stack alignItems="center" spacing={0.5}>
+                      <ImageRoundedIcon fontSize="small" />
+                      <Typography variant="caption" className="text-slate-600 text-[10px]">Icon</Typography>
+                    </Stack>
+                  )}
+                  <input
+                    id="group-edit-logo-file"
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={(e) => onPickLogo(e.target.files?.[0])}
+                  />
+                </Box>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="group-edit-logo-file">
+                    <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                      Upload Icon
+                    </Button>
+                  </label>
+                  <Button
+                    size="small"
+                    variant="text"
+                    color="error"
+                    onClick={() => { setRemoveLogo(true); setLogoFile(null); setLogoPreview(""); }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </Box>
+            </div>
+
+            {/* Cover Image Upload */}
+            <div>
+              <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
+              <Typography variant="caption" className="text-slate-500 block mb-2">
+                Recommended 650×365px • Max 50 MB
+              </Typography>
+
+              <Box
+                className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 160, position: "relative", overflow: "hidden" }}
               >
-                Remove
-              </Button>
-            </Stack>
+                {localPreview ? (
+                  <img src={localPreview} alt="cover" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <Stack alignItems="center" spacing={1}>
+                    <ImageRoundedIcon />
+                    <Typography variant="body2" className="text-slate-600">Image Preview</Typography>
+                  </Stack>
+                )}
+                <input
+                  id="group-edit-image-file"
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => onPickFile(e.target.files?.[0])}
+                />
+              </Box>
+
+              <Stack direction="row" spacing={1} className="mt-2">
+                <label htmlFor="group-edit-image-file">
+                  <Button component="span" size="small" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                    Upload Cover
+                  </Button>
+                </label>
+                <Button
+                  size="small"
+                  variant="text"
+                  color="error"
+                  onClick={() => { setRemoveImage(true); setImageFile(null); setLocalPreview(""); }}
+                >
+                  Remove
+                </Button>
+              </Stack>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -679,9 +801,34 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
         ) : (
           <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
         )}
+
+        {/* Logo overlay */}
+        {g.logo && (
+          <Box
+            sx={{
+              position: "absolute",
+              bottom: -24,
+              left: 16,
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              overflow: "hidden",
+              border: "3px solid white",
+              backgroundColor: "white",
+              zIndex: 2,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+            }}
+          >
+            <img
+              src={bust(g.logo, g._cache || g.updated_at)}
+              alt="logo"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </Box>
+        )}
       </Box>
 
-      <Box className="p-4 flex flex-col gap-2 flex-1">
+      <Box className="p-4 flex flex-col gap-2 flex-1 pt-7">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <Chip
@@ -765,7 +912,7 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
           )}
         </Box>
       </Box>
-    </Paper>
+    </Paper >
   );
 }
 

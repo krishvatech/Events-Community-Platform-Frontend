@@ -477,6 +477,11 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     const [imageFile, setImageFile] = React.useState(null);
     const [localPreview, setLocalPreview] = React.useState("");
     const [removeImage, setRemoveImage] = React.useState(false);
+
+    const [logoFile, setLogoFile] = React.useState(null);
+    const [logoPreview, setLogoPreview] = React.useState("");
+    const [removeLogo, setRemoveLogo] = React.useState(false);
+
     const [submitting, setSubmitting] = React.useState(false);
     const [errors, setErrors] = React.useState({});
     const isSubgroup = !!(group?.parent_id || group?.parent?.id || group?.parent);
@@ -492,6 +497,11 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
         setImageFile(null);
         setRemoveImage(false);
+
+        setLogoPreview(group.logo ? toAbs(group.logo) : "");
+        setLogoFile(null);
+        setRemoveLogo(false);
+
         setErrors({});
     }, [group]);
 
@@ -691,69 +701,143 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     </Grid>
 
                     <Grid xs={12} md={5}>
-                        <Typography variant="subtitle1" className="font-semibold">
-                            Logo / Icon
-                        </Typography>
-                        <Typography variant="caption" className="text-slate-500 block mb-2">
-                            Recommended 650×365px • Max 50 MB
-                        </Typography>
+                        <Box className="flex flex-col gap-6">
+                            {/* Logo Upload */}
+                            <div>
+                                <Typography variant="subtitle1" className="font-semibold">
+                                    Logo / Icon
+                                </Typography>
+                                <Typography variant="caption" className="text-slate-500 block mb-2">
+                                    Recommended 200×200px (Square)
+                                </Typography>
 
-                        <Box
-                            className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-                            sx={{ height: 200, position: "relative", overflow: "hidden" }}
-                        >
-                            {localPreview ? (
-                                <img
-                                    src={localPreview}
-                                    alt="cover"
-                                    style={{
-                                        position: "absolute",
-                                        inset: 0,
-                                        width: "100%",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                    }}
-                                />
-                            ) : (
-                                <Stack alignItems="center" spacing={1}>
-                                    <ImageRoundedIcon />
-                                    <Typography variant="body2" className="text-slate-600">
-                                        Image Preview
-                                    </Typography>
-                                </Stack>
-                            )}
-                            <input
-                                id="group-edit-image-file"
-                                type="file"
-                                accept="image/*"
-                                style={{ display: "none" }}
-                                onChange={(e) => onPickFile(e.target.files?.[0])}
-                            />
-                        </Box>
+                                <Box className="flex items-center gap-4">
+                                    <Box
+                                        className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center overflow-hidden"
+                                        sx={{ width: 100, height: 100, position: "relative" }}
+                                    >
+                                        {logoPreview ? (
+                                            <img
+                                                src={logoPreview}
+                                                alt="logo"
+                                                style={{
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    objectFit: "cover",
+                                                }}
+                                            />
+                                        ) : (
+                                            <Stack alignItems="center" spacing={0.5}>
+                                                <ImageRoundedIcon fontSize="small" />
+                                                <Typography variant="caption" className="text-slate-600 text-[10px]">
+                                                    Icon
+                                                </Typography>
+                                            </Stack>
+                                        )}
+                                        <input
+                                            id="group-edit-logo-file-manage"
+                                            type="file"
+                                            accept="image/*"
+                                            style={{ display: "none" }}
+                                            onChange={(e) => onPickLogo(e.target.files?.[0])}
+                                        />
+                                    </Box>
 
-                        <Stack direction="row" spacing={1} className="mt-2">
-                            <label htmlFor="group-edit-image-file">
-                                <Button
-                                    component="span"
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<InsertPhotoRoundedIcon />}
+                                    <div className="flex flex-col gap-1">
+                                        <label htmlFor="group-edit-logo-file-manage">
+                                            <Button
+                                                component="span"
+                                                size="small"
+                                                variant="outlined"
+                                                startIcon={<InsertPhotoRoundedIcon />}
+                                            >
+                                                Upload Icon
+                                            </Button>
+                                        </label>
+                                        <Button
+                                            size="small"
+                                            variant="text"
+                                            color="error"
+                                            onClick={() => {
+                                                setRemoveLogo(true);
+                                                setLogoFile(null);
+                                                setLogoPreview("");
+                                            }}
+                                        >
+                                            Remove
+                                        </Button>
+                                    </div>
+                                </Box>
+                            </div>
+
+                            {/* Cover Image */}
+                            <div>
+                                <Typography variant="subtitle1" className="font-semibold">
+                                    Cover Image
+                                </Typography>
+                                <Typography variant="caption" className="text-slate-500 block mb-2">
+                                    Recommended 650×365px • Max 50 MB
+                                </Typography>
+
+                                <Box
+                                    className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                                    sx={{ height: 200, position: "relative", overflow: "hidden" }}
                                 >
-                                    Upload
-                                </Button>
-                            </label>
-                            <Button
-                                size="small"
-                                variant="text"
-                                onClick={() => {
-                                    setRemoveImage(true);
-                                    setImageFile(null);
-                                    setLocalPreview("");
-                                }}
-                            >
-                                Remove
-                            </Button>
-                        </Stack>
+                                    {localPreview ? (
+                                        <img
+                                            src={localPreview}
+                                            alt="cover"
+                                            style={{
+                                                position: "absolute",
+                                                inset: 0,
+                                                width: "100%",
+                                                height: "100%",
+                                                objectFit: "cover",
+                                            }}
+                                        />
+                                    ) : (
+                                        <Stack alignItems="center" spacing={1}>
+                                            <ImageRoundedIcon />
+                                            <Typography variant="body2" className="text-slate-600">
+                                                Image Preview
+                                            </Typography>
+                                        </Stack>
+                                    )}
+                                    <input
+                                        id="group-edit-image-file"
+                                        type="file"
+                                        accept="image/*"
+                                        style={{ display: "none" }}
+                                        onChange={(e) => onPickFile(e.target.files?.[0])}
+                                    />
+                                </Box>
+
+                                <Stack direction="row" spacing={1} className="mt-2">
+                                    <label htmlFor="group-edit-image-file">
+                                        <Button
+                                            component="span"
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<InsertPhotoRoundedIcon />}
+                                        >
+                                            Upload
+                                        </Button>
+                                    </label>
+                                    <Button
+                                        size="small"
+                                        variant="text"
+                                        color="error"
+                                        onClick={() => {
+                                            setRemoveImage(true);
+                                            setImageFile(null);
+                                            setLocalPreview("");
+                                        }}
+                                    >
+                                        Remove
+                                    </Button>
+                                </Stack>
+                            </div>
+                        </Box>
                     </Grid>
                 </Grid>
             </DialogContent>
@@ -781,19 +865,25 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 }
 
 // ---- Image-only Dialog ----
-function GroupImageDialog({ open, group, onClose, onUpdated }) {
+// ---- Image-only Dialog (Generic for Logo or Cover) ----
+function GroupImageDialog({ open, group, onClose, type = "cover", onUpdated }) {
     const token = getToken();
     const [imageFile, setImageFile] = React.useState(null);
     const [localPreview, setLocalPreview] = React.useState("");
     const [submitting, setSubmitting] = React.useState(false);
     const [error, setError] = React.useState("");
 
+    const isLogo = type === "logo";
+    const title = isLogo ? "Edit Group Icon" : "Edit Cover Image";
+    const fieldName = isLogo ? "logo" : "cover_image";
+
     React.useEffect(() => {
         if (!open || !group) return;
         setImageFile(null);
-        setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
+        const initialUrl = isLogo ? group.logo : group.cover_image;
+        setLocalPreview(initialUrl ? toAbs(initialUrl) : "");
         setError("");
-    }, [open, group]);
+    }, [open, group, isLogo]);
 
     const onPickFile = (file) => {
         if (!file) return;
@@ -804,7 +894,8 @@ function GroupImageDialog({ open, group, onClose, onUpdated }) {
     };
 
     const submit = async () => {
-        if (!group || !imageFile) {
+        if (!group) return;
+        if (!imageFile) {
             setError("Please choose an image.");
             return;
         }
@@ -812,7 +903,7 @@ function GroupImageDialog({ open, group, onClose, onUpdated }) {
         setError("");
         try {
             const fd = new FormData();
-            fd.append("cover_image", imageFile, imageFile.name);
+            fd.append(fieldName, imageFile, imageFile.name);
             const idOrSlug = group.slug || group.id;
             const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {
                 method: "PATCH",
@@ -842,7 +933,7 @@ function GroupImageDialog({ open, group, onClose, onUpdated }) {
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" PaperProps={{ className: "rounded-2xl" }}>
-            <DialogTitle className="font-extrabold">Group Icon</DialogTitle>
+            <DialogTitle className="font-extrabold pb-1">{title}</DialogTitle>
             <DialogContent dividers>
                 {error && (
                     <Alert severity="error" className="mb-3">
@@ -850,45 +941,64 @@ function GroupImageDialog({ open, group, onClose, onUpdated }) {
                     </Alert>
                 )}
 
-                <Stack spacing={2}>
-                    <Stack direction="row" spacing={2} alignItems="center">
-                        <Avatar
-                            sx={{ width: 56, height: 56, bgcolor: "#10b8a6" }}
-                            src={localPreview || undefined}
-                        >
-                            {(group?.name || "G").slice(0, 1).toUpperCase()}
-                        </Avatar>
-                        <Box>
-                            <Typography variant="subtitle2">Upload a new group icon</Typography>
-                            <Typography variant="body2" className="text-slate-500">
-                                PNG or JPG. Recommended square image.
-                            </Typography>
-                        </Box>
-                    </Stack>
+                <Stack spacing={3} alignItems="center" py={2}>
+                    <Box
+                        sx={{
+                            width: isLogo ? 120 : "100%",
+                            height: isLogo ? 120 : 200,
+                            borderRadius: isLogo ? "50%" : 2,
+                            overflow: "hidden",
+                            border: "1px solid #e2e8f0",
+                            position: "relative",
+                            bgcolor: "#f1f5f9",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center"
+                        }}
+                    >
+                        {localPreview ? (
+                            <img
+                                src={localPreview}
+                                alt="preview"
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                        ) : (
+                            <ImageRoundedIcon sx={{ fontSize: 40, color: "#cbd5e1" }} />
+                        )}
+                    </Box>
 
-                    <input
-                        id="group-icon-file"
-                        type="file"
-                        hidden
-                        accept="image/*"
-                        onChange={(e) => onPickFile(e.target.files?.[0] || null)}
-                    />
-                    <label htmlFor="group-icon-file">
-                        <Button component="span" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
-                            Choose image
-                        </Button>
-                    </label>
+                    <Box textAlign="center">
+                        <Typography variant="body2" className="text-slate-500 mb-2">
+                            {isLogo ? "Recommended 200×200px (Square)" : "Recommended 650×365px"}
+                        </Typography>
+
+                        <input
+                            id="group-image-file-input"
+                            type="file"
+                            hidden
+                            accept="image/*"
+                            onChange={(e) => onPickFile(e.target.files?.[0] || null)}
+                        />
+                        <label htmlFor="group-image-file-input">
+                            <Button component="span" variant="outlined" startIcon={<InsertPhotoRoundedIcon />}>
+                                Choose Image
+                            </Button>
+                        </label>
+                    </Box>
                 </Stack>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose} disabled={submitting}>Cancel</Button>
+            <DialogActions className="px-6 py-4">
+                <Button onClick={onClose} disabled={submitting} className="rounded-xl" sx={{ textTransform: "none" }}>
+                    Cancel
+                </Button>
                 <Button
                     onClick={submit}
                     variant="contained"
                     disabled={submitting || !imageFile}
+                    className="rounded-xl"
                     sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 >
-                    {submitting ? "Saving..." : "Save"}
+                    {submitting ? "Saving..." : "Save Changes"}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -4170,7 +4280,7 @@ export default function GroupManagePage() {
                                                 bgcolor: "#10b8a6",
                                                 border: "3px solid white",
                                             }}
-                                            src={group?.cover_image ? bust(group.cover_image, group.updated_at || group._cache) : undefined}
+                                            src={group?.logo ? bust(group.logo, group.updated_at || group._cache) : undefined}
                                             alt={group?.name || "Group"}
                                         >
                                             {(group?.name || "G").slice(0, 1).toUpperCase()}
@@ -5890,6 +6000,7 @@ export default function GroupManagePage() {
                     group={group}
                     onClose={() => setImageOnlyOpen(false)}
                     onUpdated={onUpdated}
+                    type="logo"
                 />
 
                 <Dialog open={leaveGroupOpen} onClose={() => setLeaveGroupOpen(false)}>

@@ -714,7 +714,7 @@ function mapFeedItem(item) {
         ? `Community #${item.community_id ?? m.community_id}`
         : ""),
     group_id: item.group_id ?? m.group_id ?? null,
-    group_avatar: m.group_cover_url || "",
+    group_avatar: m.group_logo_url || m.group_cover_url || "",
     group: m.group_name || (m.group_id ? `Group #${m.group_id}` : "—"),
     visibility: m.visibility || item.visibility || null,
     metrics: {
