@@ -644,18 +644,15 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                     </Alert>
                 )}
 
-                <Box className="flex items-start gap-3 mb-4">
-                    <Avatar sx={{ bgcolor: "#10b8a6", width: 40, height: 40 }} />
-                    <TextField
-                        label="Group Name *"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        fullWidth
-                        error={!!errors.name}
-                        helperText={errors.name}
-                        className="mb-3"
-                    />
-                </Box>
+                <TextField
+                    label="Group Name *"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    fullWidth
+                    error={!!errors.name}
+                    helperText={errors.name}
+                    className="mb-3"
+                />
 
                 <Grid container spacing={3} columns={{ xs: 12, md: 12 }}>
                     <Grid xs={12} md={7}>
