@@ -4352,6 +4352,7 @@ export default function NewLiveMeeting() {
     return "Breakout Room";
   }, [activeTableId, activeTableName, isBreakout]);
 
+
   const handleQuickSwitch = async (targetId) => {
     closeQuickSwitchMenu();
     if (targetId === "main") {
@@ -8468,7 +8469,7 @@ export default function NewLiveMeeting() {
         </Dialog>
 
         {/* ✅ Main Room Peek (when seated at a lounge table) */}
-        {activeTableId && dyteMeeting && (
+        {activeTableId && dyteMeeting && !isPostEventLounge && (
           <Box
             sx={{
               position: "fixed",
