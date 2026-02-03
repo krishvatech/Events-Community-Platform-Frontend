@@ -493,7 +493,20 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         setName(group.name || "");
         setDescription(group.description || "");
         setVisibility(group.visibility || "public");
-        setJoinPolicy(group.join_policy === "open" ? "open" : "approval");
+
+        // Map join_policy from API to form values
+        const jp = (group.join_policy || "").toLowerCase();
+        if (jp === "open") {
+            setJoinPolicy("open");
+        } else if (jp === "invite") {
+            setJoinPolicy("invite");
+        } else if (jp === "approval" || jp === "public_approval") {
+            setJoinPolicy("approval");
+        } else {
+            // Default based on visibility
+            setJoinPolicy(group.visibility === "private" ? "invite" : "open");
+        }
+
         setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
         setImageFile(null);
         setRemoveImage(false);
@@ -551,6 +564,15 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         reader.readAsDataURL(file);
     };
 
+    const onPickLogo = (file) => {
+        if (!file) return;
+        setLogoFile(file);
+        setRemoveLogo(false);
+        const reader = new FileReader();
+        reader.onload = (e) => setLogoPreview(String(e.target?.result || ""));
+        reader.readAsDataURL(file);
+    };
+
     const validate = () => {
         const e = {};
         if (!name.trim()) e.name = "Required";
@@ -574,6 +596,9 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
             if (imageFile) fd.append("cover_image", imageFile, imageFile.name);
             if (removeImage) fd.append("remove_cover_image", "1");
+
+            if (logoFile) fd.append("logo", logoFile, logoFile.name);
+            if (removeLogo) fd.append("remove_logo", "1");
 
             const idOrSlug = group.slug || group.id;
             const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/`, {

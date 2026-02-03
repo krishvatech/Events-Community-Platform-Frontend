@@ -427,13 +427,19 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     setName(group.name || "");
     setDescription(group.description || "");
     setVisibility(group.visibility || "public");
-    setJoinPolicy(
-      group.join_policy === "open"
-        ? "open"
-        : group.join_policy === "invite"
-          ? "invite"
-          : "approval"
-    );
+
+    // Map join_policy from API to form values
+    const jp = (group.join_policy || "").toLowerCase();
+    if (jp === "open") {
+      setJoinPolicy("open");
+    } else if (jp === "invite") {
+      setJoinPolicy("invite");
+    } else if (jp === "approval" || jp === "public_approval") {
+      setJoinPolicy("approval");
+    } else {
+      // Default based on visibility
+      setJoinPolicy(group.visibility === "private" ? "invite" : "open");
+    }
 
     setLocalPreview(group.cover_image ? toAbs(group.cover_image) : "");
     setImageFile(null);
@@ -461,6 +467,15 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     setRemoveImage(false);
     const reader = new FileReader();
     reader.onload = (e) => setLocalPreview(String(e.target?.result || ""));
+    reader.readAsDataURL(file);
+  };
+
+  const onPickLogo = (file) => {
+    if (!file) return;
+    setLogoFile(file);
+    setRemoveLogo(false);
+    const reader = new FileReader();
+    reader.onload = (e) => setLogoPreview(String(e.target?.result || ""));
     reader.readAsDataURL(file);
   };
 
@@ -602,34 +617,24 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
               <MenuItem value="private">Private (invite-only)</MenuItem>
             </TextField>
 
-            <TextField
+
+            <CustomSelect
               label="Join Policy"
-              select
-              fullWidth
-              className="mb-3"
               value={joinPolicy}
-              onChange={(e) => {
-                const newVal = e.target.value;
-                setJoinPolicy(newVal);
-              }}
+              onChange={(val) => setJoinPolicy(val)}
               disabled={visibility === "private"}
               helperText={visibility === "private" ? "Private groups are invite-only." : ""}
-              SelectProps={{
-                menuProps: {
-                  disablePortal: true,
-                  PaperProps: { sx: { zIndex: 1300 } }
-                },
-              }}
-            >
-              {visibility === "public" ? (
-                <>
-                  <MenuItem value="open">Open (join instantly)</MenuItem>
-                  <MenuItem value="approval">Approval required</MenuItem>
-                </>
-              ) : (
-                <MenuItem value="invite">Invite only</MenuItem>
-              )}
-            </TextField>
+              options={
+                visibility === "public"
+                  ? [
+                    { label: "Open (join instantly)", value: "open" },
+                    { label: "Approval required", value: "approval" }
+                  ]
+                  : [
+                    { label: "Invite only", value: "invite" }
+                  ]
+              }
+            />
           </div>
 
           <div className="col-span-12 md:col-span-5 flex flex-col gap-4">
