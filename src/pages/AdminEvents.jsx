@@ -307,6 +307,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   // Image - Waiting Room Image (replaces clock in waiting room if uploaded)
   const [waitingRoomImageFile, setWaitingRoomImageFile] = React.useState(null);
   const [localWaitingRoomImagePreview, setLocalWaitingRoomImagePreview] = React.useState("");
+  const [waitingRoomEnabled, setWaitingRoomEnabled] = React.useState(false);
+  const [waitingRoomLoungeAllowed, setWaitingRoomLoungeAllowed] = React.useState(true);
+  const [waitingRoomNetworkingAllowed, setWaitingRoomNetworkingAllowed] = React.useState(true);
+  const [waitingRoomAutoAdmitSeconds, setWaitingRoomAutoAdmitSeconds] = React.useState("");
 
   // Replay Options
   const [replayAvailable, setReplayAvailable] = React.useState(false);
@@ -463,6 +467,18 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (logoImageFile) fd.append("preview_image", logoImageFile, logoImageFile.name);
     if (coverImageFile) fd.append("cover_image", coverImageFile, coverImageFile.name);
     if (waitingRoomImageFile) fd.append("waiting_room_image", waitingRoomImageFile, waitingRoomImageFile.name);
+    fd.append("waiting_room_enabled", String(waitingRoomEnabled));
+    fd.append("lounge_enabled_waiting_room", String(waitingRoomLoungeAllowed));
+    fd.append("networking_tables_enabled_waiting_room", String(waitingRoomNetworkingAllowed));
+    if (waitingRoomAutoAdmitSeconds) {
+      fd.append("auto_admit_seconds", String(waitingRoomAutoAdmitSeconds));
+    }
+    fd.append("waiting_room_enabled", String(waitingRoomEnabled));
+    fd.append("lounge_enabled_waiting_room", String(waitingRoomLoungeAllowed));
+    fd.append("networking_tables_enabled_waiting_room", String(waitingRoomNetworkingAllowed));
+    if (waitingRoomAutoAdmitSeconds) {
+      fd.append("auto_admit_seconds", String(waitingRoomAutoAdmitSeconds));
+    }
     fd.append("publish_resources_immediately", resourcesPublishNow ? "true" : "false");
     if (!resourcesPublishNow) {
       const publishISO = iso(resPublishDate, resPublishTime);
@@ -742,9 +758,16 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         </Box>
 
         {/* Images Row - Three Equal Columns */}
-        <Grid container spacing={2} sx={{ mt: 3 }}>
+        <Box
+          sx={{
+            mt: 3,
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 2,
+          }}
+        >
           {/* Update Logo / Picture */}
-          <Grid item xs={12} sm={4}>
+          <Box>
             <Typography variant="subtitle1" className="font-semibold">Update Logo / Picture</Typography>
             <Typography variant="caption" className="text-slate-500 block mb-2">
               Recommended 650x365px - Max 50 MB
@@ -795,10 +818,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 Upload Logo
               </Button>
             </label>
-          </Grid>
+          </Box>
 
           {/* Cover Image */}
-          <Grid item xs={12} sm={4}>
+          <Box>
             <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
             <Typography variant="caption" className="text-slate-500 block mb-2">
               Recommended 650x365px - Max 50 MB
@@ -849,10 +872,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 Upload Cover
               </Button>
             </label>
-          </Grid>
+          </Box>
 
           {/* Waiting Room Image */}
-          <Grid item xs={12} sm={4}>
+          <Box>
             <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
             <Typography variant="caption" className="text-slate-500 block mb-2">
               Recommended 650x365px - Max 50 MB
@@ -903,8 +926,80 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 Upload Waiting Room
               </Button>
             </label>
-          </Grid>
-        </Grid>
+
+          </Box>
+        </Box>
+
+        <Box
+          sx={{
+            mt: 2,
+            width: "100%",
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+            gap: 1.5,
+            alignItems: "center",
+          }}
+        >
+          <FormControlLabel
+            control={
+              <Switch
+                checked={waitingRoomEnabled}
+                onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
+              />
+            }
+            label="Enable Waiting Room"
+            sx={{
+              m: 0,
+              width: "100%",
+              justifyContent: "flex-start",
+              gap: 1.5,
+              "& .MuiFormControlLabel-label": { marginLeft: 0 },
+            }}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={waitingRoomLoungeAllowed}
+                onChange={(e) => setWaitingRoomLoungeAllowed(e.target.checked)}
+                disabled={!waitingRoomEnabled}
+              />
+            }
+            label="Allow Social Lounge while waiting"
+            sx={{
+              m: 0,
+              width: "100%",
+              justifyContent: "flex-start",
+              gap: 1.5,
+              "& .MuiFormControlLabel-label": { marginLeft: 0 },
+            }}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={waitingRoomNetworkingAllowed}
+                onChange={(e) => setWaitingRoomNetworkingAllowed(e.target.checked)}
+                disabled={!waitingRoomEnabled}
+              />
+            }
+            label="Allow Networking Tables while waiting"
+            sx={{
+              m: 0,
+              width: "100%",
+              justifyContent: "flex-start",
+              gap: 1.5,
+              "& .MuiFormControlLabel-label": { marginLeft: 0 },
+            }}
+          />
+          <TextField
+            label="Auto-admit after (seconds)"
+            size="small"
+            type="number"
+            value={waitingRoomAutoAdmitSeconds}
+            onChange={(e) => setWaitingRoomAutoAdmitSeconds(e.target.value)}
+            disabled={!waitingRoomEnabled}
+            fullWidth
+          />
+        </Box>
 
         {/* ===== Schedule ===== */}
         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
@@ -1256,6 +1351,16 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const [waitingRoomImageFile, setWaitingRoomImageFile] = useState(null);
   const [localWaitingRoomImagePreview, setLocalWaitingRoomImagePreview] = useState("");
   const waitingRoomImage = event?.waiting_room_image ? toAbs(event.waiting_room_image) : "";
+  const [waitingRoomEnabled, setWaitingRoomEnabled] = useState(Boolean(event?.waiting_room_enabled));
+  const [waitingRoomLoungeAllowed, setWaitingRoomLoungeAllowed] = useState(
+    event?.lounge_enabled_waiting_room !== undefined ? Boolean(event.lounge_enabled_waiting_room) : true
+  );
+  const [waitingRoomNetworkingAllowed, setWaitingRoomNetworkingAllowed] = useState(
+    event?.networking_tables_enabled_waiting_room !== undefined ? Boolean(event.networking_tables_enabled_waiting_room) : true
+  );
+  const [waitingRoomAutoAdmitSeconds, setWaitingRoomAutoAdmitSeconds] = useState(
+    event?.auto_admit_seconds ? String(event.auto_admit_seconds) : ""
+  );
 
   // Replay Options
   const [replayAvailable, setReplayAvailable] = React.useState(false);
@@ -1610,10 +1715,16 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             </Grid>
 
             {/* Images Row - Three Equal Columns */}
-            <Grid size={{ xs: 12 }} sx={{ mt: 3 }}>
-              <Grid container spacing={2}>
+            <Box sx={{ mt: 3 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                  gap: 2,
+                }}
+              >
                 {/* Update Logo / Picture */}
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Box>
                   <Typography variant="subtitle1" className="font-semibold">Update Logo / Picture</Typography>
                   <Typography variant="caption" className="text-slate-500 block mb-2">
                     Recommended 650x365px - Max 50 MB
@@ -1640,10 +1751,10 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                       Upload Logo
                     </Button>
                   </label>
-                </Grid>
+                </Box>
 
                 {/* Cover Image */}
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Box>
                   <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
                   <Typography variant="caption" className="text-slate-500 block mb-2">
                     Recommended 650x365px - Max 50 MB
@@ -1670,10 +1781,10 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                       Upload Cover
                     </Button>
                   </label>
-                </Grid>
+                </Box>
 
                 {/* Waiting Room Image */}
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Box>
                   <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
                   <Typography variant="caption" className="text-slate-500 block mb-2">
                     Recommended 650x365px - Max 50 MB
@@ -1700,9 +1811,81 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                       Upload Waiting Room
                     </Button>
                   </label>
-                </Grid>
-              </Grid>
-            </Grid>
+
+                </Box>
+              </Box>
+            </Box>
+
+            <Box
+              sx={{
+                mt: 2,
+                width: "100%",
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                gap: 1.5,
+                alignItems: "center",
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={waitingRoomEnabled}
+                    onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
+                  />
+                }
+                label="Enable Waiting Room"
+                sx={{
+                  m: 0,
+                  width: "100%",
+                  justifyContent: "flex-start",
+                  gap: 1.5,
+                  "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={waitingRoomLoungeAllowed}
+                    onChange={(e) => setWaitingRoomLoungeAllowed(e.target.checked)}
+                    disabled={!waitingRoomEnabled}
+                  />
+                }
+                label="Allow Social Lounge while waiting"
+                sx={{
+                  m: 0,
+                  width: "100%",
+                  justifyContent: "flex-start",
+                  gap: 1.5,
+                  "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={waitingRoomNetworkingAllowed}
+                    onChange={(e) => setWaitingRoomNetworkingAllowed(e.target.checked)}
+                    disabled={!waitingRoomEnabled}
+                  />
+                }
+                label="Allow Networking Tables while waiting"
+                sx={{
+                  m: 0,
+                  width: "100%",
+                  justifyContent: "flex-start",
+                  gap: 1.5,
+                  "& .MuiFormControlLabel-label": { marginLeft: 0 },
+                }}
+              />
+              <TextField
+                label="Auto-admit after (seconds)"
+                size="small"
+                type="number"
+                value={waitingRoomAutoAdmitSeconds}
+                onChange={(e) => setWaitingRoomAutoAdmitSeconds(e.target.value)}
+                disabled={!waitingRoomEnabled}
+                fullWidth
+              />
+            </Box>
 
             {/* Dates */}
             <Grid size={{ xs: 12 }}>

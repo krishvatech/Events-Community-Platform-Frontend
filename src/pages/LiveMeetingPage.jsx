@@ -1032,6 +1032,242 @@ function WaitingForHost({
   );
 }
 
+function WaitingRoomScreen({
+  onBack,
+  eventTitle = "Live Meeting",
+  scheduled = "--",
+  duration = "--",
+  roleLabel = "Audience",
+  waitingRoomImage = null,
+  timezone = null,
+  loungeAvailable = false,
+  onOpenLounge,
+  loungeStatusLabel = "",
+}) {
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        px: 2,
+        bgcolor: "#05070D",
+        backgroundImage:
+          "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%), radial-gradient(900px 520px at 0% 100%, rgba(20,184,177,0.10), transparent 60%)",
+        color: "#E5E7EB",
+      }}
+    >
+      <Box
+        sx={{
+          position: "absolute",
+          top: 44,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, opacity: 0.95 }}>
+          <AutoAwesomeIcon sx={{ fontSize: 22, color: "rgba(255,255,255,0.85)" }} />
+          <Typography
+            sx={{
+              fontWeight: 700,
+              letterSpacing: 0.2,
+              color: "rgba(255,255,255,0.85)",
+            }}
+          >
+            IMAA Connect
+          </Typography>
+        </Box>
+      </Box>
+
+      <Box sx={{ position: "fixed", left: 16, bottom: 16, zIndex: 50 }}>
+        <Chip
+          label={roleLabel}
+          size="small"
+          sx={{
+            bgcolor: "rgba(255,255,255,0.07)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            color: "rgba(255,255,255,0.85)",
+            fontWeight: 700,
+            backdropFilter: "blur(8px)",
+          }}
+        />
+      </Box>
+
+      <Paper
+        elevation={0}
+        sx={{
+          width: "100%",
+          maxWidth: 560,
+          borderRadius: 4,
+          p: { xs: 2.5, sm: 3 },
+          bgcolor: "rgba(15, 23, 42, 0.60)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          backdropFilter: "blur(12px)",
+          textAlign: "center",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        }}
+      >
+        {waitingRoomImage ? (
+          <Box
+            sx={{
+              width: "100%",
+              maxWidth: 400,
+              height: 250,
+              mx: "auto",
+              mb: 2,
+              borderRadius: 2,
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            <img
+              src={waitingRoomImage}
+              alt="Waiting room"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              width: 72,
+              height: 72,
+              mx: "auto",
+              mb: 2,
+              borderRadius: "999px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            <AccessTimeRoundedIcon sx={{ fontSize: 34, color: "rgba(255,255,255,0.70)" }} />
+          </Box>
+        )}
+
+        <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 0.8, color: "rgba(255,255,255,0.92)" }}>
+          Waiting for host admission
+        </Typography>
+        <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.65)", mb: 2 }}>
+          You are in the waiting room. You’ll be admitted when the host is ready.
+        </Typography>
+
+        <Box
+          sx={{
+            textAlign: "left",
+            borderRadius: 3,
+            p: 2,
+            bgcolor: "rgba(0,0,0,0.18)",
+            border: "1px solid rgba(255,255,255,0.10)",
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Event</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              {eventTitle}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Scheduled</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              {scheduled}
+              {timezone && (
+                <Typography
+                  component="span"
+                  sx={{ fontSize: 11, color: "rgba(255,255,255,0.65)", ml: 0.5 }}
+                >
+                  ({timezone})
+                </Typography>
+              )}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between">
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Duration</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              {duration}
+            </Typography>
+          </Stack>
+        </Box>
+
+        <Stack direction="row" spacing={1.2} alignItems="center" justifyContent="center" sx={{ mt: 2 }}>
+          <CircularProgress size={22} sx={{ color: "rgba(255,255,255,0.70)" }} />
+          <Typography sx={{ fontWeight: 700, letterSpacing: 0.2, color: "rgba(255,255,255,0.80)" }}>
+            Waiting...
+          </Typography>
+        </Stack>
+
+        {loungeAvailable && (
+          <Button
+            onClick={onOpenLounge}
+            variant="outlined"
+            sx={{
+              mt: 2.2,
+              px: 3,
+              py: 1,
+              borderRadius: 999,
+              textTransform: "none",
+              fontWeight: 800,
+              letterSpacing: 0.4,
+              opacity: 1,
+              color: "rgba(255,255,255,0.92)",
+              borderColor: "rgba(255,255,255,0.28)",
+              bgcolor: "rgba(255,255,255,0.06)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.10)",
+                borderColor: "rgba(255,255,255,0.40)",
+              },
+            }}
+          >
+            Open Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
+          </Button>
+        )}
+
+        {onBack && (
+          <Button
+            onClick={onBack}
+            variant="outlined"
+            sx={{
+              mt: loungeAvailable ? 1.5 : 2.5,
+              px: 3,
+              py: 1,
+              borderRadius: 999,
+              textTransform: "none",
+              fontWeight: 800,
+              letterSpacing: 0.4,
+              opacity: 1,
+              color: "rgba(255,255,255,0.92)",
+              borderColor: "rgba(255,255,255,0.28)",
+              bgcolor: "rgba(255,255,255,0.06)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.10)",
+                borderColor: "rgba(255,255,255,0.40)",
+              },
+            }}
+          >
+            BACK
+          </Button>
+        )}
+      </Paper>
+
+      <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+        You can network in the Social Lounge while you wait.
+      </Typography>
+    </Box>
+  );
+}
+
 
 
 export default function NewLiveMeeting() {
@@ -1040,15 +1276,24 @@ export default function NewLiveMeeting() {
     open: false,
     message: "",
     severity: "info", // "error" | "warning" | "info" | "success"
+    onClick: null,
   });
 
-  const showSnackbar = (message, severity = "info") => {
-    setSnackbar({ open: true, message, severity });
+  const showSnackbar = (message, severity = "info", options = {}) => {
+    setSnackbar({ open: true, message, severity, onClick: options?.onClick || null });
   };
 
   const handleCloseSnackbar = (event, reason) => {
+    if (event?.stopPropagation) event.stopPropagation();
     if (reason === "clickaway") return;
-    setSnackbar((prev) => ({ ...prev, open: false }));
+    setSnackbar((prev) => ({ ...prev, open: false, onClick: null }));
+  };
+
+  const handleSnackbarClick = () => {
+    if (typeof snackbar.onClick === "function") {
+      snackbar.onClick();
+      setSnackbar((prev) => ({ ...prev, open: false, onClick: null }));
+    }
   };
 
   const theme = useTheme();
@@ -1273,6 +1518,15 @@ export default function NewLiveMeeting() {
   const [lastMessage, setLastMessage] = useState(null);
   const [isPostEventLounge, setIsPostEventLounge] = useState(false); // ✅ Track post-event lounge mode
   const [postEventLoungeClosingTime, setPostEventLoungeClosingTime] = useState(null); // ✅ Track closing time
+  const [waitingRoomActive, setWaitingRoomActive] = useState(false);
+  const [waitingRoomStatus, setWaitingRoomStatus] = useState("waiting");
+  const [waitingRoomLoungeAllowed, setWaitingRoomLoungeAllowed] = useState(false);
+  const [waitingRoomNetworkingAllowed, setWaitingRoomNetworkingAllowed] = useState(false);
+  const [waitingRoomQueueCount, setWaitingRoomQueueCount] = useState(0);
+  const [waitingRoomQueue, setWaitingRoomQueue] = useState([]);
+  const waitingRoomPrevCountRef = useRef(0);
+  const waitingSectionRef = useRef(null);
+  const [pendingWaitFocus, setPendingWaitFocus] = useState(false);
   const isPanelOpen = isMdUp ? rightPanelOpen : rightOpen;
   const isChatActive = isPanelOpen && tab === 0 && hostPerms.chat;
   const isQnaActive = isPanelOpen && tab === 1;
@@ -2379,6 +2633,9 @@ export default function NewLiveMeeting() {
           setEventData(data); // ✅ Store full event data for access to images and timezone
           if (data?.status) setDbStatus(data.status);
           if (data?.title) setEventTitle(data.title);
+          if (data?.waiting_room_enabled === false) {
+            setWaitingRoomActive(false);
+          }
           const start =
             data?.start_time ||
             data?.starts_at ||
@@ -2418,6 +2675,7 @@ export default function NewLiveMeeting() {
     // 1. If we are in a breakout room, we don't manage tokens here
     // (Breakout tokens are managed by LoungeOverlay -> handleEnterBreakout)
     if (isBreakout) return;
+    if (waitingRoomActive) return;
 
     // 2. If we already have the main token, just use it
     if (mainAuthTokenRef.current) {
@@ -2453,7 +2711,17 @@ export default function NewLiveMeeting() {
         }
         const data = await res.json();
 
+        if (data?.waiting) {
+          setWaitingRoomActive(true);
+          setWaitingRoomStatus(data?.admission_status || "waiting");
+          setWaitingRoomLoungeAllowed(Boolean(data?.lounge_allowed));
+          setWaitingRoomNetworkingAllowed(Boolean(data?.networking_allowed));
+          setLoadingJoin(false);
+          return;
+        }
+
         console.log("[LiveMeeting] Received initial Dyte token");
+        setWaitingRoomActive(false);
         setAuthToken(data.authToken);
         mainAuthTokenRef.current = data.authToken;
         if (data.role) setRole(normalizeRole(data.role));
@@ -2464,7 +2732,42 @@ export default function NewLiveMeeting() {
         setLoadingJoin(false);
       }
     })();
-  }, [eventId, role, isBreakout]);
+  }, [eventId, role, isBreakout, waitingRoomActive]);
+
+  useEffect(() => {
+    if (!eventId || !waitingRoomActive) return;
+    let alive = true;
+
+    const poll = async () => {
+      if (!alive) return;
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/status/`), {
+          headers: { ...authHeader() },
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (!data) return;
+        if (data.admission_status === "admitted") {
+          setWaitingRoomActive(false);
+          setWaitingRoomStatus("admitted");
+        } else if (data.admission_status === "rejected") {
+          setWaitingRoomActive(false);
+          setJoinError("You were not admitted to this event.");
+        } else {
+          setWaitingRoomStatus(data.admission_status || "waiting");
+          setWaitingRoomLoungeAllowed(Boolean(data?.lounge_allowed));
+          setWaitingRoomNetworkingAllowed(Boolean(data?.networking_allowed));
+        }
+      } catch { }
+    };
+
+    poll();
+    const t = setInterval(poll, 3000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [eventId, waitingRoomActive]);
 
   // Fallback: fetch lounge state periodically in case websocket updates are missed
   const fetchLoungeState = useCallback(async () => {
@@ -2621,6 +2924,129 @@ export default function NewLiveMeeting() {
     console.warn("[MainSocket] Unable to send action; socket not open", payload);
     return false;
   }, []);
+
+  const admitAllWaiting = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/admit/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ admit_all: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showSnackbar(err?.detail || "Failed to admit waiting participants", "error");
+        return;
+      }
+      showSnackbar("Admitted all waiting participants", "success");
+    } catch (e) {
+      showSnackbar("Failed to admit waiting participants", "error");
+    }
+  }, [eventId, showSnackbar]);
+
+  const admitWaitingUser = useCallback(
+    async (userId) => {
+      if (!eventId || !userId) return;
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/admit/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ user_id: userId }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          showSnackbar(err?.detail || "Failed to admit participant", "error");
+          return;
+        }
+        showSnackbar("Participant admitted", "success");
+      } catch {
+        showSnackbar("Failed to admit participant", "error");
+      }
+    },
+    [eventId, showSnackbar]
+  );
+
+  const rejectWaitingUser = useCallback(
+    async (userId) => {
+      if (!eventId || !userId) return;
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/reject/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ user_id: userId }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          showSnackbar(err?.detail || "Failed to reject participant", "error");
+          return;
+        }
+        showSnackbar("Participant rejected", "warning");
+      } catch {
+        showSnackbar("Failed to reject participant", "error");
+      }
+    },
+    [eventId, showSnackbar]
+  );
+
+  useEffect(() => {
+    if (!eventId || !isHost || !eventData?.waiting_room_enabled) return;
+    let alive = true;
+    const poll = async () => {
+      if (!alive) return;
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/queue/`), {
+          headers: { ...authHeader() },
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (data && typeof data.count === "number") {
+          setWaitingRoomQueueCount(data.count);
+          if (Array.isArray(data.results)) {
+            setWaitingRoomQueue(
+              data.results.map((r) => ({
+                ...r,
+                name: r.user_name || r.name || r.user_email || "User",
+              }))
+            );
+          }
+        }
+      } catch { }
+    };
+    poll();
+    const t = setInterval(poll, 5000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [eventId, isHost, eventData?.waiting_room_enabled]);
+
+  useEffect(() => {
+    if (!isHost || !eventData?.waiting_room_enabled) return;
+    if (waitingRoomQueueCount > waitingRoomPrevCountRef.current) {
+      const diff = waitingRoomQueueCount - waitingRoomPrevCountRef.current;
+      showSnackbar(
+        diff === 1 ? "New participant is waiting (click to view)" : `${diff} new participants are waiting (click to view)`,
+        "info",
+        {
+          onClick: () => {
+            setPendingWaitFocus(true);
+            toggleRightPanel(3);
+          },
+        }
+      );
+    }
+    waitingRoomPrevCountRef.current = waitingRoomQueueCount;
+  }, [waitingRoomQueueCount, isHost, eventData?.waiting_room_enabled, showSnackbar, toggleRightPanel]);
+
+  useEffect(() => {
+    if (!pendingWaitFocus) return;
+    if (tab !== 3 || !isPanelOpen) return;
+    const el = waitingSectionRef.current;
+    if (el?.scrollIntoView) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    setPendingWaitFocus(false);
+  }, [pendingWaitFocus, tab, isPanelOpen]);
 
   const clearSpeedNetworkingTimer = useCallback(() => {
     if (speedNetworkingTimeoutRef.current) {
@@ -6520,6 +6946,93 @@ export default function NewLiveMeeting() {
                     </Paper>
                   </Box>
 
+                  {isHost && eventData?.waiting_room_enabled && (
+                    <Box ref={waitingSectionRef}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                        <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
+                          WAITING ({waitingRoomQueueCount})
+                        </Typography>
+                      </Stack>
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          bgcolor: "rgba(255,255,255,0.03)",
+                          borderColor: "rgba(255,255,255,0.08)",
+                          borderRadius: 2,
+                        }}
+                      >
+                        {waitingRoomQueueCount === 0 ? (
+                          <Box sx={{ px: 2, py: 1.5 }}>
+                            <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
+                              No one waiting
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <List dense disablePadding>
+                            {(waitingRoomQueue || []).map((w) => (
+                              <ListItem
+                                key={w.id || `${w.user_id}-${w.joined_at || w.created_at || ""}`}
+                                disablePadding
+                                secondaryAction={
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={() => admitWaitingUser(w.user_id)}
+                                      sx={{
+                                        fontSize: 10,
+                                        color: "rgba(255,255,255,0.85)",
+                                        borderColor: "rgba(255,255,255,0.25)",
+                                        py: 0.2,
+                                        minWidth: 64,
+                                        height: 26,
+                                      }}
+                                    >
+                                      Admit
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant="text"
+                                      onClick={() => rejectWaitingUser(w.user_id)}
+                                      sx={{
+                                        fontSize: 10,
+                                        color: "rgba(239, 68, 68, 0.9)",
+                                        minWidth: 64,
+                                        height: 26,
+                                      }}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </Stack>
+                                }
+                              >
+                                <ListItemButton sx={{ px: 1.25, py: 1 }}>
+                                  <ListItemAvatar>
+                                    <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+                                      {initialsFromName(w.name || "User")}
+                                    </Avatar>
+                                  </ListItemAvatar>
+                                  <ListItemText
+                                    primary={
+                                      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
+                                        {w.name || "User"}
+                                      </Typography>
+                                    }
+                                    // /* secondary={
+                                    //   <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
+                                    //     Waiting for admission
+                                    //   </Typography>
+                                    // } */
+                                  />
+                                </ListItemButton>
+                              </ListItem>
+                            ))}
+                          </List>
+                        )}
+                      </Paper>
+                    </Box>
+                  )}
+
                   <Box>
                     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
                       <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
@@ -6937,6 +7450,35 @@ export default function NewLiveMeeting() {
 
 
 
+  if (waitingRoomActive && !isBreakout) {
+    return (
+      <>
+        <WaitingRoomScreen
+          onBack={handleBack}
+          eventTitle={eventTitle}
+          scheduled={scheduledLabel}
+          duration={durationLabel}
+          roleLabel={role === "publisher" ? "Host" : "Audience"}
+          waitingRoomImage={eventData?.waiting_room_image || null}
+          timezone={eventData?.timezone || null}
+          loungeAvailable={(waitingRoomLoungeAllowed || waitingRoomNetworkingAllowed) && loungeOpenStatus?.status === "OPEN"}
+          loungeStatusLabel={loungeOpenStatus?.reason || ""}
+          onOpenLounge={() => setLoungeOpen(true)}
+        />
+        <LoungeOverlay
+          open={loungeOpen}
+          onClose={() => setLoungeOpen(false)}
+          eventId={eventId}
+          currentUserId={getMyUserIdFromJwt()}
+          isAdmin={role === "publisher"}
+          onEnterBreakout={handleEnterBreakout}
+          dyteMeeting={dyteMeeting}
+          onParticipantClick={openLoungeParticipantInfo}
+        />
+      </>
+    );
+  }
+
   if (!initDone || !dyteMeeting) {
     return <JoiningMeetingScreen onBack={handleBack} />;
   }
@@ -7254,6 +7796,94 @@ export default function NewLiveMeeting() {
               </MenuItem>
 
               <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
+
+              {eventData?.waiting_room_enabled && (
+                <>
+                  <MenuItem
+                    onClick={() => {
+                      admitAllWaiting();
+                      closePermMenu();
+                    }}
+                    sx={{ gap: 1.25, py: 1.1 }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 34 }}>
+                      <CheckRoundedIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary="Admit All Waiting"
+                      secondary={
+                        waitingRoomQueueCount > 0
+                          ? `${waitingRoomQueueCount} waiting`
+                          : "No one waiting"
+                      }
+                    />
+                  </MenuItem>
+                  {waitingRoomQueueCount > 0 && (
+                    <Box sx={{ px: 1.5, pb: 1 }}>
+                      <Typography sx={{ fontSize: 11, opacity: 0.7, mb: 0.5 }}>
+                        Waiting Room
+                      </Typography>
+                      <Stack spacing={0.75}>
+                        {(waitingRoomQueue || []).slice(0, 6).map((w) => (
+                          <Box
+                            key={w.user_id}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              bgcolor: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 1.5,
+                              px: 1,
+                              py: 0.75,
+                            }}
+                          >
+                            <Avatar
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                fontSize: 11,
+                                bgcolor: "rgba(255,255,255,0.12)",
+                              }}
+                            >
+                              {initialsFromName(w.user_name || "U")}
+                            </Avatar>
+                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                              <Typography sx={{ fontSize: 12, fontWeight: 700 }} noWrap>
+                                {w.user_name || "User"}
+                              </Typography>
+                              <Typography sx={{ fontSize: 11, opacity: 0.6 }} noWrap>
+                                {w.user_email || ""}
+                              </Typography>
+                            </Box>
+                            <IconButton
+                              size="small"
+                              onClick={() => admitWaitingUser(w.user_id)}
+                              sx={{ color: "#22c55e" }}
+                              aria-label="Admit"
+                            >
+                              <CheckRoundedIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => rejectWaitingUser(w.user_id)}
+                              sx={{ color: "#ef4444" }}
+                              aria-label="Reject"
+                            >
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        ))}
+                        {waitingRoomQueueCount > 6 && (
+                          <Typography sx={{ fontSize: 11, opacity: 0.6 }}>
+                            +{waitingRoomQueueCount - 6} more waiting
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Box>
+                  )}
+                </>
+              )}
 
               <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
                 <ListItemIcon sx={{ minWidth: 34 }}>
@@ -8519,7 +9149,13 @@ export default function NewLiveMeeting() {
             onClose={handleCloseSnackbar}
             severity={snackbar.severity}
             variant="filled"
-            sx={{ width: "100%", boxShadow: 3 }}
+            onClick={handleSnackbarClick}
+            role={snackbar.onClick ? "button" : undefined}
+            sx={{
+              width: "100%",
+              boxShadow: 3,
+              cursor: snackbar.onClick ? "pointer" : "default",
+            }}
           >
             {snackbar.message}
           </Alert>
