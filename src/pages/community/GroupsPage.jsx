@@ -513,7 +513,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
     : pending
       ? "Request pending"
       : isApproval
-        ? "Request"
+        ? "Request to Join"
         : "Join";
 
   return (
