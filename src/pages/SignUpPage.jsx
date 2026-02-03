@@ -388,7 +388,7 @@ const SignUpPage = () => {
                     </Typography>
                     <TextField
                       name="firstName"
-                      placeholder="firstName"
+                      placeholder="First Name"
                       value={formData.firstName}
                       onChange={handleChange}
                       size="small"
@@ -414,7 +414,7 @@ const SignUpPage = () => {
                     </Typography>
                     <TextField
                       name="lastName"
-                      placeholder="lastName"
+                      placeholder="Last Name"
                       value={formData.lastName}
                       onChange={handleChange}
                       size="small"
