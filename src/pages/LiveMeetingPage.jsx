@@ -92,6 +92,7 @@ import { DyteParticipantsAudio } from "@dytesdk/react-ui-kit";
 import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
 import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
+import PostEventLoungeScreen from "../components/lounge/PostEventLoungeScreen.jsx";
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
 import BannedParticipantsDialog from "../components/live-meeting/BannedParticipantsDialog.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
@@ -1270,6 +1271,8 @@ export default function NewLiveMeeting() {
   const [loungeOpen, setLoungeOpen] = useState(false);
   const [showSpeedNetworking, setShowSpeedNetworking] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
+  const [isPostEventLounge, setIsPostEventLounge] = useState(false); // ✅ Track post-event lounge mode
+  const [postEventLoungeClosingTime, setPostEventLoungeClosingTime] = useState(null); // ✅ Track closing time
   const isPanelOpen = isMdUp ? rightPanelOpen : rightOpen;
   const isChatActive = isPanelOpen && tab === 0 && hostPerms.chat;
   const isQnaActive = isPanelOpen && tab === 1;
@@ -1419,6 +1422,8 @@ export default function NewLiveMeeting() {
   const [mainRoomAuthToken, setMainRoomAuthToken] = useState(null);
   const [isInBreakoutRoom, setIsInBreakoutRoom] = useState(false);
   const isInBreakoutRoomRef = useRef(false); // ✅ Ref for socket access
+  const leaveBreakoutInFlightRef = useRef(false);
+  const fetchLoungeStateRef = useRef(null); // ✅ Ref to store fetchLoungeState for calling from handleLeaveBreakout
 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
@@ -1865,6 +1870,8 @@ export default function NewLiveMeeting() {
   const [hostJoined, setHostJoined] = useState(false);
   const [pinnedHost, setPinnedHost] = useState(null);
   const [hostIdHint, setHostIdHint] = useState(null);
+  const hostIdRef = useRef(null);
+  const hostUserKeyRef = useRef(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
 
   const resolveTableName = useCallback(
@@ -2002,9 +2009,13 @@ export default function NewLiveMeeting() {
     applyBreakoutTokenRef.current = applyBreakoutToken;
   }, [applyBreakoutToken]);
 
-
   const handleEnterBreakout = async (tableId) => {
     if (!eventId || !tableId) return;
+
+    // ✅ DEFENSIVE: Ensure we're NOT updating meeting status
+    // Joining a lounge should NEVER trigger updateLiveStatus or change meeting state
+    console.log("[LiveMeeting] Entering lounge table - current status:", dbStatus, "(should not change)");
+
     try {
       const url = `${API_ROOT}/events/${eventId}/lounge-join-table/`.replace(/([^:]\/)\/+/g, "$1");
       const res = await fetch(url, {
@@ -2017,17 +2028,46 @@ export default function NewLiveMeeting() {
         const data = await res.json();
         if (data.token) {
           console.log("[LiveMeeting] Joining breakout room with token");
+
+          // ✅ CRITICAL: Assert we're not reactivating the meeting
+          // This join is purely lounge-based, not meeting-based
+          if (dbStatus === "live") {
+            console.warn("[LiveMeeting] WARNING: Lounge join happening while meeting is live. This is unexpected.");
+          }
+          console.assert(
+            dbStatus !== "live",
+            "[CRITICAL] Lounge join should not happen while main meeting is live!"
+          );
+
           const tableName = resolveTableName(tableId) || `Room ${tableId}`;
           // ✅ Get logo URL from loungeTables
           const table = loungeTables.find((t) => String(t.id) === String(tableId));
           const logoUrl = table?.icon_url || "";
           await applyBreakoutToken(data.token, tableId, tableName, logoUrl);
         }
+      } else if (res.status === 403) {
+        // ✅ NEW: Lounge is closed or not available
+        const data = await res.json().catch(() => ({}));
+        const reason = data.reason || "The lounge is currently closed";
+        showSnackbar(reason, "warning");
+        console.warn("[LiveMeeting] Lounge not available:", reason);
+      } else if (res.status === 400) {
+        // ✅ NEW: Check if backend detected meeting state corruption
+        const data = await res.json().catch(() => ({}));
+        if (data.error_code === "meeting_state_corrupted") {
+          console.error("[LiveMeeting] Backend detected meeting state corruption!");
+          showSnackbar("Meeting state error detected. Please refresh the page and try again.", "error");
+        } else {
+          console.error("[LiveMeeting] Failed to fetch breakout token:", res.status);
+          showSnackbar("Failed to join table. Please try again.", "error");
+        }
       } else {
         console.error("[LiveMeeting] Failed to fetch breakout token:", res.status);
+        showSnackbar("Failed to join table. Please try again.", "error");
       }
     } catch (err) {
       console.error("[LiveMeeting] Failed to join breakout:", err);
+      showSnackbar("Error joining table", "error");
     }
   };
 
@@ -2458,6 +2498,11 @@ export default function NewLiveMeeting() {
     }, 10000);
     return () => clearInterval(interval);
   }, [eventId, fetchLoungeState]);
+
+  // ✅ Keep fetchLoungeStateRef in sync for handleLeaveBreakout to call
+  useEffect(() => {
+    fetchLoungeStateRef.current = fetchLoungeState;
+  }, [fetchLoungeState]);
 
   // ---------- Persistent Main Event WebSocket (for Force Join, Timer, Broadcast) ----------
   useEffect(() => {
@@ -3181,11 +3226,12 @@ export default function NewLiveMeeting() {
 
   // Host triggers LIVE on init done
   useEffect(() => {
-    if (initDone && role === "publisher") {
-      updateLiveStatus("start");
-      setDbStatus("live"); // ✅ show LIVE chip immediately for host too
-    }
-  }, [initDone, role, updateLiveStatus]);
+    if (!initDone || role !== "publisher") return;
+    // Do not reactivate main meeting from lounge/breakout or after it ended
+    if (isBreakout || dbStatus === "ended") return;
+    updateLiveStatus("start");
+    setDbStatus("live"); // ✅ show LIVE chip immediately for host too
+  }, [initDone, role, isBreakout, dbStatus, updateLiveStatus]);
 
   const ignoreRoomLeftRef = useRef(false);
 
@@ -3209,15 +3255,75 @@ export default function NewLiveMeeting() {
         await dyteMeeting?.leave?.();
       } catch { }
 
-      if (role === "publisher") {
-        if (explicitEnd) updateLiveStatus("end");
-        navigate("/admin/events");
+      // ✅ IMPORTANT: Wait for meeting end to be processed on backend before fetching lounge status
+      // This ensures is_live = False and live_ended_at is set before we check lounge availability
+      if (explicitEnd && role === "publisher") {
+        try {
+          await updateLiveStatus("end");
+          console.log("[LiveMeeting] Host explicitly ended meeting, backend notified");
+        } catch (e) {
+          console.warn("[LiveMeeting] Error notifying backend of meeting end:", e);
+        }
+      }
+
+      let loungeStatus = loungeOpenStatus;
+
+      // ✅ Fetch latest lounge status in case it changed
+      if (!eventId) {
+        if (role === "publisher") {
+          navigate("/admin/events");
+        } else {
+          navigate(-1);
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
+          headers: authHeader(),
+        });
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data?.lounge_open_status) {
+            loungeStatus = data.lounge_open_status;
+            console.log("[LiveMeeting] Lounge status after meeting end:", loungeStatus);
+          }
+        }
+      } catch {
+        // Use existing loungeOpenStatus if fetch fails
+      }
+
+      const isPostEventWindowOpen = loungeStatus?.status === "OPEN" &&
+                                    loungeStatus?.reason?.includes("Post-event");
+
+      if (isPostEventWindowOpen && loungeStatus?.next_change) {
+        // ✅ Show post-event lounge screen (both host and participants)
+        console.log("[LiveMeeting] Showing post-event lounge, closing at:", loungeStatus.next_change);
+        setIsPostEventLounge(true);
+        setPostEventLoungeClosingTime(loungeStatus.next_change);
       } else {
-        navigate(-1);
+        // ✅ Event not in post-event window, navigate appropriately
+        console.log("[LiveMeeting] Post-event lounge not available, navigating away. Status:", loungeStatus?.status, "Reason:", loungeStatus?.reason);
+        if (role === "publisher") {
+          navigate("/admin/events");
+        } else {
+          navigate(-1);
+        }
       }
     },
-    [navigate, role, updateLiveStatus, dyteMeeting, isBanned]
+    [navigate, role, updateLiveStatus, dyteMeeting, isBanned, eventId]
   );
+
+  // ✅ Handler for exiting post-event lounge
+  const handleExitPostEventLounge = useCallback(() => {
+    setIsPostEventLounge(false);
+    // ✅ Host goes to admin dashboard, participants go back
+    if (role === "publisher") {
+      navigate("/admin/events");
+    } else {
+      navigate(-1);
+    }
+  }, [navigate, role]);
 
   // Poll event status so clients exit when backend ends the meeting
   useEffect(() => {
@@ -3438,6 +3544,19 @@ export default function NewLiveMeeting() {
     return () => clearInterval(interval);
   }, [isHost, dyteMeeting]);
 
+  useEffect(() => {
+    if (hostIdHint) hostIdRef.current = hostIdHint;
+  }, [hostIdHint]);
+
+  useEffect(() => {
+    if (pinnedHost?.id) hostIdRef.current = pinnedHost.id;
+  }, [pinnedHost?.id]);
+
+  useEffect(() => {
+    if (isHost && dyteMeeting?.self?.id) hostIdRef.current = dyteMeeting.self.id;
+  }, [isHost, dyteMeeting?.self?.id]);
+
+
   // Sync new joiners with host permission toggles
   useEffect(() => {
     if (!isHost || !dyteMeeting?.participants?.joined || !dyteMeeting?.self) return;
@@ -3476,6 +3595,19 @@ export default function NewLiveMeeting() {
   // ---------- Build participants list for your NEW UI ----------
   const [participantsTick, setParticipantsTick] = useState(0);
   const observedParticipantsRef = useRef(new Map()); // fallback map from events
+
+  useEffect(() => {
+    if (!dyteMeeting) return;
+    const hostId = hostIdHint || pinnedHost?.id || (isHost ? dyteMeeting?.self?.id : null);
+    if (!hostId) return;
+    const all = getJoinedParticipants();
+    const found =
+      all.find((p) => p?.id === hostId) ||
+      (dyteMeeting?.self?.id === hostId ? dyteMeeting.self : null);
+    if (!found) return;
+    const key = getParticipantUserKey(found);
+    if (key) hostUserKeyRef.current = key;
+  }, [dyteMeeting, getJoinedParticipants, hostIdHint, pinnedHost?.id, isHost, participantsTick]);
 
   useEffect(() => {
     if (!dyteMeeting?.participants) return;
@@ -3752,21 +3884,8 @@ export default function NewLiveMeeting() {
     });
 
     return deduped.map((p) => {
-      // ✅ Determine role from preset first, then fall back to pinned host
+      // ✅ Determine role from preset/metadata first, then fall back to pinned host
       const preset = (p.presetName || "").toLowerCase();
-      const isPublisherPreset =
-        preset.includes("host") ||
-        preset.includes("publisher") ||
-        preset.includes("admin") ||
-        preset.includes("presenter") ||
-        preset.includes("speaker");
-
-      // If preset indicates publisher/host, mark as Host
-      // Otherwise check if they're the pinned host
-      const isHostParticipant =
-        isPublisherPreset ||
-        (pinnedHost?.id && p.id === pinnedHost.id) ||
-        (isHost && dyteMeeting?.self?.id && p.id === dyteMeeting.self.id);
 
       const raw = p?._raw || p || {};
       const rawMeta =
@@ -3788,6 +3907,45 @@ export default function NewLiveMeeting() {
       } else if (typeof rawMeta === "object" && rawMeta) {
         parsedMeta = rawMeta;
       }
+      const rawRole = String(
+        raw.role ||
+        raw.user_role ||
+        raw.userRole ||
+        raw.participant_role ||
+        raw.participantRole ||
+        parsedMeta.role ||
+        parsedMeta.user_role ||
+        parsedMeta.userRole ||
+        parsedMeta.preset ||
+        parsedMeta.presetName ||
+        ""
+      ).toLowerCase();
+
+      const isPublisherPreset =
+        preset.includes("host") ||
+        preset.includes("publisher") ||
+        preset.includes("admin") ||
+        preset.includes("presenter") ||
+        preset.includes("speaker") ||
+        rawRole.includes("host") ||
+        rawRole.includes("publisher") ||
+        rawRole.includes("admin") ||
+        rawRole.includes("presenter") ||
+        rawRole.includes("speaker") ||
+        raw?.isHost === true ||
+        raw?.is_host === true;
+
+      // If preset indicates publisher/host, mark as Host
+      // Otherwise check if they're the pinned host or the broadcast host hint
+      const hostIdCurrent = hostIdRef.current || hostIdHint; // ✅ Fallback to hostIdHint if hostIdRef is cleared during lounge transition
+      const hostUserKeyCurrent = hostUserKeyRef.current;
+      const participantUserKey = getParticipantUserKey(p);
+      const isHostParticipant =
+        isPublisherPreset ||
+        (hostIdCurrent && p.id === hostIdCurrent) ||
+        (hostUserKeyCurrent && participantUserKey && participantUserKey === hostUserKeyCurrent) ||
+        (isHost && dyteMeeting?.self?.id && p.id === dyteMeeting.self.id);
+
       const metaProfilePicture =
         typeof parsedMeta?.profilePicture === "object"
           ? parsedMeta.profilePicture.displayImage || parsedMeta.profilePicture.url
@@ -3817,7 +3975,7 @@ export default function NewLiveMeeting() {
         _raw: p,
       };
     });
-  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, participantsTick, loungeTables]);
+  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables]);
 
   const breakoutParticipantCount = useMemo(() => {
     if (!isBreakout) return 0;
@@ -3831,40 +3989,90 @@ export default function NewLiveMeeting() {
 
   // ✅ Leave Breakout / Table logic
   const handleLeaveBreakout = useCallback(async () => {
+    if (leaveBreakoutInFlightRef.current) return;
+    leaveBreakoutInFlightRef.current = true;
     // 1. Notify backend via MAIN socket (same endpoint as lounge)
     if (mainSocketRef.current?.readyState === WebSocket.OPEN) {
       console.log("[LiveMeeting] Sending leave_table via main socket");
       mainSocketRef.current.send(JSON.stringify({ action: "leave_table" }));
     }
 
-    // 2. Perform local switch back to main meeting
-    if (dyteMeeting) {
+    // 2. ✅ SPECIAL HANDLING FOR POST-EVENT LOUNGE
+    // If in post-event mode, don't try to return to main meeting (it's ended)
+    // Just reset breakout state and show PostEventLoungeScreen again
+    if (isPostEventLounge) {
+      console.log("[LiveMeeting] In post-event lounge - resetting breakout state only");
       try {
-        await dyteMeeting.leaveRoom();
-      } catch (e) {
-        console.warn("Error leaving breakout room:", e);
+        if (dyteMeeting) {
+          try {
+            await dyteMeeting.leaveRoom();
+          } catch (e) {
+            console.warn("[LiveMeeting] Error leaving lounge room:", e);
+          }
+        }
+        await new Promise((r) => setTimeout(r, 200));
+
+        // ✅ REFRESH LOUNGE STATE FIRST: Fetch updated table data BEFORE resetting state
+        // This ensures data has time to fetch before UI re-renders
+        if (fetchLoungeStateRef.current) {
+          console.log("[LiveMeeting] Refreshing lounge state before returning to post-event screen");
+          fetchLoungeStateRef.current();
+        }
+
+        // Give API call time to complete before resetting state and re-rendering
+        await new Promise((r) => setTimeout(r, 300));
+
+        // Reset breakout state without trying to return to main
+        setIsBreakout(false);
+        setAuthToken(null);
+        setInitDone(false);
+        setRoomJoined(false);
+        joinedOnceRef.current = false;
+        setActiveTableId(null);
+        setActiveTableName("");
+        setActiveTableLogoUrl("");
+        if (typeof setRoomChatConversationId === "function") {
+          setRoomChatConversationId(null);
+        }
+        console.log("[LiveMeeting] Successfully returned to post-event lounge screen with refreshed table data");
+      } finally {
+        setTimeout(() => {
+          leaveBreakoutInFlightRef.current = false;
+        }, 300);
       }
+      return;
     }
 
-    // Delay for cleanup
-    await new Promise((r) => setTimeout(r, 500));
-
-    if (mainAuthTokenRef.current) {
-      console.log("[LiveMeeting] verify: switching to main token");
-      setIsBreakout(false);
-      setAuthToken(mainAuthTokenRef.current);
-      setActiveTableId(null);
-      setActiveTableName("");
-      setActiveTableLogoUrl(""); // ✅ Clear logo
-      // Force reset any chat/overlay state if needed
-      if (typeof setRoomChatConversationId === "function") {
-        setRoomChatConversationId(null);
+    // 3. Use the same switch logic as breakout end to avoid double-leave (for non-post-event)
+    try {
+      if (applyBreakoutTokenRef.current) {
+        await applyBreakoutTokenRef.current(null, null, null, null);
+      } else {
+        if (dyteMeeting) {
+          try {
+            await dyteMeeting.leaveRoom();
+          } catch (e) {
+            console.warn("Error leaving breakout room:", e);
+          }
+        }
+        await new Promise((r) => setTimeout(r, 500));
+        if (mainAuthTokenRef.current) {
+          setIsBreakout(false);
+          setAuthToken(mainAuthTokenRef.current);
+          setActiveTableId(null);
+          setActiveTableName("");
+          setActiveTableLogoUrl("");
+          if (typeof setRoomChatConversationId === "function") {
+            setRoomChatConversationId(null);
+          }
+        }
       }
-    } else {
-      console.warn("No main token found, reloading page...");
-      window.location.reload();
+    } finally {
+      setTimeout(() => {
+        leaveBreakoutInFlightRef.current = false;
+      }, 300);
     }
-  }, [dyteMeeting]);
+  }, [dyteMeeting, isPostEventLounge]);
 
   // Debug: log what Dyte exposes so we can see why audience is missing
   useEffect(() => {
@@ -4037,22 +4245,18 @@ export default function NewLiveMeeting() {
       }
     }
 
-    // If in breakout and no official host pinned, find first other person from main area
+    // If in breakout and no official host pinned, find first other participant in the lounge room
     if (!p && isBreakout) {
-      // ✅ FIX: Only show main area participants (not occupying lounge)
-      const mainAreaParticipants = getJoinedParticipants().filter(
-        x =>
-          x.id !== dyteMeeting?.self?.id &&
-          !participants.find(p => p.id === x.id)?.isOccupyingLounge
+      const breakoutParticipants = getJoinedParticipants().filter(
+        (x) => x.id && x.id !== dyteMeeting?.self?.id
       );
-      if (mainAreaParticipants.length > 0) {
-        console.log("[LoungePinning] Breakout fallback: Found main area participant:", mainAreaParticipants[0].name);
-        p = mainAreaParticipants[0];
+      if (breakoutParticipants.length > 0) {
+        console.log("[LoungePinning] Breakout fallback: Found participant:", breakoutParticipants[0].name);
+        p = breakoutParticipants[0];
       } else {
-        // No main area participants available, will show welcome screen
-        console.log("[LoungePinning] Breakout fallback: No main area participants available");
+        console.log("[LoungePinning] Breakout fallback: No other participants available");
       }
-      // If no main area participants, p remains null - will trigger welcome/placeholder UI
+      // If no other participants, p remains null - welcome/placeholder UI will show
     }
 
     // ✅ NEW: If pinned participant is self and in lounge/breakout, show someone else instead
@@ -4329,7 +4533,8 @@ export default function NewLiveMeeting() {
   const stageHasVideo = pinnedHasVideo || hasScreenshare;
 
   // If audience and host not live yet
-  const shouldShowMeeting = role === "publisher" || roomJoined || hostJoined || dbStatus === "live";
+  // ✅ Also show meeting if in breakout/lounge room (post-event)
+  const shouldShowMeeting = role === "publisher" || roomJoined || hostJoined || dbStatus === "live" || isBreakout;
 
   // Back behavior (same as old intent)
   const handleBack = () => {
@@ -5332,18 +5537,24 @@ export default function NewLiveMeeting() {
   );
 
   const groupedMembers = useMemo(() => {
-    const hostId = pinnedHost?.id || (isHost ? dyteMeeting?.self?.id : null);
+    const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || (isHost ? dyteMeeting?.self?.id : null);
+    const hostUserKey = hostUserKeyRef.current;
+    const hostFromKey = hostUserKey
+      ? participants.find((p) => getParticipantUserKey(p?._raw || p) === hostUserKey)
+      : null;
 
     const host = hostId
       ? participants.filter((p) => p.id === hostId && p.inMeeting)
-      : participants.filter((p) => p.role === "Host" && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
+      : hostFromKey
+        ? participants.filter((p) => p.id === hostFromKey.id && p.inMeeting)
+      : participants.filter((p) => p.role === "Host" && p.inMeeting); // ✅ Don't filter by isOccupyingLounge for host (they may be in transition)
 
     const audience = hostId
       ? participants.filter((p) => p.id !== hostId && p.inMeeting && (isBreakout || !p.isOccupyingLounge)) // ✅ filter lounge occupants out of main room
       : participants.filter((p) => p.role !== "Host" && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
 
     return { host, speakers: [], audience };
-  }, [participants, pinnedHost, isHost, dyteMeeting?.self?.id, isBreakout]);
+  }, [participants, pinnedHost, hostIdHint, isHost, dyteMeeting?.self?.id, isBreakout]);
 
   // --- Self helpers for Members UI ---
   const selfDyteId = dyteMeeting?.self?.id || null;
@@ -6729,8 +6940,49 @@ export default function NewLiveMeeting() {
     return <JoiningMeetingScreen onBack={handleBack} />;
   }
 
+  // ✅ IMPORTANT: Check post-event lounge BEFORE checking shouldShowMeeting
+  // This ensures post-event lounge screen always shows, never "Waiting for host"
+  // If in post-event lounge mode, show the special screen
+  // BUT if user joined a lounge table, show the actual lounge video instead
+  if (isPostEventLounge && !isBreakout) {
+    return (
+      <DyteProvider value={dyteMeeting}>
+        <div
+          ref={remoteAudioRef}
+          style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+        >
+          <DyteParticipantsAudio meeting={dyteMeeting} />
+        </div>
+        <PostEventLoungeScreen
+          closingTime={postEventLoungeClosingTime}
+          loungeTables={loungeOnlyTables}
+          onJoinTable={(tableId, seatIndex) => {
+            // ✅ Join lounge table - same as main lounge overlay
+            mainSocketRef.current?.send(
+              JSON.stringify({
+                action: "join_table",
+                table_id: tableId,
+                seat_index: seatIndex,
+              })
+            );
+            // Then get the token and enter the breakout room
+            handleEnterBreakout(tableId);
+          }}
+          onLeaveTable={() => {
+            mainSocketRef.current?.send(JSON.stringify({ action: "leave_table" }));
+          }}
+          currentUserId={getMyUserIdFromJwt()}
+          myUsername={getUserName()}
+          onExit={handleExitPostEventLounge}
+          onParticipantClick={openLoungeParticipantInfo}
+          loungeOpenStatus={loungeOpenStatus}
+          isHost={role === "publisher"}
+        />
+      </DyteProvider>
+    );
+  }
 
-
+  // ✅ Check if should show "Waiting for host" (not in post-event lounge)
   if (!shouldShowMeeting) {
     return (
       <WaitingForHost

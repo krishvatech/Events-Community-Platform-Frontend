@@ -16,11 +16,16 @@ const LoungeTable = ({
     onEditTable,
     onDeleteTable,
     onParticipantClick,
+    loungeOpenStatus, // ✅ NEW: lounge availability status
 }) => {
     const isUserAtThisTable = Object.values(table.participants || {}).some((p) => {
         return String(p.user_id) === String(currentUserId) || p.username === myUsername;
     });
     const maxSeats = table.max_seats || 4;
+
+    // ✅ NEW: Check if lounge is open
+    const isLoungeClosed = loungeOpenStatus?.status === 'CLOSED';
+    const isFull = Object.keys(table.participants || {}).length >= maxSeats;
     const [iconUploading, setIconUploading] = useState(false);
     const iconInputRef = useRef(null);
 
@@ -289,7 +294,8 @@ const LoungeTable = ({
                 <Button
                     fullWidth
                     variant="outlined"
-                    disabled={Object.keys(table.participants || {}).length >= table.max_seats}
+                    disabled={isLoungeClosed || isFull}
+                    title={isLoungeClosed ? 'Lounge is closed' : isFull ? 'Table is full' : 'Join this table'}
                     onClick={() => {
                         // Find first available seat index
                         const participants = table.participants || {};
@@ -306,13 +312,19 @@ const LoungeTable = ({
                         fontWeight: 700,
                         borderColor: 'rgba(255, 255, 255, 0.3)',
                         color: 'white',
-                        '&:hover': {
+                        opacity: isLoungeClosed ? 0.5 : 1,
+                        '&:hover:not(:disabled)': {
                             borderColor: 'white',
                             bgcolor: 'rgba(255, 255, 255, 0.1)',
                         },
+                        '&:disabled': {
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            cursor: 'not-allowed',
+                        },
                     }}
                 >
-                    Join
+                    {isLoungeClosed ? 'Lounge Closed' : 'Join'}
                 </Button>
             )}
         </Paper>

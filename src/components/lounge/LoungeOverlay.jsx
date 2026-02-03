@@ -299,11 +299,19 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     onEnterBreakout(data.token, tableId, tableName, logoUrl); // ✅ Pass logo URL
                     onClose(); // Auto-close overlay after joining
                 }
+            } else if (res.status === 403) {
+                // ✅ NEW: Lounge is closed or not available
+                const data = await res.json().catch(() => ({}));
+                const reason = data.reason || "The lounge is currently closed";
+                alert(reason);
+                console.warn("[Lounge] Lounge not available:", reason);
             } else {
                 console.error("[Lounge] Breakout fetch failed (Even with fallback):", res.status);
+                alert("Failed to join table. Please try again.");
             }
         } catch (err) {
             console.error("[Lounge] Failed to join breakout video", err);
+            alert("Error joining table");
         }
     };
 
@@ -597,6 +605,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                                 onEditTable={handleOpenEditTable}
                                 onDeleteTable={handleOpenDeleteTable}
                                 onParticipantClick={onParticipantClick}
+                                loungeOpenStatus={loungeOpenStatus}
                             />
 
                             {breakoutTables.length > 0 && (
@@ -621,6 +630,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                                         onEditTable={handleOpenEditTable}
                                         onDeleteTable={handleOpenDeleteTable}
                                         onParticipantClick={onParticipantClick}
+                                        loungeOpenStatus={loungeOpenStatus}
                                     />
                                 </Box>
                             )}

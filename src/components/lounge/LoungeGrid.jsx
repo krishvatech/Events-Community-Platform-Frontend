@@ -18,6 +18,7 @@ const LoungeGrid = ({
     title,
     description,
     showCreateButton = true,
+    loungeOpenStatus, // ✅ NEW: lounge availability status
 }) => {
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -72,6 +73,7 @@ const LoungeGrid = ({
                             onEditTable={onEditTable}
                             onDeleteTable={onDeleteTable}
                             onParticipantClick={onParticipantClick}
+                            loungeOpenStatus={loungeOpenStatus}
                         />
                     </Grid>
                 ))}
