@@ -807,28 +807,48 @@ export default function NotificationsPage({
       return;
     }
 
-    // Standard Items Handler
+    // Standard Items Handler - Update state immediately
     setItems((curr) => {
       const next = curr.map((i) => (i.id === id ? { ...i, is_read: nowRead } : i));
       return next;
     });
-    if (nowRead && item?.source === "api") {
+
+    // API Items Handler - Handle both read and unread
+    if (item?.source === "api") {
       try {
-        await fetch(`${API_BASE}/notifications/mark-read/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...tokenHeader() },
-          body: JSON.stringify({ ids: [id] }),
-        });
+        if (nowRead) {
+          await fetch(`${API_BASE}/notifications/mark-read/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...tokenHeader() },
+            body: JSON.stringify({ ids: [id] }),
+          });
+        } else {
+          await fetch(`${API_BASE}/notifications/mark-unread/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...tokenHeader() },
+            body: JSON.stringify({ ids: [id] }),
+          });
+        }
       } catch { }
     }
-    if (nowRead && item?.source === "group") {
+
+    // Group Items Handler - Handle both read and unread
+    if (item?.source === "group") {
       try {
         const rawId = String(id).replace(/^group-/, "");
-        await fetch(`${API_BASE}/groups/group-notifications/mark-read/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...tokenHeader() },
-          body: JSON.stringify({ ids: [Number(rawId)] }),
-        });
+        if (nowRead) {
+          await fetch(`${API_BASE}/groups/group-notifications/mark-read/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...tokenHeader() },
+            body: JSON.stringify({ ids: [Number(rawId)] }),
+          });
+        } else {
+          await fetch(`${API_BASE}/groups/group-notifications/mark-unread/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...tokenHeader() },
+            body: JSON.stringify({ ids: [Number(rawId)] }),
+          });
+        }
       } catch { }
     }
   };
