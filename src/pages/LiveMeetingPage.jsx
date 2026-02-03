@@ -3661,6 +3661,12 @@ export default function NewLiveMeeting() {
 
   const ignoreRoomLeftRef = useRef(false);
 
+  const myUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
+  const isEventOwner = useMemo(() => {
+    if (!myUserId || !eventData?.created_by_id) return false;
+    return String(myUserId) === String(eventData.created_by_id);
+  }, [myUserId, eventData?.created_by_id]);
+
   const handleMeetingEnd = useCallback(
     async (state, options = {}) => {
       // If user is banned, do NOT navigate away. We want to show the banned screen.
@@ -3696,7 +3702,7 @@ export default function NewLiveMeeting() {
 
       // ✅ Fetch latest lounge status in case it changed
       if (!eventId) {
-        if (role === "publisher") {
+        if (isEventOwner || (role === "publisher" && !eventData?.created_by_id)) {
           navigate("/admin/events");
         } else {
           navigate(-1);
@@ -3730,26 +3736,26 @@ export default function NewLiveMeeting() {
       } else {
         // ✅ Event not in post-event window, navigate appropriately
         console.log("[LiveMeeting] Post-event lounge not available, navigating away. Status:", loungeStatus?.status, "Reason:", loungeStatus?.reason);
-        if (role === "publisher") {
+        if (isEventOwner || (role === "publisher" && !eventData?.created_by_id)) {
           navigate("/admin/events");
         } else {
           navigate(-1);
         }
       }
     },
-    [navigate, role, updateLiveStatus, dyteMeeting, isBanned, eventId]
+    [navigate, role, isEventOwner, eventData?.created_by_id, updateLiveStatus, dyteMeeting, isBanned, eventId]
   );
 
   // ✅ Handler for exiting post-event lounge
   const handleExitPostEventLounge = useCallback(() => {
     setIsPostEventLounge(false);
     // ✅ Host goes to admin dashboard, participants go back
-    if (role === "publisher") {
+    if (isEventOwner || (role === "publisher" && !eventData?.created_by_id)) {
       navigate("/admin/events");
     } else {
       navigate(-1);
     }
-  }, [navigate, role]);
+  }, [navigate, role, isEventOwner, eventData?.created_by_id]);
 
   // Poll event status so clients exit when backend ends the meeting
   useEffect(() => {
@@ -4971,7 +4977,7 @@ export default function NewLiveMeeting() {
 
   // Back behavior (same as old intent)
   const handleBack = () => {
-    if (role === "publisher") navigate("/admin/events");
+    if (isEventOwner || (role === "publisher" && !eventData?.created_by_id)) navigate("/admin/events");
     else navigate(-1);
   };
 
@@ -5026,7 +5032,6 @@ export default function NewLiveMeeting() {
 
   // ✅ Private chat unread (per user)
   const [privateUnreadByUserId, setPrivateUnreadByUserId] = useState({});
-  const myUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
   const isRoomChatActive = Boolean(isBreakout && activeTableId);
   const activeRoomLabel =
     activeTableName || (activeTableId ? `Room ${activeTableId}` : "");
