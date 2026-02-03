@@ -3882,6 +3882,7 @@ export default function NewLiveMeeting() {
       // ✅ Host announces itself so audience can pin even if preset is weird
       if (type === "host-id" && payload?.hostId) {
         setHostIdHint(payload.hostId);
+        if (payload?.hostUserKey) hostUserKeyRef.current = payload.hostUserKey;
 
         const found = getJoinedParticipants().find((p) => p?.id === payload.hostId);
         if (found) {
@@ -3960,10 +3961,15 @@ export default function NewLiveMeeting() {
 
     const broadcastPresence = () => {
       const myId = dyteMeeting.self?.id;
+      const hostUserKey = getParticipantUserKey(dyteMeeting.self);
       // Only broadcast after join is complete to avoid ERR1205
       if (myId && dyteMeeting.self?.roomJoined) {
-        dyteMeeting.participants?.broadcastMessage?.("host-id", { hostId: myId });
+        dyteMeeting.participants?.broadcastMessage?.("host-id", {
+          hostId: myId,
+          hostUserKey,
+        });
       }
+      if (hostUserKey) hostUserKeyRef.current = hostUserKey;
     };
     broadcastPresence();
     const interval = setInterval(broadcastPresence, 4000);
@@ -5969,15 +5975,15 @@ export default function NewLiveMeeting() {
     const hostFromKey = hostUserKey
       ? participants.find((p) => getParticipantUserKey(p?._raw || p) === hostUserKey)
       : null;
+    const hostIdExists = hostId ? participants.some((p) => p.id === hostId) : false;
+    const effectiveHostId = hostIdExists ? hostId : (hostFromKey?.id || null);
 
-    const host = hostId
-      ? participants.filter((p) => p.id === hostId && p.inMeeting)
-      : hostFromKey
-        ? participants.filter((p) => p.id === hostFromKey.id && p.inMeeting)
+    const host = effectiveHostId
+      ? participants.filter((p) => p.id === effectiveHostId && p.inMeeting)
       : participants.filter((p) => p.role === "Host" && p.inMeeting); // ✅ Don't filter by isOccupyingLounge for host (they may be in transition)
 
-    const audience = hostId
-      ? participants.filter((p) => p.id !== hostId && p.inMeeting && (isBreakout || !p.isOccupyingLounge)) // ✅ filter lounge occupants out of main room
+    const audience = effectiveHostId
+      ? participants.filter((p) => p.id !== effectiveHostId && p.inMeeting && (isBreakout || !p.isOccupyingLounge)) // ✅ filter lounge occupants out of main room
       : participants.filter((p) => p.role !== "Host" && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
 
     return { host, speakers: [], audience };
@@ -6008,13 +6014,27 @@ export default function NewLiveMeeting() {
 
   // Others only (Audience + Speaker), host is pinned already
   const stageOthers = useMemo(() => {
+    const pinnedKey = latestPinnedHost ? getParticipantUserKey(latestPinnedHost?._raw || latestPinnedHost) : "";
     if (isBreakout) {
       // In breakout, everyone is a peer. Hide only the person currently occupying the main stage.
-      return participants.filter((p) => p.id !== latestPinnedHost?.id && p.inMeeting);
+      return participants.filter((p) => {
+        if (!p.inMeeting) return false;
+        if (p.id === latestPinnedHost?.id) return false;
+        const key = getParticipantUserKey(p?._raw || p);
+        if (pinnedKey && key && key === pinnedKey) return false;
+        return true;
+      });
     }
     // Main meeting: Show everyone else in the strip EXCEPT the person pinned on stage
     // (So if there are multiple hosts, they show up here)
-    return participants.filter((p) => p.id !== latestPinnedHost?.id && p.inMeeting && !p.isOccupyingLounge);
+    return participants.filter((p) => {
+      if (!p.inMeeting) return false;
+      if (p.id === latestPinnedHost?.id) return false;
+      const key = getParticipantUserKey(p?._raw || p);
+      if (pinnedKey && key && key === pinnedKey) return false;
+      if (!isBreakout && p.isOccupyingLounge) return false;
+      return true;
+    });
   }, [participants, isBreakout, latestPinnedHost]);
 
   // Strip should be only others (no host duplicate)
