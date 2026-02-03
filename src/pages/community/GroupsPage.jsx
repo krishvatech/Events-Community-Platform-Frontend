@@ -30,6 +30,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
+import LockRounded from "@mui/icons-material/LockRounded";
 import { isAdminUser } from "../../utils/adminRole";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
@@ -581,9 +582,14 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
           alignItems="center"
           sx={{ mb: 1 }}
         >
-          <Typography variant="caption" color="text.secondary">
-            {isPrivate ? "Private" : "Public"}
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Typography variant="caption" color="text.secondary">
+              {isPrivate ? "Private" : "Public"}
+            </Typography>
+            {isApproval && (
+              <LockRounded sx={{ fontSize: 14, color: "#f97316" }} />
+            )}
+          </Stack>
           <Typography variant="caption" color="text.secondary">
             {members} Member{members !== 1 ? "s" : ""}
           </Typography>

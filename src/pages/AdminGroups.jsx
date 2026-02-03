@@ -12,6 +12,7 @@ import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import LockRounded from "@mui/icons-material/LockRounded";
 
 // ---- API helpers (same style as your AdminEvents.jsx) ----
 const RAW = import.meta.env.VITE_API_BASE_URL || "";
@@ -833,6 +834,11 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
             <Chip
               size="small"
               label={g.visibility === "private" ? "Private" : "Public"}
+              icon={
+                g.visibility === "public" && (g.join_policy === "approval" || g.join_policy === "public_approval")
+                  ? <LockRounded sx={{ fontSize: 16, color: "#f97316 !important" }} />
+                  : undefined
+              }
               className={
                 g.visibility === "private"
                   ? "bg-slate-200 text-slate-700"
