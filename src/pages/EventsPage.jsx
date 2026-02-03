@@ -193,6 +193,7 @@ function toCard(ev) {
     is_free: ev.is_free || false,
     status: ev.status,
     is_live: ev.is_live,
+    event_format: ev.event_format || ev.format, // virtual, hybrid, in_person
     registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
   };
 }
@@ -376,8 +377,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 
       {/* Footer */}
       <div className="flex items-center justify-between border-t p-6">
-        <div className="text-xl font-semibold text-neutral-900">
-          {ev.is_free ? (
+        <div className="text-base font-semibold text-neutral-900">
+          {ev.isRegistered ? (
+            <span className="text-teal-600">You are registered for this event.</span>
+          ) : ev.is_free ? (
             <span className="text-teal-600">Free to Join</span>
           ) : (
             priceStr(ev.price)
@@ -388,56 +391,68 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
         {!owner && (
           ev.isRegistered ? (
             <div className="flex items-center gap-2">
-              <Button
-                variant="contained"
-                size="large"
-                onClick={handleJoinCard}
-                disabled={!canShowActiveJoin}
-                className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
-              >
-                {canShowActiveJoin ? (isLive ? "Join Live" : "Join") : "Join (Not Live Yet)"}
-              </Button>
-              {reg && ev.is_free && (
-                <RegisteredActions
-                  ev={ev}
-                  reg={reg}
-                  hideChip={true}
-                  onUnregistered={(eventId) => {
-                    setMyRegistrations((prev) => {
-                      const next = { ...prev };
-                      delete next[eventId];
-                      return next;
-                    });
-                    setRawEvents((prev) =>
-                      (prev || []).map((e) =>
-                        e.id === eventId
-                          ? {
-                            ...e,
-                            registrations_count: Math.max(
-                              0,
-                              Number(e?.registrations_count ?? e?.attending_count ?? 0) - 1
-                            ),
-                          }
-                          : e
-                      )
-                    );
+              {/* Show Join button for virtual/hybrid events */}
+              {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
+                <Button
+                  variant="contained"
+                  size="medium"
+                  onClick={handleJoinCard}
+                  disabled={!canShowActiveJoin}
+                  className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                >
+                  {canShowActiveJoin ? (isLive ? "Join Live" : "Join") : "Join (Not Live Yet)"}
+                </Button>
+              )}
+              {/* Show Cancel Registration button only for free events */}
+              {ev.is_free && reg && (
+                <Button
+                  variant="text"
+                  size="medium"
+                  color="error"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`${API_BASE}/event-registrations/${reg.id}/`, {
+                        method: "DELETE",
+                        headers: authHeaders(),
+                      });
+                      if (!res.ok) throw new Error(await res.text());
+
+                      toast.info("You have unregistered from the event.");
+                      setMyRegistrations((prev) => {
+                        const next = { ...prev };
+                        delete next[ev.id];
+                        return next;
+                      });
+                      setRawEvents((prev) =>
+                        (prev || []).map((e) =>
+                          e.id === ev.id
+                            ? {
+                              ...e,
+                              registrations_count: Math.max(
+                                0,
+                                Number(e?.registrations_count ?? e?.attending_count ?? 0) - 1
+                              ),
+                            }
+                            : e
+                        )
+                      );
+                    } catch (err) {
+                      toast.error("Failed to cancel registration: " + err.message);
+                    }
                   }}
-                  onCancelRequested={(eventId, updatedReg) => {
-                    setMyRegistrations((prev) => ({
-                      ...prev,
-                      [eventId]: updatedReg,
-                    }));
-                  }}
-                />
+                  className="normal-case rounded-full px-3 hover:bg-red-50"
+                >
+                  Cancel Registration
+                </Button>
               )}
             </div>
           ) : (
             <Button
               variant="contained"
-              size="large"
+              size="medium"
               color="primary"
               onClick={handleRegisterCard}
-              className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
+              className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
             >
               Register Now
             </Button>
@@ -596,7 +611,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
               </div>
 
               <div className="mt-3 text-base font-semibold text-neutral-900">
-                {ev.is_free ? (
+                {ev.isRegistered ? (
+                  <span className="text-teal-600">You are registered for this event.</span>
+                ) : ev.is_free ? (
                   <span className="text-teal-600">Free to Join</span>
                 ) : (
                   priceStr(ev.price)
@@ -609,56 +626,68 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
               {isOwnerUser() ? null : (
                 ev.isRegistered ? (
                   <div className="flex flex-col items-end gap-2">
-                    <Button
-                      variant="contained"
-                      size="large"
-                      onClick={handleJoinRow}
-                      disabled={!canShowActiveJoin}
-                      className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
-                    >
-                      {canShowActiveJoin ? (isLive ? "Join Live" : "Join") : "Join (Not Live Yet)"}
-                    </Button>
-                    {reg && ev.is_free && (
-                      <RegisteredActions
-                        ev={ev}
-                        reg={reg}
-                        hideChip={true}
-                        onUnregistered={(eventId) => {
-                          setMyRegistrations((prev) => {
-                            const next = { ...prev };
-                            delete next[eventId];
-                            return next;
-                          });
-                          setRawEvents((prev) =>
-                            (prev || []).map((e) =>
-                              e.id === eventId
-                                ? {
-                                  ...e,
-                                  registrations_count: Math.max(
-                                    0,
-                                    Number(e?.registrations_count ?? e?.attending_count ?? 0) - 1
-                                  ),
-                                }
-                                : e
-                            )
-                          );
+                    {/* Show Join button for virtual/hybrid events */}
+                    {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (
+                      <Button
+                        variant="contained"
+                        size="medium"
+                        onClick={handleJoinRow}
+                        disabled={!canShowActiveJoin}
+                        className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                      >
+                        {canShowActiveJoin ? (isLive ? "Join Live" : "Join") : "Join (Not Live Yet)"}
+                      </Button>
+                    )}
+                    {/* Show Cancel Registration button only for free events */}
+                    {ev.is_free && reg && (
+                      <Button
+                        variant="text"
+                        size="medium"
+                        color="error"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`${API_BASE}/event-registrations/${reg.id}/`, {
+                              method: "DELETE",
+                              headers: authHeaders(),
+                            });
+                            if (!res.ok) throw new Error(await res.text());
+
+                            toast.info("You have unregistered from the event.");
+                            setMyRegistrations((prev) => {
+                              const next = { ...prev };
+                              delete next[ev.id];
+                              return next;
+                            });
+                            setRawEvents((prev) =>
+                              (prev || []).map((e) =>
+                                e.id === ev.id
+                                  ? {
+                                    ...e,
+                                    registrations_count: Math.max(
+                                      0,
+                                      Number(e?.registrations_count ?? e?.attending_count ?? 0) - 1
+                                    ),
+                                  }
+                                  : e
+                              )
+                            );
+                          } catch (err) {
+                            toast.error("Failed to cancel registration: " + err.message);
+                          }
                         }}
-                        onCancelRequested={(eventId, updatedReg) => {
-                          setMyRegistrations((prev) => ({
-                            ...prev,
-                            [eventId]: updatedReg,
-                          }));
-                        }}
-                      />
+                        className="normal-case rounded-full px-3 hover:bg-red-50"
+                      >
+                        Cancel Registration
+                      </Button>
                     )}
                   </div>
                 ) : (
                   <Button
                     variant="contained"
-                    size="large"
+                    size="medium"
                     color="primary"
                     onClick={handleRegisterRow}
-                    className="normal-case rounded-full px-5 bg-teal-500 hover:bg-teal-600"
+                    className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                   >
                     Register Now
                   </Button>
