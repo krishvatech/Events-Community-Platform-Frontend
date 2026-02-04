@@ -1076,6 +1076,12 @@ function PreEventLoungeGate({
   loungeStatusLabel = "",
   isLoungeOpen = true,
   onJoinMain,
+  isHost = false,
+  onHostChooseLounge,
+  hostChoiceDialogOpen = false,
+  pendingHostChoice = null,
+  onConfirmHostChoice,
+  onCancelHostChoice,
 }) {
   return (
     <Box
@@ -1193,7 +1199,10 @@ function PreEventLoungeGate({
         )}
 
         <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 0.8, color: "rgba(255,255,255,0.92)" }}>
-          {isLoungeOpen ? "Social Lounge is open" : "Social Lounge is closed"}
+          {isHost
+            ? "Choose Your Entry Point"
+            : (isLoungeOpen ? "Social Lounge is open" : "Social Lounge is closed")
+          }
         </Typography>
 
         {!isLoungeOpen && (
@@ -1214,9 +1223,12 @@ function PreEventLoungeGate({
         )}
 
         <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.65)", mb: 2 }}>
-          {isLoungeOpen
-            ? "Join the Social Lounge now. You'll move into the main meeting automatically when the event begins."
-            : "The Social Lounge is closed. Please join the main meeting instead."}
+          {isHost
+            ? "As the host, you can join the main meeting to start the event, or mingle in the Social Lounge with early attendees."
+            : (isLoungeOpen
+                ? "Join the Social Lounge now. You'll move into the main meeting automatically when the event begins."
+                : "The Social Lounge is closed. Please join the main meeting instead.")
+          }
         </Typography>
 
         {/* Info box */}
@@ -1259,58 +1271,126 @@ function PreEventLoungeGate({
           </Stack>
         </Box>
 
-        {isLoungeOpen && loungeAvailable && (
-          <Button
-            onClick={onOpenLounge}
-            variant="outlined"
-            sx={{
-              mt: 2.2,
-              px: 3,
-              py: 1,
-              borderRadius: 999,
-              textTransform: "none",
-              fontWeight: 800,
-              letterSpacing: 0.4,
-              opacity: 1,
-              color: "rgba(255,255,255,0.92)",
-              borderColor: "rgba(255,255,255,0.28)",
-              bgcolor: "rgba(255,255,255,0.06)",
-              "&:hover": {
-                bgcolor: "rgba(255,255,255,0.10)",
-                borderColor: "rgba(255,255,255,0.40)",
-              },
-            }}
-          >
-            Open Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
-          </Button>
+        {/* Action Buttons - Conditional based on role */}
+        {isHost ? (
+          // Host-specific UI
+          <>
+            <Typography
+              sx={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.85)",
+                mt: 2.5,
+                mb: 1.5,
+                textAlign: "center",
+              }}
+            >
+              Choose how you want to join:
+            </Typography>
+
+            <Button
+              onClick={onJoinMain}
+              variant="contained"
+              fullWidth
+              sx={{
+                mb: 1.5,
+                px: 3,
+                py: 1.5,
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 800,
+                letterSpacing: 0.4,
+                bgcolor: "#10b8a6",
+                "&:hover": { bgcolor: "#0ea5a4" },
+              }}
+            >
+              Join as Host (Main Meeting)
+            </Button>
+
+            {loungeAvailable && isLoungeOpen && (
+              <Button
+                onClick={onHostChooseLounge}
+                variant="outlined"
+                fullWidth
+                sx={{
+                  mb: 1.5,
+                  px: 3,
+                  py: 1.5,
+                  borderRadius: 2,
+                  textTransform: "none",
+                  fontWeight: 800,
+                  letterSpacing: 0.4,
+                  color: "rgba(255,255,255,0.92)",
+                  borderColor: "rgba(255,255,255,0.28)",
+                  bgcolor: "rgba(255,255,255,0.06)",
+                  "&:hover": {
+                    bgcolor: "rgba(255,255,255,0.10)",
+                    borderColor: "rgba(255,255,255,0.40)",
+                  },
+                }}
+              >
+                Join Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
+              </Button>
+            )}
+          </>
+        ) : (
+          // Audience UI (existing behavior)
+          <>
+            {isLoungeOpen && loungeAvailable && (
+              <Button
+                onClick={onOpenLounge}
+                variant="outlined"
+                sx={{
+                  mt: 2.2,
+                  px: 3,
+                  py: 1,
+                  borderRadius: 999,
+                  textTransform: "none",
+                  fontWeight: 800,
+                  letterSpacing: 0.4,
+                  opacity: 1,
+                  color: "rgba(255,255,255,0.92)",
+                  borderColor: "rgba(255,255,255,0.28)",
+                  bgcolor: "rgba(255,255,255,0.06)",
+                  "&:hover": {
+                    bgcolor: "rgba(255,255,255,0.10)",
+                    borderColor: "rgba(255,255,255,0.40)",
+                  },
+                }}
+              >
+                Open Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
+              </Button>
+            )}
+
+            {!isLoungeOpen && onJoinMain && (
+              <Button
+                onClick={onJoinMain}
+                variant="contained"
+                sx={{
+                  mt: 2.2,
+                  px: 3,
+                  py: 1,
+                  borderRadius: 999,
+                  textTransform: "none",
+                  fontWeight: 800,
+                  letterSpacing: 0.4,
+                  bgcolor: "#10b8a6",
+                  "&:hover": { bgcolor: "#0ea5a4" },
+                }}
+              >
+                Join Main Meeting
+              </Button>
+            )}
+          </>
         )}
 
-        {!isLoungeOpen && onJoinMain && (
-          <Button
-            onClick={onJoinMain}
-            variant="contained"
-            sx={{
-              mt: 2.2,
-              px: 3,
-              py: 1,
-              borderRadius: 999,
-              textTransform: "none",
-              fontWeight: 800,
-              letterSpacing: 0.4,
-              bgcolor: "#10b8a6",
-              "&:hover": { bgcolor: "#0ea5a4" },
-            }}
-          >
-            Join Main Meeting
-          </Button>
-        )}
-
+        {/* Back button - always show */}
         {onBack && (
           <Button
             onClick={onBack}
             variant="outlined"
             sx={{
-              mt: loungeAvailable ? 1.5 : 2.5,
+              mt: isHost ? 1.5 : (loungeAvailable ? 1.5 : 2.5),
               px: 3,
               py: 1,
               borderRadius: 999,
@@ -1336,6 +1416,92 @@ function PreEventLoungeGate({
       <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
         Having trouble? Check your connection or contact support
       </Typography>
+
+      {/* Host Choice Confirmation Dialog */}
+      <Dialog
+        open={hostChoiceDialogOpen && isHost}
+        onClose={onCancelHostChoice}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "rgba(15, 23, 42, 0.95)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            backdropFilter: "blur(12px)",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 800,
+            fontSize: 18,
+            color: "rgba(255,255,255,0.92)",
+            pb: 1,
+          }}
+        >
+          {pendingHostChoice === "main"
+            ? "Join as Host (Main Meeting)"
+            : "Join Social Lounge"}
+        </DialogTitle>
+
+        <DialogContent
+          sx={{
+            color: "rgba(255,255,255,0.75)",
+            py: 2,
+          }}
+        >
+          <Typography sx={{ fontSize: 14, mb: 1 }}>
+            {pendingHostChoice === "main"
+              ? "You are about to join the main meeting as host. You'll have full control over the event settings and participant permissions."
+              : "You are about to join the social lounge. You can mingle with early attendees and switch between lounge tables. You can join the main meeting later."}
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)", mt: 2 }}>
+            {pendingHostChoice === "main"
+              ? "This will initialize the main meeting connection."
+              : "This will NOT initialize the main meeting. The main meeting will remain isolated until you explicitly join it later."}
+          </Typography>
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            gap: 1,
+            p: 2,
+            pt: 1,
+          }}
+        >
+          <Button
+            onClick={onCancelHostChoice}
+            variant="outlined"
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              color: "rgba(255,255,255,0.92)",
+              borderColor: "rgba(255,255,255,0.28)",
+              bgcolor: "rgba(255,255,255,0.06)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.10)",
+                borderColor: "rgba(255,255,255,0.40)",
+              },
+            }}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            onClick={onConfirmHostChoice}
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              bgcolor: pendingHostChoice === "main" ? "#10b8a6" : "#8b5cf6",
+              "&:hover": {
+                bgcolor: pendingHostChoice === "main" ? "#0ea5a4" : "#7c3aed",
+              },
+            }}
+          >
+            {pendingHostChoice === "main" ? "Join as Host" : "Join Lounge"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -1957,6 +2123,10 @@ export default function NewLiveMeeting() {
   const lastInitTokenRef = useRef(null);
   const tokenFetchAbortControllerRef = useRef(null); // ✅ AbortController for cancelling in-flight token fetches
   const [joinMainRequested, setJoinMainRequested] = useState(false);
+  const [hostChoiceMade, setHostChoiceMade] = useState(false);
+  const [hostChoseLoungeOnly, setHostChoseLoungeOnly] = useState(false);
+  const [hostChoiceDialogOpen, setHostChoiceDialogOpen] = useState(false);
+  const [pendingHostChoice, setPendingHostChoice] = useState(null); // "main" or "lounge"
   const [loadingJoin, setLoadingJoin] = useState(true);
   const [joinError, setJoinError] = useState("");
   const [joinRequestTick, setJoinRequestTick] = useState(0);
@@ -2520,6 +2690,7 @@ export default function NewLiveMeeting() {
         }
 
         setIsBreakout(true);
+        setLoungeOpen(true); // ✅ CRITICAL: Mark lounge as open so render condition works
         setAuthToken(newToken);
         if (tableId) {
           setActiveTableId(tableId);
@@ -3021,7 +3192,8 @@ export default function NewLiveMeeting() {
       console.log("[LiveMeeting] Skipping token fetch - user is in waiting room");
       return;
     }
-    if (preEventLoungeOpen && role !== "publisher" && !joinMainRequested) {
+    if (preEventLoungeOpen && !joinMainRequested &&
+        (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly)) {
       // ✅ Log when skipping token fetch due to pre-event lounge
       if (!joinInFlightRef.current) {
         console.log("[LiveMeeting] In pre-event lounge, skipping token fetch");
@@ -3108,7 +3280,7 @@ export default function NewLiveMeeting() {
         }
       }
     })();
-  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken]);
+  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken, hostChoiceMade, hostChoseLoungeOnly]);
 
   useEffect(() => {
     if (!eventId || !waitingRoomActive) return;
@@ -3589,6 +3761,18 @@ export default function NewLiveMeeting() {
     if (initInFlightRef.current) return;
     if (lastInitTokenRef.current === authToken && initDone) return;
 
+    // CRITICAL: Skip initialization if host is in pre-event lounge without making a choice
+    // This prevents Dyte initialization until host confirms the dialog choice
+    // BUT: Allow initialization if already in breakout (joined a lounge table)
+    const shouldSkipInitDueToPreEventLounge = preEventLoungeOpen && !joinMainRequested &&
+        (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
+        !isBreakout;  // ✅ Allow init for users in breakout rooms (joined lounge table)
+    if (shouldSkipInitDueToPreEventLounge) {
+      console.log("[LiveMeeting] ⏸️ Skipping init - host in pre-event lounge without making a choice");
+      setInitDone(false);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       initInFlightRef.current = true;
@@ -3670,11 +3854,15 @@ export default function NewLiveMeeting() {
     return () => {
       cancelled = true;
     };
-  }, [authToken, initMeeting, role, isBreakout]);
+  }, [authToken, initMeeting, role, isBreakout, preEventLoungeOpen, joinMainRequested, hostChoiceMade, hostChoseLoungeOnly]);
   // ✅ CRITICAL FIX: Neither initDone nor mainRoomAuthToken in dependencies
   // We're SETTING these states inside the effect, not depending on them
   // Having them in dependencies causes cleanup to run immediately after state updates,
   // cancelling the effect before initMeeting completes (causing "Init was cancelled" issue)
+  //
+  // ✅ HOST CHOICE FIX: Added pre-event lounge guard variables to dependencies
+  // The effect needs to re-run when host makes a choice so initialization can proceed
+  // with the proper state flags set
 
   // ---------- Join main room (for peek functionality) ----------
   useEffect(() => {
@@ -5039,6 +5227,7 @@ export default function NewLiveMeeting() {
     // Close lounge UI and force a fresh join via API (to respect waiting room/grace rules)
     setLoungeOpen(false);
     setJoinMainRequested(true);
+    setHostChoseLoungeOnly(false);
     rejoinFromLoungeRef.current = true;
 
     // ✅ Cancel any in-flight token fetch to prevent stale tokens during lounge rejoin
@@ -5623,8 +5812,13 @@ export default function NewLiveMeeting() {
   // ✅ Also show meeting if in breakout/lounge room (post-event)
   const shouldShowMeeting = role === "publisher" || roomJoined || hostJoined || dbStatus === "live" || isBreakout;
   const hasMainToken = Boolean(mainAuthTokenRef.current || authToken);
+  // ✅ Show gate/lounge if in pre-event lounge and (for hosts) haven't chosen main yet
+  // Allow breakout display if loungeOpen (user joined a table)
+  // Hosts see gate initially (!hostChoiceMade=true) or when they've chosen lounge (hostChoseLoungeOnly=true)
   const shouldShowPreEventLoungeGate =
-    preEventLoungeOpen && role !== "publisher" && !isBreakout && !joinMainRequested && !hasMainToken;
+    preEventLoungeOpen && !joinMainRequested &&
+    (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
+    (!isBreakout || loungeOpen);
 
   const handleJoinMainMeeting = useCallback(() => {
     setJoinMainRequested(true);
@@ -5632,6 +5826,45 @@ export default function NewLiveMeeting() {
     setWaitingRoomActive(false);
     setLoadingJoin(true);
     setJoinRequestTick((v) => v + 1);
+  }, []);
+
+  const handleHostChooseMainMeeting = useCallback(() => {
+    console.log("[LiveMeeting] Host clicked 'Join as Host' - opening confirmation dialog");
+    setPendingHostChoice("main");
+    setHostChoiceDialogOpen(true);
+  }, []);
+
+  const handleHostChooseLoungeOnly = useCallback(() => {
+    console.log("[LiveMeeting] Host clicked 'Join Social Lounge' - opening confirmation dialog");
+    setPendingHostChoice("lounge");
+    setHostChoiceDialogOpen(true);
+  }, []);
+
+  const handleConfirmHostChoice = useCallback(() => {
+    console.log("[LiveMeeting] Host confirmed choice:", pendingHostChoice);
+    if (pendingHostChoice === "main") {
+      setHostChoiceMade(true);
+      setHostChoseLoungeOnly(false);
+      setJoinMainRequested(true);
+      setJoinError("");
+      setWaitingRoomActive(false);
+      setLoadingJoin(true);
+      setJoinRequestTick((v) => v + 1);
+    } else if (pendingHostChoice === "lounge") {
+      setHostChoiceMade(true);
+      setHostChoseLoungeOnly(true);
+      setLoadingJoin(false);
+      setLoungeOpen(true);
+      // CRITICAL: Do NOT set joinMainRequested - keeps main meeting isolated
+    }
+    setHostChoiceDialogOpen(false);
+    setPendingHostChoice(null);
+  }, [pendingHostChoice]);
+
+  const handleCancelHostChoice = useCallback(() => {
+    console.log("[LiveMeeting] Host cancelled choice dialog");
+    setHostChoiceDialogOpen(false);
+    setPendingHostChoice(null);
   }, []);
 
   // Back behavior (same as old intent)
@@ -8182,6 +8415,46 @@ export default function NewLiveMeeting() {
     );
   }
 
+  // ✅ PRIORITY: Check pre-event lounge BEFORE loading screen
+  // Pre-event lounge gate/overlay takes priority even if loadingJoin is true
+  // This ensures users can join the lounge without waiting for main meeting token
+  if (shouldShowPreEventLoungeGate) {
+    return loungeOpen ? (
+      <LoungeOverlay
+        open
+        onClose={() => setLoungeOpen(false)}
+        eventId={eventId}
+        currentUserId={getMyUserIdFromJwt()}
+        isAdmin={role === "publisher"}
+        onEnterBreakout={applyBreakoutToken}
+        dyteMeeting={dyteMeeting}
+        onParticipantClick={openLoungeParticipantInfo}
+        onJoinMain={forceRejoinMainFromLounge}
+      />
+    ) : (
+      <PreEventLoungeGate
+        onBack={handleBack}
+        eventTitle={eventTitle}
+        scheduled={scheduledLabel}
+        duration={durationLabel}
+        roleLabel={role === "publisher" ? "Host" : "Audience"}
+        waitingRoomImage={eventData?.waiting_room_image || null}
+        timezone={eventData?.timezone || null}
+        loungeAvailable={preEventLoungeOpen}
+        loungeStatusLabel={loungeOpenStatus?.reason || "Pre-event networking"}
+        isLoungeOpen={isLoungeCurrentlyOpen}
+        onOpenLounge={() => setLoungeOpen(true)}
+        onJoinMain={role === "publisher" ? handleHostChooseMainMeeting : handleJoinMainMeeting}
+        isHost={role === "publisher"}
+        onHostChooseLounge={handleHostChooseLoungeOnly}
+        hostChoiceDialogOpen={hostChoiceDialogOpen}
+        pendingHostChoice={pendingHostChoice}
+        onConfirmHostChoice={handleConfirmHostChoice}
+        onCancelHostChoice={handleCancelHostChoice}
+      />
+    );
+  }
+
   if (loadingJoin) {
     return <JoiningMeetingScreen onBack={handleBack} />;
   }
@@ -8226,37 +8499,6 @@ export default function NewLiveMeeting() {
           onJoinMain={forceRejoinMainFromLounge}
         />
       </>
-    );
-  }
-
-  if (shouldShowPreEventLoungeGate) {
-    return loungeOpen ? (
-      <LoungeOverlay
-        open
-        onClose={() => setLoungeOpen(false)}
-        eventId={eventId}
-        currentUserId={getMyUserIdFromJwt()}
-        isAdmin={role === "publisher"}
-        onEnterBreakout={applyBreakoutToken}
-        dyteMeeting={dyteMeeting}
-        onParticipantClick={openLoungeParticipantInfo}
-        onJoinMain={forceRejoinMainFromLounge}
-      />
-    ) : (
-      <PreEventLoungeGate
-        onBack={handleBack}
-        eventTitle={eventTitle}
-        scheduled={scheduledLabel}
-        duration={durationLabel}
-        roleLabel={role === "publisher" ? "Host" : "Audience"}
-        waitingRoomImage={eventData?.waiting_room_image || null}
-        timezone={eventData?.timezone || null}
-        loungeAvailable={preEventLoungeOpen}
-        loungeStatusLabel={loungeOpenStatus?.reason || "Pre-event networking"}
-        isLoungeOpen={isLoungeCurrentlyOpen}
-        onOpenLounge={() => setLoungeOpen(true)}
-        onJoinMain={handleJoinMainMeeting}
-      />
     );
   }
 
