@@ -312,6 +312,32 @@ export const decideNameRequest = (id, status, admin_note = "") =>
   apiClient.post(`${ADMIN_NAME_REQUESTS_BASE}/${id}/decide/`, { status, admin_note }).then((r) => r.data);
 
 
+// ===================== Admin • KYC Verifications =====================
+const ADMIN_KYC_BASE = "/auth/admin/kyc";
+
+/**
+ * List all KYC verifications.
+ * Supports filtering: { kyc_status: 'pending' }
+ */
+export const getAdminKYCVerifications = (params = {}) =>
+  apiClient.get(`${ADMIN_KYC_BASE}/`, { params }).then((r) => r.data);
+
+/**
+ * Override KYC status for a user.
+ * Payload: { kyc_status: 'approved' | 'declined' | 'pending' | 'review', admin_note: "..." }
+ */
+export const overrideKYCStatus = (userId, kyc_status, admin_note = "") =>
+  apiClient.post(`${ADMIN_KYC_BASE}/${userId}/override-status/`, { kyc_status, admin_note }).then((r) => r.data);
+
+/**
+ * Reset KYC process for a user.
+ * Payload: { admin_note: "..." }
+ */
+export const resetKYCProcess = (userId, admin_note = "") =>
+  apiClient.post(`${ADMIN_KYC_BASE}/${userId}/reset/`, { admin_note }).then((r) => r.data);
+
+
+
 export async function createWagtailSession() {
   const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
   const token =

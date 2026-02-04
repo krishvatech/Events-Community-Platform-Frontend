@@ -7,6 +7,7 @@ import {
     CircularProgress, Pagination, Avatar, Skeleton
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import PersonRemoveRoundedIcon from "@mui/icons-material/PersonRemoveRounded";
@@ -189,16 +190,6 @@ export default function AdminStaffPage() {
                                                 sx={{ display: { xs: "none", lg: "table-cell" } }}
                                             />
                                             <TableCell>User</TableCell>
-                                            <TableCell
-                                                sx={{
-                                                    display: {
-                                                        xs: "table-cell !important",
-                                                        sm: "table-cell !important",
-                                                    },
-                                                }}
-                                            >
-                                                Name
-                                            </TableCell>
                                             <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                                                 Email
                                             </TableCell>
@@ -232,15 +223,6 @@ export default function AdminStaffPage() {
                                                             height={24}
                                                         />
                                                     </Stack>
-                                                </TableCell>
-
-                                                {/* Name */}
-                                                <TableCell>
-                                                    <Skeleton
-                                                        variant="text"
-                                                        width="80%"
-                                                        height={20}
-                                                    />
                                                 </TableCell>
 
                                                 {/* Email */}
@@ -292,11 +274,6 @@ export default function AdminStaffPage() {
                                             ></TableCell>
 
                                             <TableCell>User</TableCell>
-                                            <TableCell
-                                                sx={{ display: { xs: "table-cell !important", sm: "table-cell !important" } }}
-                                            >
-                                                Name
-                                            </TableCell>
 
                                             {/* Email – show from tablet upwards */}
                                             <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
@@ -330,21 +307,30 @@ export default function AdminStaffPage() {
 
                                                 {/* User */}
                                                 <TableCell>
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Chip size="small" label={u.username} />
-                                                        {u.is_superuser && (
-                                                            <Chip size="small" color="secondary" label="Superuser" />
-                                                        )}
+                                                    <Stack direction="row" spacing={2} alignItems="center">
+                                                        <Avatar
+                                                            src={u.avatar_url}
+                                                            alt={u.username}
+                                                            sx={{ width: 40, height: 40 }}
+                                                        >
+                                                            {u.username?.[0]?.toUpperCase()}
+                                                        </Avatar>
+                                                        <Box>
+                                                            <Stack direction="row" spacing={0.5} alignItems="center">
+                                                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                                                    {(u.first_name || u.last_name) ? `${u.first_name} ${u.last_name}`.trim() : u.username}
+                                                                </Typography>
+                                                                {u.profile?.kyc_status === "approved" && (
+                                                                    <Tooltip title="Identity Verified">
+                                                                        <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+                                                                    </Tooltip>
+                                                                )}
+                                                            </Stack>
+                                                            {u.is_superuser && (
+                                                                <Chip size="small" color="secondary" label="Superuser" sx={{ height: 20, fontSize: "0.65rem", mt: 0.5 }} />
+                                                            )}
+                                                        </Box>
                                                     </Stack>
-                                                </TableCell>
-
-                                                {/* Name */}
-                                                <TableCell
-                                                    sx={{ display: { xs: "table-cell !important", sm: "table-cell !important" } }}
-                                                >
-                                                    {(u.first_name || u.last_name)
-                                                        ? `${u.first_name} ${u.last_name}`
-                                                        : "—"}
                                                 </TableCell>
 
                                                 {/* Email – hide on very small screens */}

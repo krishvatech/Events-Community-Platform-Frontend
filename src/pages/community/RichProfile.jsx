@@ -57,6 +57,7 @@ import LanguageIcon from "@mui/icons-material/Language";
 import EventIcon from "@mui/icons-material/Event";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FlagIcon from "@mui/icons-material/Flag";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import ReportProfileDialog from "../../components/ReportProfileDialog.jsx";
 import { Menu, MenuItem } from "@mui/material";
 
@@ -3029,13 +3030,20 @@ export default function RichProfile() {
                       {(fullName || "?").slice(0, 1).toUpperCase()}
                     </Avatar>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography
-                        variant="h6"
-                        sx={{ fontWeight: 700 }}
-                        className="truncate"
-                      >
-                        {fullName}
-                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <Typography
+                          variant="h6"
+                          sx={{ fontWeight: 700 }}
+                          className="truncate"
+                        >
+                          {fullName}
+                        </Typography>
+                        {userItem?.profile?.kyc_status === "approved" && (
+                          <Tooltip title="Verified Member">
+                            <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 20 }} />
+                          </Tooltip>
+                        )}
+                      </Box>
                       <Typography
                         variant="body2"
                         color="text.secondary"
@@ -3445,10 +3453,11 @@ export default function RichProfile() {
             )}
           </main>
         </div>
-      </Container>
+      </Container >
 
       {/* Connections Dialog */}
-      <Dialog open={connOpen} onClose={() => setConnOpen(false)} fullWidth maxWidth="sm">
+      < Dialog open={connOpen} onClose={() => setConnOpen(false)
+      } fullWidth maxWidth="sm" >
         <DialogTitle>
           Connections
         </DialogTitle>
@@ -3575,7 +3584,7 @@ export default function RichProfile() {
             Close
           </Button>
         </DialogActions>
-      </Dialog>
+      </Dialog >
 
       <ReportProfileDialog
         open={reportOpen}
@@ -3588,6 +3597,6 @@ export default function RichProfile() {
           username: userItem?.username
         }}
       />
-    </div>
+    </div >
   );
 }

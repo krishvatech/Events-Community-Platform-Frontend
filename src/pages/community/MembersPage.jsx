@@ -34,7 +34,7 @@ import MapRoundedIcon from "@mui/icons-material/MapRounded";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { geoCentroid } from "d3-geo";
-import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import { feature as topoFeature } from "topojson-client";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -458,9 +458,9 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
             </Typography>
 
             {isVerified && (
-              <Tooltip title="KYC verified">
-                <VerifiedRoundedIcon
-                  sx={{ fontSize: 18, color: "success.main", flexShrink: 0 }}
+              <Tooltip title="Verified Member">
+                <VerifiedIcon
+                  sx={{ fontSize: 20, color: "#22d3ee", flexShrink: 0 }}
                 />
               </Tooltip>
             )}
@@ -1220,6 +1220,13 @@ export default function MembersPage() {
   const handleOpenProfile = (m) => {
     const id = m?.id;
     if (!id) return;
+
+    // If the user clicks their own profile card, go to "My Profile" (Edit) page
+    if (me?.id && String(me.id) === String(id)) {
+      navigate("/account/profile");
+      return;
+    }
+
     navigate(`/community/rich-profile/${id}`, { state: { user: m } });
   };
 

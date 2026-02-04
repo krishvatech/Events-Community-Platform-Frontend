@@ -52,8 +52,9 @@ import {
   SendRounded as SendRoundedIcon,
   TextFieldsRounded as TextFieldsRoundedIcon,
   ReplyRounded as ReplyRoundedIcon,
-  Search as SearchIcon, // Added
+  Search as SearchIcon,
 } from "@mui/icons-material";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 
 // -----------------------------------------------------------------------------
@@ -124,6 +125,7 @@ function mapFeedItemRowToUiPost(row) {
     type,
     actor_name: row.actor_name || row.actor?.name || "You",
     actor_avatar: toAbsolute(row.actor_avatar || row.actor?.avatar),
+    actor_kyc_status: row.actor_kyc_status || (row.actor && row.actor.kyc_status) || null,
     liked_by_me: !!(row.liked_by_me || row.is_liked),
     metrics: {
       likes: Number(row.metrics?.likes || row.like_count || 0),
@@ -513,7 +515,14 @@ function PostCard({
     <Card variant="outlined" sx={{ borderRadius: 3, mb: 2 }}>
       <CardHeader
         avatar={<Avatar src={photo}>{initial}</Avatar>}
-        title={<Typography fontWeight={600}>{name}</Typography>}
+        title={
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Typography fontWeight={600}>{name}</Typography>
+            {post.actor_kyc_status === "approved" && (
+              <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+            )}
+          </Stack>
+        }
         subheader={timeAgo(post.created_at)}
         action={
           <Stack direction="row" spacing={0.5}>

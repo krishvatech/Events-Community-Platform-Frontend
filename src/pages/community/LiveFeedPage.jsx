@@ -29,6 +29,7 @@ import {
 import { Checkbox, ListItemButton } from "@mui/material";
 import { Tabs, Tab, ListItemSecondaryAction } from "@mui/material";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import { isOwnerUser, isStaffUser } from "../../utils/adminRole.js";
 
 const BORDER = "#e2e8f0";
@@ -683,6 +684,7 @@ function mapFeedItem(item) {
     null;
 
   const authorKycStatus =
+    item.actor_kyc_status ||
     m.author_kyc_status ||
     m.kyc_status ||
     (typeof m.author === "object" ? (m.author.kyc_status || m.author.kycStatus) : null) ||
@@ -2442,23 +2444,21 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
         <Avatar src={toMediaUrl(post.group_avatar || post.author?.avatar)} alt={headingTitle} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
 
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>
-            {headingTitle}
-          </Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {headingTitle}
+            </Typography>
+            {headingTitle === post.author?.name && post.author?.kyc_status === "approved" && (
+              <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+            )}
+          </Stack>
 
           <Stack direction="row" spacing={0.5} alignItems="center">
             <Typography variant="caption" color="text.secondary" noWrap>
               {post.type === "resource" ? (post.resource?.title || "Resource") : (post.author?.name)}
             </Typography>
 
-            {post.author?.kyc_status === "approved" && (
-              <Tooltip title="Identity Verified">
-                <VerifiedRoundedIcon
-                  color="primary"
-                  sx={{ fontSize: 16 }}
-                />
-              </Tooltip>
-            )}
+
 
             <Typography variant="caption" color="text.secondary" noWrap>
               · {formatWhen(post.created_at)}

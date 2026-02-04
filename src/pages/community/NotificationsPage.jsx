@@ -21,6 +21,7 @@ import HourglassBottomRoundedIcon from "@mui/icons-material/HourglassBottomRound
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
+import VerifiedIcon from "@mui/icons-material/Verified";
 
 const BORDER = "#e2e8f0";
 
@@ -527,7 +528,11 @@ function NotificationRow({
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <ListItemAvatar sx={{ minWidth: 48 }}>
-          {item.kind === 'name_change' ? (
+          {String(item?.data?.type || "").toLowerCase() === "kyc" ? (
+            <Avatar sx={{ bgcolor: "transparent" }}>
+              <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 32 }} />
+            </Avatar>
+          ) : item.kind === 'name_change' ? (
             <Avatar sx={{ bgcolor: '#394d79', color: 'white' }}>
               <BadgeRoundedIcon fontSize="small" />
             </Avatar>

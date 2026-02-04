@@ -44,6 +44,7 @@ import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
+import VerifiedIcon from "@mui/icons-material/Verified";
 
 import { isOwnerUser, isStaffUser } from "../utils/adminRole";
 import { apiClient, createWagtailSession, getSaleorDashboardUrl } from "../utils/api";
@@ -566,9 +567,16 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                 {(user.first_name || user.username || "U")[0]?.toUpperCase()}
                             </Avatar>
                             <Box sx={{ minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                                <Typography variant="subtitle2" fontWeight={700} noWrap>
-                                    {user.first_name} {user.last_name}
-                                </Typography>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Typography variant="subtitle2" fontWeight={700} noWrap>
+                                        {user.first_name} {user.last_name}
+                                    </Typography>
+                                    {user.profile?.kyc_status === "approved" && (
+                                        <Tooltip title="Verified">
+                                            <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+                                        </Tooltip>
+                                    )}
+                                </Box>
                                 <Typography variant="caption" color="text.secondary" noWrap display="block">
                                     {(function () {
                                         // 1. Try latest experience

@@ -32,6 +32,7 @@ import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
+import VerifiedIcon from "@mui/icons-material/Verified";
 
 
 // ---- API helpers (reuse same pattern as AdminGroups.jsx) ----
@@ -4601,7 +4602,12 @@ export default function GroupManagePage() {
                                                                 <Stack key={m.user.id} direction="row" alignItems="center" spacing={2} className="py-2">
                                                                     <Avatar src={toAbs(m.user.avatar)}>{(m.user.name || "U").slice(0, 1).toUpperCase()}</Avatar>
                                                                     <Box sx={{ flex: 1 }}>
-                                                                        <Typography className="font-medium">{m.user.name || m.user.email || m.user.id}</Typography>
+                                                                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                                            <Typography className="font-medium">{m.user.name || m.user.email || m.user.id}</Typography>
+                                                                            {m.user?.kyc_status === "approved" && (
+                                                                                <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} /> // Cyan verified icon
+                                                                            )}
+                                                                        </Stack>
                                                                         <Stack direction="row" spacing={2}>
                                                                             {m.user.email && (
                                                                                 <Typography variant="caption" className="text-slate-500">{m.user.email}</Typography>

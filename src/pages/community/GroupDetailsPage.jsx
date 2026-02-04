@@ -33,6 +33,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 // -----------------------------------------------------------------------------
@@ -1645,7 +1646,24 @@ function MembersTab({ groupId }) {
                 {(u.name || u.full_name || u.username || "U")[0]}
               </Avatar>
             </ListItemAvatar>
-            <ListItemText primary={u.name || u.full_name || u.username} secondary={m.role || "Member"} />
+            <ListItemText
+              primary={
+                <Typography component="span" variant="body1">
+                  {u.name || u.full_name || u.username}
+                  {u.kyc_status === "approved" && (
+                    <VerifiedIcon
+                      sx={{
+                        fontSize: 16,
+                        color: "#22d3ee",
+                        ml: 0.5,
+                        verticalAlign: "middle",
+                      }}
+                    />
+                  )}
+                </Typography>
+              }
+              secondary={m.role || "Member"}
+            />
           </ListItem>
         );
       })}
