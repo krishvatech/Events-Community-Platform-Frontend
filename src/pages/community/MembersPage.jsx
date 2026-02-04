@@ -376,7 +376,7 @@ const countryColor = (name) => {
 };
 
 /* -------------------------- Member card (left) -------------------------- */
-function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
+function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const email = u?.email || "";
   const usernameFromEmail = email ? email.split("@")[0] : "";
@@ -415,6 +415,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
   // --- NEW LOGIC END ---
 
   const status = (friendStatus || "").toLowerCase();
+  const isSelf = currentUserId && String(currentUserId) === String(u?.id);
   const iso2 = resolveCountryCode(u);
   const flag = flagEmojiFromISO2(iso2);
   const country = displayCountry(u);
@@ -494,40 +495,42 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend }) {
 
         </Box>
 
-        <Stack direction="row" spacing={1} alignItems="center" flexShrink={0}>
-          {status === "friends" ? (
-            <Tooltip title="Open profile">
-              <IconButton size="small" onClick={() => onOpenProfile?.(u)}>
-                <OpenInNewOutlinedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          ) : status === "pending_outgoing" ? (
-            <Tooltip title="Request sent">
-              <IconButton size="small" disabled>
-                <CheckCircleRoundedIcon fontSize="small" color="success" />
-              </IconButton>
-            </Tooltip>
-          ) : isMobile ? (
-            <Tooltip title="Request Contact">
-              <IconButton
+        {!isSelf && (
+          <Stack direction="row" spacing={1} alignItems="center" flexShrink={0}>
+            {status === "friends" ? (
+              <Tooltip title="Open profile">
+                <IconButton size="small" onClick={() => onOpenProfile?.(u)}>
+                  <OpenInNewOutlinedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            ) : status === "pending_outgoing" ? (
+              <Tooltip title="Request sent">
+                <IconButton size="small" disabled>
+                  <CheckCircleRoundedIcon fontSize="small" color="success" />
+                </IconButton>
+              </Tooltip>
+            ) : isMobile ? (
+              <Tooltip title="Request Contact">
+                <IconButton
+                  size="small"
+                  onClick={() => onAddFriend?.(u)}
+                >
+                  <PersonAddAlt1RoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Button
                 size="small"
+                variant="outlined"
+                sx={{ textTransform: "none", borderRadius: 2 }}
+                startIcon={<PersonAddAlt1RoundedIcon />}
                 onClick={() => onAddFriend?.(u)}
               >
-                <PersonAddAlt1RoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          ) : (
-            <Button
-              size="small"
-              variant="outlined"
-              sx={{ textTransform: "none", borderRadius: 2 }}
-              startIcon={<PersonAddAlt1RoundedIcon />}
-              onClick={() => onAddFriend?.(u)}
-            >
-              Request Contact
-            </Button>
-          )}
-        </Stack>
+                Request Contact
+              </Button>
+            )}
+          </Stack>
+        )}
       </Stack>
     </Card>
   );
@@ -912,7 +915,7 @@ export default function MembersPage() {
         if (!alive) return;
         setUsers(
           (list || []).filter(
-            (u) => u.id !== me?.id && !u.is_superuser
+            (u) => !u.is_superuser
           )
         );
       } catch (e) {
@@ -1582,6 +1585,7 @@ export default function MembersPage() {
                       friendStatus={friendStatusByUser[u.id]}
                       onOpenProfile={handleOpenProfile}
                       onAddFriend={() => sendFriendRequest(u.id)}
+                      currentUserId={me?.id}
                     />
                   ))}
 
