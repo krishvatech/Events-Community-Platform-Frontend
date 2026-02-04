@@ -33,6 +33,8 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
 import { apiClient } from "../utils/api";
+import { getJoinButtonText } from "../utils/gracePeriodUtils";
+import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -186,6 +188,8 @@ function toCard(ev) {
     image: ev.preview_image,                 // URLField on your model
     start: ev.start_time,                    // DateTimeField
     end: ev.end_time,                        // DateTimeField
+    start_time: ev.start_time,
+    end_time: ev.end_time,
     location: ev.location,
     topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
     attendees: Math.max(1, Number(ev.registrations_count ?? ev.attending_count ?? 0)),
@@ -195,6 +199,8 @@ function toCard(ev) {
     is_live: ev.is_live,
     event_format: ev.event_format || ev.format, // virtual, hybrid, in_person
     registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
+    waiting_room_enabled: ev.waiting_room_enabled,
+    waiting_room_grace_period_minutes: ev.waiting_room_grace_period_minutes,
   };
 }
 
@@ -400,7 +406,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
                   disabled={!canShowActiveJoin}
                   className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                 >
-                  {canShowActiveJoin ? (isLive ? "Join Live" : "Join") : "Join (Not Live Yet)"}
+                  {canShowActiveJoin ? getJoinButtonText(ev, isLive, false) : "Join (Not Live Yet)"}
                 </Button>
               )}
               {/* Show Cancel Registration button only for free events */}
@@ -635,7 +641,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
                         disabled={!canShowActiveJoin}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                       >
-                        {canShowActiveJoin ? (isLive ? "Join Live" : "Join") : "Join (Not Live Yet)"}
+                        {canShowActiveJoin ? getJoinButtonText(ev, isLive, false) : "Join (Not Live Yet)"}
                       </Button>
                     )}
                     {/* Show Cancel Registration button only for free events */}
@@ -796,6 +802,10 @@ export default function EventsPage() {
     onOpen: () => setOpenSelect(name),
     onClose: () => setOpenSelect(null),
   });
+
+  // Force re-render every second to keep join button text current
+  useSecondTick();
+
   const handlePostEventClick = () => {
     if (isOwnerUser()) {
       navigate("/admin/events");

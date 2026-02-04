@@ -54,6 +54,8 @@ import RegisteredActions from "../components/RegisteredActions.jsx";
 import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
+import { getJoinButtonText } from "../utils/gracePeriodUtils";
+import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -311,6 +313,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [waitingRoomLoungeAllowed, setWaitingRoomLoungeAllowed] = React.useState(true);
   const [waitingRoomNetworkingAllowed, setWaitingRoomNetworkingAllowed] = React.useState(true);
   const [waitingRoomAutoAdmitSeconds, setWaitingRoomAutoAdmitSeconds] = React.useState("");
+  const [waitingRoomGracePeriodMinutes, setWaitingRoomGracePeriodMinutes] = React.useState("10");
 
   // Replay Options
   const [replayAvailable, setReplayAvailable] = React.useState(false);
@@ -473,12 +476,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (waitingRoomAutoAdmitSeconds) {
       fd.append("auto_admit_seconds", String(waitingRoomAutoAdmitSeconds));
     }
-    fd.append("waiting_room_enabled", String(waitingRoomEnabled));
-    fd.append("lounge_enabled_waiting_room", String(waitingRoomLoungeAllowed));
-    fd.append("networking_tables_enabled_waiting_room", String(waitingRoomNetworkingAllowed));
-    if (waitingRoomAutoAdmitSeconds) {
-      fd.append("auto_admit_seconds", String(waitingRoomAutoAdmitSeconds));
-    }
+    fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "10"));
     fd.append("publish_resources_immediately", resourcesPublishNow ? "true" : "false");
     if (!resourcesPublishNow) {
       const publishISO = iso(resPublishDate, resPublishTime);
@@ -1000,6 +998,21 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             fullWidth
           />
         </Box>
+        <TextField
+          label="Grace Period (minutes)"
+          type="number"
+          inputProps={{ min: "0", max: "1440", step: "1" }}
+          value={waitingRoomGracePeriodMinutes}
+          onChange={(e) => setWaitingRoomGracePeriodMinutes(e.target.value)}
+          disabled={!waitingRoomEnabled}
+          fullWidth
+          size="small"
+          sx={{ mt: 3 }}
+          helperText="Minutes after event start during which participants can join directly without waiting room approval"
+          InputProps={{
+            endAdornment: <InputAdornment position="end">minutes</InputAdornment>,
+          }}
+        />
 
         {/* ===== Schedule ===== */}
         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
@@ -1361,8 +1374,10 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const [waitingRoomAutoAdmitSeconds, setWaitingRoomAutoAdmitSeconds] = useState(
     event?.auto_admit_seconds ? String(event.auto_admit_seconds) : ""
   );
+  const [waitingRoomGracePeriodMinutes, setWaitingRoomGracePeriodMinutes] = useState(
+    event?.waiting_room_grace_period_minutes ? String(event.waiting_room_grace_period_minutes) : "10"
+  );
 
-  // Replay Options
   const [replayAvailable, setReplayAvailable] = React.useState(false);
   const [replayDuration, setReplayDuration] = React.useState("");
 
@@ -1395,6 +1410,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     setWaitingRoomImageFile(null);
     setLocalWaitingRoomImagePreview("");
 
+    setWaitingRoomGracePeriodMinutes(String(event?.waiting_room_grace_period_minutes || "10"));
     // Init replay options
     setReplayAvailable(!!event?.replay_available);
     setReplayDuration(event?.replay_availability_duration || "");
@@ -1495,6 +1511,13 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     if (logoImageFile) fd.append("preview_image", logoImageFile, logoImageFile.name);
     if (coverImageFile) fd.append("cover_image", coverImageFile, coverImageFile.name);
     if (waitingRoomImageFile) fd.append("waiting_room_image", waitingRoomImageFile, waitingRoomImageFile.name);
+    fd.append("waiting_room_enabled", String(waitingRoomEnabled));
+    fd.append("lounge_enabled_waiting_room", String(waitingRoomLoungeAllowed));
+    fd.append("networking_tables_enabled_waiting_room", String(waitingRoomNetworkingAllowed));
+    if (waitingRoomAutoAdmitSeconds) {
+      fd.append("auto_admit_seconds", String(waitingRoomAutoAdmitSeconds));
+    }
+    fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "10"));
 
     try {
       const res = await fetch(`${API_ROOT}/events/${event.id}/`, {
@@ -1887,6 +1910,21 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
               />
             </Box>
 
+            <TextField
+              label="Grace Period (minutes)"
+              type="number"
+              inputProps={{ min: "0", max: "1440", step: "1" }}
+              value={waitingRoomGracePeriodMinutes}
+              onChange={(e) => setWaitingRoomGracePeriodMinutes(e.target.value)}
+              disabled={!waitingRoomEnabled}
+              fullWidth
+              size="small"
+              sx={{ mt: 3 }}
+              helperText="Minutes after event start during which participants can join directly without waiting room approval"
+              InputProps={{
+                endAdornment: <InputAdornment position="end">minutes</InputAdornment>,
+              }}
+            />
             {/* Dates */}
             <Grid size={{ xs: 12 }}>
               <FormControlLabel
@@ -2040,6 +2078,8 @@ function AdminEventCard({
 
   // If event is live OR within early-join window, show enabled Join button
   const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
+  const joinLabel = getJoinButtonText(ev, isLive, false);
+  const joinLabelShort = joinLabel === "Join Waiting Room" ? "Waiting Room" : joinLabel.split(" ")[0];
 
   const handleOpenDetails = () => {
     if (!ev?.id) return;
@@ -2287,13 +2327,13 @@ function AdminEventCard({
                         component="span"
                         sx={{ display: { xs: "none", lg: "inline" } }}
                       >
-                        {isLive ? "Join Live" : "Join"}
+                        {joinLabel}
                       </Box>
                       <Box
                         component="span"
                         sx={{ display: { xs: "inline", lg: "none" } }}
                       >
-                        {isLive ? "Live" : "Join"}
+                        {joinLabelShort}
                       </Box>
                     </>
                   )}
@@ -2437,6 +2477,9 @@ function EventsPage() {
 
   // Helpers
   const statusTabMap = { 1: "upcoming", 2: "live", 3: "past" };
+
+  // Force re-render every second to keep join button text current
+  useSecondTick();
 
   // Reset page on tab/search change
   useEffect(() => {

@@ -3736,7 +3736,7 @@ export default function NewLiveMeeting() {
       } else {
         // ✅ Event not in post-event window, navigate appropriately
         console.log("[LiveMeeting] Post-event lounge not available, navigating away. Status:", loungeStatus?.status, "Reason:", loungeStatus?.reason);
-        if (isEventOwner || (role === "publisher" && !eventData?.created_by_id)) {
+        if (role === "publisher" || isEventOwner) {
           navigate("/admin/events");
         } else {
           navigate(-1);
@@ -4105,7 +4105,9 @@ export default function NewLiveMeeting() {
     bump();
 
     // Fallback: periodic sync in case events are missed
-    const poll = setInterval(bump, 2500);
+    // Reduced from 2500ms to 1000ms for better real-time participant visibility
+    // especially for grace period joins which might have timing issues with Dyte SDK
+    const poll = setInterval(bump, 1000);
 
     return () => {
       dyteMeeting.participants.joined?.off?.("participantJoined", bump);
@@ -6973,11 +6975,37 @@ export default function NewLiveMeeting() {
 
                   {isHost && eventData?.waiting_room_enabled && (
                     <Box ref={waitingSectionRef}>
-                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
                         <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
                           WAITING ({waitingRoomQueueCount})
                         </Typography>
                       </Stack>
+
+                      {/* Global Waiting Room Actions */}
+                      {waitingRoomQueueCount > 0 && (
+                        <Stack direction="row" spacing={1} sx={{ mb: 1.5, gap: 0.75 }}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={admitAllWaiting}
+                            sx={{
+                              bgcolor: "rgba(34, 197, 94, 0.8)",
+                              color: "white",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              py: 0.75,
+                              px: 1.5,
+                              textTransform: 'none',
+                              borderRadius: 1,
+                              '&:hover': {
+                                bgcolor: "rgba(34, 197, 94, 1)",
+                              }
+                            }}
+                          >
+                            Admit All
+                          </Button>
+                        </Stack>
+                      )}
                       <Paper
                         variant="outlined"
                         sx={{
@@ -6993,13 +7021,44 @@ export default function NewLiveMeeting() {
                             </Typography>
                           </Box>
                         ) : (
-                          <List dense disablePadding>
+                          <Stack spacing={1}>
                             {(waitingRoomQueue || []).map((w) => (
-                              <ListItem
+                              <Box
                                 key={w.id || `${w.user_id}-${w.joined_at || w.created_at || ""}`}
-                                disablePadding
-                                secondaryAction={
-                                  <Stack direction="row" spacing={1} alignItems="center">
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'flex-start',
+                                  gap: 1.25,
+                                  px: 1.25,
+                                  py: 1,
+                                  borderRadius: 1,
+                                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                }}
+                              >
+                                {/* Avatar */}
+                                <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)", flexShrink: 0 }}>
+                                  {initialsFromName(w.name || "User")}
+                                </Avatar>
+
+                                {/* Name and Buttons in vertical stack */}
+                                <Stack sx={{ flex: 1, minWidth: 0 }} spacing={0.75}>
+                                  {/* Participant name */}
+                                  <Typography
+                                    sx={{
+                                      fontWeight: 700,
+                                      fontSize: 13,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                    noWrap
+                                  >
+                                    {w.name || "User"}
+                                  </Typography>
+
+                                  {/* Action buttons below name */}
+                                  <Stack direction="row" spacing={0.75} sx={{ mt: 0.5 }}>
                                     <Button
                                       size="small"
                                       variant="outlined"
@@ -7008,9 +7067,10 @@ export default function NewLiveMeeting() {
                                         fontSize: 10,
                                         color: "rgba(255,255,255,0.85)",
                                         borderColor: "rgba(255,255,255,0.25)",
-                                        py: 0.2,
-                                        minWidth: 64,
-                                        height: 26,
+                                        py: 0.25,
+                                        px: 1,
+                                        height: 24,
+                                        flexShrink: 0,
                                       }}
                                     >
                                       Admit
@@ -7022,37 +7082,19 @@ export default function NewLiveMeeting() {
                                       sx={{
                                         fontSize: 10,
                                         color: "rgba(239, 68, 68, 0.9)",
-                                        minWidth: 64,
-                                        height: 26,
+                                        py: 0.25,
+                                        px: 1,
+                                        height: 24,
+                                        flexShrink: 0,
                                       }}
                                     >
                                       Reject
                                     </Button>
                                   </Stack>
-                                }
-                              >
-                                <ListItemButton sx={{ px: 1.25, py: 1 }}>
-                                  <ListItemAvatar>
-                                    <Avatar sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
-                                      {initialsFromName(w.name || "User")}
-                                    </Avatar>
-                                  </ListItemAvatar>
-                                  <ListItemText
-                                    primary={
-                                      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
-                                        {w.name || "User"}
-                                      </Typography>
-                                    }
-                                    // /* secondary={
-                                    //   <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
-                                    //     Waiting for admission
-                                    //   </Typography>
-                                    // } */
-                                  />
-                                </ListItemButton>
-                              </ListItem>
+                                </Stack>
+                              </Box>
                             ))}
-                          </List>
+                          </Stack>
                         )}
                       </Paper>
                     </Box>
@@ -7821,94 +7863,6 @@ export default function NewLiveMeeting() {
               </MenuItem>
 
               <Divider sx={{ borderColor: "rgba(255,255,255,0.10)" }} />
-
-              {eventData?.waiting_room_enabled && (
-                <>
-                  <MenuItem
-                    onClick={() => {
-                      admitAllWaiting();
-                      closePermMenu();
-                    }}
-                    sx={{ gap: 1.25, py: 1.1 }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 34 }}>
-                      <CheckRoundedIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Admit All Waiting"
-                      secondary={
-                        waitingRoomQueueCount > 0
-                          ? `${waitingRoomQueueCount} waiting`
-                          : "No one waiting"
-                      }
-                    />
-                  </MenuItem>
-                  {waitingRoomQueueCount > 0 && (
-                    <Box sx={{ px: 1.5, pb: 1 }}>
-                      <Typography sx={{ fontSize: 11, opacity: 0.7, mb: 0.5 }}>
-                        Waiting Room
-                      </Typography>
-                      <Stack spacing={0.75}>
-                        {(waitingRoomQueue || []).slice(0, 6).map((w) => (
-                          <Box
-                            key={w.user_id}
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              bgcolor: "rgba(255,255,255,0.04)",
-                              border: "1px solid rgba(255,255,255,0.08)",
-                              borderRadius: 1.5,
-                              px: 1,
-                              py: 0.75,
-                            }}
-                          >
-                            <Avatar
-                              sx={{
-                                width: 26,
-                                height: 26,
-                                fontSize: 11,
-                                bgcolor: "rgba(255,255,255,0.12)",
-                              }}
-                            >
-                              {initialsFromName(w.user_name || "U")}
-                            </Avatar>
-                            <Box sx={{ minWidth: 0, flex: 1 }}>
-                              <Typography sx={{ fontSize: 12, fontWeight: 700 }} noWrap>
-                                {w.user_name || "User"}
-                              </Typography>
-                              <Typography sx={{ fontSize: 11, opacity: 0.6 }} noWrap>
-                                {w.user_email || ""}
-                              </Typography>
-                            </Box>
-                            <IconButton
-                              size="small"
-                              onClick={() => admitWaitingUser(w.user_id)}
-                              sx={{ color: "#22c55e" }}
-                              aria-label="Admit"
-                            >
-                              <CheckRoundedIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => rejectWaitingUser(w.user_id)}
-                              sx={{ color: "#ef4444" }}
-                              aria-label="Reject"
-                            >
-                              <CloseIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        ))}
-                        {waitingRoomQueueCount > 6 && (
-                          <Typography sx={{ fontSize: 11, opacity: 0.6 }}>
-                            +{waitingRoomQueueCount - 6} more waiting
-                          </Typography>
-                        )}
-                      </Stack>
-                    </Box>
-                  )}
-                </>
-              )}
 
               <MenuItem sx={{ gap: 1.25, py: 1.1 }}>
                 <ListItemIcon sx={{ minWidth: 34 }}>

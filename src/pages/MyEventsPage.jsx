@@ -21,6 +21,8 @@ import {
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
 import RegisteredActions from "../components/RegisteredActions.jsx";
+import { getJoinButtonText } from "../utils/gracePeriodUtils";
+import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 // ---------------------- API base + helpers (kept) ----------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -220,11 +222,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                     borderRadius: 2,
                   }}
                 >
-                  {isJoining
-                    ? "Joining…"
-                    : isLive
-                      ? "Join Live"
-                      : "Join"}
+                  {getJoinButtonText(ev, isLive, isJoining)}
                 </Button>
               );
             }
@@ -393,6 +391,11 @@ export default function MyEventsPage() {
   // pagination state (MOD: added)
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+
+  // ✅ Force re-render every second to update grace period button text in real-time
+  // This ensures "Join Live" changes to "Join Waiting Room" when grace period expires
+  // Uses 1-second ticker for guaranteed button updates regardless of when page loads
+  useSecondTick(); // Re-render every second while page is visible
 
   // Small helper for JSON GET
   async function fetchJSON(path) {

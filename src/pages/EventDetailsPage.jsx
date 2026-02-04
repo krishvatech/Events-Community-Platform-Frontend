@@ -14,6 +14,8 @@ import {
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
+import { getJoinButtonText } from "../utils/gracePeriodUtils";
+import { useSecondTick } from "../utils/useGracePeriodTimer";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 const urlJoin = (base, path) => `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -145,11 +147,9 @@ export default function EventDetailsPage() {
   const [event, setEvent] = useState(preload || null);
   const [loading, setLoading] = useState(!preload);
   const [error, setError] = useState(null);
-  const [, setNowTick] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowTick(Date.now()), 30 * 1000);
-    return () => clearInterval(id);
-  }, []);
+
+  // Force re-render every second to keep join button text current
+  useSecondTick();
 
   // Fetch registration status
   const [registration, setRegistration] = useState(null);
@@ -382,7 +382,7 @@ export default function EventDetailsPage() {
                         className="rounded-xl"
                         variant="contained"
                       >
-                        {isLive ? "Join Live" : "Join"}
+                        {getJoinButtonText(event, isLive, false)}
                       </Button>
                     ) : canWatch ? (
                       <Button
