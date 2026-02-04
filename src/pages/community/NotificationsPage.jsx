@@ -62,12 +62,26 @@ function groupByDay(items) {
   return groups;
 }
 
+// Helper to detect if a notification is KYC-related
+function isKycNotification(item) {
+  const t = String(item?.data?.type || "").toLowerCase();
+  if (t === "kyc") return true;
+
+  // Check title for KYC keywords (for admin-triggered notifications)
+  const title = String(item?.title || "").toLowerCase();
+  if (title.includes("kyc") || title.includes("identity verification")) return true;
+
+  return false;
+}
+
 // Keep Community Notifications page scoped to verification items only
 // - API notifications: kind="event" with data.type in ["kyc", "name_change"]
 // - Local identity request (pending only): kind="name_change" (_source="identity")
 function isVerificationItem(item) {
+  if (isKycNotification(item)) return true;
+
   const t = String(item?.data?.type || "").toLowerCase();
-  if (t === "kyc" || t === "name_change") return true;
+  if (t === "name_change") return true;
 
   // Your identity loader uses: source: "identity" (NOT _source)
   if (item?.source === "identity") return true;
@@ -299,11 +313,23 @@ function NotificationRow({
   // --- Dynamic Content for Identity Requests ---
   const renderContent = () => {
     const notifType = String(item?.data?.type || "").toLowerCase();
+    const isKyc = isKycNotification(item);
 
-    if (notifType === "kyc") {
+    if (isKyc) {
       const s = String(item.state || "").toLowerCase();
+      const title = String(item?.title || "").toLowerCase();
 
-      if (s === "approved") {
+      // Handle KYC Reset
+      if (title.includes("reset")) {
+        return (
+          <Typography variant="body2">
+            Your identity verification process has been <span style={{ color: '#b42318', fontWeight: 700 }}>reset</span>. You may start a new verification, please retry KYC
+          </Typography>
+        );
+      }
+
+      // Handle Approved
+      if (s === "approved" || s === "accepted") {
         return (
           <Typography variant="body2">
             Your profile is <span style={{ color: '#1a7f37', fontWeight: 700 }}>verified</span> ✅
@@ -311,7 +337,8 @@ function NotificationRow({
         );
       }
 
-      if (s === "review") {
+      // Handle Review/Pending
+      if (s === "review" || s === "pending") {
         return (
           <Typography variant="body2">
             Your identity verification is <span style={{ fontWeight: 700 }}>under review</span> ⏳
@@ -319,9 +346,19 @@ function NotificationRow({
         );
       }
 
+      // Handle Declined/Rejected
+      if (s === "declined" || s === "rejected") {
+        return (
+          <Typography variant="body2">
+            Your identity verification status has been updated to: <span style={{ color: '#b42318', fontWeight: 700 }}>declined. Not Accepted</span>
+          </Typography>
+        );
+      }
+
+      // Default KYC message
       return (
         <Typography variant="body2">
-          Identity verification <span style={{ color: '#b42318', fontWeight: 700 }}>failed</span> ❌
+          {item.description || item.title || "Identity verification update"}
         </Typography>
       );
     }
@@ -528,7 +565,7 @@ function NotificationRow({
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <ListItemAvatar sx={{ minWidth: 48 }}>
-          {String(item?.data?.type || "").toLowerCase() === "kyc" ? (
+          {isKycNotification(item) ? (
             <Avatar sx={{ bgcolor: "transparent" }}>
               <VerifiedIcon sx={{ color: "#22d3ee", fontSize: 32 }} />
             </Avatar>
@@ -569,9 +606,8 @@ function NotificationRow({
             sx={{ mt: 0.75 }}
           >
             {(() => {
-              const t = String(item?.data?.type || "").toLowerCase();
-              const isKyc = t === "kyc";
-              const isNameChange = item.kind === "name_change" || t === "name_change" || item.source === "identity";
+              const isKyc = isKycNotification(item);
+              const isNameChange = item.kind === "name_change" || String(item?.data?.type || "").toLowerCase() === "name_change" || item.source === "identity";
               const label = isKyc ? "KYC" : isNameChange ? "Name Change" : kindChip(item.kind);
               return <Chip size="small" label={label} />;
             })()}
@@ -909,8 +945,7 @@ export default function NotificationsPage({
     const ctx = n.context || {};
 
     let dest = null;
-    const t = String(n?.data?.type || "").toLowerCase();
-    if (t === "kyc" || n.kind === "name_change" || n.source === "identity") {
+    if (isKycNotification(n) || n.kind === "name_change" || n.source === "identity") {
       markAndNavigate(n, "/account/profile");
       return;
     }
