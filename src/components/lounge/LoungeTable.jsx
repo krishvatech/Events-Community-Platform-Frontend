@@ -24,7 +24,11 @@ const LoungeTable = ({
     const maxSeats = table.max_seats || 4;
 
     // ✅ NEW: Check if lounge is open
+    // For LOUNGE tables: apply lounge availability check
+    // For BREAKOUT tables: allow join regardless of lounge status
     const isLoungeClosed = loungeOpenStatus?.status === 'CLOSED';
+    const isBreakoutTable = table.category === 'BREAKOUT';
+    const shouldDisableJoin = isLoungeClosed && !isBreakoutTable;
     const isFull = Object.keys(table.participants || {}).length >= maxSeats;
     const [iconUploading, setIconUploading] = useState(false);
     const iconInputRef = useRef(null);
@@ -294,8 +298,8 @@ const LoungeTable = ({
                 <Button
                     fullWidth
                     variant="outlined"
-                    disabled={isLoungeClosed || isFull}
-                    title={isLoungeClosed ? 'Lounge is closed' : isFull ? 'Table is full' : 'Join this table'}
+                    disabled={shouldDisableJoin || isFull}
+                    title={shouldDisableJoin ? 'Lounge is closed' : isFull ? 'Table is full' : 'Join this table'}
                     onClick={() => {
                         // Find first available seat index
                         const participants = table.participants || {};
@@ -312,7 +316,7 @@ const LoungeTable = ({
                         fontWeight: 700,
                         borderColor: 'rgba(255, 255, 255, 0.3)',
                         color: 'white',
-                        opacity: isLoungeClosed ? 0.5 : 1,
+                        opacity: shouldDisableJoin ? 0.5 : 1,
                         '&:hover:not(:disabled)': {
                             borderColor: 'white',
                             bgcolor: 'rgba(255, 255, 255, 0.1)',
@@ -324,7 +328,7 @@ const LoungeTable = ({
                         },
                     }}
                 >
-                    {isLoungeClosed ? 'Lounge Closed' : 'Join'}
+                    {shouldDisableJoin ? 'Lounge Closed' : 'Join'}
                 </Button>
             )}
         </Paper>
