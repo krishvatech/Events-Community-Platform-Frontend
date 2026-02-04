@@ -33,7 +33,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
 import { apiClient } from "../utils/api";
-import { getJoinButtonText } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 const API_BASE =
@@ -201,6 +201,8 @@ function toCard(ev) {
     registration_url: `/events/${ev.slug || ev.id}`, // tweak to your detail route
     waiting_room_enabled: ev.waiting_room_enabled,
     waiting_room_grace_period_minutes: ev.waiting_room_grace_period_minutes,
+    lounge_enabled_before: ev.lounge_enabled_before,
+    lounge_before_buffer: ev.lounge_before_buffer,
   };
 }
 
@@ -239,7 +241,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
+  const isPreEventLounge = isPreEventLoungeOpen(ev);
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge;
 
   const handleRegisterCard = async () => {
     const token =
@@ -300,7 +303,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 
   const handleJoinCard = () => {
     const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
-    navigate(livePath, { state: { event: ev }, replace: false });
+    navigate(livePath, {
+      state: { event: ev, openLounge: isPreEventLounge, preEventLounge: isPreEventLounge },
+      replace: false,
+    });
   };
 
   return (
@@ -480,7 +486,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
   const status = computeStatus(ev);
   const isLive = status === "live" && ev.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
+  const isPreEventLounge = isPreEventLoungeOpen(ev);
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge;
 
   const handleRegisterRow = async () => {
     const token =
@@ -532,7 +539,10 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 
   const handleJoinRow = () => {
     const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
-    navigate(livePath, { state: { event: ev }, replace: false });
+    navigate(livePath, {
+      state: { event: ev, openLounge: isPreEventLounge, preEventLounge: isPreEventLounge },
+      replace: false,
+    });
   };
 
   const startDate = new Date(ev.start);

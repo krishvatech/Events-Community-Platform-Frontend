@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import Grid from '@mui/material/Grid';
 import RegisteredActions from "../components/RegisteredActions.jsx";
-import { getJoinButtonText } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 // ---------------------- API base + helpers (kept) ----------------------
@@ -204,7 +204,8 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 
             // ✅ allow users to join up to 15 minutes before the start time
             const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
-            const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
+            const isPreEventLounge = isPreEventLoungeOpen(ev);
+            const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge;
 
             // 1) LIVE or within 15 min before start → active Join button
             if (canShowActiveJoin) {
@@ -535,11 +536,14 @@ export default function MyEventsPage() {
 
     setJoiningId(ev.id);
     try {
+      const isPreEventLounge = isPreEventLoungeOpen(ev);
       const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
 
       navigate(livePath, {
         state: {
           event: ev,
+          openLounge: isPreEventLounge,
+          preEventLounge: isPreEventLounge,
         },
         replace: false,
       });

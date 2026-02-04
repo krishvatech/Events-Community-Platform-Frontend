@@ -85,7 +85,7 @@ import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
 
 import { DyteParticipantsAudio } from "@dytesdk/react-ui-kit";
@@ -98,6 +98,8 @@ import BannedParticipantsDialog from "../components/live-meeting/BannedParticipa
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
 import { getUserName } from "../utils/authStorage.js";
+import { isPreEventLoungeOpen } from "../utils/gracePeriodUtils.js";
+import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 // ================ Custom Lounge Icon ================
 const SocialLoungeIcon = (props) => (
@@ -809,6 +811,9 @@ function WaitingForHost({
   roleLabel = "Audience",
   waitingRoomImage = null,
   timezone = null,
+  loungeAvailable = false,
+  onOpenLounge,
+  loungeStatusLabel = "",
 }) {
   return (
     <Box
@@ -997,12 +1002,38 @@ function WaitingForHost({
           </Typography>
         </Stack>
 
+        {loungeAvailable && (
+          <Button
+            onClick={onOpenLounge}
+            variant="outlined"
+            sx={{
+              mt: 2.2,
+              px: 3,
+              py: 1,
+              borderRadius: 999,
+              textTransform: "none",
+              fontWeight: 800,
+              letterSpacing: 0.4,
+              opacity: 1,
+              color: "rgba(255,255,255,0.92)",
+              borderColor: "rgba(255,255,255,0.28)",
+              bgcolor: "rgba(255,255,255,0.06)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.10)",
+                borderColor: "rgba(255,255,255,0.40)",
+              },
+            }}
+          >
+            Open Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
+          </Button>
+        )}
+
         {onBack && (
           <Button
             onClick={onBack}
             variant="outlined"
             sx={{
-              mt: 2.5,
+              mt: loungeAvailable ? 1.5 : 2.5,
               px: 3,
               py: 1,
               borderRadius: 999,
@@ -1032,6 +1063,282 @@ function WaitingForHost({
   );
 }
 
+function PreEventLoungeGate({
+  onBack,
+  eventTitle = "Live Meeting",
+  scheduled = "--",
+  duration = "--",
+  roleLabel = "Audience",
+  waitingRoomImage = null,
+  timezone = null,
+  loungeAvailable = false,
+  onOpenLounge,
+  loungeStatusLabel = "",
+  isLoungeOpen = true,
+  onJoinMain,
+}) {
+  return (
+    <Box
+      sx={{
+        minHeight: "100vh",
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        px: 2,
+        bgcolor: "#05070D",
+        backgroundImage:
+          "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%), radial-gradient(900px 520px at 0% 100%, rgba(20,184,177,0.10), transparent 60%)",
+        color: "#E5E7EB",
+      }}
+    >
+      {/* Top Brand */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 44,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, opacity: 0.95 }}>
+          <AutoAwesomeIcon sx={{ fontSize: 22, color: "rgba(255,255,255,0.85)" }} />
+          <Typography
+            sx={{
+              fontWeight: 700,
+              letterSpacing: 0.2,
+              color: "rgba(255,255,255,0.85)",
+            }}
+          >
+            IMAA Connect
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Bottom-left role badge */}
+      <Box sx={{ position: "fixed", left: 16, bottom: 16, zIndex: 50 }}>
+        <Chip
+          label={roleLabel}
+          size="small"
+          sx={{
+            bgcolor: "rgba(255,255,255,0.07)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            color: "rgba(255,255,255,0.85)",
+            fontWeight: 700,
+            backdropFilter: "blur(8px)",
+          }}
+        />
+      </Box>
+
+      {/* Center Card */}
+      <Paper
+        elevation={0}
+        sx={{
+          width: "100%",
+          maxWidth: 560,
+          borderRadius: 4,
+          p: { xs: 2.5, sm: 3 },
+          bgcolor: "rgba(15, 23, 42, 0.60)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          backdropFilter: "blur(12px)",
+          textAlign: "center",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+        }}
+      >
+        {/* Icon circle or waiting room image */}
+        {waitingRoomImage ? (
+          <Box
+            sx={{
+              width: "100%",
+              maxWidth: 400,
+              height: 250,
+              mx: "auto",
+              mb: 2,
+              borderRadius: 2,
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            <img
+              src={waitingRoomImage}
+              alt="Social lounge"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              width: 72,
+              height: 72,
+              mx: "auto",
+              mb: 2,
+              borderRadius: "999px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            <AccessTimeRoundedIcon sx={{ fontSize: 34, color: "rgba(255,255,255,0.70)" }} />
+          </Box>
+        )}
+
+        <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 0.8, color: "rgba(255,255,255,0.92)" }}>
+          {isLoungeOpen ? "Social Lounge is open" : "Social Lounge is closed"}
+        </Typography>
+
+        {!isLoungeOpen && (
+          <Alert
+            severity="warning"
+            sx={{
+              mb: 2,
+              bgcolor: "rgba(245, 124, 0, 0.12)",
+              border: "1px solid rgba(245, 124, 0, 0.3)",
+              color: "rgba(255, 193, 7, 0.95)",
+              "& .MuiAlert-icon": {
+                color: "rgba(255, 193, 7, 0.95)",
+              },
+            }}
+          >
+            The Social Lounge is closed. You should join the main meeting now.
+          </Alert>
+        )}
+
+        <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.65)", mb: 2 }}>
+          {isLoungeOpen
+            ? "Join the Social Lounge now. You'll move into the main meeting automatically when the event begins."
+            : "The Social Lounge is closed. Please join the main meeting instead."}
+        </Typography>
+
+        {/* Info box */}
+        <Box
+          sx={{
+            textAlign: "left",
+            borderRadius: 3,
+            p: 2,
+            bgcolor: "rgba(0,0,0,0.18)",
+            border: "1px solid rgba(255,255,255,0.10)",
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Event</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              {eventTitle}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Scheduled</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              {scheduled}
+              {timezone && (
+                <Typography
+                  component="span"
+                  sx={{ fontSize: 11, color: "rgba(255,255,255,0.65)", ml: 0.5 }}
+                >
+                  ({timezone})
+                </Typography>
+              )}
+            </Typography>
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between">
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Duration</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+              {duration}
+            </Typography>
+          </Stack>
+        </Box>
+
+        {isLoungeOpen && loungeAvailable && (
+          <Button
+            onClick={onOpenLounge}
+            variant="outlined"
+            sx={{
+              mt: 2.2,
+              px: 3,
+              py: 1,
+              borderRadius: 999,
+              textTransform: "none",
+              fontWeight: 800,
+              letterSpacing: 0.4,
+              opacity: 1,
+              color: "rgba(255,255,255,0.92)",
+              borderColor: "rgba(255,255,255,0.28)",
+              bgcolor: "rgba(255,255,255,0.06)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.10)",
+                borderColor: "rgba(255,255,255,0.40)",
+              },
+            }}
+          >
+            Open Social Lounge {loungeStatusLabel ? `• ${loungeStatusLabel}` : ""}
+          </Button>
+        )}
+
+        {!isLoungeOpen && onJoinMain && (
+          <Button
+            onClick={onJoinMain}
+            variant="contained"
+            sx={{
+              mt: 2.2,
+              px: 3,
+              py: 1,
+              borderRadius: 999,
+              textTransform: "none",
+              fontWeight: 800,
+              letterSpacing: 0.4,
+              bgcolor: "#10b8a6",
+              "&:hover": { bgcolor: "#0ea5a4" },
+            }}
+          >
+            Join Main Meeting
+          </Button>
+        )}
+
+        {onBack && (
+          <Button
+            onClick={onBack}
+            variant="outlined"
+            sx={{
+              mt: loungeAvailable ? 1.5 : 2.5,
+              px: 3,
+              py: 1,
+              borderRadius: 999,
+              textTransform: "none",
+              fontWeight: 800,
+              letterSpacing: 0.4,
+              opacity: 1,
+              color: "rgba(255,255,255,0.92)",
+              borderColor: "rgba(255,255,255,0.28)",
+              bgcolor: "rgba(255,255,255,0.06)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.10)",
+                borderColor: "rgba(255,255,255,0.40)",
+              },
+            }}
+          >
+            BACK
+          </Button>
+        )}
+      </Paper>
+
+      {/* Footer */}
+      <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+        Having trouble? Check your connection or contact support
+      </Typography>
+    </Box>
+  );
+}
 function WaitingRoomScreen({
   onBack,
   eventTitle = "Live Meeting",
@@ -1631,6 +1938,9 @@ export default function NewLiveMeeting() {
 
   const { slug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const preEventTick = useSecondTick();
+  const eventFromState = location?.state?.event || null;
 
   // ---------- Old logic states (real) ----------
   const [eventId, setEventId] = useState(null);
@@ -1639,8 +1949,17 @@ export default function NewLiveMeeting() {
 
   const [authToken, setAuthToken] = useState("");
   const mainAuthTokenRef = useRef("");
+  const joinRoomRetryRef = useRef(0);
+  const tokenFetchInFlightRef = useRef(false);
+  const initInFlightRef = useRef(false);
+  const joinInFlightRef = useRef(false);
+  const mainJoinInFlightRef = useRef(false);
+  const lastInitTokenRef = useRef(null);
+  const tokenFetchAbortControllerRef = useRef(null); // ✅ AbortController for cancelling in-flight token fetches
+  const [joinMainRequested, setJoinMainRequested] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(true);
   const [joinError, setJoinError] = useState("");
+  const [joinRequestTick, setJoinRequestTick] = useState(0);
   const [dbStatus, setDbStatus] = useState("draft");
   const [eventTitle, setEventTitle] = useState("Live Meeting");
   const [isBreakout, setIsBreakout] = useState(false);
@@ -1651,6 +1970,17 @@ export default function NewLiveMeeting() {
   const [eventData, setEventData] = useState(null); // ✅ Store full event data (images, timezone, etc.)
   const [loungeTables, setLoungeTables] = useState([]);
   const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
+  const isLoungeCurrentlyOpen = loungeOpenStatus?.status === "OPEN";
+  const isPreEventLoungeStatus = Boolean(loungeOpenStatus?.reason?.includes("Pre-event"));
+  const loungeNextChangeTs = useMemo(() => {
+    if (!loungeOpenStatus?.next_change) return null;
+    const ts = new Date(loungeOpenStatus.next_change).getTime();
+    return Number.isFinite(ts) ? ts : null;
+  }, [loungeOpenStatus?.next_change]);
+  const preEventLoungeOpen = useMemo(
+    () => isPreEventLoungeOpen(eventData || eventFromState),
+    [eventData, eventFromState, preEventTick]
+  );
 
   const loungeOnlyTables = useMemo(() =>
     loungeTables.filter(t => t.category === 'LOUNGE' || !t.category),
@@ -1677,6 +2007,8 @@ export default function NewLiveMeeting() {
   const [isInBreakoutRoom, setIsInBreakoutRoom] = useState(false);
   const isInBreakoutRoomRef = useRef(false); // ✅ Ref for socket access
   const leaveBreakoutInFlightRef = useRef(false);
+  const preEventLoungeWasOpenRef = useRef(false);
+  const preEventLoungePhaseRef = useRef(false);
   const fetchLoungeStateRef = useRef(null); // ✅ Ref to store fetchLoungeState for calling from handleLeaveBreakout
 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -2244,7 +2576,16 @@ export default function NewLiveMeeting() {
           }
         }
       } else {
-        console.warn("[LiveMeeting] No main token available to return to!");
+        console.warn("[LiveMeeting] No main token available to return to! Resetting state to re-join.");
+        setIsBreakout(false);
+        setAuthToken(null);
+        setInitDone(false);
+        setRoomJoined(false);
+        joinedOnceRef.current = false;
+        setActiveTableId(null);
+        setActiveTableName("");
+        setActiveTableLogoUrl("");
+        setRoomChatConversationId(null);
       }
     },
     [dyteMeeting, isBreakout, mainRoomAuthToken, mainDyteMeeting, initMainMeeting]
@@ -2675,7 +3016,19 @@ export default function NewLiveMeeting() {
     // 1. If we are in a breakout room, we don't manage tokens here
     // (Breakout tokens are managed by LoungeOverlay -> handleEnterBreakout)
     if (isBreakout) return;
-    if (waitingRoomActive) return;
+    if (role !== "publisher" && !eventData && !eventFromState) return;
+    if (waitingRoomActive) {
+      console.log("[LiveMeeting] Skipping token fetch - user is in waiting room");
+      return;
+    }
+    if (preEventLoungeOpen && role !== "publisher" && !joinMainRequested) {
+      // ✅ Log when skipping token fetch due to pre-event lounge
+      if (!joinInFlightRef.current) {
+        console.log("[LiveMeeting] In pre-event lounge, skipping token fetch");
+      }
+      setLoadingJoin(false);
+      return;
+    }
 
     // 2. If we already have the main token, just use it
     if (mainAuthTokenRef.current) {
@@ -2689,8 +3042,20 @@ export default function NewLiveMeeting() {
 
     // 3. Otherwise, fetch it for the first time
     (async () => {
+      if (tokenFetchInFlightRef.current) return;
+      tokenFetchInFlightRef.current = true;
       setLoadingJoin(true);
       setJoinError("");
+
+      // ✅ Cancel any previous in-flight token fetch to prevent stale tokens
+      if (tokenFetchAbortControllerRef.current) {
+        tokenFetchAbortControllerRef.current.abort();
+        console.log("[LiveMeeting] Cancelled previous in-flight token fetch");
+      }
+
+      // Create new AbortController for this fetch
+      const abortController = new AbortController();
+      tokenFetchAbortControllerRef.current = abortController;
 
       try {
         console.log("[LiveMeeting] Fetching initial Dyte token for role:", role);
@@ -2698,6 +3063,7 @@ export default function NewLiveMeeting() {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeader() },
           body: JSON.stringify({ role }),
+          signal: abortController.signal, // ✅ Add abort signal
         });
 
         if (!res.ok) {
@@ -2726,13 +3092,23 @@ export default function NewLiveMeeting() {
         mainAuthTokenRef.current = data.authToken;
         if (data.role) setRole(normalizeRole(data.role));
       } catch (e) {
+        // ✅ Don't log abort errors - they're expected when switching rooms or on lounge close
+        if (e.name === 'AbortError') {
+          console.log("[LiveMeeting] Token fetch was cancelled (expected during room switch)");
+          return;
+        }
         console.error("[LiveMeeting] Failed to fetch initial Dyte token:", e);
         setJoinError(e.message || "Join failed");
       } finally {
-        setLoadingJoin(false);
+        // ✅ Only mark complete if this is still the active fetch
+        if (tokenFetchAbortControllerRef.current === abortController) {
+          tokenFetchAbortControllerRef.current = null;
+          tokenFetchInFlightRef.current = false;
+          setLoadingJoin(false);
+        }
       }
     })();
-  }, [eventId, role, isBreakout, waitingRoomActive]);
+  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken]);
 
   useEffect(() => {
     if (!eventId || !waitingRoomActive) return;
@@ -2748,12 +3124,15 @@ export default function NewLiveMeeting() {
         const data = await res.json().catch(() => null);
         if (!data) return;
         if (data.admission_status === "admitted") {
+          console.log("[LiveMeeting] ✅ User ADMITTED from waiting room! Setting waitingRoomActive to false");
           setWaitingRoomActive(false);
           setWaitingRoomStatus("admitted");
         } else if (data.admission_status === "rejected") {
+          console.log("[LiveMeeting] ❌ User REJECTED from waiting room");
           setWaitingRoomActive(false);
           setJoinError("You were not admitted to this event.");
         } else {
+          console.log("[LiveMeeting] Waiting room status polling - status:", data.admission_status);
           setWaitingRoomStatus(data.admission_status || "waiting");
           setWaitingRoomLoungeAllowed(Boolean(data?.lounge_allowed));
           setWaitingRoomNetworkingAllowed(Boolean(data?.networking_allowed));
@@ -2801,6 +3180,12 @@ export default function NewLiveMeeting() {
     }, 10000);
     return () => clearInterval(interval);
   }, [eventId, fetchLoungeState]);
+
+  useEffect(() => {
+    if (preEventLoungeOpen && isLoungeCurrentlyOpen && role !== "publisher" && !isBreakout) {
+      setLoungeOpen(true);
+    }
+  }, [preEventLoungeOpen, isLoungeCurrentlyOpen, role, isBreakout]);
 
   // ✅ Keep fetchLoungeStateRef in sync for handleLeaveBreakout to call
   useEffect(() => {
@@ -2915,6 +3300,48 @@ export default function NewLiveMeeting() {
     };
   }, [eventId]);
 
+  // ✅ Additional polling for lounge status while in breakout (more frequent)
+  // Ensures lounge close is detected quickly even if WebSocket updates are delayed
+  useEffect(() => {
+    if (role === "publisher") return; // Only non-publishers need to check
+    if (!eventId) return;
+    if (!isBreakout) return; // Only while in breakout
+
+    let alive = true;
+
+    const pollLoungeStatus = async () => {
+      if (!alive) return;
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
+          headers: { ...authHeader() },
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (!data || !alive) return;
+
+        if (data.lounge_open_status) {
+          setLoungeOpenStatus(data.lounge_open_status);
+
+          // ✅ Log lounge status changes for debugging
+          if (data.lounge_open_status.status === "CLOSED") {
+            console.log("[LiveMeeting] Lounge status update via polling: CLOSED (will trigger rejoin)");
+          }
+        }
+      } catch (e) {
+        console.warn("[LiveMeeting] Error polling lounge status:", e);
+      }
+    };
+
+    // Poll immediately and every 5 seconds (more frequent than regular lounge polling)
+    pollLoungeStatus();
+    const interval = setInterval(pollLoungeStatus, 5000);
+
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
+  }, [eventId, isBreakout, role]);
+
   const sendMainSocketAction = useCallback((payload) => {
     const ws = mainSocketRef.current;
     if (ws?.readyState === WebSocket.OPEN) {
@@ -3020,10 +3447,31 @@ export default function NewLiveMeeting() {
     };
   }, [eventId, isHost, eventData?.waiting_room_enabled]);
 
+  // ✅ Filter out lounge occupants from waiting room display
+  // Users in the Social Lounge should NOT appear in the waiting room section
+  const filteredWaitingRoomQueue = useMemo(() => {
+    const loungeOccupantIds = new Set();
+    loungeTables.forEach((t) => {
+      Object.values(t.participants || {}).forEach((p) => {
+        if (p.user_id) loungeOccupantIds.add(String(p.user_id));
+      });
+    });
+
+    // Filter out users who are in the lounge
+    const filtered = (waitingRoomQueue || []).filter((w) => {
+      const userId = String(w.user_id || w.id || "");
+      return !loungeOccupantIds.has(userId);
+    });
+
+    return filtered;
+  }, [waitingRoomQueue, loungeTables]);
+
+  const filteredWaitingRoomCount = filteredWaitingRoomQueue.length;
+
   useEffect(() => {
     if (!isHost || !eventData?.waiting_room_enabled) return;
-    if (waitingRoomQueueCount > waitingRoomPrevCountRef.current) {
-      const diff = waitingRoomQueueCount - waitingRoomPrevCountRef.current;
+    if (filteredWaitingRoomCount > waitingRoomPrevCountRef.current) {
+      const diff = filteredWaitingRoomCount - waitingRoomPrevCountRef.current;
       showSnackbar(
         diff === 1 ? "New participant is waiting (click to view)" : `${diff} new participants are waiting (click to view)`,
         "info",
@@ -3035,8 +3483,8 @@ export default function NewLiveMeeting() {
         }
       );
     }
-    waitingRoomPrevCountRef.current = waitingRoomQueueCount;
-  }, [waitingRoomQueueCount, isHost, eventData?.waiting_room_enabled, showSnackbar, toggleRightPanel]);
+    waitingRoomPrevCountRef.current = filteredWaitingRoomCount;
+  }, [filteredWaitingRoomCount, isHost, eventData?.waiting_room_enabled, showSnackbar, toggleRightPanel]);
 
   useEffect(() => {
     if (!pendingWaitFocus) return;
@@ -3138,9 +3586,13 @@ export default function NewLiveMeeting() {
   // ---------- Init Dyte meeting ----------
   useEffect(() => {
     if (!authToken) return;
+    if (initInFlightRef.current) return;
+    if (lastInitTokenRef.current === authToken && initDone) return;
 
     let cancelled = false;
     (async () => {
+      initInFlightRef.current = true;
+      lastInitTokenRef.current = authToken;
       try {
         setInitDone(false);
         // ✅ Reset join flags so we can join the NEW meeting room
@@ -3190,6 +3642,7 @@ export default function NewLiveMeeting() {
           isBreakout
         );
 
+        console.log("[LiveMeeting] Awaiting initMeeting to complete...");
         await initMeeting({
           authToken,
           defaults: {
@@ -3197,30 +3650,47 @@ export default function NewLiveMeeting() {
             video: videoDefault,
           },
         });
+        console.log("[LiveMeeting] ✅ initMeeting completed successfully!");
 
-        if (!cancelled) setInitDone(true);
+        if (!cancelled) {
+          console.log("[LiveMeeting] Setting initDone to true - join effect should trigger now");
+          setInitDone(true);
+        } else {
+          console.log("[LiveMeeting] ⚠️ Init was cancelled, not setting initDone");
+        }
       } catch (e) {
+        console.error("[LiveMeeting] ❌ initMeeting FAILED:", e?.message || e);
         if (!cancelled) setJoinError(e.message || "Failed to initialize Dyte meeting");
+      } finally {
+        console.log("[LiveMeeting] Init effect finally block - clearing initInFlightRef");
+        initInFlightRef.current = false;
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [authToken, initMeeting, role, isBreakout, mainRoomAuthToken]);
+  }, [authToken, initMeeting, role, isBreakout]);
+  // ✅ CRITICAL FIX: Neither initDone nor mainRoomAuthToken in dependencies
+  // We're SETTING these states inside the effect, not depending on them
+  // Having them in dependencies causes cleanup to run immediately after state updates,
+  // cancelling the effect before initMeeting completes (causing "Init was cancelled" issue)
 
   // ---------- Join main room (for peek functionality) ----------
   useEffect(() => {
     if (!mainDyteMeeting?.self || !mainRoomAuthToken) return;
 
     (async () => {
-      if (mainDyteMeeting.self.roomJoined) return;
+      if (mainDyteMeeting.self.roomJoined || mainJoinInFlightRef.current) return;
+      mainJoinInFlightRef.current = true;
 
       try {
         await mainDyteMeeting.join();
         console.log("[MainRoom] Joined main room for peek");
       } catch (e) {
         console.error("[MainRoom] Failed to join:", e);
+      } finally {
+        mainJoinInFlightRef.current = false;
       }
     })();
   }, [mainDyteMeeting, mainRoomAuthToken]);
@@ -3258,18 +3728,44 @@ export default function NewLiveMeeting() {
 
   // ---------- MUST join Dyte room (custom UI doesn't auto-join) ----------
   useEffect(() => {
-    if (!dyteMeeting?.self || !initDone) return;
+    if (!dyteMeeting?.self || !initDone) {
+      console.log("[LiveMeeting] Join effect skipped - dyteMeeting?.self:", !!dyteMeeting?.self, "initDone:", initDone);
+      return;
+    }
 
-    const onRoomJoined = () => setRoomJoined(true);
+    console.log("[LiveMeeting] ✅ Join effect triggered! dyteMeeting.self exists and initDone is true");
+
+    const onRoomJoined = () => {
+      console.log("[LiveMeeting] ✅ roomJoined event received!");
+      setRoomJoined(true);
+    };
     dyteMeeting.self.on?.("roomJoined", onRoomJoined);
 
     // refresh case
     if (dyteMeeting.self.roomJoined) setRoomJoined(true);
 
     (async () => {
-      // ✅ join only once
-      if (joinedOnceRef.current || dyteMeeting.self.roomJoined) return;
+      // ✅ Multiple guards against concurrent join calls
+      if (joinInFlightRef.current) {
+        console.warn("[LiveMeeting] Join already in flight, skipping duplicate call");
+        return;
+      }
+      if (joinedOnceRef.current) {
+        console.log("[LiveMeeting] Already joined once, skipping");
+        return;
+      }
+      if (dyteMeeting.self.roomJoined) {
+        console.log("[LiveMeeting] Already in room, skipping");
+        return;
+      }
+      // ✅ Additional safety: check if we just left due to lounge transition
+      if (rejoinFromLoungeRef.current) {
+        console.log("[LiveMeeting] Recent lounge rejoin in progress, waiting");
+        return;
+      }
+
       joinedOnceRef.current = true;
+      joinInFlightRef.current = true;
 
       // ✅ ask mic+cam permission (browser popup)
       if (!askedMediaPermRef.current) {
@@ -3284,10 +3780,33 @@ export default function NewLiveMeeting() {
 
       // ✅ ACTUAL JOIN
       try {
+        console.log("[LiveMeeting] Calling dyteMeeting.joinRoom()...");
         await dyteMeeting.joinRoom?.();
+        console.log("[LiveMeeting] ✅ joinRoom() completed successfully!");
       } catch (e) {
-        console.error("[LiveMeeting] joinRoom failed:", e);
+        console.error("[LiveMeeting] ❌ joinRoom failed:", e?.message || e);
+
+        // ✅ Only retry if not recently rejoin from lounge (to avoid retry loops)
+        if (rejoinFromLoungeRef.current) {
+          console.warn("[LiveMeeting] Skipping join retry due to lounge rejoin");
+          setJoinError(e?.message || "Failed to join Dyte room");
+          return;
+        }
+
+        // ✅ Allow retry for ALL users (both audience and publishers)
+        if (joinRoomRetryRef.current < 1) {
+          console.log("[LiveMeeting] Join failed, retrying once...");
+          joinRoomRetryRef.current += 1;
+          mainAuthTokenRef.current = "";
+          setAuthToken("");
+          setLoadingJoin(true);
+          setJoinError("");
+          setJoinRequestTick((v) => v + 1);
+          return;
+        }
         setJoinError(e?.message || "Failed to join Dyte room");
+      } finally {
+        joinInFlightRef.current = false;
       }
     })();
 
@@ -3660,6 +4179,7 @@ export default function NewLiveMeeting() {
   }, [initDone, role, isBreakout, dbStatus, updateLiveStatus]);
 
   const ignoreRoomLeftRef = useRef(false);
+  const rejoinFromLoungeRef = useRef(false);
 
   const myUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
   const isEventOwner = useMemo(() => {
@@ -3789,6 +4309,7 @@ export default function NewLiveMeeting() {
     if (!dyteMeeting?.self) return;
     const handleRoomLeft = ({ state }) => {
       if (ignoreRoomLeftRef.current) return;
+      if (rejoinFromLoungeRef.current) return;
       if (["left", "ended", "kicked", "rejected", "disconnected", "failed"].includes(state)) {
         if (!isBreakout) handleMeetingEnd(state);
       }
@@ -4514,6 +5035,131 @@ export default function NewLiveMeeting() {
     }
   }, [dyteMeeting, isPostEventLounge]);
 
+  const forceRejoinMainFromLounge = useCallback(async () => {
+    // Close lounge UI and force a fresh join via API (to respect waiting room/grace rules)
+    setLoungeOpen(false);
+    setJoinMainRequested(true);
+    rejoinFromLoungeRef.current = true;
+
+    // ✅ Cancel any in-flight token fetch to prevent stale tokens during lounge rejoin
+    if (tokenFetchAbortControllerRef.current) {
+      tokenFetchAbortControllerRef.current.abort();
+      console.log("[LiveMeeting] Cancelled in-flight token fetch during lounge rejoin");
+      tokenFetchAbortControllerRef.current = null;
+    }
+
+    if (dyteMeeting) {
+      try {
+        ignoreRoomLeftRef.current = true;
+        await dyteMeeting.leaveRoom();
+      } catch (e) {
+        console.warn("[LiveMeeting] Error leaving lounge room:", e);
+      } finally {
+        ignoreRoomLeftRef.current = false;
+      }
+    }
+    mainAuthTokenRef.current = "";
+    setMainRoomAuthToken(null);
+    setIsBreakout(false);
+    setAuthToken("");
+    setInitDone(false);
+    setRoomJoined(false);
+    joinedOnceRef.current = false;
+    setActiveTableId(null);
+    setActiveTableName("");
+    setActiveTableLogoUrl("");
+    setRoomChatConversationId(null);
+    setWaitingRoomActive(false);
+    setJoinRequestTick((v) => v + 1);
+    setTimeout(() => {
+      rejoinFromLoungeRef.current = false;
+    }, 500);
+  }, [dyteMeeting]);
+
+  // ✅ Lounge close detection ref to prevent concurrent rejoin calls
+  const loungeCloseDetectionRef = useRef({
+    inFlightCount: 0,
+    lastTriggerTime: 0,
+    MIN_INTERVAL_MS: 1000, // Debounce: prevent rapid re-triggers within 1 second
+  });
+
+  // ✅ Helper function to safely trigger lounge rejoin
+  const shouldTriggerLoungeRejoin = useCallback(() => {
+    // Already in flight - don't trigger again
+    if (loungeCloseDetectionRef.current.inFlightCount > 0) {
+      console.log("[LiveMeeting] Lounge rejoin already in flight, skipping");
+      return false;
+    }
+
+    // Too soon since last trigger
+    const now = Date.now();
+    const timeSinceLastTrigger = now - loungeCloseDetectionRef.current.lastTriggerTime;
+    if (timeSinceLastTrigger < loungeCloseDetectionRef.current.MIN_INTERVAL_MS) {
+      console.log("[LiveMeeting] Lounge rejoin triggered too recently, debouncing");
+      return false;
+    }
+
+    // Check if user should be forced to rejoin
+    if (role === "publisher") return false; // Hosts don't auto-rejoin
+    if (!isBreakout) return false; // Only rejoin from breakout/lounge
+
+    return true;
+  }, [role, isBreakout]);
+
+  useEffect(() => {
+    const wasOpen = preEventLoungeWasOpenRef.current;
+    if (wasOpen && !preEventLoungeOpen) {
+      setLoungeOpen(false);
+      if (isBreakout) {
+        handleLeaveBreakout();
+      }
+    }
+    preEventLoungeWasOpenRef.current = preEventLoungeOpen;
+  }, [preEventLoungeOpen, isBreakout, handleLeaveBreakout]);
+
+  // ✅ CONSOLIDATED LOUNGE CLOSE DETECTION
+  // Replaces 5 separate effects with single guard against race conditions
+  useEffect(() => {
+    if (role === "publisher") return; // Hosts don't auto-rejoin
+    if (!isBreakout) return; // Only applies to users in breakout/lounge
+
+    // Evaluate all lounge close conditions
+    const shouldRejoin =
+      (!preEventLoungeOpen && isBreakout) || // Pre-event lounge closed
+      (!isLoungeCurrentlyOpen && isPreEventLoungeStatus && isBreakout) || // Pre-event lounge ended
+      (loungeOpenStatus?.status === "CLOSED" && !isPostEventLounge && isBreakout); // Lounge CLOSED
+
+    if (!shouldRejoin) return;
+
+    // Guard against concurrent calls
+    if (!shouldTriggerLoungeRejoin()) return;
+
+    // Execute rejoin with race condition protection
+    (async () => {
+      loungeCloseDetectionRef.current.inFlightCount++;
+      loungeCloseDetectionRef.current.lastTriggerTime = Date.now();
+
+      try {
+        console.log("[LiveMeeting] Consolidated lounge close detected, triggering rejoin");
+        await forceRejoinMainFromLounge();
+      } catch (e) {
+        console.error("[LiveMeeting] Error during forced rejoin:", e);
+      } finally {
+        loungeCloseDetectionRef.current.inFlightCount--;
+      }
+    })();
+  }, [
+    role,
+    isBreakout,
+    preEventLoungeOpen,
+    isLoungeCurrentlyOpen,
+    isPreEventLoungeStatus,
+    loungeOpenStatus?.status,
+    isPostEventLounge,
+    forceRejoinMainFromLounge,
+    shouldTriggerLoungeRejoin,
+  ]);
+
   // Debug: log what Dyte exposes so we can see why audience is missing
   useEffect(() => {
     if (!dyteMeeting) return;
@@ -4976,6 +5622,17 @@ export default function NewLiveMeeting() {
   // If audience and host not live yet
   // ✅ Also show meeting if in breakout/lounge room (post-event)
   const shouldShowMeeting = role === "publisher" || roomJoined || hostJoined || dbStatus === "live" || isBreakout;
+  const hasMainToken = Boolean(mainAuthTokenRef.current || authToken);
+  const shouldShowPreEventLoungeGate =
+    preEventLoungeOpen && role !== "publisher" && !isBreakout && !joinMainRequested && !hasMainToken;
+
+  const handleJoinMainMeeting = useCallback(() => {
+    setJoinMainRequested(true);
+    setJoinError("");
+    setWaitingRoomActive(false);
+    setLoadingJoin(true);
+    setJoinRequestTick((v) => v + 1);
+  }, []);
 
   // Back behavior (same as old intent)
   const handleBack = () => {
@@ -5117,19 +5774,37 @@ export default function NewLiveMeeting() {
       throw new Error("Must be seated in lounge to access chat.");
     }
 
-    const res = await fetch(toApiUrl("messaging/conversations/ensure-lounge/"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeader() },
-      body: JSON.stringify({ table_id: activeTableId, title: activeRoomLabel }),
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(data?.detail || "Failed to open room chat.");
+    const attemptEnsure = async () => {
+      const res = await fetch(toApiUrl("messaging/conversations/ensure-lounge/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ table_id: activeTableId, title: activeRoomLabel }),
+      });
+      const data = await res.json().catch(() => null);
+      return { res, data };
+    };
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { res, data } = await attemptEnsure();
+      if (res.ok) {
+        const cid = data?.id;
+        if (!cid) throw new Error("Room chat conversation missing.");
+        setRoomChatConversationId(cid);
+        return cid;
+      }
+      lastError = data?.detail || "Failed to open room chat.";
+      if (res.status !== 403) break;
+      // Seat creation can race join_table; re-ensure and retry briefly
+      try {
+        await ensureSeatedInLounge();
+      } catch {}
+      await sleep(350);
     }
-    const cid = data?.id;
-    if (!cid) throw new Error("Room chat conversation missing.");
-    setRoomChatConversationId(cid);
-    return cid;
+
+    throw new Error(lastError || "Failed to open room chat.");
   }, [activeRoomLabel, activeTableId, ensureSeatedInLounge]);
 
   const ensureActiveConversation = useCallback(async () => {
@@ -6457,14 +7132,20 @@ export default function NewLiveMeeting() {
                 <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
 
                 <Box sx={{ p: 2 }}>
-                  {isBreakout && !isRoomChatActive ? (
+                  {isBreakout && !isRoomChatActive && !preEventLoungeOpen ? (
                     <Alert severity="warning" sx={{ mb: 2 }}>
                       Public chat is disabled while you are in a breakout room. Return to the main room to participate.
                     </Alert>
                   ) : (
                     <TextField
                       fullWidth
-                      placeholder={isRoomChatActive ? "Type to room..." : "Type a message..."}
+                      placeholder={
+                        isRoomChatActive
+                          ? "Type to room..."
+                          : preEventLoungeOpen && isBreakout
+                            ? "Connecting to lounge chat..."
+                            : "Type a message..."
+                      }
                       size="small"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
@@ -6474,6 +7155,7 @@ export default function NewLiveMeeting() {
                           sendChatMessage();
                         }
                       }}
+                      disabled={preEventLoungeOpen && isBreakout && !isRoomChatActive}
                       InputProps={{
                         endAdornment: (
                           <InputAdornment position="end">
@@ -6481,7 +7163,7 @@ export default function NewLiveMeeting() {
                               size="small"
                               aria-label="Send message"
                               onClick={sendChatMessage}
-                              disabled={chatSending || !chatInput.trim()}
+                              disabled={chatSending || !chatInput.trim() || (preEventLoungeOpen && isBreakout && !isRoomChatActive)}
                             >
                               {chatSending ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
                             </IconButton>
@@ -6977,12 +7659,12 @@ export default function NewLiveMeeting() {
                     <Box ref={waitingSectionRef}>
                       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
                         <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
-                          WAITING ({waitingRoomQueueCount})
+                          WAITING ({filteredWaitingRoomCount})
                         </Typography>
                       </Stack>
 
                       {/* Global Waiting Room Actions */}
-                      {waitingRoomQueueCount > 0 && (
+                      {filteredWaitingRoomCount > 0 && (
                         <Stack direction="row" spacing={1} sx={{ mb: 1.5, gap: 0.75 }}>
                           <Button
                             size="small"
@@ -7014,7 +7696,7 @@ export default function NewLiveMeeting() {
                           borderRadius: 2,
                         }}
                       >
-                        {waitingRoomQueueCount === 0 ? (
+                        {filteredWaitingRoomCount === 0 ? (
                           <Box sx={{ px: 2, py: 1.5 }}>
                             <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
                               No one waiting
@@ -7022,7 +7704,7 @@ export default function NewLiveMeeting() {
                           </Box>
                         ) : (
                           <Stack spacing={1}>
-                            {(waitingRoomQueue || []).map((w) => (
+                            {(filteredWaitingRoomQueue || []).map((w) => (
                               <Box
                                 key={w.id || `${w.user_id}-${w.joined_at || w.created_at || ""}`}
                                 sx={{
@@ -7538,11 +8220,43 @@ export default function NewLiveMeeting() {
           eventId={eventId}
           currentUserId={getMyUserIdFromJwt()}
           isAdmin={role === "publisher"}
-          onEnterBreakout={handleEnterBreakout}
+          onEnterBreakout={applyBreakoutToken}
           dyteMeeting={dyteMeeting}
           onParticipantClick={openLoungeParticipantInfo}
+          onJoinMain={forceRejoinMainFromLounge}
         />
       </>
+    );
+  }
+
+  if (shouldShowPreEventLoungeGate) {
+    return loungeOpen ? (
+      <LoungeOverlay
+        open
+        onClose={() => setLoungeOpen(false)}
+        eventId={eventId}
+        currentUserId={getMyUserIdFromJwt()}
+        isAdmin={role === "publisher"}
+        onEnterBreakout={applyBreakoutToken}
+        dyteMeeting={dyteMeeting}
+        onParticipantClick={openLoungeParticipantInfo}
+        onJoinMain={forceRejoinMainFromLounge}
+      />
+    ) : (
+      <PreEventLoungeGate
+        onBack={handleBack}
+        eventTitle={eventTitle}
+        scheduled={scheduledLabel}
+        duration={durationLabel}
+        roleLabel={role === "publisher" ? "Host" : "Audience"}
+        waitingRoomImage={eventData?.waiting_room_image || null}
+        timezone={eventData?.timezone || null}
+        loungeAvailable={preEventLoungeOpen}
+        loungeStatusLabel={loungeOpenStatus?.reason || "Pre-event networking"}
+        isLoungeOpen={isLoungeCurrentlyOpen}
+        onOpenLounge={() => setLoungeOpen(true)}
+        onJoinMain={handleJoinMainMeeting}
+      />
     );
   }
 
@@ -9032,6 +9746,7 @@ export default function NewLiveMeeting() {
           onEnterBreakout={async (newToken, tableId, tableName, logoUrl) => {
             await applyBreakoutToken(newToken, tableId, tableName, logoUrl); // ✅ Pass logo URL
           }}
+          onJoinMain={forceRejoinMainFromLounge}
         />
 
         {/* ✅ Breakout Controls (Host Only) */}

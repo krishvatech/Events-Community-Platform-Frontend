@@ -42,6 +42,26 @@ export function willGoToWaitingRoom(event) {
 }
 
 /**
+ * Check if pre-event Social Lounge window is open
+ * @param {Object} event - Event object with start_time, lounge_enabled_before, lounge_before_buffer
+ * @returns {Boolean} true if pre-event lounge should be open
+ */
+export function isPreEventLoungeOpen(event) {
+  if (!event) return false;
+  if (!event.lounge_enabled_before) return false;
+  if (!event.start_time) return false;
+
+  const startTime = new Date(event.start_time).getTime();
+  if (!Number.isFinite(startTime)) return false;
+
+  const bufferMinutes = Number(event.lounge_before_buffer ?? 0);
+  const bufferMs = Math.max(0, bufferMinutes) * 60 * 1000;
+  const now = Date.now();
+
+  return now >= (startTime - bufferMs) && now < startTime;
+}
+
+/**
  * Determine appropriate button text for event join button
  * @param {Object} event - Event object with timing and waiting room info
  * @param {Boolean} isLive - Is event currently live?
@@ -52,6 +72,11 @@ export function getJoinButtonText(event, isLive, isJoining) {
   if (isJoining) return "Joining…";
 
   if (!event) return "Join";
+
+  // Pre-event lounge (if configured and open)
+  if (isPreEventLoungeOpen(event)) {
+    return "Join Social Lounge";
+  }
 
   // If waiting room will be required (e.g. grace period expired or event hasn't started),
   // always reflect that in the button label wherever a join option is shown.

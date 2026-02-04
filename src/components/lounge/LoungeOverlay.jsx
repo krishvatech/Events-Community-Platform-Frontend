@@ -10,7 +10,7 @@ function getToken() {
     return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
 }
 
-const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, dyteMeeting, onParticipantClick }) => {
+const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, dyteMeeting, onParticipantClick, onJoinMain }) => {
     const [tables, setTables] = useState([]);
     const [breakoutTables, setBreakoutTables] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -303,8 +303,11 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                 // ✅ NEW: Lounge is closed or not available
                 const data = await res.json().catch(() => ({}));
                 const reason = data.reason || "The lounge is currently closed";
-                alert(reason);
-                console.warn("[Lounge] Lounge not available:", reason);
+                console.warn("[Lounge] ❌ 403 Forbidden - Lounge not available:", reason);
+                console.warn("[Lounge] This usually means the lounge status changed or the waiting room is still active");
+                alert(`Unable to join table:\n${reason}\n\nPlease refresh the page if the lounge should be open.`);
+                // Refresh the lounge state to get latest status
+                window.location.reload();
             } else {
                 console.error("[Lounge] Breakout fetch failed (Even with fallback):", res.status);
                 alert("Failed to join table. Please try again.");
@@ -508,7 +511,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                 }}
             >
                 <Box sx={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Box sx={{ ml: 2 }}>
                             <Typography variant="h5" sx={{ color: 'white', fontWeight: 700 }}>
                                 Social Lounge & Networking
@@ -529,6 +532,25 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                             <CloseIcon />
                         </IconButton>
                     </Box>
+
+                    {loungeOpenStatus?.status === 'CLOSED' && onJoinMain && (
+                        <Box sx={{ px: 3, pb: 1.5 }}>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                onClick={onJoinMain}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontWeight: 700,
+                                    borderRadius: 2,
+                                    bgcolor: '#10b8a6',
+                                    '&:hover': { bgcolor: '#0ea5a4' },
+                                }}
+                            >
+                                Join Live Meeting
+                            </Button>
+                        </Box>
+                    )}
 
                     {loading ? (
                         <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

@@ -194,7 +194,7 @@ const LoungeTable = ({
                         const displayParticipants = entries.slice(0, displayLimit);
                         const displayCount = Math.min(
                             displayLimit,
-                            Math.max(maxSeats, displayParticipants.length, 1)
+                            Math.max(displayParticipants.length, 1)
                         );
                         const availableSeatIndices = [];
                         for (let i = 0; i < maxSeats; i++) {

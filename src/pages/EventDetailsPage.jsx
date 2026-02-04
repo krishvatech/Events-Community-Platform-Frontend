@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
-import { getJoinButtonText } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -238,8 +238,9 @@ export default function EventDetailsPage() {
   const isPast = status === "past" || event.status === "ended";
   const isLive = status === "live" && event.status !== "ended";
   const isWithinEarlyJoinWindow = canEarlyJoin(event);
+  const isPreEventLounge = isPreEventLoungeOpen(event);
 
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge;
   const canWatch = isPast && !!event.recording_url;
   const desc = event?.description ?? "";
 
@@ -374,6 +375,7 @@ export default function EventDetailsPage() {
                       <Button
                         component={Link}
                         to={livePath}
+                        state={{ event, openLounge: isPreEventLounge, preEventLounge: isPreEventLounge }}
                         sx={{
                           textTransform: "none",
                           backgroundColor: "#10b8a6",

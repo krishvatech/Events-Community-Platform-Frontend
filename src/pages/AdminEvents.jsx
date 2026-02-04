@@ -54,7 +54,7 @@ import RegisteredActions from "../components/RegisteredActions.jsx";
 import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
-import { getJoinButtonText } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 dayjs.extend(utc);
@@ -2075,11 +2075,17 @@ function AdminEventCard({
 
   // ✅ allow staff to join up to 15 minutes before the start time
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
+  const isPreEventLounge = isPreEventLoungeOpen(ev);
 
-  // If event is live OR within early-join window, show enabled Join button
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow;
+  // If event is live OR within early-join window OR pre-event lounge, show enabled Join button
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge;
   const joinLabel = getJoinButtonText(ev, isLive, false);
-  const joinLabelShort = joinLabel === "Join Waiting Room" ? "Waiting Room" : joinLabel.split(" ")[0];
+  const joinLabelShort =
+    joinLabel === "Join Waiting Room"
+      ? "Waiting Room"
+      : joinLabel === "Join Social Lounge"
+        ? "Lounge"
+        : joinLabel.split(" ")[0];
 
   const handleOpenDetails = () => {
     if (!ev?.id) return;
@@ -2607,8 +2613,9 @@ function EventsPage() {
     if (!ev?.id) return;
     setJoiningId(ev.id);
     try {
+      const isPreEventLounge = isPreEventLoungeOpen(ev);
       const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
-      navigate(livePath, { state: { event: ev } });
+      navigate(livePath, { state: { event: ev, openLounge: isPreEventLounge, preEventLounge: isPreEventLounge } });
     } catch (e) {
       setErrMsg(e?.message || "Unable to join live.");
       setErrOpen(true);
