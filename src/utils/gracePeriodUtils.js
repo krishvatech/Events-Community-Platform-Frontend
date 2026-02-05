@@ -15,8 +15,8 @@ export function isGracePeriodActive(event) {
   if (!event.waiting_room_enabled) return false;
   if (!event.start_time) return false;
 
-  const gracePeriodMinutes = event.waiting_room_grace_period_minutes || 10;
-  if (!gracePeriodMinutes || gracePeriodMinutes < 0) return false;
+  const gracePeriodMinutes = event.waiting_room_grace_period_minutes ?? 10;
+  if (gracePeriodMinutes <= 0) return false;
 
   const now = Date.now();
   const startTime = new Date(event.start_time).getTime();
@@ -98,7 +98,8 @@ export function getJoinButtonText(event, isLive, isJoining) {
 export function getGracePeriodEndTime(event) {
   if (!event || !event.start_time || !event.waiting_room_enabled) return null;
 
-  const gracePeriodMinutes = event.waiting_room_grace_period_minutes || 10;
+  const gracePeriodMinutes = event.waiting_room_grace_period_minutes ?? 10;
+  if (gracePeriodMinutes <= 0) return null;
   const startTime = new Date(event.start_time);
   const endTime = new Date(startTime.getTime() + gracePeriodMinutes * 60 * 1000);
 

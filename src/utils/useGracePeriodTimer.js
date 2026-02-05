@@ -28,7 +28,8 @@ export function useGracePeriodTimer(event) {
 
     // Calculate grace period boundaries
     const startTime = new Date(event.start_time).getTime();
-    const gracePeriodMinutes = event.waiting_room_grace_period_minutes || 10;
+    const gracePeriodMinutes = event.waiting_room_grace_period_minutes ?? 10;
+    if (gracePeriodMinutes <= 0) return;
     const gracePeriodMs = gracePeriodMinutes * 60 * 1000;
     const gracePeriodEnd = startTime + gracePeriodMs;
 

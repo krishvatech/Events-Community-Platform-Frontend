@@ -1862,6 +1862,8 @@ export default function NewLiveMeeting() {
   const [speedNetworkingTotalRounds, setSpeedNetworkingTotalRounds] = useState(0);
   const [speedNetworkingDurationMinutes, setSpeedNetworkingDurationMinutes] = useState(0);
   const mainSocketRef = useRef(null);
+  const mainSocketReadyRef = useRef(false);
+  const pendingMainSocketActionsRef = useRef([]);
   const lastLoungeFetchRef = useRef(0);
   const speedNetworkingTimeoutRef = useRef(null);
 
@@ -2042,6 +2044,9 @@ export default function NewLiveMeeting() {
   const [waitingRoomQueue, setWaitingRoomQueue] = useState([]);
   const waitingRoomPrevCountRef = useRef(0);
   const waitingSectionRef = useRef(null);
+  const breakoutJoinInProgressRef = useRef(false);
+  const breakoutJoinTimeoutRef = useRef(null);
+  const isBreakoutRef = useRef(false);
   const [pendingWaitFocus, setPendingWaitFocus] = useState(false);
 
   // ✅ NEW: Announcement Dialog State
@@ -2209,6 +2214,12 @@ export default function NewLiveMeeting() {
     loungeTables.filter(t => t.category === 'BREAKOUT'),
     [loungeTables]
   );
+  const activeTableCategory = useMemo(() => {
+    if (!activeTableId) return null;
+    const table = loungeTables.find((t) => String(t.id) === String(activeTableId));
+    return table?.category || "LOUNGE";
+  }, [loungeTables, activeTableId]);
+  const isInBreakoutTable = activeTableCategory === "BREAKOUT";
 
 
   const [scheduledLabel, setScheduledLabel] = useState("--");
@@ -2738,6 +2749,7 @@ export default function NewLiveMeeting() {
         }
 
         setIsBreakout(true);
+        isBreakoutRef.current = true;
         setLoungeOpen(true); // ✅ CRITICAL: Mark lounge as open so render condition works
         setAuthToken(newToken);
         if (tableId) {
@@ -2776,6 +2788,7 @@ export default function NewLiveMeeting() {
         joinedOnceRef.current = false;
 
         setIsBreakout(false);
+        isBreakoutRef.current = false;
         setAuthToken(mainAuthTokenRef.current);
         setActiveTableId(null);
         setActiveTableName("");
@@ -2797,6 +2810,7 @@ export default function NewLiveMeeting() {
       } else {
         console.warn("[LiveMeeting] No main token available to return to! Resetting state to re-join.");
         setIsBreakout(false);
+        isBreakoutRef.current = false;
         setAuthToken(null);
         setInitDone(false);
         setRoomJoined(false);
@@ -2816,6 +2830,10 @@ export default function NewLiveMeeting() {
   }, [isInBreakoutRoom]);
 
   useEffect(() => {
+    isBreakoutRef.current = isBreakout;
+  }, [isBreakout]);
+
+  useEffect(() => {
     activeTableIdRef.current = activeTableId;
   }, [activeTableId]);
 
@@ -2823,65 +2841,126 @@ export default function NewLiveMeeting() {
     applyBreakoutTokenRef.current = applyBreakoutToken;
   }, [applyBreakoutToken]);
 
-  const handleEnterBreakout = async (tableId) => {
-    if (!eventId || !tableId) return;
+  const handleEnterBreakout = async (tableId, tableName = null) => {
+    if (!eventId || !tableId) {
+      console.error("[BREAKOUT] ❌ Missing eventId or tableId");
+      return;
+    }
 
     // ✅ DEFENSIVE: Ensure we're NOT updating meeting status
     // Joining a lounge should NEVER trigger updateLiveStatus or change meeting state
-    console.log("[LiveMeeting] Entering lounge table - current status:", dbStatus, "(should not change)");
+    console.log("[BREAKOUT] Attempting to enter room", tableId, "- current status:", dbStatus);
 
     try {
+      breakoutJoinInProgressRef.current = true;
+      if (breakoutJoinTimeoutRef.current) {
+        clearTimeout(breakoutJoinTimeoutRef.current);
+        breakoutJoinTimeoutRef.current = null;
+      }
+      let breakoutJoinSucceeded = false;
       const url = `${API_ROOT}/events/${eventId}/lounge-join-table/`.replace(/([^:]\/)\/+/g, "$1");
+      console.log("[BREAKOUT] Calling endpoint:", url, "with table_id:", tableId);
+
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ table_id: tableId }),
       });
 
+      // ✅ FIX #2C: Enhanced error handling with detailed feedback
       if (res.ok) {
         const data = await res.json();
-        if (data.token) {
-          console.log("[LiveMeeting] Joining breakout room with token");
-
-          // ✅ CRITICAL: Assert we're not reactivating the meeting
-          // This join is purely lounge-based, not meeting-based
-          if (dbStatus === "live") {
-            console.warn("[LiveMeeting] WARNING: Lounge join happening while meeting is live. This is unexpected.");
-          }
-          console.assert(
-            dbStatus !== "live",
-            "[CRITICAL] Lounge join should not happen while main meeting is live!"
-          );
-
-          const tableName = resolveTableName(tableId) || `Room ${tableId}`;
-          // ✅ Get logo URL from loungeTables
-          const table = loungeTables.find((t) => String(t.id) === String(tableId));
-          const logoUrl = table?.icon_url || "";
-          await applyBreakoutToken(data.token, tableId, tableName, logoUrl);
+        if (!data.token) {
+          console.error("[BREAKOUT] ❌ No auth token received from server");
+          showSnackbar("Server did not return authentication token", "error");
+          return;
         }
+
+        console.log("[BREAKOUT] ✅ Token received, applying to room", tableId);
+
+        // ✅ CRITICAL: Assert we're not reactivating the meeting
+        if (dbStatus === "live") {
+          console.warn("[BREAKOUT] ⚠️ Room join happening while main meeting is live (expected during active event)");
+        }
+
+        const finalTableName = tableName || resolveTableName(tableId) || `Room ${tableId}`;
+        // ✅ Get logo URL from loungeTables
+        const table = loungeTables.find((t) => String(t.id) === String(tableId));
+        const logoUrl = table?.icon_url || "";
+
+        console.log("[BREAKOUT] Applying token for room:", finalTableName);
+        await applyBreakoutToken(data.token, tableId, finalTableName, logoUrl);
+        console.log("[BREAKOUT] ✅ Successfully joined room", tableId);
+        breakoutJoinSucceeded = true;
+
+        // Clear the join-in-progress flag once Dyte room join completes (see roomJoined handler).
+        // Fallback timeout in case roomJoined never fires.
+        breakoutJoinTimeoutRef.current = setTimeout(() => {
+          breakoutJoinInProgressRef.current = false;
+          breakoutJoinTimeoutRef.current = null;
+        }, 8000);
+
       } else if (res.status === 403) {
-        // ✅ NEW: Lounge is closed or not available
+        // ✅ FIX: Handle new waiting room and permission errors
         const data = await res.json().catch(() => ({}));
-        const reason = data.reason || "The lounge is currently closed";
-        showSnackbar(reason, "warning");
-        console.warn("[LiveMeeting] Lounge not available:", reason);
+        console.error("[BREAKOUT] ❌ Access denied (403):", data);
+
+        if (data.error === "waiting_room_active") {
+          console.warn("[BREAKOUT] User in waiting room, lounge not allowed");
+          showSnackbar("You must be admitted to the meeting before accessing this room", "warning");
+        } else if (data.error === "not_assigned") {
+          console.warn("[BREAKOUT] User not assigned to this room");
+          showSnackbar("You are not assigned to this breakout room", "warning");
+        } else if (data.error === "waiting_rejected") {
+          console.warn("[BREAKOUT] User has been rejected from event");
+          showSnackbar("You have been rejected from this event", "error");
+        } else {
+          const reason = data.reason || "Access denied";
+          showSnackbar(reason, "warning");
+        }
+
+      } else if (res.status === 409) {
+        // User already in meeting
+        const data = await res.json().catch(() => ({}));
+        console.warn("[BREAKOUT] User already in room");
+        showSnackbar("You are already in this room", "info");
+
       } else if (res.status === 400) {
         // ✅ NEW: Check if backend detected meeting state corruption
         const data = await res.json().catch(() => ({}));
         if (data.error_code === "meeting_state_corrupted") {
-          console.error("[LiveMeeting] Backend detected meeting state corruption!");
+          console.error("[BREAKOUT] ❌ Meeting state corrupted detected");
           showSnackbar("Meeting state error detected. Please refresh the page and try again.", "error");
         } else {
-          console.error("[LiveMeeting] Failed to fetch breakout token:", res.status);
-          showSnackbar("Failed to join table. Please try again.", "error");
+          console.error("[BREAKOUT] ❌ Bad request (400):", data);
+          showSnackbar(data.detail || "Failed to join room. Invalid request.", "error");
         }
+
       } else {
-        console.error("[LiveMeeting] Failed to fetch breakout token:", res.status);
-        showSnackbar("Failed to join table. Please try again.", "error");
+        console.error("[BREAKOUT] ❌ Failed to join room:", res.status, res.statusText);
+        const data = await res.json().catch(() => ({}));
+        showSnackbar(
+          data.detail || data.reason || `Failed to join room (${res.status})`,
+          "error"
+        );
       }
+
+      if (!breakoutJoinSucceeded) {
+        breakoutJoinInProgressRef.current = false;
+        if (breakoutJoinTimeoutRef.current) {
+          clearTimeout(breakoutJoinTimeoutRef.current);
+          breakoutJoinTimeoutRef.current = null;
+        }
+      }
+
     } catch (err) {
-      console.error("[LiveMeeting] Failed to join breakout:", err);
-      showSnackbar("Error joining table", "error");
+      console.error("[BREAKOUT] ❌ Exception while entering breakout room:", err);
+      showSnackbar(err.message || "Error joining room", "error");
+      breakoutJoinInProgressRef.current = false;
+      if (breakoutJoinTimeoutRef.current) {
+        clearTimeout(breakoutJoinTimeoutRef.current);
+        breakoutJoinTimeoutRef.current = null;
+      }
     }
   };
 
@@ -3240,6 +3319,10 @@ export default function NewLiveMeeting() {
       console.log("[LiveMeeting] Skipping token fetch - user is in waiting room");
       return;
     }
+    if (breakoutJoinInProgressRef.current || isBreakoutRef.current) {
+      console.log("[LiveMeeting] Skipping token fetch - breakout join in progress");
+      return;
+    }
     if (preEventLoungeOpen && !joinMainRequested &&
         (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly)) {
       // ✅ Log when skipping token fetch due to pre-event lounge
@@ -3302,6 +3385,16 @@ export default function NewLiveMeeting() {
           setWaitingRoomStatus(data?.admission_status || "waiting");
           setWaitingRoomLoungeAllowed(Boolean(data?.lounge_allowed));
           setWaitingRoomNetworkingAllowed(Boolean(data?.networking_allowed));
+          setLoadingJoin(false);
+          return;
+        }
+
+        const shouldDeferMainToken = breakoutJoinInProgressRef.current || isBreakoutRef.current;
+        if (shouldDeferMainToken) {
+          console.log("[LiveMeeting] Main token received during breakout join; storing for later");
+          mainAuthTokenRef.current = data.authToken;
+          if (!mainRoomAuthToken) setMainRoomAuthToken(data.authToken);
+          setWaitingRoomActive(false);
           setLoadingJoin(false);
           return;
         }
@@ -3435,6 +3528,22 @@ export default function NewLiveMeeting() {
     const ws = new WebSocket(wsUrl);
     mainSocketRef.current = ws;
 
+    ws.onopen = () => {
+      console.log("[MainSocket] Connected");
+      mainSocketReadyRef.current = true;
+      if (pendingMainSocketActionsRef.current.length > 0) {
+        const queued = [...pendingMainSocketActionsRef.current];
+        pendingMainSocketActionsRef.current = [];
+        queued.forEach((payload) => {
+          try {
+            ws.send(JSON.stringify(payload));
+          } catch (e) {
+            console.warn("[MainSocket] Failed to send queued action:", e);
+          }
+        });
+      }
+    };
+
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
@@ -3498,9 +3607,18 @@ export default function NewLiveMeeting() {
           if (msg.lounge_open_status) {
             setLoungeOpenStatus(msg.lounge_open_status);
           }
-          setActiveTableId(null);
-          setActiveTableName("");
-          setRoomChatConversationId(null);
+
+          // ✅ FIX: Don't clear active table state while participant is in breakout room
+          // This prevents race conditions where lounge_state broadcast conflicts with breakout join.
+          // When a participant joins a breakout, we need to preserve activeTableId and activeTableName
+          // so that the breakout state remains consistent. Without this guard, the WebSocket lounge_state
+          // broadcast (which fires immediately after join) would clear these values, causing the Dyte SDK
+          // to lose track of the participant's breakout assignment and auto-rejoin the main meeting.
+          if (!isBreakoutRef.current) {
+            setActiveTableId(null);
+            setActiveTableName("");
+            setRoomChatConversationId(null);
+          }
         } else if (msg.type === "message" && msg.data) {
           // Handle broadcast messages (kick/ban)
           const payload = msg.data;
@@ -3530,6 +3648,8 @@ export default function NewLiveMeeting() {
         timestamp: new Date().toISOString()
       });
       mainSocketRef.current = null;
+      mainSocketReadyRef.current = false;
+      pendingMainSocketActionsRef.current = [];
     };
 
     return () => {
@@ -3585,6 +3705,11 @@ export default function NewLiveMeeting() {
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(payload));
       return true;
+    }
+    if (ws?.readyState === WebSocket.CONNECTING) {
+      pendingMainSocketActionsRef.current.push(payload);
+      console.warn("[MainSocket] Socket connecting; queued action", payload);
+      return false;
     }
     console.warn("[MainSocket] Unable to send action; socket not open", payload);
     return false;
@@ -4020,6 +4145,13 @@ export default function NewLiveMeeting() {
     const onRoomJoined = () => {
       console.log("[LiveMeeting] ✅ roomJoined event received!");
       setRoomJoined(true);
+      if (isBreakoutRef.current) {
+        breakoutJoinInProgressRef.current = false;
+        if (breakoutJoinTimeoutRef.current) {
+          clearTimeout(breakoutJoinTimeoutRef.current);
+          breakoutJoinTimeoutRef.current = null;
+        }
+      }
     };
     dyteMeeting.self.on?.("roomJoined", onRoomJoined);
 
@@ -4639,6 +4771,7 @@ export default function NewLiveMeeting() {
     // Audience: search host in joined participants
     const checkForHostAndPin = (participant) => {
       if (!participant) return;
+      if (!dyteMeeting?.self?.roomJoined) return;
       const preset = (participant.presetName || "").toLowerCase();
       const isPublisher =
         preset.includes("host") ||
@@ -4746,6 +4879,7 @@ export default function NewLiveMeeting() {
   // If pinned host is no longer present, clear pinned state
   useEffect(() => {
     if (!pinnedHost) return;
+    if (!dyteMeeting?.self?.roomJoined) return;
     const current = getJoinedParticipants().find((p) => p?.id === pinnedHost?.id);
     if (current) return;
 
@@ -5234,6 +5368,11 @@ export default function NewLiveMeeting() {
   const handleLeaveBreakout = useCallback(async () => {
     if (leaveBreakoutInFlightRef.current) return;
     leaveBreakoutInFlightRef.current = true;
+    breakoutJoinInProgressRef.current = false;
+    if (breakoutJoinTimeoutRef.current) {
+      clearTimeout(breakoutJoinTimeoutRef.current);
+      breakoutJoinTimeoutRef.current = null;
+    }
     // 1. Notify backend via MAIN socket (same endpoint as lounge)
     if (mainSocketRef.current?.readyState === WebSocket.OPEN) {
       console.log("[LiveMeeting] Sending leave_table via main socket");
@@ -5344,6 +5483,7 @@ export default function NewLiveMeeting() {
     mainAuthTokenRef.current = "";
     setMainRoomAuthToken(null);
     setIsBreakout(false);
+    isBreakoutRef.current = false;
     setAuthToken("");
     setInitDone(false);
     setRoomJoined(false);
@@ -5373,6 +5513,10 @@ export default function NewLiveMeeting() {
       console.log("[LiveMeeting] Lounge rejoin already in flight, skipping");
       return false;
     }
+    if (breakoutJoinInProgressRef.current) {
+      console.log("[LiveMeeting] Breakout join in progress, skipping lounge rejoin");
+      return false;
+    }
 
     // Too soon since last trigger
     const now = Date.now();
@@ -5393,18 +5537,19 @@ export default function NewLiveMeeting() {
     const wasOpen = preEventLoungeWasOpenRef.current;
     if (wasOpen && !preEventLoungeOpen) {
       setLoungeOpen(false);
-      if (isBreakout) {
+      if (isBreakout && !isInBreakoutTable && !breakoutJoinInProgressRef.current) {
         handleLeaveBreakout();
       }
     }
     preEventLoungeWasOpenRef.current = preEventLoungeOpen;
-  }, [preEventLoungeOpen, isBreakout, handleLeaveBreakout]);
+  }, [preEventLoungeOpen, isBreakout, isInBreakoutTable, handleLeaveBreakout]);
 
   // ✅ CONSOLIDATED LOUNGE CLOSE DETECTION
   // Replaces 5 separate effects with single guard against race conditions
   useEffect(() => {
     if (role === "publisher") return; // Hosts don't auto-rejoin
     if (!isBreakout) return; // Only applies to users in breakout/lounge
+    if (isInBreakoutTable) return; // Do not force rejoin from real breakout rooms
 
     // Evaluate all lounge close conditions
     const shouldRejoin =
@@ -5439,6 +5584,7 @@ export default function NewLiveMeeting() {
     isPreEventLoungeStatus,
     loungeOpenStatus?.status,
     isPostEventLounge,
+    isInBreakoutTable,
     forceRejoinMainFromLounge,
     shouldTriggerLoungeRejoin,
   ]);
@@ -5554,6 +5700,25 @@ export default function NewLiveMeeting() {
     }
 
     let p = pinnedHost;
+
+    // ✅ FIX: If pinnedHost is null but there IS a host participant connected, find and use them
+    // This fixes the issue where host appears in Participants list but shows as "disconnected" in pinned area
+    if (!p && !isHost) {
+      const hostParticipant = getJoinedParticipants().find((participant) => {
+        if (!participant) return false;
+        const preset = (participant.presetName || "").toLowerCase();
+        return (
+          preset.includes("host") ||
+          preset.includes("publisher") ||
+          preset.includes("admin") ||
+          preset.includes("presenter")
+        );
+      });
+      if (hostParticipant) {
+        console.log("[LatestPinnedHost] Found host in participants, using as pinned host:", hostParticipant.name);
+        p = hostParticipant;
+      }
+    }
 
     // ✅ NEW: If pinned host is occupying lounge, find another participant to show audience instead
     // In breakout/lounge, keep pinned host visible
