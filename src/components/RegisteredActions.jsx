@@ -3,6 +3,22 @@ import { Button, Dialog, DialogActions, DialogContent, DialogContentText, Dialog
 import { toast } from "react-toastify";
 import { API_BASE, authConfig } from "../utils/api";
 
+// Helper to compute event status
+function computeEventStatus(ev) {
+    const now = Date.now();
+    const s = ev.start_time ? new Date(ev.start_time).getTime() : 0;
+    const e = ev.end_time ? new Date(ev.end_time).getTime() : 0;
+
+    // If meeting is manually ended, always treat as past
+    if (ev.status === "ended") return "past";
+
+    if (ev.is_live && ev.status !== "ended") return "live";
+    if (s && e && now >= s && now <= e && ev.status !== "ended") return "live";
+    if (s && now < s) return "upcoming";
+    if (e && now > e) return "past";
+    return "upcoming";
+}
+
 export default function RegisteredActions({ ev, reg, onUnregistered, onCancelRequested, hideChip = false }) {
 
     const [open, setOpen] = useState(false);
@@ -10,6 +26,15 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
     const [loading, setLoading] = useState(false);
 
     const authHeaders = () => authConfig().headers;
+
+    // Check if event has started or ended
+    const eventStatus = computeEventStatus(ev);
+    const hasEventStartedOrEnded = eventStatus === "live" || eventStatus === "past";
+
+    // Don't show cancel/unregister buttons if event has started or ended
+    if (hasEventStartedOrEnded) {
+        return null;
+    }
 
     const handleOpen = (type) => {
         setActionType(type);

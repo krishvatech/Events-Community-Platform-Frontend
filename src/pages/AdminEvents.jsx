@@ -2429,7 +2429,7 @@ function AdminEventCard({
 
 
           {/* Cancellation / Unregistration Actions (for Staff side) */}
-          {!isOwner && !isPast && reg && (
+          {!isOwner && reg && (
             <RegisteredActions
               ev={ev}
               reg={reg}
