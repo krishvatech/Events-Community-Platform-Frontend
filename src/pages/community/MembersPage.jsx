@@ -475,23 +475,16 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId
               />
             )}
           </Stack>
-          <Typography variant="caption" color="text.secondary" noWrap>
-            {email}
-          </Typography>
 
-          {/* --- UPDATED TYPOGRAPHY START --- */}
-          {/* We use visibility: hidden so the height remains the same even if data is missing */}
+          {/* Email - always rendered to maintain consistent height */}
           <Typography
-            variant="body2"
-            sx={{
-              mt: 0.25,
-              visibility: hasWorkInfo ? "visible" : "hidden"
-            }}
+            variant="caption"
+            color="text.secondary"
             noWrap
+            sx={{ visibility: email ? "visible" : "hidden", height: "1.25rem" }}
           >
-            {displayCompany} • <span style={{ color: "#64748b" }}>{displayTitle}</span>
+            {email || "placeholder@email.com"}
           </Typography>
-          {/* --- UPDATED TYPOGRAPHY END --- */}
 
         </Box>
 
