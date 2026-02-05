@@ -60,6 +60,8 @@ import FlagIcon from "@mui/icons-material/Flag";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import ReportProfileDialog from "../../components/ReportProfileDialog.jsx";
 import { Menu, MenuItem } from "@mui/material";
+import { isAdminUser } from "../../utils/adminRole";
+import { startKYC } from "../../utils/api";
 
 
 
@@ -73,6 +75,43 @@ const tokenHeader = () => {
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
+
+async function fetchGroupListForUser(userId) {
+  const candidateEndpoints = userId
+    ? [
+      `${API_BASE}/groups/joined-groups/?user_id=${userId}`,
+      `${API_BASE}/users/${userId}/groups/?page_size=100`,
+      `${API_BASE}/groups/?member_id=${userId}&page_size=100`,
+      `${API_BASE}/groups/members/?user_id=${userId}&page_size=100`,
+    ]
+    : [
+      `${API_BASE}/groups/joined-groups/`,
+      `${API_BASE}/groups/?page_size=100`,
+    ];
+
+  for (const url of candidateEndpoints) {
+    try {
+      const r = await fetch(url, { headers: tokenHeader(), credentials: "include" });
+      if (!r.ok) continue;
+      const j = await r.json().catch(() => null);
+      const rows = Array.isArray(j?.results) ? j.results : Array.isArray(j) ? j : [];
+      if (rows.length) return rows;
+    } catch { }
+  }
+  return [];
+}
+
+function extractGroupId(row) {
+  if (!row) return null;
+  return (
+    row.id ||
+    row.group_id ||
+    row.groupId ||
+    row?.group?.id ||
+    row?.group?.pk ||
+    null
+  );
+}
 
 function parseLinks(value) {
   const v = (value ?? "").toString().trim();
@@ -96,6 +135,20 @@ function normalizeUrl(value) {
   if (!v) return "";
   if (/^https?:\/\//i.test(v)) return v;
   return `https://${v}`;
+}
+
+function normalizeVisibility(value) {
+  const v = (value || "").toString().trim().toLowerCase();
+  if (!v) return "";
+  if (v === "direct_contacts") return "contacts";
+  if (v === "contacts_and_groups" || v === "contacts+groups") return "contacts_groups";
+  if (v === "by_request" || v === "by request") return "request";
+  return v;
+}
+
+function isVerifiedStatus(raw) {
+  const v = String(raw || "").toLowerCase();
+  return v === "approved" || v === "verified";
 }
 
 // Helper to get country flag emoji from phone number
@@ -2045,6 +2098,9 @@ export default function RichProfile() {
     try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
   }, []);
   const isMe = String(me?.id || "") === String(userId || "");
+  const viewerIsStaff = isAdminUser();
+  const viewerIsVerified = isVerifiedStatus(me?.profile?.kyc_status || me?.kyc_status);
+  const [sharesGroup, setSharesGroup] = useState(false);
 
   // --- FRIEND BUTTON / STATUS ---
   const [friendStatus, setFriendStatus] = useState(isMe ? "self" : "none"); // self | none | pending_outgoing | pending_incoming | friends
@@ -2531,6 +2587,19 @@ export default function RichProfile() {
     }
   };
 
+  const handleStartKYC = async () => {
+    try {
+      const data = await startKYC();
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Could not start verification. Please try again.");
+      }
+    } catch (error) {
+      alert(error?.message || "Failed to start verification");
+    }
+  };
+
   // if navigated directly, obtain roster item so we have basic info to render
   useEffect(() => {
     let alive = true;
@@ -2624,7 +2693,7 @@ export default function RichProfile() {
     return (
       u?.profile?.full_name ||
       `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
-      u?.email ||
+      u?.username ||
       "Member"
     );
   }, [userItem]);
@@ -2639,12 +2708,15 @@ export default function RichProfile() {
     userItem?.profile?.role ||
     "";
 
-  const canViewContactVisibility = (visibility) => {
-    const v = (visibility || "public").toLowerCase();
-    if (v === "public" || !v) return true;
-    if (v === "contacts") return isMe || friendStatus === "friends";
-    if (v === "private") return isMe;
-    return isMe;
+  const canViewContactVisibility = (visibility, opts = {}) => {
+    const v = normalizeVisibility(visibility || "");
+    if (isMe || viewerIsStaff) return true;
+    if (opts.requireVerified && !viewerIsVerified) return false;
+    if (!v || v === "public") return true;
+    if (v === "private") return false;
+    if (v === "request" || v === "contacts") return friendStatus === "friends";
+    if (v === "contacts_groups") return friendStatus === "friends" || sharesGroup;
+    return false;
   };
 
   const resolvedLinks = useMemo(() => {
@@ -2668,6 +2740,51 @@ export default function RichProfile() {
     item?.access_level ||
     "";
 
+  const contactSettings = resolvedLinks?.contact || {};
+  const emailRequireVerified = !!(
+    contactSettings.require_verified ||
+    contactSettings.member_integrity ||
+    contactSettings.email_requires_verified
+  );
+  const emailVisibilityModes = [
+    normalizeVisibility(getVisibilityValue(contactSettings.main_email)),
+    ...(Array.isArray(contactSettings.emails)
+      ? contactSettings.emails.map((e) => normalizeVisibility(getVisibilityValue(e)))
+      : []),
+  ].filter(Boolean);
+  const needsGroupCheck = emailVisibilityModes.includes("contacts_groups");
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!needsGroupCheck || isMe || !me?.id || !userId) {
+        setSharesGroup(false);
+        return;
+      }
+
+      try {
+        const [mineRaw, theirsRaw] = await Promise.all([
+          fetchGroupListForUser(me.id),
+          fetchGroupListForUser(userId),
+        ]);
+        const mineIds = new Set(
+          (mineRaw || [])
+            .map(extractGroupId)
+            .filter(Boolean)
+            .map((id) => String(id))
+        );
+        const share = (theirsRaw || [])
+          .map(extractGroupId)
+          .filter(Boolean)
+          .some((id) => mineIds.has(String(id)));
+        if (alive) setSharesGroup(share);
+      } catch {
+        if (alive) setSharesGroup(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [needsGroupCheck, isMe, me?.id, userId]);
+
   // --- Helper: Extract visible phone ---
   const visiblePhones = useMemo(() => {
     const contact = resolvedLinks?.contact || {};
@@ -2685,7 +2802,7 @@ export default function RichProfile() {
     // Filter by visibility - return ALL visible phones
     const visible = phones.filter(
       (p) => {
-        const vis = getVisibilityValue(p);
+        const vis = normalizeVisibility(getVisibilityValue(p));
         const canView = canViewContactVisibility(vis);
         console.log('📞 Phone filter:', { number: p?.number, visibility: vis, canView });
         return p?.number && canView;
@@ -2733,8 +2850,8 @@ export default function RichProfile() {
     // Filter by visibility - return ALL visible emails
     const visible = emails.filter(
       (e) => {
-        const vis = getVisibilityValue(e);
-        const canView = canViewContactVisibility(vis);
+        const vis = normalizeVisibility(getVisibilityValue(e)) || "contacts";
+        const canView = canViewContactVisibility(vis, { requireVerified: emailRequireVerified });
         console.log('📧 Email filter:', { email: e?.email, visibility: vis, canView });
         return e?.email && canView;
       }
@@ -2749,9 +2866,9 @@ export default function RichProfile() {
       if (!alreadyIncluded) {
         // Check if main_email has visibility settings
         const mainEmail = contact.main_email || {};
-        const mainVisibility = getVisibilityValue(mainEmail);
+        const mainVisibility = normalizeVisibility(getVisibilityValue(mainEmail)) || "contacts";
 
-        if (isMe || !mainVisibility || canViewContactVisibility(mainVisibility)) {
+        if (isMe || canViewContactVisibility(mainVisibility, { requireVerified: emailRequireVerified })) {
           visible.unshift({
             email: mainEmailValue,
             type: mainEmail.type || "Main",
@@ -2762,7 +2879,33 @@ export default function RichProfile() {
     }
 
     return visible;
-  }, [resolvedLinks, friendStatus, isMe, userItem]);
+  }, [resolvedLinks, friendStatus, isMe, userItem, sharesGroup, viewerIsStaff]);
+
+  const emailVisibilityInfo = useMemo(() => {
+    const contact = resolvedLinks?.contact || {};
+    const emails = Array.isArray(contact.emails) ? contact.emails : [];
+    const rawMain = normalizeVisibility(getVisibilityValue(contact.main_email));
+    const fallbackVis =
+      rawMain ||
+      normalizeVisibility(getVisibilityValue(emails[0])) ||
+      "contacts";
+    const anyEmail = Boolean(
+      (userItem?.email || "").trim() ||
+      emails.some((e) => (e?.email || "").trim())
+    );
+    return { anyEmail, visibility: fallbackVis };
+  }, [resolvedLinks, userItem]);
+
+  const emailBlockedByVerified =
+    emailRequireVerified && !viewerIsVerified && !isMe && !viewerIsStaff;
+  const primaryEmailVisibility = emailVisibilityInfo.visibility || "contacts";
+  const canRequestContact =
+    !isMe &&
+    !viewerIsStaff &&
+    !emailBlockedByVerified &&
+    ["request", "contacts", "contacts_groups"].includes(primaryEmailVisibility) &&
+    (friendStatus || "").toLowerCase() !== "friends" &&
+    (friendStatus || "").toLowerCase() !== "pending_outgoing";
 
   // --- Helper: Extract visible location ---
   const visibleLocation = useMemo(() => {
@@ -2783,7 +2926,7 @@ export default function RichProfile() {
     if (!value) return "";
     if (contactVisibility && !canViewContactVisibility(contactVisibility)) return "";
     return value;
-  }, [resolvedLinks, friendStatus, isMe, userItem]);
+  }, [resolvedLinks, friendStatus, isMe, userItem, sharesGroup, viewerIsStaff, viewerIsVerified, emailRequireVerified]);
 
   const socialItems = useMemo(() => {
     const contactSocials =
@@ -2888,7 +3031,6 @@ export default function RichProfile() {
     u?.profile?.full_name ||
     [u?.first_name, u?.last_name].filter(Boolean).join(" ").trim() ||
     u?.username ||
-    u?.email ||
     (u?.id ? `User #${u.id}` : "User");
 
   async function startChat(recipientId) {
@@ -3115,11 +3257,15 @@ export default function RichProfile() {
                           <Button
                             variant="contained"
                             size="small"
-                            onClick={sendFriendRequest}
+                            onClick={emailBlockedByVerified ? handleStartKYC : sendFriendRequest}
                             disabled={friendSubmitting}
                             sx={{ textTransform: "none", borderRadius: 2 }}
                           >
-                            {friendSubmitting ? "Sending…" : "Add as Contact"}
+                            {emailBlockedByVerified
+                              ? "Get Verified"
+                              : friendSubmitting
+                                ? "Sending…"
+                                : "Add as Contact"}
                           </Button>
                         )}
                       </Box>
@@ -3245,6 +3391,54 @@ export default function RichProfile() {
                                   </Box>
                                 ))}
                               </Stack>
+                            </Box>
+                          )}
+                          {visibleEmails.length === 0 && emailVisibilityInfo.anyEmail && (
+                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                                Email:
+                              </Typography>
+                              {emailBlockedByVerified ? (
+                                <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "#f8fafc", borderColor: "#e2e8f0", flex: 1 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                    This member only shares their email with Verified Professionals.
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Click below to get your Verification Badge.
+                                  </Typography>
+                                  <Box sx={{ mt: 1 }}>
+                                    <Button size="small" variant="contained" onClick={handleStartKYC}>
+                                      Get Verified
+                                    </Button>
+                                  </Box>
+                                </Paper>
+                              ) : (
+                                <Stack spacing={0.5} sx={{ flex: 1 }}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {primaryEmailVisibility === "request"
+                                      ? "By request"
+                                      : primaryEmailVisibility === "contacts_groups"
+                                        ? "Contacts & Group Members"
+                                        : primaryEmailVisibility === "contacts"
+                                          ? "Direct Contacts only"
+                                          : "Private"}
+                                  </Typography>
+                                  {(friendStatus || "").toLowerCase() === "pending_outgoing" && (
+                                    <Chip size="small" label="Request sent" sx={{ width: "fit-content" }} />
+                                  )}
+                                  {canRequestContact && (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={sendFriendRequest}
+                                      disabled={friendSubmitting}
+                                      sx={{ width: "fit-content" }}
+                                    >
+                                      Request Contact
+                                    </Button>
+                                  )}
+                                </Stack>
+                              )}
                             </Box>
                           )}
 

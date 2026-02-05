@@ -76,6 +76,8 @@ import CloseIcon from '@mui/icons-material/Close'; // Used in chips
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
+import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 
 // --- API helpers ---
 const API_ROOT = (
@@ -698,15 +700,19 @@ const CONTACT_PHONE_TYPES = [
 ];
 
 const VISIBILITY_META = {
-  public: { label: "Visible to Public", Icon: PublicOutlinedIcon },
-  contacts: { label: "Visible to your Contacts", Icon: PeopleAltOutlinedIcon },
-  private: { label: "Invisible", Icon: VisibilityOffOutlinedIcon },
+  private: { label: "Private (Only Me)", Icon: VisibilityOffOutlinedIcon },
+  request: { label: "By Request", Icon: PersonAddAlt1RoundedIcon },
+  contacts: { label: "Direct Contacts", Icon: PeopleAltOutlinedIcon },
+  contacts_groups: { label: "Contacts & Group Members", Icon: GroupOutlinedIcon },
+  public: { label: "Public (Everyone)", Icon: PublicOutlinedIcon },
 };
 
 const CONTACT_VISIBILITY_OPTIONS = [
-  { value: "private", label: "Private" },
-  { value: "contacts", label: "Contacts" },
-  { value: "public", label: "Public" },
+  { value: "private", label: "Private (Only Me)" },
+  { value: "request", label: "By Request (Shows a button, not the email)" },
+  { value: "contacts", label: "Direct Contacts" },
+  { value: "contacts_groups", label: "Contacts & Group Members" },
+  { value: "public", label: "Public (Everyone)" },
 ];
 
 const renderVisibilityIcon = (visibility) => {
@@ -737,7 +743,8 @@ function createEmptyContactForm() {
     websites: [],
     scheduler: { label: "Calendly", url: "https://calendly.com/me", visibility: "private" },
     socials: { linkedin: "", x: "", facebook: "", instagram: "", github: "" },
-    main_email: { type: "", visibility: "private" },
+    main_email: { type: "", visibility: "contacts" },
+    require_verified: false,
   };
 }
 
@@ -747,13 +754,18 @@ function buildContactFormFromLinks(links) {
   const phones = Array.isArray(contact.phones) ? contact.phones : [];
   const websites = Array.isArray(contact.websites) ? contact.websites : [];
   const scheduler = contact.scheduler && typeof contact.scheduler === "object" ? contact.scheduler : {};
+  const requireVerified = !!(
+    contact.require_verified ||
+    contact.member_integrity ||
+    contact.email_requires_verified
+  );
 
   // Handle main_email
-  let mainEmail = { type: "", visibility: "private" };
+  let mainEmail = { type: "", visibility: "contacts" };
   if (contact.main_email && typeof contact.main_email === "object") {
     mainEmail = {
       type: contact.main_email.type || "",
-      visibility: contact.main_email.visibility || "private",
+      visibility: contact.main_email.visibility || "contacts",
     };
   }
 
@@ -761,7 +773,7 @@ function buildContactFormFromLinks(links) {
     emails: emails.map((item) => ({
       email: item?.email || "",
       type: item?.type || "professional",
-      visibility: item?.visibility || "private",
+      visibility: item?.visibility || "contacts",
     })),
     phones: phones.map((item) => ({
       number: item?.number || "",
@@ -787,6 +799,7 @@ function buildContactFormFromLinks(links) {
       github: links?.github || "",
     },
     main_email: mainEmail,
+    require_verified: requireVerified,
   };
 }
 
@@ -812,7 +825,7 @@ function buildLinksWithContact(existingLinks, contactForm) {
     .map((item) => ({
       email: (item?.email || "").trim(),
       type: item?.type || "professional",
-      visibility: item?.visibility || "private",
+      visibility: item?.visibility || "contacts",
     }))
     .filter((item) => item.email);
 
@@ -849,7 +862,7 @@ function buildLinksWithContact(existingLinks, contactForm) {
   // Handle main_email
   const mainEmail = {
     type: contactForm?.main_email?.type || "",
-    visibility: contactForm?.main_email?.visibility || "private",
+    visibility: contactForm?.main_email?.visibility || "contacts",
   };
 
   const contact = {};
@@ -858,6 +871,8 @@ function buildLinksWithContact(existingLinks, contactForm) {
   if (websites.length) contact.websites = websites;
   if (scheduler) contact.scheduler = scheduler;
   contact.main_email = mainEmail;
+  if (contactForm?.require_verified) contact.require_verified = true;
+  else delete contact.require_verified;
 
   if (Object.keys(contact).length) newLinks.contact = contact;
   else delete newLinks.contact;
@@ -1503,8 +1518,14 @@ export default function AdminSettings() {
   const [emailErrors, setEmailErrors] = React.useState({});
   const [phoneErrors, setPhoneErrors] = React.useState({});
   const [websiteErrors, setWebsiteErrors] = React.useState({});
+  const [integrityPromptDismissed, setIntegrityPromptDismissed] = React.useState(false);
   const [schedulerError, setSchedulerError] = React.useState("");
   const [locationForm, setLocationForm] = React.useState({ city: "", country: "" });
+
+  const isUserVerified = React.useMemo(() => {
+    const s = String(profile?.kyc_status || "").toLowerCase();
+    return s === "approved" || s === "verified";
+  }, [profile?.kyc_status]);
 
   const [eduList, setEduList] = React.useState([]);
   const [expList, setExpList] = React.useState([]);
@@ -3439,7 +3460,7 @@ export default function AdminSettings() {
                         </Box>
                         {/* Right: Metadata */}
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          {renderVisibilityIcon(profile.links?.contact?.main_email?.visibility || "private")}
+                          {renderVisibilityIcon(profile.links?.contact?.main_email?.visibility || "contacts")}
                           {profile.links?.contact?.main_email?.type && (
                             <Typography variant="caption" color="text.secondary">
                               ({getEmailTypeLabel(profile.links.contact.main_email.type)})
@@ -4114,7 +4135,7 @@ export default function AdminSettings() {
                         select
                         label="Visibility"
                         fullWidth
-                        value={contactForm.main_email?.visibility || "private"}
+                        value={contactForm.main_email?.visibility || "contacts"}
                         onChange={(e) =>
                           setContactForm((prev) => ({
                             ...prev,
@@ -4130,6 +4151,43 @@ export default function AdminSettings() {
                       </TextField>
                     </Grid>
                   </Grid>
+                  <Box sx={{ mt: 0.5 }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={!!contactForm.require_verified}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setContactForm((prev) => ({ ...prev, require_verified: checked }));
+                            if (checked) setIntegrityPromptDismissed(false);
+                          }}
+                        />
+                      }
+                      label="Member Integrity: Require Verified Status"
+                    />
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", ml: 4 }}>
+                      Only verified members can see or request your email.
+                    </Typography>
+                  </Box>
+                  {contactForm.require_verified && !isUserVerified && !integrityPromptDismissed && (
+                    <Paper variant="outlined" sx={{ mt: 1.5, p: 1.5, bgcolor: "#f8fafc", borderColor: "#e2e8f0" }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Great choice.
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Since you value high-trust networking, why not lead by example?
+                        Get your Verified Badge now to ensure your requests are always seen by others.
+                      </Typography>
+                      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                        <Button variant="contained" size="small" onClick={handleStartKYC}>
+                          Get Verified
+                        </Button>
+                        <Button variant="text" size="small" onClick={() => setIntegrityPromptDismissed(true)}>
+                          Maybe Later
+                        </Button>
+                      </Stack>
+                    </Paper>
+                  )}
                   {contactForm.emails.map((item, idx) => (
                     <Grid container spacing={1} alignItems="center" key={`email-row-${idx}`}>
                       <Grid item xs={12} sm={6}>
@@ -4201,7 +4259,7 @@ export default function AdminSettings() {
                     onClick={() =>
                       setContactForm((prev) => ({
                         ...prev,
-                        emails: [...prev.emails, { email: "", type: "professional", visibility: "private" }],
+                        emails: [...prev.emails, { email: "", type: "professional", visibility: "contacts" }],
                       }))
                     }
                   >

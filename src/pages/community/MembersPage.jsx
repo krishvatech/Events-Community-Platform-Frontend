@@ -38,6 +38,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import { feature as topoFeature } from "topojson-client";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
+import { isAdminUser } from "../../utils/adminRole";
 isoCountries.registerLocale(enLocale);
 import {
   MapContainer,
@@ -66,6 +67,81 @@ const tokenHeader = () => {
     localStorage.getItem("jwt");
   return t ? { Authorization: `Bearer ${t}` } : {};
 };
+
+function parseLinks(value) {
+  const v = (value ?? "").toString().trim();
+  if (!v) return {};
+  try {
+    const j = JSON.parse(v);
+    if (j && typeof j === "object" && !Array.isArray(j)) return j;
+  } catch { }
+  const out = {};
+  v.split(/\n|,|;/).forEach((part) => {
+    const [k, ...rest] = part.split("=");
+    const key = (k || "").trim();
+    const val = rest.join("=").trim();
+    if (key && val) out[key] = val;
+  });
+  return out;
+}
+
+function normalizeVisibility(value) {
+  const v = (value || "").toString().trim().toLowerCase();
+  if (!v) return "";
+  if (v === "direct_contacts") return "contacts";
+  if (v === "contacts_and_groups" || v === "contacts+groups") return "contacts_groups";
+  if (v === "by_request" || v === "by request") return "request";
+  return v;
+}
+
+function isVerifiedStatus(raw) {
+  const v = String(raw || "").toLowerCase();
+  return v === "approved" || v === "verified";
+}
+
+function getVisibilityValue(item) {
+  return (
+    item?.visibility ||
+    item?.visibility_level ||
+    item?.visibilityLevel ||
+    item?.access ||
+    item?.access_level ||
+    ""
+  );
+}
+
+function getContactSettings(user) {
+  const rawLinks =
+    user?.profile?.links ||
+    user?.profile?.links_text ||
+    user?.profile?.linksText ||
+    user?.links ||
+    {};
+  const parsed = typeof rawLinks === "string" ? parseLinks(rawLinks) : rawLinks;
+  const links = parsed && typeof parsed === "object" ? parsed : {};
+  const contact = links?.contact && typeof links.contact === "object" ? links.contact : {};
+  return contact;
+}
+
+function getEmailVisibilityInfo(user) {
+  const contact = getContactSettings(user);
+  const emails = Array.isArray(contact.emails) ? contact.emails : [];
+  const requireVerified = !!(
+    contact.require_verified ||
+    contact.member_integrity ||
+    contact.email_requires_verified
+  );
+  const rawMain = normalizeVisibility(getVisibilityValue(contact.main_email));
+  const visibility =
+    rawMain ||
+    normalizeVisibility(getVisibilityValue(emails[0])) ||
+    "contacts";
+  const hasEmail = Boolean(
+    (user?.email || "").trim() ||
+    emails.some((e) => (e?.email || "").trim())
+  );
+  return { visibility, requireVerified, hasEmail };
+}
 
 const normalizeFriendStatus = (s) => {
   const v = (s || "").toLowerCase();
@@ -376,15 +452,16 @@ const countryColor = (name) => {
 };
 
 /* -------------------------- Member card (left) -------------------------- */
-function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId }) {
+function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId, viewerIsStaff, viewerIsVerified }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const email = u?.email || "";
   const usernameFromEmail = email ? email.split("@")[0] : "";
   const name =
     u?.profile?.full_name ||
     `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
+    u?.username ||
     usernameFromEmail ||
-    email;
+    "Member";
 
   const rawKycStatus = (
     u?.profile?.kyc_status ||
@@ -416,6 +493,31 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId
 
   const status = (friendStatus || "").toLowerCase();
   const isSelf = currentUserId && String(currentUserId) === String(u?.id);
+  const emailInfo = getEmailVisibilityInfo(u);
+  const blockByVerified =
+    emailInfo.requireVerified && !viewerIsVerified && !viewerIsStaff && !isSelf;
+  const canViewEmail =
+    emailInfo.hasEmail &&
+    (isSelf ||
+      viewerIsStaff ||
+      (!blockByVerified &&
+        (emailInfo.visibility === "public" ||
+          (["contacts", "request", "contacts_groups"].includes(emailInfo.visibility) &&
+            status === "friends"))));
+  const emailDisplay = !emailInfo.hasEmail
+    ? ""
+    : canViewEmail
+      ? email
+      : blockByVerified
+        ? "Verified members only"
+        : emailInfo.visibility === "request"
+          ? "By request"
+          : emailInfo.visibility === "contacts_groups"
+            ? "Contacts & Group Members"
+            : emailInfo.visibility === "contacts"
+              ? "Direct Contacts only"
+              : "Private";
+  const showEmailLine = !!emailDisplay;
   const iso2 = resolveCountryCode(u);
   const flag = flagEmojiFromISO2(iso2);
   const country = displayCountry(u);
@@ -481,9 +583,9 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId
             variant="caption"
             color="text.secondary"
             noWrap
-            sx={{ visibility: email ? "visible" : "hidden", height: "1.25rem" }}
+            sx={{ visibility: showEmailLine ? "visible" : "hidden", height: "1.25rem" }}
           >
-            {email || "placeholder@email.com"}
+            {emailDisplay || "placeholder@email.com"}
           </Typography>
 
         </Box>
@@ -503,24 +605,32 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId
                 </IconButton>
               </Tooltip>
             ) : isMobile ? (
-              <Tooltip title="Request Contact">
-                <IconButton
-                  size="small"
-                  onClick={() => onAddFriend?.(u)}
-                >
-                  <PersonAddAlt1RoundedIcon fontSize="small" />
-                </IconButton>
+              <Tooltip title={blockByVerified ? "Verified members only" : "Request Contact"}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => onAddFriend?.(u)}
+                    disabled={blockByVerified}
+                  >
+                    <PersonAddAlt1RoundedIcon fontSize="small" />
+                  </IconButton>
+                </span>
               </Tooltip>
             ) : (
-              <Button
-                size="small"
-                variant="outlined"
-                sx={{ textTransform: "none", borderRadius: 2 }}
-                startIcon={<PersonAddAlt1RoundedIcon />}
-                onClick={() => onAddFriend?.(u)}
-              >
-                Request Contact
-              </Button>
+              <Tooltip title={blockByVerified ? "Verified members only" : ""}>
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    sx={{ textTransform: "none", borderRadius: 2 }}
+                    startIcon={<PersonAddAlt1RoundedIcon />}
+                    onClick={() => onAddFriend?.(u)}
+                    disabled={blockByVerified}
+                  >
+                    {blockByVerified ? "Verified Required" : "Request Contact"}
+                  </Button>
+                </span>
+              </Tooltip>
             )}
           </Stack>
         )}
@@ -786,13 +896,15 @@ export default function MembersPage() {
   const userDisplayName = (u) =>
     u?.profile?.full_name ||
     `${u?.first_name || ""} ${u?.last_name || ""}`.trim() ||
-    u?.email ||
+    u?.username ||
     `User #${u?.id}`;
 
   const me = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("user") || "{}"); }
     catch { return {}; }
   }, []);
+  const viewerIsStaff = isAdminUser();
+  const viewerIsVerified = isVerifiedStatus(me?.profile?.kyc_status || me?.kyc_status);
 
   async function fetchFriendStatus(id) {
     const r = await fetch(`${API_BASE}/friends/status/?user_id=${id}`, {
@@ -1579,6 +1691,8 @@ export default function MembersPage() {
                       onOpenProfile={handleOpenProfile}
                       onAddFriend={() => sendFriendRequest(u.id)}
                       currentUserId={me?.id}
+                      viewerIsStaff={viewerIsStaff}
+                      viewerIsVerified={viewerIsVerified}
                     />
                   ))}
 
