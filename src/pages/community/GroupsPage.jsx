@@ -891,7 +891,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
   const navigate = useNavigate();
   const { search } = useLocation();
   const params = new URLSearchParams(search);
-  const headerTitle = params.get("topic") || "Community Groups";
+  const headerTitle = params.get("topic") || "Groups";
 
   const [tabIndex, setTabIndex] = React.useState(0);
   const [q, setQ] = React.useState("");
@@ -1086,8 +1086,8 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <TopicHeader
             title={headerTitle}
-            previews={previews}
-            extraCount={extraCount}
+            previews={[]}
+            extraCount={0}
           />
 
           {/* TABS + FILTER BAR */}
