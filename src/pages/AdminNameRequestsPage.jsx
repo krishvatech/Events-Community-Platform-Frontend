@@ -25,6 +25,9 @@ import {
   Skeleton,
   Tabs,
   Tab,
+  Grid,
+  TablePagination,
+  InputAdornment,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -33,6 +36,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import SearchIcon from "@mui/icons-material/Search";
 
 import {
   getAdminNameRequests,
@@ -101,6 +106,22 @@ export default function AdminNameRequestsPage() {
   const [kycProcessing, setKycProcessing] = useState(false);
   const [kycError, setKycError] = useState("");
   const [kycStatusFilter, setKycStatusFilter] = useState("all"); // New filter state
+  const [kycDetailsDialog, setKycDetailsDialog] = useState({ open: false, verification: null });
+
+  // Pagination State - Name Requests
+  const [requestsPage, setRequestsPage] = useState(0);
+  const [requestsRowsPerPage, setRequestsRowsPerPage] = useState(8);
+  const [requestsTotal, setRequestsTotal] = useState(0);
+  const [requestsSearch, setRequestsSearch] = useState("");
+
+  // Pagination State - KYC
+  const [kycPage, setKycPage] = useState(0);
+  const [kycRowsPerPage, setKycRowsPerPage] = useState(8);
+  const [kycTotal, setKycTotal] = useState(0);
+  const [kycSearch, setKycSearch] = useState("");
+
+  const openKycDetails = (v) => setKycDetailsDialog({ open: true, verification: v });
+  const closeKycDetails = () => setKycDetailsDialog({ open: false, verification: null });
 
   const openDetails = (req) => setDetailsDialog({ open: true, request: req });
   const closeDetails = () => setDetailsDialog({ open: false, request: null });
@@ -108,9 +129,23 @@ export default function AdminNameRequestsPage() {
   const fetchRequests = async () => {
     setLoadingRequests(true);
     try {
-      const data = await getAdminNameRequests({ ordering: "-created_at" });
-      const list = Array.isArray(data) ? data : data.results || [];
+      const params = {
+        ordering: "-created_at",
+        page: requestsPage + 1, // API is 1-based
+        page_size: requestsRowsPerPage
+      };
+
+      if (requestsSearch) {
+        params.search = requestsSearch;
+      }
+
+      const data = await getAdminNameRequests(params);
+
+      const list = data.results || (Array.isArray(data) ? data : []);
+      const count = data.count || list.length;
+
       setRequests(list);
+      setRequestsTotal(count);
     } catch (err) {
       console.error(err);
     } finally {
@@ -121,14 +156,27 @@ export default function AdminNameRequestsPage() {
   const fetchKycVerifications = async () => {
     setLoadingKyc(true);
     try {
-      const params = { ordering: "-kyc_didit_last_webhook_at" };
+      const params = {
+        ordering: "-kyc_didit_last_webhook_at",
+        page: kycPage + 1,
+        page_size: kycRowsPerPage
+      };
+
+      if (kycSearch) {
+        params.search = kycSearch;
+      }
+
       // Apply filter if not "all"
       if (kycStatusFilter !== "all") {
         params.kyc_status = kycStatusFilter;
       }
       const data = await getAdminKYCVerifications(params);
-      const list = Array.isArray(data) ? data : data.results || [];
+
+      const list = data.results || (Array.isArray(data) ? data : []);
+      const count = data.count || list.length;
+
       setKycVerifications(list);
+      setKycTotal(count);
     } catch (err) {
       console.error(err);
     } finally {
@@ -138,11 +186,11 @@ export default function AdminNameRequestsPage() {
 
   useEffect(() => {
     fetchRequests();
-  }, []);
+  }, [requestsPage, requestsRowsPerPage, requestsSearch]);
 
   useEffect(() => {
     fetchKycVerifications();
-  }, [kycStatusFilter]); // Refetch when filter changes
+  }, [kycStatusFilter, kycPage, kycRowsPerPage, kycSearch]);
 
   const handleOpenAction = (req, type) => {
     setActionDialog({ open: true, request: req, type });
@@ -280,6 +328,24 @@ export default function AdminNameRequestsPage() {
 
       {/* Tab 1: Name Change Requests */}
       <TabPanel value={tabValue} index={0}>
+        <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+          <TextField
+            size="small"
+            placeholder="Search requests..."
+            variant="outlined"
+            value={requestsSearch}
+            onChange={(e) => setRequestsSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" color="action" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ width: 250 }}
+          />
+        </Stack>
+
         <Paper variant="outlined" sx={{ overflow: "hidden" }}>
           <TableContainer>
             <Table sx={{ minWidth: 800 }}>
@@ -415,49 +481,81 @@ export default function AdminNameRequestsPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component="div"
+            count={requestsTotal}
+            page={requestsPage}
+            onPageChange={(e, newPage) => setRequestsPage(newPage)}
+            rowsPerPage={requestsRowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setRequestsRowsPerPage(parseInt(e.target.value, 10));
+              setRequestsPage(0);
+            }}
+            rowsPerPageOptions={[8, 16, 24, 40]}
+          />
         </Paper>
       </TabPanel>
 
       {/* Tab 2: KYC Verifications */}
       <TabPanel value={tabValue} index={1}>
-        {/* Filter Chips */}
+        {/* Filters & Search */}
         <Box sx={{ mb: 2 }}>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Chip
-              label="All"
-              onClick={() => setKycStatusFilter("all")}
-              color={kycStatusFilter === "all" ? "primary" : "default"}
-              variant={kycStatusFilter === "all" ? "filled" : "outlined"}
-            />
-            <Chip
-              label="Not Started"
-              onClick={() => setKycStatusFilter("not_started")}
-              color={kycStatusFilter === "not_started" ? "default" : "default"}
-              variant={kycStatusFilter === "not_started" ? "filled" : "outlined"}
-            />
-            <Chip
-              label="Pending"
-              onClick={() => setKycStatusFilter("pending")}
-              color={kycStatusFilter === "pending" ? "info" : "default"}
-              variant={kycStatusFilter === "pending" ? "filled" : "outlined"}
-            />
-            <Chip
-              label="Review"
-              onClick={() => setKycStatusFilter("review")}
-              color={kycStatusFilter === "review" ? "warning" : "default"}
-              variant={kycStatusFilter === "review" ? "filled" : "outlined"}
-            />
-            <Chip
-              label="Approved"
-              onClick={() => setKycStatusFilter("approved")}
-              color={kycStatusFilter === "approved" ? "success" : "default"}
-              variant={kycStatusFilter === "approved" ? "filled" : "outlined"}
-            />
-            <Chip
-              label="Declined"
-              onClick={() => setKycStatusFilter("declined")}
-              color={kycStatusFilter === "declined" ? "error" : "default"}
-              variant={kycStatusFilter === "declined" ? "filled" : "outlined"}
+          <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
+            {/* Filter Chips */}
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip
+                label="All"
+                onClick={() => setKycStatusFilter("all")}
+                color={kycStatusFilter === "all" ? "primary" : "default"}
+                variant={kycStatusFilter === "all" ? "filled" : "outlined"}
+              />
+              <Chip
+                label="Not Started"
+                onClick={() => setKycStatusFilter("not_started")}
+                color={kycStatusFilter === "not_started" ? "default" : "default"}
+                variant={kycStatusFilter === "not_started" ? "filled" : "outlined"}
+              />
+              <Chip
+                label="Pending"
+                onClick={() => setKycStatusFilter("pending")}
+                color={kycStatusFilter === "pending" ? "info" : "default"}
+                variant={kycStatusFilter === "pending" ? "filled" : "outlined"}
+              />
+              <Chip
+                label="Review"
+                onClick={() => setKycStatusFilter("review")}
+                color={kycStatusFilter === "review" ? "warning" : "default"}
+                variant={kycStatusFilter === "review" ? "filled" : "outlined"}
+              />
+              <Chip
+                label="Approved"
+                onClick={() => setKycStatusFilter("approved")}
+                color={kycStatusFilter === "approved" ? "success" : "default"}
+                variant={kycStatusFilter === "approved" ? "filled" : "outlined"}
+              />
+              <Chip
+                label="Declined"
+                onClick={() => setKycStatusFilter("declined")}
+                color={kycStatusFilter === "declined" ? "error" : "default"}
+                variant={kycStatusFilter === "declined" ? "filled" : "outlined"}
+              />
+            </Stack>
+
+            {/* Search Box */}
+            <TextField
+              size="small"
+              placeholder="Search users..."
+              variant="outlined"
+              value={kycSearch}
+              onChange={(e) => setKycSearch(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" color="action" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: 250 }}
             />
           </Stack>
         </Box>
@@ -499,7 +597,16 @@ export default function AdminNameRequestsPage() {
                     {kycVerifications.map((verification) => (
                       <TableRow key={verification.user_id} hover>
                         <TableCell>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                          <Box
+                            onClick={() => openKycDetails(verification)}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.5,
+                              cursor: "pointer",
+                              "&:hover": { opacity: 0.8 }
+                            }}
+                          >
                             <Avatar
                               src={verification.user_image_url}
                               sx={{ width: 40, height: 40 }}
@@ -575,13 +682,31 @@ export default function AdminNameRequestsPage() {
                                   <RestartAltIcon />
                                 </IconButton>
                               </Tooltip>
+                              <Tooltip title="View Details">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => openKycDetails(verification)}
+                                >
+                                  <VisibilityIcon />
+                                </IconButton>
+                              </Tooltip>
                             </Stack>
                           ) : (
-                            <Typography variant="caption" color="text.secondary">
-                              {verification.legal_name_verified_at
-                                ? new Date(verification.legal_name_verified_at).toLocaleDateString()
-                                : "—"}
-                            </Typography>
+                            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                              <Typography variant="caption" color="text.secondary" sx={{ mr: 1, alignSelf: 'center' }}>
+                                {verification.legal_name_verified_at
+                                  ? new Date(verification.legal_name_verified_at).toLocaleDateString()
+                                  : "—"}
+                              </Typography>
+                              <Tooltip title="View Details">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => openKycDetails(verification)}
+                                >
+                                  <VisibilityIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
                           )}
                         </TableCell>
                       </TableRow>
@@ -591,6 +716,18 @@ export default function AdminNameRequestsPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component="div"
+            count={kycTotal}
+            page={kycPage}
+            onPageChange={(e, newPage) => setKycPage(newPage)}
+            rowsPerPage={kycRowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setKycRowsPerPage(parseInt(e.target.value, 10));
+              setKycPage(0);
+            }}
+            rowsPerPageOptions={[8, 16, 24, 40]}
+          />
         </Paper>
       </TabPanel>
 
@@ -764,6 +901,182 @@ export default function AdminNameRequestsPage() {
           <Button onClick={closeDetails}>Close</Button>
         </DialogActions>
       </Dialog>
-    </Box>
+
+      {/* KYC Details Dialog */}
+      <Dialog open={kycDetailsDialog.open} onClose={closeKycDetails} fullWidth maxWidth="md">
+        <DialogTitle>KYC Verification Details</DialogTitle>
+        <DialogContent dividers>
+          {kycDetailsDialog.verification && (
+            <Stack spacing={3}>
+              {/* Header Info */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar
+                  src={kycDetailsDialog.verification.user_image_url}
+                  sx={{ width: 64, height: 64 }}
+                >
+                  {(kycDetailsDialog.verification.first_name || "U")[0].toUpperCase()}
+                </Avatar>
+                <Box>
+                  <Typography variant="h6">
+                    {kycDetailsDialog.verification.full_name || kycDetailsDialog.verification.username}
+                  </Typography>
+                  <Chip
+                    label={(kycDetailsDialog.verification.kyc_status || "").replace("_", " ").toUpperCase()}
+                    color={getKYCStatusColor(kycDetailsDialog.verification.kyc_status)}
+                    size="small"
+                  />
+                </Box>
+              </Box>
+
+              {/* Status Checks */}
+              {(() => {
+                const payload = kycDetailsDialog.verification.kyc_didit_raw_payload || {};
+                const decision = payload.decision || {};
+                const liveness = decision.liveness || {};
+                const idVerification = decision.id_verification || {};
+                const faceMatch = decision.face_match || {};
+
+                // Helper for score color
+                const getScoreColor = (score) => {
+                  if (!score) return 'text.secondary';
+                  if (score >= 80) return 'success.main';
+                  if (score >= 50) return 'warning.main';
+                  return 'error.main';
+                };
+
+                return (
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 2 }}>Verification Checks</Typography>
+                    <Stack direction="row" spacing={4} divider={<Box sx={{ borderRight: 1, borderColor: 'divider' }} />}>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">Liveness</Typography>
+                        <Typography variant="body1" fontWeight="bold" sx={{ color: liveness.status === 'Approved' ? 'success.main' : 'error.main' }}>
+                          {liveness.status || 'N/A'}
+                        </Typography>
+                        {liveness.score !== undefined && (
+                          <Typography variant="caption" sx={{ color: getScoreColor(liveness.score) }}>
+                            Score: {liveness.score.toFixed(1)}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">Face Match</Typography>
+                        <Typography variant="body1" fontWeight="bold" sx={{ color: faceMatch.status === 'Approved' ? 'success.main' : 'error.main' }}>
+                          {faceMatch.status || 'N/A'}
+                        </Typography>
+                        {faceMatch.score !== undefined && (
+                          <Typography variant="caption" sx={{ color: getScoreColor(faceMatch.score) }}>
+                            Score: {faceMatch.score.toFixed(1)}%
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">ID Document</Typography>
+                        <Typography variant="body1" fontWeight="bold" sx={{ color: idVerification.status === 'Approved' ? 'success.main' : 'error.main' }}>
+                          {idVerification.status || 'N/A'}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Paper>
+                );
+              })()}
+
+              {/* Document Details (Extracted) */}
+              {(() => {
+                const payload = kycDetailsDialog.verification.kyc_didit_raw_payload || {};
+                const idv = payload.decision?.id_verification || {};
+
+                // Defined fields to display
+                const fields = [
+                  { label: "Full Name", value: idv.full_name },
+                  { label: "Date of Birth", value: idv.date_of_birth },
+                  { label: "Age", value: idv.age },
+                  { label: "Gender", value: idv.gender },
+                  { label: "Nationality", value: idv.nationality },
+                  { label: "Place of Birth", value: idv.place_of_birth },
+                  { label: "Document Type", value: idv.document_type },
+                  { label: "Document Number", value: idv.document_number },
+                  { label: "Issue Date", value: idv.date_of_issue },
+                  { label: "Expiration Date", value: idv.expiration_date },
+                  { label: "Issuing State", value: idv.issuing_state_name || idv.issuing_state },
+                ];
+
+                return (
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 2 }}>Document Details</Typography>
+                    <Grid container spacing={2}>
+                      {fields.map((f, i) => (
+                        <Grid item xs={6} sm={4} key={i}>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {f.label}
+                          </Typography>
+                          <Typography variant="body2" fontWeight={500}>
+                            {f.value || "—"}
+                          </Typography>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Paper>
+                );
+              })()}
+
+
+              {/* Images */}
+              {(() => {
+                const payload = kycDetailsDialog.verification.kyc_didit_raw_payload || {};
+                const decision = payload.decision || {};
+                const idVerification = decision.id_verification || {};
+                const frontImage = idVerification.front_image;
+                const portraitImage = idVerification.portrait_image;
+
+                if (!frontImage && !portraitImage) return null;
+
+                return (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Extracted Images</Typography>
+                    <Stack direction="row" spacing={2} sx={{ overflowX: 'auto', pb: 1 }}>
+                      {portraitImage && (
+                        <Box>
+                          <Typography variant="caption" display="block" align="center">Portrait</Typography>
+                          <Box
+                            component="img"
+                            src={portraitImage}
+                            sx={{ height: 150, borderRadius: 1, border: '1px solid #ddd' }}
+                          />
+                        </Box>
+                      )}
+                      {frontImage && (
+                        <Box>
+                          <Typography variant="caption" display="block" align="center">ID Front</Typography>
+                          <Box
+                            component="img"
+                            src={frontImage}
+                            sx={{ height: 150, borderRadius: 1, border: '1px solid #ddd' }}
+                          />
+                        </Box>
+                      )}
+                    </Stack>
+                  </Box>
+                )
+              })()}
+
+              {/* Raw JSON */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Raw Payload</Typography>
+                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "grey.50", overflow: "auto", maxHeight: 300 }}>
+                  <pre style={{ margin: 0, fontSize: 11 }}>
+                    {JSON.stringify(kycDetailsDialog.verification.kyc_didit_raw_payload || {}, null, 2)}
+                  </pre>
+                </Paper>
+              </Box>
+
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeKycDetails}>Close</Button>
+        </DialogActions>
+      </Dialog >
+    </Box >
   );
 }
