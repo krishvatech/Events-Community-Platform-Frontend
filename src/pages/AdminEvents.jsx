@@ -313,7 +313,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [waitingRoomLoungeAllowed, setWaitingRoomLoungeAllowed] = React.useState(true);
   const [waitingRoomNetworkingAllowed, setWaitingRoomNetworkingAllowed] = React.useState(true);
   const [waitingRoomAutoAdmitSeconds, setWaitingRoomAutoAdmitSeconds] = React.useState("");
-  const [waitingRoomGracePeriodMinutes, setWaitingRoomGracePeriodMinutes] = React.useState("10");
+  const [waitingRoomGracePeriodMinutes, setWaitingRoomGracePeriodMinutes] = React.useState("0");
 
   // Replay Options
   const [replayAvailable, setReplayAvailable] = React.useState(false);
@@ -476,7 +476,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (waitingRoomAutoAdmitSeconds) {
       fd.append("auto_admit_seconds", String(waitingRoomAutoAdmitSeconds));
     }
-    fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "10"));
+    fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "0"));
     fd.append("publish_resources_immediately", resourcesPublishNow ? "true" : "false");
     if (!resourcesPublishNow) {
       const publishISO = iso(resPublishDate, resPublishTime);
@@ -1375,7 +1375,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     event?.auto_admit_seconds ? String(event.auto_admit_seconds) : ""
   );
   const [waitingRoomGracePeriodMinutes, setWaitingRoomGracePeriodMinutes] = useState(
-    event?.waiting_room_grace_period_minutes ? String(event.waiting_room_grace_period_minutes) : "10"
+    event?.waiting_room_grace_period_minutes ? String(event.waiting_room_grace_period_minutes) : "0"
   );
 
   const [replayAvailable, setReplayAvailable] = React.useState(false);
@@ -1410,7 +1410,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     setWaitingRoomImageFile(null);
     setLocalWaitingRoomImagePreview("");
 
-    setWaitingRoomGracePeriodMinutes(String(event?.waiting_room_grace_period_minutes || "10"));
+    setWaitingRoomGracePeriodMinutes(String(event?.waiting_room_grace_period_minutes || "0"));
     // Init replay options
     setReplayAvailable(!!event?.replay_available);
     setReplayDuration(event?.replay_availability_duration || "");
@@ -1517,7 +1517,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     if (waitingRoomAutoAdmitSeconds) {
       fd.append("auto_admit_seconds", String(waitingRoomAutoAdmitSeconds));
     }
-    fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "10"));
+    fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "0"));
 
     try {
       const res = await fetch(`${API_ROOT}/events/${event.id}/`, {

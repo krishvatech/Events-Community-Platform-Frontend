@@ -62,6 +62,7 @@ import CallEndIcon from "@mui/icons-material/CallEnd";
 import LogoutIcon from "@mui/icons-material/Logout"; // <--- ADDED for Leave Table
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import AnnouncementIcon from "@mui/icons-material/Announcement"; // ✅ NEW for waiting room announcements
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
 import ShuffleIcon from "@mui/icons-material/Shuffle"; // Keep this if used elsewhere
@@ -95,6 +96,8 @@ import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
 import PostEventLoungeScreen from "../components/lounge/PostEventLoungeScreen.jsx";
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
 import BannedParticipantsDialog from "../components/live-meeting/BannedParticipantsDialog.jsx";
+import WaitingRoomAnnouncements from "../components/live-meeting/WaitingRoomAnnouncements.jsx";
+import WaitingRoomControls from "../components/live-meeting/WaitingRoomControls.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
 import { getUserName } from "../utils/authStorage.js";
@@ -1516,7 +1519,21 @@ function WaitingRoomScreen({
   loungeAvailable = false,
   onOpenLounge,
   loungeStatusLabel = "",
+  isHost = false,
+  eventId = null,
+  waitingCount = 0,
+  announcementsRef = null,
 }) {
+  // ✅ NEW: Initialize announcements component
+  const announcementHelper = WaitingRoomAnnouncements({});
+
+  // Store reference for parent to use
+  useEffect(() => {
+    if (announcementsRef) {
+      announcementsRef.current = announcementHelper;
+    }
+  }, [announcementHelper, announcementsRef]);
+
   return (
     <Box
       sx={{
@@ -1632,8 +1649,31 @@ function WaitingRoomScreen({
           Waiting for host admission
         </Typography>
         <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.65)", mb: 2 }}>
-          You are in the waiting room. You’ll be admitted when the host is ready.
+          You are in the waiting room. You'll be admitted when the host is ready.
         </Typography>
+
+        {/* ✅ NEW: Display waiting room announcements */}
+        {announcementHelper && (
+          <Box sx={{ mb: 2 }}>
+            {announcementHelper.AnnouncementsUI}
+          </Box>
+        )}
+
+        {/* ✅ NEW: Host announcement controls */}
+        {isHost && eventId && (
+          <Box sx={{ mb: 2 }}>
+            <WaitingRoomControls
+              eventId={eventId}
+              waitingCount={waitingCount}
+              onAnnounce={(result) => {
+                console.log(`[WaitingRoom] Announcement sent to ${result.recipients} participants`);
+              }}
+              onError={(error) => {
+                console.error("[WaitingRoom] Failed to send announcement:", error);
+              }}
+            />
+          </Box>
+        )}
 
         <Box
           sx={{
@@ -1799,6 +1839,9 @@ export default function NewLiveMeeting() {
   const [breakoutTimer, setBreakoutTimer] = useState(null);
   const [breakoutAnnouncement, setBreakoutAnnouncement] = useState("");
   const [showBreakoutAnnouncement, setShowBreakoutAnnouncement] = useState(false);
+
+  // ✅ NEW: Waiting Room Announcements State
+  const waitingRoomAnnouncementsRef = useRef(null);
 
   // Participant Menu (Kick/Ban)
   const [participantMenuAnchor, setParticipantMenuAnchor] = useState(null);
@@ -2000,6 +2043,11 @@ export default function NewLiveMeeting() {
   const waitingRoomPrevCountRef = useRef(0);
   const waitingSectionRef = useRef(null);
   const [pendingWaitFocus, setPendingWaitFocus] = useState(false);
+
+  // ✅ NEW: Announcement Dialog State
+  const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
+  const [announcementText, setAnnouncementText] = useState("");
+  const [announcementSending, setAnnouncementSending] = useState(false);
   const isPanelOpen = isMdUp ? rightPanelOpen : rightOpen;
   const isChatActive = isPanelOpen && tab === 0 && hostPerms.chat;
   const isQnaActive = isPanelOpen && tab === 1;
@@ -3299,10 +3347,18 @@ export default function NewLiveMeeting() {
           console.log("[LiveMeeting] ✅ User ADMITTED from waiting room! Setting waitingRoomActive to false");
           setWaitingRoomActive(false);
           setWaitingRoomStatus("admitted");
+          // ✅ NEW: Clear announcements when user is admitted
+          if (waitingRoomAnnouncementsRef.current?.clearAllAnnouncements) {
+            waitingRoomAnnouncementsRef.current.clearAllAnnouncements();
+          }
         } else if (data.admission_status === "rejected") {
           console.log("[LiveMeeting] ❌ User REJECTED from waiting room");
           setWaitingRoomActive(false);
           setJoinError("You were not admitted to this event.");
+          // ✅ NEW: Clear announcements when user is rejected
+          if (waitingRoomAnnouncementsRef.current?.clearAllAnnouncements) {
+            waitingRoomAnnouncementsRef.current.clearAllAnnouncements();
+          }
         } else {
           console.log("[LiveMeeting] Waiting room status polling - status:", data.admission_status);
           setWaitingRoomStatus(data.admission_status || "waiting");
@@ -3420,6 +3476,16 @@ export default function NewLiveMeeting() {
             }
           } else {
             console.log("[MainSocket] Not in breakout, refreshing lounge state");
+          }
+        } else if (msg.type === "waiting_room_announcement") {
+          // ✅ NEW: Handle waiting room announcements
+          console.log("[MainSocket] Received waiting room announcement:", msg.message);
+          if (waitingRoomAnnouncementsRef.current) {
+            waitingRoomAnnouncementsRef.current.addAnnouncement({
+              message: msg.message,
+              sender_name: msg.sender_name,
+              timestamp: msg.timestamp,
+            });
           }
         } else if (msg.type === "lounge_state" || msg.type === "welcome") {
           if (msg.online_users) setOnlineUsers(msg.online_users);
@@ -3582,6 +3648,34 @@ export default function NewLiveMeeting() {
         showSnackbar("Participant rejected", "warning");
       } catch {
         showSnackbar("Failed to reject participant", "error");
+      }
+    },
+    [eventId, showSnackbar]
+  );
+
+  // ✅ NEW: Send announcement to waiting room
+  const sendAnnouncement = useCallback(
+    async (message) => {
+      if (!eventId || !message?.trim()) return;
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/announce/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ message: message.trim() }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          showSnackbar(err?.detail || "Failed to send announcement", "error");
+          return;
+        }
+        const data = await res.json();
+        showSnackbar(
+          `Announcement sent to ${data.recipients || 0} participant(s)`,
+          "success"
+        );
+      } catch (e) {
+        console.error("[Announcement] Error:", e);
+        showSnackbar("Failed to send announcement", "error");
       }
     },
     [eventId, showSnackbar]
@@ -7898,7 +7992,7 @@ export default function NewLiveMeeting() {
 
                       {/* Global Waiting Room Actions */}
                       {filteredWaitingRoomCount > 0 && (
-                        <Stack direction="row" spacing={1} sx={{ mb: 1.5, gap: 0.75 }}>
+                        <Stack direction="row" spacing={1} sx={{ mb: 1.5, gap: 0.75, flexWrap: 'wrap' }}>
                           <Button
                             size="small"
                             variant="contained"
@@ -7918,6 +8012,34 @@ export default function NewLiveMeeting() {
                             }}
                           >
                             Admit All
+                          </Button>
+
+                          {/* ✅ NEW: Send Announcement Button */}
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<AnnouncementIcon sx={{ fontSize: 14 }} />}
+                            onClick={() => {
+                              // ✅ Open proper Material-UI dialog
+                              setAnnouncementDialogOpen(true);
+                              setAnnouncementText("");
+                            }}
+                            sx={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              py: 0.75,
+                              px: 1.5,
+                              textTransform: 'none',
+                              borderRadius: 1,
+                              color: "rgba(100, 200, 255, 1)",
+                              borderColor: "rgba(100, 200, 255, 0.5)",
+                              '&:hover': {
+                                bgcolor: "rgba(100, 200, 255, 0.1)",
+                                borderColor: "rgba(100, 200, 255, 0.8)",
+                              }
+                            }}
+                          >
+                            Announce
                           </Button>
                         </Stack>
                       )}
@@ -8486,6 +8608,10 @@ export default function NewLiveMeeting() {
           loungeAvailable={(waitingRoomLoungeAllowed || waitingRoomNetworkingAllowed) && loungeOpenStatus?.status === "OPEN"}
           loungeStatusLabel={loungeOpenStatus?.reason || ""}
           onOpenLounge={() => setLoungeOpen(true)}
+          isHost={role === "publisher"}
+          eventId={eventId}
+          waitingCount={filteredWaitingRoomCount || 0}
+          announcementsRef={waitingRoomAnnouncementsRef}
         />
         <LoungeOverlay
           open={loungeOpen}
@@ -10096,6 +10222,143 @@ export default function NewLiveMeeting() {
             {snackbar.message}
           </Alert>
         </Snackbar>
+
+        {/* ✅ NEW: Announcement Dialog */}
+        <Dialog
+          open={announcementDialogOpen}
+          onClose={() => {
+            setAnnouncementDialogOpen(false);
+            setAnnouncementText("");
+          }}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              bgcolor: "rgba(15, 23, 42, 0.90)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(255,255,255,0.10)",
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              fontWeight: 800,
+              fontSize: 16,
+              color: "rgba(255,255,255,0.92)",
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            📢 Send Announcement
+          </DialogTitle>
+          <DialogContent sx={{ pt: 2.5 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "rgba(255,255,255,0.65)",
+                mb: 2,
+                display: "block",
+              }}
+            >
+              Send a message to all {filteredWaitingRoomCount} waiting participant(s)
+            </Typography>
+
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              placeholder="e.g., 'We're running 5 minutes late. Thanks for your patience!'"
+              value={announcementText}
+              onChange={(e) => setAnnouncementText(e.target.value)}
+              maxRows={6}
+              disabled={announcementSending}
+              autoFocus
+              InputProps={{
+                sx: {
+                  color: "rgba(255,255,255,0.85)",
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "rgba(255,255,255,0.15)",
+                  },
+                  "&:hover .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "rgba(255,255,255,0.25)",
+                  },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "rgba(100, 200, 255, 0.5)",
+                  },
+                },
+              }}
+            />
+
+            <Typography
+              variant="caption"
+              sx={{
+                color: "rgba(255,255,255,0.45)",
+                mt: 1,
+                display: "block",
+                textAlign: "right",
+              }}
+            >
+              {announcementText.length} / 1000 characters
+            </Typography>
+          </DialogContent>
+          <DialogActions
+            sx={{
+              borderTop: "1px solid rgba(255,255,255,0.08)",
+              pt: 2,
+              pb: 2,
+              px: 2.5,
+              gap: 1,
+            }}
+          >
+            <Button
+              onClick={() => {
+                setAnnouncementDialogOpen(false);
+                setAnnouncementText("");
+              }}
+              disabled={announcementSending}
+              sx={{
+                color: "rgba(255,255,255,0.65)",
+                textTransform: "none",
+                fontWeight: 600,
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!announcementText.trim()) return;
+                setAnnouncementSending(true);
+                try {
+                  await sendAnnouncement(announcementText);
+                  setAnnouncementDialogOpen(false);
+                  setAnnouncementText("");
+                } finally {
+                  setAnnouncementSending(false);
+                }
+              }}
+              variant="contained"
+              disabled={
+                announcementSending || !announcementText.trim() || announcementText.length > 1000
+              }
+              startIcon={announcementSending ? <CircularProgress size={20} /> : <AnnouncementIcon />}
+              sx={{
+                bgcolor: "rgba(100, 200, 255, 0.8)",
+                color: "#fff",
+                textTransform: "none",
+                fontWeight: 700,
+                px: 2.5,
+                "&:hover": {
+                  bgcolor: "rgba(100, 200, 255, 1)",
+                },
+                "&:disabled": {
+                  bgcolor: "rgba(100, 200, 255, 0.3)",
+                  color: "rgba(255,255,255,0.4)",
+                },
+              }}
+            >
+              {announcementSending ? "Sending..." : "Send"}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
       </Box>
     </DyteProvider>
