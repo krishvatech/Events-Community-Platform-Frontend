@@ -9151,7 +9151,11 @@ export default function NewLiveMeeting() {
             <Button
               variant="contained"
               onClick={() => {
-                navigate(-1);
+                if (role === "publisher" || isEventOwner) {
+                  navigate("/admin/events");
+                } else {
+                  navigate(-1);
+                }
               }}
               sx={{
                 bgcolor: "#14b8b1",
@@ -9166,7 +9170,7 @@ export default function NewLiveMeeting() {
                 },
               }}
             >
-              Go Back
+              {role === "publisher" || isEventOwner ? "Go to Dashboard" : "Go Back"}
             </Button>
           </Box>
         </Box>
@@ -9297,7 +9301,11 @@ export default function NewLiveMeeting() {
             <Button
               variant="contained"
               onClick={() => {
-                navigate(-1);
+                if (role === "publisher" || isEventOwner) {
+                  navigate("/admin/events");
+                } else {
+                  navigate(-1);
+                }
               }}
               sx={{
                 bgcolor: "#14b8b1",
@@ -9312,7 +9320,7 @@ export default function NewLiveMeeting() {
                 },
               }}
             >
-              Go Back
+              {role === "publisher" || isEventOwner ? "Go to Dashboard" : "Go Back"}
             </Button>
           </Box>
         </Box>

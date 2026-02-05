@@ -117,6 +117,9 @@ const PostEventLoungeScreen = ({
                 fontWeight: 800,
                 color: 'white',
                 fontSize: { xs: '1.5rem', md: '2rem' },
+                fontFamily: 'monospace',
+                minWidth: { xs: '120px', md: '150px' },
+                textAlign: 'center',
               }}
             >
               {timeRemaining}
