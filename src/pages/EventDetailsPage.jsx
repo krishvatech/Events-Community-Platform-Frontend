@@ -16,6 +16,9 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import { getJoinButtonText, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
+import GroupsIcon from "@mui/icons-material/Groups";
+import ParticipantListDialog from "../components/ParticipantListDialog";
+import { isOwnerUser, isStaffUser } from "../utils/adminRole";
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 const urlJoin = (base, path) => `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -147,6 +150,32 @@ export default function EventDetailsPage() {
   const [event, setEvent] = useState(preload || null);
   const [loading, setLoading] = useState(!preload);
   const [error, setError] = useState(null);
+
+  // Participant List Dialog
+  const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
+  const [participantList, setParticipantList] = useState([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [participantError, setParticipantError] = useState(null);
+
+  const handleShowParticipants = async () => {
+    setShowParticipantsDialog(true);
+    setParticipantList([]);
+    setLoadingParticipants(true);
+    setParticipantError(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/events/${event.id}/participants/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load participants");
+      const data = await res.json();
+      setParticipantList(data);
+    } catch (err) {
+      setParticipantError(err.message);
+    } finally {
+      setLoadingParticipants(false);
+    }
+  };
 
   // Force re-render every second to keep join button text current
   useSecondTick();
@@ -334,6 +363,46 @@ export default function EventDetailsPage() {
                         </Typography>
                       </Stack>
                     ) : null}
+
+                    {/* Participant Count */}
+                    {Number.isFinite(event.registrations_count) && (() => {
+                      const owner = isOwnerUser();
+                      const staff = isStaffUser();
+                      const now = Date.now();
+                      const s = event.start_time ? parseDateSafe(event.start_time).getTime() : 0;
+                      const e = event.end_time ? parseDateSafe(event.end_time).getTime() : 0;
+                      const isBefore = s && now < s;
+                      const isAfter = e && now > e;
+
+                      let canView = true;
+                      if (!owner && !staff) {
+                        if (isBefore && event.show_participants_before_event === false) canView = false;
+                        else if (isAfter && event.show_participants_after_event === false) canView = false;
+                      }
+
+                      if (canView) {
+                        return (
+                          <Stack direction="row" spacing={0.75} alignItems="center"
+                            sx={{ cursor: 'pointer', '&:hover': { color: 'teal' }, transition: 'color 0.2s' }}
+                            onClick={handleShowParticipants}
+                          >
+                            <GroupsIcon fontSize="small" className="text-teal-700" />
+                            <Typography variant="body2" color="text.secondary" sx={{ '&:hover': { color: 'teal' } }}>
+                              {event.registrations_count} registered
+                            </Typography>
+                          </Stack>
+                        );
+                      } else {
+                        return (
+                          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default' }}>
+                            <GroupsIcon fontSize="small" className="text-teal-700" />
+                            <Typography variant="body2" color="text.secondary">
+                              {event.registrations_count} registered
+                            </Typography>
+                          </Stack>
+                        );
+                      }
+                    })()}
                     <Typography variant="h6" fontWeight={800}>
                       About this event
                     </Typography>
@@ -447,6 +516,15 @@ export default function EventDetailsPage() {
           </main>
         </div>
       </Container>
+
+      <ParticipantListDialog
+        open={showParticipantsDialog}
+        onClose={() => setShowParticipantsDialog(false)}
+        participants={participantList}
+        eventTitle={event?.title || "Event"}
+        loading={loadingParticipants}
+        error={participantError}
+      />
     </div>
   );
 }

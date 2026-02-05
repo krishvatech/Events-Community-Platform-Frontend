@@ -225,6 +225,13 @@ export default function EventManagePage() {
     lounge_after_buffer: 30,
   });
 
+  // Participant Visibility Settings State
+  const [visibilitySettingsSaving, setVisibilitySettingsSaving] = useState(false);
+  const [participantVisibility, setParticipantVisibility] = useState({
+    show_participants_before_event: true,
+    show_participants_after_event: false,
+  });
+
   const isOwner = isOwnerUser();
   const isStaff = isStaffUser();
   const canManageLounge = isOwner || isStaff;
@@ -286,6 +293,10 @@ export default function EventManagePage() {
         lounge_enabled_breaks: event.lounge_enabled_breaks ?? false,
         lounge_enabled_after: event.lounge_enabled_after ?? false,
         lounge_after_buffer: event.lounge_after_buffer ?? 30,
+      });
+      setParticipantVisibility({
+        show_participants_before_event: event.show_participants_before_event ?? true,
+        show_participants_after_event: event.show_participants_after_event ?? false,
       });
     }
   }, [event]);
@@ -1090,6 +1101,71 @@ export default function EventManagePage() {
             </Box>
           </Paper>
         </Grid>
+
+        {/* Participant Visibility Settings (Owner/Staff only) */}
+        {(isOwner || isStaff) && (
+          <Grid item xs={12}>
+            <Paper
+              elevation={0}
+              sx={{
+                borderRadius: 3,
+                border: "1px solid",
+                borderColor: "divider",
+                p: { xs: 2, sm: 3 },
+                bgcolor: "background.paper",
+              }}
+            >
+              <Box mb={2}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Participant List Visibility
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Control when regular participants can see the list of registered members.
+                </Typography>
+              </Box>
+              <Stack spacing={2}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={participantVisibility.show_participants_before_event}
+                      onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_participants_before_event: e.target.checked }))}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>Show participants before event starts</Typography>
+                      <Typography variant="caption" color="text.secondary">Default: On</Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={participantVisibility.show_participants_after_event}
+                      onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_participants_after_event: e.target.checked }))}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>Show participants after event ends</Typography>
+                      <Typography variant="caption" color="text.secondary">Default: Off</Typography>
+                    </Box>
+                  }
+                />
+                <Box>
+                  <Button
+                    variant="contained"
+                    onClick={() => handleSaveVisibilitySettings(participantVisibility)}
+                    disabled={visibilitySettingsSaving}
+                    size="small"
+                  >
+                    {visibilitySettingsSaving ? "Saving..." : "Save Settings"}
+                  </Button>
+                </Box>
+              </Stack>
+            </Paper>
+          </Grid>
+        )}
       </Grid >
     );
   };
@@ -1263,6 +1339,33 @@ export default function EventManagePage() {
       toast.error(e?.message || "Failed to save lounge settings");
     } finally {
       setLoungeSettingsSaving(false);
+    }
+  };
+
+  const handleSaveVisibilitySettings = async (newSettings) => {
+    if (!eventId || visibilitySettingsSaving) return;
+    setVisibilitySettingsSaving(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_ROOT}/events/${eventId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(newSettings),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+      setEvent((prev) => ({ ...prev, ...newSettings }));
+      setParticipantVisibility(prev => ({ ...prev, ...newSettings }));
+      toast.success("Visibility settings updated");
+    } catch (e) {
+      toast.error(e?.message || "Failed to save visibility settings");
+    } finally {
+      setVisibilitySettingsSaving(false);
     }
   };
 

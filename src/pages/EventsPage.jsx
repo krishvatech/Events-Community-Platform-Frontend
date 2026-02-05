@@ -7,6 +7,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Link, useNavigate } from "react-router-dom";
 import RegisteredActions from "../components/RegisteredActions.jsx";
+import ParticipantListDialog from "../components/ParticipantListDialog.jsx";
 import {
   Box,
   Button,
@@ -203,6 +204,8 @@ function toCard(ev) {
     waiting_room_grace_period_minutes: ev.waiting_room_grace_period_minutes,
     lounge_enabled_before: ev.lounge_enabled_before,
     lounge_before_buffer: ev.lounge_before_buffer,
+    show_participants_before_event: ev.show_participants_before_event,
+    show_participants_after_event: ev.show_participants_after_event,
   };
 }
 
@@ -234,7 +237,7 @@ function canJoinEarly(ev, minutes = 15) {
 // ————————————————————————————————————————
 // Card (thumbnail view)
 // ————————————————————————————————————————
-function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
+function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants }) {
   const navigate = useNavigate();
   const owner = isOwnerUser();
   const reg = myRegistrations?.[ev.id];
@@ -376,12 +379,43 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
             </div>
           )}
 
-          {Number.isFinite(ev.attendees) && (
-            <div className="flex items-center gap-2">
-              <GroupsIcon fontSize="small" className="text-teal-700" />
-              <span>{ev.attendees} registered</span>
-            </div>
-          )}
+          {Number.isFinite(ev.attendees) && (() => {
+            const owner = isOwnerUser();
+            const staff = isStaffUser();
+            const now = Date.now();
+            const s = ev.start ? new Date(ev.start).getTime() : 0;
+            const e = ev.end ? new Date(ev.end).getTime() : 0;
+            const isBefore = s && now < s;
+            const isAfter = e && now > e;
+
+            let canView = true;
+            if (!owner && !staff) {
+              if (isBefore && ev.show_participants_before_event === false) canView = false;
+              else if (isAfter && ev.show_participants_after_event === false) canView = false;
+            }
+
+            if (canView) {
+              return (
+                <div
+                  className="flex items-center gap-2 cursor-pointer hover:text-teal-600 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShowParticipants(ev.id, ev.title);
+                  }}
+                >
+                  <GroupsIcon fontSize="small" className="text-teal-700" />
+                  <span>{ev.attendees} registered</span>
+                </div>
+              );
+            } else {
+              return (
+                <div className="flex items-center gap-2 cursor-default">
+                  <GroupsIcon fontSize="small" className="text-teal-700" />
+                  <span>{ev.attendees} registered</span>
+                </div>
+              );
+            }
+          })()}
         </div>
 
         <div className="mt-auto" />
@@ -480,7 +514,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
 // ————————————————————————————————————————
 // Row (details/list view)
 // ————————————————————————————————————————
-function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
+function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onShowParticipants }) {
   const navigate = useNavigate();
   const reg = myRegistrations?.[ev.id];
   const status = computeStatus(ev);
@@ -618,12 +652,43 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents }) {
                   </span>
                 )}
 
-                {Number.isFinite(ev.attendees) && (
-                  <span className="inline-flex items-center gap-2">
-                    <GroupsIcon fontSize="small" className="text-teal-700" />
-                    {ev.attendees} registered
-                  </span>
-                )}
+                {Number.isFinite(ev.attendees) && (() => {
+                  const owner = isOwnerUser(); // Function is imported globally in the file
+                  const staff = isStaffUser();
+                  const now = Date.now();
+                  const s = ev.start ? new Date(ev.start).getTime() : 0;
+                  const e = ev.end ? new Date(ev.end).getTime() : 0;
+                  const isBefore = s && now < s;
+                  const isAfter = e && now > e;
+
+                  let canView = true;
+                  if (!owner && !staff) {
+                    if (isBefore && ev.show_participants_before_event === false) canView = false;
+                    else if (isAfter && ev.show_participants_after_event === false) canView = false;
+                  }
+
+                  if (canView) {
+                    return (
+                      <span
+                        className="inline-flex items-center gap-2 cursor-pointer hover:text-teal-600 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onShowParticipants(ev.id, ev.title);
+                        }}
+                      >
+                        <GroupsIcon fontSize="small" className="text-teal-700" />
+                        {ev.attendees} registered
+                      </span>
+                    );
+                  } else {
+                    return (
+                      <span className="inline-flex items-center gap-2 cursor-default">
+                        <GroupsIcon fontSize="small" className="text-teal-700" />
+                        {ev.attendees} registered
+                      </span>
+                    );
+                  }
+                })()}
               </div>
 
               <div className="mt-3 text-base font-semibold text-neutral-900">
@@ -798,6 +863,44 @@ export default function EventsPage() {
   const [selectedFormats, setSelectedFormats] = useState([]);
   const [startDMY, setStartDMY] = useState(""); // "dd-mm-yyyy"
   const [endDMY, setEndDMY] = useState("");   // "dd-mm-yyyy"
+
+  // Participant List Dialog State
+  const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
+  const [participantList, setParticipantList] = useState([]);
+  const [participantListLoading, setParticipantListLoading] = useState(false);
+  const [participantListError, setParticipantListError] = useState("");
+  const [participantEventTitle, setParticipantEventTitle] = useState("");
+
+  const handleShowParticipants = React.useCallback(async (eventId, eventTitle) => {
+    setParticipantEventTitle(eventTitle);
+    setParticipantDialogOpen(true);
+    setParticipantListLoading(true);
+    setParticipantListError("");
+    setParticipantList([]);
+
+    try {
+      const token = localStorage.getItem("access_token") ||
+        localStorage.getItem("access") ||
+        localStorage.getItem("access_token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${EVENTS_URL}${eventId}/participants/`, { headers });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        if (res.status === 403) {
+          throw new Error(json.detail || "You do not have permission to view the participant list.");
+        }
+        throw new Error(json.detail || `Error loading participants`);
+      }
+
+      const data = await res.json();
+      setParticipantList(data);
+    } catch (err) {
+      setParticipantListError(err.message);
+    } finally {
+      setParticipantListLoading(false);
+    }
+  }, []);
   const [q, setQ] = useState("");
   const [locations, setLocations] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState("");
@@ -1864,7 +1967,7 @@ export default function EventsPage() {
                   ))
                   : events.map((ev) => (
                     <Box key={ev.id}>
-                      <EventCard ev={ev} myRegistrations={myRegistrations} setMyRegistrations={setMyRegistrations} setRawEvents={setRawEvents} />
+                      <EventCard ev={ev} myRegistrations={myRegistrations} setMyRegistrations={setMyRegistrations} setRawEvents={setRawEvents} onShowParticipants={handleShowParticipants} />
                     </Box>
                   ))}
               </Box>
@@ -1878,7 +1981,7 @@ export default function EventsPage() {
                   ))
                   : events.map((ev) => (
                     <Grid item key={ev.id} xs={12}>
-                      <EventRow ev={ev} myRegistrations={myRegistrations} setMyRegistrations={setMyRegistrations} setRawEvents={setRawEvents} />
+                      <EventRow ev={ev} myRegistrations={myRegistrations} setMyRegistrations={setMyRegistrations} setRawEvents={setRawEvents} onShowParticipants={handleShowParticipants} />
                     </Grid>
                   ))}
               </Grid>
@@ -2121,6 +2224,14 @@ export default function EventsPage() {
           />
         </Box>
       </Container>
+      <ParticipantListDialog
+        open={participantDialogOpen}
+        onClose={() => setParticipantDialogOpen(false)}
+        participants={participantList}
+        eventTitle={participantEventTitle}
+        loading={participantListLoading}
+        error={participantListError}
+      />
       <ToastContainer
         position="top-center"
         autoClose={2000}
