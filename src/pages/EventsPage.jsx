@@ -34,7 +34,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
 import { apiClient } from "../utils/api";
-import { getJoinButtonText, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 const API_BASE =
@@ -204,6 +204,9 @@ function toCard(ev) {
     waiting_room_grace_period_minutes: ev.waiting_room_grace_period_minutes,
     lounge_enabled_before: ev.lounge_enabled_before,
     lounge_before_buffer: ev.lounge_before_buffer,
+    lounge_enabled_after: ev.lounge_enabled_after,
+    lounge_after_buffer: ev.lounge_after_buffer,
+    live_ended_at: ev.live_ended_at,
     show_participants_before_event: ev.show_participants_before_event,
     show_participants_after_event: ev.show_participants_after_event,
   };
@@ -245,7 +248,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const isLive = status === "live" && ev.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
   const isPreEventLounge = isPreEventLoungeOpen(ev);
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge;
+  const isPostEventLounge = isPostEventLoungeOpen(ev);
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
 
   const handleRegisterCard = async () => {
     const token =
@@ -307,7 +311,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const handleJoinCard = () => {
     const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
     navigate(livePath, {
-      state: { event: ev, openLounge: isPreEventLounge, preEventLounge: isPreEventLounge },
+      state: { event: ev, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge },
       replace: false,
     });
   };
@@ -521,7 +525,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const isLive = status === "live" && ev.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
   const isPreEventLounge = isPreEventLoungeOpen(ev);
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge;
+  const isPostEventLounge = isPostEventLoungeOpen(ev);
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
 
   const handleRegisterRow = async () => {
     const token =
@@ -574,7 +579,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const handleJoinRow = () => {
     const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
     navigate(livePath, {
-      state: { event: ev, openLounge: isPreEventLounge, preEventLounge: isPreEventLounge },
+      state: { event: ev, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge },
       replace: false,
     });
   };
@@ -936,6 +941,19 @@ export default function EventsPage() {
   useEffect(() => {
     let mounted = true;
 
+    const cmsDisabledEnv =
+      String(import.meta.env.VITE_CMS_ENABLED || "true").toLowerCase() === "false";
+    const cmsDisabledCached =
+      typeof window !== "undefined" &&
+      window.sessionStorage?.getItem("cms:events:disabled") === "1";
+
+    if (cmsDisabledEnv || cmsDisabledCached) {
+      setCmsLoading(false);
+      return () => {
+        mounted = false;
+      };
+    }
+
     (async () => {
       try {
         const res = await apiClient.get("/cms/pages/events/");
@@ -946,6 +964,9 @@ export default function EventsPage() {
         if (!mounted) return;
         const status = e?.response?.status;
         if (status === 404) {
+          try {
+            window.sessionStorage?.setItem("cms:events:disabled", "1");
+          } catch {}
           setCmsPage(null);
           setCmsError("");
         } else {
@@ -1023,6 +1044,7 @@ export default function EventsPage() {
         const distinct = Array.from(canonicalMap.values());
         setLocations(distinct);
       } catch (err) {
+        if (err?.name === "AbortError") return;
         console.error("Failed to load locations:", err);
         setLocations([]);
       }
@@ -1060,7 +1082,8 @@ export default function EventsPage() {
           if (evid) map[evid] = item;
         }
         setMyRegistrations(map);
-      } catch {
+      } catch (err) {
+        if (err?.name === "AbortError") return;
         setMyRegistrations({});
       }
     })();

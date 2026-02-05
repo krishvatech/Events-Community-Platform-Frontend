@@ -62,6 +62,31 @@ export function isPreEventLoungeOpen(event) {
 }
 
 /**
+ * Check if post-event Social Lounge window is open
+ * @param {Object} event - Event object with live_ended_at, lounge_enabled_after, lounge_after_buffer
+ * @returns {Boolean} true if post-event lounge should be open
+ */
+export function isPostEventLoungeOpen(event) {
+  if (!event) return false;
+  if (!event.lounge_enabled_after) return false;
+  if (!event.live_ended_at) return false;
+
+  const endedAt = new Date(event.live_ended_at).getTime();
+  if (!Number.isFinite(endedAt)) return false;
+
+  const bufferMinutes = Number(event.lounge_after_buffer ?? 0);
+  const bufferMs = Math.max(0, bufferMinutes) * 60 * 1000;
+  if (bufferMs <= 0) return false;
+
+  const now = Date.now();
+  const closing = endedAt + bufferMs;
+
+  // Post-event lounge is active if: live_ended_at <= now < live_ended_at + buffer
+  // The end boundary is EXCLUSIVE (at exactly closing time, lounge has ended)
+  return now >= endedAt && now < closing;
+}
+
+/**
  * Determine appropriate button text for event join button
  * @param {Object} event - Event object with timing and waiting room info
  * @param {Boolean} isLive - Is event currently live?
@@ -75,6 +100,11 @@ export function getJoinButtonText(event, isLive, isJoining) {
 
   // Pre-event lounge (if configured and open)
   if (isPreEventLoungeOpen(event)) {
+    return "Join Social Lounge";
+  }
+
+  // Post-event lounge (if configured and open)
+  if (isPostEventLoungeOpen(event)) {
     return "Join Social Lounge";
   }
 

@@ -54,7 +54,7 @@ import RegisteredActions from "../components/RegisteredActions.jsx";
 import Autocomplete from "@mui/material/Autocomplete";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
-import { getJoinButtonText, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 dayjs.extend(utc);
@@ -2070,7 +2070,8 @@ function AdminEventCard({
   const chip = statusChip(status);
 
   // Staff side status helpers
-  const isPast = status === "past" || ev.status === "ended";
+  const isPostEventLounge = isPostEventLoungeOpen(ev);
+  const isPast = (status === "past" || ev.status === "ended") && !isPostEventLounge;
   const isLive = status === "live" && ev.status !== "ended";
 
   // ✅ allow staff to join up to 15 minutes before the start time
@@ -2078,7 +2079,7 @@ function AdminEventCard({
   const isPreEventLounge = isPreEventLoungeOpen(ev);
 
   // If event is live OR within early-join window OR pre-event lounge, show enabled Join button
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge;
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
   const joinLabel = getJoinButtonText(ev, isLive, false);
   const joinLabelShort =
     joinLabel === "Join Waiting Room"
@@ -2184,7 +2185,51 @@ function AdminEventCard({
           {isOwner ? (
             <>
               {/* OWNER: Buttons row */}
-              {isPast ? (
+              {isPostEventLounge ? (
+                <>
+                  <Button
+                    onClick={() => onJoinLive?.(ev)}
+                    variant="contained"
+                    className="rounded-xl flex-1"
+                    sx={{
+                      textTransform: "none",
+                      backgroundColor: "#10b8a6",
+                      "&:hover": { backgroundColor: "#0ea5a4" },
+                      minWidth: 0,
+                      px: 1,
+                    }}
+                    disabled={isJoining}
+                  >
+                    {isJoining ? (
+                      <span className="flex items-center gap-2">
+                        <CircularProgress size={18} />
+                      </span>
+                    ) : (
+                      <Box component="span" sx={{ whiteSpace: "nowrap" }}>
+                        {joinLabel}
+                      </Box>
+                    )}
+                  </Button>
+
+                  <Button
+                    component={Link}
+                    to={`/admin/events/${ev.id}`}
+                    state={{ event: ev }}
+                    variant="outlined"
+                    className="rounded-xl flex-1"
+                    sx={{
+                      textTransform: "none",
+                      minWidth: 0,
+                      px: 1,
+                      borderColor: "#cbd5e1",
+                      color: "#475569",
+                      "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
+                    }}
+                  >
+                    Details
+                  </Button>
+                </>
+              ) : isPast ? (
                 <>
                   {ev.recording_url ? (
                     // Event ended & recording available → Watch Recording
@@ -2614,8 +2659,9 @@ function EventsPage() {
     setJoiningId(ev.id);
     try {
       const isPreEventLounge = isPreEventLoungeOpen(ev);
+      const isPostEventLounge = isPostEventLoungeOpen(ev);
       const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
-      navigate(livePath, { state: { event: ev, openLounge: isPreEventLounge, preEventLounge: isPreEventLounge } });
+      navigate(livePath, { state: { event: ev, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge } });
     } catch (e) {
       setErrMsg(e?.message || "Unable to join live.");
       setErrOpen(true);

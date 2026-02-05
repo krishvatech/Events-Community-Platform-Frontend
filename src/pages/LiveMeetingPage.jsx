@@ -2202,9 +2202,14 @@ export default function NewLiveMeeting() {
     const ts = new Date(loungeOpenStatus.next_change).getTime();
     return Number.isFinite(ts) ? ts : null;
   }, [loungeOpenStatus?.next_change]);
+  const openLoungeFromState = Boolean(location?.state?.openLounge);
   const preEventLoungeOpen = useMemo(
     () => isPreEventLoungeOpen(eventData || eventFromState),
     [eventData, eventFromState, preEventTick]
+  );
+  const isPostEventWindowOpen = useMemo(
+    () => loungeOpenStatus?.status === "OPEN" && loungeOpenStatus?.reason?.includes("Post-event"),
+    [loungeOpenStatus?.status, loungeOpenStatus?.reason]
   );
 
   const loungeOnlyTables = useMemo(() =>
@@ -3325,11 +3330,11 @@ export default function NewLiveMeeting() {
       console.log("[LiveMeeting] Skipping token fetch - breakout join in progress");
       return;
     }
-    if (preEventLoungeOpen && !joinMainRequested &&
+    if ((preEventLoungeOpen || openLoungeFromState || isPostEventWindowOpen) && !joinMainRequested &&
         (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly)) {
       // ✅ Log when skipping token fetch due to pre-event lounge
       if (!joinInFlightRef.current) {
-        console.log("[LiveMeeting] In pre-event lounge, skipping token fetch");
+        console.log("[LiveMeeting] In lounge-only flow, skipping token fetch");
       }
       setLoadingJoin(false);
       return;
@@ -3423,7 +3428,7 @@ export default function NewLiveMeeting() {
         }
       }
     })();
-  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken, hostChoiceMade, hostChoseLoungeOnly]);
+  }, [eventId, role, isBreakout, waitingRoomActive, preEventLoungeOpen, openLoungeFromState, isPostEventWindowOpen, eventData, eventFromState, joinRequestTick, joinMainRequested, authToken, hostChoiceMade, hostChoseLoungeOnly]);
 
   useEffect(() => {
     if (!eventId || !waitingRoomActive) return;
@@ -3509,6 +3514,22 @@ export default function NewLiveMeeting() {
       setLoungeOpen(true);
     }
   }, [preEventLoungeOpen, isLoungeCurrentlyOpen, role, isBreakout]);
+
+  useEffect(() => {
+    if (!isPostEventWindowOpen || loungeHasEnded) return;
+    if (!isPostEventLounge) {
+      setIsPostEventLounge(true);
+    }
+    if (loungeOpenStatus?.next_change) {
+      setPostEventLoungeClosingTime(loungeOpenStatus.next_change);
+    }
+  }, [isPostEventWindowOpen, loungeHasEnded, isPostEventLounge, loungeOpenStatus?.next_change]);
+
+  useEffect(() => {
+    if (!isPostEventLounge || loungeHasEnded) return;
+    if (loadingJoin) setLoadingJoin(false);
+    if (joinError) setJoinError("");
+  }, [isPostEventLounge, loungeHasEnded, loadingJoin, joinError]);
 
   // ✅ Keep fetchLoungeStateRef in sync for handleLeaveBreakout to call
   useEffect(() => {
@@ -4744,12 +4765,12 @@ export default function NewLiveMeeting() {
   const handleExitPostEventLounge = useCallback(() => {
     setIsPostEventLounge(false);
     // ✅ Host goes to admin dashboard, participants go back
-    if (isEventOwner || (role === "publisher" && !eventData?.created_by_id)) {
+    if (role === "publisher" || isEventOwner) {
       navigate("/admin/events");
     } else {
       navigate(-1);
     }
-  }, [navigate, role, isEventOwner, eventData?.created_by_id]);
+  }, [navigate, role, isEventOwner]);
 
   // Poll event status so clients exit when backend ends the meeting
   useEffect(() => {
@@ -8855,6 +8876,37 @@ export default function NewLiveMeeting() {
     );
   }
 
+  // ✅ PRIORITY: Post-event lounge should render before loading screen
+  if (isPostEventLounge && !loungeHasEnded && !isBreakout) {
+    return (
+      <PostEventLoungeScreen
+        closingTime={postEventLoungeClosingTime}
+        loungeTables={loungeOnlyTables}
+        onJoinTable={(tableId, seatIndex) => {
+          // ✅ Join lounge table - same as main lounge overlay
+          mainSocketRef.current?.send(
+            JSON.stringify({
+              action: "join_table",
+              table_id: tableId,
+              seat_index: seatIndex,
+            })
+          );
+          // Then get the token and enter the breakout room
+          handleEnterBreakout(tableId);
+        }}
+        onLeaveTable={() => {
+          mainSocketRef.current?.send(JSON.stringify({ action: "leave_table" }));
+        }}
+        currentUserId={getMyUserIdFromJwt()}
+        myUsername={getUserName()}
+        onExit={handleExitPostEventLounge}
+        onParticipantClick={openLoungeParticipantInfo}
+        loungeOpenStatus={loungeOpenStatus}
+        isHost={role === "publisher"}
+      />
+    );
+  }
+
   if (loadingJoin) {
     return <JoiningMeetingScreen onBack={handleBack} />;
   }
@@ -9175,49 +9227,6 @@ export default function NewLiveMeeting() {
           </Box>
         </Box>
       </Box>
-    );
-  }
-
-  // ✅ IMPORTANT: Check post-event lounge BEFORE checking shouldShowMeeting
-  // This ensures post-event lounge screen always shows, never "Waiting for host"
-  // If in post-event lounge mode, show the special screen
-  // BUT if user joined a lounge table, show the actual lounge video instead
-  // ✅ FIXED: Don't render lounge screen if loungeHasEnded=true (thank you page takes precedence)
-  if (isPostEventLounge && !loungeHasEnded && !isBreakout) {
-    return (
-      <DyteProvider value={dyteMeeting}>
-        <div
-          ref={remoteAudioRef}
-          style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
-        >
-          <DyteParticipantsAudio meeting={dyteMeeting} />
-        </div>
-        <PostEventLoungeScreen
-          closingTime={postEventLoungeClosingTime}
-          loungeTables={loungeOnlyTables}
-          onJoinTable={(tableId, seatIndex) => {
-            // ✅ Join lounge table - same as main lounge overlay
-            mainSocketRef.current?.send(
-              JSON.stringify({
-                action: "join_table",
-                table_id: tableId,
-                seat_index: seatIndex,
-              })
-            );
-            // Then get the token and enter the breakout room
-            handleEnterBreakout(tableId);
-          }}
-          onLeaveTable={() => {
-            mainSocketRef.current?.send(JSON.stringify({ action: "leave_table" }));
-          }}
-          currentUserId={getMyUserIdFromJwt()}
-          myUsername={getUserName()}
-          onExit={handleExitPostEventLounge}
-          onParticipantClick={openLoungeParticipantInfo}
-          loungeOpenStatus={loungeOpenStatus}
-          isHost={role === "publisher"}
-        />
-      </DyteProvider>
     );
   }
 

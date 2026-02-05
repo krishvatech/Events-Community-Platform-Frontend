@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
-import { getJoinButtonText, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ParticipantListDialog from "../components/ParticipantListDialog";
@@ -264,12 +264,13 @@ export default function EventDetailsPage() {
       : { label: "Past", className: "bg-slate-100 text-slate-700" };
   // Decide the best join URL:
   const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=audience`;
-  const isPast = status === "past" || event.status === "ended";
+  const isPostEventLounge = isPostEventLoungeOpen(event);
+  const isPast = (status === "past" || event.status === "ended") && !isPostEventLounge;
   const isLive = status === "live" && event.status !== "ended";
   const isWithinEarlyJoinWindow = canEarlyJoin(event);
   const isPreEventLounge = isPreEventLoungeOpen(event);
 
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge;
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
   const canWatch = isPast && !!event.recording_url;
   const desc = event?.description ?? "";
 
@@ -444,7 +445,7 @@ export default function EventDetailsPage() {
                       <Button
                         component={Link}
                         to={livePath}
-                        state={{ event, openLounge: isPreEventLounge, preEventLounge: isPreEventLounge }}
+                        state={{ event, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge }}
                         sx={{
                           textTransform: "none",
                           backgroundColor: "#10b8a6",
