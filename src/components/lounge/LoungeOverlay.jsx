@@ -533,25 +533,6 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         </IconButton>
                     </Box>
 
-                    {loungeOpenStatus?.status === 'CLOSED' && onJoinMain && (
-                        <Box sx={{ px: 3, pb: 1.5 }}>
-                            <Button
-                                fullWidth
-                                variant="contained"
-                                onClick={onJoinMain}
-                                sx={{
-                                    textTransform: 'none',
-                                    fontWeight: 700,
-                                    borderRadius: 2,
-                                    bgcolor: '#10b8a6',
-                                    '&:hover': { bgcolor: '#0ea5a4' },
-                                }}
-                            >
-                                Join Live Meeting
-                            </Button>
-                        </Box>
-                    )}
-
                     {loading ? (
                         <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <CircularProgress />

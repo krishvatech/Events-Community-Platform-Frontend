@@ -2036,6 +2036,8 @@ export default function NewLiveMeeting() {
   const [lastMessage, setLastMessage] = useState(null);
   const [isPostEventLounge, setIsPostEventLounge] = useState(false); // ✅ Track post-event lounge mode
   const [postEventLoungeClosingTime, setPostEventLoungeClosingTime] = useState(null); // ✅ Track closing time
+  const [showEndStateMessage, setShowEndStateMessage] = useState(false); // ✅ Show thank you/event ended message
+  const [loungeHasEnded, setLoungeHasEnded] = useState(false); // ✅ Track when lounge time is over
   const [waitingRoomActive, setWaitingRoomActive] = useState(false);
   const [waitingRoomStatus, setWaitingRoomStatus] = useState("waiting");
   const [waitingRoomLoungeAllowed, setWaitingRoomLoungeAllowed] = useState(false);
@@ -3630,6 +3632,27 @@ export default function NewLiveMeeting() {
             setIsBanned(true);
             if (dyteMeeting) dyteMeeting.leaveRoom();
           }
+        } else if (msg.type === "meeting_ended") {
+          // ✅ NEW: Handle meeting end notification from backend
+          // This message is broadcast when host ends meeting or auto-end conditions trigger
+          console.log("[MainSocket] Received meeting_ended broadcast:", {
+            event_id: msg.event_id,
+            ended_at: msg.ended_at,
+            lounge_available: msg.lounge_available,
+            lounge_closing_time: msg.lounge_closing_time
+          });
+
+          // Set lounge availability before triggering meeting end
+          if (msg.lounge_available && msg.lounge_closing_time) {
+            setLoungeOpenStatus({
+              status: "OPEN",
+              reason: "Post-event lounge is available",
+              next_change: msg.lounge_closing_time
+            });
+          }
+
+          // Trigger meeting end flow
+          handleMeetingEnd("ended", { explicitEnd: false });
         } else {
           console.log("[MainSocket] Other message type:", msg.type, msg);
         }
@@ -4604,11 +4627,18 @@ export default function NewLiveMeeting() {
   const handleMeetingEnd = useCallback(
     async (state, options = {}) => {
       // If user is banned, do NOT navigate away. We want to show the banned screen.
-      if (isBanned) return;
+      if (isBanned) {
+        console.log("[LiveMeeting] User is banned, not processing end");
+        return;
+      }
 
       const { explicitEnd = false } = options;
-      if (endHandledRef.current) return;
+      if (endHandledRef.current) {
+        console.log("[LiveMeeting] End already handled, skipping");
+        return;
+      }
       endHandledRef.current = true;
+      console.log("[LiveMeeting] handleMeetingEnd called with state:", state, "explicitEnd:", explicitEnd);
 
       if (document.fullscreenElement) {
         try {
@@ -4619,7 +4649,10 @@ export default function NewLiveMeeting() {
       try {
         await dyteMeeting?.leaveRoom?.();
         await dyteMeeting?.leave?.();
-      } catch { }
+        console.log("[LiveMeeting] Left Dyte room");
+      } catch (e) {
+        console.warn("[LiveMeeting] Error leaving Dyte room:", e);
+      }
 
       // ✅ IMPORTANT: Wait for meeting end to be processed on backend before fetching lounge status
       // This ensures is_live = False and live_ended_at is set before we check lounge availability
@@ -4633,9 +4666,11 @@ export default function NewLiveMeeting() {
       }
 
       let loungeStatus = loungeOpenStatus;
+      console.log("[LiveMeeting] Current loungeOpenStatus:", loungeOpenStatus);
 
       // ✅ Fetch latest lounge status in case it changed
       if (!eventId) {
+        console.log("[LiveMeeting] No eventId, navigating away");
         if (isEventOwner || (role === "publisher" && !eventData?.created_by_id)) {
           navigate("/admin/events");
         } else {
@@ -4645,6 +4680,7 @@ export default function NewLiveMeeting() {
       }
 
       try {
+        console.log("[LiveMeeting] Fetching lounge-state...");
         const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
           headers: authHeader(),
         });
@@ -4652,29 +4688,53 @@ export default function NewLiveMeeting() {
           const data = await res.json().catch(() => null);
           if (data?.lounge_open_status) {
             loungeStatus = data.lounge_open_status;
-            console.log("[LiveMeeting] Lounge status after meeting end:", loungeStatus);
+            console.log("[LiveMeeting] ✅ Lounge status after meeting end:", loungeStatus);
+          } else {
+            console.log("[LiveMeeting] No lounge_open_status in response:", data);
           }
+        } else {
+          console.warn("[LiveMeeting] Lounge state fetch failed:", res.status);
         }
-      } catch {
+      } catch (err) {
         // Use existing loungeOpenStatus if fetch fails
+        console.error("[LiveMeeting] Error fetching lounge-state:", err);
       }
 
+      // ✅ FIXED: Check if lounge is OPEN with post-event reason
+      // The backend ensures "Post-event" is in the reason only for post-event lounge windows
       const isPostEventWindowOpen = loungeStatus?.status === "OPEN" &&
                                     loungeStatus?.reason?.includes("Post-event");
 
+      console.log("[LiveMeeting] Checking lounge availability:");
+      console.log("  - loungeStatus?.status:", loungeStatus?.status);
+      console.log("  - loungeStatus?.reason:", loungeStatus?.reason);
+      console.log("  - Has 'Post-event' in reason:", loungeStatus?.reason?.includes("Post-event"));
+      console.log("  - isPostEventWindowOpen:", isPostEventWindowOpen);
+      console.log("  - loungeStatus?.next_change:", loungeStatus?.next_change);
+
       if (isPostEventWindowOpen && loungeStatus?.next_change) {
         // ✅ Show post-event lounge screen (both host and participants)
-        console.log("[LiveMeeting] Showing post-event lounge, closing at:", loungeStatus.next_change);
+        console.log("[LiveMeeting] ✅ Showing post-event lounge, closing at:", loungeStatus.next_change);
         setIsPostEventLounge(true);
         setPostEventLoungeClosingTime(loungeStatus.next_change);
       } else {
-        // ✅ Event not in post-event window, navigate appropriately
-        console.log("[LiveMeeting] Post-event lounge not available, navigating away. Status:", loungeStatus?.status, "Reason:", loungeStatus?.reason);
-        if (role === "publisher" || isEventOwner) {
-          navigate("/admin/events");
-        } else {
-          navigate(-1);
-        }
+        // ✅ Event not in post-event window, show end-state message first
+        console.log("[LiveMeeting] ✅ Post-event lounge not available - will show thank you page");
+        console.log("[LiveMeeting] Setting showEndStateMessage = true");
+        setShowEndStateMessage(true);
+
+        // Auto-navigate after 4 seconds to give user time to read the message
+        const navigationTimeout = setTimeout(() => {
+          console.log("[LiveMeeting] Auto-navigating after 4 seconds");
+          if (role === "publisher" || isEventOwner) {
+            navigate("/admin/events");
+          } else {
+            navigate(-1);
+          }
+        }, 4000);
+
+        // Return cleanup function to clear timeout if component unmounts
+        return () => clearTimeout(navigationTimeout);
       }
     },
     [navigate, role, isEventOwner, eventData?.created_by_id, updateLiveStatus, dyteMeeting, isBanned, eventId]
@@ -4699,25 +4759,78 @@ export default function NewLiveMeeting() {
     const fetchStatus = async () => {
       try {
         const res = await fetch(toApiUrl(`events/${eventId}/`), { headers: authHeader() });
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.warn("[LiveMeeting] Status poll failed:", res.status);
+          return;
+        }
         const data = await res.json();
         if (cancelled) return;
-        if (data?.status) setDbStatus(data.status);
-        if (data?.status === "ended" && !endHandledRef.current) {
-          handleMeetingEnd("ended");
+        if (data?.status) {
+          setDbStatus(data.status);
+          console.log("[LiveMeeting] Status poll result:", data.status);
         }
-      } catch {
-        // ignore transient errors
+        // ✅ IMPROVED: Check if meeting has ended and handle it
+        if (data?.status === "ended" && !endHandledRef.current) {
+          console.log("[LiveMeeting] ✅ Detected meeting ended from status poll - triggering handleMeetingEnd");
+          try {
+            await handleMeetingEnd("ended");
+          } catch (error) {
+            console.error("[LiveMeeting] Error in handleMeetingEnd:", error);
+          }
+        }
+      } catch (err) {
+        console.error("[LiveMeeting] Status poll error:", err);
       }
     };
 
+    // ✅ Fetch immediately on mount
     fetchStatus();
-    const interval = setInterval(fetchStatus, 3000);
+    // ✅ Poll more frequently (every 2 seconds instead of 3) for faster end detection
+    const interval = setInterval(fetchStatus, 2000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
   }, [eventId, handleMeetingEnd]);
+
+  // ✅ NEW: Detect when post-event lounge time has ended using countdown timer
+  // Uses postEventLoungeClosingTime instead of polling loungeOpenStatus to avoid premature closure
+  useEffect(() => {
+    console.log("[LiveMeeting LOUNGE_TIMER] Check conditions - isPostEventLounge:", isPostEventLounge, "loungeHasEnded:", loungeHasEnded, "postEventLoungeClosingTime:", postEventLoungeClosingTime);
+
+    if (!isPostEventLounge || loungeHasEnded || !postEventLoungeClosingTime) {
+      console.log("[LiveMeeting LOUNGE_TIMER] Early return: isPostEventLounge=" + isPostEventLounge + ", loungeHasEnded=" + loungeHasEnded + ", hasClosingTime=" + !!postEventLoungeClosingTime);
+      return;
+    }
+
+    const checkLoungeExpired = () => {
+      const now = new Date().getTime();
+      const closingTime = new Date(postEventLoungeClosingTime).getTime();
+      const timeUntilClose = closingTime - now;
+
+      if (timeUntilClose <= 0) {
+        console.log("[LiveMeeting] ✅ Post-event lounge time has ended (timer-based), showing end-state message", {
+          closingTime: postEventLoungeClosingTime,
+          now: new Date().toISOString(),
+          elapsedMs: Math.abs(timeUntilClose),
+        });
+        setLoungeHasEnded(true);
+      } else if (timeUntilClose < 5000) {
+        console.log("[LiveMeeting LOUNGE_TIMER] Lounge closing soon:", Math.floor(timeUntilClose / 1000), "seconds remaining");
+      }
+    };
+
+    // Check immediately
+    checkLoungeExpired();
+
+    // Then check every second
+    const interval = setInterval(checkLoungeExpired, 1000);
+    console.log("[LiveMeeting LOUNGE_TIMER] Started timer for lounge closing at:", postEventLoungeClosingTime);
+    return () => {
+      clearInterval(interval);
+      console.log("[LiveMeeting LOUNGE_TIMER] Cleared timer");
+    };
+  }, [isPostEventLounge, loungeHasEnded, postEventLoungeClosingTime]);
 
   useEffect(() => {
     if (!dyteMeeting?.self) return;
@@ -8746,6 +8859,91 @@ export default function NewLiveMeeting() {
     return <JoiningMeetingScreen onBack={handleBack} />;
   }
 
+  // ✅ If lounge has ended and user gets "Event ended" error, show thank you page instead
+  if (joinError && !authToken && loungeHasEnded && isPostEventLounge) {
+    return (
+      <Box
+        sx={{
+          width: "100%",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          bgcolor: "#05070D",
+          backgroundImage: "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%)",
+          gap: 3,
+          p: 2,
+        }}
+      >
+        <Box
+          sx={{
+            textAlign: "center",
+            maxWidth: 600,
+            animation: "fadeIn 0.6s ease-in-out",
+            "@keyframes fadeIn": {
+              "0%": { opacity: 0, transform: "translateY(20px)" },
+              "100%": { opacity: 1, transform: "translateY(0)" },
+            },
+          }}
+        >
+          <Typography
+            variant="h3"
+            sx={{
+              color: "white",
+              fontWeight: 700,
+              mb: 2,
+              textShadow: "0 2px 8px rgba(90,120,255,0.3)",
+            }}
+          >
+            Thank You for Attending!
+          </Typography>
+          <Typography
+            variant="h6"
+            sx={{
+              color: "rgba(255,255,255,0.7)",
+              fontWeight: 400,
+              mb: 2,
+              lineHeight: 1.6,
+            }}
+          >
+            Social Lounge Time is Over
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "rgba(255,255,255,0.6)",
+              mb: 4,
+              lineHeight: 1.6,
+            }}
+          >
+            {eventData?.title && `Thank you for joining ${eventData.title} and engaging in the social lounge.`}
+          </Typography>
+          <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              onClick={handleBack}
+              sx={{
+                bgcolor: "#14b8b1",
+                color: "white",
+                px: 4,
+                py: 1.5,
+                textTransform: "none",
+                fontSize: 16,
+                fontWeight: 600,
+                "&:hover": {
+                  bgcolor: "#0e8e88",
+                },
+              }}
+            >
+              Go Back
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
   if (joinError && !authToken) {
     return (
       <Box sx={{ p: 3 }}>
@@ -8797,11 +8995,191 @@ export default function NewLiveMeeting() {
     return <JoiningMeetingScreen onBack={handleBack} />;
   }
 
+  // ✅ IMPORTANT: Show end-state message when meeting ends and lounge is not available
+  // This gives users a "Thank you for attending" message before navigating away
+  if (showEndStateMessage && !isPostEventLounge) {
+    return (
+      <Box
+        sx={{
+          width: "100%",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          bgcolor: "#05070D",
+          backgroundImage: "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%)",
+          gap: 3,
+          p: 2,
+        }}
+      >
+        <Box
+          sx={{
+            textAlign: "center",
+            maxWidth: 600,
+            animation: "fadeIn 0.6s ease-in-out",
+            "@keyframes fadeIn": {
+              "0%": { opacity: 0, transform: "translateY(20px)" },
+              "100%": { opacity: 1, transform: "translateY(0)" },
+            },
+          }}
+        >
+          <Typography
+            variant="h3"
+            sx={{
+              color: "white",
+              fontWeight: 700,
+              mb: 2,
+              textShadow: "0 2px 8px rgba(90,120,255,0.3)",
+            }}
+          >
+            Thank You for Attending!
+          </Typography>
+          <Typography
+            variant="h6"
+            sx={{
+              color: "rgba(255,255,255,0.7)",
+              fontWeight: 400,
+              mb: 4,
+              lineHeight: 1.6,
+            }}
+          >
+            {eventData?.title && `Thanks for joining ${eventData.title}.`} We hope you had a great experience.
+          </Typography>
+          <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              onClick={() => {
+                if (role === "publisher" || isEventOwner) {
+                  navigate("/admin/events");
+                } else {
+                  navigate(-1);
+                }
+              }}
+              sx={{
+                bgcolor: "#14b8b1",
+                color: "white",
+                px: 4,
+                py: 1.5,
+                textTransform: "none",
+                fontSize: 16,
+                fontWeight: 600,
+                "&:hover": {
+                  bgcolor: "#0e8e88",
+                },
+              }}
+            >
+              {role === "publisher" || isEventOwner ? "Go to Dashboard" : "Go Back"}
+            </Button>
+          </Box>
+          <Typography
+            variant="caption"
+            sx={{
+              color: "rgba(255,255,255,0.4)",
+              mt: 3,
+              display: "block",
+            }}
+          >
+            You will be redirected automatically...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  // ✅ NEW: Show thank you page when post-event lounge time has ended
+  if (loungeHasEnded && isPostEventLounge && !isBreakout) {
+    return (
+      <Box
+        sx={{
+          width: "100%",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          bgcolor: "#05070D",
+          backgroundImage: "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%)",
+          gap: 3,
+          p: 2,
+        }}
+      >
+        <Box
+          sx={{
+            textAlign: "center",
+            maxWidth: 600,
+            animation: "fadeIn 0.6s ease-in-out",
+            "@keyframes fadeIn": {
+              "0%": { opacity: 0, transform: "translateY(20px)" },
+              "100%": { opacity: 1, transform: "translateY(0)" },
+            },
+          }}
+        >
+          <Typography
+            variant="h3"
+            sx={{
+              color: "white",
+              fontWeight: 700,
+              mb: 2,
+              textShadow: "0 2px 8px rgba(90,120,255,0.3)",
+            }}
+          >
+            Thank You for Attending!
+          </Typography>
+          <Typography
+            variant="h6"
+            sx={{
+              color: "rgba(255,255,255,0.7)",
+              fontWeight: 400,
+              mb: 2,
+              lineHeight: 1.6,
+            }}
+          >
+            Social Lounge Time is Over
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "rgba(255,255,255,0.6)",
+              mb: 4,
+              lineHeight: 1.6,
+            }}
+          >
+            {eventData?.title && `Thank you for joining ${eventData.title} and engaging in the social lounge.`}
+          </Typography>
+          <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              onClick={() => {
+                navigate(-1);
+              }}
+              sx={{
+                bgcolor: "#14b8b1",
+                color: "white",
+                px: 4,
+                py: 1.5,
+                textTransform: "none",
+                fontSize: 16,
+                fontWeight: 600,
+                "&:hover": {
+                  bgcolor: "#0e8e88",
+                },
+              }}
+            >
+              Go Back
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
   // ✅ IMPORTANT: Check post-event lounge BEFORE checking shouldShowMeeting
   // This ensures post-event lounge screen always shows, never "Waiting for host"
   // If in post-event lounge mode, show the special screen
   // BUT if user joined a lounge table, show the actual lounge video instead
-  if (isPostEventLounge && !isBreakout) {
+  // ✅ FIXED: Don't render lounge screen if loungeHasEnded=true (thank you page takes precedence)
+  if (isPostEventLounge && !loungeHasEnded && !isBreakout) {
     return (
       <DyteProvider value={dyteMeeting}>
         <div
@@ -8851,6 +9229,94 @@ export default function NewLiveMeeting() {
         waitingRoomImage={eventData?.waiting_room_image || null}
         timezone={eventData?.timezone || null}
       />
+    );
+  }
+
+  // ✅ CRITICAL: Show thank you page if lounge has ended, even for hosts in breakout/lounge tables
+  // This ensures hosts also see thank you page when lounge time expires
+  if (loungeHasEnded && isPostEventLounge) {
+    return (
+      <Box
+        sx={{
+          width: "100%",
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          bgcolor: "#05070D",
+          backgroundImage: "radial-gradient(900px 420px at 50% 0%, rgba(90,120,255,0.18), transparent 55%)",
+          gap: 3,
+          p: 2,
+        }}
+      >
+        <Box
+          sx={{
+            textAlign: "center",
+            maxWidth: 600,
+            animation: "fadeIn 0.6s ease-in-out",
+            "@keyframes fadeIn": {
+              "0%": { opacity: 0, transform: "translateY(20px)" },
+              "100%": { opacity: 1, transform: "translateY(0)" },
+            },
+          }}
+        >
+          <Typography
+            variant="h3"
+            sx={{
+              color: "white",
+              fontWeight: 700,
+              mb: 2,
+              textShadow: "0 2px 8px rgba(90,120,255,0.3)",
+            }}
+          >
+            Thank You for Attending!
+          </Typography>
+          <Typography
+            variant="h6"
+            sx={{
+              color: "rgba(255,255,255,0.7)",
+              fontWeight: 400,
+              mb: 2,
+              lineHeight: 1.6,
+            }}
+          >
+            Social Lounge Time is Over
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "rgba(255,255,255,0.6)",
+              mb: 4,
+              lineHeight: 1.6,
+            }}
+          >
+            {eventData?.title && `Thank you for joining ${eventData.title} and engaging in the social lounge.`}
+          </Typography>
+          <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+            <Button
+              variant="contained"
+              onClick={() => {
+                navigate(-1);
+              }}
+              sx={{
+                bgcolor: "#14b8b1",
+                color: "white",
+                px: 4,
+                py: 1.5,
+                textTransform: "none",
+                fontSize: 16,
+                fontWeight: 600,
+                "&:hover": {
+                  bgcolor: "#0e8e88",
+                },
+              }}
+            >
+              Go Back
+            </Button>
+          </Box>
+        </Box>
+      </Box>
     );
   }
 
