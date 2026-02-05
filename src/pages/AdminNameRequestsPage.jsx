@@ -1021,55 +1021,6 @@ export default function AdminNameRequestsPage() {
               })()}
 
 
-              {/* Images */}
-              {(() => {
-                const payload = kycDetailsDialog.verification.kyc_didit_raw_payload || {};
-                const decision = payload.decision || {};
-                const idVerification = decision.id_verification || {};
-                const frontImage = idVerification.front_image;
-                const portraitImage = idVerification.portrait_image;
-
-                if (!frontImage && !portraitImage) return null;
-
-                return (
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Extracted Images</Typography>
-                    <Stack direction="row" spacing={2} sx={{ overflowX: 'auto', pb: 1 }}>
-                      {portraitImage && (
-                        <Box>
-                          <Typography variant="caption" display="block" align="center">Portrait</Typography>
-                          <Box
-                            component="img"
-                            src={portraitImage}
-                            sx={{ height: 150, borderRadius: 1, border: '1px solid #ddd' }}
-                          />
-                        </Box>
-                      )}
-                      {frontImage && (
-                        <Box>
-                          <Typography variant="caption" display="block" align="center">ID Front</Typography>
-                          <Box
-                            component="img"
-                            src={frontImage}
-                            sx={{ height: 150, borderRadius: 1, border: '1px solid #ddd' }}
-                          />
-                        </Box>
-                      )}
-                    </Stack>
-                  </Box>
-                )
-              })()}
-
-              {/* Raw JSON */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Raw Payload</Typography>
-                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "grey.50", overflow: "auto", maxHeight: 300 }}>
-                  <pre style={{ margin: 0, fontSize: 11 }}>
-                    {JSON.stringify(kycDetailsDialog.verification.kyc_didit_raw_payload || {}, null, 2)}
-                  </pre>
-                </Paper>
-              </Box>
-
             </Stack>
           )}
         </DialogContent>

@@ -53,6 +53,48 @@ const slugify = (s) =>
 const labelJoinPolicy = (v) =>
   v === "approval" ? "Approval" : v === "invite" ? "Invite" : "Open";
 
+const normalizeRole = (g) => {
+  const raw =
+    g?.current_user_role ??
+    g?.membership_role ??
+    g?.member_role ??
+    g?.role ??
+    g?.membership?.role ??
+    g?.current_user_membership?.role ??
+    "";
+  const val =
+    typeof raw === "string"
+      ? raw
+      : raw?.name || raw?.role || raw?.title || "";
+  return String(val || "").toLowerCase();
+};
+
+const roleLabel = (g) => {
+  const role = normalizeRole(g);
+  if (!role) return "";
+  if (role.includes("owner")) return "Owner";
+  if (role.includes("admin")) return "Admin";
+  if (role.includes("moderator") || role === "mod") return "Moderator";
+  return "";
+};
+
+const normalizeMembershipStatus = (g) => {
+  const raw =
+    g?.membership_status ??
+    g?.status ??
+    g?.membership?.status ??
+    g?.current_user_membership?.status ??
+    "";
+  return String(raw || "").toLowerCase();
+};
+
+const membershipLabel = (g) => {
+  const s = normalizeMembershipStatus(g);
+  if (s === "pending" || s === "requested" || s === "request") return "Pending";
+  if (s === "active" || s === "approved" || s === "member") return "Member";
+  return "";
+};
+
 // ---- Create Group Dialog ----
 // Replace the entire CreateGroupDialog and EditGroupDialog with this:
 function CustomSelect({ label, value, onChange, options, disabled, helperText }) {
@@ -787,6 +829,9 @@ function GroupCardSkeleton() {
 
 // ---- Group Card ----
 function GroupCard({ g, onOpen, onEdit, canEdit }) {
+  const role = roleLabel(g);
+  const memberStatus = membershipLabel(g);
+
   return (
     <Paper elevation={0} className="h-full flex flex-col rounded-2xl border border-slate-200 overflow-hidden">
       <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
@@ -850,6 +895,24 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
                 size="small"
                 label={labelJoinPolicy(g.join_policy)}
                 className="bg-slate-100 text-slate-700"
+              />
+            )}
+            {memberStatus && (
+              <Chip
+                size="small"
+                label={memberStatus}
+                className={
+                  memberStatus === "Pending"
+                    ? "bg-amber-50 text-amber-700"
+                    : "bg-emerald-50 text-emerald-700"
+                }
+              />
+            )}
+            {role && (
+              <Chip
+                size="small"
+                label={role}
+                className="bg-indigo-50 text-indigo-700"
               />
             )}
           </div>

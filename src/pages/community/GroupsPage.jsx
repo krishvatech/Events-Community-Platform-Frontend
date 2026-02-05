@@ -24,6 +24,7 @@ import {
   MenuItem,
   IconButton,
   Popper,
+  Chip,
 } from "@mui/material";
 import Skeleton from "@mui/material/Skeleton";
 import SearchIcon from "@mui/icons-material/Search";
@@ -89,6 +90,49 @@ const slugify = (s) =>
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+
+const normalizeRole = (g) => {
+  const raw =
+    g?.current_user_role ??
+    g?.membership_role ??
+    g?.member_role ??
+    g?.role ??
+    g?.membership?.role ??
+    g?.current_user_membership?.role ??
+    "";
+  const val =
+    typeof raw === "string"
+      ? raw
+      : raw?.name || raw?.role || raw?.title || "";
+  return String(val || "").toLowerCase();
+};
+
+const roleLabel = (g) => {
+  const role = normalizeRole(g);
+  if (!role) return "";
+  if (role.includes("owner")) return "Owner";
+  if (role.includes("admin")) return "Admin";
+  if (role.includes("moderator") || role === "mod") return "Moderator";
+  return "";
+};
+
+const normalizeMembershipStatus = (g) => {
+  const raw =
+    g?.membership_status ??
+    g?.status ??
+    g?.membership?.status ??
+    g?.current_user_membership?.status ??
+    "";
+  return String(raw || "").toLowerCase();
+};
+
+const membershipLabel = (g) => {
+  if (g?.is_member) return "Member";
+  const s = normalizeMembershipStatus(g);
+  if (s === "pending" || s === "requested" || s === "request") return "Pending";
+  if (s === "joined" || s === "active" || s === "approved" || s === "member") return "Member";
+  return "";
+};
 
 /* ---------- Custom Select Component ---------- */
 function CustomSelect({ label, value, onChange, options, disabled, helperText }) {
@@ -499,6 +543,8 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
   const isPrivate = (g.visibility || "").toLowerCase() === "private";
   const members = g.member_count ?? g.members_count ?? g.members?.length ?? 0;
+  const role = roleLabel(g);
+  const memberStatus = membershipLabel(g);
 
   const visibility = (g.visibility || "").toLowerCase();
   const jp = (g.join_policy || "").toLowerCase();
@@ -582,12 +628,38 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
           alignItems="center"
           sx={{ mb: 1 }}
         >
-          <Stack direction="row" alignItems="center" spacing={0.5}>
-            <Typography variant="caption" color="text.secondary">
-              {isPrivate ? "Private" : "Public"}
-            </Typography>
-            {isApproval && (
-              <LockRounded sx={{ fontSize: 14, color: "#f97316" }} />
+          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexWrap: "wrap" }}>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Typography variant="caption" color="text.secondary">
+                {isPrivate ? "Private" : "Public"}
+              </Typography>
+              {isApproval && (
+                <LockRounded sx={{ fontSize: 14, color: "#f97316" }} />
+              )}
+            </Stack>
+            {memberStatus && (
+              <Chip
+                size="small"
+                label={memberStatus}
+                sx={{
+                  height: 20,
+                  fontSize: 11,
+                  bgcolor: memberStatus === "Pending" ? "#fffbeb" : "#ecfdf3",
+                  color: memberStatus === "Pending" ? "#b45309" : "#166534",
+                }}
+              />
+            )}
+            {role && (
+              <Chip
+                size="small"
+                label={role}
+                sx={{
+                  height: 20,
+                  fontSize: 11,
+                  bgcolor: "#eef2ff",
+                  color: "#4338ca",
+                }}
+              />
             )}
           </Stack>
           <Typography variant="caption" color="text.secondary">
