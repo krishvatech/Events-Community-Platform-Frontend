@@ -1894,7 +1894,8 @@ function SettingsTab({ group, onUpdate }) {
                 onChange={(e) => {
                   setVisibility(e.target.value);
                   if (e.target.value === 'private') setJoinPolicy('invite');
-                  if (e.target.value === 'public' && isParentPrivate) setJoinPolicy('approval');
+                  // NEW: If switching to PUBLIC, default to Approval (user can change to Open later if allowed)
+                  if (e.target.value === 'public') setJoinPolicy('approval');
                 }}
                 helperText={isParentPrivate ? "Public subgroups of private groups require approval." : "Private groups are invite-only."}
               >
