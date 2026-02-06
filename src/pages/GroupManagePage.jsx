@@ -122,6 +122,26 @@ const cleanPollOptions = (arr) => {
     return out;
 };
 
+const JOIN_POLICY_LABELS = {
+    open: "Open (Join instantly)",
+    approval: "Approval required (Request approval)",
+    invite: "Invite only (By invitation only)",
+};
+
+const getAllowedJoinPolicies = ({ visibility, isSubgroup, parentVisibility, parentJoinPolicy }) => {
+    if (visibility === "private") return ["invite"];
+    const parentAllowsOpen = !isSubgroup || (parentVisibility === "public" && parentJoinPolicy === "open");
+    return parentAllowsOpen ? ["open", "approval", "invite"] : ["approval", "invite"];
+};
+
+const coerceJoinPolicy = ({ visibility, joinPolicy, isSubgroup, parentVisibility, parentJoinPolicy }) => {
+    const allowed = getAllowedJoinPolicies({ visibility, isSubgroup, parentVisibility, parentJoinPolicy });
+    if (allowed.includes(joinPolicy)) return joinPolicy;
+    if (visibility === "private") return "invite";
+    if (allowed.includes("approval")) return "approval";
+    return allowed[0] || "invite";
+};
+
 function ClampedText({ text = "", lines = 5, sx = {} }) {
     const [expanded, setExpanded] = React.useState(false);
     const [showToggle, setShowToggle] = React.useState(false);
@@ -487,6 +507,7 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     const [errors, setErrors] = React.useState({});
     const isSubgroup = !!(group?.parent_id || group?.parent?.id || group?.parent);
     const [parentVis, setParentVis] = React.useState("");
+    const [parentJoinPolicy, setParentJoinPolicy] = React.useState("");
 
     // hydrate from loaded group
     React.useEffect(() => {
@@ -523,16 +544,23 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     React.useEffect(() => {
         if (!group || !open || !isSubgroup) {
             setParentVis("");
+            setParentJoinPolicy("");
             return;
         }
         // 1. If parent object is fully loaded with visibility
-        const pv = group.parent?.visibility;
-        if (pv) {
-            setParentVis(pv.toLowerCase());
+        const pv = group.parent?.visibility || group.parent_group?.visibility;
+        const pj = group.parent?.join_policy || group.parent_group?.join_policy;
+        if (pv || pj) {
+            if (pv) setParentVis(pv.toLowerCase());
+            if (pj) setParentJoinPolicy(String(pj).toLowerCase());
             return;
         }
         // 2. Fetch parent if we only have ID
-        const pid = group.parent_id || group.parent?.id || (typeof group.parent === "object" ? null : group.parent);
+        const pid =
+            group.parent_group?.id ||
+            group.parent_id ||
+            group.parent?.id ||
+            (typeof group.parent === "object" ? null : group.parent);
         if (!pid) return;
 
         let active = true;
@@ -541,20 +569,32 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
         })
             .then(r => r.ok ? r.json() : null)
             .then(d => {
-                if (active && d?.visibility) setParentVis(d.visibility.toLowerCase());
+                if (!active || !d) return;
+                if (d?.visibility) setParentVis(String(d.visibility).toLowerCase());
+                if (d?.join_policy) setParentJoinPolicy(String(d.join_policy).toLowerCase());
             })
             .catch(() => { });
         return () => { active = false; };
     }, [group, open, isSubgroup, token]);
 
-    const isParentPrivate = parentVis === "private";
+    const allowedPolicies = getAllowedJoinPolicies({
+        visibility,
+        isSubgroup,
+        parentVisibility: parentVis,
+        parentJoinPolicy,
+    });
 
-    // if Private → force Invite-only (optional safety)
+    // Enforce policy rules locally
     React.useEffect(() => {
-        if (visibility === "private" && joinPolicy !== "invite") {
-            setJoinPolicy("invite");
-        }
-    }, [visibility]);
+        const next = coerceJoinPolicy({
+            visibility,
+            joinPolicy,
+            isSubgroup,
+            parentVisibility: parentVis,
+            parentJoinPolicy,
+        });
+        if (next !== joinPolicy) setJoinPolicy(next);
+    }, [visibility, joinPolicy, isSubgroup, parentVis, parentJoinPolicy]);
 
     const onPickFile = (file) => {
         if (!file) return;
@@ -593,7 +633,16 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
             // flexible policy: always send visibility/join_policy
             // logic: server defaults to parent's if missing, but we want to override
             fd.append("visibility", visibility);
-            fd.append("join_policy", joinPolicy);
+            fd.append(
+                "join_policy",
+                coerceJoinPolicy({
+                    visibility,
+                    joinPolicy,
+                    isSubgroup,
+                    parentVisibility: parentVis,
+                    parentJoinPolicy,
+                })
+            );
 
             if (imageFile) fd.append("cover_image", imageFile, imageFile.name);
             if (removeImage) fd.append("remove_cover_image", "1");
@@ -675,22 +724,21 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                             value={visibility}
                             onChange={(val) => {
                                 setVisibility(val);
-                                // Strict Policy Enforcement:
-                                // 1. If switching to PRIVATE -> Must be Invite Only.
-                                if (val === "private") {
-                                    setJoinPolicy("invite");
-                                }
-                                // 2. If switching to PUBLIC and Parent is PRIVATE -> Must be Approval (no open).
-                                if (val === "public" && isParentPrivate) {
-                                    setJoinPolicy("approval");
-                                }
+                                const next = coerceJoinPolicy({
+                                    visibility: val,
+                                    joinPolicy,
+                                    isSubgroup,
+                                    parentVisibility: parentVis,
+                                    parentJoinPolicy,
+                                });
+                                if (next !== joinPolicy) setJoinPolicy(next);
                             }}
                             // Constraint: User wants to allow Public Subgroups under Private Parents (restricted to Approval)
                             // So we do NOT disable Public option.
                             disabled={false}
                             helperText={
-                                (isSubgroup && isParentPrivate)
-                                    ? "Public subgroups of private groups will require approval to join."
+                                (isSubgroup && (parentVis !== "public" || parentJoinPolicy !== "open") && visibility === "public")
+                                    ? "Public subgroups under non-open parents cannot be Open."
                                     : "You can make this subgroup private even if the parent is public."
                             }
                             options={[
@@ -707,18 +755,12 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                             disabled={visibility === "private"}
                             helperText={visibility === "private" ? "Private groups are invite-only." : ""}
                             options={
-                                visibility === "public"
-                                    ? (
-                                        (isSubgroup && isParentPrivate)
-                                            ? [{ label: "Approval required", value: "approval" }]
-                                            : [
-                                                { label: "Open (join instantly)", value: "open" },
-                                                { label: "Approval required", value: "approval" }
-                                            ]
-                                    )
-                                    : [
-                                        { label: "Invite only", value: "invite" }
-                                    ]
+                                visibility === "private"
+                                    ? [{ label: JOIN_POLICY_LABELS.invite, value: "invite" }]
+                                    : allowedPolicies.map((v) => ({
+                                        value: v,
+                                        label: JOIN_POLICY_LABELS[v] || v,
+                                    }))
                             }
                         />
                     </Grid>
@@ -1346,22 +1388,25 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
     const [visibility, setVisibility] = React.useState("public");  // public | private
     const [joinPolicy, setJoinPolicy] = React.useState("open");
 
-    // Constraint logic:
-    // If Parent is Private, we don't force Private anymore, but we limit the Join Policy options.
-    const isParentPrivate = (parentGroup?.visibility || "").toLowerCase() === "private";
+    const parentVisibility = String(parentGroup?.visibility || "").toLowerCase();
+    const parentJoinPolicy = String(parentGroup?.join_policy || "").toLowerCase();
+    const allowedPolicies = getAllowedJoinPolicies({
+        visibility,
+        isSubgroup: true,
+        parentVisibility,
+        parentJoinPolicy,
+    });
 
-    // However, we should probably set a safe default if not set.
     React.useEffect(() => {
-        if (isParentPrivate) {
-            // User wants "Public - Approval required" or "Private - Invite only".
-            // Let's default to Public+Approval if they haven't chosen yet, or just leave defaults.
-            // Actually, staying with 'public'+'open' default might be misleading if 'open' is forbidden.
-            // So if Parent is Private, default to "approval" if visibility is public.
-            if (visibility === "public" && joinPolicy === "open") {
-                setJoinPolicy("approval");
-            }
-        }
-    }, [isParentPrivate, open, visibility]);
+        const next = coerceJoinPolicy({
+            visibility,
+            joinPolicy,
+            isSubgroup: true,
+            parentVisibility,
+            parentJoinPolicy,
+        });
+        if (next !== joinPolicy) setJoinPolicy(next);
+    }, [open, visibility, joinPolicy, parentVisibility, parentJoinPolicy]);
     const [imageFile, setImageFile] = React.useState(null);
     const [localPreview, setLocalPreview] = React.useState("");
     const [submitting, setSubmitting] = React.useState(false);
@@ -1404,7 +1449,16 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
 
             // Flexible Policy: Use user selection
             fd.append("visibility", visibility);
-            fd.append("join_policy", joinPolicy);
+            fd.append(
+                "join_policy",
+                coerceJoinPolicy({
+                    visibility,
+                    joinPolicy,
+                    isSubgroup: true,
+                    parentVisibility,
+                    parentJoinPolicy,
+                })
+            );
 
             fd.append("parent_id", String(parentGroup.id));
             if (parentGroup?.community?.id) fd.append("community_id", String(parentGroup.community.id));
@@ -1480,14 +1534,23 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
                             className="mb-3"
                             value={visibility}
                             onChange={(e) => {
-                                setVisibility(e.target.value);
-                                // if switching to private, force invite
-                                if (e.target.value === "private") setJoinPolicy("invite");
-                                // if switching to public and parent is private, force approval (no open)
-                                if (e.target.value === "public" && isParentPrivate) setJoinPolicy("approval");
+                                const nextVisibility = e.target.value;
+                                setVisibility(nextVisibility);
+                                const next = coerceJoinPolicy({
+                                    visibility: nextVisibility,
+                                    joinPolicy,
+                                    isSubgroup: true,
+                                    parentVisibility,
+                                    parentJoinPolicy,
+                                });
+                                if (next !== joinPolicy) setJoinPolicy(next);
                             }}
                             disabled={false} // Allow specific combinations
-                            helperText={isParentPrivate ? "Public subgroups of private parents require approval." : "Private subgroups can be created inside public groups."}
+                            helperText={
+                                (parentVisibility !== "public" || parentJoinPolicy !== "open") && visibility === "public"
+                                    ? "Public subgroups under non-open parents cannot be Open."
+                                    : "Private subgroups can be created inside public groups."
+                            }
                         >
                             <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
                             <MenuItem value="private">Private (invite-only)</MenuItem>
@@ -1501,34 +1564,21 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
                             className="mb-3"
                             value={joinPolicy}
                             onChange={(e) => setJoinPolicy(e.target.value)}
-                            // logic:
-                            // 1. If Vis=Private => Only Invite (disable others? or just hide?)
-                            // 2. If Vis=Public & Parent=Private => Only Approval (disable Open)
                             helperText={
-                                visibility === "private" ? "Private groups are invite-only." :
-                                    (isParentPrivate ? "Public subgroups of private groups cannot be Open." : undefined)
+                                visibility === "private"
+                                    ? "Private groups are invite-only."
+                                    : ((parentVisibility !== "public" || parentJoinPolicy !== "open") ? "Public subgroups under non-open parents cannot be Open." : undefined)
                             }
                         >
-                            <MenuItem
-                                value="open"
-                                disabled={visibility === "private" || isParentPrivate}
-                            >
-                                Open (join instantly)
-                            </MenuItem>
-                            <MenuItem
-                                value="approval"
-                                disabled={visibility === "private"} // Private means Invite Only per user rules
-                            >
-                                Approval required
-                            </MenuItem>
-                            <MenuItem
-                                value="invite"
-                                // Only show/enable for Private? Logic says Public-Approval OR Private-Invite.
-                                // If Vis is Public, can we have Invite? Usually no.
-                                disabled={visibility === "public"}
-                            >
-                                Invite only
-                            </MenuItem>
+                            {visibility === "private" ? (
+                                <MenuItem value="invite">{JOIN_POLICY_LABELS.invite}</MenuItem>
+                            ) : (
+                                allowedPolicies.map((v) => (
+                                    <MenuItem key={v} value={v}>
+                                        {JOIN_POLICY_LABELS[v] || v}
+                                    </MenuItem>
+                                ))
+                            )}
                         </TextField>
                         {/* hidden slug like Create Group */}
                         <Box sx={{ display: "none" }}>
@@ -3562,6 +3612,7 @@ export default function GroupManagePage() {
     const [joinPolicySetting, setJoinPolicySetting] = React.useState("open");
     const [saveSettingsLoading, setSaveSettingsLoading] = React.useState(false);
     const [parentVis, setParentVis] = React.useState(""); // robust parent visibility
+    const [parentJoinPolicy, setParentJoinPolicy] = React.useState("");
     const isSubgroup = !!(group?.parent_id || group?.parent?.id || group?.parent);
 
     // Group Actions Menu
@@ -3639,6 +3690,14 @@ export default function GroupManagePage() {
     // visibility helpers
     const isPublicGroup = group?.visibility === "public";
     const isPrivateGroup = group?.visibility === "private";
+    const settingsAllowedPolicies = getAllowedJoinPolicies({
+        visibility: visibilitySetting,
+        isSubgroup,
+        parentVisibility: parentVis,
+        parentJoinPolicy,
+    });
+    const settingsParentAllowsOpen =
+        !isSubgroup || (parentVis === "public" && parentJoinPolicy === "open");
 
     // ✅ Who can directly ADD members?
     // - Owner/Admin: always
@@ -4082,9 +4141,13 @@ export default function GroupManagePage() {
             // Allow "public" or "private"
             fd.append("visibility", visibilitySetting);
             // Enforce policy rules
-            let validPolicy = joinPolicySetting;
-            if (visibilitySetting === "private") validPolicy = "invite";
-            else if (visibilitySetting === "public" && parentVis === "private") validPolicy = "approval";
+            const validPolicy = coerceJoinPolicy({
+                visibility: visibilitySetting,
+                joinPolicy: joinPolicySetting,
+                isSubgroup,
+                parentVisibility: parentVis,
+                parentJoinPolicy,
+            });
 
             fd.append("join_policy", validPolicy);
 
@@ -4177,7 +4240,8 @@ export default function GroupManagePage() {
     React.useEffect(() => {
         if (group) {
             setVisibilitySetting(group.visibility || "public");
-            setJoinPolicySetting(group.join_policy || "open");
+            const jp = String(group.join_policy || "").toLowerCase();
+            setJoinPolicySetting(jp === "public_approval" ? "approval" : (jp || "open"));
         }
     }, [group]);
 
@@ -4185,16 +4249,23 @@ export default function GroupManagePage() {
     React.useEffect(() => {
         if (!group || !isSubgroup) {
             setParentVis("");
+            setParentJoinPolicy("");
             return;
         }
         // 1. If parent object is fully loaded
-        const pv = group.parent?.visibility;
-        if (pv) {
-            setParentVis(pv.toLowerCase());
+        const pv = group.parent?.visibility || group.parent_group?.visibility;
+        const pj = group.parent?.join_policy || group.parent_group?.join_policy;
+        if (pv || pj) {
+            if (pv) setParentVis(String(pv).toLowerCase());
+            if (pj) setParentJoinPolicy(String(pj).toLowerCase());
             return;
         }
         // 2. Fetch if missing
-        const pid = group.parent_id || group.parent?.id || (typeof group.parent === "object" ? null : group.parent);
+        const pid =
+            group.parent_group?.id ||
+            group.parent_id ||
+            group.parent?.id ||
+            (typeof group.parent === "object" ? null : group.parent);
         if (!pid) return;
 
         let active = true;
@@ -4203,11 +4274,24 @@ export default function GroupManagePage() {
         })
             .then(r => r.ok ? r.json() : null)
             .then(d => {
-                if (active && d?.visibility) setParentVis(d.visibility.toLowerCase());
+                if (!active || !d) return;
+                if (d?.visibility) setParentVis(String(d.visibility).toLowerCase());
+                if (d?.join_policy) setParentJoinPolicy(String(d.join_policy).toLowerCase());
             })
             .catch(() => { });
         return () => { active = false; };
     }, [group, isSubgroup, token]);
+
+    React.useEffect(() => {
+        const next = coerceJoinPolicy({
+            visibility: visibilitySetting,
+            joinPolicy: joinPolicySetting,
+            isSubgroup,
+            parentVisibility: parentVis,
+            parentJoinPolicy,
+        });
+        if (next !== joinPolicySetting) setJoinPolicySetting(next);
+    }, [visibilitySetting, joinPolicySetting, isSubgroup, parentVis, parentJoinPolicy]);
 
 
     const fetchMembers = React.useCallback(async () => {
@@ -4809,23 +4893,23 @@ export default function GroupManagePage() {
                                                     value={visibilitySetting}
                                                     onChange={(val) => {
                                                         setVisibilitySetting(val);
-                                                        // Auto-adjust join policy based on rules
-                                                        if (val === "private") {
-                                                            setJoinPolicySetting("invite");
-                                                        }
-                                                        // NEW: If switching to PUBLIC, default to Approval (user can change to Open later if allowed)
-                                                        if (val === "public") {
-                                                            setJoinPolicySetting("approval");
-                                                        }
+                                                        const next = coerceJoinPolicy({
+                                                            visibility: val,
+                                                            joinPolicy: joinPolicySetting,
+                                                            isSubgroup,
+                                                            parentVisibility: parentVis,
+                                                            parentJoinPolicy,
+                                                        });
+                                                        if (next !== joinPolicySetting) setJoinPolicySetting(next);
                                                     }}
                                                     options={[
                                                         { label: "Public (anyone can find & request to join)", value: "public" },
                                                         { label: "Private (invite-only)", value: "private" }
                                                     ]}
                                                     helperText={
-                                                        (parentVis === "private" && visibilitySetting === "public")
-                                                            ? "Public subgroups of private groups will require approval to join."
-                                                            : (visibilitySetting === "private" ? "Private groups are always invite-only." : "")
+                                                        visibilitySetting === "private"
+                                                            ? "Private groups are always invite-only."
+                                                            : (!settingsParentAllowsOpen ? "Public subgroups under non-open parents cannot be Open." : "")
                                                     }
                                                 />
                                             </Grid>
@@ -4836,18 +4920,12 @@ export default function GroupManagePage() {
                                                     onChange={(val) => setJoinPolicySetting(val)}
                                                     disabled={visibilitySetting === "private"} // Private is always invite-only
                                                     options={
-                                                        visibilitySetting === "public"
-                                                            ? (
-                                                                (parentVis === "private")
-                                                                    ? [{ label: "Approval required", value: "approval" }]
-                                                                    : [
-                                                                        { label: "Open (join instantly)", value: "open" },
-                                                                        { label: "Approval required", value: "approval" }
-                                                                    ]
-                                                            )
-                                                            : [
-                                                                { label: "Invite only", value: "invite" }
-                                                            ]
+                                                        visibilitySetting === "private"
+                                                            ? [{ label: JOIN_POLICY_LABELS.invite, value: "invite" }]
+                                                            : settingsAllowedPolicies.map((v) => ({
+                                                                value: v,
+                                                                label: JOIN_POLICY_LABELS[v] || v,
+                                                            }))
                                                     }
                                                 />
                                             </Grid>

@@ -1782,6 +1782,8 @@ function SettingsTab({ group, onUpdate }) {
   const [visibility, setVisibility] = React.useState(group?.visibility || "public");
   // Default to open. If private, backend/UI usually forces invite.
   const [joinPolicy, setJoinPolicy] = React.useState(group?.join_policy || "open");
+  const isSubgroup = Boolean(group?.parent_id || group?.parent_group?.id || group?.parent?.id || group?.parent);
+  const [parentInfo, setParentInfo] = React.useState({ visibility: "", join_policy: "" });
 
   const [loading, setLoading] = React.useState(false);
   const [logoFile, setLogoFile] = React.useState(null);
@@ -1795,11 +1797,44 @@ function SettingsTab({ group, onUpdate }) {
       setName(group.name || "");
       setDescription(group.description || "");
       setVisibility(group.visibility || "public");
-      setJoinPolicy(group.join_policy || "open");
+      const jp = (group.join_policy || "").toLowerCase();
+      setJoinPolicy(jp === "public_approval" ? "approval" : (jp || "open"));
       setLogoPreview(group.logo ? toMediaUrl(group.logo) : "");
       setCoverPreview(group.cover_image ? toMediaUrl(group.cover_image) : "");
     }
   }, [group]);
+
+  // Load parent visibility/join policy for subgroup rules
+  React.useEffect(() => {
+    if (!group || !isSubgroup) {
+      setParentInfo({ visibility: "", join_policy: "" });
+      return;
+    }
+
+    const pv = group?.parent_group?.visibility || group?.parent?.visibility;
+    const pj = group?.parent_group?.join_policy || group?.parent?.join_policy;
+    if (pv || pj) {
+      setParentInfo({ visibility: pv || "", join_policy: pj || "" });
+      return;
+    }
+
+    const pid =
+      group?.parent_group?.id ||
+      group?.parent_id ||
+      group?.parent?.id ||
+      (typeof group?.parent === "number" ? group.parent : null);
+    if (!pid) return;
+
+    let active = true;
+    fetch(toApiUrl(`groups/${pid}/`), { headers: { Accept: "application/json", ...authHeaders() } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!active || !d) return;
+        setParentInfo({ visibility: d.visibility || "", join_policy: d.join_policy || "" });
+      })
+      .catch(() => { });
+    return () => { active = false; };
+  }, [group, isSubgroup]);
 
   const handleLogoChange = (e) => {
     const file = e.target.files?.[0];
@@ -1828,7 +1863,13 @@ function SettingsTab({ group, onUpdate }) {
       fd.append("name", name.trim());
       fd.append("description", description.trim());
       fd.append("visibility", visibility);
-      fd.append("join_policy", joinPolicy);
+      const parentVis = String(parentInfo.visibility || "").toLowerCase();
+      const parentJoin = String(parentInfo.join_policy || "").toLowerCase();
+      const parentAllowsOpen = !isSubgroup || (parentVis === "public" && parentJoin === "open");
+      let safePolicy = joinPolicy;
+      if (visibility === "private") safePolicy = "invite";
+      else if (!parentAllowsOpen && safePolicy === "open") safePolicy = "approval";
+      fd.append("join_policy", safePolicy);
 
       if (logoFile) {
         fd.append("logo", logoFile);
@@ -1858,7 +1899,20 @@ function SettingsTab({ group, onUpdate }) {
     }
   };
 
-  const isParentPrivate = group?.parent_group?.visibility === "private";
+  const parentVis = String(parentInfo.visibility || "").toLowerCase();
+  const parentJoin = String(parentInfo.join_policy || "").toLowerCase();
+  const parentAllowsOpen = !isSubgroup || (parentVis === "public" && parentJoin === "open");
+
+  React.useEffect(() => {
+    if (visibility === "private") {
+      if (joinPolicy !== "invite") setJoinPolicy("invite");
+      return;
+    }
+    const allowed = parentAllowsOpen ? ["open", "approval", "invite"] : ["approval", "invite"];
+    if (!allowed.includes(joinPolicy)) {
+      setJoinPolicy("approval");
+    }
+  }, [visibility, joinPolicy, parentAllowsOpen]);
 
   return (
     <Stack spacing={3} maxWidth="md">
@@ -1894,10 +1948,13 @@ function SettingsTab({ group, onUpdate }) {
                 onChange={(e) => {
                   setVisibility(e.target.value);
                   if (e.target.value === 'private') setJoinPolicy('invite');
-                  // NEW: If switching to PUBLIC, default to Approval (user can change to Open later if allowed)
-                  if (e.target.value === 'public') setJoinPolicy('approval');
+                  if (e.target.value === 'public' && !parentAllowsOpen) setJoinPolicy('approval');
                 }}
-                helperText={isParentPrivate ? "Public subgroups of private groups require approval." : "Private groups are invite-only."}
+                helperText={
+                  visibility === "private"
+                    ? "Private groups are invite-only."
+                    : (!parentAllowsOpen ? "Public subgroups under non-open parents cannot be Open." : "")
+                }
               >
                 <MenuItem value="public">Public</MenuItem>
                 <MenuItem value="private">Private</MenuItem>
@@ -1913,9 +1970,17 @@ function SettingsTab({ group, onUpdate }) {
                 onChange={(e) => setJoinPolicy(e.target.value)}
                 disabled={visibility === 'private'}
               >
-                <MenuItem value="open" disabled={visibility === 'private' || isParentPrivate}>Open (Join Instantly)</MenuItem>
-                <MenuItem value="approval" disabled={visibility === 'private'}>Approval Required</MenuItem>
-                <MenuItem value="invite" disabled={visibility === 'public'}>Invite Only</MenuItem>
+                {visibility === "private" ? (
+                  <MenuItem value="invite">Invite only (By invitation only)</MenuItem>
+                ) : (
+                  <>
+                    {parentAllowsOpen && (
+                      <MenuItem value="open">Open (Join instantly)</MenuItem>
+                    )}
+                    <MenuItem value="approval">Approval required (Request approval)</MenuItem>
+                    <MenuItem value="invite">Invite only (By invitation only)</MenuItem>
+                  </>
+                )}
               </TextField>
             </FormControl>
           </Grid>

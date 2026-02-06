@@ -185,11 +185,9 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
 
   React.useEffect(() => {
     if (visibility === "private") {
-      setJoinPolicy("invite");
-    } else {
-      if (!joinPolicy || joinPolicy === "invite") {
-        setJoinPolicy("open");
-      }
+      if (joinPolicy !== "invite") setJoinPolicy("invite");
+    } else if (!joinPolicy) {
+      setJoinPolicy("open");
     }
   }, [visibility]);
 
@@ -322,11 +320,12 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
                 options={
                   visibility === "public"
                     ? [
-                      { label: "Open (join instantly)", value: "open" },
-                      { label: "Approval required", value: "approval" }
+                      { label: "Open (Join instantly)", value: "open" },
+                      { label: "Approval required (Request approval)", value: "approval" },
+                      { label: "Invite only (By invitation only)", value: "invite" }
                     ]
                     : [
-                      { label: "Invite only", value: "invite" }
+                      { label: "Invite only (By invitation only)", value: "invite" }
                     ]
                 }
               />
@@ -493,11 +492,9 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
 
   React.useEffect(() => {
     if (visibility === "private") {
-      setJoinPolicy("invite");
-    } else {
-      if (!joinPolicy || joinPolicy === "invite") {
-        setJoinPolicy("open");
-      }
+      if (joinPolicy !== "invite") setJoinPolicy("invite");
+    } else if (!joinPolicy) {
+      setJoinPolicy("open");
     }
   }, [visibility]);
 
@@ -664,11 +661,12 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
               options={
                 visibility === "public"
                   ? [
-                    { label: "Open (join instantly)", value: "open" },
-                    { label: "Approval required", value: "approval" }
+                    { label: "Open (Join instantly)", value: "open" },
+                    { label: "Approval required (Request approval)", value: "approval" },
+                    { label: "Invite only (By invitation only)", value: "invite" }
                   ]
                   : [
-                    { label: "Invite only", value: "invite" }
+                    { label: "Invite only (By invitation only)", value: "invite" }
                   ]
               }
             />
