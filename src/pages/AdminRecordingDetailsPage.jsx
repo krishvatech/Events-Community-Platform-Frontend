@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
     Box,
@@ -30,6 +30,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import PersonIcon from "@mui/icons-material/Person";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import VerifiedIcon from "@mui/icons-material/Verified";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
     .toString()
@@ -52,6 +53,11 @@ const fmtDate = (iso) => {
         dateStyle: "medium",
         timeStyle: "short",
     });
+};
+
+const isVerifiedStatus = (raw) => {
+    const v = String(raw || "").toLowerCase();
+    return v === "approved" || v === "verified";
 };
 
 export default function AdminRecordingDetailsPage() {
@@ -333,6 +339,17 @@ export default function AdminRecordingDetailsPage() {
                                                         <Box>
                                                             <Typography variant="subtitle2" className="leading-tight">
                                                                 {reg.user_name}
+                                                                {isVerifiedStatus(
+                                                                    reg.user_kyc_status ||
+                                                                    reg.user?.kyc_status ||
+                                                                    reg.profile?.kyc_status ||
+                                                                    reg.kyc_status ||
+                                                                    ""
+                                                                ) && (
+                                                                    <VerifiedIcon
+                                                                        sx={{ fontSize: 16, color: "#22d3ee", ml: 0.5, verticalAlign: "middle" }}
+                                                                    />
+                                                                )}
                                                             </Typography>
                                                             <Typography variant="caption" className="text-slate-500">
                                                                 {reg.user_email}

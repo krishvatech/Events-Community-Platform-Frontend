@@ -62,6 +62,7 @@ import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import AddIcon from "@mui/icons-material/Add";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import VerifiedIcon from "@mui/icons-material/Verified";
 
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
@@ -82,6 +83,11 @@ const toAbs = (u) => {
   if (/^https?:\/\//i.test(u)) return u;
   const p = u.startsWith("/") ? u : `/${u}`;
   return `${API_ORIGIN}${p}`;
+};
+
+const isVerifiedStatus = (raw) => {
+  const v = String(raw || "").toLowerCase();
+  return v === "approved" || v === "verified";
 };
 
 // ---- Status helpers ----
@@ -1711,6 +1717,13 @@ export default function EventManagePage() {
                       const purchased = r.registered_at
                         ? new Date(r.registered_at).toLocaleString()
                         : "";
+                      const regKyc =
+                        r.user_kyc_status ||
+                        r.user?.kyc_status ||
+                        r.profile?.kyc_status ||
+                        r.kyc_status ||
+                        "";
+                      const isVerified = isVerifiedStatus(regKyc);
                       const avatarSrc = toAbs(
                         r.user_avatar_url ||
                         r.user_image_url ||
@@ -1739,6 +1752,11 @@ export default function EventManagePage() {
                                   sx={{ fontWeight: 500 }}
                                 >
                                   {name}
+                                  {isVerified && (
+                                    <VerifiedIcon
+                                      sx={{ fontSize: 16, color: "#22d3ee", ml: 0.5, verticalAlign: "middle" }}
+                                    />
+                                  )}
                                 </Typography>
                               </Box>
                             </Stack>
