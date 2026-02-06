@@ -8,7 +8,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Chip,
   FormControlLabel, Checkbox, InputAdornment, Collapse, IconButton, Tooltip, Radio,
   useMediaQuery, useTheme, MenuItem, Stack, ListItemAvatar, CircularProgress,
-  Slider, Skeleton
+  Slider, Skeleton, Switch
 } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -1338,7 +1338,7 @@ export default function ProfilePage() {
     first_name: "", last_name: "", email: "", full_name: "", timezone: "",
     bio: "", headline: "", job_title: "", company: "", location: "",
     skillsText: "", linksText: "", avatar: "", kyc_status: "not_started",
-    legal_name_locked: false, kyc_decline_reason: "",
+    legal_name_locked: false, kyc_decline_reason: "", directory_hidden: false,
   });
 
   const [aboutBioExpanded, setAboutBioExpanded] = useState(false);
@@ -1550,9 +1550,12 @@ export default function ProfilePage() {
     organization_name: "",
     role_type: "",
     start_month: "",
-    start_month: "",
     end_month: "",
   });
+
+  // Privacy Dialog State
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [privacyHidden, setPrivacyHidden] = useState(false);
 
   // --- Email Verification State ---
   const [emailVerificationOpen, setEmailVerificationOpen] = useState(false);
@@ -1689,6 +1692,7 @@ export default function ProfilePage() {
           kyc_status: prof.kyc_status || "not_started",
           legal_name_locked: prof.legal_name_locked || false,
           kyc_decline_reason: prof.kyc_decline_reason || "",
+          directory_hidden: prof.directory_hidden || false,
         });
       } catch (e) {
         if (e?.name === "AbortError") return;
@@ -2394,6 +2398,51 @@ export default function ProfilePage() {
       setLocationOpen(false);
     } catch (e) {
       showNotification("error", e?.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
+
+  function openPrivacy() {
+    setPrivacyHidden(form.directory_hidden || false);
+    setPrivacyOpen(true);
+  }
+
+  async function savePrivacy() {
+    try {
+      setSaving(true);
+      const newValue = privacyHidden; // Read from local dialog state
+
+      const payload = {
+        first_name: form.first_name,
+        last_name: form.last_name,
+        email: form.email,
+        profile: {
+          directory_hidden: newValue,
+        },
+      };
+
+      const r = await fetch(`${API_BASE}/users/me/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        body: JSON.stringify(payload),
+      });
+
+      if (!r.ok) {
+        throw new Error("Failed to update privacy settings");
+      }
+
+      setForm((prev) => ({ ...prev, directory_hidden: newValue }));
+
+      showNotification(
+        "success",
+        newValue ? "You are now hidden from the directory" : "You are visible in the directory"
+      );
+      setPrivacyOpen(false);
+    } catch (e) {
+      showNotification("error", e?.message || "Update failed");
     } finally {
       setSaving(false);
     }
@@ -3761,6 +3810,69 @@ export default function ProfilePage() {
                             </Typography>
                           </Box>
                         </Box>
+                      </SectionCard>
+
+                      <SectionCard
+                        sx={{ mt: 2 }}
+                        title="Privacy Settings"
+                        action={
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={openPrivacy}>
+                              <EditRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        }
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={!form.directory_hidden}
+                                disabled
+                                size="small"
+                              />
+                            }
+                            label={form.directory_hidden ? "Hidden from Directory" : "Visible in Directory"}
+                          />
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          When enabled, your profile will be hidden from the public Member Directory.
+                          You will still be visible to members of groups you have joined and events you attend.
+                        </Typography>
+
+                        <Dialog
+                          open={privacyOpen}
+                          onClose={() => setPrivacyOpen(false)}
+                          fullWidth
+                          maxWidth="xs"
+                        >
+                          <DialogTitle>Privacy Settings</DialogTitle>
+                          <DialogContent>
+                            <DialogContentText sx={{ mb: 2 }}>
+                              Manage your visibility in the member directory.
+                            </DialogContentText>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={!privacyHidden}
+                                  onChange={(e) => setPrivacyHidden(!e.target.checked)}
+                                />
+                              }
+                              label={privacyHidden ? "Hide from Directory" : "Show in Directory"}
+                            />
+                            <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                              {privacyHidden
+                                ? "Your profile will be hidden from the public roster."
+                                : "Your profile will be visible to other members."}
+                            </Typography>
+                          </DialogContent>
+                          <DialogActions>
+                            <Button onClick={() => setPrivacyOpen(false)}>Cancel</Button>
+                            <Button onClick={savePrivacy} variant="contained" disabled={saving}>
+                              Save
+                            </Button>
+                          </DialogActions>
+                        </Dialog>
                       </SectionCard>
 
                       <SectionCard
