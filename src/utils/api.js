@@ -336,6 +336,15 @@ export const overrideKYCStatus = (userId, kyc_status, admin_note = "") =>
 export const resetKYCProcess = (userId, admin_note = "") =>
   apiClient.post(`${ADMIN_KYC_BASE}/${userId}/reset/`, { admin_note }).then((r) => r.data);
 
+/**
+ * Manually approve KYC for a user.
+ * Payload: FormData with 'proof' (file) and 'reason' (text)
+ */
+export const manualApproveKYC = (userId, formData) =>
+  apiClient.post(`${ADMIN_KYC_BASE}/${userId}/manual-approve/`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  }).then((r) => r.data);
+
 
 
 export async function createWagtailSession() {

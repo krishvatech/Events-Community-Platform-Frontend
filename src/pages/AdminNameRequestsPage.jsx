@@ -38,6 +38,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import SearchIcon from "@mui/icons-material/Search";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 
 import {
   getAdminNameRequests,
@@ -45,6 +46,7 @@ import {
   getAdminKYCVerifications,
   overrideKYCStatus,
   resetKYCProcess,
+  manualApproveKYC,
 } from "../utils/api";
 
 // Helper to color-code statuses
@@ -107,6 +109,13 @@ export default function AdminNameRequestsPage() {
   const [kycError, setKycError] = useState("");
   const [kycStatusFilter, setKycStatusFilter] = useState("all"); // New filter state
   const [kycDetailsDialog, setKycDetailsDialog] = useState({ open: false, verification: null });
+
+  // Manual Approval State
+  const [manualApproveDialog, setManualApproveDialog] = useState({ open: false, user: null });
+  const [manualProof, setManualProof] = useState(null);
+  const [manualReason, setManualReason] = useState("");
+  const [manualProcessing, setManualProcessing] = useState(false);
+  const [manualError, setManualError] = useState("");
 
   // Pagination State - Name Requests
   const [requestsPage, setRequestsPage] = useState(0);
@@ -267,6 +276,47 @@ export default function AdminNameRequestsPage() {
       setKycError(err.response?.data?.detail || "Failed to perform action");
     } finally {
       setKycProcessing(false);
+    }
+  };
+
+  const handleOpenManualApprove = (user) => {
+    setManualApproveDialog({ open: true, user });
+    setManualProof(null);
+    setManualReason("");
+    setManualError("");
+  };
+
+  const handleCloseManualApprove = () => {
+    setManualApproveDialog({ open: false, user: null });
+  };
+
+  const submitManualApprove = async () => {
+    if (!manualApproveDialog.user || !manualProof || !manualReason) {
+      setManualError("Please provide both proof and a reason.");
+      return;
+    }
+
+    setManualProcessing(true);
+    setManualError("");
+    try {
+      const formData = new FormData();
+      formData.append("proof", manualProof);
+      formData.append("reason", manualReason);
+
+      await manualApproveKYC(manualApproveDialog.user.user_id, formData);
+
+      setKycVerifications((prev) =>
+        prev.map((v) =>
+          v.user_id === manualApproveDialog.user.user_id
+            ? { ...v, kyc_status: "approved", admin_note: manualReason }
+            : v
+        )
+      );
+      handleCloseManualApprove();
+    } catch (err) {
+      setManualError(err.response?.data?.detail || "Failed to approve.");
+    } finally {
+      setManualProcessing(false);
     }
   };
 
@@ -655,6 +705,15 @@ export default function AdminNameRequestsPage() {
                         <TableCell align="right">
                           {["pending", "review", "declined"].includes(verification.kyc_status) ? (
                             <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                              <Tooltip title="Manual Approve">
+                                <IconButton
+                                  color="primary"
+                                  size="small"
+                                  onClick={() => handleOpenManualApprove(verification)}
+                                >
+                                  <CloudUploadIcon />
+                                </IconButton>
+                              </Tooltip>
                               <Tooltip title="Approve">
                                 <IconButton
                                   color="success"
@@ -693,6 +752,17 @@ export default function AdminNameRequestsPage() {
                             </Stack>
                           ) : (
                             <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                              {verification.kyc_status !== "approved" && (
+                                <Tooltip title="Manual Approve">
+                                  <IconButton
+                                    color="primary"
+                                    size="small"
+                                    onClick={() => handleOpenManualApprove(verification)}
+                                  >
+                                    <CloudUploadIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                               <Typography variant="caption" color="text.secondary" sx={{ mr: 1, alignSelf: 'center' }}>
                                 {verification.legal_name_verified_at
                                   ? new Date(verification.legal_name_verified_at).toLocaleDateString()
@@ -928,6 +998,49 @@ export default function AdminNameRequestsPage() {
                 </Box>
               </Box>
 
+              {/* Manual Approval Details */}
+              {kycDetailsDialog.verification.kyc_manual_approved_at && (
+                <Paper variant="outlined" sx={{ p: 2, borderColor: 'primary.main', bgcolor: 'primary.50' }}>
+                  <Typography variant="subtitle2" color="primary" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CloudUploadIcon fontSize="small" /> Manual Verification Details
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Approved By</Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {kycDetailsDialog.verification.kyc_manual_approved_by_full_name}
+                        (@{kycDetailsDialog.verification.kyc_manual_approved_by_username})
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Date</Typography>
+                      <Typography variant="body2" fontWeight={500}>
+                        {new Date(kycDetailsDialog.verification.kyc_manual_approved_at).toLocaleString()}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">Reason</Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {kycDetailsDialog.verification.kyc_manual_reason}
+                      </Typography>
+                    </Grid>
+                    {kycDetailsDialog.verification.kyc_manual_proof && (
+                      <Grid item xs={12}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          href={kycDetailsDialog.verification.kyc_manual_proof}
+                          target="_blank"
+                          startIcon={<VisibilityIcon />}
+                        >
+                          View Proof Document
+                        </Button>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+              )}
+
               {/* Status Checks */}
               {(() => {
                 const payload = kycDetailsDialog.verification.kyc_didit_raw_payload || {};
@@ -1028,6 +1141,55 @@ export default function AdminNameRequestsPage() {
           <Button onClick={closeKycDetails}>Close</Button>
         </DialogActions>
       </Dialog >
+
+      {/* Manual Approve Dialog */}
+      <Dialog open={manualApproveDialog.open} onClose={handleCloseManualApprove} fullWidth maxWidth="xs">
+        <DialogTitle>Manual Identification Approval</DialogTitle>
+        <DialogContent dividers>
+          {manualError && <Alert severity="error" sx={{ mb: 2 }}>{manualError}</Alert>}
+
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Upload proof of identity and provide a reason for manual approval.
+            This will fully verify the user.
+          </Typography>
+
+          <Button
+            variant="outlined"
+            component="label"
+            fullWidth
+            sx={{ mb: 2, height: 56, borderStyle: 'dashed' }}
+            startIcon={<CloudUploadIcon />}
+          >
+            {manualProof ? manualProof.name : "Upload Proof Document"}
+            <input
+              type="file"
+              hidden
+              onChange={(e) => setManualProof(e.target.files[0])}
+            />
+          </Button>
+
+          <TextField
+            label="Reason / Admin Note"
+            fullWidth
+            multiline
+            rows={3}
+            value={manualReason}
+            onChange={(e) => setManualReason(e.target.value)}
+            placeholder="e.g. Verified via video call..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseManualApprove} disabled={manualProcessing}>Cancel</Button>
+          <Button
+            onClick={submitManualApprove}
+            variant="contained"
+            color="primary"
+            disabled={manualProcessing || !manualProof || !manualReason}
+          >
+            {manualProcessing ? "Approving..." : "Approve User"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box >
   );
 }
