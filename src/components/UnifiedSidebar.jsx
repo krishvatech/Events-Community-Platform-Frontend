@@ -202,7 +202,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Recordings", to: "/admin/recordings", icon: OndemandVideoRoundedIcon },
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "Moderation", to: "/admin/moderation", icon: ReportProblemRoundedIcon },
-            { label: "My Orders", to: "/admin/carts", icon: ShoppingCartRoundedIcon }, // "AdminCarts.jsx"
+            { label: "My Cart & Orders", to: "/admin/carts", icon: ShoppingCartRoundedIcon }, // "AdminCarts.jsx"
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" }, // Staff uses Community Notifications per prompt ("Community/NotificationsPage.jsx")
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
@@ -217,7 +217,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Events", to: "/account/events", icon: EventNoteRoundedIcon },
             { label: "My Resources", to: "/account/resources", icon: LibraryBooksRoundedIcon },
             { label: "My Recordings", to: "/account/recordings", icon: OndemandVideoRoundedIcon },
-            { label: "My Orders", to: "/account/cart", icon: ShoppingCartRoundedIcon },
+            { label: "My Cart & Orders", to: "/account/cart", icon: ShoppingCartRoundedIcon },
             { label: "Messages", to: "/community?view=messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
