@@ -1862,6 +1862,7 @@ export default function NewLiveMeeting() {
   const [speedNetworkingTotalRounds, setSpeedNetworkingTotalRounds] = useState(0);
   const [speedNetworkingDurationMinutes, setSpeedNetworkingDurationMinutes] = useState(0);
   const mainSocketRef = useRef(null);
+  const navigationTimeoutRef = useRef(null);
   const mainSocketReadyRef = useRef(false);
   const pendingMainSocketActionsRef = useRef([]);
   const lastLoungeFetchRef = useRef(0);
@@ -4746,28 +4747,35 @@ export default function NewLiveMeeting() {
       console.log("  - loungeStatus?.next_change:", loungeStatus?.next_change);
 
       if (isPostEventWindowOpen && loungeStatus?.next_change) {
-        // ✅ Show post-event lounge screen (both host and participants)
-        console.log("[LiveMeeting] ✅ Showing post-event lounge, closing at:", loungeStatus.next_change);
+        // Cancel any pending auto-navigation if the lounge has become available
+        if (navigationTimeoutRef.current) {
+          clearTimeout(navigationTimeoutRef.current);
+          navigationTimeoutRef.current = null;
+        }
+        // Show post-event lounge immediately and don't schedule a redirect
         setIsPostEventLounge(true);
         setPostEventLoungeClosingTime(loungeStatus.next_change);
+        return; // prevent scheduling a fallback redirect below
       } else {
-        // ✅ Event not in post-event window, show end-state message first
-        console.log("[LiveMeeting] ✅ Post-event lounge not available - will show thank you page");
-        console.log("[LiveMeeting] Setting showEndStateMessage = true");
+        // Not in post-event window: show thank-you page
         setShowEndStateMessage(true);
 
-        // Auto-navigate after 4 seconds to give user time to read the message
-        const navigationTimeout = setTimeout(() => {
-          console.log("[LiveMeeting] Auto-navigating after 4 seconds");
+        // Schedule a single auto-redirect after four seconds
+        navigationTimeoutRef.current = setTimeout(() => {
           if (role === "publisher" || isEventOwner) {
+            // Admins still go to dashboard
             navigate("/admin/events");
           } else {
-            navigate(-1);
+            // Participants go explicitly to My Events (avoids history.goBack issues)
+            navigate("/my-events");
           }
         }, 4000);
 
-        // Return cleanup function to clear timeout if component unmounts
-        return () => clearTimeout(navigationTimeout);
+        // Clean up the timeout if the component unmounts
+        return () => {
+          clearTimeout(navigationTimeoutRef.current);
+          navigationTimeoutRef.current = null;
+        };
       }
     },
     [navigate, role, isEventOwner, eventData?.created_by_id, updateLiveStatus, dyteMeeting, isBanned, eventId]
