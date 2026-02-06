@@ -3492,6 +3492,14 @@ export default function NewLiveMeeting() {
   // Fallback: fetch lounge state periodically in case websocket updates are missed
   const fetchLoungeState = useCallback(async () => {
     if (!eventId) return;
+
+    // ✅ CRITICAL FOR PARTICIPANTS: Stop polling once meeting ends
+    // On server, polling can reset lounge status before backend catches up
+    if (endHandledRef.current && role !== "publisher") {
+      console.log("[LiveMeeting] Skipping lounge poll - meeting ended for participant");
+      return;
+    }
+
     try {
       const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
         headers: { ...authHeader() },
@@ -3508,7 +3516,7 @@ export default function NewLiveMeeting() {
     } catch (e) {
       // ignore transient errors
     }
-  }, [eventId]);
+  }, [eventId, role]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -4784,11 +4792,11 @@ export default function NewLiveMeeting() {
   // ✅ Handler for exiting post-event lounge
   const handleExitPostEventLounge = useCallback(() => {
     setIsPostEventLounge(false);
-    // ✅ Host goes to admin dashboard, participants go back
+    // ✅ Host goes to admin dashboard, participants go to My Events
     if (role === "publisher" || isEventOwner) {
       navigate("/admin/events");
     } else {
-      navigate(-1);
+      navigate("/my-events");
     }
   }, [navigate, role, isEventOwner]);
 
