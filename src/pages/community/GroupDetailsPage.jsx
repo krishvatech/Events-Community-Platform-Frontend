@@ -1946,9 +1946,17 @@ function SettingsTab({ group, onUpdate }) {
                 label="Visibility"
                 value={visibility}
                 onChange={(e) => {
-                  setVisibility(e.target.value);
-                  if (e.target.value === 'private') setJoinPolicy('invite');
-                  if (e.target.value === 'public' && !parentAllowsOpen) setJoinPolicy('approval');
+                  const nextVis = e.target.value;
+                  setVisibility(nextVis);
+                  if (nextVis === "private") {
+                    setJoinPolicy("invite");
+                    return;
+                  }
+                  setJoinPolicy((prev) => {
+                    if (!prev) return parentAllowsOpen ? "open" : "approval";
+                    if (prev === "open" && !parentAllowsOpen) return "approval";
+                    return prev;
+                  });
                 }}
                 helperText={
                   visibility === "private"
