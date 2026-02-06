@@ -1229,8 +1229,8 @@ function PreEventLoungeGate({
           {isHost
             ? "As the host, you can join the main meeting to start the event, or mingle in the Social Lounge with early attendees."
             : (isLoungeOpen
-                ? "Join the Social Lounge now. You'll move into the main meeting automatically when the event begins."
-                : "The Social Lounge is closed. Please join the main meeting instead.")
+              ? "Join the Social Lounge now. You'll move into the main meeting automatically when the event begins."
+              : "The Social Lounge is closed. Please join the main meeting instead.")
           }
         </Typography>
 
@@ -2831,6 +2831,18 @@ export default function NewLiveMeeting() {
     [dyteMeeting, isBreakout, mainRoomAuthToken, mainDyteMeeting, initMainMeeting]
   );
 
+  // ✅ NEW: Auto-close lounge overlay once user is in breakout meeting (fixes rejoin UI issue)
+  // When user joins a table, applyBreakoutToken sets loungeOpen=true to satisfy render conditions.
+  // However, once the meeting initializes and roomJoined=true, we should close the lounge overlay
+  // so users see the meeting instead of the lounge table list.
+  // This ensures consistent behavior between first join and rejoin.
+  useEffect(() => {
+    if (isBreakout && roomJoined && loungeOpen) {
+      console.log("[LiveMeeting] User joined breakout meeting, closing lounge overlay to show meeting");
+      setLoungeOpen(false);
+    }
+  }, [isBreakout, roomJoined, loungeOpen]);
+
   // ✅ Keep refs in sync for WebSocket handlers to avoid stale closures
   useEffect(() => {
     isInBreakoutRoomRef.current = isInBreakoutRoom;
@@ -3331,7 +3343,7 @@ export default function NewLiveMeeting() {
       return;
     }
     if ((preEventLoungeOpen || openLoungeFromState || isPostEventWindowOpen) && !joinMainRequested &&
-        (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly)) {
+      (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly)) {
       // ✅ Log when skipping token fetch due to pre-event lounge
       if (!joinInFlightRef.current) {
         console.log("[LiveMeeting] In lounge-only flow, skipping token fetch");
@@ -4028,8 +4040,8 @@ export default function NewLiveMeeting() {
     // This prevents Dyte initialization until host confirms the dialog choice
     // BUT: Allow initialization if already in breakout (joined a lounge table)
     const shouldSkipInitDueToPreEventLounge = preEventLoungeOpen && !joinMainRequested &&
-        (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
-        !isBreakout;  // ✅ Allow init for users in breakout rooms (joined lounge table)
+      (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
+      !isBreakout;  // ✅ Allow init for users in breakout rooms (joined lounge table)
     if (shouldSkipInitDueToPreEventLounge) {
       console.log("[LiveMeeting] ⏸️ Skipping init - host in pre-event lounge without making a choice");
       setInitDone(false);
@@ -4724,7 +4736,7 @@ export default function NewLiveMeeting() {
       // ✅ FIXED: Check if lounge is OPEN with post-event reason
       // The backend ensures "Post-event" is in the reason only for post-event lounge windows
       const isPostEventWindowOpen = loungeStatus?.status === "OPEN" &&
-                                    loungeStatus?.reason?.includes("Post-event");
+        loungeStatus?.reason?.includes("Post-event");
 
       console.log("[LiveMeeting] Checking lounge availability:");
       console.log("  - loungeStatus?.status:", loungeStatus?.status);
@@ -6426,7 +6438,7 @@ export default function NewLiveMeeting() {
       // Seat creation can race join_table; re-ensure and retry briefly
       try {
         await ensureSeatedInLounge();
-      } catch {}
+      } catch { }
       await sleep(350);
     }
 
