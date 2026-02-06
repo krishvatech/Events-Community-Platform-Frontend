@@ -4813,7 +4813,8 @@ export default function GroupManagePage() {
                                                         if (val === "private") {
                                                             setJoinPolicySetting("invite");
                                                         }
-                                                        if (val === "public" && parentVis === "private") {
+                                                        // NEW: If switching to PUBLIC, default to Approval (user can change to Open later if allowed)
+                                                        if (val === "public") {
                                                             setJoinPolicySetting("approval");
                                                         }
                                                     }}
