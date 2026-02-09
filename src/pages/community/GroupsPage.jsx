@@ -447,8 +447,8 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
               value={visibility}
               onChange={(val) => setVisibility(val)}
               options={[
-                { label: "Public (anyone can find & request to join)", value: "public" },
-                { label: "Private (invite-only)", value: "private" }
+                { label: "Public (anyone can find)", value: "public" },
+                { label: "Private", value: "private" }
               ]}
             />
 
