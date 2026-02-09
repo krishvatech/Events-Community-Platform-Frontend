@@ -29,6 +29,11 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { Slider } from "@mui/material";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
@@ -361,17 +366,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           <div className="flex items-center gap-6">
             <span className="inline-flex items-center gap-2">
               <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-              {new Date(ev.start).toLocaleDateString(undefined, {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
+              {dayjs(ev.start).format("MMMM D, YYYY")}
             </span>
             {ev.end && (
               <span className="inline-flex items-center gap-2">
                 <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                {new Date(ev.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}{" "}
-                – {new Date(ev.end).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                {dayjs(ev.start).format("h:mm A")} – {dayjs(ev.end).format("h:mm A")}
               </span>
             )}
           </div>
@@ -635,18 +635,14 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-neutral-800 text-sm">
                 <span className="inline-flex items-center gap-2">
                   <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-                  {startDate.toLocaleDateString(undefined, {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {dayjs(ev.start).format("MMMM D, YYYY")}
                 </span>
 
                 {ev.end && (
                   <span className="inline-flex items-center gap-2">
                     <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                    {startDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} -{" "}
-                    {endDate?.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                    {dayjs(ev.start).format("h:mm A")} -{" "}
+                    {dayjs(ev.end).format("h:mm A")}
                   </span>
                 )}
 
@@ -966,7 +962,7 @@ export default function EventsPage() {
         if (status === 404) {
           try {
             window.sessionStorage?.setItem("cms:events:disabled", "1");
-          } catch {}
+          } catch { }
           setCmsPage(null);
           setCmsError("");
         } else {

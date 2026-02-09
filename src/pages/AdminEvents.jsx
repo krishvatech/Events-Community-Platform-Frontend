@@ -154,12 +154,12 @@ const getToken = () =>
 // --- Helpers ---
 const fmtDateRange = (s, e) => {
   try {
-    const start = new Date(s);
-    const end = new Date(e);
-    const sameDay = start.toDateString() === end.toDateString();
-    const left = start.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-    const right = end.toLocaleTimeString(undefined, { timeStyle: "short" });
-    return sameDay ? `${left} – ${right}` : `${left} → ${end.toLocaleString()}`;
+    const start = dayjs(s);
+    const end = dayjs(e);
+    const sameDay = start.isSame(end, 'day');
+    const left = start.format("MMM D, YYYY h:mm A");
+    const right = end.format("h:mm A");
+    return sameDay ? `${left} – ${right}` : `${left} → ${end.format("MMM D, YYYY h:mm A")}`;
   } catch {
     return "";
   }

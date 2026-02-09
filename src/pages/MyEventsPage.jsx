@@ -46,14 +46,21 @@ const urlJoin = (base, path) => {
 const asList = (data) => (Array.isArray(data) ? data : (data?.results ?? []));
 
 // ---------------------- Date/status helpers (kept) ----------------------
+// ---------------------- Date/status helpers ----------------------
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 function fmtDateRange(startISO, endISO) {
   try {
-    const start = new Date(startISO);
-    const end = new Date(endISO);
-    const sameDay = start.toDateString() === end.toDateString();
-    const d = start.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-    const e = end.toLocaleTimeString(undefined, { timeStyle: "short" });
-    return sameDay ? `${d} – ${e}` : `${d} → ${end.toLocaleString()}`;
+    const start = dayjs(startISO);
+    const end = dayjs(endISO);
+    const sameDay = start.isSame(end, 'day');
+    const left = start.format("MMM D, YYYY h:mm A");
+    const right = end.format("h:mm A");
+    return sameDay ? `${left} – ${right}` : `${left} → ${end.format("MMM D, YYYY h:mm A")}`;
   } catch {
     return "";
   }

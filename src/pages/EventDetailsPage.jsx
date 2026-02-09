@@ -19,6 +19,14 @@ import { useSecondTick } from "../utils/useGracePeriodTimer";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ParticipantListDialog from "../components/ParticipantListDialog";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
 const urlJoin = (base, path) => `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -356,6 +364,26 @@ export default function EventDetailsPage() {
                         {event.title}
                       </Typography>
                     ) : null}
+
+                    {/* Date & Time Display */}
+                    {(event.start_time || event.end_time) && (
+                      <Stack direction="row" spacing={3} alignItems="center" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                          <Typography variant="body2">
+                            {dayjs(event.start_time).format("MMMM D, YYYY")}
+                          </Typography>
+                        </Stack>
+                        {event.end_time && (
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <AccessTimeIcon fontSize="small" className="text-teal-700" />
+                            <Typography variant="body2">
+                              {dayjs(event.start_time).format("h:mm A")} – {dayjs(event.end_time).format("h:mm A")}
+                            </Typography>
+                          </Stack>
+                        )}
+                      </Stack>
+                    )}
                     {event?.location ? (
                       <Stack direction="row" spacing={0.75} alignItems="center">
                         <span role="img" aria-label="location">📍</span>

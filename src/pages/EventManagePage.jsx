@@ -91,11 +91,18 @@ const isVerifiedStatus = (raw) => {
 };
 
 // ---- Status helpers ----
+// ---- Status helpers ----
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 const computeStatus = (ev) => {
   if (!ev) return "upcoming";
   const now = Date.now();
-  const s = ev.start_time ? new Date(ev.start_time).getTime() : 0;
-  const e = ev.end_time ? new Date(ev.end_time).getTime() : 0;
+  const s = ev.start_time ? dayjs(ev.start_time).valueOf() : 0;
+  const e = ev.end_time ? dayjs(ev.end_time).valueOf() : 0;
 
   if (ev.status === "ended") return "past";
   if (ev.is_live && ev.status !== "ended") return "live";
@@ -121,26 +128,17 @@ const statusChip = (status) => {
 const fmtDateRange = (start, end) => {
   if (!start && !end) return "Not scheduled";
   try {
-    const s = start ? new Date(start) : null;
-    const e = end ? new Date(end) : null;
-    if (s && e && s.toDateString() === e.toDateString()) {
-      return `${s.toLocaleDateString(undefined, {
-        dateStyle: "medium",
-      })} • ${s.toLocaleTimeString(undefined, {
-        timeStyle: "short",
-      })} – ${e.toLocaleTimeString(undefined, { timeStyle: "short" })}`;
+    const s = dayjs(start);
+    const e = dayjs(end);
+    if (s.isValid() && e.isValid() && s.isSame(e, 'day')) {
+      return `${s.format("MMM D, YYYY")} • ${s.format("h:mm A")} – ${e.format("h:mm A")}`;
     }
-    if (s && e) {
-      return `${s.toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })} → ${e.toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })}`;
+    if (s.isValid() && e.isValid()) {
+      return `${s.format("MMM D, YYYY h:mm A")} → ${e.format("MMM D, YYYY h:mm A")}`;
     }
-    if (s) return s.toLocaleString();
-    if (e) return `Ends: ${e.toLocaleString()}`;
+    if (s.isValid()) return s.format("MMM D, YYYY h:mm A");
+    if (e.isValid()) return `Ends: ${e.format("MMM D, YYYY h:mm A")}`;
+    return "Invalid date";
   } catch {
     return `${start || ""} – ${end || ""}`;
   }
