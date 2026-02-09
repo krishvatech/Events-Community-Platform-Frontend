@@ -26,6 +26,7 @@ import {
   Popper,
   Chip,
 } from "@mui/material";
+import Autocomplete from "@mui/material/Autocomplete";
 import Skeleton from "@mui/material/Skeleton";
 import SearchIcon from "@mui/icons-material/Search";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
@@ -43,6 +44,17 @@ const JOIN_BTN_SX = {
   px: 2.25,
   fontWeight: 600,
   borderRadius: 2,
+};
+
+const JOIN_POLICY_LABELS = {
+  open: "Open",
+  approval: "Request approval",
+  invite: "Invite-only",
+};
+
+const VISIBILITY_LABELS = {
+  public: "Public",
+  private: "Private",
 };
 
 const ITEMS_PER_PAGE = 6;
@@ -124,6 +136,41 @@ const normalizeMembershipStatus = (g) => {
     g?.current_user_membership?.status ??
     "";
   return String(raw || "").toLowerCase();
+};
+
+function extractCountryFromLocation(raw) {
+  if (!raw) return "";
+  const parts = String(raw)
+    .split(/,|\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (!parts.length) return "";
+
+  // usually last part = country | e.g. "Mumbai, Maharashtra, India" -> "India"
+  const last = parts[parts.length - 1]
+    .replace(/\s*-\s.*$/, "")
+    .trim();
+
+  return last;
+}
+
+const normalizeJoinPolicy = (g) => {
+  const raw =
+    g?.join_policy ??
+    g?.joinPolicy ??
+    g?.join_policy_value ??
+    g?.joinPolicyValue ??
+    "";
+  const v = String(raw || "").toLowerCase().trim();
+  if (v === "public_approval") return "approval";
+  if (v === "request") return "approval";
+  return v;
+};
+
+const normalizeVisibility = (g) => {
+  const raw = g?.visibility ?? g?.visibility_level ?? g?.visibilityLevel ?? "";
+  return String(raw || "").toLowerCase().trim();
 };
 
 const membershipLabel = (g) => {
@@ -968,6 +1015,18 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
   const [q, setQ] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
 
+  const [selectedCompanies, setSelectedCompanies] = React.useState([]);
+  const [selectedRegions, setSelectedRegions] = React.useState([]);
+  const [selectedTitles, setSelectedTitles] = React.useState([]);
+  const [globalOptions, setGlobalOptions] = React.useState({
+    companies: [],
+    titles: [],
+    regions: [],
+  });
+
+  const [selectedJoinPolicies, setSelectedJoinPolicies] = React.useState([]);
+  const [selectedVisibilities, setSelectedVisibilities] = React.useState([]);
+
   const [exploreGroups, setExploreGroups] = React.useState([]);
   const [myGroups, setMyGroups] = React.useState([]);
 
@@ -1004,9 +1063,50 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
     );
   };
 
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${API_ROOT}/users/filters/`, {
+          headers: { Accept: "application/json", ...authHeader() },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!alive) return;
+
+        const regionSet = new Set();
+        (data.locations || []).forEach((loc) => {
+          const c = extractCountryFromLocation(loc);
+          if (c) regionSet.add(c);
+        });
+        const sortedRegions = Array.from(regionSet).sort((a, b) => a.localeCompare(b));
+
+        setGlobalOptions({
+          companies: data.companies || [],
+          titles: data.titles || [],
+          regions: sortedRegions,
+        });
+      } catch (e) {
+        console.error("Failed to load filter options", e);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const buildMemberFiltersQuery = React.useCallback(() => {
+    const params = new URLSearchParams();
+    selectedCompanies.forEach((v) => params.append("company", v));
+    selectedTitles.forEach((v) => params.append("title", v));
+    selectedRegions.forEach((v) => params.append("region", v));
+    const qs = params.toString();
+    return qs ? `?${qs}` : "";
+  }, [selectedCompanies, selectedTitles, selectedRegions]);
+
   async function fetchExploreGroups() {
     try {
-      const r = await fetch(`${API_ROOT}/groups/explore-groups/`, {
+      const r = await fetch(`${API_ROOT}/groups/explore-groups/${buildMemberFiltersQuery()}`, {
         headers: { Accept: "application/json", ...authHeader() },
       });
       if (r.status === 401) throw new Error("Please log in to see groups.");
@@ -1033,7 +1133,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
 
   async function fetchMyGroups() {
     try {
-      const r = await fetch(`${API_ROOT}/groups/joined-groups/`, {
+      const r = await fetch(`${API_ROOT}/groups/joined-groups/${buildMemberFiltersQuery()}`, {
         headers: { Accept: "application/json", ...authHeader() },
       });
       if (r.ok) {
@@ -1052,7 +1152,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
     Promise.all([fetchExploreGroups(), fetchMyGroups()]).finally(() =>
       setLoading(false)
     );
-  }, []);
+  }, [selectedCompanies, selectedRegions, selectedTitles]);
 
   const handleJoin = async (g) => {
     const visibility = (g.visibility || "").toLowerCase();
@@ -1123,13 +1223,21 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
           }`.toLowerCase();
         if (!hay.includes(t)) return false;
       }
+      if (selectedJoinPolicies.length) {
+        const jp = normalizeJoinPolicy(g);
+        if (!selectedJoinPolicies.includes(jp)) return false;
+      }
+      if (selectedVisibilities.length) {
+        const vis = normalizeVisibility(g);
+        if (!selectedVisibilities.includes(vis)) return false;
+      }
       return true;
     });
-  }, [activeList, q]);
+  }, [activeList, q, selectedJoinPolicies, selectedVisibilities]);
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [q, tabIndex]);
+  }, [q, tabIndex, selectedJoinPolicies, selectedVisibilities, selectedCompanies, selectedRegions, selectedTitles]);
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginatedGroups = React.useMemo(() => {
@@ -1207,6 +1315,113 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                     }}
                   />
                 </Box>
+              </Stack>
+
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1}
+              >
+                <Autocomplete
+                  multiple
+                  fullWidth
+                  size="small"
+                  options={globalOptions.companies}
+                  value={selectedCompanies}
+                  onChange={(_, newValue) => setSelectedCompanies(newValue)}
+                  filterSelectedOptions
+                  disableCloseOnSelect
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Company"
+                      placeholder={selectedCompanies.length ? "" : "All companies"}
+                    />
+                  )}
+                  sx={{ flex: 1 }}
+                />
+
+                <Autocomplete
+                  multiple
+                  fullWidth
+                  size="small"
+                  options={globalOptions.regions}
+                  value={selectedRegions}
+                  onChange={(_, newValue) => setSelectedRegions(newValue)}
+                  filterSelectedOptions
+                  disableCloseOnSelect
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Region"
+                      placeholder={selectedRegions.length ? "" : "All regions"}
+                    />
+                  )}
+                  sx={{ flex: 1 }}
+                />
+
+                <Autocomplete
+                  multiple
+                  fullWidth
+                  size="small"
+                  options={globalOptions.titles}
+                  value={selectedTitles}
+                  onChange={(_, newValue) => setSelectedTitles(newValue)}
+                  filterSelectedOptions
+                  disableCloseOnSelect
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Job title"
+                      placeholder={selectedTitles.length ? "" : "All job titles"}
+                    />
+                  )}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
+
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1}
+              >
+                <Autocomplete
+                  multiple
+                  fullWidth
+                  size="small"
+                  options={Object.keys(JOIN_POLICY_LABELS)}
+                  value={selectedJoinPolicies}
+                  onChange={(_, newValue) => setSelectedJoinPolicies(newValue)}
+                  filterSelectedOptions
+                  disableCloseOnSelect
+                  getOptionLabel={(opt) => JOIN_POLICY_LABELS[opt] || opt}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Join policy"
+                      placeholder={selectedJoinPolicies.length ? "" : "All policies"}
+                    />
+                  )}
+                  sx={{ flex: 1 }}
+                />
+
+                <Autocomplete
+                  multiple
+                  fullWidth
+                  size="small"
+                  options={Object.keys(VISIBILITY_LABELS)}
+                  value={selectedVisibilities}
+                  onChange={(_, newValue) => setSelectedVisibilities(newValue)}
+                  filterSelectedOptions
+                  disableCloseOnSelect
+                  getOptionLabel={(opt) => VISIBILITY_LABELS[opt] || opt}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Visibility"
+                      placeholder={selectedVisibilities.length ? "" : "All visibility"}
+                    />
+                  )}
+                  sx={{ flex: 1 }}
+                />
               </Stack>
             </Stack>
           </Paper>

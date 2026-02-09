@@ -10,6 +10,7 @@ import {
   CircularProgress, LinearProgress, Link, Checkbox, Skeleton,
   Snackbar, Alert, Menu, MenuItem, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio
 } from "@mui/material";
+import Autocomplete from "@mui/material/Autocomplete";
 
 // Icons
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
@@ -57,6 +58,17 @@ const REPORT_REASONS = [
   { id: "violence", label: "Violence" },
   { id: "sexual_content", label: "Sexual content" },
   { id: "other", label: "Other" },
+];
+
+const LINKEDIN_COMPANY_SIZES = [
+  "1-10",
+  "11-50",
+  "51-200",
+  "201-500",
+  "501-1000",
+  "1001-5000",
+  "5001-10000",
+  "10000+",
 ];
 
 const RAW_BASE =
@@ -124,6 +136,45 @@ async function runLimited(items, limit, worker) {
 
 function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
+}
+
+function extractCountryFromLocation(raw) {
+  if (!raw) return "";
+  const parts = String(raw)
+    .split(/,|\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!parts.length) return "";
+  const last = parts[parts.length - 1]
+    .replace(/\s*-\s.*$/, "")
+    .trim();
+  return last;
+}
+
+function getMinCompanySize(s) {
+  if (!s) return 0;
+  const firstPart = String(s).split("-")[0];
+  const clean = firstPart.replace(/[^0-9]/g, "");
+  return parseInt(clean, 10) || 0;
+}
+
+function formatCompanySizeLabel(size) {
+  const raw = String(size || "").trim();
+  if (!raw) return "";
+  if (/employee/i.test(raw)) return raw;
+
+  const nums = raw.match(/\d[\d,]*/g) || [];
+  const hasPlus = /\+/.test(raw);
+  const toNum = (v) => Number(String(v).replace(/,/g, ""));
+  const fmt = (v) => toNum(v).toLocaleString("en-US");
+
+  if (nums.length >= 2) {
+    return `${fmt(nums[0])}-${fmt(nums[1])} employees`;
+  }
+  if (nums.length === 1 && hasPlus) {
+    return `${fmt(nums[0])}+ employees`;
+  }
+  return raw;
 }
 
 function pickId(...cands) {
@@ -1619,6 +1670,71 @@ function PostsTab({ groupId }) {
 function MembersTab({ groupId }) {
   const [members, setMembers] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [q, setQ] = React.useState("");
+
+  const [selectedCompanies, setSelectedCompanies] = React.useState([]);
+  const [selectedRegions, setSelectedRegions] = React.useState([]);
+  const [selectedTitles, setSelectedTitles] = React.useState([]);
+  const [selectedIndustries, setSelectedIndustries] = React.useState([]);
+  const [selectedCompanySizes, setSelectedCompanySizes] = React.useState([]);
+
+  const [globalOptions, setGlobalOptions] = React.useState({
+    companies: [],
+    titles: [],
+    industries: [],
+    sizes: [],
+    regions: [],
+  });
+
+  const getCompanyFromUser = (u) => (u?.company_from_experience || "").trim();
+  const getJobTitleFromUser = (u) =>
+    (u?.position_from_experience || u?.profile?.job_title || u?.job_title || "").trim();
+  const getIndustryFromUser = (u) =>
+    (u?.industry_from_experience || u?.profile?.industry || u?.industry || "").trim();
+  const getCompanySizeFromUser = (u) =>
+    (u?.number_of_employees_from_experience || u?.profile?.number_of_employees || u?.number_of_employees || "").trim();
+  const getLocationFromUser = (u) => (u?.location || u?.profile?.location || "").trim();
+  const getCountryFromUser = (u) => extractCountryFromLocation(getLocationFromUser(u)).trim();
+
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(toApiUrl("users/filters/"), {
+          headers: { Accept: "application/json", ...authHeaders() },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!alive) return;
+
+        const regionSet = new Set();
+        (data.locations || []).forEach((loc) => {
+          const c = extractCountryFromLocation(loc);
+          if (c) regionSet.add(c);
+        });
+        const sortedRegions = Array.from(regionSet).sort((a, b) => a.localeCompare(b));
+
+        const sizeSet = new Set([...(data.sizes || []), ...LINKEDIN_COMPANY_SIZES]);
+        const sortedSizes = Array.from(sizeSet).sort(
+          (a, b) => getMinCompanySize(a) - getMinCompanySize(b)
+        );
+
+        setGlobalOptions({
+          companies: data.companies || [],
+          titles: data.titles || [],
+          industries: data.industries || [],
+          sizes: sortedSizes,
+          regions: sortedRegions,
+        });
+      } catch (e) {
+        console.error("Failed to load filter options", e);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   React.useEffect(() => {
     (async () => {
       setLoading(true);
@@ -1631,19 +1747,218 @@ function MembersTab({ groupId }) {
     })();
   }, [groupId]);
 
+  const filtered = React.useMemo(() => {
+    let list = members;
+
+    if (selectedCompanies.length) {
+      list = list.filter((m) => selectedCompanies.includes(getCompanyFromUser(m.user || m)));
+    }
+    if (selectedRegions.length) {
+      list = list.filter((m) => selectedRegions.includes(getCountryFromUser(m.user || m)));
+    }
+    if (selectedTitles.length) {
+      list = list.filter((m) => selectedTitles.includes(getJobTitleFromUser(m.user || m)));
+    }
+    if (selectedIndustries.length) {
+      list = list.filter((m) => selectedIndustries.includes(getIndustryFromUser(m.user || m)));
+    }
+    if (selectedCompanySizes.length) {
+      list = list.filter((m) => selectedCompanySizes.includes(getCompanySizeFromUser(m.user || m)));
+    }
+
+    const t = q.trim().toLowerCase();
+    if (!t) return list;
+
+    return list.filter((m) => {
+      const u = m.user || m;
+      const name = (u?.name || u?.full_name || u?.username || "").toLowerCase();
+      const email = (u?.email || "").toLowerCase();
+      const company = getCompanyFromUser(u).toLowerCase();
+      const title = getJobTitleFromUser(u).toLowerCase();
+      const industry = getIndustryFromUser(u).toLowerCase();
+      const location = getLocationFromUser(u).toLowerCase();
+      const hay = `${name} ${email} ${company} ${title} ${industry} ${location}`;
+      return hay.includes(t);
+    });
+  }, [
+    members,
+    q,
+    selectedCompanies,
+    selectedRegions,
+    selectedTitles,
+    selectedIndustries,
+    selectedCompanySizes,
+  ]);
+
   if (loading) {
     return <ListSkeleton count={5} type="short" />;
   }
 
   return (
-    <List>
-      {members.map(m => {
-        const u = m.user || m;
-        return (
-          <ListItem key={u.id} sx={{ border: "1px solid #eee", borderRadius: 2, mb: 1 }}>
-            <ListItemAvatar>
-              <Avatar src={toMediaUrl(u.avatar)} sx={{ width: 40, height: 40 }}>
-                {(u.name || u.full_name || u.username || "U")[0]}
+    <Box>
+      <Paper
+        sx={{
+          p: 1.5,
+          mb: 1.5,
+          border: `1px solid ${BORDER}`,
+          borderRadius: 3,
+        }}
+      >
+        <Stack spacing={1.25}>
+          <TextField
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            size="small"
+            placeholder="Search by name, email, company, title, industry, location..."
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <Autocomplete
+              multiple
+              fullWidth
+              size="small"
+              options={globalOptions.companies}
+              value={selectedCompanies}
+              onChange={(_, newValue) => setSelectedCompanies(newValue)}
+              filterSelectedOptions
+              disableCloseOnSelect
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Company"
+                  placeholder={selectedCompanies.length ? "" : "All companies"}
+                />
+              )}
+              sx={{ flex: 1 }}
+            />
+
+            <Autocomplete
+              multiple
+              fullWidth
+              size="small"
+              options={globalOptions.regions}
+              value={selectedRegions}
+              onChange={(_, newValue) => setSelectedRegions(newValue)}
+              filterSelectedOptions
+              disableCloseOnSelect
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Region"
+                  placeholder={selectedRegions.length ? "" : "All regions"}
+                />
+              )}
+              sx={{ flex: 1 }}
+            />
+
+            <Autocomplete
+              multiple
+              fullWidth
+              size="small"
+              options={globalOptions.titles}
+              value={selectedTitles}
+              onChange={(_, newValue) => setSelectedTitles(newValue)}
+              filterSelectedOptions
+              disableCloseOnSelect
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Job title"
+                  placeholder={selectedTitles.length ? "" : "All job titles"}
+                />
+              )}
+              sx={{ flex: 1 }}
+            />
+          </Stack>
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <TextField
+              size="small"
+              select
+              fullWidth
+              label="Industry"
+              value={selectedIndustries}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSelectedIndustries(
+                  typeof value === "string" ? value.split(",") : value
+                );
+              }}
+              InputLabelProps={{ shrink: true }}
+              SelectProps={{
+                multiple: true,
+                displayEmpty: true,
+                renderValue: (selected) => {
+                  if (!selected || selected.length === 0) return "All industries";
+                  return selected.join(", ");
+                },
+              }}
+              sx={{ flex: 1 }}
+            >
+              {globalOptions.industries.map((name) => (
+                <MenuItem key={name} value={name}>
+                  <Checkbox checked={selectedIndustries.indexOf(name) > -1} />
+                  <ListItemText primary={name} />
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              size="small"
+              select
+              fullWidth
+              label="Company Size"
+              value={selectedCompanySizes}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSelectedCompanySizes(
+                  typeof value === "string" ? value.split(",") : value
+                );
+              }}
+              InputLabelProps={{ shrink: true }}
+              SelectProps={{
+                multiple: true,
+                displayEmpty: true,
+                renderValue: (selected) => {
+                  if (!selected || selected.length === 0) return "All sizes";
+                  return selected.map((s) => formatCompanySizeLabel(s)).join(", ");
+                },
+              }}
+              sx={{ flex: 1 }}
+            >
+              {globalOptions.sizes.map((name) => (
+                <MenuItem key={name} value={name}>
+                  <Checkbox checked={selectedCompanySizes.indexOf(name) > -1} />
+                  <ListItemText primary={formatCompanySizeLabel(name)} />
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
+        </Stack>
+      </Paper>
+
+      {!filtered.length && (
+        <Typography color="text.secondary" sx={{ mb: 1 }}>
+          No members match your filters.
+        </Typography>
+      )}
+
+      <List>
+        {filtered.map(m => {
+          const u = m.user || m;
+          return (
+            <ListItem key={u.id} sx={{ border: "1px solid #eee", borderRadius: 2, mb: 1 }}>
+              <ListItemAvatar>
+                <Avatar src={toMediaUrl(u.avatar)} sx={{ width: 40, height: 40 }}>
+                  {(u.name || u.full_name || u.username || "U")[0]}
               </Avatar>
             </ListItemAvatar>
             <ListItemText
@@ -1668,6 +1983,7 @@ function MembersTab({ groupId }) {
         );
       })}
     </List>
+    </Box>
   );
 }
 
