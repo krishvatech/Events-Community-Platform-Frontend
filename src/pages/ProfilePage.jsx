@@ -3827,12 +3827,12 @@ export default function ProfilePage() {
                           <FormControlLabel
                             control={
                               <Switch
-                                checked={!form.directory_hidden}
+                                checked={form.directory_hidden}
                                 disabled
                                 size="small"
                               />
                             }
-                            label={form.directory_hidden ? "Hidden from Directory" : "Visible in Directory"}
+                            label="Not listed in Directory"
                           />
                         </Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -3854,26 +3854,25 @@ export default function ProfilePage() {
                             <FormControlLabel
                               control={
                                 <Switch
-                                  checked={!privacyHidden}
-                                  onChange={(e) => setPrivacyHidden(!e.target.checked)}
+                                  checked={privacyHidden}
+                                  onChange={(e) => setPrivacyHidden(e.target.checked)}
                                 />
                               }
-                              label={privacyHidden ? "Hide from Directory" : "Show in Directory"}
+                              label="Not listed in Directory"
                             />
-                            <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-                              {privacyHidden
-                                ? "Your profile will be hidden from the public roster."
-                                : "Your profile will be visible to other members."}
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                              Turn ON to hide your profile. Turn OFF to be visible.
                             </Typography>
                           </DialogContent>
                           <DialogActions>
                             <Button onClick={() => setPrivacyOpen(false)}>Cancel</Button>
-                            <Button onClick={savePrivacy} variant="contained" disabled={saving}>
+                            <Button onClick={savePrivacy} variant="contained">
                               Save
                             </Button>
                           </DialogActions>
                         </Dialog>
                       </SectionCard>
+
 
                       <SectionCard
                         sx={{ mt: 2 }}
@@ -4093,17 +4092,18 @@ export default function ProfilePage() {
               )
             )}
           </main>
-        </div>
-      </Container>
+        </div >
+      </Container >
 
       {/* --- Avatar Upload Dialog --- */}
-      <AvatarUploadDialog
+      < AvatarUploadDialog
         open={avatarDialogOpen}
         file={avatarFile}
         preview={avatarPreview}
         currentUrl={form.avatar}
         saving={avatarSaving}
-        onPick={(f, url) => { setAvatarFile(f); setAvatarPreview(url); }}
+        onPick={(f, url) => { setAvatarFile(f); setAvatarPreview(url); }
+        }
         onClose={() => { setAvatarDialogOpen(false); setAvatarFile(null); setAvatarPreview(""); }}
         onSaved={(newUrl) => {
           if (newUrl) setForm((p) => ({ ...p, avatar: newUrl }));
@@ -4115,7 +4115,7 @@ export default function ProfilePage() {
       />
 
       {/* --- NEW DIALOG: Identity (Header Trigger) --- */}
-      <BasicInfoDialog
+      < BasicInfoDialog
         open={basicInfoOpen}
         onClose={() => setBasicInfoOpen(false)}
         profile={form}
@@ -4127,7 +4127,7 @@ export default function ProfilePage() {
       />
 
       {/* --- NEW DIALOG: Edit About Work --- */}
-      <Dialog open={workOpen} onClose={() => setWorkOpen(false)} fullWidth maxWidth="sm">
+      < Dialog open={workOpen} onClose={() => setWorkOpen(false)} fullWidth maxWidth="sm" >
         <DialogTitle>Edit About your work</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={3} sx={{ mt: 1 }}>
@@ -4146,10 +4146,10 @@ export default function ProfilePage() {
           </Stack>
         </DialogContent>
         <DialogActions><Button onClick={() => setWorkOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveAboutWork} disabled={saving || !latestExp}>Save</Button></DialogActions>
-      </Dialog>
+      </Dialog >
 
       {/* --- Email Verification Dialog --- */}
-      <Dialog open={emailVerificationOpen} onClose={() => setEmailVerificationOpen(false)} maxWidth="xs" fullWidth>
+      < Dialog open={emailVerificationOpen} onClose={() => setEmailVerificationOpen(false)} maxWidth="xs" fullWidth >
         <DialogTitle>Verify Email</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -4181,10 +4181,10 @@ export default function ProfilePage() {
             {verifyingEmail ? "Verifying..." : "Verify & Change"}
           </Button>
         </DialogActions>
-      </Dialog>
+      </Dialog >
 
       {/* --- Other Dialogs (Contact, Education, Experience, etc.) --- */}
-      <Dialog open={contactOpen} onClose={closeContactEditor} fullWidth maxWidth="sm" fullScreen={isMobile}>
+      < Dialog open={contactOpen} onClose={closeContactEditor} fullWidth maxWidth="sm" fullScreen={isMobile} >
         <DialogTitle sx={{ fontWeight: 700 }}>
           {contactEditSection === "emails"
             ? "Edit E-Mail"
@@ -4717,7 +4717,7 @@ export default function ProfilePage() {
           <Button onClick={closeContactEditor}>Cancel</Button>
           <Button variant="contained" onClick={saveContact} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         </DialogActions>
-      </Dialog>
+      </Dialog >
 
       <Dialog open={locationOpen} onClose={() => setLocationOpen(false)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 700 }}>Edit Location</DialogTitle>
@@ -5697,6 +5697,6 @@ export default function ProfilePage() {
       <Snackbar open={snack.open} autoHideDuration={3500} onClose={() => setSnack({ ...snack, open: false })}>
         <Alert onClose={() => setSnack({ ...snack, open: false })} severity={snack.sev} variant="filled" sx={{ width: "100%" }}>{snack.msg}</Alert>
       </Snackbar>
-    </div>
+    </div >
   );
 }
