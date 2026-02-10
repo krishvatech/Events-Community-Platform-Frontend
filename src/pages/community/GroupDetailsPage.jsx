@@ -1,6 +1,6 @@
 // src/pages/community/GroupDetailsPage.jsx
 import * as React from "react";
-import { useParams, Link as RouterLink, useNavigate } from "react-router-dom";
+import { useParams, Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import {
   Avatar, AvatarGroup, Box, Button, Card, CardContent,
   Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider,
@@ -1378,7 +1378,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, viewerId, 
 // 7. TABS CONTENT
 // -----------------------------------------------------------------------------
 
-function PostsTab({ groupId }) {
+function PostsTab({ groupId, group }) {
   const [posts, setPosts] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [postsMeta, setPostsMeta] = React.useState(null);
@@ -1457,9 +1457,11 @@ function PostsTab({ groupId }) {
       // 4. Hydrate with metrics
       const ids = uniqueMapped.map(p => p.id).filter(id => Number.isInteger(id));
 
+      let finalPosts = uniqueMapped.map(p => ({ ...p, group_id: numericGroupId }));
+
       if (ids.length) {
         const metrics = await fetchBatchMetrics(ids);
-        const hydrated = uniqueMapped.map(p => {
+        finalPosts = uniqueMapped.map(p => {
           const m = metrics[p.id];
           const base = m ? {
             ...p,
@@ -1470,21 +1472,32 @@ function PostsTab({ groupId }) {
           // Attach group_id explicitly
           return { ...base, group_id: numericGroupId };
         });
-        console.log('[GroupDetails] Final posts with metrics:', hydrated.length);
-        const removedInFinal = hydrated.filter(p => p.is_removed || p.moderation_status === 'removed');
-        if (removedInFinal.length) {
-          console.log('[GroupDetails] Removed posts in final array:', removedInFinal.length);
-        }
-        setPosts(hydrated);
-      } else {
-        console.log('[GroupDetails] Final posts without metrics:', uniqueMapped.length);
-        setPosts(uniqueMapped.map(p => ({ ...p, group_id: numericGroupId })));
       }
+
+      // FILTER FOR OWNER ONLY AND EXCLUDE EVENTS
+      const ownerId = group?.owner?.id || group?.created_by?.id;
+
+      if (ownerId) {
+        finalPosts = finalPosts.filter(p => {
+          // 1. Exclude events explicitly
+          const isEvent = p.type === 'event' || p.metadata?.type === 'event';
+          if (isEvent) return false;
+
+          // 2. Check Owner
+          const authorId = p.actor_id || p.author_id || p.author?.id;
+          return String(authorId) === String(ownerId);
+        });
+      } else {
+        // If owner is not loaded, show nothing to be safe as per "only owner posts" requirement
+        finalPosts = [];
+      }
+
+      setPosts(finalPosts);
     } catch (e) {
       console.error("Failed to load group posts:", e);
     }
     setLoading(false);
-  }, [groupId]);
+  }, [groupId, group]);
 
   React.useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
@@ -1959,30 +1972,30 @@ function MembersTab({ groupId }) {
               <ListItemAvatar>
                 <Avatar src={toMediaUrl(u.avatar)} sx={{ width: 40, height: 40 }}>
                   {(u.name || u.full_name || u.username || "U")[0]}
-              </Avatar>
-            </ListItemAvatar>
-            <ListItemText
-              primary={
-                <Typography component="span" variant="body1">
-                  {u.name || u.full_name || u.username}
-                  {u.kyc_status === "approved" && (
-                    <VerifiedIcon
-                      sx={{
-                        fontSize: 16,
-                        color: "#22d3ee",
-                        ml: 0.5,
-                        verticalAlign: "middle",
-                      }}
-                    />
-                  )}
-                </Typography>
-              }
-              secondary={m.role || "Member"}
-            />
-          </ListItem>
-        );
-      })}
-    </List>
+                </Avatar>
+              </ListItemAvatar>
+              <ListItemText
+                primary={
+                  <Typography component="span" variant="body1">
+                    {u.name || u.full_name || u.username}
+                    {u.kyc_status === "approved" && (
+                      <VerifiedIcon
+                        sx={{
+                          fontSize: 16,
+                          color: "#22d3ee",
+                          ml: 0.5,
+                          verticalAlign: "middle",
+                        }}
+                      />
+                    )}
+                  </Typography>
+                }
+                secondary={m.role || "Member"}
+              />
+            </ListItem>
+          );
+        })}
+      </List>
     </Box>
   );
 }
@@ -2495,6 +2508,7 @@ function ListSkeleton({ count = 3, type = "text" }) {
 export default function GroupDetailsPage() {
   const { groupId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [group, setGroup] = React.useState(null);
   const [tab, setTab] = React.useState(0);
   const [me, setMe] = React.useState(null);
@@ -2503,6 +2517,10 @@ export default function GroupDetailsPage() {
 
   const [toast, setToast] = React.useState({ open: false, msg: "", type: "info" });
   const [leaveDialogOpen, setLeaveDialogOpen] = React.useState(false);
+
+  // Back Button Logic
+  const backTo = location.state?.backTo || "/community?view=feed";
+  const backLabel = location.state?.backLabel || "Back to Explore Groups";
 
   // --- Actions ---
   const fetchGroup = React.useCallback(async () => {
@@ -2694,7 +2712,7 @@ export default function GroupDetailsPage() {
 
   const tabDefs = React.useMemo(() => {
     const items = [
-      { label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} /> },
+      { label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} /> },
       { label: "MEMBERS", icon: <PeopleOutlineRoundedIcon />, render: () => <MembersTab groupId={groupId} /> },
     ];
     if (canSeeRequests) {
@@ -2753,7 +2771,7 @@ export default function GroupDetailsPage() {
           <Box sx={{ mb: 2 }}>
             <Button
               startIcon={<ArrowBackRoundedIcon />}
-              onClick={() => navigate("/community?view=feed")}
+              onClick={() => navigate(backTo)}
               sx={{
                 textTransform: "none",
                 color: "text.primary",
@@ -2763,7 +2781,7 @@ export default function GroupDetailsPage() {
                 "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
               }}
             >
-              Back to Explore Groups
+              {backLabel}
             </Button>
           </Box>
           <Card

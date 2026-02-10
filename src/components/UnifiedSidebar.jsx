@@ -214,6 +214,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         // Normal User
         manageItems = [
             { label: "My Posts", to: "/community?view=myposts", icon: ArticleRoundedIcon },
+            { label: "My Groups", to: "/community/mygroups", icon: GroupsRoundedIcon },
             { label: "My Events", to: "/account/events", icon: EventNoteRoundedIcon },
             { label: "My Resources", to: "/account/resources", icon: LibraryBooksRoundedIcon },
             { label: "My Recordings", to: "/account/recordings", icon: OndemandVideoRoundedIcon },

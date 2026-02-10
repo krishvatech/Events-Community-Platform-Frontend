@@ -30,6 +30,7 @@ import CommunityHubPage from "./pages/CommunityHubPage.jsx";
 import GroupManagePage from "./pages/GroupManagePage";
 import RichProfile from "./pages/community/RichProfile.jsx";
 import GroupDetailsPage from "./pages/community/GroupDetailsPage.jsx";
+import MyGroupsPage from "./pages/community/mygroups.jsx";
 import AdminLayout from "./components/layout/AdminLayout.jsx";
 import AdminPostsPage from "./pages/AdminPostsPage.jsx";
 import AdminResources from "./pages/AdminResources.jsx";
@@ -189,6 +190,8 @@ const AppShell = () => {
           <Route path="/account/cart" element={<MyCartPage />} />
           <Route path="/community" element={<CommunityHubPage />} />
           <Route path="/groups/:idOrSlug" element={<RequireAuth><RedirectGroupToAdmin /></RequireAuth>} />
+          <Route path="/community/mygroups" element={<RequireAuth><MyGroupsPage /></RequireAuth>} />
+          <Route path="/community/mygroups/:groupId" element={<RequireAuth><GroupDetailsPage /></RequireAuth>} />
 
           {/* My Events list and details */}
           <Route path="/account/events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
