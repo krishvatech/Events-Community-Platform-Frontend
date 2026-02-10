@@ -307,8 +307,8 @@ function CreateGroupDialog({ open, onClose, onCreated }) {
                   },
                 }}
               >
-                <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-                <MenuItem value="private">Private (invite-only)</MenuItem>
+                <MenuItem value="public">Public (anyone can find )</MenuItem>
+                <MenuItem value="private">Private </MenuItem>
               </TextField>
 
               <CustomSelect
@@ -647,8 +647,8 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                 },
               }}
             >
-              <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-              <MenuItem value="private">Private (invite-only)</MenuItem>
+              <MenuItem value="public">Public (anyone can find )</MenuItem>
+              <MenuItem value="private">Private </MenuItem>
             </TextField>
 
 

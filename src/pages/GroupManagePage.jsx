@@ -742,8 +742,8 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
                                     : "You can make this subgroup private even if the parent is public."
                             }
                             options={[
-                                { label: "Public (anyone can find & request to join)", value: "public" },
-                                { label: "Private (invite-only)", value: "private" }
+                                { label: "Public (anyone can find)", value: "public" },
+                                { label: "Private", value: "private" }
                             ]}
                         />
 
@@ -1552,8 +1552,8 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
                                     : "Private subgroups can be created inside public groups."
                             }
                         >
-                            <MenuItem value="public">Public (anyone can find & request to join)</MenuItem>
-                            <MenuItem value="private">Private (invite-only)</MenuItem>
+                            <MenuItem value="public">Public (anyone can find)</MenuItem>
+                            <MenuItem value="private">Private</MenuItem>
                         </TextField>
 
                         {/* Join Policy */}
@@ -4903,8 +4903,8 @@ export default function GroupManagePage() {
                                                         if (next !== joinPolicySetting) setJoinPolicySetting(next);
                                                     }}
                                                     options={[
-                                                        { label: "Public (anyone can find & request to join)", value: "public" },
-                                                        { label: "Private (invite-only)", value: "private" }
+                                                        { label: "Public (anyone can find)", value: "public" },
+                                                        { label: "Private", value: "private" }
                                                     ]}
                                                     helperText={
                                                         visibilitySetting === "private"
