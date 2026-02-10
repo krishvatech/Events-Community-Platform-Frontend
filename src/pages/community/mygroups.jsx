@@ -901,6 +901,8 @@ export default function MyGroupsPage() {
 
     // "My Groups" list
     const [data, setData] = React.useState([]);
+    const [allData, setAllData] = React.useState([]);
+    const [isServerPaginated, setIsServerPaginated] = React.useState(true);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState("");
 
@@ -1000,11 +1002,27 @@ export default function MyGroupsPage() {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const json = await r.json();
 
-            const results = json.results || json.data || [];
-            setData(results);
-            // Determine total pages
-            const total = json.count || results.length;
-            setTotalPages(Math.ceil(total / ITEMS_PER_PAGE) || 1);
+            const results = json?.results ?? json?.data ?? json ?? [];
+            const serverPaginated =
+                typeof json?.count === "number" ||
+                json?.next !== undefined ||
+                json?.previous !== undefined;
+            setIsServerPaginated(serverPaginated);
+
+            if (serverPaginated) {
+                setData(results);
+                setAllData([]);
+                // Determine total pages
+                const total = json.count || results.length;
+                setTotalPages(Math.ceil(total / ITEMS_PER_PAGE) || 1);
+            } else {
+                const list = Array.isArray(results) ? results : [];
+                setAllData(list);
+                const total = list.length;
+                setTotalPages(Math.ceil(total / ITEMS_PER_PAGE) || 1);
+                const start = (page - 1) * ITEMS_PER_PAGE;
+                setData(list.slice(start, start + ITEMS_PER_PAGE));
+            }
 
         } catch (e) {
             console.error(e);
@@ -1014,10 +1032,22 @@ export default function MyGroupsPage() {
         }
     }).current;
 
-    // React to changes
+    // React to filter/search changes
     React.useEffect(() => {
         fetchGroups();
-    }, [page, debouncedSearch, selectedCompanies, selectedRegions, selectedTitles, selectedJoinPolicies, selectedVisibilities]);
+    }, [debouncedSearch, selectedCompanies, selectedRegions, selectedTitles, selectedJoinPolicies, selectedVisibilities]);
+
+    // React to page changes (server-side pagination only)
+    React.useEffect(() => {
+        if (!isServerPaginated) return;
+        fetchGroups();
+    }, [page, isServerPaginated]);
+
+    React.useEffect(() => {
+        if (isServerPaginated) return;
+        const start = (page - 1) * ITEMS_PER_PAGE;
+        setData(allData.slice(start, start + ITEMS_PER_PAGE));
+    }, [page, allData, isServerPaginated]);
 
     const handleJoin = async (g) => {
         // If user is already active/pending, maybe do nothing or navigate
@@ -1214,7 +1244,10 @@ export default function MyGroupsPage() {
 
                 {/* Pagination */}
                 {!loading && totalPages > 1 && (
-                    <Box className="flex justify-center mt-8">
+                    <Box className="flex flex-col items-center gap-2 mt-8">
+                        <Typography variant="caption" className="text-slate-500">
+                            {ITEMS_PER_PAGE} per page
+                        </Typography>
                         <Pagination
                             count={totalPages}
                             page={page}
