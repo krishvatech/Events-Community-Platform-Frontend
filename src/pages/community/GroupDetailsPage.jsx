@@ -1392,6 +1392,11 @@ function PostsTab({ groupId, group }) {
   const fetchPosts = React.useCallback(async () => {
     setLoading(true);
     try {
+      const numericGroupId = Number(groupId);
+      const resolvedGroupId = Number.isFinite(numericGroupId) && numericGroupId
+        ? numericGroupId
+        : Number(group?.id || group?.group_id || group?.groupId || group?.groupID);
+
       // 1. Fetch Posts
       const res = await fetch(toApiUrl(`groups/${groupId}/posts/`), { headers: { Accept: "application/json", ...authHeaders() } });
       const data = res.ok ? await res.json() : [];
@@ -1409,13 +1414,13 @@ function PostsTab({ groupId, group }) {
         console.log('[GroupDetails] Found removed posts:', removedPosts);
       }
 
-      const numericGroupId = Number(groupId);
       const postsArr = postsArrRaw
 
         .map(p => {
           // Trust the endpoint: these posts belong to this group. Ensure ID is attached.
           const existingId = p.group_id ?? p.group?.id ?? p.groupId ?? p.groupID;
-          return { ...p, group_id: existingId ? Number(existingId) : numericGroupId };
+          const groupIdToUse = Number(existingId) || resolvedGroupId || numericGroupId;
+          return { ...p, group_id: groupIdToUse };
         })
         // Drop polls/events if backend mixes them in this endpoint.
         .filter(p => {
@@ -1424,10 +1429,13 @@ function PostsTab({ groupId, group }) {
         });
 
       // 2. Fetch Polls from Activity Feed
-      const pollsUrl = toApiUrl(`activity/feed/?scope=group&group_id=${groupId}`);
-      const resPolls = await fetch(pollsUrl, { headers: { Accept: "application/json", ...authHeaders() } });
-      const dataPolls = resPolls.ok ? await resPolls.json() : [];
-      const pollsFeed = Array.isArray(dataPolls?.results) ? dataPolls.results : (Array.isArray(dataPolls) ? dataPolls : []);
+      let pollsFeed = [];
+      if (Number.isFinite(resolvedGroupId) && resolvedGroupId) {
+        const pollsUrl = toApiUrl(`activity/feed/?scope=group&group_id=${resolvedGroupId}`);
+        const resPolls = await fetch(pollsUrl, { headers: { Accept: "application/json", ...authHeaders() } });
+        const dataPolls = resPolls.ok ? await resPolls.json() : [];
+        pollsFeed = Array.isArray(dataPolls?.results) ? dataPolls.results : (Array.isArray(dataPolls) ? dataPolls : []);
+      }
 
       // 3. Merge & Dedupe (prefer feed item if collision)
       const allRaw = [...postsArr, ...pollsFeed];
@@ -1436,9 +1444,9 @@ function PostsTab({ groupId, group }) {
       const mapped = allRaw.map(mapFeedItem).filter(Boolean);
       console.log('[GroupDetails] After mapFeedItem + filter(Boolean):', mapped.length, 'items');
 
-      const scopedMapped = Number.isFinite(numericGroupId) && numericGroupId
-        ? mapped.filter(p => Number(p.group_id) === numericGroupId)
-        : mapped;
+      const scopedMapped = Number.isFinite(resolvedGroupId) && resolvedGroupId
+        ? mapped.filter(p => Number(p.group_id) === resolvedGroupId)
+        : [];
       console.log('[GroupDetails] After scope filter:', scopedMapped.length, 'items');
 
       const seenIds = new Set();
@@ -1457,7 +1465,7 @@ function PostsTab({ groupId, group }) {
       // 4. Hydrate with metrics
       const ids = uniqueMapped.map(p => p.id).filter(id => Number.isInteger(id));
 
-      let finalPosts = uniqueMapped.map(p => ({ ...p, group_id: numericGroupId }));
+      let finalPosts = uniqueMapped.map(p => ({ ...p, group_id: resolvedGroupId || p.group_id }));
 
       if (ids.length) {
         const metrics = await fetchBatchMetrics(ids);
@@ -1470,7 +1478,7 @@ function PostsTab({ groupId, group }) {
             metrics: { ...p.metrics, ...m }
           } : p;
           // Attach group_id explicitly
-          return { ...base, group_id: numericGroupId };
+          return { ...base, group_id: resolvedGroupId || p.group_id };
         });
       }
 
