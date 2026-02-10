@@ -590,7 +590,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                             <LoungeGrid
                                 tables={tables}
                                 title="Social Lounge"
-                                description="Meet and greet while we prepare to go live. Take a seat to join a conversation."
+                                description="Meet and greet. Take a seat to join a conversation."
                                 onJoin={(tableId, seatIndex) => {
                                     if (loungeOpenStatus?.status === 'CLOSED' && !isAdmin) {
                                         alert("The lounge is currently closed.");
