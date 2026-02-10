@@ -6769,6 +6769,14 @@ export default function NewLiveMeeting() {
     else navigate(-1);
   };
 
+  const handleLeaveMeetingClick = useCallback(async () => {
+    if (isHost) {
+      setLeaveDialogOpen(true);
+      return;
+    }
+    await handleMeetingEnd("left");
+  }, [handleMeetingEnd, isHost]);
+
   const handleToggleChat = useCallback(async () => {
     if (!isHost) return;
     const next = !hostPerms.chat;
@@ -9954,7 +9962,7 @@ export default function NewLiveMeeting() {
                 </Typography>
               </Box>
             )}
-            <IconButton sx={headerIconBtnSx} aria-label="Back" onClick={handleBack}>
+            <IconButton sx={headerIconBtnSx} aria-label="Leave meeting" onClick={handleLeaveMeetingClick}>
               <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
             </IconButton>
 
@@ -10859,13 +10867,7 @@ export default function NewLiveMeeting() {
 
                 <Tooltip title="Leave meeting">
                   <IconButton
-                    onClick={async () => {
-                      if (isHost) {
-                        setLeaveDialogOpen(true);
-                        return;
-                      }
-                      await handleMeetingEnd("left");
-                    }}
+                    onClick={handleLeaveMeetingClick}
                     sx={{
                       bgcolor: "rgba(244,67,54,0.22)",
                       "&:hover": { bgcolor: "rgba(244,67,54,0.30)" },
