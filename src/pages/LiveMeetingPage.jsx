@@ -2233,10 +2233,10 @@ export default function NewLiveMeeting() {
     () =>
       Boolean(
         isBreakout &&
-          dbStatus === "live" &&
-          !isPostEventLounge &&
-          !isPreEventLoungeStatus &&
-          !isInBreakoutTable
+        dbStatus === "live" &&
+        !isPostEventLounge &&
+        !isPreEventLoungeStatus &&
+        !isInBreakoutTable
       ),
     [isBreakout, dbStatus, isPostEventLounge, isPreEventLoungeStatus, isInBreakoutTable]
   );
@@ -3678,6 +3678,28 @@ export default function NewLiveMeeting() {
           } else {
             console.log("[MainSocket] Not in breakout, refreshing lounge state");
           }
+        } else if (msg.type === "waiting_room_enforced") {
+          // ✅ NEW: Handle waiting room enforcement
+          console.log("[MainSocket] Received waiting_room_enforced");
+          if (!isHost) {
+            console.log("[MainSocket] Enforcing waiting room transition - host started meeting");
+
+            // 1. Unset main token ref so we don't auto-rejoin main
+            mainAuthTokenRef.current = null;
+
+            // 2. Leave any active room (breakout/lounge) and reset state
+            if (applyBreakoutTokenRef.current) {
+              applyBreakoutTokenRef.current(null, null, null, null).catch(console.error);
+            }
+
+            // 3. Force Waiting Room UI
+            setWaitingRoomActive(true);
+            setLoungeOpen(false);
+            setWaitingRoomStatus("waiting");
+
+            showSnackbar("The meeting has started. You are now in the waiting room.", "info");
+          }
+
         } else if (msg.type === "waiting_room_announcement") {
           // ✅ NEW: Handle waiting room announcements
           console.log("[MainSocket] Received waiting room announcement:", msg.message);
@@ -3782,7 +3804,7 @@ export default function NewLiveMeeting() {
       console.log("[MainSocket] Cleanup function called - closing WebSocket");
       if (ws.readyState <= WebSocket.OPEN) ws.close();
     };
-  }, [eventId]);
+  }, [eventId, isHost]);
 
   // ✅ Additional polling for lounge status while in breakout (more frequent)
   // Ensures lounge close is detected quickly even if WebSocket updates are delayed
@@ -5694,14 +5716,14 @@ export default function NewLiveMeeting() {
       };
 
       const isInHostSection = toArraySafe(dyteMeeting?.participants?.host).some(x => x?.id === p.id) ||
-                             toArraySafe(dyteMeeting?.participants?.hosts).some(x => x?.id === p.id) ||
-                             toArraySafe(dyteMeeting?.participants?.active).some(x => x?.id === p.id && (String(x?.role || "").toLowerCase().includes("host") || String(x?.presetName || "").toLowerCase().includes("host")));
+        toArraySafe(dyteMeeting?.participants?.hosts).some(x => x?.id === p.id) ||
+        toArraySafe(dyteMeeting?.participants?.active).some(x => x?.id === p.id && (String(x?.role || "").toLowerCase().includes("host") || String(x?.presetName || "").toLowerCase().includes("host")));
 
       // ✅ Also check raw properties that might indicate host role
       const participantRoleStr = String(p?.role || p?._raw?.role || "").toLowerCase();
       const participantPresetStr = String(p?.presetName || p?._raw?.presetName || "").toLowerCase();
       const hasHostRoleOrPreset = participantRoleStr.includes("host") || participantRoleStr.includes("publisher") ||
-                                  participantPresetStr.includes("host") || participantPresetStr.includes("publisher");
+        participantPresetStr.includes("host") || participantPresetStr.includes("publisher");
 
       const isHostParticipant =
         isPublisherPreset ||
