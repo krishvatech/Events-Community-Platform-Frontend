@@ -1,7 +1,57 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 
-export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedParticipantId, loungeParticipantsData }) {
+function getParticipantUserKey(participant) {
+    if (!participant) return "";
+
+    const raw = participant?._raw || participant || {};
+    const directId =
+        raw.customParticipantId ??
+        raw.customParticipant_id ??
+        raw.clientSpecificId ??
+        raw.client_specific_id ??
+        raw.userId ??
+        raw.user_id ??
+        raw.uid ??
+        raw.id ??
+        participant.id;
+
+    let meta =
+        raw.customParticipantData ||
+        raw.customParticipant ||
+        raw.customParticipantDetails ||
+        raw.metadata ||
+        raw.meta ||
+        raw.user ||
+        raw.profile ||
+        raw.profileData ||
+        raw.userData ||
+        null;
+
+    if (typeof meta === "string") {
+        try {
+            meta = JSON.parse(meta);
+        } catch {
+            meta = null;
+        }
+    }
+
+    const metaId =
+        meta?.user_id ??
+        meta?.userId ??
+        meta?.id ??
+        meta?.uid ??
+        meta?.pk ??
+        null;
+
+    const id = directId || metaId;
+    if (id) return `id:${String(id)}`;
+
+    const name = raw.name || participant.name || "";
+    return name ? `name:${String(name).toLowerCase()}` : "";
+}
+
+export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedParticipantId, loungeParticipantKeys }) {
     const [primaryParticipant, setPrimaryParticipant] = useState(null);
     const videoRef = useRef(null);
 
@@ -11,11 +61,14 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedPart
         const updatePrimaryParticipant = () => {
             const allParticipants = mainDyteMeeting.participants.joined.toArray();
 
+            const loungeKeySet = new Set(loungeParticipantKeys || []);
+
             // ✅ PRIORITY 1: Use pinned participant if available and in main room
             if (pinnedParticipantId) {
                 console.log('[MainRoomPeek] Looking for pinned participant:', pinnedParticipantId);
                 const pinnedParticipant = allParticipants.find(p => p.id === pinnedParticipantId);
-                if (pinnedParticipant) {
+                const pinnedKey = pinnedParticipant ? getParticipantUserKey(pinnedParticipant) : "";
+                if (pinnedParticipant && (!pinnedKey || !loungeKeySet.has(pinnedKey))) {
                     console.log('[MainRoomPeek] Found pinned participant:', pinnedParticipant.name);
                     setPrimaryParticipant(pinnedParticipant);
                     return;
@@ -25,10 +78,12 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedPart
             }
 
             // ✅ PRIORITY 2: Find first participant NOT in lounge (main area participants only)
-            if (loungeParticipantsData && loungeParticipantsData.length > 0) {
-                console.log('[MainRoomPeek] Filtering out lounge participants:', loungeParticipantsData);
-                const loungeIds = new Set(loungeParticipantsData.map(p => p.id));
-                const mainAreaParticipant = allParticipants.find(p => !loungeIds.has(p.id));
+            if (loungeKeySet.size > 0) {
+                console.log('[MainRoomPeek] Filtering out lounge participants:', loungeParticipantKeys);
+                const mainAreaParticipant = allParticipants.find(p => {
+                    const key = getParticipantUserKey(p);
+                    return !key || !loungeKeySet.has(key);
+                });
                 if (mainAreaParticipant) {
                     console.log('[MainRoomPeek] Found main area participant:', mainAreaParticipant.name);
                     setPrimaryParticipant(mainAreaParticipant);
@@ -39,15 +94,19 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedPart
             // ✅ PRIORITY 3: Try to find the active speaker
             const activeSpeaker = mainDyteMeeting.participants.activeSpeaker;
             if (activeSpeaker) {
-                console.log('[MainRoomPeek] Using active speaker:', activeSpeaker.name);
-                setPrimaryParticipant(activeSpeaker);
-                return;
+                const activeKey = getParticipantUserKey(activeSpeaker);
+                if (activeKey && loungeKeySet.has(activeKey)) {
+                    console.log('[MainRoomPeek] Active speaker is in lounge, ignoring for main room peek');
+                } else {
+                    console.log('[MainRoomPeek] Using active speaker:', activeSpeaker.name);
+                    setPrimaryParticipant(activeSpeaker);
+                    return;
+                }
             }
 
             // ✅ PRIORITY 4: Find the host/admin (only if not in lounge)
-            const loungeIds = loungeParticipantsData ? new Set(loungeParticipantsData.map(p => p.id)) : new Set();
             const host = allParticipants.find(p =>
-                !loungeIds.has(p.id) &&
+                !loungeKeySet.has(getParticipantUserKey(p)) &&
                 (p.presetName?.toLowerCase().includes('host') ||
                     p.presetName?.toLowerCase().includes('admin') ||
                     p.presetName?.toLowerCase().includes('webinar_presenter') ||
@@ -62,7 +121,7 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedPart
 
             // ✅ PRIORITY 5: Fallback to first participant with video enabled (not in lounge)
             const videoParticipant = allParticipants.find(p =>
-                !loungeIds.has(p.id) && p.videoEnabled
+                !loungeKeySet.has(getParticipantUserKey(p)) && p.videoEnabled
             );
             if (videoParticipant) {
                 console.log('[MainRoomPeek] Using video participant:', videoParticipant.name);
@@ -71,7 +130,7 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedPart
             }
 
             // ✅ PRIORITY 6: Last resort: any main area participant
-            const anyParticipant = allParticipants.find(p => !loungeIds.has(p.id));
+            const anyParticipant = allParticipants.find(p => !loungeKeySet.has(getParticipantUserKey(p)));
             if (anyParticipant) {
                 console.log('[MainRoomPeek] Using any main area participant:', anyParticipant.name);
                 setPrimaryParticipant(anyParticipant);
@@ -79,9 +138,8 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedPart
             }
 
             // If only lounge participants, show them as fallback
-            const fallbackParticipant = allParticipants[0];
-            console.log('[MainRoomPeek] Fallback to first available:', fallbackParticipant?.name);
-            setPrimaryParticipant(fallbackParticipant || null);
+            console.log('[MainRoomPeek] No main room participants available, showing empty state');
+            setPrimaryParticipant(null);
         };
 
         updatePrimaryParticipant();
@@ -103,7 +161,7 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedPart
             mainDyteMeeting.participants.removeListener('activeSpeakerChanged', handleActiveSpeakerChanged);
             mainDyteMeeting.participants.joined.removeListener('videoUpdate', handleVideoUpdate);
         };
-    }, [mainDyteMeeting, pinnedParticipantId, loungeParticipantsData]);
+    }, [mainDyteMeeting, pinnedParticipantId, loungeParticipantKeys]);
 
     // Attach video track or screen share to video element
     useEffect(() => {
