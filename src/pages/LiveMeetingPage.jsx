@@ -2758,6 +2758,11 @@ export default function NewLiveMeeting() {
   );
 
   const applyBreakoutTokenRef = useRef(null);
+  const loungeOpenAutoCloseRef = useRef(false);
+  const openLoungeOverlay = useCallback(() => {
+    loungeOpenAutoCloseRef.current = false;
+    setLoungeOpen(true);
+  }, []);
 
   const applyBreakoutToken = useCallback(
     async (newToken, tableId, tableName, logoUrl) => {
@@ -2810,6 +2815,7 @@ export default function NewLiveMeeting() {
 
         setIsBreakout(true);
         isBreakoutRef.current = true;
+        loungeOpenAutoCloseRef.current = true;
         setLoungeOpen(true); // ✅ CRITICAL: Mark lounge as open so render condition works
         setAuthToken(newToken);
 
@@ -2844,6 +2850,7 @@ export default function NewLiveMeeting() {
 
         setIsBreakout(false);
         isBreakoutRef.current = false;
+        loungeOpenAutoCloseRef.current = false;
         setAuthToken(mainAuthTokenRef.current);
         setActiveTableId(null);
         setActiveTableName("");
@@ -2886,8 +2893,9 @@ export default function NewLiveMeeting() {
   // so users see the meeting instead of the lounge table list.
   // This ensures consistent behavior between first join and rejoin.
   useEffect(() => {
-    if (isBreakout && roomJoined && loungeOpen) {
+    if (isBreakout && roomJoined && loungeOpen && loungeOpenAutoCloseRef.current) {
       console.log("[LiveMeeting] User joined breakout meeting, closing lounge overlay to show meeting");
+      loungeOpenAutoCloseRef.current = false;
       setLoungeOpen(false);
     }
   }, [isBreakout, roomJoined, loungeOpen]);
@@ -9380,7 +9388,7 @@ export default function NewLiveMeeting() {
         loungeAvailable={preEventLoungeOpen}
         loungeStatusLabel={loungeOpenStatus?.reason || "Pre-event networking"}
         isLoungeOpen={isLoungeCurrentlyOpen}
-        onOpenLounge={() => setLoungeOpen(true)}
+        onOpenLounge={openLoungeOverlay}
         onJoinMain={role === "publisher" ? handleHostChooseMainMeeting : handleJoinMainMeeting}
         isHost={role === "publisher"}
         onHostChooseLounge={handleHostChooseLoungeOnly}
@@ -9538,7 +9546,7 @@ export default function NewLiveMeeting() {
           timezone={eventData?.timezone || null}
           loungeAvailable={(waitingRoomLoungeAllowed || waitingRoomNetworkingAllowed) && loungeOpenStatus?.status === "OPEN"}
           loungeStatusLabel={loungeOpenStatus?.reason || ""}
-          onOpenLounge={() => setLoungeOpen(true)}
+          onOpenLounge={openLoungeOverlay}
           isHost={role === "publisher"}
           eventId={eventId}
           waitingCount={filteredWaitingRoomCount || 0}
@@ -10804,7 +10812,7 @@ export default function NewLiveMeeting() {
 
                 <Tooltip title="Social Lounge">
                   <IconButton
-                    onClick={() => setLoungeOpen(true)}
+                    onClick={openLoungeOverlay}
                     sx={{
                       bgcolor: "rgba(255,255,255,0.06)",
                       "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
