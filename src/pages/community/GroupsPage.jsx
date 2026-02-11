@@ -596,6 +596,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
   const jp = (g.join_policy || "").toLowerCase();
   const isApproval =
     visibility === "public" && (jp === "public_approval" || jp === "approval");
+  const isInviteOnly = jp === "invite";
   const pending = (g.membership_status || "").toLowerCase() === "pending";
   const joined =
     (g.membership_status || "").toLowerCase() === "joined" || !!g.is_member;
@@ -604,9 +605,11 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
     ? "Joined"
     : pending
       ? "Request pending"
-      : isApproval
-        ? "Request to Join"
-        : "Join";
+      : isInviteOnly
+        ? "Invite Only"
+        : isApproval
+          ? "Request to Join"
+          : "Join";
 
   return (
     <Card
@@ -735,7 +738,7 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
               variant={joined ? "outlined" : "contained"}
               onClick={() => onJoin?.(g)}
               sx={{ ...JOIN_BTN_SX, flex: 1 }}
-              disabled={pending || joined}
+              disabled={pending || joined || isInviteOnly}
               title={ctaText}
             >
               {ctaText}
@@ -893,13 +896,16 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
     (group.membership_status || "").toLowerCase() === "joined" || !!group.is_member;
   const isApproval =
     visibility === "public" && (jp === "public_approval" || jp === "approval");
+  const isInviteOnly = jp === "invite";
   const ctaText = joined
     ? "Joined"
     : pending
       ? "Request pending"
-      : isApproval
-        ? "Request to join"
-        : "Join";
+      : isInviteOnly
+        ? "Invite Only"
+        : isApproval
+          ? "Request to join"
+          : "Join";
 
   return (
     <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -969,7 +975,7 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
         <Button
           variant="contained"
           onClick={() => onJoin?.(group)}
-          disabled={pending || joined}
+          disabled={pending || joined || isInviteOnly}
           sx={{ textTransform: "none", fontWeight: 700 }}
         >
           {ctaText}
