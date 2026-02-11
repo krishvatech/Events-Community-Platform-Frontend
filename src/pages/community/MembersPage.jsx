@@ -35,6 +35,7 @@ import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRound
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { geoCentroid } from "d3-geo";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import { feature as topoFeature } from "topojson-client";
 import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -504,6 +505,10 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId
         (emailInfo.visibility === "public" ||
           (["contacts", "request", "contacts_groups"].includes(emailInfo.visibility) &&
             status === "friends"))));
+
+  // Check if user is hidden in directory (for Admins to see)
+  const isDirectoryHidden = !!u?.profile?.directory_hidden;
+
   const emailDisplay = !emailInfo.hasEmail
     ? ""
     : canViewEmail
@@ -564,6 +569,14 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId
               <Tooltip title="Verified Member">
                 <VerifiedIcon
                   sx={{ fontSize: 20, color: "#22d3ee", flexShrink: 0 }}
+                />
+              </Tooltip>
+            )}
+
+            {isDirectoryHidden && (
+              <Tooltip title="User enabled Privacy">
+                <VisibilityOffRoundedIcon
+                  sx={{ fontSize: 20, color: "text.secondary", flexShrink: 0 }}
                 />
               </Tooltip>
             )}
