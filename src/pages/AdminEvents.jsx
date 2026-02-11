@@ -1491,6 +1491,55 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const [replayAvailable, setReplayAvailable] = React.useState(false);
   const [replayDuration, setReplayDuration] = React.useState("");
 
+  const normalizeParticipantsFromEvent = React.useCallback((eventPayload) => {
+    const normalizedParticipants = [];
+    const pushParticipant = (p = {}) => {
+      const participantTypeRaw =
+        p.participant_type ||
+        p.participantType ||
+        (p.user_id || p.userId || p.user ? "staff" : "guest");
+      const participantType = String(participantTypeRaw || "guest").toLowerCase() === "staff" ? "staff" : "guest";
+      const firstName = p.first_name || p.firstName || p.user?.first_name || "";
+      const lastName = p.last_name || p.lastName || p.user?.last_name || "";
+      const fullName = p.name || p.guestName || `${firstName} ${lastName}`.trim();
+      const role = String(p.role || "speaker").toLowerCase();
+
+      normalizedParticipants.push({
+        id: p.id,
+        participantType,
+        role,
+        userId: p.user_id || p.userId || p.user?.id || null,
+        firstName,
+        lastName,
+        email: p.email || p.user?.email || "",
+        guestName: fullName,
+        guestEmail: p.email || p.guestEmail || "",
+        bio: p.bio || p.bio_text || "",
+        imageUrl: p.profile_image_url || p.imageUrl || p.user?.profile?.image || "",
+        displayOrder: Number(p.display_order ?? p.displayOrder ?? 0),
+      });
+    };
+
+    if (Array.isArray(eventPayload?.participants)) {
+      eventPayload.participants.forEach(pushParticipant);
+    }
+    if (Array.isArray(eventPayload?.event_participants)) {
+      eventPayload.event_participants.forEach(pushParticipant);
+    }
+    if (eventPayload?.event_participants && typeof eventPayload.event_participants === "object") {
+      ["speakers", "moderators", "hosts"].forEach((roleGroup) => {
+        const roleParticipants = eventPayload.event_participants[roleGroup] || [];
+        roleParticipants.forEach(pushParticipant);
+      });
+    }
+    if (Array.isArray(eventPayload?.speakers)) eventPayload.speakers.forEach(pushParticipant);
+    if (Array.isArray(eventPayload?.hosts)) eventPayload.hosts.forEach(pushParticipant);
+    if (Array.isArray(eventPayload?.moderators)) eventPayload.moderators.forEach(pushParticipant);
+
+    normalizedParticipants.sort((a, b) => a.displayOrder - b.displayOrder);
+    return normalizedParticipants;
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     // hydrate on open in case `event` changed
@@ -1525,39 +1574,40 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     setReplayAvailable(!!event?.replay_available);
     setReplayDuration(event?.replay_availability_duration || "");
 
-    // Populate participants from event_participants
-    if (event?.event_participants) {
-      const allParticipants = [];
-
-      ['speakers', 'moderators', 'hosts'].forEach(roleGroup => {
-        const roleParticipants = event.event_participants[roleGroup] || [];
-        roleParticipants.forEach(p => {
-          allParticipants.push({
-            id: p.id,
-            participantType: p.participant_type,
-            role: p.role,
-            userId: p.user_id,
-            firstName: p.first_name,
-            lastName: p.last_name,
-            email: p.email,
-            guestName: p.name,
-            guestEmail: p.email,
-            bio: p.bio_text,
-            imageUrl: p.profile_image_url,
-            displayOrder: p.display_order
-          });
-        });
-      });
-
-      // Sort by display_order
-      allParticipants.sort((a, b) => a.displayOrder - b.displayOrder);
-      setParticipants(allParticipants);
-    } else {
-      setParticipants([]);
-    }
+    setParticipants(normalizeParticipantsFromEvent(event));
 
     setErrors({});
-  }, [open, event?.id]);
+  }, [open, event, normalizeParticipantsFromEvent]);
+
+  useEffect(() => {
+    if (!open || !event?.id) return;
+
+    let cancelled = false;
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    const loadParticipantsFromDetail = async () => {
+      try {
+        const res = await fetch(`${API_ROOT}/events/${event.id}/`, { headers });
+        if (!res.ok) return;
+        const detail = await res.json();
+        if (cancelled) return;
+        const normalized = normalizeParticipantsFromEvent(detail);
+        if (normalized.length > 0) {
+          setParticipants(normalized);
+        }
+      } catch (err) {
+        // keep current participants state from initial event payload
+      }
+    };
+
+    loadParticipantsFromDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, event?.id, token, normalizeParticipantsFromEvent]);
 
   const slugifyLocal = (s) =>
     (s || "")
@@ -2903,9 +2953,28 @@ function EventsPage() {
     }
   };
 
-  const handleEditEvent = (ev) => {
-    setEditingEvent(ev);
-    setEditOpen(true);
+  const handleEditEvent = async (ev) => {
+    if (!ev?.id) return;
+
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    try {
+      const res = await fetch(`${API_ROOT}/events/${ev.id}/`, { headers });
+      if (res.ok) {
+        const detail = await res.json();
+        setEditingEvent(detail);
+      } else {
+        setEditingEvent(ev);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch event details for edit dialog, using list payload.", e);
+      setEditingEvent(ev);
+    } finally {
+      setEditOpen(true);
+    }
   };
 
   const handleEventUpdated = (updated) => {

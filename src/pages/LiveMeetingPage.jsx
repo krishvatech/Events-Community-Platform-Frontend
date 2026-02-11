@@ -1864,6 +1864,7 @@ export default function NewLiveMeeting() {
   const [kickConfirmOpen, setKickConfirmOpen] = useState(false);
   const [banConfirmOpen, setBanConfirmOpen] = useState(false);
   const [actionTargetUser, setActionTargetUser] = useState(null);
+  const [spotlightTarget, setSpotlightTarget] = useState(null); // { participantId, participantUserKey, name, byHostId, ts }
 
   const [isBreakoutControlsOpen, setIsBreakoutControlsOpen] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -2207,6 +2208,17 @@ export default function NewLiveMeeting() {
   const [activeTableName, setActiveTableName] = useState("");
   const [activeTableLogoUrl, setActiveTableLogoUrl] = useState(""); // ✅ Store table logo
   const [eventData, setEventData] = useState(null); // ✅ Store full event data (images, timezone, etc.)
+  const currentUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
+  const primaryHostUserId = useMemo(
+    () => String(eventData?.created_by_id || ""),
+    [eventData?.created_by_id]
+  );
+  const isPrimaryBroadcastHost = Boolean(
+    isHost &&
+    currentUserId &&
+    primaryHostUserId &&
+    currentUserId === primaryHostUserId
+  );
   const assignedRoleByIdentity = useMemo(() => {
     const map = new Map();
     const groups = eventData?.event_participants || {};
@@ -3210,6 +3222,42 @@ export default function NewLiveMeeting() {
     setParticipantMenuTarget(null);
   };
 
+  const handleSpotlightParticipant = () => {
+    const p = participantMenuTarget;
+    handleCloseParticipantMenu();
+    if (!isHost || !p) return;
+
+    const payload = {
+      participantId: p.id || null,
+      participantUserKey: getParticipantUserKey(p?._raw || p) || null,
+      name: p.name || "Participant",
+      byHostId: dyteMeeting?.self?.id || null,
+      ts: Date.now(),
+    };
+
+    setSpotlightTarget(payload);
+    try {
+      dyteMeeting?.participants?.broadcastMessage?.("spotlight-user", payload);
+    } catch (e) {
+      console.warn("[Spotlight] Failed to broadcast spotlight-user:", e);
+    }
+    showSnackbar(`${payload.name} moved to main stage`, "success");
+  };
+
+  const handleClearSpotlight = () => {
+    handleCloseParticipantMenu();
+    if (!isHost) return;
+
+    setSpotlightTarget(null);
+    const payload = { byHostId: dyteMeeting?.self?.id || null, ts: Date.now() };
+    try {
+      dyteMeeting?.participants?.broadcastMessage?.("spotlight-clear", payload);
+    } catch (e) {
+      console.warn("[Spotlight] Failed to broadcast spotlight-clear:", e);
+    }
+    showSnackbar("Returned to normal layout", "info");
+  };
+
   const handleKickParticipant = () => {
     const p = participantMenuTarget;
     handleCloseParticipantMenu();
@@ -3319,7 +3367,6 @@ export default function NewLiveMeeting() {
       showSnackbar("Error banning user: " + e.message, "error");
     }
   };
-
 
   const getJoinedParticipants = useCallback(() => {
     const participantsObj = dyteMeeting?.participants;
@@ -5225,6 +5272,9 @@ export default function NewLiveMeeting() {
       if (!participant) return;
       if (!dyteMeeting?.self?.roomJoined) return;
       const preset = (participant.presetName || "").toLowerCase();
+      const designatedHostId = hostIdRef.current || hostIdHint || null;
+      const primaryHostKey = primaryHostUserId ? `id:${primaryHostUserId}` : "";
+      const participantKey = getParticipantUserKey(participant?._raw || participant);
       const isPublisher =
         preset.includes("host") ||
         preset.includes("publisher") ||
@@ -5232,7 +5282,13 @@ export default function NewLiveMeeting() {
         preset.includes("presenter") ||
         (hostIdHint && participant.id === hostIdHint);
 
+      // If we already have a designated host ID, only pin that participant.
+      if (designatedHostId && participant.id !== designatedHostId) return;
+      // If we don't have designated host yet but know creator ID, only accept creator as canonical host.
+      if (!designatedHostId && primaryHostKey && participantKey !== primaryHostKey) return;
+
       if (isPublisher) {
+        if (!designatedHostId) setHostIdHint(participant.id || null);
         setHostJoined(true);
         setPinnedHost(participant);
         enforceSpotlightLayout();
@@ -5253,7 +5309,7 @@ export default function NewLiveMeeting() {
       dyteMeeting.participants?.joined?.off?.("participantJoined", handleJoin);
       dyteMeeting.participants?.off?.("participantJoined", handleJoin);
     };
-  }, [dyteMeeting, getJoinedParticipants, initDone, role, hostIdHint]);
+  }, [dyteMeeting, getJoinedParticipants, initDone, role, hostIdHint, primaryHostUserId]);
 
   // Listen for host broadcast updates (audience)
   useEffect(() => {
@@ -5278,7 +5334,12 @@ export default function NewLiveMeeting() {
         setHostIdHint(payload.hostId);
         if (payload?.hostUserKey) hostUserKeyRef.current = payload.hostUserKey;
 
-        const found = getJoinedParticipants().find((p) => p?.id === payload.hostId);
+        let found = getJoinedParticipants().find((p) => p?.id === payload.hostId);
+        if (!found && payload?.hostUserKey) {
+          found = getJoinedParticipants().find(
+            (p) => getParticipantUserKey(p?._raw || p) === payload.hostUserKey
+          );
+        }
         if (found) {
           setHostJoined(true);
           setPinnedHost(found);
@@ -5295,6 +5356,20 @@ export default function NewLiveMeeting() {
         if (targetTableId && currentTableId && targetTableId !== currentTableId) return;
         if (payload?.pinnedId === loungePinnedIdRef.current) return;
         setLoungePinnedId(payload.pinnedId);
+      }
+
+      if (type === "spotlight-user" && (payload?.participantId || payload?.participantUserKey)) {
+        setSpotlightTarget({
+          participantId: payload?.participantId || null,
+          participantUserKey: payload?.participantUserKey || null,
+          name: payload?.name || "Participant",
+          byHostId: payload?.byHostId || null,
+          ts: payload?.ts || Date.now(),
+        });
+      }
+
+      if (type === "spotlight-clear") {
+        setSpotlightTarget(null);
       }
     };
 
@@ -5358,10 +5433,43 @@ export default function NewLiveMeeting() {
     setPinnedHost(null);
   }, [dyteMeeting, getJoinedParticipants, pinnedHost]);
 
+  // If spotlighted participant leaves, host clears spotlight and broadcasts clear.
+  // Non-host clients should not auto-clear locally, otherwise layouts can diverge.
+  useEffect(() => {
+    if (!spotlightTarget) return;
+    if (!isHost) return;
+    if (!dyteMeeting?.self?.roomJoined) return;
+
+    const spotlightId = spotlightTarget.participantId ? String(spotlightTarget.participantId) : "";
+    const spotlightKey = spotlightTarget.participantUserKey ? String(spotlightTarget.participantUserKey) : "";
+    const currentParticipants = [
+      ...(dyteMeeting?.self ? [dyteMeeting.self] : []),
+      ...getJoinedParticipants(),
+    ];
+    const exists = currentParticipants.some((pp) => {
+      if (!pp) return false;
+      if (spotlightId && String(pp.id) === spotlightId) return true;
+      if (spotlightKey && getParticipantUserKey(pp?._raw || pp) === spotlightKey) return true;
+      return false;
+    });
+    if (exists) return;
+
+    setSpotlightTarget(null);
+    try {
+      dyteMeeting?.participants?.broadcastMessage?.("spotlight-clear", {
+        byHostId: dyteMeeting?.self?.id || null,
+        ts: Date.now(),
+      });
+    } catch (e) {
+      console.warn("[Spotlight] Failed to auto-broadcast spotlight-clear:", e);
+    }
+  }, [getJoinedParticipants, spotlightTarget, dyteMeeting, isHost]);
+
   // Host broadcasts presence so audience can pin
   useEffect(() => {
     if (!isHost || !dyteMeeting?.self) return;
     if (!dyteMeeting.self.roomJoined) return;
+    if (primaryHostUserId && !isPrimaryBroadcastHost) return;
 
     const broadcastPresence = () => {
       const myId = dyteMeeting.self?.id;
@@ -5378,7 +5486,7 @@ export default function NewLiveMeeting() {
     broadcastPresence();
     const interval = setInterval(broadcastPresence, 4000);
     return () => clearInterval(interval);
-  }, [isHost, dyteMeeting]);
+  }, [isHost, dyteMeeting, primaryHostUserId, isPrimaryBroadcastHost]);
 
   useEffect(() => {
     if (hostIdHint) hostIdRef.current = hostIdHint;
@@ -5393,8 +5501,8 @@ export default function NewLiveMeeting() {
   }, [loungePinnedId]);
 
   useEffect(() => {
-    if (isHost && dyteMeeting?.self?.id) hostIdRef.current = dyteMeeting.self.id;
-  }, [isHost, dyteMeeting?.self?.id]);
+    if (isPrimaryBroadcastHost && dyteMeeting?.self?.id) hostIdRef.current = dyteMeeting.self.id;
+  }, [isPrimaryBroadcastHost, dyteMeeting?.self?.id]);
 
   const getCurrentRoomParticipants = useCallback(() => {
     const list = [];
@@ -6362,9 +6470,49 @@ export default function NewLiveMeeting() {
       const fallback = participants.find((x) => x.id === pinnedId);
       return fallback?._raw || fallback || null;
     }
-    // ✅ FORCE for Host: Always use self as the pinned host source of truth
+
+    // Host-controlled spotlight: if active, force spotlighted participant as primary view for everyone.
+    // This intentionally overrides canonical host pin.
+    if (!isBreakout && spotlightTarget) {
+      const spotlightId = spotlightTarget.participantId ? String(spotlightTarget.participantId) : "";
+      const spotlightKey = spotlightTarget.participantUserKey ? String(spotlightTarget.participantUserKey) : "";
+
+      let spotlighted = null;
+      if (spotlightId) {
+        spotlighted =
+          getJoinedParticipants().find((x) => String(x?.id) === spotlightId) ||
+          participants.find((x) => String(x?.id) === spotlightId) ||
+          null;
+      }
+      if (!spotlighted && spotlightKey) {
+        spotlighted =
+          getJoinedParticipants().find((x) => getParticipantUserKey(x?._raw || x) === spotlightKey) ||
+          participants.find((x) => getParticipantUserKey(x?._raw || x) === spotlightKey) ||
+          null;
+      }
+      if (!spotlighted && dyteMeeting?.self) {
+        const selfKey = getParticipantUserKey(dyteMeeting.self);
+        if ((spotlightId && String(dyteMeeting.self.id) === spotlightId) || (spotlightKey && selfKey === spotlightKey)) {
+          spotlighted = dyteMeeting.self;
+        }
+      }
+
+      if (spotlighted) return spotlighted?._raw || spotlighted;
+    }
+
+    // Canonical host pin: when creator is present, everyone must pin the same creator participant.
+    if (!isBreakout && primaryHostUserId) {
+      const primaryHostKey = `id:${primaryHostUserId}`;
+      const creatorHost =
+        getJoinedParticipants().find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
+        participants.find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
+        (dyteMeeting?.self && getParticipantUserKey(dyteMeeting.self) === primaryHostKey ? dyteMeeting.self : null);
+      if (creatorHost) return creatorHost?._raw || creatorHost;
+    }
+
+    // ✅ FORCE for primary host only: use self as source of truth
     // In breakout/lounge, always pin self if host is present
-    if (isHost && dyteMeeting?.self) {
+    if (isPrimaryBroadcastHost && dyteMeeting?.self) {
       const selfParticipant = participants.find(x => x.id === dyteMeeting.self.id);
 
       // ✅ NEW RULE: If host is in lounge, ALWAYS show the host (not other participants)
@@ -6407,6 +6555,16 @@ export default function NewLiveMeeting() {
     }
 
     let p = pinnedHost;
+    const designatedHostId = hostIdRef.current || hostIdHint || null;
+
+    // Keep all clients aligned to the same designated host when available.
+    if (!isBreakout && designatedHostId) {
+      const designated =
+        getJoinedParticipants().find((x) => x?.id === designatedHostId) ||
+        participants.find((x) => x?.id === designatedHostId) ||
+        (dyteMeeting?.self?.id === designatedHostId ? dyteMeeting.self : null);
+      if (designated) p = designated;
+    }
 
     // ✅ CRITICAL FIX: In breakout rooms, verify pinned host is actually in the current room
     // If the pinned host is from the main room (not in this breakout table), reset and find a local participant instead
@@ -6424,7 +6582,7 @@ export default function NewLiveMeeting() {
     // ✅ FIX: If pinnedHost is null but there IS a host participant connected, find and use them
     // This fixes the issue where host appears in Participants list but shows as "disconnected" in pinned area
     // CRITICAL: In breakout rooms, verify the host is actually in the current room (not in main room)
-    if (!p && !isHost) {
+    if (!p && (!isHost || !isPrimaryBroadcastHost)) {
       // ✅ CRITICAL FIX: In social lounges, host may be in a different lounge table
       // Search in the full participants array, not just getJoinedParticipants()
       // This ensures audience can find the host even if they're in separate lounge tables
@@ -6667,10 +6825,13 @@ export default function NewLiveMeeting() {
     dyteMeeting?.self,
     camOn,
     isHost,
+    isPrimaryBroadcastHost,
+    primaryHostUserId,
     participants,
     isLiveEventSocialLounge,
     loungePinnedId,
     loungePrimaryUserId,
+    spotlightTarget,
   ]);
 
   // Pinned “host” view data
@@ -9003,6 +9164,17 @@ export default function NewLiveMeeting() {
                                       </Badge>
                                     </IconButton>
                                   </Tooltip>
+                                )}
+
+                                {/* Host actions for other hosts (Bring to Main Stage / Clear / Kick / Ban) */}
+                                {isHost && !isSelfMember(m) && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleOpenParticipantMenu(e, m)}
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}
+                                  >
+                                    <MoreVertIcon fontSize="small" />
+                                  </IconButton>
                                 )}
                               </Stack>
                             }
@@ -11492,6 +11664,30 @@ export default function NewLiveMeeting() {
             }
           }}
         >
+          <MenuItem
+            onClick={handleSpotlightParticipant}
+            disabled={!participantMenuTarget}
+          >
+            <ListItemIcon>
+              <AutoAwesomeIcon fontSize="small" sx={{ color: "#22c55e" }} />
+            </ListItemIcon>
+            <ListItemText>
+              {spotlightTarget &&
+              (spotlightTarget?.participantId
+                ? String(spotlightTarget.participantId) === String(participantMenuTarget?.id)
+                : spotlightTarget?.participantUserKey &&
+                  spotlightTarget.participantUserKey === getParticipantUserKey(participantMenuTarget?._raw || participantMenuTarget))
+                ? "Already On Stage"
+                : "Bring To Main Stage"}
+            </ListItemText>
+          </MenuItem>
+          <MenuItem onClick={handleClearSpotlight} disabled={!spotlightTarget}>
+            <ListItemIcon>
+              <AutoAwesomeIcon fontSize="small" sx={{ color: "#94a3b8" }} />
+            </ListItemIcon>
+            <ListItemText>Clear Spotlight</ListItemText>
+          </MenuItem>
+          <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
           <MenuItem onClick={handleKickParticipant}>
             <ListItemIcon>
               <DirectionsWalkIcon fontSize="small" sx={{ color: "#f59e0b" }} />
