@@ -59,6 +59,14 @@ const ENDPOINTS = {
       page_size: params?.page_size,
     })}`,
   notifMarkReadBulk: () => `${API_ROOT}/group-notifications/mark-read/`,
+  standardNotifList: (params) =>
+    `${API_ROOT}/notifications/?${qs({
+      kind: params?.kind,
+      unread: params?.unread ? 1 : undefined,
+      page: params?.page,
+      page_size: params?.page_size,
+    })}`,
+  standardNotifMarkReadBulk: () => `${API_ROOT}/notifications/mark-read/`,
   groupsPage: (page = 1) => `${API_ROOT}/groups/?${qs({ page, page_size: 50 })}`,
   pendingForGroup: (groupId) => `${API_ROOT}/groups/${groupId}/member-requests/`,
   approveJoin: (groupId, userId) => `${API_ROOT}/groups/${groupId}/member-requests/approve/${userId}/`,
@@ -179,6 +187,44 @@ async function loadGroupCreated(onlyUnread) {
   } catch { return { items: [], count: 0 }; }
 }
 
+async function loadStandardNotifications(onlyUnread, kindFilter) {
+  try {
+    const res = await fetch(
+      ENDPOINTS.standardNotifList({
+        kind: kindFilter,
+        unread: onlyUnread ? 1 : undefined,
+        page_size: 100
+      }),
+      { headers: { Accept: "application/json", ...authHeader() } }
+    );
+    if (!res.ok) return { items: [], count: 0 };
+    const j = await res.json();
+    const list = Array.isArray(j) ? j : j?.results || [];
+
+    const items = list.map((n) => ({
+      id: `std-${n.id}`,
+      _source: "standard_notif",
+      type: n.kind,
+      status: n.state || (n.is_read ? "read" : "unread"),
+      created_at: n.created_at,
+      actor_id: n?.actor?.id,
+      actor_name: n?.actor?.first_name || n?.actor?.username || n?.actor?.email || "User",
+      actor_avatar: n?.actor?.avatar_url || "",
+      data: n.data || {},
+      description: n.description,
+      title: n.title,
+      read_at: n.is_read ? n.created_at : null,
+      original_id: n.id, // Store original ID for mark-read
+    }));
+
+    return { items, count: items.length };
+  } catch (e) {
+    console.warn("Failed to load standard notifications:", e);
+    return { items: [], count: 0 };
+  }
+}
+
+
 function formatTime(iso) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -195,6 +241,9 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
   const isRead = !!n.read_at && n.status !== 'pending';
   const isMobile = useMediaQuery("(max-width:600px)");
 
+  // Check if this is a moderation report notification
+  const isModerationReport = n.type === "system" && (n.title?.toLowerCase().includes("report") || n.data?.type === "moderation_report");
+
   // Helper to render Status Chip on right
   const renderStatus = () => {
     const s = n.status || (n.read_at ? "read" : "pending");
@@ -208,6 +257,8 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
 
   return (
     <Paper
+      component={isModerationReport ? Link : "div"}
+      to={isModerationReport ? "/admin/moderation" : undefined}
       elevation={0}
       sx={{
         p: 1.5,
@@ -217,7 +268,9 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
         borderRadius: 2,
         bgcolor: isRead ? "white" : "#f6fffe", // Light teal background for unread/pending
         transition: 'all 0.2s',
-        '&:hover': { borderColor: '#cbd5e1' }
+        '&:hover': { borderColor: '#cbd5e1', cursor: isModerationReport ? 'pointer' : 'default' },
+        textDecoration: 'none',
+        color: 'inherit'
       }}
     >
       <Stack direction="row" spacing={1.5} alignItems="flex-start">
@@ -247,12 +300,43 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
               <>
                 <Box component="span" fontWeight={700}>{n.actor_name}</Box> joined <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
               </>
+            ) : n.type === "friend_request" ? (
+              <>
+                <Box component="span" fontWeight={700}>{n.actor_name}</Box> sent you a friend request.
+              </>
+            ) : n.type === "mention" ? (
+              <>
+                <Box component="span" fontWeight={700}>{n.actor_name}</Box> mentioned you in a post.
+              </>
+            ) : n.type === "comment" ? (
+              <>
+                <Box component="span" fontWeight={700}>{n.actor_name}</Box> commented on your post.
+              </>
+            ) : n.type === "reaction" ? (
+              <>
+                <Box component="span" fontWeight={700}>{n.actor_name}</Box> reacted to your post.
+              </>
+            ) : n.type === "event" ? (
+              <>
+                <Box component="span" fontWeight={700}>{n.title || "Event notification"}</Box>
+              </>
+            ) : n.type === "system" ? (
+              <>
+                <Box component="span" fontWeight={700}>System:</Box> {n.title}
+              </>
             ) : (
               <>
                 <Box component="span" fontWeight={700}>{n.actor_name}</Box> created group <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
               </>
             )}
           </Typography>
+
+          {/* Show description for standard notifications */}
+          {n.description && n._source === "standard_notif" && (
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#64748b' }}>
+              {n.description}
+            </Typography>
+          )}
 
           {/* Subtext Row: Kind Badge + Date */}
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
@@ -298,7 +382,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
         <Stack spacing={0.5} alignItems="flex-end" sx={{ flexShrink: 0 }}>
           <Stack direction="row" spacing={0.5}>
             {/* Mark Read/Unread Toggle */}
-            {n._source === 'notif' && (
+            {(n._source === 'notif' || n._source === 'standard_notif') && (
               <IconButton size="small" onClick={() => onMarkRead(n)} title={isRead ? "Mark as unread" : "Mark as read"}>
                 {isRead ? <MarkEmailReadOutlinedIcon fontSize="small" color="disabled" /> : <MarkEmailUnreadOutlinedIcon fontSize="small" color="primary" />}
               </IconButton>
@@ -416,24 +500,46 @@ export default function AdminNotificationsPage() {
     setInitialLoading(true);
     try {
       let out = { items: [], count: 0 };
+
+      // Filter-specific loading
       if (tab === "name_change") out = await loadNameChangeRequests();
       else if (tab === "join_request") out = await loadJoinRequests();
       else if (tab === "member_joined") out = await loadMemberJoined(onlyUnread);
       else if (tab === "group_created") out = await loadGroupCreated(onlyUnread);
+      else if (tab === "friend_request") out = await loadStandardNotifications(onlyUnread, "friend_request");
+      else if (tab === "mention") out = await loadStandardNotifications(onlyUnread, "mention");
+      else if (tab === "comment") out = await loadStandardNotifications(onlyUnread, "comment");
+      else if (tab === "reaction") out = await loadStandardNotifications(onlyUnread, "reaction");
+      else if (tab === "event") out = await loadStandardNotifications(onlyUnread, "event");
+      else if (tab === "system") out = await loadStandardNotifications(onlyUnread, "system");
       else {
-        const [reqs, joined, created, names] = await Promise.all([
+        // "all" tab - load everything
+        const [reqs, joined, created, names, standard] = await Promise.all([
           loadJoinRequests(),
           loadMemberJoined(onlyUnread),
           loadGroupCreated(onlyUnread),
           loadNameChangeRequests(),
+          loadStandardNotifications(onlyUnread),
         ]);
-        out.items = [...names.items, ...reqs.items, ...joined.items, ...created.items].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+        out.items = [
+          ...names.items,
+          ...reqs.items,
+          ...joined.items,
+          ...created.items,
+          ...standard.items
+        ].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
         out.count = out.items.length;
+
         if (onlyUnread) {
-          out.items = out.items.filter((x) => (x.type === "join_request" || x.type === "name_change" ? x.status === "pending" : !x.read_at));
+          out.items = out.items.filter((x) =>
+            (x.type === "join_request" || x.type === "name_change")
+              ? x.status === "pending"
+              : !x.read_at
+          );
           out.count = out.items.length;
         }
       }
+
       const unread = out.items.filter((x) => (x.type === "join_request" || x.type === "name_change") ? x.status === "pending" : !x.read_at).length;
       setUnreadCount(unread);
       try {
@@ -452,13 +558,23 @@ export default function AdminNotificationsPage() {
 
   // --- Handlers ---
   const markRead = async (n) => {
-    if (n?._source !== "notif" || !n?.id || n.read_at) return;
+    if (!n?.id || n.read_at) return;
+    if (n._source !== "notif" && n._source !== "standard_notif") return;
+
     setBusyId(n.id);
     try {
-      await fetch(ENDPOINTS.notifMarkReadBulk(), {
+      const endpoint = n._source === "standard_notif"
+        ? ENDPOINTS.standardNotifMarkReadBulk()
+        : ENDPOINTS.notifMarkReadBulk();
+
+      const realId = n._source === "standard_notif" && n.original_id
+        ? n.original_id
+        : n.id;
+
+      await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ ids: [n.id] }),
+        body: JSON.stringify({ ids: [realId] }),
       });
 
       setItems((prev) => {
@@ -476,17 +592,40 @@ export default function AdminNotificationsPage() {
   };
 
   const handleMarkAllRead = async () => {
-    const ids = items.filter((n) => n._source === "notif" && !n.read_at).map((n) => n.id);
-    if (!ids.length) return;
+    const groupNotifIds = items.filter((n) => n._source === "notif" && !n.read_at).map((n) => n.id);
+    const standardNotifIds = items.filter((n) => n._source === "standard_notif" && !n.read_at).map((n) => n.original_id || n.id.replace("std-", ""));
+
+    if (!groupNotifIds.length && !standardNotifIds.length) return;
+
     setBusyId("bulk");
     try {
-      await fetch(ENDPOINTS.notifMarkReadBulk(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ ids }),
-      });
+      const promises = [];
+
+      if (groupNotifIds.length > 0) {
+        promises.push(
+          fetch(ENDPOINTS.notifMarkReadBulk(), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeader() },
+            body: JSON.stringify({ ids: groupNotifIds }),
+          })
+        );
+      }
+
+      if (standardNotifIds.length > 0) {
+        promises.push(
+          fetch(ENDPOINTS.standardNotifMarkReadBulk(), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeader() },
+            body: JSON.stringify({ ids: standardNotifIds }),
+          })
+        );
+      }
+
+      await Promise.all(promises);
+
       const now = new Date().toISOString();
-      setItems((prev) => prev.map((n) => ids.includes(n.id) ? { ...n, read_at: now } : n));
+      const allIds = [...groupNotifIds, ...items.filter((n) => n._source === "standard_notif" && !n.read_at).map((n) => n.id)];
+      setItems((prev) => prev.map((n) => allIds.includes(n.id) ? { ...n, read_at: now } : n));
       setUnreadCount(0);
       window.dispatchEvent(new CustomEvent("admin:notify:unread", { detail: { count: 0 } }));
       setToast({ open: true, type: "success", msg: "Marked all read" });
@@ -590,6 +729,13 @@ export default function AdminNotificationsPage() {
             <MenuItem value="join_request">Join Requests</MenuItem>
             <MenuItem value="member_joined">User Joined</MenuItem>
             <MenuItem value="group_created">Group Created</MenuItem>
+            <Divider />
+            <MenuItem value="friend_request">Friend Requests</MenuItem>
+            <MenuItem value="mention">Mentions</MenuItem>
+            <MenuItem value="comment">Comments</MenuItem>
+            <MenuItem value="reaction">Reactions</MenuItem>
+            <MenuItem value="event">Events</MenuItem>
+            <MenuItem value="system">System</MenuItem>
           </Select>
         </FormControl>
       </Stack>
