@@ -988,10 +988,33 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
 // Normalize "joined-groups" API result
 function normalizeMyGroup(row) {
   if (row?.name && !row.group) {
-    return { ...row, is_member: true, membership_status: "joined" };
+    // If backend provides specific status, use it. Otherwise fallback.
+    // "joined-groups" endpoint returns "active" or "pending".
+    const status = row.membership_status || "joined";
+    const isMember =
+      typeof row.is_member === "boolean"
+        ? row.is_member
+        : status === "active" || status === "joined" || status === "member";
+
+    return { ...row, is_member: isMember, membership_status: status };
   }
   if (row?.group) {
     const g = row.group;
+    // Attempt to read status from the wrapper or the group
+    const status =
+      row.membership_status ||
+      row.status ||
+      g.membership_status ||
+      "joined";
+
+    // Check if truly active
+    const lower = String(status).toLowerCase();
+    const isMember =
+      lower === "active" ||
+      lower === "joined" ||
+      lower === "member" ||
+      lower === "approved";
+
     return {
       ...g,
       id: g.id,
@@ -1003,8 +1026,8 @@ function normalizeMyGroup(row) {
         (Array.isArray(g.members) ? g.members.length : g.members ?? 0),
       cover_image: g.cover_image || g.coverImage || null,
       visibility: g.visibility || "public",
-      is_member: true,
-      membership_status: "joined",
+      is_member: isMember,
+      membership_status: status,
     };
   }
   return null;
@@ -1208,8 +1231,8 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
         const existing = map.get(mg.id);
         map.set(mg.id, {
           ...existing,
-          is_member: true,
-          membership_status: "joined",
+          is_member: mg.is_member,
+          membership_status: mg.membership_status,
         });
       } else {
         map.set(mg.id, mg);
