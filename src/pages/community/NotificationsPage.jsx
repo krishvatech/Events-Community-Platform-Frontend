@@ -454,6 +454,58 @@ function NotificationRow({
       );
     }
 
+    if (item.kind === "system") {
+      if (item.data?.type === "moderation") {
+        const action = item.data?.action;
+        const isApproved = action === "approve";
+        const target = item.data?.target_type === "post" ? "post" : "comment";
+        const targetId = item.data?.target_id;
+
+        return (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              System
+            </Typography>
+            <Typography variant="body2">
+              {isApproved ? `approved your ${target}` : `removed your ${target}`}
+            </Typography>
+            {isApproved ? (
+              <Chip
+                size="small"
+                label="Approved"
+                component={targetId ? "a" : "div"}
+                clickable={!!targetId}
+                href={targetId && target === 'post' ? `/feed/post/${targetId}` : undefined}
+                icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  bgcolor: "#e6f4ea",
+                  color: "#1a7f37",
+                  borderColor: "#e6f4ea",
+                  "& .MuiChip-icon": { color: "#1a7f37", ml: 0.5 },
+                  textDecoration: "none"
+                }}
+              />
+            ) : (
+              <Chip
+                size="small"
+                label="Removed"
+                icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />}
+                sx={{ bgcolor: "#fde7e9", color: "#b42318", borderColor: "#fde7e9", "& .MuiChip-icon": { color: "#b42318", ml: 0.5 } }}
+              />
+            )}
+          </Stack>
+        );
+      }
+      return (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            System
+          </Typography>
+          <Typography variant="body2">{item.title}</Typography>
+        </Stack>
+      );
+    }
+
     // Default Render
     return (
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
@@ -572,6 +624,11 @@ function NotificationRow({
           ) : item.kind === 'name_change' ? (
             <Avatar sx={{ bgcolor: '#394d79', color: 'white' }}>
               <BadgeRoundedIcon fontSize="small" />
+            </Avatar>
+
+          ) : item.kind === 'system' ? (
+            <Avatar sx={{ bgcolor: '#f3f4f6', color: '#1f2937' }}>
+              <InfoRoundedIcon />
             </Avatar>
           ) : (
             <Avatar
