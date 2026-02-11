@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, IconButton, Tooltip, Typography } from '@mui/material';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import UnfoldLessRoundedIcon from '@mui/icons-material/UnfoldLessRounded';
+import UnfoldMoreRoundedIcon from '@mui/icons-material/UnfoldMoreRounded';
 
 function getParticipantUserKey(participant) {
     if (!participant) return "";
@@ -51,8 +54,17 @@ function getParticipantUserKey(participant) {
     return name ? `name:${String(name).toLowerCase()}` : "";
 }
 
-export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedParticipantId, loungeParticipantKeys }) {
+export default function MainRoomPeek({
+    mainDyteMeeting,
+    isInBreakout,
+    pinnedParticipantId,
+    loungeParticipantKeys,
+    onClose,
+    onHeaderPointerDown,
+    isDragging = false,
+}) {
     const [primaryParticipant, setPrimaryParticipant] = useState(null);
+    const [isFolded, setIsFolded] = useState(false);
     const videoRef = useRef(null);
 
     useEffect(() => {
@@ -247,85 +259,154 @@ export default function MainRoomPeek({ mainDyteMeeting, isInBreakout, pinnedPart
 
     return (
         <Box sx={{
-            width: '100%',
-            height: '100%',
+            width: isFolded ? { xs: 184, sm: 220 } : { xs: 224, sm: 280 },
+            height: isFolded ? 42 : { xs: 148, sm: 180 },
             bgcolor: '#1a1a1a',
-            borderRadius: 3,
+            borderRadius: 2.5,
             border: '2px solid rgba(255,255,255,0.1)',
             overflow: 'hidden',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            transition: 'width 180ms ease, height 180ms ease',
         }}>
-            <Box sx={{ flex: 1, position: 'relative', bgcolor: '#000', overflow: 'hidden' }}>
-                {primaryParticipant ? (
-                    <>
-                        <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                display: (primaryParticipant.screenShareEnabled || primaryParticipant.videoEnabled) ? 'block' : 'none'
-                            }}
-                        />
-                        {!primaryParticipant.screenShareEnabled && !primaryParticipant.videoEnabled && (
+            <Box
+                sx={{
+                    px: 1,
+                    minHeight: 40,
+                    bgcolor: 'rgba(0,0,0,0.65)',
+                    borderBottom: isFolded ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                    backdropFilter: 'blur(6px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 0.5,
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    userSelect: 'none',
+                    touchAction: 'none',
+                }}
+                onMouseDown={onHeaderPointerDown}
+                onTouchStart={onHeaderPointerDown}
+            >
+                <Typography
+                    sx={{
+                        color: '#e5e7eb',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        pr: 0.5
+                    }}
+                >
+                    {primaryParticipant ? `Main Room: ${primaryParticipant.name || 'Live'}` : 'Main Room View'}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Tooltip title={isFolded ? 'Unfold' : 'Fold'}>
+                        <IconButton
+                            size="small"
+                            onClick={() => setIsFolded((prev) => !prev)}
+                            aria-label={isFolded ? 'Unfold secondary screen' : 'Fold secondary screen'}
+                            sx={{ color: '#d1d5db' }}
+                        >
+                            {isFolded ? <UnfoldMoreRoundedIcon fontSize="small" /> : <UnfoldLessRoundedIcon fontSize="small" />}
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Close">
+                        <IconButton
+                            size="small"
+                            onClick={onClose}
+                            aria-label="Close secondary screen"
+                            sx={{ color: '#d1d5db' }}
+                        >
+                            <CloseRoundedIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+            </Box>
+
+            {!isFolded && (
+                <>
+                    <Box sx={{ flex: 1, position: 'relative', bgcolor: '#000', overflow: 'hidden' }}>
+                        {primaryParticipant ? (
+                            <>
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        display: (primaryParticipant.screenShareEnabled || primaryParticipant.videoEnabled) ? 'block' : 'none'
+                                    }}
+                                />
+                                {!primaryParticipant.screenShareEnabled && !primaryParticipant.videoEnabled && (
+                                    <Box sx={{
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        bgcolor: '#1a1a1a'
+                                    }}>
+                                        <Box sx={{
+                                            width: 48,
+                                            height: 48,
+                                            borderRadius: '50%',
+                                            bgcolor: '#374151',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: 20,
+                                            fontWeight: 600,
+                                            color: '#fff',
+                                            mb: 1
+                                        }}>
+                                            {primaryParticipant.name?.[0]?.toUpperCase() || 'U'}
+                                        </Box>
+                                        <Typography sx={{ color: '#9ca3af', fontSize: 11 }}>
+                                            {primaryParticipant.name || 'User'}
+                                        </Typography>
+                                        <Typography sx={{ color: '#6b7280', fontSize: 9, mt: 0.5 }}>
+                                            Camera off
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </>
+                        ) : (
                             <Box sx={{
                                 width: '100%',
                                 height: '100%',
                                 display: 'flex',
-                                flexDirection: 'column',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                bgcolor: '#1a1a1a'
+                                justifyContent: 'center'
                             }}>
-                                <Box sx={{
-                                    width: 48,
-                                    height: 48,
-                                    borderRadius: '50%',
-                                    bgcolor: '#374151',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: 20,
-                                    fontWeight: 600,
-                                    color: '#fff',
-                                    mb: 1
-                                }}>
-                                    {primaryParticipant.name?.[0]?.toUpperCase() || 'U'}
-                                </Box>
-                                <Typography sx={{ color: '#9ca3af', fontSize: 11 }}>
-                                    {primaryParticipant.name || 'User'}
-                                </Typography>
-                                <Typography sx={{ color: '#6b7280', fontSize: 9, mt: 0.5 }}>
-                                    Camera off
+                                <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+                                    No active participants on stage
                                 </Typography>
                             </Box>
                         )}
-                    </>
-                ) : (
-                    <Box sx={{
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    }}>
-                        <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-                            No active participants on stage
+                    </Box>
+                    <Box sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+                        <Typography sx={{ color: '#22c55e', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#22c55e' }} />
+                            {primaryParticipant ? `LIVE: ${primaryParticipant.name || 'Main Stage'}` : 'MAIN STAGE'}
                         </Typography>
                     </Box>
-                )}
-            </Box>
-            <Box sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-                <Typography sx={{ color: '#22c55e', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#22c55e' }} />
-                    {primaryParticipant ? `LIVE: ${primaryParticipant.name || 'Main Stage'}` : 'MAIN STAGE'}
-                </Typography>
-            </Box>
+                </>
+            )}
+
+            {isFolded && (
+                <Box sx={{ px: 1, pb: 0.75 }}>
+                    <Typography sx={{ color: '#22c55e', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#22c55e' }} />
+                        LIVE PREVIEW
+                    </Typography>
+                </Box>
+            )}
         </Box>
     );
 }

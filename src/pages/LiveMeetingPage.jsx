@@ -2286,6 +2286,12 @@ export default function NewLiveMeeting() {
   const [mainDyteMeeting, initMainMeeting] = useDyteClient();
   const [mainRoomAuthToken, setMainRoomAuthToken] = useState(null);
   const [isInBreakoutRoom, setIsInBreakoutRoom] = useState(false);
+  const [showMainRoomPeek, setShowMainRoomPeek] = useState(true);
+  const [mainRoomPeekPosition, setMainRoomPeekPosition] = useState({ x: 0, y: 80 });
+  const [hasMovedMainRoomPeek, setHasMovedMainRoomPeek] = useState(false);
+  const [isDraggingMainRoomPeek, setIsDraggingMainRoomPeek] = useState(false);
+  const mainRoomPeekRef = useRef(null);
+  const mainRoomPeekDragRef = useRef({ active: false, offsetX: 0, offsetY: 0 });
   const isInBreakoutRoomRef = useRef(false); // ✅ Ref for socket access
   const leaveBreakoutInFlightRef = useRef(false);
   const preEventLoungeWasOpenRef = useRef(false);
@@ -2302,6 +2308,50 @@ export default function NewLiveMeeting() {
     !roomJoined ||
     !canSelfScreenShare ||
     (isHost ? !hostPerms.screenShare : true);
+
+  const RIGHT_PANEL_W = 460;
+  const APPBAR_H = 44;
+
+  const clampMainRoomPeekPosition = useCallback((x, y) => {
+    const el = mainRoomPeekRef.current;
+    const width = el?.offsetWidth || 280;
+    const height = el?.offsetHeight || 180;
+    const minX = 8;
+    const minY = APPBAR_H + 8;
+    const maxX = Math.max(minX, window.innerWidth - width - 8);
+    const maxY = Math.max(minY, window.innerHeight - height - 8);
+    return {
+      x: Math.min(Math.max(x, minX), maxX),
+      y: Math.min(Math.max(y, minY), maxY),
+    };
+  }, [APPBAR_H]);
+
+  const getMainRoomPeekDefaultPosition = useCallback(() => {
+    const el = mainRoomPeekRef.current;
+    const width = el?.offsetWidth || 280;
+    const reservedRight = isMdUp ? (rightPanelOpen ? RIGHT_PANEL_W : 70) : 8;
+    const x = window.innerWidth - reservedRight - width - 12;
+    const y = APPBAR_H + 32;
+    return clampMainRoomPeekPosition(x, y);
+  }, [APPBAR_H, RIGHT_PANEL_W, clampMainRoomPeekPosition, isMdUp, rightPanelOpen]);
+
+  const handleMainRoomPeekDragStart = useCallback((event) => {
+    const target = event.target;
+    if (target?.closest?.("button")) return;
+
+    const point = "touches" in event ? event.touches[0] : event;
+    const rect = mainRoomPeekRef.current?.getBoundingClientRect();
+    if (!point || !rect) return;
+
+    mainRoomPeekDragRef.current = {
+      active: true,
+      offsetX: point.clientX - rect.left,
+      offsetY: point.clientY - rect.top,
+    };
+    setHasMovedMainRoomPeek(true);
+    setIsDraggingMainRoomPeek(true);
+    event.preventDefault?.();
+  }, []);
 
   // ============ DEVICE ENUMERATION & SWITCHING ============
 
@@ -2904,6 +2954,76 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     isInBreakoutRoomRef.current = isInBreakoutRoom;
   }, [isInBreakoutRoom]);
+
+  useEffect(() => {
+    if (activeTableId && isInBreakoutRoom) {
+      setShowMainRoomPeek(true);
+      setHasMovedMainRoomPeek(false);
+    }
+  }, [activeTableId, isInBreakoutRoom]);
+
+  useEffect(() => {
+    if (!showMainRoomPeek || !activeTableId || !isInBreakoutRoom) return;
+    if (hasMovedMainRoomPeek) return;
+
+    const applyDefaultPosition = () => {
+      setMainRoomPeekPosition(getMainRoomPeekDefaultPosition());
+    };
+
+    applyDefaultPosition();
+    const raf = window.requestAnimationFrame(applyDefaultPosition);
+    return () => window.cancelAnimationFrame(raf);
+  }, [
+    activeTableId,
+    getMainRoomPeekDefaultPosition,
+    hasMovedMainRoomPeek,
+    isInBreakoutRoom,
+    rightOpen,
+    rightPanelOpen,
+    showMainRoomPeek,
+  ]);
+
+  useEffect(() => {
+    if (!showMainRoomPeek || !activeTableId || !isInBreakoutRoom) return;
+
+    const handleResize = () => {
+      setMainRoomPeekPosition((prev) => clampMainRoomPeekPosition(prev.x, prev.y));
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [activeTableId, clampMainRoomPeekPosition, isInBreakoutRoom, showMainRoomPeek]);
+
+  useEffect(() => {
+    if (!isDraggingMainRoomPeek) return;
+
+    const handleMove = (event) => {
+      if (!mainRoomPeekDragRef.current.active) return;
+      const point = "touches" in event ? event.touches[0] : event;
+      if (!point) return;
+      const nextX = point.clientX - mainRoomPeekDragRef.current.offsetX;
+      const nextY = point.clientY - mainRoomPeekDragRef.current.offsetY;
+      setMainRoomPeekPosition(clampMainRoomPeekPosition(nextX, nextY));
+      if ("touches" in event) event.preventDefault?.();
+    };
+
+    const handleEnd = () => {
+      mainRoomPeekDragRef.current.active = false;
+      setIsDraggingMainRoomPeek(false);
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleEnd);
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleEnd);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleEnd);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleEnd);
+    };
+  }, [clampMainRoomPeekPosition, isDraggingMainRoomPeek]);
 
   useEffect(() => {
     isBreakoutRef.current = isBreakout;
@@ -7831,9 +7951,6 @@ export default function NewLiveMeeting() {
 
   const isSelfMember = (m) => Boolean(selfDyteId && m?.id === selfDyteId);
 
-  const RIGHT_PANEL_W = 460;
-  const APPBAR_H = 44;
-
   // Others only (Audience + Speaker), host is pinned already
   const stageOthers = useMemo(() => {
     const pinnedKey = latestPinnedHost ? getParticipantUserKey(latestPinnedHost?._raw || latestPinnedHost) : "";
@@ -11372,20 +11489,23 @@ export default function NewLiveMeeting() {
         </Dialog>
 
         {/* ✅ Main Room Peek (when seated at a lounge table) */}
-        {activeTableId && dyteMeeting && !isPostEventLounge && (
+        {activeTableId && dyteMeeting && !isPostEventLounge && showMainRoomPeek && (
           <Box
+            ref={mainRoomPeekRef}
             sx={{
               position: "fixed",
-              bottom: 20,
-              right: 20,
+              top: `${mainRoomPeekPosition.y}px`,
+              left: `${mainRoomPeekPosition.x}px`,
               zIndex: 1300,
-              width: 280,
-              height: 180,
+              transition: isDraggingMainRoomPeek ? "none" : "top 140ms ease, left 140ms ease",
             }}
           >
             <MainRoomPeek
               mainDyteMeeting={mainDyteMeeting}
               isInBreakout={isInBreakoutRoom}
+              onClose={() => setShowMainRoomPeek(false)}
+              onHeaderPointerDown={handleMainRoomPeekDragStart}
+              isDragging={isDraggingMainRoomPeek}
               pinnedParticipantId={pinnedRaw?.id}
               loungeParticipantKeys={participants
                 .filter((p) => p.isOccupyingLounge)
