@@ -2797,6 +2797,7 @@ export default function NewLiveMeeting() {
   const loungePinnedIdRef = useRef(null);
   const loungePinElectionTimeoutRef = useRef(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [leaveTableDialogOpen, setLeaveTableDialogOpen] = useState(false);
 
   const resolveTableName = useCallback(
     (tid) => {
@@ -6897,6 +6898,25 @@ export default function NewLiveMeeting() {
     await handleMeetingEnd("left");
   }, [handleMeetingEnd, isHost]);
 
+  // Handle back button - show confirmation if in breakout/lounge, otherwise use existing leave logic
+  const handleBackButtonClick = useCallback(() => {
+    // Check if user is in a breakout/lounge table
+    if (activeTableId) {
+      // User is in a breakout/lounge - show confirmation dialog
+      setLeaveTableDialogOpen(true);
+      return;
+    }
+
+    // User is not in breakout/lounge - use existing leave logic
+    handleLeaveMeetingClick();
+  }, [activeTableId, handleLeaveMeetingClick]);
+
+  // Handle confirmation to leave current table/room
+  const handleConfirmLeaveTable = useCallback(async () => {
+    setLeaveTableDialogOpen(false);
+    await handleLeaveBreakout();
+  }, [handleLeaveBreakout]);
+
   const handleToggleChat = useCallback(async () => {
     if (!isHost) return;
     const next = !hostPerms.chat;
@@ -10079,7 +10099,7 @@ export default function NewLiveMeeting() {
                 </Typography>
               </Box>
             )}
-            <IconButton sx={headerIconBtnSx} aria-label="Leave meeting" onClick={handleLeaveMeetingClick}>
+            <IconButton sx={headerIconBtnSx} aria-label="Leave meeting" onClick={handleBackButtonClick}>
               <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
             </IconButton>
 
@@ -11154,6 +11174,46 @@ export default function NewLiveMeeting() {
               sx={{ flex: 1, fontWeight: 700 }}
             >
               Leave Meeting
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Leave Table/Room Confirmation Dialog */}
+        <Dialog
+          open={leaveTableDialogOpen}
+          onClose={() => setLeaveTableDialogOpen(false)}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={MODAL_PAPER_PROPS}
+        >
+          <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
+            Leave this table and return to Main Room?
+          </DialogTitle>
+          <DialogContent>
+            <Typography sx={{ color: "rgba(255,255,255,0.7)" }}>
+              {activeTableName
+                ? `You will leave "${activeTableName}" and return to the Main Room. You can rejoin tables anytime.`
+                : "You will leave this table and return to the Main Room. You can rejoin tables anytime."}
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => setLeaveTableDialogOpen(false)}
+              sx={{ textTransform: "none", color: "rgba(255,255,255,0.7)" }}
+            >
+              No, Stay Here
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleConfirmLeaveTable}
+              sx={{
+                textTransform: "none",
+                bgcolor: "#14b8b1",
+                "&:hover": { bgcolor: "#0e8e88" },
+                fontWeight: 700,
+              }}
+            >
+              Yes, Return to Main Room
             </Button>
           </DialogActions>
         </Dialog>
