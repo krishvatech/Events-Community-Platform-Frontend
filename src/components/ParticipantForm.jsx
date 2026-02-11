@@ -181,6 +181,12 @@ const ParticipantForm = ({
         participantData.firstName = selectedUser.first_name || "";
         participantData.lastName = selectedUser.last_name || "";
         participantData.email = selectedUser.email || "";
+        participantData.imageUrl =
+          selectedUser.avatar_url ||
+          selectedUser?.profile?.user_image_url ||
+          selectedUser?.profile?.avatar_url ||
+          selectedUser?.profile?.image_url ||
+          "";
       } else {
         participantData.guestName = guestName.trim();
         participantData.guestEmail = guestEmail.trim();
@@ -188,8 +194,10 @@ const ParticipantForm = ({
 
       if (imageFile) {
         participantData.imageFile = imageFile;
+        participantData.imageUrl = imagePreview || "";
       } else if (imagePreview && imagePreview.startsWith("blob:")) {
         // Keep existing preview if not changed
+        participantData.imageUrl = imagePreview;
       } else if (imagePreview) {
         participantData.imageUrl = imagePreview;
       }
@@ -248,6 +256,8 @@ const ParticipantForm = ({
               setUserSearch("");
               setGuestName("");
               setGuestEmail("");
+              setImageFile(null);
+              setImagePreview("");
               setErrors((prev) => ({ ...prev, user: "", name: "", email: "" }));
             }}
           >
@@ -362,59 +372,61 @@ const ParticipantForm = ({
           placeholder="Add a short bio or description"
         />
 
-        {/* Image Upload */}
-        <Box>
-          <Typography variant="subtitle2" className="font-semibold mb-2">
-            Profile Image
-          </Typography>
-          <Stack spacing={2}>
-            {/* Preview */}
-            <Box
-              className="rounded-lg border border-slate-300 bg-slate-100/70 flex items-center justify-center"
-              sx={{ height: 120, position: "relative", overflow: "hidden" }}
-            >
-              {imagePreview ? (
-                <img
-                  src={imagePreview}
-                  alt="profile preview"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <Stack alignItems="center" spacing={0.5}>
-                  <ImageRoundedIcon sx={{ fontSize: 32, color: "text.secondary" }} />
-                  <Typography variant="caption" className="text-slate-500">
-                    No image selected
-                  </Typography>
-                </Stack>
-              )}
-            </Box>
-
-            {/* Upload Button */}
-            <input
-              id="participant-image-file"
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={handleImageChange}
-            />
-            <label htmlFor="participant-image-file" style={{ width: "100%" }}>
-              <Button
-                component="span"
-                variant="outlined"
-                startIcon={<InsertPhotoRoundedIcon />}
-                fullWidth
+        {/* Image Upload (Guest only) */}
+        {participantType === "guest" && (
+          <Box>
+            <Typography variant="subtitle2" className="font-semibold mb-2">
+              Profile Image
+            </Typography>
+            <Stack spacing={2}>
+              {/* Preview */}
+              <Box
+                className="rounded-lg border border-slate-300 bg-slate-100/70 flex items-center justify-center"
+                sx={{ height: 120, position: "relative", overflow: "hidden" }}
               >
-                {imageFile ? "Change Image" : "Upload Image"}
-              </Button>
-            </label>
+                {imagePreview ? (
+                  <img
+                    src={imagePreview}
+                    alt="profile preview"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <Stack alignItems="center" spacing={0.5}>
+                    <ImageRoundedIcon sx={{ fontSize: 32, color: "text.secondary" }} />
+                    <Typography variant="caption" className="text-slate-500">
+                      No image selected
+                    </Typography>
+                  </Stack>
+                )}
+              </Box>
 
-            {imageFile && (
-              <Typography variant="caption" color="success.main">
-                ✓ Image selected: {imageFile.name}
-              </Typography>
-            )}
-          </Stack>
-        </Box>
+              {/* Upload Button */}
+              <input
+                id="participant-image-file"
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={handleImageChange}
+              />
+              <label htmlFor="participant-image-file" style={{ width: "100%" }}>
+                <Button
+                  component="span"
+                  variant="outlined"
+                  startIcon={<InsertPhotoRoundedIcon />}
+                  fullWidth
+                >
+                  {imageFile ? "Change Image" : "Upload Image"}
+                </Button>
+              </label>
+
+              {imageFile && (
+                <Typography variant="caption" color="success.main">
+                  ✓ Image selected: {imageFile.name}
+                </Typography>
+              )}
+            </Stack>
+          </Box>
+        )}
       </DialogContent>
 
       <DialogActions sx={{ p: 2, gap: 1 }}>

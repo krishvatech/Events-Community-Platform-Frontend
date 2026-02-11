@@ -284,7 +284,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [category, setCategory] = React.useState("Workshop");
   const [format, setFormat] = React.useState("virtual");
   const [price, setPrice] = React.useState();
-  const [isFree, setIsFree] = React.useState(false);
+  const [isFree, setIsFree] = React.useState(true);
 
   const today = dayjs().format("YYYY-MM-DD");
   const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);
@@ -377,7 +377,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setCategory("Workshop");
     setFormat("virtual");
     setPrice(0);
-    setIsFree(false);
+    setIsFree(true);
 
     setIsMultiDay(false);
     setStartDate(sch.startDate);
@@ -512,13 +512,15 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
     // Add participants if any
     if (participants.length > 0) {
-      const participantsData = participants.map((p) => ({
+      const participantsData = participants.map((p, idx) => ({
         type: p.participantType,
         user_id: p.participantType === "staff" ? p.userId : undefined,
         role: p.role,
         name: p.participantType === "guest" ? p.guestName : undefined,
         email: p.participantType === "guest" ? p.guestEmail : undefined,
         bio: p.bio || "",
+        display_order: idx,
+        client_index: idx,
       }));
 
       console.log("Sending participants data:", participantsData); // Debug log
@@ -526,7 +528,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       // Backend expects JSON string for nested array
       fd.append("participants", JSON.stringify(participantsData));
 
-      // Note: Participant images will be handled via separate API calls after event creation
+      participants.forEach((p, idx) => {
+        if (p?.imageFile) {
+          fd.append(`participant_image_${idx}`, p.imageFile, p.imageFile.name || `participant_${idx}.jpg`);
+        }
+      });
     }
 
     try {
@@ -756,8 +762,16 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           </TextField>
         </Box>
 
-        {/* Row 2: Price & Free Event */}
+        {/* Row 2: Free Event & Price */}
         <Grid container spacing={3} sx={{ mb: 3 }}>
+          {/* Free Event Checkbox */}
+          <Grid item xs={12} sm={6} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
+            <FormControlLabel
+              control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
+              label="Free Event"
+              sx={{ width: "100%", m: 0 }}
+            />
+          </Grid>
           {/* Price Field */}
           <Grid item xs={12} sm={6}>
             <TextField
@@ -770,15 +784,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               error={!!errors.price}
               helperText={errors.price}
               disabled={isFree}
-            />
-          </Grid>
-
-          {/* Free Event Checkbox */}
-          <Grid item xs={12} sm={6} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
-            <FormControlLabel
-              control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
-              label="Free Event"
-              sx={{ width: "100%", m: 0 }}
             />
           </Grid>
         </Grid>
@@ -1712,13 +1717,15 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
 
     // Add participants if any
     if (participants.length > 0) {
-      const participantsData = participants.map((p) => ({
+      const participantsData = participants.map((p, idx) => ({
         type: p.participantType,
         user_id: p.participantType === "staff" ? p.userId : undefined,
         role: p.role,
         name: p.participantType === "guest" ? p.guestName : undefined,
         email: p.participantType === "guest" ? p.guestEmail : undefined,
         bio: p.bio || "",
+        display_order: idx,
+        client_index: idx,
       }));
 
       console.log("Sending participants data:", participantsData); // Debug log
@@ -1726,7 +1733,12 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
       // Backend expects JSON string for nested array
       fd.append("participants", JSON.stringify(participantsData));
 
-      // Note: Participant images will be handled via separate API calls after event creation
+      participants.forEach((p, idx) => {
+        if (p?.imageFile) {
+          fd.append(`participant_image_${idx}`, p.imageFile, p.imageFile.name || `participant_${idx}.jpg`);
+        }
+      });
+
     }
 
     try {
@@ -1926,21 +1938,21 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                 {categories.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
               </TextField>
 
+              <Box sx={{ mt: 3, mb: 1 }}>
+                <FormControlLabel
+                  control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
+                  label="Free Event (all users can register)"
+                />
+              </Box>
+
               <TextField
                 label="Price ($)" type="number" fullWidth
                 value={price} onChange={(e) => setPrice(e.target.value)}
                 inputProps={{ min: 0, step: "0.01" }}
                 error={!!errors.price} helperText={errors.price}
                 disabled={isFree}
-                sx={{ mt: 3 }}
+                sx={{ mt: 0.5, mb: 2 }}
               />
-
-              <Box sx={{ mt: 1.5, mb: 2 }}>
-                <FormControlLabel
-                  control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
-                  label="Free Event (all users can register)"
-                />
-              </Box>
 
               {/* keep slug hidden but present */}
               <Box sx={{ display: "none" }}>
