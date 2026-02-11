@@ -214,6 +214,17 @@ function roleFromPreset(presetName = "") {
   return "Audience";
 }
 
+function normalizeDisplayRole(rawRole = "") {
+  const r = String(rawRole || "").toLowerCase();
+  if (r.includes("host") || r.includes("publisher") || r.includes("admin") || r.includes("presenter")) {
+    return "Host";
+  }
+  if (r.includes("speaker") || r.includes("moderator")) {
+    return "Speaker";
+  }
+  return "Audience";
+}
+
 // Normalize backend role strings into the two modes we support
 const normalizeRole = (raw = "") => {
   const r = String(raw || "").toLowerCase();
@@ -2143,12 +2154,13 @@ export default function NewLiveMeeting() {
         participant.avatar ||
         "";
       const roleLabel = String(participant.role || participant.user_role || "Audience");
+      const normalizedRole = normalizeDisplayRole(roleLabel);
 
       openMemberInfo({
         id: userId || participant.username || name,
         name,
         picture,
-        role: roleLabel.toLowerCase().includes("host") ? "Host" : "Audience",
+        role: normalizedRole,
         job_title: participant.job_title || participant.title || participant.designation || "",
         company: participant.company || participant.organization || participant.company_name || "",
         location: participant.location || participant.city || participant.country || "",
@@ -2195,6 +2207,33 @@ export default function NewLiveMeeting() {
   const [activeTableName, setActiveTableName] = useState("");
   const [activeTableLogoUrl, setActiveTableLogoUrl] = useState(""); // ✅ Store table logo
   const [eventData, setEventData] = useState(null); // ✅ Store full event data (images, timezone, etc.)
+  const assignedRoleByIdentity = useMemo(() => {
+    const map = new Map();
+    const groups = eventData?.event_participants || {};
+
+    const add = (key, role) => {
+      if (!key || !role) return;
+      map.set(String(key).toLowerCase(), role);
+    };
+
+    const ingest = (items, role) => {
+      if (!Array.isArray(items)) return;
+      items.forEach((p) => {
+        const userId = p?.user_id ?? p?.id ?? null;
+        const email = String(p?.email || "").trim().toLowerCase();
+        const name = String(p?.name || "").trim().toLowerCase();
+        if (userId !== null && userId !== undefined && String(userId)) add(`id:${userId}`, role);
+        if (email) add(`email:${email}`, role);
+        if (name) add(`name:${name}`, role);
+      });
+    };
+
+    ingest(groups.hosts || groups.host || [], "Host");
+    ingest(groups.speakers || groups.speaker || [], "Speaker");
+    ingest(groups.moderators || groups.moderator || [], "Speaker");
+
+    return map;
+  }, [eventData?.event_participants]);
   const [loungeTables, setLoungeTables] = useState([]);
   const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
   const isLoungeCurrentlyOpen = loungeOpenStatus?.status === "OPEN";
@@ -5814,21 +5853,25 @@ export default function NewLiveMeeting() {
         ""
       ).toLowerCase();
 
-      const isPublisherPreset =
+      const isHostLikePreset =
         preset.includes("host") ||
         preset.includes("publisher") ||
         preset.includes("admin") ||
         preset.includes("presenter") ||
-        preset.includes("speaker") ||
         rawRole.includes("host") ||
         rawRole.includes("publisher") ||
         rawRole.includes("admin") ||
         rawRole.includes("presenter") ||
-        rawRole.includes("speaker") ||
         raw?.isHost === true ||
         raw?.is_host === true ||
         String(raw?.role || "").toLowerCase().includes("host") ||  // ✅ Direct role property
         String(raw?.participantRole || "").toLowerCase().includes("host");  // ✅ Alternative role property
+
+      const isSpeakerLikePreset =
+        preset.includes("speaker") ||
+        preset.includes("moderator") ||
+        rawRole.includes("speaker") ||
+        rawRole.includes("moderator");
 
       // If preset indicates publisher/host, mark as Host
       // Otherwise check if they're the pinned host or the broadcast host hint
@@ -5855,7 +5898,7 @@ export default function NewLiveMeeting() {
         participantPresetStr.includes("host") || participantPresetStr.includes("publisher");
 
       const isHostParticipant =
-        isPublisherPreset ||
+        isHostLikePreset ||
         hasHostRoleOrPreset ||
         (hostIdCurrent && p.id === hostIdCurrent) ||
         (hostUserKeyCurrent && participantUserKey && participantUserKey === hostUserKeyCurrent) ||
@@ -5863,6 +5906,36 @@ export default function NewLiveMeeting() {
         (hostFromMeeting && p.id === hostFromMeeting) ||  // ✅ Check if participant is the host from dyteMeeting
         (dyteMeeting?.host && (p.name === dyteMeeting.host.name || p.id === dyteMeeting.host.id)) ||  // ✅ Match by name or ID
         isInHostSection;  // ✅ Check if participant is in the "host" section of participants map
+
+      const participantEmail = String(
+        raw?.email ||
+        raw?.user_email ||
+        raw?.userEmail ||
+        parsedMeta?.email ||
+        parsedMeta?.user_email ||
+        parsedMeta?.userEmail ||
+        ""
+      ).trim().toLowerCase();
+      const participantName = String(p?.name || raw?.name || parsedMeta?.name || "").trim().toLowerCase();
+      const participantIdKey = String(
+        raw?.clientSpecificId ||
+        raw?.client_specific_id ||
+        p?.clientSpecificId ||
+        raw?.userId ||
+        raw?.user_id ||
+        parsedMeta?.user_id ||
+        parsedMeta?.userId ||
+        p?.userId ||
+        p?.id ||
+        ""
+      ).trim().toLowerCase();
+      const assignedRole =
+        (participantUserKey ? assignedRoleByIdentity.get(String(participantUserKey).toLowerCase()) : null) ||
+        (participantIdKey ? assignedRoleByIdentity.get(`id:${participantIdKey}`) : null) ||
+        (participantEmail ? assignedRoleByIdentity.get(`email:${participantEmail}`) : null) ||
+        (participantName ? assignedRoleByIdentity.get(`name:${participantName}`) : null) ||
+        null;
+      const finalRole = assignedRole || (isHostParticipant ? "Host" : (isSpeakerLikePreset ? "Speaker" : "Audience"));
 
       const metaProfilePicture =
         typeof parsedMeta?.profilePicture === "object"
@@ -5882,7 +5955,7 @@ export default function NewLiveMeeting() {
       return {
         id: p.id,
         name: p.name || "User",
-        role: isHostParticipant ? "Host" : "Audience",
+        role: finalRole,
         presetName: p.presetName || "", // ✅ Include Dyte SDK preset name for display
         mic: Boolean(p.audioEnabled),
         cam: Boolean(p.videoEnabled),
@@ -5894,7 +5967,7 @@ export default function NewLiveMeeting() {
         _raw: p,
       };
     });
-  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables]);
+  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables, assignedRoleByIdentity]);
 
   const breakoutParticipantCount = useMemo(() => {
     if (!isBreakout) return 0;
@@ -7940,15 +8013,20 @@ export default function NewLiveMeeting() {
     // ✅ CRITICAL FIX: Apply lounge filter to hosts when not in breakout (main room context)
     // When user is in main room, hosts occupying lounge should be filtered out
     // When user is in breakout, show all participants in that room (lounge filter doesn't apply)
-    const host = effectiveHostId
-      ? participants.filter((p) => p.id === effectiveHostId && p.inMeeting && (isBreakout || !p.isOccupyingLounge)) // ✅ Filter lounge hosts from main room view
-      : participants.filter((p) => p.role === "Host" && p.inMeeting && (isBreakout || !p.isOccupyingLounge)); // ✅ Filter lounge hosts from main room view
+    let host = participants.filter((p) => p.role === "Host" && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
+    if (host.length === 0 && effectiveHostId) {
+      host = participants.filter((p) => p.id === effectiveHostId && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
+    }
 
-    const audience = effectiveHostId
-      ? participants.filter((p) => p.id !== effectiveHostId && p.inMeeting && (isBreakout || !p.isOccupyingLounge)) // ✅ filter lounge occupants out of main room
-      : participants.filter((p) => p.role !== "Host" && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
+    const hostIdSet = new Set(host.map((p) => p.id));
+    const speakers = participants.filter(
+      (p) => !hostIdSet.has(p.id) && p.role === "Speaker" && p.inMeeting && (isBreakout || !p.isOccupyingLounge)
+    );
+    const audience = participants.filter(
+      (p) => !hostIdSet.has(p.id) && p.role !== "Speaker" && p.inMeeting && (isBreakout || !p.isOccupyingLounge)
+    );
 
-    return { host, speakers: [], audience };
+    return { host, speakers, audience };
   }, [participants, pinnedHost, hostIdHint, isHost, dyteMeeting?.self?.id, isBreakout]);
 
   // --- Self helpers for Members UI ---

@@ -119,6 +119,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
   const status = computeStatus(ev);
   const chip = statusChip(status);
   const [imgFailed, setImgFailed] = useState(false);
+  const isHost = Boolean(reg?.is_host);
 
   return (
     <Paper
@@ -213,13 +214,13 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
             // ✅ allow users to join up to 15 minutes before the start time
             const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
             const isPreEventLounge = isPreEventLoungeOpen(ev);
-            const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+            const canShowActiveJoin = isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
 
             // 1) LIVE or within 15 min before start → active Join button
             if (canShowActiveJoin) {
               return (
                 <Button
-                  onClick={() => onJoinLive?.(ev)}
+                  onClick={() => onJoinLive?.(ev, isHost)}
                   disabled={isJoining}
                   variant="contained"
                   sx={{
@@ -231,7 +232,9 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                     borderRadius: 2,
                   }}
                 >
-                  {getJoinButtonText(ev, isLive, isJoining)}
+                  {isHost
+                    ? (isJoining ? "Opening Host Access..." : "Join as Host")
+                    : getJoinButtonText(ev, isLive, isJoining)}
                 </Button>
               );
             }
@@ -539,14 +542,14 @@ export default function MyEventsPage() {
   //   1) history state: location.state?.agora
   //   2) sessionStorage key: live:EVENT_ID
   // -----------------------------------------------------------------------------
-  const handleJoinLive = async (ev) => {
+  const handleJoinLive = async (ev, isHost = false) => {
     if (!ev?.id) return;
 
     setJoiningId(ev.id);
     try {
       const isPreEventLounge = isPreEventLoungeOpen(ev);
       const isPostEventLounge = isPostEventLoungeOpen(ev);
-      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=audience`;
+      const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=${isHost ? "publisher" : "audience"}`;
 
       navigate(livePath, {
         state: {

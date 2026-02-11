@@ -271,14 +271,15 @@ export default function EventDetailsPage() {
       ? { label: "Upcoming", className: "bg-teal-50 text-teal-700" }
       : { label: "Past", className: "bg-slate-100 text-slate-700" };
   // Decide the best join URL:
-  const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=audience`;
+  const isHost = Boolean(registration?.is_host);
+  const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
   const isPostEventLounge = isPostEventLoungeOpen(event);
   const isPast = (status === "past" || event.status === "ended") && !isPostEventLounge;
   const isLive = status === "live" && event.status !== "ended";
   const isWithinEarlyJoinWindow = canEarlyJoin(event);
   const isPreEventLounge = isPreEventLoungeOpen(event);
 
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+  const canShowActiveJoin = isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
   const canWatch = isPast && !!event.recording_url;
   const desc = event?.description ?? "";
 
@@ -482,7 +483,7 @@ export default function EventDetailsPage() {
                         className="rounded-xl"
                         variant="contained"
                       >
-                        {getJoinButtonText(event, isLive, false)}
+                        {isHost ? "Join as Host" : getJoinButtonText(event, isLive, false)}
                       </Button>
                     ) : canWatch ? (
                       <Button

@@ -390,3 +390,13 @@ export async function getSaleorDashboardUrl() {
   }
   return r.json(); // { url }
 }
+
+// ===================== Event Participants =====================
+// Note: Participants are managed via event endpoints, not standalone
+
+/**
+ * Fetch staff users for participant selection
+ * Uses existing listAdminUsers, re-exported for convenience
+ */
+export const fetchStaffUsers = (params = {}) =>
+  listAdminUsers({ ...params, is_staff: true });

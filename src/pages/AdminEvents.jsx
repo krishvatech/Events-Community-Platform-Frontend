@@ -56,6 +56,9 @@ import * as isoCountries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
+import ParticipantForm from "../components/ParticipantForm";
+import ParticipantList from "../components/ParticipantList";
+import RecordVoiceOverRoundedIcon from "@mui/icons-material/RecordVoiceOverRounded";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -340,6 +343,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [toast, setToast] = React.useState({ open: false, type: "success", msg: "" });
   const [errors, setErrors] = React.useState({});
 
+  // Participants
+  const [participants, setParticipants] = React.useState([]);
+  const [participantDialogOpen, setParticipantDialogOpen] = React.useState(false);
+  const [editingParticipantIndex, setEditingParticipantIndex] = React.useState(null);
+
   const slugifyLocal = (s) =>
     (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const iso = (d, t) => (d && t ? dayjs(`${d}T${t}:00`).toISOString() : null);
@@ -401,6 +409,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setResourcesPublishNow(true);
     setResPublishDate(sch.startDate);
     setResPublishTime(sch.startTime);
+
+    // Participants
+    setParticipants([]);
+    setParticipantDialogOpen(false);
+    setEditingParticipantIndex(null);
 
     setErrors({});
   };
@@ -497,6 +510,25 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (resDesc.trim()) fd.append("resource_description", resDesc.trim());
     resTags.filter(Boolean).forEach((t) => fd.append("resource_tags", t));
 
+    // Add participants if any
+    if (participants.length > 0) {
+      const participantsData = participants.map((p) => ({
+        type: p.participantType,
+        user_id: p.participantType === "staff" ? p.userId : undefined,
+        role: p.role,
+        name: p.participantType === "guest" ? p.guestName : undefined,
+        email: p.participantType === "guest" ? p.guestEmail : undefined,
+        bio: p.bio || "",
+      }));
+
+      console.log("Sending participants data:", participantsData); // Debug log
+
+      // Backend expects JSON string for nested array
+      fd.append("participants", JSON.stringify(participantsData));
+
+      // Note: Participant images will be handled via separate API calls after event creation
+    }
+
     try {
       const res = await fetch(`${API_ROOT}/events/`, {
         method: "POST",
@@ -505,6 +537,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
+        console.error("Request error response:", json); // Log full error to console
         const msg =
           json?.detail ||
           Object.entries(json)
@@ -1114,6 +1147,48 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           </Grid>
         </Paper>
 
+        {/* ===== Speakers & Hosts ===== */}
+        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+          <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+            <RecordVoiceOverRoundedIcon color="action" />
+            <Typography variant="h6" className="font-semibold">
+              Speakers & Hosts
+            </Typography>
+          </Stack>
+
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Add speakers, moderators, or hosts for this event
+          </Typography>
+
+          {participants.length > 0 && (
+            <Box mb={2}>
+              <ParticipantList
+                participants={participants}
+                onEdit={(p, idx) => {
+                  setEditingParticipantIndex(idx);
+                  setParticipantDialogOpen(true);
+                }}
+                onRemove={(p, idx) => {
+                  setParticipants(prev => prev.filter((_, i) => i !== idx));
+                  toast.success("Participant removed");
+                }}
+              />
+            </Box>
+          )}
+
+          <Button
+            variant="outlined"
+            startIcon={<AddRoundedIcon />}
+            onClick={() => {
+              setEditingParticipantIndex(null);
+              setParticipantDialogOpen(true);
+            }}
+            fullWidth
+          >
+            Add Participant
+          </Button>
+        </Paper>
+
         {/* ===== Attach Resources ===== */}
         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
           <Typography variant="h6" className="font-semibold mb-1">Attach Resources (optional)</Typography>
@@ -1299,6 +1374,36 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           {toast.msg}
         </Alert>
       </Snackbar>
+
+      {/* Participant Form Dialog */}
+      <ParticipantForm
+        open={participantDialogOpen}
+        onClose={() => {
+          setParticipantDialogOpen(false);
+          setEditingParticipantIndex(null);
+        }}
+        onSubmit={(participantData) => {
+          if (editingParticipantIndex !== null) {
+            // Edit existing
+            setParticipants(prev => prev.map((p, i) =>
+              i === editingParticipantIndex ? participantData : p
+            ));
+            setToast({ open: true, type: "success", msg: "Participant updated" });
+          } else {
+            // Add new
+            setParticipants(prev => [...prev, participantData]);
+            setToast({ open: true, type: "success", msg: "Participant added" });
+          }
+          setParticipantDialogOpen(false);
+          setEditingParticipantIndex(null);
+        }}
+        initialData={
+          editingParticipantIndex !== null
+            ? participants[editingParticipantIndex]
+            : null
+        }
+        existingParticipants={participants}
+      />
     </Dialog>
   );
 }
@@ -1349,6 +1454,11 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState({ open: false, type: "success", msg: "" });
+
+  // Participants
+  const [participants, setParticipants] = useState([]);
+  const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
+  const [editingParticipantIndex, setEditingParticipantIndex] = useState(null);
 
   // image handling - Update Logo / Picture (original branding image)
   const [logoImageFile, setLogoImageFile] = useState(null);
@@ -1414,6 +1524,37 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     // Init replay options
     setReplayAvailable(!!event?.replay_available);
     setReplayDuration(event?.replay_availability_duration || "");
+
+    // Populate participants from event_participants
+    if (event?.event_participants) {
+      const allParticipants = [];
+
+      ['speakers', 'moderators', 'hosts'].forEach(roleGroup => {
+        const roleParticipants = event.event_participants[roleGroup] || [];
+        roleParticipants.forEach(p => {
+          allParticipants.push({
+            id: p.id,
+            participantType: p.participant_type,
+            role: p.role,
+            userId: p.user_id,
+            firstName: p.first_name,
+            lastName: p.last_name,
+            email: p.email,
+            guestName: p.name,
+            guestEmail: p.email,
+            bio: p.bio_text,
+            imageUrl: p.profile_image_url,
+            displayOrder: p.display_order
+          });
+        });
+      });
+
+      // Sort by display_order
+      allParticipants.sort((a, b) => a.displayOrder - b.displayOrder);
+      setParticipants(allParticipants);
+    } else {
+      setParticipants([]);
+    }
 
     setErrors({});
   }, [open, event?.id]);
@@ -1519,6 +1660,25 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     }
     fd.append("waiting_room_grace_period_minutes", String(waitingRoomGracePeriodMinutes || "0"));
 
+    // Add participants if any
+    if (participants.length > 0) {
+      const participantsData = participants.map((p) => ({
+        type: p.participantType,
+        user_id: p.participantType === "staff" ? p.userId : undefined,
+        role: p.role,
+        name: p.participantType === "guest" ? p.guestName : undefined,
+        email: p.participantType === "guest" ? p.guestEmail : undefined,
+        bio: p.bio || "",
+      }));
+
+      console.log("Sending participants data:", participantsData); // Debug log
+
+      // Backend expects JSON string for nested array
+      fd.append("participants", JSON.stringify(participantsData));
+
+      // Note: Participant images will be handled via separate API calls after event creation
+    }
+
     try {
       const res = await fetch(`${API_ROOT}/events/${event.id}/`, {
         method: "PATCH",
@@ -1530,6 +1690,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
+        console.error("Request error response:", json); // Log full error to console
         const msg =
           json?.detail ||
           Object.entries(json)
@@ -2012,6 +2173,48 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                 </Grid>
               </Grid>
             </Grid>
+
+            {/* ===== Speakers & Hosts ===== */}
+            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+              <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                <RecordVoiceOverRoundedIcon color="action" />
+                <Typography variant="h6" className="font-semibold">
+                  Speakers & Hosts
+                </Typography>
+              </Stack>
+
+              <Typography variant="body2" color="text.secondary" mb={2}>
+                Add speakers, moderators, or hosts for this event
+              </Typography>
+
+              {participants.length > 0 && (
+                <Box mb={2}>
+                  <ParticipantList
+                    participants={participants}
+                    onEdit={(p, idx) => {
+                      setEditingParticipantIndex(idx);
+                      setParticipantDialogOpen(true);
+                    }}
+                    onRemove={(p, idx) => {
+                      setParticipants(prev => prev.filter((_, i) => i !== idx));
+                      setToast({ open: true, type: "success", msg: "Participant removed" });
+                    }}
+                  />
+                </Box>
+              )}
+
+              <Button
+                variant="outlined"
+                startIcon={<AddRoundedIcon />}
+                onClick={() => {
+                  setEditingParticipantIndex(null);
+                  setParticipantDialogOpen(true);
+                }}
+                fullWidth
+              >
+                Add Participant
+              </Button>
+            </Paper>
           </Grid>
         </DialogContent>
 
@@ -2027,6 +2230,36 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             Save
           </Button>
         </DialogActions>
+
+        {/* Participant Form Dialog */}
+        <ParticipantForm
+          open={participantDialogOpen}
+          onClose={() => {
+            setParticipantDialogOpen(false);
+            setEditingParticipantIndex(null);
+          }}
+          onSubmit={(participantData) => {
+            if (editingParticipantIndex !== null) {
+              // Edit existing
+              setParticipants(prev => prev.map((p, i) =>
+                i === editingParticipantIndex ? participantData : p
+              ));
+              setToast({ open: true, type: "success", msg: "Participant updated" });
+            } else {
+              // Add new
+              setParticipants(prev => [...prev, participantData]);
+              setToast({ open: true, type: "success", msg: "Participant added" });
+            }
+            setParticipantDialogOpen(false);
+            setEditingParticipantIndex(null);
+          }}
+          initialData={
+            editingParticipantIndex !== null
+              ? participants[editingParticipantIndex]
+              : null
+          }
+          existingParticipants={participants}
+        />
       </Dialog>
 
       <Snackbar
