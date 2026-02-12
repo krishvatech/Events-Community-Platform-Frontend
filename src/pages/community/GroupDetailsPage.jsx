@@ -1136,7 +1136,7 @@ function ReportDialog({ open, onClose, onSubmit, loading, targetLabel }) {
 // -----------------------------------------------------------------------------
 // 6. POST CARD
 // -----------------------------------------------------------------------------
-function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, viewerId, viewerIsStaff }) {
+function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, onDelete, canEdit, canDelete, viewerId, viewerIsStaff }) {
   const [local, setLocal] = React.useState(post);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
@@ -1205,7 +1205,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, viewerId, 
           <Typography variant="caption" color="text.secondary">{formatWhen(local.created_at)}</Typography>
         </Box>
         {local.type !== 'text' && <Chip size="small" label={local.type.toUpperCase()} variant="outlined" />}
-        {canReport && (
+        {(canReport || canEdit || canDelete) && (
           <>
             <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
               <MoreVertRoundedIcon fontSize="small" />
@@ -1217,11 +1217,34 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, viewerId, 
               anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
               transformOrigin={{ vertical: "top", horizontal: "right" }}
             >
+              {canEdit && (
+                <MenuItem
+                  onClick={() => {
+                    setMenuAnchor(null);
+                    onEdit?.(local);
+                  }}
+                >
+                  <EditNoteRoundedIcon fontSize="small" sx={{ mr: 1 }} />
+                  Edit post
+                </MenuItem>
+              )}
+              {canDelete && (
+                <MenuItem
+                  onClick={() => {
+                    setMenuAnchor(null);
+                    onDelete?.(local);
+                  }}
+                >
+                  <DeleteOutlineRoundedIcon fontSize="small" sx={{ mr: 1 }} />
+                  Delete post
+                </MenuItem>
+              )}
               <MenuItem
                 onClick={() => {
                   setMenuAnchor(null);
                   onReport?.(local);
                 }}
+                disabled={!canReport}
               >
                 <FlagOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
                 Report post
@@ -1389,6 +1412,15 @@ function PostsTab({ groupId, group, moderatorCanI }) {
   const [pollQuestion, setPollQuestion] = React.useState("");
   const [pollOptions, setPollOptions] = React.useState(["", ""]); // at least two
   const [postBusy, setPostBusy] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editPost, setEditPost] = React.useState(null);
+  const [editText, setEditText] = React.useState("");
+  const [editUrl, setEditUrl] = React.useState("");
+  const [editImageFile, setEditImageFile] = React.useState(null);
+  const [editBusy, setEditBusy] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deletePost, setDeletePost] = React.useState(null);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
 
   // Report state management
   const [reportOpen, setReportOpen] = React.useState(false);
@@ -1489,22 +1521,7 @@ function PostsTab({ groupId, group, moderatorCanI }) {
         });
       }
 
-      // Announcement mode: restrict to owner/admin/mod posts (fallback to owner-only if role not available)
-      const forumEnabled = Boolean(group?.forum_enabled);
-      if (!forumEnabled) {
-        const ownerId = group?.owner?.id || group?.created_by?.id;
-        if (ownerId) {
-          finalPosts = finalPosts.filter(p => {
-            const isEvent = p.type === "event" || p.metadata?.type === "event";
-            if (isEvent) return false;
-            const authorId = p.actor_id || p.author_id || p.author?.id;
-            return String(authorId) === String(ownerId);
-          });
-        } else {
-          // If owner is not loaded, show nothing to be safe as per "only owner posts" requirement
-          finalPosts = [];
-        }
-      }
+      // Keep all posts regardless of forum setting (announcement mode hides creation only)
 
       setPosts(finalPosts);
     } catch (e) {
@@ -1571,6 +1588,8 @@ function PostsTab({ groupId, group, moderatorCanI }) {
     moderatorCanI?.can_create_post
     || (!forumEnabled ? isElevated : (creationRestricted ? isElevated : (isElevated || isActiveMember)))
   );
+  const canMemberManageOwn = forumEnabled && isActiveMember;
+  const canManageAny = isElevated;
 
   // Report dialog handlers
   const openReport = React.useCallback((payload) => {
@@ -1651,6 +1670,102 @@ function PostsTab({ groupId, group, moderatorCanI }) {
       },
     });
   }, [openReport, viewerId, viewerIsStaff]);
+
+  const openEditPost = (post) => {
+    if (!post) return;
+    if (String(post.type).toLowerCase() === "poll") {
+      alert("Poll editing is not supported.");
+      return;
+    }
+    setEditPost(post);
+    setEditText(post.text || "");
+    setEditUrl(post.url || "");
+    setEditImageFile(null);
+    setEditOpen(true);
+  };
+
+  const submitEditPost = async () => {
+    if (!editPost || editBusy) return;
+    setEditBusy(true);
+    try {
+      const t = String(editPost.type || "text").toLowerCase();
+      const url = toApiUrl(`groups/${groupId}/posts/${editPost.id}/edit/`);
+      if (t === "image" && editImageFile) {
+        const fd = new FormData();
+        if (editText.trim()) fd.append("text", editText.trim());
+        fd.append("image", editImageFile, editImageFile.name);
+        const res = await fetch(url, { method: "PATCH", headers: { ...authHeaders() }, body: fd });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to edit post");
+        }
+      } else {
+        const payload = {};
+        if (t === "link") {
+          payload.text = editText.trim();
+          payload.url = editUrl.trim();
+        } else {
+          payload.text = editText.trim();
+        }
+        const res = await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to edit post");
+        }
+      }
+      setEditOpen(false);
+      setEditPost(null);
+      await fetchPosts();
+    } catch (e) {
+      alert(e.message || "Failed to edit post");
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleDeletePost = (post) => {
+    if (!post) return;
+    setDeletePost(post);
+    setDeleteOpen(true);
+  };
+
+  const confirmDeletePost = async () => {
+    if (!deletePost || deleteBusy) return;
+    setDeleteBusy(true);
+    try {
+      if (String(deletePost.type).toLowerCase() === "poll" && deletePost.poll_id) {
+        const res = await fetch(toApiUrl(`activity/feed/polls/${deletePost.poll_id}/delete/`), {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+        });
+        if (!res.ok && res.status !== 204) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to delete poll");
+        }
+      } else {
+        const res = await fetch(toApiUrl(`groups/${groupId}/posts/${deletePost.id}/delete/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: "{}",
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to delete post");
+        }
+      }
+      await fetchPosts();
+      setDeleteOpen(false);
+      setDeletePost(null);
+    } catch (e) {
+      alert(e.message || "Failed to delete post");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   const updatePollOption = (idx, val) => {
     setPollOptions((prev) => {
@@ -1876,17 +1991,26 @@ function PostsTab({ groupId, group, moderatorCanI }) {
           </Typography>
         </Paper>
       ) : (
-        posts.map(p => (
-          <PostCard
-            key={p.id}
-            post={p}
-            onReact={handleReact}
-            onPollVote={(post, optId) => handlePollVote(post, optId)}
-            onReport={handleReport}
-            viewerId={viewerId}
-            viewerIsStaff={viewerIsStaff}
-          />
-        ))
+        posts.map(p => {
+          const isOwn = viewerId && (Number(viewerId) === Number(p.author_id || p.author?.id));
+          const canEdit = canManageAny || (canMemberManageOwn && isOwn);
+          const canDelete = canManageAny || (canMemberManageOwn && isOwn);
+          return (
+            <PostCard
+              key={p.id}
+              post={p}
+              onReact={handleReact}
+              onPollVote={(post, optId) => handlePollVote(post, optId)}
+              onReport={handleReport}
+              onEdit={openEditPost}
+              onDelete={handleDeletePost}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              viewerId={viewerId}
+              viewerIsStaff={viewerIsStaff}
+            />
+          );
+        })
       )}
       <ReportDialog
         open={reportOpen}
@@ -1895,6 +2019,64 @@ function PostsTab({ groupId, group, moderatorCanI }) {
         loading={reportBusy}
         targetLabel={reportTarget?.label}
       />
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Post</DialogTitle>
+        <DialogContent dividers>
+          {String(editPost?.type || "text").toLowerCase() === "link" && (
+            <TextField
+              label="URL"
+              fullWidth
+              value={editUrl}
+              onChange={(e) => setEditUrl(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+          )}
+          <TextField
+            label={String(editPost?.type || "text").toLowerCase() === "image" ? "Caption" : "Text"}
+            fullWidth
+            multiline
+            minRows={3}
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+          />
+          {String(editPost?.type || "text").toLowerCase() === "image" && (
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2 }}>
+              <Button variant="outlined" component="label" startIcon={<InsertPhotoRoundedIcon />}>
+                Replace image
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => setEditImageFile(e.target.files?.[0] || null)}
+                />
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                {editImageFile ? editImageFile.name : "No file selected"}
+              </Typography>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditOpen(false)} disabled={editBusy}>Cancel</Button>
+          <Button variant="contained" onClick={submitEditPost} disabled={editBusy}>
+            {editBusy ? "Saving..." : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Post?</DialogTitle>
+        <DialogContent dividers>
+          <Typography>
+            This will permanently delete the post. This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteOpen(false)} disabled={deleteBusy}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={confirmDeletePost} disabled={deleteBusy}>
+            {deleteBusy ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
