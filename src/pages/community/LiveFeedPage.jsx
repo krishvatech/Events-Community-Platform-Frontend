@@ -2253,7 +2253,7 @@ function ReportDialog({ open, onClose, onSubmit, loading, targetLabel }) {
 
 
 // ---- POST CARD ----
-function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId, viewerIsStaff, onReport }) {
+function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId, viewerIsStaff, onReport, commentsEnabled }) {
   const [local, setLocal] = React.useState(post);
   const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
@@ -2297,6 +2297,9 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
       : `${(likeCount || 0).toLocaleString()} reactions`;
 
   React.useEffect(() => { setLocal(post); }, [post]);
+  React.useEffect(() => {
+    if (commentsEnabled === false) setCommentsOpen(false);
+  }, [commentsEnabled]);
   const commentInputRef = React.useRef(null);
   const bumpShareCount = () => {
     setLocal((curr) => ({ ...curr, metrics: { ...curr.metrics, shares: (curr.metrics?.shares ?? 0) + 1 } }));
@@ -2666,21 +2669,23 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
           {likeBtnLabel}
         </Button>
 
-        <Button
-          size="small"
-          startIcon={<ChatBubbleOutlineIcon />}
-          disabled={!canEngage}
-          onClick={() => {
-            if (!canEngage) return;
-            setCommentsOpen((v) => {
-              const next = !v;
-              if (!v) setTimeout(() => commentInputRef.current?.focus?.(), 0); // focus when opening
-              return next;
-            });
-          }}
-        >
-          COMMENT
-        </Button>
+        {commentsEnabled && (
+          <Button
+            size="small"
+            startIcon={<ChatBubbleOutlineIcon />}
+            disabled={!canEngage}
+            onClick={() => {
+              if (!canEngage) return;
+              setCommentsOpen((v) => {
+                const next = !v;
+                if (!v) setTimeout(() => commentInputRef.current?.focus?.(), 0); // focus when opening
+                return next;
+              });
+            }}
+          >
+            COMMENT
+          </Button>
+        )}
 
 
         <Button
@@ -2740,7 +2745,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
       </Popover>
 
       {/* Inline comments, always visible like LinkedIn/Instagram */}
-      {commentsOpen && (
+      {commentsEnabled && commentsOpen && (
         <CommentsDialog
           inline
           initialCount={3}
@@ -2982,6 +2987,8 @@ export default function LiveFeedPage({
   const [me, setMe] = React.useState(null);
   const [focusPostId, setFocusPostId] = React.useState(null);
   const focusHandledRef = React.useRef(false);
+  const [groupCommentsEnabled, setGroupCommentsEnabled] = React.useState({});
+  const groupCommentsEnabledRef = React.useRef({});
   // Composer (kept off per your UI; uncomment if needed)
   const MAX_LEN = 280;
   const [composeText, setComposeText] = React.useState("");
@@ -3014,6 +3021,37 @@ export default function LiveFeedPage({
         setMe(null);
       }
     })();
+  }, []);
+
+  React.useEffect(() => {
+    groupCommentsEnabledRef.current = groupCommentsEnabled;
+  }, [groupCommentsEnabled]);
+
+  const ensureGroupCommentSettings = React.useCallback(async (groupIds) => {
+    const uniq = Array.from(new Set((groupIds || []).filter(Boolean)));
+    if (!uniq.length) return;
+    const missing = uniq.filter((gid) => groupCommentsEnabledRef.current[gid] === undefined);
+    if (!missing.length) return;
+
+    const headers = { Accept: "application/json", ...authHeaders() };
+    const entries = await Promise.all(missing.map(async (gid) => {
+      try {
+        const res = await fetch(toApiUrl(`groups/${gid}/settings/communication/`), { headers });
+        if (!res.ok) return [gid, true];
+        const data = await res.json();
+        return [gid, data?.posts_comments_enabled !== false];
+      } catch {
+        return [gid, true];
+      }
+    }));
+
+    setGroupCommentsEnabled((prev) => {
+      const next = { ...prev };
+      entries.forEach(([gid, enabled]) => {
+        if (gid != null) next[gid] = enabled;
+      });
+      return next;
+    });
   }, []);
 
   // 🔼 Show "scroll to top" button after user scrolls down
@@ -3504,6 +3542,7 @@ export default function LiveFeedPage({
       const page = await res.json();
       const rawItems = (page.results || page).map(mapFeedItem).filter(Boolean);
       const items = await hydrateMetrics(rawItems); // ⬅️ enrich with like/comment/share + me_liked
+      await ensureGroupCommentSettings(items.map((p) => p.group_id).filter(Boolean));
 
       setPosts((curr) => (append ? [...curr, ...items] : items));
       const next = page?.next ? page.next : null;
@@ -3539,13 +3578,14 @@ export default function LiveFeedPage({
           // If backend already shaped the post (has .type), use it as-is; else map it.
           const incoming = msg.post?.type ? msg.post : mapFeedItem(msg.post);
           if (!incoming) return;
+          if (incoming.group_id) ensureGroupCommentSettings([incoming.group_id]);
           // De-dup if the same id is already present (e.g., appears later via HTTP page load)
           setPosts((curr) => [incoming, ...curr.filter((p) => p.id !== incoming.id)]);
         }
       } catch { }
     };
     return () => ws.close();
-  }, [websocketUrl, scope]);
+  }, [websocketUrl, scope, ensureGroupCommentSettings]);
 
   // Check if we should focus a specific post (shared from messages)
   React.useEffect(() => {
@@ -3852,6 +3892,7 @@ export default function LiveFeedPage({
                       viewerId={viewerId}
                       viewerIsStaff={viewerIsStaff}
                       onReport={handleReport}
+                      commentsEnabled={p.group_id ? (groupCommentsEnabled[p.group_id] !== false) : true}
                     />
                   </Box>
                   {/* After 4 posts: mutual connections */}
