@@ -86,6 +86,9 @@ import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
+import ReportProblemIcon from "@mui/icons-material/ReportProblem";
+import SupportAgentIcon from "@mui/icons-material/SupportAgent";
+
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
 
@@ -2097,6 +2100,30 @@ export default function NewLiveMeeting() {
     else setRightOpen(false);
   };
 
+  // --- Participant "More" Menu State ---
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState(null);
+  const moreMenuOpen = Boolean(moreMenuAnchor);
+
+  const handleOpenMoreMenu = (event) => {
+    setMoreMenuAnchor(event.currentTarget);
+  };
+
+  const handleCloseMoreMenu = () => {
+    setMoreMenuAnchor(null);
+  };
+
+  const handleReportIssue = () => {
+    handleCloseMoreMenu();
+    showSnackbar("Report issue feature coming soon!", "info");
+  };
+
+
+
+  const handleContactSupport = () => {
+    handleCloseMoreMenu();
+    showSnackbar("Contact support feature coming soon!", "info");
+  };
+  // -------------------------------------
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(false);
   // ✅ Store user's preferred media state to preserve across room switches
@@ -10467,7 +10494,14 @@ export default function NewLiveMeeting() {
               </Tooltip>
             ) : (
               <Tooltip title="More">
-                <IconButton sx={headerIconBtnSx} aria-label="More options">
+                <IconButton
+                  sx={headerIconBtnSx}
+                  aria-label="More options"
+                  onClick={handleOpenMoreMenu}
+                  aria-controls={moreMenuOpen ? "participant-more-menu" : undefined}
+                  aria-haspopup="true"
+                  aria-expanded={moreMenuOpen ? "true" : undefined}
+                >
                   <MoreVertIcon />
                 </IconButton>
               </Tooltip>
@@ -11673,9 +11707,9 @@ export default function NewLiveMeeting() {
             </ListItemIcon>
             <ListItemText>
               {spotlightTarget &&
-              (spotlightTarget?.participantId
-                ? String(spotlightTarget.participantId) === String(participantMenuTarget?.id)
-                : spotlightTarget?.participantUserKey &&
+                (spotlightTarget?.participantId
+                  ? String(spotlightTarget.participantId) === String(participantMenuTarget?.id)
+                  : spotlightTarget?.participantUserKey &&
                   spotlightTarget.participantUserKey === getParticipantUserKey(participantMenuTarget?._raw || participantMenuTarget))
                 ? "Already On Stage"
                 : "Bring To Main Stage"}
@@ -12028,8 +12062,53 @@ export default function NewLiveMeeting() {
           </DialogActions>
         </Dialog>
 
+        {/* ✅ Participant More Menu */}
+        <Menu
+          id="participant-more-menu"
+          anchorEl={moreMenuAnchor}
+          open={moreMenuOpen}
+          onClose={handleCloseMoreMenu}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+          PaperProps={{
+            sx: {
+              mt: 1,
+              minWidth: 220,
+              bgcolor: "rgba(0,0,0,0.92)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              borderRadius: 2.5,
+              backdropFilter: "blur(12px)",
+              color: "#fff",
+              "& .MuiMenuItem-root": {
+                typography: "body2",
+                fontWeight: 600,
+                gap: 1.5,
+                py: 1.2,
+                "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
+              },
+              "& .MuiListItemIcon-root": {
+                color: "rgba(255,255,255,0.8)",
+                minWidth: 32,
+              },
+            },
+          }}
+        >
+          <MenuItem onClick={handleReportIssue}>
+            <ListItemIcon>
+              <ReportProblemIcon fontSize="small" />
+            </ListItemIcon>
+            Report an Issue
+          </MenuItem>
+          <MenuItem onClick={handleContactSupport}>
+            <ListItemIcon>
+              <SupportAgentIcon fontSize="small" />
+            </ListItemIcon>
+            Help & Support
+          </MenuItem>
+        </Menu>
+
       </Box>
-    </DyteProvider>
+    </DyteProvider >
 
   );
 }
