@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Typography } from '@mui/material';
+import { Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Typography, FormControlLabel, Checkbox, Slider, Paper } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import AddIcon from '@mui/icons-material/Add';
@@ -20,12 +20,51 @@ export default function SpeedNetworkingControls({
     const [createOpen, setCreateOpen] = useState(false);
     const [sessionName, setSessionName] = useState('Speed Networking');
     const [duration, setDuration] = useState(3);
+    const [criteriaConfig, setCriteriaConfig] = useState({
+        skill: { enabled: true, weight: 35 },
+        experience: { enabled: true, weight: 30 },
+        location: { enabled: true, weight: 20 },
+        education: { enabled: true, weight: 15 }
+    });
     const [loading, setLoading] = useState(false);
 
     const handleCreateSession = async () => {
         try {
             setLoading(true);
             const url = `${API_ROOT}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
+
+            // Build criteria config with proper structure
+            const builtCriteriaConfig = {
+                skill: criteriaConfig.skill.enabled ? {
+                    enabled: true,
+                    required: true,
+                    weight: criteriaConfig.skill.weight / 100,
+                    threshold: 40,
+                    match_mode: 'similar'
+                } : { enabled: false },
+                experience: criteriaConfig.experience.enabled ? {
+                    enabled: true,
+                    required: true,
+                    weight: criteriaConfig.experience.weight / 100,
+                    threshold: 50,
+                    match_type: 'peer'
+                } : { enabled: false },
+                location: criteriaConfig.location.enabled ? {
+                    enabled: true,
+                    required: true,
+                    weight: criteriaConfig.location.weight / 100,
+                    threshold: 30,
+                    match_strategy: 'radius'
+                } : { enabled: false },
+                education: criteriaConfig.education.enabled ? {
+                    enabled: true,
+                    required: true,
+                    weight: criteriaConfig.education.weight / 100,
+                    threshold: 40,
+                    match_type: 'same_level'
+                } : { enabled: false }
+            };
+
             const res = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -35,6 +74,8 @@ export default function SpeedNetworkingControls({
                 body: JSON.stringify({
                     name: sessionName,
                     duration_minutes: duration,
+                    matching_strategy: 'both',
+                    criteria_config: builtCriteriaConfig,
                     status: 'PENDING'
                 })
             });
@@ -149,7 +190,7 @@ export default function SpeedNetworkingControls({
                             label="Duration (minutes)"
                             value={duration}
                             onChange={(e) => setDuration(Number(e.target.value))}
-                            inputProps={{ min: 2, max: 10 }}
+                            slotProps={{ input: { min: 2, max: 10 } }}
                             sx={{
                                 mt: 2,
                                 '& .MuiOutlinedInput-root': {
@@ -161,6 +202,192 @@ export default function SpeedNetworkingControls({
                                 }
                             }}
                         />
+
+                        {/* Matching Criteria Configuration */}
+                        <Typography sx={{ color: '#fff', mt: 3, mb: 2, fontWeight: 600 }}>
+                            Matching Criteria
+                        </Typography>
+                        <Paper sx={{ bgcolor: 'rgba(255,255,255,0.04)', p: 2, borderRadius: 2 }}>
+                            {/* Skill */}
+                            <Box sx={{ mb: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Typography sx={{ color: '#fff' }}>🔧 Skill Matching</Typography>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={criteriaConfig.skill.enabled}
+                                                onChange={(e) =>
+                                                    setCriteriaConfig({
+                                                        ...criteriaConfig,
+                                                        skill: { ...criteriaConfig.skill, enabled: e.target.checked }
+                                                    })
+                                                }
+                                                sx={{ color: '#5a78ff' }}
+                                            />
+                                        }
+                                        label=""
+                                    />
+                                </Box>
+                                {criteriaConfig.skill.enabled && (
+                                    <Box sx={{ mt: 1 }}>
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, mb: 1 }}>
+                                            Weight: {criteriaConfig.skill.weight}%
+                                        </Typography>
+                                        <Slider
+                                            value={criteriaConfig.skill.weight}
+                                            onChange={(e, newValue) =>
+                                                setCriteriaConfig({
+                                                    ...criteriaConfig,
+                                                    skill: { ...criteriaConfig.skill, weight: newValue }
+                                                })
+                                            }
+                                            min={0}
+                                            max={100}
+                                            step={5}
+                                            sx={{ color: '#5a78ff' }}
+                                        />
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, mt: 1 }}>
+                                            Matches complementary skills (Jaccard similarity)
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+
+                            {/* Experience */}
+                            <Box sx={{ mb: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Typography sx={{ color: '#fff' }}>📈 Experience Matching</Typography>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={criteriaConfig.experience.enabled}
+                                                onChange={(e) =>
+                                                    setCriteriaConfig({
+                                                        ...criteriaConfig,
+                                                        experience: { ...criteriaConfig.experience, enabled: e.target.checked }
+                                                    })
+                                                }
+                                                sx={{ color: '#5a78ff' }}
+                                            />
+                                        }
+                                        label=""
+                                    />
+                                </Box>
+                                {criteriaConfig.experience.enabled && (
+                                    <Box sx={{ mt: 1 }}>
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, mb: 1 }}>
+                                            Weight: {criteriaConfig.experience.weight}%
+                                        </Typography>
+                                        <Slider
+                                            value={criteriaConfig.experience.weight}
+                                            onChange={(e, newValue) =>
+                                                setCriteriaConfig({
+                                                    ...criteriaConfig,
+                                                    experience: { ...criteriaConfig.experience, weight: newValue }
+                                                })
+                                            }
+                                            min={0}
+                                            max={100}
+                                            step={5}
+                                            sx={{ color: '#5a78ff' }}
+                                        />
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, mt: 1 }}>
+                                            Analyzes gap between experience levels for mentorship
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+
+                            {/* Location */}
+                            <Box sx={{ mb: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Typography sx={{ color: '#fff' }}>📍 Location Matching</Typography>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={criteriaConfig.location.enabled}
+                                                onChange={(e) =>
+                                                    setCriteriaConfig({
+                                                        ...criteriaConfig,
+                                                        location: { ...criteriaConfig.location, enabled: e.target.checked }
+                                                    })
+                                                }
+                                                sx={{ color: '#5a78ff' }}
+                                            />
+                                        }
+                                        label=""
+                                    />
+                                </Box>
+                                {criteriaConfig.location.enabled && (
+                                    <Box sx={{ mt: 1 }}>
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, mb: 1 }}>
+                                            Weight: {criteriaConfig.location.weight}%
+                                        </Typography>
+                                        <Slider
+                                            value={criteriaConfig.location.weight}
+                                            onChange={(e, newValue) =>
+                                                setCriteriaConfig({
+                                                    ...criteriaConfig,
+                                                    location: { ...criteriaConfig.location, weight: newValue }
+                                                })
+                                            }
+                                            min={0}
+                                            max={100}
+                                            step={5}
+                                            sx={{ color: '#5a78ff' }}
+                                        />
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, mt: 1 }}>
+                                            Uses Haversine distance for proximity matching
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+
+                            {/* Education */}
+                            <Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Typography sx={{ color: '#fff' }}>🎓 Education Matching</Typography>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={criteriaConfig.education.enabled}
+                                                onChange={(e) =>
+                                                    setCriteriaConfig({
+                                                        ...criteriaConfig,
+                                                        education: { ...criteriaConfig.education, enabled: e.target.checked }
+                                                    })
+                                                }
+                                                sx={{ color: '#5a78ff' }}
+                                            />
+                                        }
+                                        label=""
+                                    />
+                                </Box>
+                                {criteriaConfig.education.enabled && (
+                                    <Box sx={{ mt: 1 }}>
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, mb: 1 }}>
+                                            Weight: {criteriaConfig.education.weight}%
+                                        </Typography>
+                                        <Slider
+                                            value={criteriaConfig.education.weight}
+                                            onChange={(e, newValue) =>
+                                                setCriteriaConfig({
+                                                    ...criteriaConfig,
+                                                    education: { ...criteriaConfig.education, weight: newValue }
+                                                })
+                                            }
+                                            min={0}
+                                            max={100}
+                                            step={5}
+                                            sx={{ color: '#5a78ff' }}
+                                        />
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, mt: 1 }}>
+                                            Matches complementary education backgrounds and fields
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        </Paper>
                     </DialogContent>
                     <DialogActions sx={{ p: 2 }}>
                         <Button

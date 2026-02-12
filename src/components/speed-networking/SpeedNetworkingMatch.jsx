@@ -21,6 +21,7 @@ export default function SpeedNetworkingMatch({
     // Initialize Dyte Meeting for this match
     useEffect(() => {
         if (match?.dyte_token) {
+            console.log("[SpeedNetworkingMatch] Initializing Dyte meeting with token for match:", match.id);
             initMeeting({
                 authToken: match.dyte_token,
                 defaults: {
@@ -34,6 +35,38 @@ export default function SpeedNetworkingMatch({
             setVideoError("Video connection unavailable (Server Error)");
         }
     }, [match, initMeeting]);
+
+    // Log participants when meeting changes
+    useEffect(() => {
+        if (meeting) {
+            console.log("[SpeedNetworkingMatch] Meeting joined. Participants:", {
+                total: meeting.participants?.count || 0,
+                remote: meeting.participants?.remoteParticipants?.length || 0,
+                self: meeting.self?.id
+            });
+
+            // Listen for participant events
+            const handleParticipantJoined = (event) => {
+                console.log("[SpeedNetworkingMatch] Participant joined:", event);
+            };
+
+            const handleParticipantLeft = (event) => {
+                console.log("[SpeedNetworkingMatch] Participant left:", event);
+            };
+
+            if (meeting.participants) {
+                meeting.participants.on?.('participantJoined', handleParticipantJoined);
+                meeting.participants.on?.('participantLeft', handleParticipantLeft);
+            }
+
+            return () => {
+                if (meeting.participants) {
+                    meeting.participants.off?.('participantJoined', handleParticipantJoined);
+                    meeting.participants.off?.('participantLeft', handleParticipantLeft);
+                }
+            };
+        }
+    }, [meeting]);
 
     // Timer countdown
     useEffect(() => {

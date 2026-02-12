@@ -98,6 +98,14 @@ export default function SpeedNetworkingZone({
         }
     }, [lastMessage, onEnterMatch, fetchActiveSession]);
 
+    // When session ends, immediately clear queue and match states
+    useEffect(() => {
+        if (session && session.status === 'ENDED') {
+            setCurrentMatch(null);
+            setInQueue(false);
+        }
+    }, [session?.status]);
+
     // Join queue
     const handleJoinQueue = async () => {
         if (!session) return;
@@ -110,9 +118,11 @@ export default function SpeedNetworkingZone({
                 headers: { ...authHeader(), 'Content-Type': 'application/json' }
             });
 
-            if (!res.ok) throw new Error('Failed to join queue');
-
             const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to join queue');
+            }
 
             if (data.status === 'matched') {
                 setCurrentMatch(data.match);
@@ -154,40 +164,43 @@ export default function SpeedNetworkingZone({
     };
 
     // Next match
-    const handleNextMatch = async () => {
+    const handleNextMatch = useCallback(async () => {
         if (!currentMatch) return;
         setError(null);
 
+        // Capture current match ID before clearing state
+        const matchId = currentMatch.id;
+
+        // CRITICAL: Immediately show "Finding your match..." to both users
+        // This ensures immediate UI feedback when timer expires or user clicks "Next Match"
+        // The backend API call happens in the background
+        setCurrentMatch(null);
+        setInQueue(true);
+        setLoading(true);
+
         try {
-            setLoading(true);
-            const url = `${API_ROOT}/events/${eventId}/speed-networking/matches/${currentMatch.id}/next/`.replace(/([^:]\/)\/+/g, "$1");
+            const url = `${API_ROOT}/events/${eventId}/speed-networking/matches/${matchId}/next/`.replace(/([^:]\/)\/+/g, "$1");
             const res = await fetch(url, {
                 method: 'POST',
                 headers: authHeader()
             });
 
-            if (!res.ok) throw new Error('Failed to get next match');
-
             const data = await res.json();
 
-            if (data.status === 'matched') {
-                setCurrentMatch(data.match);
-                if (onEnterMatch) {
-                    onEnterMatch(data.match);
-                }
-            } else {
-                setCurrentMatch(null);
-                setInQueue(true);
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to get next match');
             }
+
             setLoading(false);
         } catch (err) {
             console.error('[SpeedNetworking] Error getting next match:', err);
             setError(err.message);
             setLoading(false);
         }
-    };
+    }, [currentMatch, eventId]);
 
-    // Poll for current match when in queue
+    // Poll for current match when in queue (only if waiting)
+    // WebSocket will notify of matches, but polling is fallback for reliability
     useEffect(() => {
         if (!inQueue || !session) return;
 
@@ -217,7 +230,7 @@ export default function SpeedNetworkingZone({
             } catch (err) {
                 console.error('[SpeedNetworking] Error polling match:', err);
             }
-        }, 2000); // Poll every 2 seconds
+        }, 5000); // Poll every 5 seconds (reduced frequency - WebSocket handles real-time)
 
         return () => clearInterval(pollInterval);
     }, [inQueue, session, eventId, onEnterMatch]);
@@ -226,6 +239,59 @@ export default function SpeedNetworkingZone({
     useEffect(() => {
         fetchActiveSession();
     }, [fetchActiveSession]);
+
+    // Poll session status periodically (fallback for WebSocket)
+    // Only check when session might have changed (not in active match)
+    useEffect(() => {
+        if (!session) return;
+
+        const pollInterval = setInterval(async () => {
+            try {
+                const url = `${API_ROOT}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
+                const res = await fetch(url, { headers: authHeader() });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    // First look for ACTIVE/PENDING sessions
+                    let activeSession = data.results?.find(s => ['ACTIVE', 'PENDING'].includes(s.status)) || null;
+
+                    // If no ACTIVE/PENDING session but we have a session, check if current session ended
+                    if (!activeSession && session) {
+                        activeSession = data.results?.find(s => s.id === session.id) || null;
+                    }
+
+                    // If session status changed, update it
+                    if (activeSession && activeSession.id !== session.id) {
+                        // Different session found (new session created)
+                        console.log("[SpeedNetworking] New session detected, updating:", activeSession.id);
+                        setSession(activeSession);
+                        setCurrentMatch(null);
+                        setInQueue(false);
+                    } else if (activeSession && activeSession.status !== session.status) {
+                        // Same session but status changed
+                        console.log("[SpeedNetworking] Session status changed to:", activeSession.status);
+                        setSession(activeSession);
+
+                        // If session ended, clear match and queue
+                        if (activeSession.status === 'ENDED') {
+                            setCurrentMatch(null);
+                            setInQueue(false);
+                        }
+                    } else if (!activeSession && session) {
+                        // Current session was not found (might have been deleted) - treat as ended
+                        console.log("[SpeedNetworking] Current session no longer exists");
+                        setSession(prev => prev ? { ...prev, status: 'ENDED' } : prev);
+                        setCurrentMatch(null);
+                        setInQueue(false);
+                    }
+                }
+            } catch (err) {
+                console.error('[SpeedNetworking] Error polling session status:', err);
+            }
+        }, 5000); // Poll every 5 seconds (reduced frequency - WebSocket handles real-time updates)
+
+        return () => clearInterval(pollInterval);
+    }, [session, eventId]);
 
     if (loading && !session) {
         return (
@@ -268,7 +334,7 @@ export default function SpeedNetworkingZone({
         );
     }
 
-    if (!session) {
+    if (!session || session.status === 'ENDED') {
         return (
             <Box sx={{
                 width: '100%',
