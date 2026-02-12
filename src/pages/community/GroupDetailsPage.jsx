@@ -43,11 +43,11 @@ import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
 const POST_REACTIONS = [
-  { id: "like", emoji: "ðŸ‘", label: "Like" },
-  { id: "intriguing", emoji: "ðŸ¤”", label: "Intriguing" },
-  { id: "spot_on", emoji: "ðŸŽ¯", label: "Spot On" },
-  { id: "validated", emoji: "ðŸ§ ", label: "Validated" },
-  { id: "debatable", emoji: "ðŸ¤·", label: "Debatable" },
+  { id: "like", emoji: "\u{1F44D}", label: "Like" },
+  { id: "intriguing", emoji: "\u{1F914}", label: "Intriguing" },
+  { id: "spot_on", emoji: "\u{1F3AF}", label: "Spot On" },
+  { id: "validated", emoji: "\u{1F9E0}", label: "Validated" },
+  { id: "debatable", emoji: "\u{1F937}", label: "Debatable" },
 ];
 
 const REPORT_REASONS = [
@@ -1159,7 +1159,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
   const myReactionId = local.my_reaction || (local.liked_by_me ? "like" : null);
   const myReactionDef = POST_REACTIONS.find(r => r.id === myReactionId);
   const likeBtnLabel = myReactionDef?.label || "Like";
-  const likeBtnEmoji = myReactionDef?.emoji || "ðŸ‘";
+  const likeBtnEmoji = myReactionDef?.emoji || "\u{1F44D}";
   const hasReaction = !!myReactionId;
 
   // Check if user can report this post
