@@ -1417,6 +1417,8 @@ function PostsTab({ groupId, group, moderatorCanI }) {
   const [editText, setEditText] = React.useState("");
   const [editUrl, setEditUrl] = React.useState("");
   const [editImageFile, setEditImageFile] = React.useState(null);
+  const [editPollQuestion, setEditPollQuestion] = React.useState("");
+  const [editPollOptions, setEditPollOptions] = React.useState(["", ""]);
   const [editBusy, setEditBusy] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deletePost, setDeletePost] = React.useState(null);
@@ -1671,13 +1673,24 @@ function PostsTab({ groupId, group, moderatorCanI }) {
     });
   }, [openReport, viewerId, viewerIsStaff]);
 
+  const updateEditPollOption = (idx, val) => {
+    setEditPollOptions((prev) => {
+      const copy = [...prev];
+      copy[idx] = val;
+      return copy;
+    });
+  };
+  const addEditPollOption = () => setEditPollOptions((prev) => [...prev, ""]);
+  const removeEditPollOption = (idx) => setEditPollOptions((prev) => prev.filter((_, i) => i !== idx));
+
   const openEditPost = (post) => {
     if (!post) return;
-    if (String(post.type).toLowerCase() === "poll") {
-      alert("Poll editing is not supported.");
-      return;
-    }
     setEditPost(post);
+    if (String(post.type).toLowerCase() === "poll") {
+      setEditPollQuestion(post.text || post.question || "");
+      const opts = (post.options || []).map((o) => o?.label ?? o?.text ?? String(o));
+      setEditPollOptions(opts.length >= 2 ? opts : ["", ""]);
+    }
     setEditText(post.text || "");
     setEditUrl(post.url || "");
     setEditImageFile(null);
@@ -1690,7 +1703,22 @@ function PostsTab({ groupId, group, moderatorCanI }) {
     try {
       const t = String(editPost.type || "text").toLowerCase();
       const url = toApiUrl(`groups/${groupId}/posts/${editPost.id}/edit/`);
-      if (t === "image" && editImageFile) {
+      if (t === "poll") {
+        const payload = {
+          poll_id: Number(editPost.poll_id),
+          question: editPollQuestion.trim(),
+          options: cleanPollOptions(editPollOptions),
+        };
+        const res = await fetch(toApiUrl(`activity/feed/polls/update/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to edit poll");
+        }
+      } else if (t === "image" && editImageFile) {
         const fd = new FormData();
         if (editText.trim()) fd.append("text", editText.trim());
         fd.append("image", editImageFile, editImageFile.name);
@@ -2022,6 +2050,35 @@ function PostsTab({ groupId, group, moderatorCanI }) {
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Edit Post</DialogTitle>
         <DialogContent dividers>
+          {String(editPost?.type || "text").toLowerCase() === "poll" && (
+            <>
+              <TextField
+                label="Poll question"
+                fullWidth
+                value={editPollQuestion}
+                onChange={(e) => setEditPollQuestion(e.target.value)}
+                sx={{ mb: 2 }}
+              />
+              <Stack spacing={1}>
+                {editPollOptions.map((opt, idx) => (
+                  <Stack key={idx} direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      label={`Option ${idx + 1}`}
+                      value={opt}
+                      onChange={(e) => updateEditPollOption(idx, e.target.value)}
+                      fullWidth
+                    />
+                    {editPollOptions.length > 2 && (
+                      <Button size="small" onClick={() => removeEditPollOption(idx)}>Remove</Button>
+                    )}
+                  </Stack>
+                ))}
+                <Button size="small" onClick={addEditPollOption}>
+                  Add option
+                </Button>
+              </Stack>
+            </>
+          )}
           {String(editPost?.type || "text").toLowerCase() === "link" && (
             <TextField
               label="URL"
@@ -2038,6 +2095,7 @@ function PostsTab({ groupId, group, moderatorCanI }) {
             minRows={3}
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
+            sx={{ display: String(editPost?.type || "text").toLowerCase() === "poll" ? "none" : "block" }}
           />
           {String(editPost?.type || "text").toLowerCase() === "image" && (
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2 }}>
