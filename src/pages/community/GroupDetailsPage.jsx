@@ -8,7 +8,7 @@ import {
   ListItemText, ListItemButton, ListItemSecondaryAction, Pagination,
   Paper, Popover, Stack, Tab, Tabs, TextField, Tooltip, Typography,
   CircularProgress, LinearProgress, Link, Checkbox, Skeleton,
-  Snackbar, Alert, Menu, MenuItem, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio
+  Snackbar, Alert, Menu, MenuItem, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, Switch
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 
@@ -1378,10 +1378,17 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, viewerId, 
 // 7. TABS CONTENT
 // -----------------------------------------------------------------------------
 
-function PostsTab({ groupId, group }) {
+function PostsTab({ groupId, group, moderatorCanI }) {
   const [posts, setPosts] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [postsMeta, setPostsMeta] = React.useState(null);
+  const [postType, setPostType] = React.useState("text"); // text | image | link | poll
+  const [postText, setPostText] = React.useState("");
+  const [postImageFile, setPostImageFile] = React.useState(null);
+  const [postLinkUrl, setPostLinkUrl] = React.useState("");
+  const [pollQuestion, setPollQuestion] = React.useState("");
+  const [pollOptions, setPollOptions] = React.useState(["", ""]); // at least two
+  const [postBusy, setPostBusy] = React.useState(false);
 
   // Report state management
   const [reportOpen, setReportOpen] = React.useState(false);
@@ -1482,22 +1489,21 @@ function PostsTab({ groupId, group }) {
         });
       }
 
-      // FILTER FOR OWNER ONLY AND EXCLUDE EVENTS
-      const ownerId = group?.owner?.id || group?.created_by?.id;
-
-      if (ownerId) {
-        finalPosts = finalPosts.filter(p => {
-          // 1. Exclude events explicitly
-          const isEvent = p.type === 'event' || p.metadata?.type === 'event';
-          if (isEvent) return false;
-
-          // 2. Check Owner
-          const authorId = p.actor_id || p.author_id || p.author?.id;
-          return String(authorId) === String(ownerId);
-        });
-      } else {
-        // If owner is not loaded, show nothing to be safe as per "only owner posts" requirement
-        finalPosts = [];
+      // Announcement mode: restrict to owner/admin/mod posts (fallback to owner-only if role not available)
+      const forumEnabled = Boolean(group?.forum_enabled);
+      if (!forumEnabled) {
+        const ownerId = group?.owner?.id || group?.created_by?.id;
+        if (ownerId) {
+          finalPosts = finalPosts.filter(p => {
+            const isEvent = p.type === "event" || p.metadata?.type === "event";
+            if (isEvent) return false;
+            const authorId = p.actor_id || p.author_id || p.author?.id;
+            return String(authorId) === String(ownerId);
+          });
+        } else {
+          // If owner is not loaded, show nothing to be safe as per "only owner posts" requirement
+          finalPosts = [];
+        }
       }
 
       setPosts(finalPosts);
@@ -1556,6 +1562,15 @@ function PostsTab({ groupId, group }) {
 
   const viewerId = me?.id || me?.user?.id || null;
   const viewerIsStaff = !!(me?.is_staff || me?.is_superuser || me?.isAdmin || me?.role === "admin");
+  const role = String(group?.current_user_role || "").toLowerCase();
+  const isActiveMember = String(group?.membership_status || "").toLowerCase() === "active";
+  const isElevated = role === "owner" || role === "admin" || role === "moderator";
+  const forumEnabled = Boolean(group?.forum_enabled);
+  const creationRestricted = Boolean(group?.posts_creation_restricted);
+  const canCreatePost = Boolean(
+    moderatorCanI?.can_create_post
+    || (!forumEnabled ? isElevated : (creationRestricted ? isElevated : (isElevated || isActiveMember)))
+  );
 
   // Report dialog handlers
   const openReport = React.useCallback((payload) => {
@@ -1637,6 +1652,88 @@ function PostsTab({ groupId, group }) {
     });
   }, [openReport, viewerId, viewerIsStaff]);
 
+  const updatePollOption = (idx, val) => {
+    setPollOptions((prev) => {
+      const copy = [...prev];
+      copy[idx] = val;
+      return copy;
+    });
+  };
+  const addPollOption = () => setPollOptions((prev) => [...prev, ""]);
+  const removePollOption = (idx) => setPollOptions((prev) => prev.filter((_, i) => i !== idx));
+  const cleanPollOptions = (opts) => (opts || []).map((o) => String(o || "").trim()).filter(Boolean);
+
+  const handleCreatePost = async () => {
+    if (postBusy) return;
+    setPostBusy(true);
+    try {
+      if (postType === "image") {
+        const fd = new FormData();
+        fd.append("type", "image");
+        if (postText.trim()) fd.append("text", postText.trim());
+        if (postImageFile) fd.append("image", postImageFile, postImageFile.name);
+        const res = await fetch(toApiUrl(`groups/${groupId}/posts/`), {
+          method: "POST",
+          headers: { ...authHeaders() },
+          body: fd,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to create image post");
+        }
+      } else if (postType === "link") {
+        const payload = { type: "link", url: postLinkUrl.trim(), text: postText.trim() };
+        const res = await fetch(toApiUrl(`groups/${groupId}/posts/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to create link post");
+        }
+      } else if (postType === "poll") {
+        const payload = {
+          question: pollQuestion.trim(),
+          options: cleanPollOptions(pollOptions),
+          group_id: Number(group?.id || groupId),
+        };
+        const res = await fetch(toApiUrl(`activity/feed/polls/create/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to create poll");
+        }
+      } else {
+        const text = postText.trim();
+        if (!text) throw new Error("Text is required");
+        const res = await fetch(toApiUrl(`groups/${groupId}/posts/`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ type: "text", text }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to create post");
+        }
+      }
+
+      setPostText("");
+      setPostImageFile(null);
+      setPostLinkUrl("");
+      setPollQuestion("");
+      setPollOptions(["", ""]);
+      await fetchPosts();
+    } catch (e) {
+      alert(e.message || "Failed to create post");
+    } finally {
+      setPostBusy(false);
+    }
+  };
+
   // Inside PostsTab function
   if (loading) {
     return (
@@ -1649,34 +1746,148 @@ function PostsTab({ groupId, group }) {
     );
   }
 
-  // Empty state: differentiate between "no posts" and "posts removed by moderation"
-  if (!posts.length) {
-    const hasRemovedPosts = postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0);
-
-    return (
-      <Paper sx={{ p: 3, border: `1px solid ${BORDER}`, borderRadius: 3, textAlign: "center" }}>
-        <Typography color="text.secondary" sx={{ fontStyle: hasRemovedPosts ? "italic" : "normal" }}>
-          {hasRemovedPosts
-            ? "This content was removed by moderators."
-            : "No posts in this group yet."}
-        </Typography>
-      </Paper>
-    );
-  }
+  const hasRemovedPosts = postsMeta?.has_removed_posts || (postsMeta?.removed_posts > 0 && postsMeta?.visible_posts === 0);
 
   return (
     <Box>
-      {posts.map(p => (
-        <PostCard
-          key={p.id}
-          post={p}
-          onReact={handleReact}
-          onPollVote={(post, optId) => handlePollVote(post, optId)}
-          onReport={handleReport}
-          viewerId={viewerId}
-          viewerIsStaff={viewerIsStaff}
-        />
-      ))}
+      {canCreatePost && (
+        <Paper sx={{ p: 2, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+          <Stack spacing={2}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <TextField
+                select
+                size="small"
+                label="Post Type"
+                value={postType}
+                onChange={(e) => setPostType(e.target.value)}
+                sx={{ minWidth: 200 }}
+              >
+                <MenuItem value="text">Text</MenuItem>
+                <MenuItem value="image">Image</MenuItem>
+                <MenuItem value="link">Link</MenuItem>
+                <MenuItem value="poll">Poll</MenuItem>
+              </TextField>
+              <Button
+                variant="contained"
+                onClick={handleCreatePost}
+                disabled={
+                  postBusy
+                  || (postType === "text" && !postText.trim())
+                  || (postType === "image" && !postImageFile)
+                  || (postType === "link" && !postLinkUrl.trim())
+                  || (postType === "poll" && (!pollQuestion.trim() || cleanPollOptions(pollOptions).length < 2))
+                }
+              >
+                {postBusy ? "Posting..." : "Post"}
+              </Button>
+            </Stack>
+
+            {postType === "text" && (
+              <TextField
+                multiline
+                minRows={3}
+                placeholder="Write a post..."
+                value={postText}
+                onChange={(e) => setPostText(e.target.value)}
+              />
+            )}
+
+            {postType === "image" && (
+              <>
+                <TextField
+                  multiline
+                  minRows={2}
+                  placeholder="Caption (optional)"
+                  value={postText}
+                  onChange={(e) => setPostText(e.target.value)}
+                />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button variant="outlined" component="label" startIcon={<InsertPhotoRoundedIcon />}>
+                    Choose image
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={(e) => setPostImageFile(e.target.files?.[0] || null)}
+                    />
+                  </Button>
+                  <Typography variant="body2" color="text.secondary">
+                    {postImageFile ? postImageFile.name : "No file selected"}
+                  </Typography>
+                </Stack>
+              </>
+            )}
+
+            {postType === "link" && (
+              <>
+                <TextField
+                  placeholder="https://example.com"
+                  label="URL"
+                  value={postLinkUrl}
+                  onChange={(e) => setPostLinkUrl(e.target.value)}
+                />
+                <TextField
+                  multiline
+                  minRows={2}
+                  placeholder="Comment (optional)"
+                  value={postText}
+                  onChange={(e) => setPostText(e.target.value)}
+                />
+              </>
+            )}
+
+            {postType === "poll" && (
+              <>
+                <TextField
+                  label="Poll question"
+                  value={pollQuestion}
+                  onChange={(e) => setPollQuestion(e.target.value)}
+                />
+                <Stack spacing={1}>
+                  {pollOptions.map((opt, idx) => (
+                    <Stack key={idx} direction="row" spacing={1} alignItems="center">
+                      <TextField
+                        label={`Option ${idx + 1}`}
+                        value={opt}
+                        onChange={(e) => updatePollOption(idx, e.target.value)}
+                        fullWidth
+                      />
+                      {pollOptions.length > 2 && (
+                        <Button size="small" onClick={() => removePollOption(idx)}>Remove</Button>
+                      )}
+                    </Stack>
+                  ))}
+                  <Button size="small" onClick={addPollOption}>
+                    Add option
+                  </Button>
+                </Stack>
+              </>
+            )}
+          </Stack>
+        </Paper>
+      )}
+
+      {!posts.length ? (
+        <Paper sx={{ p: 3, border: `1px solid ${BORDER}`, borderRadius: 3, textAlign: "center" }}>
+          <Typography color="text.secondary" sx={{ fontStyle: hasRemovedPosts ? "italic" : "normal" }}>
+            {hasRemovedPosts
+              ? "This content was removed by moderators."
+              : "No posts in this group yet."}
+          </Typography>
+        </Paper>
+      ) : (
+        posts.map(p => (
+          <PostCard
+            key={p.id}
+            post={p}
+            onReact={handleReact}
+            onPollVote={(post, optId) => handlePollVote(post, optId)}
+            onReport={handleReport}
+            viewerId={viewerId}
+            viewerIsStaff={viewerIsStaff}
+          />
+        ))
+      )}
       <ReportDialog
         open={reportOpen}
         onClose={closeReport}
@@ -2127,6 +2338,10 @@ function SettingsTab({ group, onUpdate }) {
   const [logoPreview, setLogoPreview] = React.useState(group?.logo ? toMediaUrl(group.logo) : "");
   const [coverFile, setCoverFile] = React.useState(null);
   const [coverPreview, setCoverPreview] = React.useState(group?.cover_image ? toMediaUrl(group.cover_image) : "");
+  const [forumEnabled, setForumEnabled] = React.useState(Boolean(group?.forum_enabled));
+  const [postsCreationRestricted, setPostsCreationRestricted] = React.useState(Boolean(group?.posts_creation_restricted));
+  const [postsCommentsEnabled, setPostsCommentsEnabled] = React.useState(Boolean(group?.posts_comments_enabled));
+  const [commLoading, setCommLoading] = React.useState(false);
 
   // Update local state when group changes (e.g. re-fetch)
   React.useEffect(() => {
@@ -2138,8 +2353,32 @@ function SettingsTab({ group, onUpdate }) {
       setJoinPolicy(jp === "public_approval" ? "approval" : (jp || "open"));
       setLogoPreview(group.logo ? toMediaUrl(group.logo) : "");
       setCoverPreview(group.cover_image ? toMediaUrl(group.cover_image) : "");
+      setForumEnabled(Boolean(group.forum_enabled));
+      setPostsCreationRestricted(Boolean(group.posts_creation_restricted));
+      setPostsCommentsEnabled(Boolean(group.posts_comments_enabled));
     }
   }, [group]);
+
+  React.useEffect(() => {
+    if (!group?.id) return;
+    let active = true;
+    setCommLoading(true);
+    fetch(toApiUrl(`groups/${group.id}/settings/communication/`), {
+      headers: { Accept: "application/json", ...authHeaders() },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!active || !d) return;
+        setForumEnabled(Boolean(d.forum_enabled));
+        setPostsCreationRestricted(Boolean(d.posts_creation_restricted));
+        setPostsCommentsEnabled(Boolean(d.posts_comments_enabled));
+      })
+      .catch(() => { })
+      .finally(() => {
+        if (active) setCommLoading(false);
+      });
+    return () => { active = false; };
+  }, [group?.id]);
 
   // Load parent visibility/join policy for subgroup rules
   React.useEffect(() => {
@@ -2196,6 +2435,22 @@ function SettingsTab({ group, onUpdate }) {
   const handleSave = async () => {
     setLoading(true);
     try {
+      let commResult = null;
+      const commRes = await fetch(toApiUrl(`groups/${group.id}/settings/communication/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          forum_enabled: forumEnabled,
+          posts_creation_restricted: postsCreationRestricted,
+          posts_comments_enabled: postsCommentsEnabled,
+        }),
+      });
+      if (!commRes.ok) {
+        const err = await commRes.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to update communication settings");
+      }
+      commResult = await commRes.json();
+
       const fd = new FormData();
       fd.append("name", name.trim());
       fd.append("description", description.trim());
@@ -2226,7 +2481,8 @@ function SettingsTab({ group, onUpdate }) {
         throw new Error(err.detail || "Failed to update settings");
       }
 
-      const updatedGroup = await res.json();
+      let updatedGroup = await res.json();
+      if (commResult) updatedGroup = { ...updatedGroup, ...commResult };
       onUpdate?.(updatedGroup);
       alert("Settings updated successfully!");
     } catch (e) {
@@ -2330,6 +2586,47 @@ function SettingsTab({ group, onUpdate }) {
             </FormControl>
           </Grid>
         </Grid>
+      </Card>
+
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
+        <Typography variant="h6" gutterBottom fontWeight={700}>
+          Communication / Forum
+        </Typography>
+        <Stack spacing={1.5}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={forumEnabled}
+                onChange={(e) => setForumEnabled(e.target.checked)}
+                disabled={commLoading || loading}
+              />
+            }
+            label="Enable Forum"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={postsCreationRestricted}
+                onChange={(e) => setPostsCreationRestricted(e.target.checked)}
+                disabled={!forumEnabled || commLoading || loading}
+              />
+            }
+            label="Restrict posting to admins only"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={postsCommentsEnabled}
+                onChange={(e) => setPostsCommentsEnabled(e.target.checked)}
+                disabled={!forumEnabled || commLoading || loading}
+              />
+            }
+            label="Enable comments"
+          />
+          <Typography variant="caption" color="text.secondary">
+            Forum settings control who can create posts and whether comments are enabled.
+          </Typography>
+        </Stack>
       </Card>
 
       <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
@@ -2522,6 +2819,7 @@ export default function GroupDetailsPage() {
   const [me, setMe] = React.useState(null);
   const [canSeeRequests, setCanSeeRequests] = React.useState(false);
   const [canApproveRequests, setCanApproveRequests] = React.useState(false);
+  const [moderatorCanI, setModeratorCanI] = React.useState(null);
 
   const [toast, setToast] = React.useState({ open: false, msg: "", type: "info" });
   const [leaveDialogOpen, setLeaveDialogOpen] = React.useState(false);
@@ -2544,9 +2842,11 @@ export default function GroupDetailsPage() {
         const can = await rCan.json();
         setCanSeeRequests(Boolean(can?.is_admin || can?.is_moderator));
         setCanApproveRequests(Boolean(can?.is_admin));
+        setModeratorCanI(can);
       } else {
         setCanSeeRequests(false);
         setCanApproveRequests(false);
+        setModeratorCanI(null);
       }
     } catch { }
   }, [groupId]);
@@ -2720,7 +3020,7 @@ export default function GroupDetailsPage() {
 
   const tabDefs = React.useMemo(() => {
     const items = [
-      { label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} /> },
+      { label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} /> },
       { label: "MEMBERS", icon: <PeopleOutlineRoundedIcon />, render: () => <MembersTab groupId={groupId} /> },
     ];
     if (canSeeRequests) {

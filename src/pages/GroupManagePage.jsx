@@ -3231,6 +3231,12 @@ export default function GroupManagePage() {
     // confirm modal for chat toggle
     const [chatConfirmOpen, setChatConfirmOpen] = React.useState(false);
     const [chatNext, setChatNext] = React.useState(true);
+    // --- Forum settings (Settings tab) ---
+    const [forumEnabled, setForumEnabled] = React.useState(false);
+    const [postsCreationRestricted, setPostsCreationRestricted] = React.useState(false);
+    const [postsCommentsEnabled, setPostsCommentsEnabled] = React.useState(false);
+    const [commLoading, setCommLoading] = React.useState(false);
+    const [commSaving, setCommSaving] = React.useState(false);
 
     // keep the confirm text for delete group
     const [deleteGroupOpen, setDeleteGroupOpen] = React.useState(false);
@@ -3283,6 +3289,30 @@ export default function GroupManagePage() {
         };
     }, [group, idOrSlug, token]);
 
+    // Load communication settings (forum / posts) for Settings tab
+    React.useEffect(() => {
+        if (!group?.id) return;
+        let active = true;
+        setCommLoading(true);
+        fetch(`${API_ROOT}/groups/${idOrSlug}/settings/communication/`, {
+            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+                if (!active || !d) return;
+                setForumEnabled(Boolean(d.forum_enabled));
+                setPostsCreationRestricted(Boolean(d.posts_creation_restricted));
+                setPostsCommentsEnabled(Boolean(d.posts_comments_enabled));
+            })
+            .catch(() => { })
+            .finally(() => {
+                if (active) setCommLoading(false);
+            });
+        return () => {
+            active = false;
+        };
+    }, [group?.id, idOrSlug, token]);
+
     const saveChatToggle = async (next) => {
         if (!group) return;
         setChatSaving(true);
@@ -3319,6 +3349,31 @@ export default function GroupManagePage() {
         }
     };
 
+    const saveCommunicationSettings = async () => {
+        if (!group?.id) return;
+        setCommSaving(true);
+        try {
+            const res = await fetch(`${API_ROOT}/groups/${idOrSlug}/settings/communication/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({
+                    forum_enabled: forumEnabled,
+                    posts_creation_restricted: postsCreationRestricted,
+                    posts_comments_enabled: postsCommentsEnabled,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+
+            // Keep local group snapshot aligned for downstream UI
+            setGroup((prev) => prev ? { ...prev, ...data } : prev);
+            showMessage("Forum settings updated.", "success");
+        } catch (e) {
+            showMessage(`Failed to update forum settings: ${e?.message || e}`, "error");
+        } finally {
+            setCommSaving(false);
+        }
+    };
 
 
     // Load saved prefs per group from localStorage
@@ -4941,6 +4996,68 @@ export default function GroupManagePage() {
                                                 </Button>
                                             </Grid>
                                         </Grid>
+
+                                        <Divider className="mb-4" />
+                                        {/* Forum settings */}
+                                        <Stack spacing={1.5} className="mb-4">
+                                            <Typography variant="subtitle1" className="font-semibold">Communication / Forum</Typography>
+                                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                <Typography variant="body2" className="text-slate-600">
+                                                    Enable forum posts for members.
+                                                </Typography>
+                                                <FormControlLabel
+                                                    control={
+                                                        <Switch
+                                                            checked={!!forumEnabled}
+                                                            onChange={(e) => setForumEnabled(e.target.checked)}
+                                                            disabled={commLoading || commSaving}
+                                                        />
+                                                    }
+                                                    label={forumEnabled ? "On" : "Off"}
+                                                />
+                                            </Stack>
+                                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                <Typography variant="body2" className="text-slate-600">
+                                                    Restrict posting to admins only.
+                                                </Typography>
+                                                <FormControlLabel
+                                                    control={
+                                                        <Switch
+                                                            checked={!!postsCreationRestricted}
+                                                            onChange={(e) => setPostsCreationRestricted(e.target.checked)}
+                                                            disabled={!forumEnabled || commLoading || commSaving}
+                                                        />
+                                                    }
+                                                    label={postsCreationRestricted ? "On" : "Off"}
+                                                />
+                                            </Stack>
+                                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                <Typography variant="body2" className="text-slate-600">
+                                                    Enable comments on posts.
+                                                </Typography>
+                                                <FormControlLabel
+                                                    control={
+                                                        <Switch
+                                                            checked={!!postsCommentsEnabled}
+                                                            onChange={(e) => setPostsCommentsEnabled(e.target.checked)}
+                                                            disabled={!forumEnabled || commLoading || commSaving}
+                                                        />
+                                                    }
+                                                    label={postsCommentsEnabled ? "On" : "Off"}
+                                                />
+                                            </Stack>
+                                            <Stack direction="row" justifyContent="flex-end">
+                                                <Button
+                                                    variant="contained"
+                                                    onClick={saveCommunicationSettings}
+                                                    disabled={commLoading || commSaving}
+                                                    className="rounded-xl"
+                                                    sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                >
+                                                    {commSaving ? "Saving..." : "Save Forum Settings"}
+                                                </Button>
+                                            </Stack>
+                                        </Stack>
 
                                         <Divider className="mb-4" />
                                         {/* Chat toggle */}
