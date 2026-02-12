@@ -5,6 +5,36 @@ import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import { useDyteClient, DyteProvider } from '@dytesdk/react-web-core';
 import { DyteMeeting } from '@dytesdk/react-ui-kit';
 
+// Style to ensure Dyte UI controls don't overflow and Chat is always visible
+const dyteStyles = `
+    .dyte-meeting-ui {
+        width: 100% !important;
+        height: 100% !important;
+    }
+    /* Ensure control bar buttons don't wrap or overflow */
+    .dyte-controlbar,
+    [class*="controlbar"] {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
+        padding: 8px !important;
+        background: rgba(0,0,0,0.8) !important;
+    }
+    /* Ensure all control bar buttons are visible */
+    .dyte-controlbar button,
+    [class*="controlbar"] button,
+    [class*="control-item"] {
+        min-width: auto !important;
+        flex-shrink: 0 !important;
+    }
+    /* Ensure sidebar/chat doesn't get hidden */
+    [class*="sidebar"],
+    [class*="chat"] {
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+`;
+
 export default function SpeedNetworkingMatch({
     match,
     session,
@@ -17,6 +47,21 @@ export default function SpeedNetworkingMatch({
     const [timeRemaining, setTimeRemaining] = useState(session.duration_minutes * 60);
     const [videoError, setVideoError] = useState(null);
     const autoAdvanceTriggeredRef = useRef(false);
+
+    // Inject Dyte UI styles to ensure Chat and controls are always visible
+    useEffect(() => {
+        const styleElement = document.createElement('style');
+        styleElement.textContent = dyteStyles;
+        styleElement.id = 'dyte-visibility-styles';
+        document.head.appendChild(styleElement);
+
+        return () => {
+            const existingStyle = document.getElementById('dyte-visibility-styles');
+            if (existingStyle) {
+                existingStyle.remove();
+            }
+        };
+    }, []);
 
     // Initialize Dyte Meeting for this match
     useEffect(() => {
@@ -167,7 +212,30 @@ export default function SpeedNetworkingMatch({
             </Box>
 
             {/* Dyte Meeting Area */}
-            <Box sx={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Box sx={{
+                flex: 1,
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                height: '100%',
+                minHeight: 0,
+                '& .dyte-meeting': {
+                    width: '100%',
+                    height: '100%'
+                },
+                // Ensure Dyte toolbar doesn't hide controls
+                '& [class*="controlbar"]': {
+                    flexWrap: 'nowrap',
+                    overflowX: 'visible !important'
+                },
+                // Ensure all toolbar buttons are visible
+                '& [class*="control-item"]': {
+                    minWidth: 'auto',
+                    whiteSpace: 'nowrap'
+                }
+            }}>
                 {videoError ? (
                     <Box sx={{ textAlign: 'center', p: 3, bgcolor: 'rgba(239,68,68,0.1)', borderRadius: 2, border: '1px solid #ef4444' }}>
                         <Typography variant="h6" color="error" gutterBottom>
