@@ -103,6 +103,8 @@ const KIND_LABEL = {
   member_joined: "Group",
   member_added: "Group",
   group_created: "Group",
+  forum_enabled: "Group",
+  forum_disabled: "Group",
   name_change: "Identity",
   suggestion_digest: "Suggestions",
 };
@@ -454,6 +456,32 @@ function NotificationRow({
       );
     }
 
+    if (item.kind === "forum_enabled") {
+      return (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2">
+            Forum has been <span style={{ fontWeight: 700, color: '#10b8a6' }}>enabled</span> for
+          </Typography>
+          {item.data?.group_name && (
+            <Chip size="small" label={item.data.group_name} variant="outlined" />
+          )}
+        </Stack>
+      );
+    }
+
+    if (item.kind === "forum_disabled") {
+      return (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2">
+            Forum has been <span style={{ fontWeight: 700, color: '#b42318' }}>disabled</span> for
+          </Typography>
+          {item.data?.group_name && (
+            <Chip size="small" label={item.data.group_name} variant="outlined" />
+          )}
+        </Stack>
+      );
+    }
+
     if (item.kind === "system") {
       if (item.data?.type === "moderation") {
         const action = item.data?.action;
@@ -531,7 +559,10 @@ function NotificationRow({
           <Button
             size="small"
             variant="contained"
-            onClick={() => onAcceptRequest?.(item.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAcceptRequest?.(item.id);
+            }}
             disabled={!!item._busy}
             sx={{ textTransform: "none", borderRadius: 2 }}
             startIcon={<CheckCircleOutlineIcon />}
@@ -541,7 +572,10 @@ function NotificationRow({
           <Button
             size="small"
             variant="outlined"
-            onClick={() => onDeclineRequest?.(item.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeclineRequest?.(item.id);
+            }}
             disabled={!!item._busy}
             sx={{ textTransform: "none", borderRadius: 2 }}
             startIcon={<HighlightOffIcon />}
@@ -561,7 +595,10 @@ function NotificationRow({
           <Button
             size="small"
             variant="outlined"
-            onClick={() => onOpenDigest?.(item, "connections")}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDigest?.(item, "connections");
+            }}
             sx={{ textTransform: "none", borderRadius: 2 }}
             disabled={cc === 0}
           >
@@ -571,7 +608,10 @@ function NotificationRow({
           <Button
             size="small"
             variant="outlined"
-            onClick={() => onOpenDigest?.(item, "groups")}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDigest?.(item, "groups");
+            }}
             sx={{ textTransform: "none", borderRadius: 2 }}
             disabled={gc === 0}
           >
@@ -588,7 +628,10 @@ function NotificationRow({
         <Button
           size="small"
           variant="outlined"
-          onClick={() => onFollowBack?.(item.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFollowBack?.(item.id);
+          }}
           disabled={!!item._busy}
           sx={{ textTransform: "none", borderRadius: 2, mt: 1 }}
           startIcon={<PersonAddAlt1Icon />}
@@ -604,6 +647,23 @@ function NotificationRow({
   return (
     <Paper
       elevation={0}
+      onClick={() => {
+        // Make entire card clickable for certain notification types
+        if (
+          item.kind === "forum_enabled" ||
+          item.kind === "forum_disabled" ||
+          item.data?.type === "kyc" ||
+          item.kind === "name_change" ||
+          item.source === "identity" ||
+          item.context?.profile_user_id ||
+          item.context?.eventId ||
+          item.context?.postId ||
+          item.context?.groupSlug ||
+          item.data?.group_slug
+        ) {
+          onOpen?.(item);
+        }
+      }}
       sx={{
         p: 1.25,
         mb: 1,
@@ -613,6 +673,32 @@ function NotificationRow({
         border: `1px solid ${BORDER}`,
         borderRadius: 2,
         bgcolor: unread ? "#f6fffe" : "background.paper",
+        cursor: (
+          item.kind === "forum_enabled" ||
+          item.kind === "forum_disabled" ||
+          item.data?.type === "kyc" ||
+          item.kind === "name_change" ||
+          item.source === "identity" ||
+          item.context?.profile_user_id ||
+          item.context?.eventId ||
+          item.context?.postId ||
+          item.context?.groupSlug ||
+          item.data?.group_slug
+        ) ? "pointer" : "default",
+        "&:hover": (
+          item.kind === "forum_enabled" ||
+          item.kind === "forum_disabled" ||
+          item.data?.type === "kyc" ||
+          item.kind === "name_change" ||
+          item.source === "identity" ||
+          item.context?.profile_user_id ||
+          item.context?.eventId ||
+          item.context?.postId ||
+          item.context?.groupSlug ||
+          item.data?.group_slug
+        ) ? {
+          bgcolor: unread ? "#e6f7f5" : "#f9fafb",
+        } : {},
       }}
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
@@ -681,7 +767,10 @@ function NotificationRow({
             <IconButton
               size="small"
               title={unread ? "Mark as read" : "Mark as unread"}
-              onClick={() => onToggleRead?.(item.id, !unread)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleRead?.(item.id, !unread);
+              }}
             >
               {unread ? (
                 <MarkEmailReadOutlinedIcon fontSize="small" />
@@ -693,13 +782,19 @@ function NotificationRow({
             {(
               item.data?.type === "kyc" ||
               item.kind === "name_change" ||
+              item.kind === "forum_enabled" ||
+              item.kind === "forum_disabled" ||
               item.source === "identity" ||
               item.context?.profile_user_id ||
               item.context?.eventId ||
               item.context?.postId ||
-              item.context?.groupSlug
+              item.context?.groupSlug ||
+              item.data?.group_slug
             ) && (
-                <IconButton size="small" title="Open" onClick={() => onOpen?.(item)}>
+                <IconButton size="small" title="Open" onClick={(e) => {
+                  e.stopPropagation();
+                  onOpen?.(item);
+                }}>
                   <OpenInNewOutlinedIcon fontSize="small" />
                 </IconButton>
               )}
@@ -792,7 +887,7 @@ export default function NotificationsPage({
       const k = kind.toLowerCase();
       const norm = {
         requests: ["friend_request", "connection_request"],
-        group: ["join_request", "member_joined", "member_added", "group_created"],
+        group: ["join_request", "member_joined", "member_added", "group_created", "forum_enabled", "forum_disabled"],
         follows: ["follow"],
         mentions: ["mention"],
         comments: ["comment"],
@@ -1006,6 +1101,13 @@ export default function NotificationsPage({
       markAndNavigate(n, "/account/profile");
       return;
     }
+
+    // Handle forum enable/disable notifications
+    if ((n.kind === "forum_enabled" || n.kind === "forum_disabled") && n.data?.group_slug) {
+      markAndNavigate(n, `/community/groups/${n.data.group_slug}?tab=posts`);
+      return;
+    }
+
     if (n.kind === "friend_request" || n.kind === "connection_request") {
       if (ctx.profile_user_id) dest = `/community/rich-profile/${ctx.profile_user_id}`;
     } else if (ctx.eventId) {
