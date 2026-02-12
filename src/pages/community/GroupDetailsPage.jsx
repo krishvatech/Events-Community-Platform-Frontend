@@ -2582,6 +2582,7 @@ function SettingsTab({ group, onUpdate }) {
   const [postsCreationRestricted, setPostsCreationRestricted] = React.useState(Boolean(group?.posts_creation_restricted));
   const [postsCommentsEnabled, setPostsCommentsEnabled] = React.useState(Boolean(group?.posts_comments_enabled));
   const [commLoading, setCommLoading] = React.useState(false);
+  const [snack, setSnack] = React.useState({ open: false, message: "", severity: "success" });
 
   // Update local state when group changes (e.g. re-fetch)
   React.useEffect(() => {
@@ -2724,9 +2725,9 @@ function SettingsTab({ group, onUpdate }) {
       let updatedGroup = await res.json();
       if (commResult) updatedGroup = { ...updatedGroup, ...commResult };
       onUpdate?.(updatedGroup);
-      alert("Settings updated successfully!");
+      setSnack({ open: true, message: "Settings updated successfully!", severity: "success" });
     } catch (e) {
-      alert(e.message);
+      setSnack({ open: true, message: e.message || "Failed to update settings", severity: "error" });
     } finally {
       setLoading(false);
     }
@@ -2990,6 +2991,16 @@ function SettingsTab({ group, onUpdate }) {
           {loading ? "Saving..." : "Save Changes"}
         </Button>
       </Box>
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={3000}
+        onClose={() => setSnack((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert severity={snack.severity} onClose={() => setSnack((prev) => ({ ...prev, open: false }))}>
+          {snack.message}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }
