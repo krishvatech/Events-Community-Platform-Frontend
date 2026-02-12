@@ -3986,6 +3986,19 @@ export default function NewLiveMeeting() {
             setIsBanned(true);
             if (dyteMeeting) dyteMeeting.leaveRoom();
           }
+        } else if (msg.type === "meeting_started") {
+          // ✅ NEW: Handle meeting start notification from backend
+          console.log("[MainSocket] Received meeting_started broadcast:", {
+            event_id: msg.event_id,
+            status: msg.status,
+            started_at: msg.started_at
+          });
+
+          // Update status immediately without waiting for poll
+          if (msg.status === "live") {
+            console.log("[MainSocket] ✅ Meeting went LIVE via WebSocket - updating dbStatus");
+            setDbStatus("live");
+          }
         } else if (msg.type === "meeting_ended") {
           // ✅ NEW: Handle meeting end notification from backend
           // This message is broadcast when host ends meeting or auto-end conditions trigger
@@ -4530,6 +4543,13 @@ export default function NewLiveMeeting() {
       return;
     }
 
+    // ✅ CRITICAL FIX: Prevent audience from joining until host starts meeting (dbStatus === "live")
+    // This prevents the race condition where audience joins before shouldShowMeeting check
+    if (role !== "publisher" && !isBreakout && dbStatus !== "live") {
+      console.log("[LiveMeeting] Join effect skipped for audience - waiting for meeting to go live. dbStatus:", dbStatus);
+      return;
+    }
+
     console.log("[LiveMeeting] ✅ Join effect triggered! dyteMeeting.self exists and initDone is true");
 
     const onRoomJoined = () => {
@@ -4617,7 +4637,7 @@ export default function NewLiveMeeting() {
     return () => {
       dyteMeeting.self.off?.("roomJoined", onRoomJoined);
     };
-  }, [dyteMeeting, initDone]);
+  }, [dyteMeeting, initDone, dbStatus, role, isBreakout]);
 
   // ✅ NEW: Initialize main room peek AFTER breakout is ready (not during breakout join)
   // This prevents concurrent Dyte init calls that cause "Unsupported concurrent calls" error
@@ -5178,9 +5198,16 @@ export default function NewLiveMeeting() {
         }
         const data = await res.json();
         if (cancelled) return;
+
+        const previousStatus = dbStatus;
         if (data?.status) {
           setDbStatus(data.status);
           console.log("[LiveMeeting] Status poll result:", data.status);
+
+          // ✅ NEW: Detect transition from draft → live for audience members
+          if (role !== "publisher" && previousStatus !== "live" && data.status === "live") {
+            console.log("[LiveMeeting] ✅ Meeting went live via status poll - audience can now join");
+          }
         }
         // ✅ IMPROVED: Check if meeting has ended and handle it
         if (data?.status === "ended" && !endHandledRef.current) {
@@ -7088,7 +7115,12 @@ export default function NewLiveMeeting() {
 
   // If audience and host not live yet
   // ✅ Also show meeting if in breakout/lounge room (post-event)
-  const shouldShowMeeting = role === "publisher" || roomJoined || hostJoined || dbStatus === "live" || isBreakout;
+  // FIXED: Audience should only see meeting when dbStatus is "live" or they've joined their room
+  // Host sees immediately (role === "publisher"), breakout rooms work as before (isBreakout)
+  const shouldShowMeeting =
+    role === "publisher" ||
+    isBreakout ||
+    (role !== "publisher" && (dbStatus === "live" || roomJoined));
   const hasMainToken = Boolean(mainAuthTokenRef.current || authToken);
   // ✅ Show gate/lounge if in pre-event lounge and (for hosts) haven't chosen main yet
   // Allow breakout display if loungeOpen (user joined a table)
