@@ -3202,8 +3202,9 @@ export default function GroupDetailsPage() {
 
   const tabDefs = React.useMemo(() => {
     const items = [
-      { label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} /> },
+      { label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> },
       { label: "MEMBERS", icon: <PeopleOutlineRoundedIcon />, render: () => <MembersTab groupId={groupId} /> },
+      { label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} /> },
     ];
     if (canSeeRequests) {
       items.push({
@@ -3228,7 +3229,6 @@ export default function GroupDetailsPage() {
         render: () => <SettingsTab group={group} onUpdate={setGroup} />,
       });
     }
-    items.push({ label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> });
     return items;
   }, [canApproveRequests, canSeeRequests, group, groupId]);
 
