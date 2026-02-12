@@ -65,6 +65,7 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import AnnouncementIcon from "@mui/icons-material/Announcement"; // ✅ NEW for waiting room announcements
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded"; // <--- ADDED
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded"; // <--- ADDED for KYC verified badge
 import ShuffleIcon from "@mui/icons-material/Shuffle"; // Keep this if used elsewhere
 import Diversity3Icon from "@mui/icons-material/Diversity3"; // New icon for Networking
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
@@ -2149,6 +2150,39 @@ export default function NewLiveMeeting() {
 
   const [memberInfoOpen, setMemberInfoOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [participantKycCache, setParticipantKycCache] = useState({}); // Cache for kyc_status by userId
+
+  const fetchAndCacheKycStatus = useCallback((userId) => {
+    if (!userId || participantKycCache[userId] !== undefined) return; // Already cached
+
+    const headers = { accept: "application/json", ...authHeader() };
+    const urls = [
+      toApiUrl(`users/${userId}/`),
+      toApiUrl(`users/${userId}/profile/`),
+    ];
+
+    let isMounted = true;
+    (async () => {
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { headers });
+          if (!res.ok) continue;
+          const data = await res.json().catch(() => null);
+          if (!isMounted || !data) break;
+
+          const kycStatus = data?.kyc_status || data?.profile?.kyc_status || "";
+          if (isMounted && kycStatus) {
+            setParticipantKycCache(prev => ({ ...prev, [userId]: kycStatus }));
+          }
+          break;
+        } catch (e) {
+          // try next URL
+        }
+      }
+    })();
+
+    return () => { isMounted = false; };
+  }, [participantKycCache]);
 
   const openMemberInfo = useCallback((member) => {
     setSelectedMember(member);
@@ -2193,7 +2227,10 @@ export default function NewLiveMeeting() {
         company: participant.company || participant.organization || participant.company_name || "",
         location: participant.location || participant.city || participant.country || "",
         username: participant.username,
-        _raw: { customParticipantId: userId || participant.user_id || participant.id || null },
+        _raw: {
+          customParticipantId: userId || participant.user_id || participant.id || null,
+          isKycVerified: participant.is_kyc_verified || participant.isKycVerified || false,
+        },
       });
     },
     [openMemberInfo]
@@ -8571,7 +8608,7 @@ export default function NewLiveMeeting() {
                           }}
                         >
                           <Stack direction="row" alignItems="center" justifyContent="space-between">
-                            <Stack direction="row" alignItems="center" spacing={1}>
+                            <Stack direction="row" alignItems="center" spacing={0.8} sx={{ flex: 1, minWidth: 0 }}>
                               <Avatar
                                 src={
                                   getParticipantFromMessage(m)?.picture ||
@@ -8587,33 +8624,60 @@ export default function NewLiveMeeting() {
                                   height: 28,
                                   fontSize: 12,
                                   bgcolor: "rgba(255,255,255,0.12)",
+                                  flexShrink: 0,
                                 }}
                               >
                                 {(m.sender_display || m.sender_name || "U").slice(0, 1)}
                               </Avatar>
-                              <Typography
-                                onClick={() => {
-                                  const member = getParticipantFromMessage(m);
-                                  if (member) openMemberInfo(member);
-                                }}
-                                sx={{
-                                  fontWeight: 700,
-                                  fontSize: 13,
-                                  cursor: "pointer",
-                                  "&:hover": { textDecoration: "underline" },
-                                }}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
+                                <Typography
+                                  onClick={() => {
                                     const member = getParticipantFromMessage(m);
                                     if (member) openMemberInfo(member);
+                                  }}
+                                  sx={{
+                                    fontWeight: 600,
+                                    fontSize: 13,
+                                    cursor: "pointer",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    "&:hover": { textDecoration: "underline" },
+                                    color: "rgba(255,255,255,0.9)",
+                                  }}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      const member = getParticipantFromMessage(m);
+                                      if (member) openMemberInfo(member);
+                                    }
+                                  }}
+                                >
+                                  {m.sender_display || m.sender_name || "User"}
+                                </Typography>
+                                {(() => {
+                                  const participant = getParticipantFromMessage(m);
+                                  const userId = participant?._raw?.customParticipantId || participant?.id;
+
+                                  // Fetch kyc_status if not cached
+                                  if (userId && !participantKycCache[userId]) {
+                                    fetchAndCacheKycStatus(userId);
                                   }
-                                }}
-                              >
-                                {m.sender_display || m.sender_name || "User"}
-                              </Typography>
+
+                                  const isVerified = participantKycCache[userId] === "approved";
+                                  return isVerified ? (
+                                    <VerifiedRoundedIcon
+                                      sx={{
+                                        fontSize: 16,
+                                        color: "#14b8a6",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                  ) : null;
+                                })()}
+                              </Box>
                             </Stack>
                             <Stack direction="row" spacing={1} alignItems="center">
                               <Typography sx={{ fontSize: 12, opacity: 0.7 }}>
@@ -9246,8 +9310,18 @@ export default function NewLiveMeeting() {
                               </ListItemAvatar>
                               <ListItemText
                                 primary={
-                                  <Stack direction="row" spacing={1} alignItems="center">
+                                  <Stack direction="row" spacing={0.8} alignItems="center">
                                     <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>
+                                    {(() => {
+                                      const userId = m._raw?.customParticipantId || m.id;
+                                      if (userId && !participantKycCache[userId]) {
+                                        fetchAndCacheKycStatus(userId);
+                                      }
+                                      const isVerified = participantKycCache[userId] === "approved";
+                                      return isVerified ? (
+                                        <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
+                                      ) : null;
+                                    })()}
                                     <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
                                   </Stack>
                                 }
@@ -9500,7 +9574,23 @@ export default function NewLiveMeeting() {
                                 </Avatar>
                               </ListItemAvatar>
                               <ListItemText
-                                primary={<Typography sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>}
+                                primary={
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
+                                      {truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}
+                                    </Typography>
+                                    {(() => {
+                                      const userId = m._raw?.customParticipantId || m.id;
+                                      if (userId && !participantKycCache[userId]) {
+                                        fetchAndCacheKycStatus(userId);
+                                      }
+                                      const isVerified = participantKycCache[userId] === "approved";
+                                      return isVerified ? (
+                                        <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
+                                      ) : null;
+                                    })()}
+                                  </Box>
+                                }
                                 secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
                               />
                             </ListItemButton>
@@ -9648,7 +9738,23 @@ export default function NewLiveMeeting() {
                               </Avatar>
                             </ListItemAvatar>
                             <ListItemText
-                              primary={<Typography noWrap sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>}
+                              primary={
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                  <Typography noWrap sx={{ fontWeight: 700, fontSize: 13 }}>
+                                    {truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}
+                                  </Typography>
+                                  {(() => {
+                                    const userId = m._raw?.customParticipantId || m.id;
+                                    if (userId && !participantKycCache[userId]) {
+                                      fetchAndCacheKycStatus(userId);
+                                    }
+                                    const isVerified = participantKycCache[userId] === "approved";
+                                    return isVerified ? (
+                                      <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
+                                    ) : null;
+                                  })()}
+                                </Box>
+                              }
                               secondary={<Typography noWrap sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
                             />
                           </ListItemButton>
@@ -12246,6 +12352,7 @@ function MemberInfoContent({ selectedMember, onClose }) {
       if (alive) setProfileLoading(true);
       const headers = { accept: "application/json", ...authHeader() };
       const urls = [
+        toApiUrl(`users/${userId}/`),
         toApiUrl(`users/${userId}/profile/`),
         toApiUrl(`profile/${userId}/`),
       ];
@@ -12263,10 +12370,19 @@ function MemberInfoContent({ selectedMember, onClose }) {
           const jobTitle = base.jobTitle || fromExp.jobTitle || "";
           const company = base.company || fromExp.company || "";
 
+          // Extract kyc_status from various possible locations
+          const kycStatus =
+            data?.kyc_status ||
+            data?.profile?.kyc_status ||
+            data?.user?.kyc_status ||
+            data?.user?.profile?.kyc_status ||
+            "";
+
           setProfileInfo({
             jobTitle: jobTitle || "",
             company: company || "",
             location: location || "",
+            kycStatus: kycStatus,
           });
           break;
         } catch (e) {
@@ -12405,9 +12521,20 @@ function MemberInfoContent({ selectedMember, onClose }) {
       </Box>
 
       {/* 2. Name */}
-      <Typography sx={{ fontWeight: 700, fontSize: 18, mb: 0.5 }}>
-        {selectedMember.name}
-      </Typography>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.8, mb: 0.5 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: 18 }}>
+          {selectedMember.name}
+        </Typography>
+        {profileInfo?.kycStatus === "approved" && (
+          <VerifiedRoundedIcon
+            sx={{
+              fontSize: 20,
+              color: "#14b8a6",
+              flexShrink: 0,
+            }}
+          />
+        )}
+      </Box>
 
       {/* 3. Role Chip */}
       <Chip

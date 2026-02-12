@@ -1,7 +1,69 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Avatar, Tooltip, Box, Typography } from '@mui/material';
+import VerifiedRoundedIcon from '@mui/icons-material/VerifiedRounded';
+import { getToken, API_BASE } from '../../utils/api';
+
+// Helper function to create auth headers
+const authHeader = () => {
+    const tok = getToken();
+    return tok ? { Authorization: `Bearer ${tok}` } : {};
+};
+
+// Helper function to build API URLs
+const toApiUrl = (pathOrUrl) => {
+    try {
+        return new URL(pathOrUrl).toString();
+    } catch {
+        const rel = String(pathOrUrl).replace(/^\/+/, "");
+        return `${API_BASE}/${rel}`;
+    }
+};
 
 const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
+    const [isVerified, setIsVerified] = useState(false);
+
+    // Fetch kyc_status if not available in participant data
+    useEffect(() => {
+        if (!participant) return;
+
+        // Check if kyc_status is already available in participant data
+        if (participant?.kyc_status === "approved") {
+            setIsVerified(true);
+            return;
+        }
+
+        // Fetch from API if not available
+        const userId = participant?.user_id || participant?.id;
+        if (!userId) return;
+
+        let isMounted = true;
+        const fetchKycStatus = async () => {
+            try {
+                const headers = { accept: "application/json", ...authHeader() };
+                const res = await fetch(toApiUrl(`users/${userId}/`), { headers });
+                if (!res.ok) return;
+                const data = await res.json().catch(() => null);
+                if (!isMounted || !data) return;
+
+                // Check kyc_status in multiple possible locations
+                const kycStatus =
+                    data?.kyc_status ||
+                    data?.profile?.kyc_status ||
+                    data?.user?.kyc_status ||
+                    data?.user?.profile?.kyc_status;
+
+                if (kycStatus === "approved") {
+                    setIsVerified(true);
+                }
+            } catch (e) {
+                // Silently fail
+            }
+        };
+
+        fetchKycStatus();
+        return () => { isMounted = false; };
+    }, [participant]);
+
     // ✅ FIXED SEAT POSITIONING BASED ON JOIN ORDER
     // Ensures consistent, balanced, and predictable placement
     // Seats are assigned in fixed order: RIGHT → LEFT → TOP → BOTTOM
@@ -74,10 +136,13 @@ const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
                     <Avatar src={avatarSrc} sx={{ width: 32, height: 32 }}>
                         {displayName?.[0]?.toUpperCase()}
                     </Avatar>
-                    <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
                             {displayName}
                         </Typography>
+                        {isVerified && (
+                            <VerifiedRoundedIcon sx={{ fontSize: 14, color: '#14b8a6', flexShrink: 0 }} />
+                        )}
                     </Box>
                 </Box>
             }
