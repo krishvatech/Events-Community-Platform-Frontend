@@ -1,4 +1,4 @@
-// src/pages/community/GroupDetailsPage.jsx
+﻿// src/pages/community/GroupDetailsPage.jsx
 import * as React from "react";
 import { useParams, Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -43,11 +43,11 @@ import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 
 const BORDER = "#e2e8f0";
 const POST_REACTIONS = [
-  { id: "like", emoji: "👍", label: "Like" },
-  { id: "intriguing", emoji: "🤔", label: "Intriguing" },
-  { id: "spot_on", emoji: "🎯", label: "Spot On" },
-  { id: "validated", emoji: "🧠", label: "Validated" },
-  { id: "debatable", emoji: "🤷", label: "Debatable" },
+  { id: "like", emoji: "ðŸ‘", label: "Like" },
+  { id: "intriguing", emoji: "ðŸ¤”", label: "Intriguing" },
+  { id: "spot_on", emoji: "ðŸŽ¯", label: "Spot On" },
+  { id: "validated", emoji: "ðŸ§ ", label: "Validated" },
+  { id: "debatable", emoji: "ðŸ¤·", label: "Debatable" },
 ];
 
 const REPORT_REASONS = [
@@ -119,7 +119,7 @@ async function getMeCached() {
   return _meCache;
 }
 
-// ⬇️ NEW: Helper for concurrent fetching (needed for comments+replies)
+// â¬‡ï¸ NEW: Helper for concurrent fetching (needed for comments+replies)
 async function runLimited(items, limit, worker) {
   const ret = new Array(items.length);
   let i = 0;
@@ -287,7 +287,7 @@ function mapFeedItem(item) {
 
   let t = (m.type || m.post_type || item.type || "text").toLowerCase();
 
-  // ⬇️ ROBUST POLL DETECTION
+  // â¬‡ï¸ ROBUST POLL DETECTION
   const rawOptions = m.options ?? item.options ?? m.poll_options ?? item.poll_options ?? [];
   const hasOptions = Array.isArray(rawOptions) && rawOptions.length > 0;
 
@@ -435,7 +435,7 @@ function PollBlock({ post, onVote }) {
         })}
       </Stack>
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-        Total: {totalVotes} vote{totalVotes === 1 ? "" : "s"}{post.is_closed ? " · Poll closed" : ""}
+        Total: {totalVotes} vote{totalVotes === 1 ? "" : "s"}{post.is_closed ? " Â· Poll closed" : ""}
       </Typography>
     </Box>
   );
@@ -446,7 +446,7 @@ function EventBlock({ post, onOpen }) {
     <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{post.event?.title}</Typography>
       <Typography variant="caption" color="text.secondary">
-        {post.event?.when ? new Date(post.event.when).toLocaleString() : ""} · {post.event?.where}
+        {post.event?.when ? new Date(post.event.when).toLocaleString() : ""} Â· {post.event?.where}
       </Typography>
       {post.text && <ExpandableText text={post.text} maxLines={5} wrapperSx={{ mt: 1 }} />}
       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
@@ -883,7 +883,7 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
           });
         }
 
-        // ⬇️ STRICT INTERSECTION: Only show friends who are ALSO group members.
+        // â¬‡ï¸ STRICT INTERSECTION: Only show friends who are ALSO group members.
         // No fallback to 'all friends' if fetch fails.
         const mutuals = myFriends.filter(f => groupMembers.has(String(f.id)));
         setFriends(mutuals);
@@ -962,7 +962,7 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
             <TextField
               size="small"
               fullWidth
-              placeholder="Search friends…"
+              placeholder="Search friendsâ€¦"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               InputProps={{
@@ -993,7 +993,7 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
       <DialogActions>
         <Button onClick={onClose} disabled={sending}>Cancel</Button>
         <Button variant="contained" onClick={shareNow} disabled={!selected.size || sending}>
-          {sending ? "Sharing…" : "Share"}
+          {sending ? "Sharingâ€¦" : "Share"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -1126,7 +1126,7 @@ function ReportDialog({ open, onClose, onSubmit, loading, targetLabel }) {
           onClick={() => onSubmit?.(reason, notes)}
           disabled={loading}
         >
-          {loading ? "Submitting…" : "Submit report"}
+          {loading ? "Submittingâ€¦" : "Submit report"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -1159,7 +1159,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
   const myReactionId = local.my_reaction || (local.liked_by_me ? "like" : null);
   const myReactionDef = POST_REACTIONS.find(r => r.id === myReactionId);
   const likeBtnLabel = myReactionDef?.label || "Like";
-  const likeBtnEmoji = myReactionDef?.emoji || "👍";
+  const likeBtnEmoji = myReactionDef?.emoji || "ðŸ‘";
   const hasReaction = !!myReactionId;
 
   // Check if user can report this post
@@ -2519,7 +2519,7 @@ function RequestsTab({ groupId, canApprove, onApproved }) {
             <ListItemAvatar><Avatar src={toMediaUrl(u.avatar || u.user_image)} /></ListItemAvatar>
             <ListItemText
               primary={u.name || u.full_name || u.username || u.email || "User"}
-              secondary={`Pending · ${formatWhen(req.joined_at || req.created_at || req.requested_at)}`}
+              secondary={`Pending Â· ${formatWhen(req.joined_at || req.created_at || req.requested_at)}`}
             />
             {canApprove && (
               <ListItemSecondaryAction>
@@ -2674,6 +2674,12 @@ function SettingsTab({ group, onUpdate }) {
   };
 
   const handleSave = async () => {
+    // Validate group name
+    if (!name || name.trim().length < 3) {
+      setSnack({ open: true, message: "Group name must be at least 3 characters", severity: "error" });
+      return;
+    }
+
     setLoading(true);
     try {
       let commResult = null;
@@ -2750,6 +2756,103 @@ function SettingsTab({ group, onUpdate }) {
 
   return (
     <Stack spacing={3} maxWidth="md">
+      {/* Group Details Section */}
+      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
+        <Typography variant="h6" gutterBottom fontWeight={700}>
+          Group Details
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Edit your group's basic information
+        </Typography>
+        <Stack spacing={2.5}>
+          <TextField
+            label="Group Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            fullWidth
+            required
+            disabled={loading}
+            error={name.trim().length < 3 && name.trim().length > 0}
+            helperText={
+              name.trim().length < 3 && name.trim().length > 0
+                ? "Group name must be at least 3 characters"
+                : `${name.length}/100 characters`
+            }
+            inputProps={{ maxLength: 100 }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
+          />
+          <TextField
+            label="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            fullWidth
+            multiline
+            rows={4}
+            disabled={loading}
+            helperText={`${description.length}/500 characters`}
+            inputProps={{ maxLength: 500 }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+              },
+            }}
+          />
+          <FormControl fullWidth disabled={loading}>
+            <FormLabel sx={{ mb: 1, fontWeight: 600, color: 'text.primary' }}>Visibility</FormLabel>
+            <RadioGroup
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value)}
+            >
+              <FormControlLabel
+                value="public"
+                control={<Radio />}
+                label="Public (anyone can find)"
+              />
+              <FormControlLabel
+                value="private"
+                control={<Radio />}
+                label="Private (invite only)"
+              />
+            </RadioGroup>
+          </FormControl>
+          <FormControl fullWidth disabled={loading}>
+            <FormLabel sx={{ mb: 1, fontWeight: 600, color: 'text.primary' }}>Join Policy</FormLabel>
+            <RadioGroup
+              value={joinPolicy}
+              onChange={(e) => setJoinPolicy(e.target.value)}
+            >
+              <FormControlLabel
+                value="open"
+                control={<Radio />}
+                label="Open (Join instantly)"
+                disabled={visibility === 'private' || !parentAllowsOpen}
+              />
+              <FormControlLabel
+                value="approval"
+                control={<Radio />}
+                label="Approval required (Request approval)"
+                disabled={visibility === 'private'}
+              />
+              <FormControlLabel
+                value="invite"
+                control={<Radio />}
+                label="Invite only (By invitation only)"
+              />
+            </RadioGroup>
+            {visibility === 'private' && (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                Private groups must use invite-only join policy
+              </Typography>
+            )}
+          </FormControl>
+        </Stack>
+      </Card>
+
+      {/* Communication / Forum Section */}
       <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
         <Typography variant="h6" gutterBottom fontWeight={700}>
           Communication / Forum
@@ -3166,7 +3269,7 @@ export default function GroupDetailsPage() {
         } catch { }
       }
 
-      // ⬇️ CHANGED: Use a Map to ensure distinct users (Deduplication)
+      // â¬‡ï¸ CHANGED: Use a Map to ensure distinct users (Deduplication)
       const uniqueMap = new Map();
 
       rows.forEach(row => {
@@ -3296,7 +3399,7 @@ export default function GroupDetailsPage() {
                     {group?.member_count || 0} Members
                     {group?.parent_group && (
                       <>
-                        {" • Subgroup of "}
+                        {" â€¢ Subgroup of "}
                         <Link
                           component={RouterLink}
                           to={`/community/groups/${group.parent_group.id}`}
