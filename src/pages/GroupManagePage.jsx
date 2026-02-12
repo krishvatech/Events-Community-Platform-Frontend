@@ -212,6 +212,21 @@ function mapFeedPollToPost(row) {
     const gidRaw = row?.group_id ?? m.group_id ?? m.groupId ?? m.group?.id;
     const gid = Number(gidRaw) || null;
 
+    const rawAuthor = row.actor || row.created_by || row.user || row.author || {};
+    const authorName =
+        rawAuthor.name ||
+        rawAuthor.full_name ||
+        rawAuthor.username ||
+        row.actor_name ||
+        row.actor_username ||
+        (rawAuthor.id ? `User #${rawAuthor.id}` : "User");
+    const authorAvatar =
+        rawAuthor.avatar ||
+        rawAuthor.avatar_url ||
+        rawAuthor.user_image ||
+        row.actor_avatar ||
+        "";
+
     // 👇 real poll id coming from metadata
     const pollId = Number(m.poll_id ?? row.poll_id ?? null) || null;
 
@@ -225,7 +240,9 @@ function mapFeedPollToPost(row) {
         user_votes: Array.isArray(m.user_votes) ? m.user_votes : [],
         is_closed: Boolean(m.is_closed),
         created_at: row.created_at || m.created_at || row.createdAt || new Date().toISOString(),
-        created_by: row.created_by || row.user || row.actor || null,
+        created_by: rawAuthor
+            ? { id: rawAuthor.id ?? row.actor_id ?? row.user_id, name: authorName, avatar: authorAvatar }
+            : null,
         hidden: !!(row.is_hidden ?? m.is_hidden),
         is_hidden: !!(row.is_hidden ?? m.is_hidden),
         group_id: gid,
@@ -5277,22 +5294,32 @@ export default function GroupManagePage() {
 
                                                         return (
                                                             <Paper key={postKey(p)} elevation={0} className="rounded-xl border border-slate-200 p-3">
-                                                                <Stack direction="row" spacing={1} alignItems="center" className="mb-1">
-                                                                    <Chip size="small" label={String(p.type || "text").toUpperCase()} />
-                                                                    <Typography variant="caption" className="text-slate-500">
-                                                                        {p.created_by?.name || p.created_by?.email || "User"} • {p.created_at ? new Date(p.created_at).toLocaleString() : ""}
-                                                                    </Typography>
+                                                                <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                                                    <Stack direction="row" spacing={1.5} alignItems="center">
+                                                                        <Avatar src={toAbs(p.created_by?.avatar || p.created_by?.avatar_url || p.created_by?.user_image || "")}>
+                                                                            {(p.created_by?.name || p.created_by?.email || "U").slice(0, 1).toUpperCase()}
+                                                                        </Avatar>
+                                                                        <Box>
+                                                                            <Typography variant="subtitle2" className="font-semibold">
+                                                                                {p.created_by?.name || p.created_by?.email || "User"}
+                                                                            </Typography>
+                                                                            <Typography variant="caption" className="text-slate-500">
+                                                                                {p.created_at ? new Date(p.created_at).toLocaleString() : ""}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                    </Stack>
+                                                                    <Stack direction="row" spacing={1} alignItems="center">
+                                                                        <Chip size="small" label={String(p.type || "text").toUpperCase()} />
+                                                                        {canModerate && Number.isInteger(Number(p.feed_item_id ?? p.id)) && (
+                                                                            <IconButton size="small" onClick={(e) => openPostMenu(e, p)} title="More">
+                                                                                <MoreVertRoundedIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        )}
+                                                                    </Stack>
                                                                 </Stack>
 
                                                                 {/* Render by type */}
                                                                 {/* footer actions at end of post — show for ALL types if we can moderate and item has an id */}
-                                                                {canModerate && Number.isInteger(Number(p.feed_item_id ?? p.id)) && (
-                                                                    <Stack direction="row" justifyContent="flex-end" className="mt-2">
-                                                                        <IconButton size="small" onClick={(e) => openPostMenu(e, p)} title="More">
-                                                                            <MoreVertRoundedIcon fontSize="small" />
-                                                                        </IconButton>
-                                                                    </Stack>
-                                                                )}
 
                                                                 {isRemoved ? (
                                                                     <Typography color="text.secondary" sx={{ fontStyle: "italic", py: 2 }}>
@@ -6266,3 +6293,4 @@ export default function GroupManagePage() {
     );
 
 }
+
