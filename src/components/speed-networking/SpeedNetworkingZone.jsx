@@ -87,16 +87,14 @@ export default function SpeedNetworkingZone({
             console.log("[SpeedNetworking] Match ended via WebSocket. Return to queue.");
             setCurrentMatch(null);
             setInQueue(true);
-            // Optionally trigger a session refresh to be safe
-            fetchActiveSession();
         } else if (messageType === 'speed_networking.session_ended' || messageType === 'speed_networking_session_ended') {
             setSession(prev => prev ? { ...prev, status: 'ENDED' } : prev);
             setCurrentMatch(null);
             setInQueue(false);
         } else if (messageType === 'speed_networking.session_started' || messageType === 'speed_networking_session_started') {
-            fetchActiveSession();
+            // Session started message will be picked up by polling mechanism
         }
-    }, [lastMessage, onEnterMatch, fetchActiveSession]);
+    }, [lastMessage, onEnterMatch]);
 
     // When session ends, immediately clear queue and match states
     useEffect(() => {
@@ -202,7 +200,7 @@ export default function SpeedNetworkingZone({
     // Poll for current match when in queue (only if waiting)
     // WebSocket will notify of matches, but polling is fallback for reliability
     useEffect(() => {
-        if (!inQueue || !session) return;
+        if (!inQueue || !session?.id) return;
 
         const pollInterval = setInterval(async () => {
             try {
@@ -233,7 +231,7 @@ export default function SpeedNetworkingZone({
         }, 5000); // Poll every 5 seconds (reduced frequency - WebSocket handles real-time)
 
         return () => clearInterval(pollInterval);
-    }, [inQueue, session, eventId, onEnterMatch]);
+    }, [inQueue, session?.id, eventId, onEnterMatch]);
 
     // Initial fetch
     useEffect(() => {
@@ -243,7 +241,7 @@ export default function SpeedNetworkingZone({
     // Poll session status periodically (fallback for WebSocket)
     // Only check when session might have changed (not in active match)
     useEffect(() => {
-        if (!session) return;
+        if (!session?.id) return;
 
         const pollInterval = setInterval(async () => {
             try {
@@ -291,7 +289,7 @@ export default function SpeedNetworkingZone({
         }, 5000); // Poll every 5 seconds (reduced frequency - WebSocket handles real-time updates)
 
         return () => clearInterval(pollInterval);
-    }, [session, eventId]);
+    }, [session?.id, eventId]);
 
     if (loading && !session) {
         return (
