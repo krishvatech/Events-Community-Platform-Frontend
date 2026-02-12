@@ -1136,7 +1136,7 @@ function ReportDialog({ open, onClose, onSubmit, loading, targetLabel }) {
 // -----------------------------------------------------------------------------
 // 6. POST CARD
 // -----------------------------------------------------------------------------
-function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, onDelete, canEdit, canDelete, viewerId, viewerIsStaff }) {
+function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, onDelete, canEdit, canDelete, viewerId, viewerIsStaff, commentsEnabled }) {
   const [local, setLocal] = React.useState(post);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
@@ -1336,20 +1336,22 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
         >
           {likeBtnLabel}
         </Button>
-        <Button
-          startIcon={<ChatBubbleOutlineIcon />}
-          color="inherit"
-          onClick={() => {
-            if (!canEngage) return;
-            setCommentsOpen(prev => {
-              if (!prev) setTimeout(() => commentInputRef.current?.focus(), 0);
-              return !prev;
-            });
-          }}
-          disabled={!canEngage}
-        >
-          Comment
-        </Button>
+        {commentsEnabled && (
+          <Button
+            startIcon={<ChatBubbleOutlineIcon />}
+            color="inherit"
+            onClick={() => {
+              if (!canEngage) return;
+              setCommentsOpen(prev => {
+                if (!prev) setTimeout(() => commentInputRef.current?.focus(), 0);
+                return !prev;
+              });
+            }}
+            disabled={!canEngage}
+          >
+            Comment
+          </Button>
+        )}
         <Button startIcon={<IosShareIcon />} color="inherit" onClick={() => canEngage && setShareOpen(true)} disabled={!canEngage}>Share</Button>
       </Stack>
 
@@ -1373,7 +1375,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
       </Popover>
 
       {/* Inline Comments */}
-      {commentsOpen && (
+      {commentsEnabled && commentsOpen && (
         <CommentsDialog
           inline
           postId={local.id}
@@ -2036,6 +2038,7 @@ function PostsTab({ groupId, group, moderatorCanI }) {
               canDelete={canDelete}
               viewerId={viewerId}
               viewerIsStaff={viewerIsStaff}
+              commentsEnabled={Boolean(group?.posts_comments_enabled)}
             />
           );
         })
