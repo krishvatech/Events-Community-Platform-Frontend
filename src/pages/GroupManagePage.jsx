@@ -241,7 +241,12 @@ function mapFeedPollToPost(row) {
         is_closed: Boolean(m.is_closed),
         created_at: row.created_at || m.created_at || row.createdAt || new Date().toISOString(),
         created_by: rawAuthor
-            ? { id: rawAuthor.id ?? row.actor_id ?? row.user_id, name: authorName, avatar: authorAvatar }
+            ? {
+                id: rawAuthor.id ?? row.actor_id ?? row.user_id,
+                name: authorName,
+                avatar: authorAvatar,
+                kyc_status: row.actor_kyc_status ?? m.actor_kyc_status ?? rawAuthor.kyc_status // Map kyc_status
+            }
             : null,
         hidden: !!(row.is_hidden ?? m.is_hidden),
         is_hidden: !!(row.is_hidden ?? m.is_hidden),
@@ -5306,9 +5311,14 @@ export default function GroupManagePage() {
                                                                             {(p.created_by?.name || p.created_by?.email || "U").slice(0, 1).toUpperCase()}
                                                                         </Avatar>
                                                                         <Box>
-                                                                            <Typography variant="subtitle2" className="font-semibold">
-                                                                                {p.created_by?.name || p.created_by?.email || "User"}
-                                                                            </Typography>
+                                                                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                                                <Typography variant="subtitle2" className="font-semibold">
+                                                                                    {p.created_by?.name || p.created_by?.email || "User"}
+                                                                                </Typography>
+                                                                                {p.created_by?.kyc_status === "approved" && (
+                                                                                    <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+                                                                                )}
+                                                                            </Stack>
                                                                             <Typography variant="caption" className="text-slate-500">
                                                                                 {p.created_at ? new Date(p.created_at).toLocaleString() : ""}
                                                                             </Typography>
