@@ -3249,7 +3249,8 @@ export default function GroupDetailsPage() {
         return {
           id: u.id,
           name: u.name || u.full_name || u.username || "User",
-          avatar: toMediaUrl(u.avatar || u.user_image),
+          avatar: toMediaUrl(u.avatar || u.user_image || u.avatar_url || u.user_image_url),
+          kyc_status: u.kyc_status || (u.profile?.kyc_status) || null,
           reactionId,
           reactionEmoji: def?.emoji,
           reactionLabel: def?.label,
@@ -3295,7 +3296,8 @@ export default function GroupDetailsPage() {
           uniqueMap.set(String(uid), {
             id: uid,
             name: u.name || u.full_name || u.username || "User",
-            avatar: toMediaUrl(u.avatar || u.user_image),
+            avatar: toMediaUrl(u.avatar || u.user_image || u.avatar_url || u.user_image_url),
+            kyc_status: u.kyc_status || (u.profile?.kyc_status) || null,
           });
         }
       });
@@ -3513,7 +3515,16 @@ export default function GroupDetailsPage() {
               {likesFilteredUsers.map(u => (
                 <ListItem key={u.id}>
                   <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U")[0]}</Avatar></ListItemAvatar>
-                  <ListItemText primary={u.name} />
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        {u.name}
+                        {u.kyc_status === "approved" && (
+                          <VerifiedIcon color="primary" sx={{ fontSize: 16, ml: 0.5 }} />
+                        )}
+                      </Box>
+                    }
+                  />
                   {u.reactionEmoji && (
                     <ListItemSecondaryAction>
                       <Tooltip title={u.reactionLabel || ""}><Box sx={{ fontSize: 20, mr: 1 }}>{u.reactionEmoji}</Box></Tooltip>
@@ -3538,7 +3549,16 @@ export default function GroupDetailsPage() {
               {listUsers.map(u => (
                 <ListItem key={u.id}>
                   <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U")[0]}</Avatar></ListItemAvatar>
-                  <ListItemText primary={u.name} />
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        {u.name}
+                        {u.kyc_status === "approved" && (
+                          <VerifiedIcon color="primary" sx={{ fontSize: 16, ml: 0.5 }} />
+                        )}
+                      </Box>
+                    }
+                  />
                 </ListItem>
               ))}
             </List>
