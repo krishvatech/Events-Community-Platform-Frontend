@@ -18,6 +18,7 @@ import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import GroupsIcon from "@mui/icons-material/Groups";
 import ParticipantListDialog from "../components/ParticipantListDialog";
+import SpeedNetworkingMatchHistory from "../components/speed-networking/SpeedNetworkingMatchHistory";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -141,6 +142,55 @@ function EventDetailsSkeleton() {
         </div>
       </Container>
     </div>
+  );
+}
+
+// Wrapper to fetch active speed networking session
+function SpeedNetworkingMatchHistoryWrapper({ eventId }) {
+  const [sessionId, setSessionId] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchActiveSession = async () => {
+      try {
+        const token = localStorage.getItem("access") || localStorage.getItem("access_token");
+        if (!token || !eventId) {
+          setLoading(false);
+          return;
+        }
+
+        const url = `${API_BASE}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const activeSession = data.results?.find(s => s.status === 'ACTIVE' || s.status === 'ENDED');
+          if (activeSession) {
+            setSessionId(activeSession.id);
+          }
+        }
+      } catch (err) {
+        console.error('[MatchHistoryWrapper] Error fetching session:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActiveSession();
+  }, [eventId]);
+
+  if (loading || !sessionId) {
+    return null;
+  }
+
+  return (
+    <Paper elevation={0} className="rounded-2xl border border-slate-200" sx={{ mt: 3 }}>
+      <Box className="p-5">
+        <SpeedNetworkingMatchHistory eventId={eventId} sessionId={sessionId} />
+      </Box>
+    </Paper>
   );
 }
 
@@ -448,6 +498,11 @@ export default function EventDetailsPage() {
                   </Stack>
                 </Box>
               </Paper>
+
+              {/* Speed Networking Match History Section */}
+              {registration && event.id && (
+                <SpeedNetworkingMatchHistoryWrapper eventId={event.id} />
+              )}
               {/* ATTEND CARD (now BELOW the event card) */}
               <Paper elevation={0} className="rounded-2xl border border-slate-200">
                 <Box className="p-5">

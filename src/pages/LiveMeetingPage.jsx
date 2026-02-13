@@ -2050,6 +2050,7 @@ export default function NewLiveMeeting() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [loungeOpen, setLoungeOpen] = useState(false);
   const [showSpeedNetworking, setShowSpeedNetworking] = useState(false);
+  const [speedNetworkingNotification, setSpeedNetworkingNotification] = useState(null); // ✅ Notification message
   const [lastMessage, setLastMessage] = useState(null);
   const [isPostEventLounge, setIsPostEventLounge] = useState(false); // ✅ Track post-event lounge mode
   const [postEventLoungeClosingTime, setPostEventLoungeClosingTime] = useState(null); // ✅ Track closing time
@@ -4721,6 +4722,148 @@ export default function NewLiveMeeting() {
     const intervalId = setInterval(tick, 1000);
     return () => clearInterval(intervalId);
   }, [roomJoined]);
+
+  // ✅ Auto-join Speed Networking if session is active when user joins/rejoins
+  const speedNetworkingAutoJoinedRef = useRef(false);
+  const autoJoinCheckOnMountRef = useRef(false);
+
+  // Helper function to check and auto-join Speed Networking
+  const checkAndAutoJoinSpeedNetworking = useCallback(async () => {
+    try {
+      const token = getToken();
+      if (!token) {
+        console.warn('[LiveMeeting] No auth token available for auto-join');
+        return;
+      }
+
+      if (!eventId) {
+        console.warn('[LiveMeeting] No eventId available for auto-join');
+        return;
+      }
+
+      console.log('[LiveMeeting] Fetching Speed Networking sessions for event', eventId);
+
+      // Fetch active Speed Networking session
+      const url = `${API_ROOT}/events/${eventId}/speed-networking/`;
+      console.log('[LiveMeeting] Fetch URL:', url);
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('[LiveMeeting] API response status:', res.status);
+
+      if (!res.ok) {
+        console.warn('[LiveMeeting] Failed to fetch sessions, status:', res.status);
+        return;
+      }
+
+      const data = await res.json();
+      console.log('[LiveMeeting] Sessions data:', data);
+
+      const activeSession = data.results?.find(s => s.status === 'ACTIVE');
+      console.log('[LiveMeeting] Active session found:', activeSession ? { id: activeSession.id, name: activeSession.name } : 'NONE');
+
+      if (activeSession) {
+        console.log('[LiveMeeting] ✅ Auto-detected active Speed Networking session, opening zone');
+        // Mark as auto-joined to prevent repeated attempts
+        speedNetworkingAutoJoinedRef.current = true;
+
+        // Show notification
+        setSpeedNetworkingNotification('Speed Networking session is in progress. Opening queue...');
+        console.log('[LiveMeeting] Setting showSpeedNetworking to true');
+
+        // Open the Speed Networking dialog
+        setShowSpeedNetworking(true);
+
+        // Check if user already has an active queue entry or match
+        setTimeout(async () => {
+          try {
+            const checkUrl = `${API_ROOT}/events/${eventId}/speed-networking/${activeSession.id}/my-match/`;
+            console.log('[LiveMeeting] Checking user queue status:', checkUrl);
+
+            const checkRes = await fetch(checkUrl, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+
+            console.log('[LiveMeeting] Queue check response status:', checkRes.status);
+
+            // If user already has a queue entry/match, they'll be restored automatically
+            // by SpeedNetworkingZone component. Only join if they don't have one.
+            if (checkRes.status === 404) {
+              // No existing queue entry, join now
+              console.log('[LiveMeeting] No existing queue entry, attempting auto-join');
+
+              const joinUrl = `${API_ROOT}/events/${eventId}/speed-networking/${activeSession.id}/join/`;
+              const joinRes = await fetch(joinUrl, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+
+              console.log('[LiveMeeting] Auto-join response status:', joinRes.status);
+
+              if (joinRes.ok) {
+                const joinData = await joinRes.json();
+                console.log('[LiveMeeting] ✅ User auto-joined Speed Networking queue', joinData);
+                setSpeedNetworkingNotification('You have been added to the Speed Networking queue!');
+                setTimeout(() => setSpeedNetworkingNotification(null), 3000);
+              } else {
+                console.warn('[LiveMeeting] Failed to auto-join queue:', joinRes.status);
+                const errorText = await joinRes.text();
+                console.warn('[LiveMeeting] Error response:', errorText);
+                setSpeedNetworkingNotification(null);
+              }
+            } else if (checkRes.ok) {
+              const existingQueue = await checkRes.json();
+              console.log('[LiveMeeting] ✅ User has existing queue entry, restoring:', existingQueue);
+              if (existingQueue.current_match) {
+                setSpeedNetworkingNotification('Restoring your active match...');
+              } else {
+                setSpeedNetworkingNotification('You have been restored to the Speed Networking queue!');
+              }
+              setTimeout(() => setSpeedNetworkingNotification(null), 3000);
+            } else {
+              console.warn('[LiveMeeting] Unexpected queue check response:', checkRes.status);
+            }
+          } catch (err) {
+            console.error('[LiveMeeting] Error checking queue status:', err);
+            setSpeedNetworkingNotification(null);
+          }
+        }, 500); // Small delay to ensure zone is rendered
+      } else {
+        console.log('[LiveMeeting] No active Speed Networking session found');
+      }
+    } catch (err) {
+      console.error('[LiveMeeting] Error checking for active Speed Networking session:', err);
+    }
+  }, [eventId]);
+
+  // Trigger auto-join when user is in room - handles both new joins and refresh cases
+  useEffect(() => {
+    console.log('[LiveMeeting] Auto-join check:', { roomJoined, eventId, alreadyAutoJoined: speedNetworkingAutoJoinedRef.current });
+
+    // Skip if not ready
+    if (!roomJoined || !eventId) {
+      console.log('[LiveMeeting] Auto-join skipped: roomJoined=' + roomJoined + ', eventId=' + eventId);
+      return;
+    }
+
+    // Skip if already auto-joined
+    if (speedNetworkingAutoJoinedRef.current) {
+      console.log('[LiveMeeting] Auto-join already executed, skipping');
+      return;
+    }
+
+    // Prevent duplicate checks from multiple effect triggers
+    if (!autoJoinCheckOnMountRef.current) {
+      autoJoinCheckOnMountRef.current = true;
+      console.log('[LiveMeeting] Triggering auto-join for roomJoined=true, eventId=' + eventId);
+      checkAndAutoJoinSpeedNetworking();
+    }
+  }, [roomJoined, eventId, checkAndAutoJoinSpeedNetworking]);
 
   // Keep local button state in sync with Dyte actual state
 
@@ -10858,7 +11001,8 @@ export default function NewLiveMeeting() {
           )}
         </Menu>
 
-        {/* Main Layout */}
+        {/* Main Layout - Hidden if Speed Networking is active */}
+        {!showSpeedNetworking && (
         <Box
           sx={{
             display: "flex",
@@ -11525,6 +11669,7 @@ export default function NewLiveMeeting() {
             </Drawer>
           )}
         </Box>
+        )}
         {/* Member Info Dialog - Redesigned */}
         <Dialog
           open={memberInfoOpen}
@@ -12060,6 +12205,26 @@ export default function NewLiveMeeting() {
             }}
           >
             {snackbar.message}
+          </Alert>
+        </Snackbar>
+
+        {/* ✅ Speed Networking Auto-Join Notification */}
+        <Snackbar
+          open={!!speedNetworkingNotification}
+          autoHideDuration={4000}
+          onClose={() => setSpeedNetworkingNotification(null)}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
+            onClose={() => setSpeedNetworkingNotification(null)}
+            severity="info"
+            variant="filled"
+            sx={{
+              width: "100%",
+              boxShadow: 3,
+            }}
+          >
+            {speedNetworkingNotification}
           </Alert>
         </Snackbar>
 
