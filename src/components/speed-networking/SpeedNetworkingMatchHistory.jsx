@@ -8,7 +8,9 @@ import {
     Chip,
     Button,
     Grid,
-    Paper
+    Paper,
+    Tabs,
+    Tab
 } from '@mui/material';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -26,6 +28,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [sessionName, setSessionName] = useState('');
+    const [selectedTab, setSelectedTab] = useState('all');
 
     useEffect(() => {
         fetchUserMatches();
@@ -74,7 +77,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
     if (error) {
         return (
-            <Box sx={{ py: 2, px: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', borderRadius: 2 }}>
+            <Box sx={{ py: 2, px: 2, bgcolor: '#1a1a2e', borderRadius: 2, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
                 <Typography sx={{ color: '#ef4444' }}>
                     Error: {error}
                 </Typography>
@@ -84,7 +87,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
     if (matches.length === 0) {
         return (
-            <Box sx={{ py: 4, textAlign: 'center' }}>
+            <Box sx={{ py: 4, textAlign: 'center', bgcolor: '#0b101a', borderRadius: 2, px: 2 }}>
                 <Typography sx={{ color: 'rgba(255,255,255,0.5)' }}>
                     No matches yet. Join the speed networking session to start connecting!
                 </Typography>
@@ -92,10 +95,15 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
         );
     }
 
+    // Filter matches based on selected tab
+    const filteredMatches = selectedTab === 'all'
+        ? matches
+        : matches.filter(m => m.status === selectedTab.toUpperCase());
+
     return (
-        <Box>
+        <Box sx={{ bgcolor: '#0b101a', borderRadius: 2, p: 2 }}>
             {/* Header */}
-            <Box sx={{ mb: 3 }}>
+            <Box sx={{ mb: 2 }}>
                 <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, mb: 1 }}>
                     Your Matches
                 </Typography>
@@ -104,9 +112,47 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                 </Typography>
             </Box>
 
+            {/* Tabs */}
+            <Tabs
+                value={selectedTab}
+                onChange={(e, newValue) => setSelectedTab(newValue)}
+                sx={{
+                    borderBottom: '2px solid rgba(255,255,255,0.1)',
+                    mb: 3,
+                    bgcolor: 'transparent',
+                    borderRadius: 1,
+                    '& .MuiTab-root': {
+                        color: 'rgba(255,255,255,0.6)',
+                        fontSize: 14,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        minHeight: 48,
+                        letterSpacing: '0.5px',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                            color: '#fff',
+                            bgcolor: 'rgba(255,255,255,0.05)'
+                        },
+                        '&.Mui-selected': {
+                            color: '#fff',
+                            fontWeight: 700
+                        }
+                    },
+                    '& .MuiTabs-indicator': {
+                        bgcolor: '#5a78ff',
+                        height: 3,
+                        borderRadius: '2px 2px 0 0'
+                    }
+                }}
+            >
+                <Tab label={`All (${matches.length})`} value="all" />
+                <Tab label={`Completed (${matches.filter(m => m.status === 'COMPLETED').length})`} value="completed" />
+                <Tab label={`Skipped (${matches.filter(m => m.status === 'SKIPPED').length})`} value="skipped" />
+            </Tabs>
+
             {/* Matches Grid */}
             <Grid container spacing={2}>
-                {matches.map((match) => (
+                {filteredMatches.map((match) => (
                     <Grid item xs={12} sm={6} md={4} key={match.match_id}>
                         <Card sx={{
                             bgcolor: '#0b101a',
@@ -245,13 +291,22 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                 ))}
             </Grid>
 
+            {/* Empty State Message */}
+            {filteredMatches.length === 0 && (
+                <Box sx={{ py: 4, textAlign: 'center', bgcolor: '#0b101a', borderRadius: 2, px: 2, mt: 2 }}>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                        No matches in this category
+                    </Typography>
+                </Box>
+            )}
+
             {/* Stats Footer */}
             <Paper sx={{
                 mt: 3,
                 p: 2,
-                bgcolor: 'rgba(90, 120, 255, 0.05)',
+                bgcolor: '#0b101a',
                 borderRadius: 2,
-                border: '1px solid rgba(90, 120, 255, 0.2)'
+                border: '1px solid rgba(255,255,255,0.1)'
             }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
                     <Box>
