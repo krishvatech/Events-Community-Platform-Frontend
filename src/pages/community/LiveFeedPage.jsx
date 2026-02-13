@@ -1303,11 +1303,18 @@ function normalizeCommentRow(c) {
     c.can_engage ??
     (!is_under_review && !is_removed);
 
+  const kyc_status =
+    rawAuthor.kyc_status ||
+    rawAuthor.kycStatus ||
+    rawAuthor.profile?.kyc_status ||
+    rawAuthor.profile?.kycStatus ||
+    null;
+
   return {
     ...c,
     parent_id,
     author_id,
-    author: { id: author_id, name, avatar },
+    author: { id: author_id, name, avatar, kyc_status },
     moderation_status,
     is_under_review,
     is_removed,
@@ -1367,8 +1374,11 @@ function CommentItem({
         >
           {(c.author?.name || "U").slice(0, 1)}
         </Avatar>
-        <Typography variant="subtitle2">
+        <Typography variant="subtitle2" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           {c.author?.name || c.author?.username || "User"}
+          {c.author?.kyc_status === "approved" && (
+            <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />
+          )}
         </Typography>
         <Typography variant="caption" color="text.secondary">
           {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
@@ -3401,6 +3411,16 @@ export default function LiveFeedPage({
           POST_REACTIONS.find((x) => x.id === reactionId) ||
           POST_REACTIONS[0]; // default to "Like"
 
+        // 🟢 Extract KYC status
+        const kycStatus =
+          u?.kyc_status ||
+          u?.kycStatus ||
+          u?.profile?.kyc_status ||
+          u?.profile?.kycStatus ||
+          row.kyc_status ||
+          row.kycStatus ||
+          null;
+
         return {
           id: id2,
           name,
@@ -3408,6 +3428,7 @@ export default function LiveFeedPage({
           reactionId,
           reactionEmoji: def?.emoji,
           reactionLabel: def?.label,
+          kyc_status: kycStatus,
         };
       });
 
@@ -3979,7 +4000,16 @@ export default function LiveFeedPage({
                         {(u.name || "U").slice(0, 1)}
                       </Avatar>
                     </ListItemAvatar>
-                    <ListItemText primary={u.name} />
+                    <ListItemText
+                      primary={
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Typography variant="body1">{u.name}</Typography>
+                          {u.kyc_status === "approved" && (
+                            <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+                          )}
+                        </Stack>
+                      }
+                    />
                     {u.reactionEmoji && (
                       <ListItemSecondaryAction>
                         <Tooltip title={u.reactionLabel || ""}>
