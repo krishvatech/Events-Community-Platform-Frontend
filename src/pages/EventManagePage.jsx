@@ -2376,11 +2376,14 @@ export default function EventManagePage() {
             },
           }}
         >
-          <DialogTitle sx={{ fontWeight: 700 }}>Create Lounge Table</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>
+            {loungeCreateCategory === 'BREAKOUT' ? 'Create Breakout Room' : 'Create Lounge Table'}
+          </DialogTitle>
+          <br />
           <DialogContent sx={{ pt: 1 }}>
             <Stack spacing={2}>
               <TextField
-                label="Table name"
+                label={loungeCreateCategory === 'BREAKOUT' ? 'Room name' : 'Table name'}
                 value={loungeCreateName}
                 onChange={(e) => setLoungeCreateName(e.target.value)}
                 fullWidth
@@ -2393,38 +2396,40 @@ export default function EventManagePage() {
                 onChange={(e) => setLoungeCreateSeats(clampSeats(Number(e.target.value)))}
                 fullWidth
               />
-              <Box>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Table logo (optional)
-                </Typography>
-                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1 }}>
-                  <Button variant="outlined" component="label" sx={{ textTransform: "none" }}>
-                    {loungeCreateIcon ? "Replace logo" : "Upload logo"}
-                    <input
-                      type="file"
-                      hidden
-                      accept="image/*"
-                      onChange={(e) => setLoungeCreateIcon(e.target.files?.[0] || null)}
-                    />
-                  </Button>
-                  {loungeCreatePreview && (
-                    <Avatar
-                      src={loungeCreatePreview}
-                      variant="rounded"
-                      sx={{ width: 40, height: 40, bgcolor: "grey.100" }}
-                    />
-                  )}
-                  {loungeCreateIcon && (
-                    <Button
-                      size="small"
-                      onClick={() => setLoungeCreateIcon(null)}
-                      sx={{ textTransform: "none" }}
-                    >
-                      Remove
+              {loungeCreateCategory !== 'BREAKOUT' && (
+                <Box>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Table logo (optional)
+                  </Typography>
+                  <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1 }}>
+                    <Button variant="outlined" component="label" sx={{ textTransform: "none" }}>
+                      {loungeCreateIcon ? "Replace logo" : "Upload logo"}
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={(e) => setLoungeCreateIcon(e.target.files?.[0] || null)}
+                      />
                     </Button>
-                  )}
-                </Stack>
-              </Box>
+                    {loungeCreatePreview && (
+                      <Avatar
+                        src={loungeCreatePreview}
+                        variant="rounded"
+                        sx={{ width: 40, height: 40, bgcolor: "grey.100" }}
+                      />
+                    )}
+                    {loungeCreateIcon && (
+                      <Button
+                        size="small"
+                        onClick={() => setLoungeCreateIcon(null)}
+                        sx={{ textTransform: "none" }}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </Stack>
+                </Box>
+              )}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -2464,11 +2469,14 @@ export default function EventManagePage() {
             },
           }}
         >
-          <DialogTitle sx={{ fontWeight: 700 }}>Edit Lounge Table</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>
+            {(loungeEditTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'Edit Breakout Room' : 'Edit Lounge Table'}
+          </DialogTitle>
+          <br />
           <DialogContent sx={{ pt: 1 }}>
             <Stack spacing={2}>
               <TextField
-                label="Table name"
+                label={(loungeEditTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'Room name' : 'Table name'}
                 value={loungeEditName}
                 onChange={(e) => setLoungeEditName(e.target.value)}
                 fullWidth
@@ -2481,38 +2489,40 @@ export default function EventManagePage() {
                 onChange={(e) => setLoungeEditSeats(clampSeats(Number(e.target.value)))}
                 fullWidth
               />
-              <Box>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Table logo (optional)
-                </Typography>
-                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1 }}>
-                  <Button variant="outlined" component="label" sx={{ textTransform: "none" }}>
-                    {loungeEditIcon ? "Replace logo" : "Upload logo"}
-                    <input
-                      type="file"
-                      hidden
-                      accept="image/*"
-                      onChange={(e) => setLoungeEditIcon(e.target.files?.[0] || null)}
-                    />
-                  </Button>
-                  {(loungeEditPreview || loungeEditTarget?.icon_url) && (
-                    <Avatar
-                      src={loungeEditPreview || loungeEditTarget?.icon_url || ""}
-                      variant="rounded"
-                      sx={{ width: 40, height: 40, bgcolor: "grey.100" }}
-                    />
-                  )}
-                  {loungeEditIcon && (
-                    <Button
-                      size="small"
-                      onClick={() => setLoungeEditIcon(null)}
-                      sx={{ textTransform: "none" }}
-                    >
-                      Remove
+              {(loungeEditTarget?.category || 'LOUNGE') !== 'BREAKOUT' && (
+                <Box>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Table logo (optional)
+                  </Typography>
+                  <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1 }}>
+                    <Button variant="outlined" component="label" sx={{ textTransform: "none" }}>
+                      {loungeEditIcon ? "Replace logo" : "Upload logo"}
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={(e) => setLoungeEditIcon(e.target.files?.[0] || null)}
+                      />
                     </Button>
-                  )}
-                </Stack>
-              </Box>
+                    {(loungeEditPreview || loungeEditTarget?.icon_url) && (
+                      <Avatar
+                        src={loungeEditPreview || loungeEditTarget?.icon_url || ""}
+                        variant="rounded"
+                        sx={{ width: 40, height: 40, bgcolor: "grey.100" }}
+                      />
+                    )}
+                    {loungeEditIcon && (
+                      <Button
+                        size="small"
+                        onClick={() => setLoungeEditIcon(null)}
+                        sx={{ textTransform: "none" }}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </Stack>
+                </Box>
+              )}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -2552,10 +2562,12 @@ export default function EventManagePage() {
             },
           }}
         >
-          <DialogTitle sx={{ fontWeight: 700 }}>Delete Lounge Table?</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 700 }}>
+            {(loungeDeleteTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'Delete Breakout Room?' : 'Delete Lounge Table?'}
+          </DialogTitle>
           <DialogContent>
             <DialogContentText>
-              This will remove the table "{loungeDeleteTarget?.name || "Table"}" and clear its seats.
+              This will remove the {(loungeDeleteTarget?.category || 'LOUNGE') === 'BREAKOUT' ? 'room' : 'table'} "{loungeDeleteTarget?.name || "Table"}" and clear its seats.
             </DialogContentText>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
