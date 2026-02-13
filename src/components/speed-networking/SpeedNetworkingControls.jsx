@@ -136,6 +136,7 @@ export default function SpeedNetworkingControls({
         }
     };
 
+
     if (!session) {
         return (
             <>

@@ -3,6 +3,7 @@ import { Box, Typography, Button, CircularProgress } from '@mui/material';
 import SpeedNetworkingMatch from './SpeedNetworkingMatch';
 import SpeedNetworkingLobby from './SpeedNetworkingLobby';
 import SpeedNetworkingControls from './SpeedNetworkingControls';
+import SpeedNetworkingHostPanel from './SpeedNetworkingHostPanel';
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
@@ -70,7 +71,11 @@ export default function SpeedNetworkingZone({
     useEffect(() => {
         if (!lastMessage) return;
 
-        console.log("[SpeedNetworking] Processing message:", lastMessage.type);
+        console.log("[SpeedNetworking] Processing WebSocket message:", {
+            type: lastMessage.type,
+            hasData: !!lastMessage.data,
+            timestamp: new Date().toISOString()
+        });
 
         const messageType = lastMessage.type;
         const messageData = lastMessage.data || {};
@@ -93,6 +98,19 @@ export default function SpeedNetworkingZone({
             setInQueue(false);
         } else if (messageType === 'speed_networking.session_started' || messageType === 'speed_networking_session_started') {
             // Session started message will be picked up by polling mechanism
+        } else if (messageType === 'speed_networking_queue_update' || messageType === 'speed_networking.queue_update') {
+            console.log("[SpeedNetworking] Queue update via WebSocket", {
+                messageType,
+                queue_count: messageData.queue_count,
+                active_matches_count: messageData.active_matches_count,
+                timestamp: new Date().toISOString()
+            });
+            const d = messageData;
+            setSession(prev => prev ? {
+                ...prev,
+                queue_count: d.queue_count ?? prev.queue_count,
+                active_matches_count: d.active_matches_count ?? prev.active_matches_count
+            } : prev);
         }
     }, [lastMessage, onEnterMatch]);
 
@@ -462,15 +480,23 @@ export default function SpeedNetworkingZone({
             {/* Admin Controls */}
             {isAdmin && (
                 <Box sx={{
-                    p: 2,
                     borderTop: '1px solid rgba(255,255,255,0.1)',
                     bgcolor: 'rgba(90,120,255,0.05)'
                 }}>
-                    <SpeedNetworkingControls
-                        eventId={eventId}
-                        session={session}
-                        onSessionUpdated={fetchActiveSession}
-                    />
+                    <Box sx={{ p: 2 }}>
+                        <SpeedNetworkingControls
+                            eventId={eventId}
+                            session={session}
+                            onSessionUpdated={fetchActiveSession}
+                        />
+                    </Box>
+                    {session.status === 'ACTIVE' && (
+                        <SpeedNetworkingHostPanel
+                            eventId={eventId}
+                            session={session}
+                            lastMessage={lastMessage}
+                        />
+                    )}
                 </Box>
             )}
         </Box>
