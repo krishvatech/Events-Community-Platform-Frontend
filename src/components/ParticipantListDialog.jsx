@@ -12,9 +12,11 @@ import {
     Typography,
     Box,
     CircularProgress,
-    Chip
+    Chip,
+    Tooltip
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import VerifiedIcon from '@mui/icons-material/Verified';
 
 export default function ParticipantListDialog({ open, onClose, participants, eventTitle, loading, error }) {
     return (
@@ -62,6 +64,12 @@ export default function ParticipantListDialog({ open, onClose, participants, eve
                                             <Typography variant="body1">
                                                 {reg.user_name || "Unknown User"}
                                             </Typography>
+                                            {/* KYC Badge */}
+                                            {['approved', 'verified'].includes((reg.user_kyc_status || reg.kyc_status || '').toLowerCase()) && (
+                                                <Tooltip title="Verified Member">
+                                                    <VerifiedIcon sx={{ fontSize: 16, color: '#22d3ee' }} />
+                                                </Tooltip>
+                                            )}
                                             {reg.is_host && (
                                                 <Chip
                                                     label="Host"

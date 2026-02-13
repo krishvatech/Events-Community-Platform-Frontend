@@ -15,6 +15,7 @@ import {
     Tooltip,
     IconButton
 } from '@mui/material';
+import VerifiedIcon from '@mui/icons-material/Verified';
 import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -243,9 +244,17 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                                                 fontWeight: 700,
                                                 lineHeight: 1.2,
                                                 mb: 0.5,
-                                                color: 'text.primary'
+                                                color: 'text.primary',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 0.5
                                             }} noWrap>
                                                 {match.partner.first_name || match.partner.username} {match.partner.last_name}
+                                                {(match.partner.kyc_status === 'APPROVED' || match.partner.kyc_status === 'VERIFIED') && (
+                                                    <Tooltip title="Verified Member">
+                                                        <VerifiedIcon sx={{ fontSize: 16, color: '#22d3ee' }} />
+                                                    </Tooltip>
+                                                )}
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary" display="block" noWrap>
                                                 @{match.partner.username}
