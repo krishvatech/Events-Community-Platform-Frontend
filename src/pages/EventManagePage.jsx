@@ -1223,19 +1223,17 @@ export default function EventManagePage() {
               Sync
             </Button>
 
-            {targetCategory !== "BREAKOUT" && (
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  setLoungeCreateCategory(targetCategory);
-                  setLoungeCreateOpen(true);
-                }}
-                sx={{ textTransform: "none", borderRadius: 2 }}
-              >
-                Create {targetCategory === 'BREAKOUT' ? 'Room' : 'Table'}
-              </Button>
-            )}
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setLoungeCreateCategory(targetCategory);
+                setLoungeCreateOpen(true);
+              }}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+            >
+              Create {targetCategory === 'BREAKOUT' ? 'Room' : 'Table'}
+            </Button>
           </Stack>
         </Stack>
 

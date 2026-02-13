@@ -4145,14 +4145,16 @@ export default function NewLiveMeeting() {
     const ws = mainSocketRef.current;
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(payload));
+      console.log("[MainSocket] Action sent:", payload);
       return true;
     }
-    if (ws?.readyState === WebSocket.CONNECTING) {
+    // Queue action if socket is connecting or closed - it will be sent when reconnected
+    if (!ws || ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.CLOSED) {
       pendingMainSocketActionsRef.current.push(payload);
-      console.warn("[MainSocket] Socket connecting; queued action", payload);
+      console.warn("[MainSocket] Socket not ready; queued action", payload);
       return false;
     }
-    console.warn("[MainSocket] Unable to send action; socket not open", payload);
+    console.warn("[MainSocket] Unable to send action; socket state:", ws?.readyState, payload);
     return false;
   }, []);
 
@@ -12102,7 +12104,7 @@ export default function NewLiveMeeting() {
           onClose={() => setIsBreakoutControlsOpen(false)}
           onAction={(data) => {
             if (data?.action === "speed_networking_start") {
-              // Legacy/confusing call - redirecting or ignoring. 
+              // Legacy/confusing call - redirecting or ignoring.
               // Ideally we shouldn't receive this from current UI anymore.
               console.warn("Received legacy speed networking start action");
               return;
@@ -12114,6 +12116,8 @@ export default function NewLiveMeeting() {
             sendMainSocketAction(data);
           }}
           onlineCount={onlineUsers.length}
+          onlineUsers={onlineUsers}
+          loungeTables={loungeTables}
           debugMessage={serverDebugMessage}
         // Removing these props from passing down as they are no longer handled by BreakoutControls UI
         // speedNetworkingActive={speedNetworkingActive}
