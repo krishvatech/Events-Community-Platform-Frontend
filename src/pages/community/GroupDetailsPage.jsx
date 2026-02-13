@@ -264,6 +264,7 @@ function mapFeedItem(item) {
       id: authorId,
       name: displayName,
       avatar: toMediaUrl(authorAvatar),
+      kyc_status: rawAuthor.kyc_status || item.actor_kyc_status || item.kyc_status || m.kyc_status || null,
     },
     group_id: item.group_id ?? m.group_id ?? null,
     group: m.group_name ?? null,
@@ -508,7 +509,7 @@ function normalizeCommentRow(c) {
     ...c,
     parent_id,
     author_id,
-    author: { id: author_id, name, avatar },
+    author: { id: author_id, name, avatar, kyc_status: rawAuthor.kyc_status || null },
   };
 }
 
@@ -664,7 +665,12 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
           <Avatar src={c.author.avatar} sx={{ width: 24, height: 24 }}>{(c.author.name || "U")[0]}</Avatar>
           <Box sx={{ flex: 1 }}>
             <Box sx={{ bgcolor: "#f1f5f9", p: 1, borderRadius: 2 }}>
-              <Typography variant="subtitle2">{c.author.name}</Typography>
+              <Typography variant="subtitle2">
+                {c.author.name}
+                {c.author.kyc_status === "approved" && (
+                  <VerifiedIcon color="primary" sx={{ fontSize: 14, ml: 0.5, verticalAlign: "text-top" }} />
+                )}
+              </Typography>
               <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "anywhere" }}>
                 {c.text}
               </Typography>
@@ -1201,7 +1207,12 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
         <Avatar src={local.author?.avatar} />
         <Box sx={{ flex: 1 }}>
-          <Typography variant="subtitle2" fontWeight={700}>{local.author?.name}</Typography>
+          <Typography variant="subtitle2" fontWeight={700}>
+            {local.author?.name}
+            {local.author?.kyc_status === "approved" && (
+              <VerifiedIcon color="primary" sx={{ fontSize: 16, ml: 0.5, verticalAlign: "text-top" }} />
+            )}
+          </Typography>
           <Typography variant="caption" color="text.secondary">{formatWhen(local.created_at)}</Typography>
         </Box>
         {local.type !== 'text' && <Chip size="small" label={local.type.toUpperCase()} variant="outlined" />}
