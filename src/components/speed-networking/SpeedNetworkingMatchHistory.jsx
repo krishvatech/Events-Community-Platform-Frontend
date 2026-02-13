@@ -10,11 +10,16 @@ import {
     Grid,
     Paper,
     Tabs,
-    Tab
+    Tab,
+    Stack,
+    Tooltip,
+    IconButton
 } from '@mui/material';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import PersonAddAlt1RoundedIcon from '@mui/icons-material/PersonAddAlt1Rounded';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BlockIcon from '@mui/icons-material/Block';
+import { useNavigate } from 'react-router-dom';
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
@@ -24,11 +29,15 @@ function authHeader() {
 }
 
 export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
+    const navigate = useNavigate();
     const [matches, setMatches] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [sessionName, setSessionName] = useState('');
     const [selectedTab, setSelectedTab] = useState('all');
+
+    // State to track friend request status for each match partner
+    const [friendStatusMap, setFriendStatusMap] = useState({}); // { [userId]: 'none' | 'pending_outgoing' | 'friends' }
 
     useEffect(() => {
         fetchUserMatches();
@@ -52,11 +61,63 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
             const data = await res.json();
             setMatches(data.matches || []);
             setSessionName(data.session_name || '');
+
+            // Optimistically checking friend status if available in data, otherwise defaults to 'none'
+            // Using a simple effect to load status could be better but let's init map first
+            // Note: The backend response might need to include friend status for this to be perfect on load.
+            // For now, we assume 'none' and let the user click connect.
         } catch (err) {
             console.error('[MatchHistory] Error fetching matches:', err);
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Logic to send friend request
+    const handleConnect = async (partnerId) => {
+        if (!partnerId) return;
+
+        // Optimistic update
+        setFriendStatusMap(prev => ({ ...prev, [partnerId]: 'pending_outgoing' }));
+
+        try {
+            const res = await fetch(`${API_ROOT}/friend-requests/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...authHeader(),
+                },
+                body: JSON.stringify({ to_user: Number(partnerId) }),
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                // Revert optimistic update if failed
+                if (data.detail && data.detail.includes("already sent")) {
+                    setFriendStatusMap(prev => ({ ...prev, [partnerId]: 'pending_outgoing' }));
+                } else if (data.detail && data.detail.includes("already friends")) {
+                    setFriendStatusMap(prev => ({ ...prev, [partnerId]: 'friends' }));
+                } else {
+                    setFriendStatusMap(prev => ({ ...prev, [partnerId]: 'none' }));
+                    // alert(data.detail || "Failed to send request");
+                }
+            } else {
+                // Success
+                const status = (data.status || 'pending_outgoing').toLowerCase();
+                setFriendStatusMap(prev => ({ ...prev, [partnerId]: status }));
+            }
+        } catch (err) {
+            console.error("Failed to connect:", err);
+            setFriendStatusMap(prev => ({ ...prev, [partnerId]: 'none' }));
+        }
+    };
+
+    // Helper to open profile
+    const handleOpenProfile = (user) => {
+        if (user?.id) {
+            navigate(`/community/rich-profile/${user.id}`, { state: { user } });
         }
     };
 
@@ -77,7 +138,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
     if (error) {
         return (
-            <Box sx={{ py: 2, px: 2, bgcolor: '#1a1a2e', borderRadius: 2, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            <Box sx={{ py: 2, px: 2, bgcolor: '#fef2f2', borderRadius: 2, border: '1px solid #fee2e2' }}>
                 <Typography sx={{ color: '#ef4444' }}>
                     Error: {error}
                 </Typography>
@@ -87,9 +148,12 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
     if (matches.length === 0) {
         return (
-            <Box sx={{ py: 4, textAlign: 'center', bgcolor: '#0b101a', borderRadius: 2, px: 2 }}>
-                <Typography sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                    No matches yet. Join the speed networking session to start connecting!
+            <Box sx={{ py: 6, textAlign: 'center', bgcolor: 'background.paper', borderRadius: 4, px: 3, border: '1px solid #e2e8f0' }}>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No matches yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                    Join the speed networking session to start connecting!
                 </Typography>
             </Box>
         );
@@ -101,13 +165,13 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
         : matches.filter(m => m.status === selectedTab.toUpperCase());
 
     return (
-        <Box sx={{ bgcolor: '#0b101a', borderRadius: 2, p: 2 }}>
+        <Box>
             {/* Header */}
-            <Box sx={{ mb: 2 }}>
-                <Typography variant="h6" sx={{ color: '#fff', fontWeight: 700, mb: 1 }}>
+            <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5, color: 'text.primary' }}>
                     Your Matches
                 </Typography>
-                <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>
+                <Typography variant="body2" color="text.secondary">
                     {sessionName} • {matches.length} {matches.length === 1 ? 'connection' : 'connections'}
                 </Typography>
             </Box>
@@ -117,32 +181,15 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                 value={selectedTab}
                 onChange={(e, newValue) => setSelectedTab(newValue)}
                 sx={{
-                    borderBottom: '2px solid rgba(255,255,255,0.1)',
-                    mb: 3,
-                    bgcolor: 'transparent',
-                    borderRadius: 1,
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                    mb: 4,
                     '& .MuiTab-root': {
-                        color: 'rgba(255,255,255,0.6)',
-                        fontSize: 14,
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        fontSize: '0.95rem',
                         minHeight: 48,
-                        letterSpacing: '0.5px',
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                            color: '#fff',
-                            bgcolor: 'rgba(255,255,255,0.05)'
-                        },
-                        '&.Mui-selected': {
-                            color: '#fff',
-                            fontWeight: 700
-                        }
                     },
-                    '& .MuiTabs-indicator': {
-                        bgcolor: '#5a78ff',
-                        height: 3,
-                        borderRadius: '2px 2px 0 0'
-                    }
                 }}
             >
                 <Tab label={`All (${matches.length})`} value="all" />
@@ -151,198 +198,182 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
             </Tabs>
 
             {/* Matches Grid */}
-            <Grid container spacing={2}>
-                {filteredMatches.map((match) => (
-                    <Grid item xs={12} sm={6} md={4} key={match.match_id}>
-                        <Card sx={{
-                            bgcolor: '#0b101a',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                                borderColor: 'rgba(90,120,255,0.5)',
-                                transform: 'translateY(-2px)',
-                            }
-                        }}>
-                            <Box sx={{ p: 2 }}>
-                                {/* Partner Info */}
-                                <Box sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 2,
-                                    mb: 2
-                                }}>
-                                    <Avatar
-                                        src={match.partner.avatar_url}
-                                        alt={match.partner.first_name}
-                                        sx={{ width: 56, height: 56 }}
-                                    >
-                                        {(match.partner.first_name || 'U').charAt(0)}
-                                    </Avatar>
-                                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                                        <Typography sx={{
-                                            color: '#fff',
-                                            fontWeight: 600,
-                                            fontSize: 15,
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis'
-                                        }}>
-                                            {match.partner.first_name || match.partner.username}
-                                        </Typography>
-                                        <Typography sx={{
-                                            color: 'rgba(255,255,255,0.5)',
-                                            fontSize: 12
-                                        }}>
-                                            @{match.partner.username}
-                                        </Typography>
-                                    </Box>
-                                </Box>
+            <Grid container spacing={3}>
+                {filteredMatches.map((match) => {
+                    const partnerId = match.partner?.id;
+                    const requestStatus = friendStatusMap[partnerId] || 'none';
+                    const isPending = requestStatus === 'pending_outgoing' || requestStatus === 'requested';
+                    const isFriend = requestStatus === 'friends' || requestStatus === 'accepted';
 
-                                {/* Match Details */}
-                                <Box sx={{ mb: 2, py: 2, borderTop: '1px solid rgba(255,255,255,0.1)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                    return (
+                        <Grid item xs={12} sm={6} md={4} key={match.match_id}>
+                            <Card
+                                elevation={0}
+                                sx={{
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: 3,
+                                    height: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': {
+                                        borderColor: '#cbd5e1',
+                                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+                                    }
+                                }}
+                            >
+                                <Box sx={{ p: 2.5, flex: 1 }}>
+                                    {/* Partner Info */}
                                     <Box sx={{
                                         display: 'flex',
-                                        justifyContent: 'space-between',
                                         alignItems: 'center',
-                                        mb: 1
-                                    }}>
-                                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
-                                            Duration
-                                        </Typography>
-                                        <Typography sx={{ color: '#fff', fontWeight: 500, fontSize: 13 }}>
-                                            {formatDuration(match.duration_seconds)}
-                                        </Typography>
-                                    </Box>
-
-                                    {match.match_score && (
-                                        <Box sx={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center'
-                                        }}>
-                                            <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
-                                                Match Score
+                                        gap: 2,
+                                        mb: 2.5,
+                                        cursor: 'pointer'
+                                    }} onClick={() => handleOpenProfile(match.partner)}>
+                                        <Avatar
+                                            src={match.partner.avatar_url}
+                                            alt={match.partner.first_name}
+                                            sx={{ width: 56, height: 56, bgcolor: '#f1f5f9', color: '#64748b', fontWeight: 700 }}
+                                        >
+                                            {(match.partner.first_name || 'U').charAt(0)}
+                                        </Avatar>
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                                            <Typography variant="subtitle1" sx={{
+                                                fontWeight: 700,
+                                                lineHeight: 1.2,
+                                                mb: 0.5,
+                                                color: 'text.primary'
+                                            }} noWrap>
+                                                {match.partner.first_name || match.partner.username} {match.partner.last_name}
                                             </Typography>
-                                            <Typography sx={{
-                                                color: match.match_score >= 7 ? '#22c55e' : match.match_score >= 5 ? '#f59e0b' : '#ef4444',
-                                                fontWeight: 600,
-                                                fontSize: 13
-                                            }}>
-                                                {(match.match_score / 10 * 100).toFixed(0)}%
+                                            <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                                                @{match.partner.username}
                                             </Typography>
                                         </Box>
-                                    )}
-                                </Box>
+                                    </Box>
 
-                                {/* Status Badge */}
-                                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                                    {match.status === 'COMPLETED' ? (
-                                        <Chip
-                                            icon={<CheckCircleIcon />}
-                                            label="Completed"
-                                            size="small"
-                                            sx={{
-                                                bgcolor: 'rgba(34, 197, 94, 0.2)',
-                                                color: '#22c55e',
-                                                fontSize: 11,
-                                                fontWeight: 600
-                                            }}
-                                        />
+                                    {/* Match Details */}
+                                    <Box sx={{
+                                        py: 2,
+                                        borderTop: '1px solid #f1f5f9',
+                                        borderBottom: '1px solid #f1f5f9',
+                                        mb: 2.5
+                                    }}>
+                                        <Stack spacing={1.5}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                                                    DURATION
+                                                </Typography>
+                                                <Typography variant="body2" fontWeight={600} color="text.primary">
+                                                    {formatDuration(match.duration_seconds)}
+                                                </Typography>
+                                            </Box>
+
+                                            {match.match_score && (
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                                                        MATCH SCORE
+                                                    </Typography>
+                                                    <Typography variant="body2" fontWeight={700} sx={{
+                                                        color: match.match_score >= 7 ? '#16a34a' : match.match_score >= 5 ? '#d97706' : '#dc2626',
+                                                    }}>
+                                                        {(match.match_score / 10 * 100).toFixed(0)}%
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </Stack>
+                                    </Box>
+
+                                    {/* Status Badge */}
+                                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                                        {match.status === 'COMPLETED' ? (
+                                            <Chip
+                                                icon={<CheckCircleIcon style={{ fontSize: 16 }} />}
+                                                label="Completed"
+                                                size="small"
+                                                sx={{
+                                                    bgcolor: '#f0fdf4',
+                                                    color: '#16a34a',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.75rem',
+                                                    height: 24,
+                                                    '& .MuiChip-icon': { color: '#16a34a' }
+                                                }}
+                                            />
+                                        ) : (
+                                            <Chip
+                                                icon={<BlockIcon style={{ fontSize: 16 }} />}
+                                                label="Skipped"
+                                                size="small"
+                                                sx={{
+                                                    bgcolor: '#fef2f2',
+                                                    color: '#dc2626',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.75rem',
+                                                    height: 24,
+                                                    '& .MuiChip-icon': { color: '#dc2626' }
+                                                }}
+                                            />
+                                        )}
+                                    </Box>
+
+                                    {/* Action Button */}
+                                    {isFriend ? (
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            disabled
+                                            startIcon={<CheckCircleRoundedIcon />}
+                                            sx={{ borderRadius: 2, textTransform: 'none' }}
+                                        >
+                                            Connected
+                                        </Button>
+                                    ) : isPending ? (
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            disabled
+                                            startIcon={<CheckCircleRoundedIcon />}
+                                            sx={{ borderRadius: 2, textTransform: 'none' }}
+                                        >
+                                            Request Sent
+                                        </Button>
                                     ) : (
-                                        <Chip
-                                            icon={<BlockIcon />}
-                                            label="Skipped"
-                                            size="small"
+                                        <Button
+                                            fullWidth
+                                            variant="outlined"
+                                            startIcon={<PersonAddAlt1RoundedIcon />}
+                                            onClick={() => handleConnect(partnerId)}
                                             sx={{
-                                                bgcolor: 'rgba(239, 68, 68, 0.2)',
-                                                color: '#ef4444',
-                                                fontSize: 11,
-                                                fontWeight: 600
+                                                borderRadius: 2,
+                                                textTransform: 'none',
+                                                borderColor: '#e2e8f0',
+                                                color: 'text.primary',
+                                                '&:hover': {
+                                                    borderColor: '#cbd5e1',
+                                                    bgcolor: '#f8fafc'
+                                                }
                                             }}
-                                        />
+                                        >
+                                            Connect
+                                        </Button>
                                     )}
                                 </Box>
-
-                                {/* Action Button */}
-                                <Button
-                                    fullWidth
-                                    startIcon={<PersonAddIcon />}
-                                    sx={{
-                                        color: '#5a78ff',
-                                        borderColor: '#5a78ff',
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        textTransform: 'none',
-                                        py: 1,
-                                        '&:hover': {
-                                            bgcolor: 'rgba(90, 120, 255, 0.1)',
-                                            borderColor: '#7a94ff'
-                                        }
-                                    }}
-                                    variant="outlined"
-                                >
-                                    Connect
-                                </Button>
-                            </Box>
-                        </Card>
-                    </Grid>
-                ))}
+                            </Card>
+                        </Grid>
+                    );
+                })}
             </Grid>
 
             {/* Empty State Message */}
-            {filteredMatches.length === 0 && (
-                <Box sx={{ py: 4, textAlign: 'center', bgcolor: '#0b101a', borderRadius: 2, px: 2, mt: 2 }}>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                        No matches in this category
+            {filteredMatches.length === 0 && matches.length > 0 && (
+                <Box sx={{ py: 6, textAlign: 'center', bgcolor: 'background.paper', borderRadius: 4, px: 3, border: '1px dashed #e2e8f0', mt: 2 }}>
+                    <Typography color="text.secondary">
+                        No matches found in this category
                     </Typography>
                 </Box>
             )}
-
-            {/* Stats Footer */}
-            <Paper sx={{
-                mt: 3,
-                p: 2,
-                bgcolor: '#0b101a',
-                borderRadius: 2,
-                border: '1px solid rgba(255,255,255,0.1)'
-            }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
-                    <Box>
-                        <Typography sx={{ color: '#5a78ff', fontWeight: 700, fontSize: 20 }}>
-                            {matches.length}
-                        </Typography>
-                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 0.5 }}>
-                            Total Matches
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography sx={{
-                            color: '#22c55e',
-                            fontWeight: 700,
-                            fontSize: 20
-                        }}>
-                            {matches.filter(m => m.status === 'COMPLETED').length}
-                        </Typography>
-                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 0.5 }}>
-                            Completed
-                        </Typography>
-                    </Box>
-                    <Box>
-                        <Typography sx={{
-                            color: '#f59e0b',
-                            fontWeight: 700,
-                            fontSize: 20
-                        }}>
-                            {matches.filter(m => m.status === 'SKIPPED').length}
-                        </Typography>
-                        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 0.5 }}>
-                            Skipped
-                        </Typography>
-                    </Box>
-                </Box>
-            </Paper>
         </Box>
     );
 }
