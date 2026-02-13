@@ -1694,13 +1694,15 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
             const id = u?.id ?? r.user_id ?? r.id;
 
             const name = u.name || u.full_name || u.username || (u.first_name ? `${u.first_name} ${u.last_name || ""}` : `User #${id}`);
-            const avatar = toAbs(u.avatar || u.photo || u.photo_url || u.image || null);
+            const avatar = toAbs(u.avatar || u.photo || u.photo_url || u.image || u.avatar_url || null);
+
+            const kyc_status = u.kyc_status || u.actor_kyc_status || null;
 
             // Determine reaction type
             const reactionId = r.reaction || r.reaction_type || r.kind || "like";
             const def = POST_REACTIONS.find(x => x.id === reactionId) || POST_REACTIONS[0];
 
-            return id ? { id, name, avatar, reactionId, reactionEmoji: def.emoji, reactionLabel: def.label } : null;
+            return id ? { id, name, avatar, kyc_status, reactionId, reactionEmoji: def.emoji, reactionLabel: def.label } : null;
         }).filter(Boolean);
     };
 
@@ -1801,7 +1803,12 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
                         {filteredRows.map((u, i) => (
                             <ListItem key={u.id || i}>
                                 <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar>
-                                <ListItemText primary={u.name} />
+                                <ListItemText primary={
+                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                        <span>{u.name}</span>
+                                        {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                                    </Stack>
+                                } />
                                 {u.reactionEmoji && (
                                     <Tooltip title={u.reactionLabel || ""}>
                                         <Box sx={{ fontSize: 20 }}>{u.reactionEmoji}</Box>
@@ -1851,7 +1858,8 @@ function GroupSharesDialog({ open, onClose, groupIdOrSlug, postId }) {
                         return {
                             id: u.id ?? it.id,
                             name: u.name || u.full_name || u.username || `User #${u.id ?? it.id ?? ""}`,
-                            avatar: u.avatar || u.photo || u.photo_url || u.image || null,
+                            avatar: u.avatar || u.photo || u.photo_url || u.image || u.avatar_url || null,
+                            kyc_status: u.kyc_status || null,
                         };
                     });
                     break;
@@ -1881,7 +1889,12 @@ function GroupSharesDialog({ open, onClose, groupIdOrSlug, postId }) {
                             return (
                                 <ListItem key={user.id ?? i}>
                                     <ListItemAvatar><Avatar src={user.avatar} /></ListItemAvatar>
-                                    <ListItemText primary={user.name || user.username || `User #${user.id}`} />
+                                    <ListItemText primary={
+                                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                                            <span>{user.name || user.username || `User #${user.id}`}</span>
+                                            {user.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                                        </Stack>
+                                    } />
                                 </ListItem>
                             );
                         })}
