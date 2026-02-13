@@ -1892,6 +1892,7 @@ export default function NewLiveMeeting() {
   const joinedOnceRef = useRef(false);
   const askedMediaPermRef = useRef(false);
   const [roomJoined, setRoomJoined] = useState(false);
+  const roomJoinedRef = useRef(false); // ✅ Track roomJoined state for async contexts (e.g., breakout rejoin)
 
   // ✅ Local join timer (per user)
   const joinedAtRef = useRef(null);
@@ -3151,6 +3152,10 @@ export default function NewLiveMeeting() {
   }, [activeTableId]);
 
   useEffect(() => {
+    roomJoinedRef.current = roomJoined;
+  }, [roomJoined]);
+
+  useEffect(() => {
     applyBreakoutTokenRef.current = applyBreakoutToken;
   }, [applyBreakoutToken]);
 
@@ -3923,8 +3928,89 @@ export default function NewLiveMeeting() {
         console.log("[MainSocket] Received:", msg.type, msg);
 
         if (msg.type === "force_join_breakout") {
-          // 1. Join the table via API to get token
+          // Host-initiated force join - enter the breakout room
+          console.log("[MainSocket] Force join to breakout:", msg.table_id);
           handleEnterBreakout(msg.table_id);
+        } else if (msg.type === "breakout_restored") {
+          // ✅ NEW: Page reload/reconnect - user is being restored to their previous breakout room
+          console.log("[MainSocket] Breakout restored to table", msg.table_id);
+          showSnackbar(`Restored to ${msg.table_name || "your breakout room"}`, "info");
+
+          // 🎥 Restore BOTH breakout room AND main room peek view after page reload
+          // The main room peek is essential for the dual-screen layout
+          if (msg.main_room_meeting_id && !mainDyteMeeting) {
+            (async () => {
+              try {
+                console.log("[MainSocket] Getting main room token for peek view restoration");
+                const res = await fetch(toApiUrl(`events/${eventId}/dyte/join/`), {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", ...authHeader() },
+                  body: JSON.stringify({ is_host: false }),
+                });
+                if (!res.ok) {
+                  console.warn("[MainSocket] Failed to get main room token:", res.status);
+                  return;
+                }
+                const data = await res.json();
+                if (data.authToken) {
+                  mainAuthTokenRef.current = data.authToken;
+                  console.log("[MainSocket] ✅ Main room token obtained, initializing peek");
+                  // Initialize main meeting for peek view (receive-only, no audio/video)
+                  await initMainMeeting({
+                    authToken: data.authToken,
+                    defaults: { audio: false, video: false },
+                  });
+                }
+              } catch (e) {
+                console.warn("[MainSocket] Error restoring main room for peek:", e);
+              }
+            })();
+          }
+
+          // Join the breakout room (happens in parallel with main room init)
+          handleEnterBreakout(msg.table_id);
+
+          // ✅ NEW: After breakout rejoin, refresh Dyte SDK participant list
+          // When a participant rejoins a breakout room after page reload, the Dyte SDK
+          // doesn't automatically sync existing participants. We need to force a refresh.
+          // This ensures that other participants (e.g., Christopher) become visible to the
+          // rejoining participant (e.g., Ravikumar) without requiring manual action.
+          (async () => {
+            try {
+              // Wait for Dyte SDK to initialize and room to be joined (timeout after 8 seconds)
+              const maxWaitTime = 8000;
+              const startTime = Date.now();
+              while (!roomJoinedRef?.current && Date.now() - startTime < maxWaitTime) {
+                await new Promise((r) => setTimeout(r, 100));
+              }
+
+              // Check if room joined successfully
+              if (!roomJoinedRef?.current) {
+                console.warn("[MainSocket] Dyte room not joined after 8s, skipping participant refresh");
+                return;
+              }
+
+              // Give Dyte SDK a moment to populate the initial participant list
+              await new Promise((r) => setTimeout(r, 200));
+
+              // Force refresh of participant list and video subscriptions
+              if (dyteMeeting && typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                console.log("[MainSocket] 🔄 Refreshing Dyte participant list after breakout rejoin");
+                try {
+                  await dyteMeeting.participants.videoSubscribed.refresh();
+                  console.log("[MainSocket] ✅ Dyte participant list refreshed successfully");
+                } catch (e) {
+                  console.warn("[MainSocket] Participant list refresh failed (non-critical):", e?.message);
+                }
+              }
+            } catch (e) {
+              console.warn("[MainSocket] Error during breakout rejoin participant sync:", e);
+            }
+          })();
+        } else if (msg.type === "breakout_restore_failed") {
+          // ✅ NEW: Page reload/reconnect - restoration failed (room full, closed, etc.)
+          console.log("[MainSocket] Breakout restore failed:", msg.message);
+          showSnackbar(msg.message || "Your previous breakout room is no longer available", "warning");
         } else if (msg.type === "server_debug") {
           // Show a toast or console log if host
           if (isHost) {
