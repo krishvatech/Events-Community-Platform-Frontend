@@ -813,6 +813,8 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
           {SHOW_INDIVIDUAL_DOTS &&
             markers.map((m, i) => {
               const [lng, lat] = m.coordinates;
+              const isVerified = isVerifiedStatus(m.user?.profile?.kyc_status || m.user?.kyc_status);
+
               return (
                 <CircleMarker
                   key={i}
@@ -835,7 +837,12 @@ function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOp
                       sx={{ fontSize: 12, cursor: "pointer" }}
                       onClick={() => onOpenProfile?.(m.user)}
                     >
-                      <div style={{ fontWeight: 600 }}>{m.userName}</div>
+                      <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
+                        {m.userName}
+                        {isVerified && (
+                          <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />
+                        )}
+                      </div>
                       <div style={{ opacity: 0.85 }}>
                         {m.isFriend ? "My Contact" : "Member"}
                       </div>
