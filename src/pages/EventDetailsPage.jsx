@@ -11,6 +11,8 @@ import {
   Typography,
   Breadcrumbs,
   Skeleton,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
@@ -145,53 +147,31 @@ function EventDetailsSkeleton() {
   );
 }
 
-// Wrapper to fetch active speed networking session
-function SpeedNetworkingMatchHistoryWrapper({ eventId }) {
-  const [sessionId, setSessionId] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    const fetchActiveSession = async () => {
-      try {
-        const token = localStorage.getItem("access") || localStorage.getItem("access_token");
-        if (!token || !eventId) {
-          setLoading(false);
-          return;
-        }
-
-        const url = `${API_BASE}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const activeSession = data.results?.find(s => s.status === 'ACTIVE' || s.status === 'ENDED');
-          if (activeSession) {
-            setSessionId(activeSession.id);
-          }
-        }
-      } catch (err) {
-        console.error('[MatchHistoryWrapper] Error fetching session:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchActiveSession();
-  }, [eventId]);
-
-  if (loading || !sessionId) {
-    return null;
-  }
+function CustomTabPanel(props) {
+  const { children, value, index, ...other } = props;
 
   return (
-    <Paper elevation={0} className="rounded-2xl border border-slate-200" sx={{ mt: 3 }}>
-      <Box className="p-5">
-        <SpeedNetworkingMatchHistory eventId={eventId} sessionId={sessionId} />
-      </Box>
-    </Paper>
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ py: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
   );
+}
+
+function a11yProps(index) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
 }
 
 export default function EventDetailsPage() {
@@ -214,6 +194,12 @@ export default function EventDetailsPage() {
   const [participantList, setParticipantList] = useState([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [participantError, setParticipantError] = useState(null);
+
+  // Tabs & Speed Networking
+  const [activeTab, setActiveTab] = useState(0);
+  const [speedNetworkingSessionId, setSpeedNetworkingSessionId] = useState(null);
+  const [checkingSpeedNetworking, setCheckingSpeedNetworking] = useState(false);
+
 
   const handleShowParticipants = async () => {
     setShowParticipantsDialog(true);
@@ -259,6 +245,7 @@ export default function EventDetailsPage() {
     })();
     return () => { cancelled = true; };
   }, [event?.id, token]);
+
   useEffect(() => {
     let cancelled = false;
     async function fetchEvent() {
@@ -310,6 +297,44 @@ export default function EventDetailsPage() {
     fetchEvent();
     return () => { cancelled = true; };
   }, [slug, token, fallbackId]);
+
+
+  // Check for Speed Networking Session
+  useEffect(() => {
+    if (!event?.id || !token) return;
+
+    let cancelled = false;
+    const fetchActiveSession = async () => {
+      setCheckingSpeedNetworking(true);
+      try {
+        const url = `${API_BASE}/events/${event.id}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (cancelled) return;
+
+        if (res.ok) {
+          const data = await res.json();
+          // Check for active or ended sessions.
+          // If exist, we show the tab. Ideally checking for ANY session relevant to display.
+          const existingSession = data.results?.find(s => s.status === 'ACTIVE' || s.status === 'ENDED' || s.status === 'SCHEDULED'); // Including SCHEDULED just in case
+          if (existingSession) {
+            setSpeedNetworkingSessionId(existingSession.id);
+          }
+        }
+      } catch (err) {
+        console.error('[EventDetails] Error fetching session:', err);
+      } finally {
+        if (!cancelled) setCheckingSpeedNetworking(false);
+      }
+    };
+
+    fetchActiveSession();
+    return () => { cancelled = true; };
+  }, [event?.id, token]);
+
+
   if (loading) {
     return <EventDetailsSkeleton />;
   }
@@ -338,13 +363,18 @@ export default function EventDetailsPage() {
   const backLabel = refParam === "my_events" ? "My Events" : "Explore Events";
   const backPath = refParam === "my_events" ? "/account/events" : "/events";
 
+  const showSpeedNetworkingTab = !!speedNetworkingSessionId;
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* BODY with LEFT NAV + MAIN */}
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
-            {/* Stack vertically so Attend appears AFTER the event card */}
             <div className="flex flex-col gap-6">
 
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
@@ -372,7 +402,8 @@ export default function EventDetailsPage() {
                   </Typography>
                 </Breadcrumbs>
               </Stack>
-              {/* EVENT CARD */}
+
+              {/* EVENT HEADER CARD */}
               <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
                 {event.preview_image ? (
                   <Box
@@ -483,120 +514,147 @@ export default function EventDetailsPage() {
                         );
                       }
                     })()}
-                    <Typography variant="h6" fontWeight={800}>
-                      About this event
-                    </Typography>
-                    {desc?.trim() ? (
-                      <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                        {desc}
-                      </Typography>
-                    ) : (
-                      <Typography variant="body1" color="text.secondary">
-                        Event details will be announced soon.
-                      </Typography>
-                    )}
                   </Stack>
                 </Box>
+
+                {/* TABS HEADER */}
+                {showSpeedNetworkingTab && (
+                  <Box sx={{ borderBottom: 1, borderColor: 'divider', px: { xs: 2.5, sm: 3, md: 4 } }}>
+                    <Tabs value={activeTab} onChange={handleTabChange} aria-label="event details tabs">
+                      <Tab label="Overview" {...a11yProps(0)} />
+                      <Tab label="Speed Networking" {...a11yProps(1)} />
+                    </Tabs>
+                  </Box>
+                )}
               </Paper>
 
-              {/* Speed Networking Match History Section */}
-              {registration && event.id && (
-                <SpeedNetworkingMatchHistoryWrapper eventId={event.id} />
-              )}
-              {/* ATTEND CARD (now BELOW the event card) */}
-              <Paper elevation={0} className="rounded-2xl border border-slate-200">
-                <Box className="p-5">
-                  <Typography variant="h6" className="font-extrabold">Attend</Typography>
-                  <Typography variant="h5" className="font-bold text-teal-600 mt-1 mb-2">
-                    {event.is_free ? "Free" : priceStr(event.price)}
-                  </Typography>
-                  <div className="mt-3 flex flex-col gap-2">
-                    {/* Replay Info Badge */}
-                    {event.replay_available && (
-                      <Box className="mt-2 mb-3 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
-                        <Typography variant="subtitle2" className="text-indigo-800 font-semibold">
-                          Replay will be available
+              {/* TAB CONTENT: OVERVIEW */}
+              {/* If tabs are hidden (no speed networking), always show content. Otherwise check activeTab === 0 */}
+              {(!showSpeedNetworkingTab || activeTab === 0) && (
+                <Box>
+                  <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden mb-6">
+                    <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
+                      <Typography variant="h6" fontWeight={800} sx={{ mb: 2 }}>
+                        About this event
+                      </Typography>
+                      {desc?.trim() ? (
+                        <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                          {desc}
                         </Typography>
-                        {event.replay_availability_duration && (
-                          <Typography variant="caption" className="text-indigo-600 block mt-0.5">
-                            Accessible for: {event.replay_availability_duration}
-                          </Typography>
+                      ) : (
+                        <Typography variant="body1" color="text.secondary">
+                          Event details will be announced soon.
+                        </Typography>
+                      )}
+                    </Box>
+                  </Paper>
+
+                  {/* ATTEND CARD */}
+                  <Paper elevation={0} className="rounded-2xl border border-slate-200">
+                    <Box className="p-5">
+                      <Typography variant="h6" className="font-extrabold">Attend</Typography>
+                      <Typography variant="h5" className="font-bold text-teal-600 mt-1 mb-2">
+                        {event.is_free ? "Free" : priceStr(event.price)}
+                      </Typography>
+                      <div className="mt-3 flex flex-col gap-2">
+                        {/* Replay Info Badge */}
+                        {event.replay_available && (
+                          <Box className="mt-2 mb-3 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
+                            <Typography variant="subtitle2" className="text-indigo-800 font-semibold">
+                              Replay will be available
+                            </Typography>
+                            {event.replay_availability_duration && (
+                              <Typography variant="caption" className="text-indigo-600 block mt-0.5">
+                                Accessible for: {event.replay_availability_duration}
+                              </Typography>
+                            )}
+                          </Box>
                         )}
-                      </Box>
-                    )}
 
-                    {canShowActiveJoin ? (
-                      <Button
-                        component={Link}
-                        to={livePath}
-                        state={{ event, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge }}
-                        sx={{
-                          textTransform: "none",
-                          backgroundColor: "#10b8a6",
-                          "&:hover": { backgroundColor: "#0ea5a4" },
-                        }}
-                        className="rounded-xl"
-                        variant="contained"
-                      >
-                        {isHost ? "Join as Host" : getJoinButtonText(event, isLive, false)}
-                      </Button>
-                    ) : canWatch ? (
-                      <Button
-                        component="a"
-                        href={event.recording_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        variant="outlined"
-                        sx={{ textTransform: "none" }}
-                        className="rounded-xl"
-                      >
-                        Watch Recording
-                      </Button>
-                    ) : isPast ? (
-                      <Button
-                        disabled
-                        variant="contained"
-                        sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
-                        className="rounded-xl"
-                      >
-                        Event Ended
-                      </Button>
-                    ) : (
-                      <Button
-                        disabled
-                        variant="contained"
-                        sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
-                        className="rounded-xl"
-                      >
-                        Join (Not Live Yet)
-                      </Button>
+                        {canShowActiveJoin ? (
+                          <Button
+                            component={Link}
+                            to={livePath}
+                            state={{ event, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge }}
+                            sx={{
+                              textTransform: "none",
+                              backgroundColor: "#10b8a6",
+                              "&:hover": { backgroundColor: "#0ea5a4" },
+                            }}
+                            className="rounded-xl"
+                            variant="contained"
+                          >
+                            {isHost ? "Join as Host" : getJoinButtonText(event, isLive, false)}
+                          </Button>
+                        ) : canWatch ? (
+                          <Button
+                            component="a"
+                            href={event.recording_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            variant="outlined"
+                            sx={{ textTransform: "none" }}
+                            className="rounded-xl"
+                          >
+                            Watch Recording
+                          </Button>
+                        ) : isPast ? (
+                          <Button
+                            disabled
+                            variant="contained"
+                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                            className="rounded-xl"
+                          >
+                            Event Ended
+                          </Button>
+                        ) : (
+                          <Button
+                            disabled
+                            variant="contained"
+                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                            className="rounded-xl"
+                          >
+                            Join (Not Live Yet)
+                          </Button>
 
 
-                    )}
+                        )}
 
-                    {registration && (
-                      <Box className="flex justify-center py-2">
-                        <RegisteredActions
-                          ev={event}
-                          reg={registration}
-                          onUnregistered={() => setRegistration(null)}
-                          onCancelRequested={(_, updated) => setRegistration(updated)}
-                        />
-                      </Box>
-                    )}
+                        {registration && (
+                          <Box className="flex justify-center py-2">
+                            <RegisteredActions
+                              ev={event}
+                              reg={registration}
+                              onUnregistered={() => setRegistration(null)}
+                              onCancelRequested={(_, updated) => setRegistration(updated)}
+                            />
+                          </Box>
+                        )}
 
-                    <Button
-                      component={Link}
-                      to="/account/events"
-                      variant="outlined"
-                      sx={{ textTransform: "none" }}
-                      className="rounded-xl"
-                    >
-                      Back to my events
-                    </Button>
-                  </div>
+                        <Button
+                          component={Link}
+                          to="/account/events"
+                          variant="outlined"
+                          sx={{ textTransform: "none" }}
+                          className="rounded-xl"
+                        >
+                          Back to my events
+                        </Button>
+                      </div>
+                    </Box>
+                  </Paper>
                 </Box>
-              </Paper>
+              )}
+
+              {/* TAB CONTENT: SPEED NETWORKING */}
+              {showSpeedNetworkingTab && activeTab === 1 && (
+                <Paper elevation={0} className="rounded-2xl border border-slate-200">
+                  <Box className="p-5">
+                    <SpeedNetworkingMatchHistory eventId={event.id} sessionId={speedNetworkingSessionId} />
+                  </Box>
+                </Paper>
+              )}
+
             </div>
           </main>
         </div>
