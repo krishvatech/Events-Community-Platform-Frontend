@@ -31,6 +31,7 @@ import {
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import {
   Divider, List, ListItem, ListItemAvatar, ListItemText, AvatarGroup, Badge, Checkbox
 } from "@mui/material";
@@ -322,6 +323,7 @@ function PostCard({ item }) {
             id: u.id || u.user_id,
             name: nameFrom(u),
             avatar: avatarFrom(u),
+            kyc_status: u.kyc_status || u.profile?.kyc_status || r.kyc_status,
             votedAt: r.voted_at || r.created_at
           };
         });
@@ -347,9 +349,18 @@ function PostCard({ item }) {
             {headerNameFromItem(item).slice(0, 1)}
           </Avatar>
 
-          <Typography variant="subtitle2" color="text.secondary">
-            {headerNameFromItem(item)} • {new Date(item.created_at || Date.now()).toLocaleString()}
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Typography variant="subtitle2" color="text.secondary">
+              {headerNameFromItem(item)}
+            </Typography>
+            {/* KYC Check */}
+            {(item.actor?.kyc_status === "approved" || item.author?.kyc_status === "approved" || item.kyc_status === "approved") && (
+              <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+            )}
+            <Typography variant="subtitle2" color="text.secondary">
+              • {new Date(item.created_at || Date.now()).toLocaleString()}
+            </Typography>
+          </Stack>
         </Stack>
         {item.community?.name && (
           <Chip
@@ -554,7 +565,12 @@ function PostCard({ item }) {
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
-                    primary={u.name}
+                    primary={
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Typography variant="body2">{u.name}</Typography>
+                        {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                      </Stack>
+                    }
                     secondary={u.votedAt ? new Date(u.votedAt).toLocaleDateString() : null}
                   />
                 </ListItem>
@@ -912,7 +928,9 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
       const reactionId = r.reaction || r.reaction_type || r.kind || null;
       const def = POST_REACTIONS.find(x => x.id === reactionId) || POST_REACTIONS[0]; // fallback to like
 
-      return id ? { id, name, avatar, reactionId, reactionEmoji: def.emoji, reactionLabel: def.label } : null;
+      const kyc_status = u?.kyc_status || u?.profile?.kyc_status || r.kyc_status || null;
+
+      return id ? { id, name, avatar, kyc_status, reactionId, reactionEmoji: def.emoji, reactionLabel: def.label } : null;
     }).filter(Boolean);
   };
 
@@ -1014,7 +1032,14 @@ function LikesDialog({ open, onClose, communityId, postId, target: propTarget })
             {filteredRows.map((u) => (
               <ListItem key={u.id}>
                 <ListItemAvatar><Avatar src={u.avatar} alt={u.name} /></ListItemAvatar>
-                <ListItemText primary={u.name} />
+                <ListItemText
+                  primary={
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <Typography variant="body2">{u.name}</Typography>
+                      {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                    </Stack>
+                  }
+                />
                 {u.reactionEmoji && (
                   <Tooltip title={u.reactionLabel || ""}>
                     <Box sx={{ fontSize: 20 }}>{u.reactionEmoji}</Box>
@@ -1054,7 +1079,8 @@ function SharesDialog({ open, onClose, communityId, postId, target: propTarget }
         u?.avatar_url || u?.user_image_url || u?.user_image ||
         u?.avatar || u?.photo || u?.image || u?.profile?.avatar_url || u?.profile?.avatar ||
         r.user_image || r.user_image_url || r.avatar || "";
-      return id ? { id, name, avatar: absMedia(rawAvatar) } : null;
+      const kyc_status = u?.kyc_status || u?.profile?.kyc_status || r.kyc_status || null;
+      return id ? { id, name, avatar: absMedia(rawAvatar), kyc_status } : null;
     }).filter(Boolean);
   };
 
@@ -1118,7 +1144,14 @@ function SharesDialog({ open, onClose, communityId, postId, target: propTarget }
             {rows.map((u) => (
               <ListItem key={u.id || u.name}>
                 <ListItemAvatar><Avatar src={u.avatar} alt={u.name} /></ListItemAvatar>
-                <ListItemText primary={u.name} />
+                <ListItemText
+                  primary={
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <Typography variant="body2">{u.name}</Typography>
+                      {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                    </Stack>
+                  }
+                />
               </ListItem>
             ))}
           </List>
@@ -1173,7 +1206,8 @@ function CommentsDialog({
         : rawAuthor.username) ||
       (author_id ? `User #${author_id}` : "User");
     const avatar = avatarFrom(rawAuthor) || absMedia(c.author_avatar || "");
-    return { ...c, parent_id, author_id, author: { id: author_id, name, avatar } };
+    const kyc_status = rawAuthor.kyc_status || c.kyc_status || null;
+    return { ...c, parent_id, author_id, author: { id: author_id, name, avatar, kyc_status } };
   };
 
   const load = React.useCallback(async () => {
@@ -1335,6 +1369,7 @@ function CommentsDialog({
       <Stack direction="row" alignItems="center" spacing={1}>
         <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
         <Typography variant="subtitle2">{c.author?.name || "User"}</Typography>
+        {c.author?.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
         <Typography variant="caption" color="text.secondary">
           {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
         </Typography>
@@ -1528,7 +1563,9 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
     const avatar = u?.user_image || u?.user_image_url || u?.avatar || u?.avatar_url ||
       u?.photo || u?.image || u?.profile?.avatar || "";
 
-    return { id, name, avatar };
+    const kyc_status = u?.kyc_status || u?.profile?.kyc_status || row.kyc_status || null;
+
+    return { id, name, avatar, kyc_status };
   };
 
   const normGroup = (row) => {
@@ -1692,7 +1729,14 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
                   {filteredUsers.map(u => (
                     <ListItem key={`u-${u.id}`} button onClick={() => toggleSel(selectedUsers, setSelectedUsers, u.id)}>
                       <ListItemAvatar><Avatar src={u.avatar}>{(u.name || "U").slice(0, 1)}</Avatar></ListItemAvatar>
-                      <ListItemText primary={u.name || `User #${u.id}`} />
+                      <ListItemText
+                        primary={
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <Typography variant="body2">{u.name || `User #${u.id}`}</Typography>
+                            {u.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                          </Stack>
+                        }
+                      />
                       <Checkbox edge="end" checked={selectedUsers.has(u.id)} />
                     </ListItem>
                   ))}
@@ -1898,7 +1942,7 @@ function PostSocialBar({ communityId, post, onCounts }) {
               {/* If we have specific names, show them, otherwise generic count */}
               {likers.length > 0 ? (
                 <>
-                  {likers[0].name}
+                  Reacted by {likers[0].name}
                   {likeCount > 1 && ` and ${Math.max(0, likeCount - 1).toLocaleString()} others`}
                 </>
               ) : (
@@ -2571,8 +2615,15 @@ export default function AdminPostsPage() {
       question: m.question || "",
       options,
       tags: m.tags || [],
+      tags: m.tags || [],
       __source: "feed",            // marker (optional)
       __feed_item_id: row.id,      // marker (optional)
+      actor: {
+        id: row.actor?.id,
+        name: row.actor?.name || row.actor?.username || "User",
+        avatar: row.actor?.avatar || row.actor?.user_image_url || "",
+        kyc_status: row.actor?.kyc_status || row.actor?.profile?.kyc_status || "not_started"
+      }
     };
   }
 
