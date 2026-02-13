@@ -441,10 +441,9 @@ const SignUpPage = () => {
                     Email Address
                   </Typography>
                   <TextField
-                    label="Email Address"
                     name="email"
                     type="email"
-                    placeholder="your@email.com"
+                    placeholder="Email Address"
                     value={formData.email}
                     onChange={handleChange}
                     size="small"
