@@ -1963,9 +1963,10 @@ function GroupCommentsDialog({
                 : rawAuthor.username) ||
             (author_id ? `User #${author_id}` : "User");
 
-        const avatar = rawAuthor.avatar || rawAuthor.profile?.avatar || c.author_avatar || "";
+        const avatar = rawAuthor.avatar || rawAuthor.profile?.avatar || c.author_avatar || rawAuthor.avatar_url || "";
+        const kyc_status = rawAuthor.kyc_status || null;
 
-        return { ...c, parent_id, author_id, author: { id: author_id, name, avatar } };
+        return { ...c, parent_id, author_id, author: { id: author_id, name, avatar, kyc_status } };
     };
 
     async function runLimited(items, limit, worker) {
@@ -2169,9 +2170,12 @@ function GroupCommentsDialog({
         }}>
             <Stack direction="row" spacing={1} alignItems="center">
                 <Avatar src={c.author?.avatar} sx={{ width: 28, height: 28 }} />
-                <Typography variant="subtitle2">
-                    {c.author?.name || c.author?.username || `User #${c.author_id}`}
-                </Typography>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <Typography variant="subtitle2">
+                        {c.author?.name || c.author?.username || `User #${c.author_id}`}
+                    </Typography>
+                    {c.author?.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                </Stack>
                 <Typography variant="caption" color="text.secondary">
                     {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
                 </Typography>
@@ -2400,7 +2404,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                         return {
                             id: u.id,
                             name: u.name || u.full_name || u.username,
-                            avatar: toAbs(u.avatar || u.photo)
+                            avatar: toAbs(u.avatar || u.photo || u.avatar_url || u.image || null)
                         };
                     }));
                 }
