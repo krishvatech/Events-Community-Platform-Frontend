@@ -1181,7 +1181,10 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
                                         {(u.name || u.email || "U").slice(0, 1).toUpperCase()}
                                     </Avatar>
                                     <Box sx={{ flex: 1 }}>
-                                        <Typography className="font-medium">{u.name || u.email || u.id}</Typography>
+                                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                                            <Typography className="font-medium">{u.name || u.email || u.id}</Typography>
+                                            {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: "#10b8a6" }} />}
+                                        </Stack>
                                         {u.email && <Typography variant="caption" className="text-slate-500">{u.email}</Typography>}
                                     </Box>
                                 </Stack>
@@ -1367,7 +1370,10 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
                                         {(u.name || u.email || "U").slice(0, 1).toUpperCase()}
                                     </Avatar>
                                     <Box sx={{ flex: 1 }}>
-                                        <Typography className="font-medium">{u.name || u.email || u.id}</Typography>
+                                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                                            <Typography className="font-medium">{u.name || u.email || u.id}</Typography>
+                                            {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: "#10b8a6" }} />}
+                                        </Stack>
                                         {u.email && <Typography variant="caption" className="text-slate-500">{u.email}</Typography>}
                                     </Box>
                                 </Stack>
