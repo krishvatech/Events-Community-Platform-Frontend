@@ -403,149 +403,144 @@ export default function EventDetailsPage() {
                 </Breadcrumbs>
               </Stack>
 
-              {/* EVENT HEADER CARD */}
-              <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden">
-                {event.preview_image ? (
-                  <Box
-                    component="img"
-                    src={toAbs(event.preview_image)}
-                    alt={event.title}
-                    loading="lazy"
-                    sx={{
-                      width: "100%",
-                      height: { xs: 160, sm: 200, md: 240 },
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                  />
-                ) : (
-                  <Box
-                    sx={{
-                      width: "100%",
-                      height: { xs: 160, sm: 200, md: 240 },
-                      bgcolor: "grey.200",
-                    }}
-                  />
-                )}
-                <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
-                  <Stack spacing={2}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Chip
-                        size="small"
-                        label={chip.label}
-                        className={`${chip.className} font-medium`}
-                      />
-                      {event?.category ? (
-                        <Typography variant="caption" color="text.secondary">
-                          {event.category}
-                        </Typography>
-                      ) : null}
-                    </Stack>
-                    {event?.title ? (
-                      <Typography variant="h5" fontWeight={800} lineHeight={1.2}>
-                        {event.title}
-                      </Typography>
-                    ) : null}
-
-                    {/* Date & Time Display */}
-                    {(event.start_time || event.end_time) && (
-                      <Stack direction="row" spacing={3} alignItems="center" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-                          <Typography variant="body2">
-                            {dayjs(event.start_time).format("MMMM D, YYYY")}
-                          </Typography>
-                        </Stack>
-                        {event.end_time && (
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                            <Typography variant="body2">
-                              {dayjs(event.start_time).format("h:mm A")} – {dayjs(event.end_time).format("h:mm A")}
-                            </Typography>
-                          </Stack>
-                        )}
-                      </Stack>
-                    )}
-                    {event?.location ? (
-                      <Stack direction="row" spacing={0.75} alignItems="center">
-                        <span role="img" aria-label="location">📍</span>
-                        <Typography variant="body2" color="text.secondary">
-                          {event.location}
-                        </Typography>
-                      </Stack>
-                    ) : null}
-
-                    {/* Participant Count */}
-                    {Number.isFinite(event.registrations_count) && (() => {
-                      const owner = isOwnerUser();
-                      const staff = isStaffUser();
-                      const now = Date.now();
-                      const s = event.start_time ? parseDateSafe(event.start_time).getTime() : 0;
-                      const e = event.end_time ? parseDateSafe(event.end_time).getTime() : 0;
-                      const isBefore = s && now < s;
-                      const isAfter = e && now > e;
-
-                      let canView = true;
-                      if (!owner && !staff) {
-                        if (isBefore && event.show_participants_before_event === false) canView = false;
-                        else if (isAfter && event.show_participants_after_event === false) canView = false;
-                      }
-
-                      if (canView) {
-                        return (
-                          <Stack direction="row" spacing={0.75} alignItems="center"
-                            sx={{ cursor: 'pointer', '&:hover': { color: 'teal' }, transition: 'color 0.2s' }}
-                            onClick={handleShowParticipants}
-                          >
-                            <GroupsIcon fontSize="small" className="text-teal-700" />
-                            <Typography variant="body2" color="text.secondary" sx={{ '&:hover': { color: 'teal' } }}>
-                              {event.registrations_count} registered
-                            </Typography>
-                          </Stack>
-                        );
-                      } else {
-                        return (
-                          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default' }}>
-                            <GroupsIcon fontSize="small" className="text-teal-700" />
-                            <Typography variant="body2" color="text.secondary">
-                              {event.registrations_count} registered
-                            </Typography>
-                          </Stack>
-                        );
-                      }
-                    })()}
-                  </Stack>
+              {/* TABS HEADER - MOVED TO TOP */}
+              {showSpeedNetworkingTab && (
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+                  <Tabs value={activeTab} onChange={handleTabChange} aria-label="event details tabs">
+                    <Tab label="Overview" {...a11yProps(0)} />
+                    <Tab label="Speed Networking" {...a11yProps(1)} />
+                  </Tabs>
                 </Box>
-
-                {/* TABS HEADER */}
-                {showSpeedNetworkingTab && (
-                  <Box sx={{ borderBottom: 1, borderColor: 'divider', px: { xs: 2.5, sm: 3, md: 4 } }}>
-                    <Tabs value={activeTab} onChange={handleTabChange} aria-label="event details tabs">
-                      <Tab label="Overview" {...a11yProps(0)} />
-                      <Tab label="Speed Networking" {...a11yProps(1)} />
-                    </Tabs>
-                  </Box>
-                )}
-              </Paper>
+              )}
 
               {/* TAB CONTENT: OVERVIEW */}
               {/* If tabs are hidden (no speed networking), always show content. Otherwise check activeTab === 0 */}
               {(!showSpeedNetworkingTab || activeTab === 0) && (
                 <Box>
+                  {/* EVENT HEADER CARD */}
                   <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden mb-6">
+                    {event.preview_image ? (
+                      <Box
+                        component="img"
+                        src={toAbs(event.preview_image)}
+                        alt={event.title}
+                        loading="lazy"
+                        sx={{
+                          width: "100%",
+                          height: { xs: 160, sm: 200, md: 240 },
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: "100%",
+                          height: { xs: 160, sm: 200, md: 240 },
+                          bgcolor: "grey.200",
+                        }}
+                      />
+                    )}
                     <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
-                      <Typography variant="h6" fontWeight={800} sx={{ mb: 2 }}>
-                        About this event
-                      </Typography>
-                      {desc?.trim() ? (
-                        <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                          {desc}
+                      <Stack spacing={2}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Chip
+                            size="small"
+                            label={chip.label}
+                            className={`${chip.className} font-medium`}
+                          />
+                          {event?.category ? (
+                            <Typography variant="caption" color="text.secondary">
+                              {event.category}
+                            </Typography>
+                          ) : null}
+                        </Stack>
+                        {event?.title ? (
+                          <Typography variant="h5" fontWeight={800} lineHeight={1.2}>
+                            {event.title}
+                          </Typography>
+                        ) : null}
+
+                        {/* Date & Time Display */}
+                        {(event.start_time || event.end_time) && (
+                          <Stack direction="row" spacing={3} alignItems="center" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                              <Typography variant="body2">
+                                {dayjs(event.start_time).format("MMMM D, YYYY")}
+                              </Typography>
+                            </Stack>
+                            {event.end_time && (
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <AccessTimeIcon fontSize="small" className="text-teal-700" />
+                                <Typography variant="body2">
+                                  {dayjs(event.start_time).format("h:mm A")} – {dayjs(event.end_time).format("h:mm A")}
+                                </Typography>
+                              </Stack>
+                            )}
+                          </Stack>
+                        )}
+                        {event?.location ? (
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            <span role="img" aria-label="location">📍</span>
+                            <Typography variant="body2" color="text.secondary">
+                              {event.location}
+                            </Typography>
+                          </Stack>
+                        ) : null}
+
+                        {/* Participant Count */}
+                        {Number.isFinite(event.registrations_count) && (() => {
+                          const owner = isOwnerUser();
+                          const staff = isStaffUser();
+                          const now = Date.now();
+                          const s = event.start_time ? parseDateSafe(event.start_time).getTime() : 0;
+                          const e = event.end_time ? parseDateSafe(event.end_time).getTime() : 0;
+                          const isBefore = s && now < s;
+                          const isAfter = e && now > e;
+
+                          let canView = true;
+                          if (!owner && !staff) {
+                            if (isBefore && event.show_participants_before_event === false) canView = false;
+                            else if (isAfter && event.show_participants_after_event === false) canView = false;
+                          }
+
+                          if (canView) {
+                            return (
+                              <Stack direction="row" spacing={0.75} alignItems="center"
+                                sx={{ cursor: 'pointer', '&:hover': { color: 'teal' }, transition: 'color 0.2s' }}
+                                onClick={handleShowParticipants}
+                              >
+                                <GroupsIcon fontSize="small" className="text-teal-700" />
+                                <Typography variant="body2" color="text.secondary" sx={{ '&:hover': { color: 'teal' } }}>
+                                  {event.registrations_count} registered
+                                </Typography>
+                              </Stack>
+                            );
+                          } else {
+                            return (
+                              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default' }}>
+                                <GroupsIcon fontSize="small" className="text-teal-700" />
+                                <Typography variant="body2" color="text.secondary">
+                                  {event.registrations_count} registered
+                                </Typography>
+                              </Stack>
+                            );
+                          }
+                        })()}
+                        <Typography variant="h6" fontWeight={800}>
+                          About this event
                         </Typography>
-                      ) : (
-                        <Typography variant="body1" color="text.secondary">
-                          Event details will be announced soon.
-                        </Typography>
-                      )}
+                        {desc?.trim() ? (
+                          <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                            {desc}
+                          </Typography>
+                        ) : (
+                          <Typography variant="body1" color="text.secondary">
+                            Event details will be announced soon.
+                          </Typography>
+                        )}
+                      </Stack>
                     </Box>
                   </Paper>
 
@@ -654,6 +649,7 @@ export default function EventDetailsPage() {
                   </Box>
                 </Paper>
               )}
+
 
             </div>
           </main>
