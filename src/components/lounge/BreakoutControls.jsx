@@ -149,40 +149,57 @@ export default function BreakoutControls({
                     )}
 
                     {/* Auto-Assign Settings */}
-                    <Box sx={{ mb: 3, p: 1.5, bgcolor: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.2)', borderRadius: 1 }}>
-                        <Typography variant="subtitle2" color="rgba(255,255,255,0.6)" gutterBottom>
+                    <Box sx={{ mb: 3, p: 2, bgcolor: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.2)', borderRadius: 1 }}>
+                        <Typography variant="subtitle2" color="rgba(255,255,255,0.7)" fontWeight={600} gutterBottom sx={{ mb: 1.5 }}>
                             AUTO-ASSIGN LATE JOINERS
                         </Typography>
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={autoAssignEnabled}
-                                    onChange={handleAutoAssignToggle}
-                                    sx={{ color: 'rgba(255,255,255,0.7)' }}
-                                />
-                            }
-                            label={<Typography variant="body2">Enable automatic assignment for late joiners</Typography>}
-                            sx={{ display: 'block', mb: 1 }}
-                        />
+
+                        {/* Checkbox with inline label */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: autoAssignEnabled ? 2 : 0 }}>
+                            <Checkbox
+                                checked={autoAssignEnabled}
+                                onChange={handleAutoAssignToggle}
+                                sx={{
+                                    color: 'rgba(255,255,255,0.6)',
+                                    '&.Mui-checked': { color: '#4caf50' },
+                                    p: 0
+                                }}
+                            />
+                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }}>
+                                Enable automatic assignment for late joiners
+                            </Typography>
+                        </Box>
+
+                        {/* Strategy Dropdown - Only show when enabled */}
                         {autoAssignEnabled && (
-                            <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-                                <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Strategy</InputLabel>
-                                <Select
-                                    value={autoAssignStrategy}
-                                    onChange={handleAutoAssignStrategyChange}
-                                    label="Strategy"
-                                    sx={{
-                                        color: 'white',
-                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
-                                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' },
-                                        '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' }
-                                    }}
-                                >
-                                    <MenuItem value="least">Least participants (recommended)</MenuItem>
-                                    <MenuItem value="round_robin">Round-robin distribution</MenuItem>
-                                    <MenuItem value="sequential">Sequential room mapping</MenuItem>
-                                </Select>
-                            </FormControl>
+                            <Box sx={{ ml: 4 }}>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', mb: 1 }}>
+                                    Strategy
+                                </Typography>
+                                <FormControl fullWidth size="small">
+                                    <Select
+                                        value={autoAssignStrategy}
+                                        onChange={handleAutoAssignStrategyChange}
+                                        sx={{
+                                            color: 'white',
+                                            '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
+                                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' },
+                                            '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' }
+                                        }}
+                                    >
+                                        <MenuItem value="least">
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <span>✓</span> Least participants (recommended)
+                                            </Box>
+                                        </MenuItem>
+                                        <MenuItem value="round_robin">Round-robin distribution</MenuItem>
+                                        <MenuItem value="sequential">Sequential room mapping</MenuItem>
+                                    </Select>
+                                </FormControl>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mt: 0.5 }}>
+                                    Automatically assigns new joiners based on selected strategy
+                                </Typography>
+                            </Box>
                         )}
                     </Box>
 
