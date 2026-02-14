@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import RegisteredActions from "../components/RegisteredActions";
+import InviteUsersDialog from "../components/InviteUsersDialog";
 
 import {
   Avatar,
@@ -63,6 +64,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
@@ -210,6 +212,7 @@ export default function EventManagePage() {
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [addParticipantEmail, setAddParticipantEmail] = useState("");
   const [addParticipantLoading, setAddParticipantLoading] = useState(false);
+  const [inviteUsersOpen, setInviteUsersOpen] = useState(false);
   const [regsRefresh, setRegsRefresh] = useState(0);
 
   // User Search State
@@ -1622,6 +1625,15 @@ export default function EventManagePage() {
             >
               Add Member
             </Button>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<PersonAddRoundedIcon />}
+              onClick={() => setInviteUsersOpen(true)}
+              sx={{ textTransform: "none", borderRadius: 999 }}
+            >
+              Invite
+            </Button>
           </Stack>
         </Stack>
 
@@ -2734,7 +2746,15 @@ export default function EventManagePage() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {eventId && (
+          <InviteUsersDialog
+            open={inviteUsersOpen}
+            onClose={() => setInviteUsersOpen(false)}
+            eventId={eventId}
+          />
+        )}
       </Container>
-    </Box>
+    </Box >
   );
 }

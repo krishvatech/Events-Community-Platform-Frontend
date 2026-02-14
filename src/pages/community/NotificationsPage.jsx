@@ -22,6 +22,7 @@ import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import BadgeRoundedIcon from '@mui/icons-material/BadgeRounded';
 import VerifiedIcon from "@mui/icons-material/Verified";
+import EventRoundedIcon from "@mui/icons-material/EventRounded";
 
 const BORDER = "#e2e8f0";
 
@@ -530,6 +531,25 @@ function NotificationRow({
             System
           </Typography>
           <Typography variant="body2">{item.title}</Typography>
+        </Stack>
+      );
+    }
+
+    if (item.kind === "event") {
+      return (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {item.actor?.name || "System"}
+          </Typography>
+          <Typography variant="body2">
+            invited you to
+          </Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <EventRoundedIcon sx={{ fontSize: 16, color: "primary.main" }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: "primary.main" }}>
+              {item.title.replace(/^Invitation:\s*/i, "")}
+            </Typography>
+          </Stack>
         </Stack>
       );
     }
@@ -1092,7 +1112,7 @@ export default function NotificationsPage({
     if (destination) navigate(destination);
   };
 
-  const handleOpen = (n) => {
+  const handleOpen = async (n) => {
     if (onOpen) return onOpen(n); // Custom override
     const ctx = n.context || {};
 
@@ -1108,10 +1128,42 @@ export default function NotificationsPage({
       return;
     }
 
+    // Handle Event Notifications with Conditional Navigation
+    if (ctx.eventId) {
+      // Mark as read immediately
+      if (!n.is_read) {
+        handleToggleRead(n.id, true);
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/events/${ctx.eventId}/check_registration/`, {
+          headers: { ...tokenHeader(), Accept: "application/json" }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const slug = data.slug || ctx.eventId;
+
+          if (data.is_registered) {
+            // If registered, go to the account events page as requested
+            navigate("/account/events");
+          } else {
+            // If not registered, go to main events listing page
+            navigate("/events");
+          }
+        } else {
+          // Fallback if check fails
+          navigate(`/events/${ctx.eventId}`);
+        }
+      } catch (err) {
+        console.warn("Failed to check registration status:", err);
+        navigate(`/events/${ctx.eventId}`);
+      }
+      return;
+    }
+
     if (n.kind === "friend_request" || n.kind === "connection_request") {
       if (ctx.profile_user_id) dest = `/community/rich-profile/${ctx.profile_user_id}`;
-    } else if (ctx.eventId) {
-      dest = `/events/${ctx.eventId}`;
     } else if (ctx.postId) {
       dest = `/feed/post/${ctx.postId}`;
     } else if (ctx.groupSlug) {
