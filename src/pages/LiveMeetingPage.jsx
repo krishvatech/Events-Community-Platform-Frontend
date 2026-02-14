@@ -23,7 +23,7 @@ import {
   Switch,
   Paper,
   Stack,
-
+  Popover,
   TextField,
   Toolbar,
   Tooltip,
@@ -89,6 +89,8 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import SupportAgentIcon from "@mui/icons-material/SupportAgent";
+import NotificationsIcon from "@mui/icons-material/Notifications";
+import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
@@ -98,6 +100,7 @@ import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
 import BreakoutControls from "../components/lounge/BreakoutControls.jsx";
 import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
 import PostEventLoungeScreen from "../components/lounge/PostEventLoungeScreen.jsx";
+import NotificationHistoryPanel from "../components/lounge/NotificationHistoryPanel.jsx";
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
 import BannedParticipantsDialog from "../components/live-meeting/BannedParticipantsDialog.jsx";
 import WaitingRoomAnnouncements from "../components/live-meeting/WaitingRoomAnnouncements.jsx";
@@ -1824,6 +1827,12 @@ export default function NewLiveMeeting() {
       setSnackbar((prev) => ({ ...prev, open: false, onClick: null }));
     }
   };
+
+  // ✅ Notification History State (for late-joiner notifications)
+  const [notificationHistory, setNotificationHistory] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [notifAnchorEl, setNotifAnchorEl] = useState(null);
+  const [assigningParticipantId, setAssigningParticipantId] = useState(null);
 
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up("md"));
@@ -4054,11 +4063,23 @@ export default function NewLiveMeeting() {
           console.log("[MainSocket] Late joiner notification:", msg.notification);
           // ✅ FIX: Only show notification to host/publisher role
           if (role === "publisher") {
+            const notif = msg.notification;
             showSnackbar(
-              `${msg.notification.participant_name} joined and is in the Main Room.`,
+              `${notif.participant_name} joined and is in the Main Room.`,
               "info",
               { onClick: () => setLoungeOpen(true) }
             );
+
+            // ✅ Add to notification history
+            setNotificationHistory(prev => [
+              ...prev.filter(n => n.participant_id !== notif.participant_id),
+              {
+                ...notif,
+                joinedAt: new Date().toISOString(),
+                status: "Joined in Main Room"
+              }
+            ]);
+            setUnreadNotifCount(prev => prev + 1);
           }
         } else if (msg.type === "waiting_for_breakout_assignment") {
           // Participant receives message that they are waiting for assignment
@@ -4325,6 +4346,20 @@ export default function NewLiveMeeting() {
     console.warn("[MainSocket] Unable to send action; socket state:", ws?.readyState, payload);
     return false;
   }, []);
+
+  // ✅ Handle assignment from notification history
+  const handleAssignFromHistory = useCallback((participantId, roomId) => {
+    setAssigningParticipantId(participantId);
+    sendMainSocketAction({
+      action: "assign_late_joiner",
+      participant_id: participantId,
+      room_id: roomId,
+    });
+    // Remove from history after assignment
+    setNotificationHistory(prev => prev.filter(n => n.participant_id !== participantId));
+    setAssigningParticipantId(null);
+    console.log(`[NotificationHistory] Assigned participant ${participantId} to room ${roomId}`);
+  }, [sendMainSocketAction]);
 
   const admitAllWaiting = useCallback(async () => {
     if (!eventId) return;
@@ -10963,6 +10998,28 @@ export default function NewLiveMeeting() {
               {meeting.recording && <Chip size="small" label="Recording" sx={headerChipSx} />}
             </Stack>
 
+            {/* ✅ Notification History Bell Icon (Host Only) */}
+            {isHost && (
+              <Tooltip title="Notification History">
+                <IconButton
+                  sx={headerIconBtnSx}
+                  aria-label="Notification History"
+                  onClick={(e) => {
+                    setNotifAnchorEl(e.currentTarget);
+                    setUnreadNotifCount(0);
+                  }}
+                >
+                  <Badge badgeContent={unreadNotifCount} color="error" max={99}>
+                    {unreadNotifCount > 0 ? (
+                      <NotificationsIcon fontSize="small" sx={{ color: 'white' }} />
+                    ) : (
+                      <NotificationsNoneIcon fontSize="small" sx={{ color: 'white' }} />
+                    )}
+                  </Badge>
+                </IconButton>
+              </Tooltip>
+            )}
+
             <Tooltip title={isHost ? "Host permissions" : "My controls"}>
               <span>
                 <IconButton
@@ -12444,6 +12501,33 @@ export default function NewLiveMeeting() {
             {speedNetworkingNotification}
           </Alert>
         </Snackbar>
+
+        {/* ✅ Notification History Popover */}
+        <Popover
+          open={Boolean(notifAnchorEl)}
+          anchorEl={notifAnchorEl}
+          onClose={() => setNotifAnchorEl(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          PaperProps={{
+            sx: {
+              bgcolor: '#111827',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 2,
+              width: 340,
+              maxHeight: 480,
+            },
+          }}
+        >
+          <NotificationHistoryPanel
+            notifications={notificationHistory}
+            onClearAll={() => setNotificationHistory([])}
+            onClose={() => setNotifAnchorEl(null)}
+            breakoutRooms={loungeTables}
+            onAssign={handleAssignFromHistory}
+            assigningParticipantId={assigningParticipantId}
+          />
+        </Popover>
 
         {/* ✅ NEW: Announcement Dialog */}
         <Dialog
