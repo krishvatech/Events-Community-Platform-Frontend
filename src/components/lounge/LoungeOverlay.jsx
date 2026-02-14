@@ -3,6 +3,8 @@ import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typ
 import CloseIcon from '@mui/icons-material/Close';
 import LoungeGrid from './LoungeGrid';
 import MainRoomPeek from './MainRoomPeek';
+import LateJoinerNotification from './LateJoinerNotification';
+import LateJoinerWaitingMessage from './LateJoinerWaitingMessage';
 
 const API_RAW = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 const WS_ROOT = API_RAW.replace(/^http/, "ws").replace(/\/api\/?$/, "");
@@ -34,6 +36,9 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteSaving, setDeleteSaving] = useState(false);
+    const [lateJoiners, setLateJoiners] = useState([]);
+    const [isWaitingForAssignment, setIsWaitingForAssignment] = useState(false);
+    const [waitingJoinedAt, setWaitingJoinedAt] = useState(null);
     const socketRef = useRef(null);
 
     useEffect(() => {
@@ -171,7 +176,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             setWsStatus('open');
         };
 
-        ws.onmessage = (event) => {
+        ws.onmessage = async (event) => {
             try {
                 const msg = JSON.parse(event.data);
                 console.log("[Lounge] Incoming Message:", msg.type, msg);
@@ -196,6 +201,73 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     console.log("[Lounge] Received breakout_end - refreshing table state");
                     setBreakoutTables([]); // Clear all breakout tables
                     // Trigger a fresh fetch to ensure consistency
+                    fetchLoungeState();
+                } else if (msg.type === "late_joiner_notification") {
+                    // Host receives notification about new late joiner
+                    console.log("[Lounge] Late joiner notification:", msg.notification);
+                    setLateJoiners(prev => [
+                        ...prev.filter(lj => lj.participant_id !== msg.notification.participant_id),
+                        msg.notification
+                    ]);
+                } else if (msg.type === "waiting_for_breakout_assignment") {
+                    // Participant receives message that they are waiting for assignment
+                    console.log("[Lounge] Participant is waiting for breakout assignment");
+                    setIsWaitingForAssignment(true);
+                    setWaitingJoinedAt(msg.joined_at || new Date().toISOString());
+                } else if (msg.type === "late_joiner_assigned") {
+                    // Participant receives assignment to a breakout room
+                    console.log("[Lounge] Late joiner assigned:", msg);
+                    setIsWaitingForAssignment(false);
+
+                    // ✅ Refresh Dyte participant list to show newly assigned participant
+                    if (dyteMeeting) {
+                        console.log("[Lounge] Refreshing Dyte participants after assignment...");
+                        try {
+                            // Refresh video subscriptions to detect new participant
+                            if (typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                                await dyteMeeting.participants.videoSubscribed.refresh();
+                                console.log("[Lounge] ✅ Dyte participants refreshed");
+                            }
+                            // Also try to refresh active participants list
+                            if (typeof dyteMeeting.participants?.refresh === 'function') {
+                                await dyteMeeting.participants.refresh();
+                            }
+                        } catch (e) {
+                            console.warn("[Lounge] Failed to refresh Dyte participants:", e);
+                        }
+                    }
+
+                    // Notify parent to join the breakout room
+                    if (onEnterBreakout) {
+                        onEnterBreakout(null, msg.room_id, msg.room_name, "");
+                    }
+                } else if (msg.type === "late_joiner_dismissed") {
+                    // Participant receives message that they stay in main room
+                    console.log("[Lounge] Late joiner dismissed - staying in main room");
+                    setIsWaitingForAssignment(false);
+                } else if (msg.type === "refresh_breakout_participants") {
+                    // Someone was assigned to a breakout room - refresh that room's participant list
+                    console.log("[Lounge] Refreshing breakout participants for room:", msg.room_id);
+
+                    // ✅ Refresh Dyte participants to sync with late joiner assignment
+                    if (dyteMeeting) {
+                        console.log("[Lounge] Refreshing Dyte participants due to assignment...");
+                        try {
+                            // Refresh video subscriptions to detect newly assigned participant
+                            if (typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                                await dyteMeeting.participants.videoSubscribed.refresh();
+                                console.log("[Lounge] ✅ Dyte participants refreshed");
+                            }
+                            // Also try to refresh active participants list
+                            if (typeof dyteMeeting.participants?.refresh === 'function') {
+                                await dyteMeeting.participants.refresh();
+                            }
+                        } catch (e) {
+                            console.warn("[Lounge] Failed to refresh Dyte participants:", e);
+                        }
+                    }
+
+                    // The fetchLoungeState will get latest data
                     fetchLoungeState();
                 } else if (msg.type === "error") {
                     console.error("[Lounge] Backend Error:", msg.message);
@@ -315,6 +387,39 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
         } catch (err) {
             console.error("[Lounge] Failed to join breakout video", err);
             alert("Error joining table");
+        }
+    };
+
+    const handleAssignLateJoiner = (participantId, roomId) => {
+        const ws = socketRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            console.log("[Lounge] Assigning late joiner:", { participantId, roomId });
+            ws.send(JSON.stringify({
+                action: "assign_late_joiner",
+                participant_id: participantId,
+                room_id: roomId
+            }));
+            // Remove from UI immediately
+            setLateJoiners(prev => prev.filter(lj => lj.participant_id !== participantId));
+        } else {
+            console.error("[Lounge] WebSocket not ready for assignment");
+            alert("Connection error. Please try again.");
+        }
+    };
+
+    const handleDismissLateJoiner = (participantId) => {
+        const ws = socketRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            console.log("[Lounge] Dismissing late joiner:", participantId);
+            ws.send(JSON.stringify({
+                action: "dismiss_late_joiner",
+                participant_id: participantId
+            }));
+            // Remove from UI immediately
+            setLateJoiners(prev => prev.filter(lj => lj.participant_id !== participantId));
+        } else {
+            console.error("[Lounge] WebSocket not ready for dismissal");
+            alert("Connection error. Please try again.");
         }
     };
 
@@ -584,6 +689,27 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                                             {loungeOpenStatus.next_change && ` • Changes at ${new Date(loungeOpenStatus.next_change).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
                                         </Typography>
                                     </Box>
+                                </Box>
+                            )}
+
+                            {/* Late Joiner Notifications (Host) */}
+                            {isAdmin && lateJoiners.length > 0 && (
+                                <Box sx={{ mx: 3, mt: 2, mb: 2 }}>
+                                    {lateJoiners.map((lj) => (
+                                        <LateJoinerNotification
+                                            key={lj.participant_id}
+                                            notification={lj}
+                                            onAssign={handleAssignLateJoiner}
+                                            onDismiss={handleDismissLateJoiner}
+                                        />
+                                    ))}
+                                </Box>
+                            )}
+
+                            {/* Late Joiner Waiting Message (Participant) */}
+                            {isWaitingForAssignment && (
+                                <Box sx={{ mx: 3, mt: 2, mb: 2 }}>
+                                    <LateJoinerWaitingMessage joinedAt={waitingJoinedAt} />
                                 </Box>
                             )}
 

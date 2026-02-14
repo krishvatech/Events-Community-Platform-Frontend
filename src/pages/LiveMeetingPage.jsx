@@ -107,6 +107,7 @@ import { getRefreshToken } from "../utils/api.js";
 import { getUserName } from "../utils/authStorage.js";
 import { isPreEventLoungeOpen } from "../utils/gracePeriodUtils.js";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
+import { getBrowserTimezone } from "../utils/timezoneUtils.js";
 
 // ================ Custom Lounge Icon ================
 const SocialLoungeIcon = (props) => (
@@ -2379,7 +2380,11 @@ export default function NewLiveMeeting() {
     return entries[0]?.participant?.user_id || null;
   }, [isLiveEventSocialLounge, activeTableId, loungeTables]);
   const currentLoungeUserIds = useMemo(() => {
-    if (!isLiveEventSocialLounge || !activeTableId) return new Set();
+    // ✅ CRITICAL FIX: Works for ALL breakout contexts, not just social lounge
+    // For regular breakout rooms: activeTableId is set, loungeTables has the breakout data
+    // For social lounges: same structure applies
+    // This set is used to filter participants in the current breakout/lounge in the video grid
+    if (!activeTableId) return new Set();
     const table = loungeTables.find((t) => String(t.id) === String(activeTableId));
     const ids = new Set();
     if (!table?.participants) return ids;
@@ -2388,7 +2393,7 @@ export default function NewLiveMeeting() {
       if (id !== undefined && id !== null && String(id)) ids.add(String(id));
     });
     return ids;
-  }, [isLiveEventSocialLounge, activeTableId, loungeTables]);
+  }, [activeTableId, loungeTables]);
 
 
   const [scheduledLabel, setScheduledLabel] = useState("--");
@@ -3921,7 +3926,7 @@ export default function NewLiveMeeting() {
       }
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       try {
         const msg = JSON.parse(event.data);
         setLastMessage(msg);
@@ -4043,6 +4048,80 @@ export default function NewLiveMeeting() {
             }
           } else {
             console.log("[MainSocket] Not in breakout, refreshing lounge state");
+          }
+        } else if (msg.type === "late_joiner_notification") {
+          // Host gets a notification that a new participant joined during breakout
+          console.log("[MainSocket] Late joiner notification:", msg.notification);
+          showSnackbar(
+            `${msg.notification.participant_name} joined and is in the Main Room.`,
+            "info",
+            { onClick: () => setLoungeOpen(true) }
+          );
+        } else if (msg.type === "waiting_for_breakout_assignment") {
+          // Participant receives message that they are waiting for assignment
+          console.log("[MainSocket] Waiting for breakout assignment");
+          showSnackbar(
+            "Breakout sessions are active. Waiting for host to assign you to a room.",
+            "info"
+          );
+        } else if (msg.type === "late_joiner_assigned") {
+          // Participant receives assignment to a breakout room
+          console.log("[MainSocket] Late joiner assigned to room:", msg);
+          showSnackbar(`You've been assigned to ${msg.room_name}!`, "success");
+
+          // ✅ Refresh Dyte participant list to show newly assigned participant
+          if (dyteMeeting) {
+            console.log("[MainSocket] Refreshing Dyte participants after assignment...");
+            try {
+              // Refresh video subscriptions to detect new participant
+              if (typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                await dyteMeeting.participants.videoSubscribed.refresh();
+                console.log("[MainSocket] ✅ Dyte participants refreshed");
+              }
+              // Also try to refresh active participants list
+              if (typeof dyteMeeting.participants?.refresh === 'function') {
+                await dyteMeeting.participants.refresh();
+              }
+            } catch (e) {
+              console.warn("[MainSocket] Failed to refresh Dyte participants:", e);
+            }
+          }
+
+          // Trigger join breakout room if we have the token function
+          if (applyBreakoutTokenRef.current) {
+            // The token is handled by the backend in the socket, so we just need to trigger joining the room
+            // The LoungeOverlay will handle this via WebSocket
+          }
+        } else if (msg.type === "late_joiner_dismissed") {
+          // Participant receives message that they stay in main room
+          console.log("[MainSocket] Late joiner dismissed - staying in main room");
+          showSnackbar("You will remain in the Main Room.", "info");
+        } else if (msg.type === "refresh_breakout_participants") {
+          // Someone was assigned to a breakout room - refresh that room's participant list
+          console.log("[MainSocket] Refreshing breakout participants for room:", msg.room_id);
+
+          // ✅ Refresh Dyte participants to sync with late joiner assignment
+          if (dyteMeeting) {
+            console.log("[MainSocket] Refreshing Dyte participants due to breakout assignment...");
+            try {
+              // Refresh video subscriptions to detect newly assigned participant
+              if (typeof dyteMeeting.participants?.videoSubscribed?.refresh === 'function') {
+                await dyteMeeting.participants.videoSubscribed.refresh();
+                console.log("[MainSocket] ✅ Dyte participants refreshed for breakout room");
+              }
+              // Also try to refresh active participants list
+              if (typeof dyteMeeting.participants?.refresh === 'function') {
+                await dyteMeeting.participants.refresh();
+              }
+            } catch (e) {
+              console.warn("[MainSocket] Failed to refresh Dyte participants:", e);
+            }
+          }
+
+          // ✅ FIX: Refresh lounge state (table participants)
+          if (fetchLoungeState) {
+            console.log("[MainSocket] Refreshing lounge state for video grid sync...");
+            fetchLoungeState();
           }
         } else if (msg.type === "waiting_room_enforced") {
           // ✅ NEW: Handle waiting room enforcement
@@ -8544,23 +8623,24 @@ export default function NewLiveMeeting() {
       // ✅ CRITICAL FIX: In breakout/lounge, show ONLY participants actually in the current room
       // When user joins a lounge table (breakout), they enter a separate Dyte room
       // This room should only include participants who are also in that table
-      // Filter out:
-      // 1. Participants not in the meeting
-      // 2. The pinned host (shown separately in main stage)
-      // 3. Participants occupying a lounge (in a different lounge table)
-      // 4. Participants in main room (those not in this breakout)
+      // Uses currentLoungeUserIds which is populated from the CURRENT breakout's participants
+      // This works for BOTH social lounges AND regular breakout rooms
+      // Fix: Late joiners who are manually assigned now appear correctly in the grid
       return participants.filter((p) => {
         if (!p.inMeeting) return false;
         if (p.id === latestPinnedHost?.id) return false;
 
-        if (isLiveEventSocialLounge && currentLoungeUserIds.size > 0) {
+        // ✅ FIX: Use currentLoungeUserIds for ALL breakout contexts
+        // This set contains user_id from the current table's LoungeParticipant records
+        if (currentLoungeUserIds.size > 0) {
           const key = getParticipantUserKey(p?._raw || p);
           const userId = key.startsWith("id:") ? key.replace("id:", "") : null;
+          // Show only if the participant is actually in THIS breakout room
           if (!userId || !currentLoungeUserIds.has(String(userId))) return false;
         } else {
-          // ✅ CRITICAL: Don't show lounge occupants in breakout view
-          // If they're occupying a lounge, they're in a different table, not this one
-          if (p.isOccupyingLounge && p.id !== dyteMeeting?.self?.id) return false;
+          // If we don't have participant data yet (data still syncing), don't filter
+          // The video grid will show empty and update once data arrives
+          console.warn("[stageOthers] Empty currentLoungeUserIds in breakout - waiting for sync");
         }
 
         const key = getParticipantUserKey(p?._raw || p);
@@ -8578,7 +8658,7 @@ export default function NewLiveMeeting() {
       if (!isBreakout && p.isOccupyingLounge) return false;
       return true;
     });
-  }, [participants, isBreakout, latestPinnedHost, dyteMeeting?.self?.id, isLiveEventSocialLounge, currentLoungeUserIds]);
+  }, [participants, isBreakout, latestPinnedHost, dyteMeeting?.self?.id, currentLoungeUserIds]);
 
   // Strip should be only others (no host duplicate)
   const stageStrip = stageOthers;
@@ -10175,7 +10255,7 @@ export default function NewLiveMeeting() {
         duration={durationLabel}
         roleLabel={role === "publisher" ? "Host" : "Audience"}
         waitingRoomImage={eventData?.waiting_room_image || null}
-        timezone={eventData?.timezone || null}
+        timezone={getBrowserTimezone()}
         loungeAvailable={preEventLoungeOpen}
         loungeStatusLabel={loungeOpenStatus?.reason || "Pre-event networking"}
         isLoungeOpen={isLoungeCurrentlyOpen}
@@ -10334,7 +10414,7 @@ export default function NewLiveMeeting() {
           duration={durationLabel}
           roleLabel={role === "publisher" ? "Host" : "Audience"}
           waitingRoomImage={eventData?.waiting_room_image || null}
-          timezone={eventData?.timezone || null}
+          timezone={getBrowserTimezone()}
           loungeAvailable={(waitingRoomLoungeAllowed || waitingRoomNetworkingAllowed) && loungeOpenStatus?.status === "OPEN"}
           loungeStatusLabel={loungeOpenStatus?.reason || ""}
           onOpenLounge={openLoungeOverlay}
@@ -10555,7 +10635,7 @@ export default function NewLiveMeeting() {
         duration={durationLabel}
         roleLabel={role === "publisher" ? "Host" : "Audience"}
         waitingRoomImage={eventData?.waiting_room_image || null}
-        timezone={eventData?.timezone || null}
+        timezone={getBrowserTimezone()}
       />
     );
   }
@@ -11091,133 +11171,176 @@ export default function NewLiveMeeting() {
 
         {/* Main Layout - Hidden if Speed Networking is active */}
         {!showSpeedNetworking && (
-        <Box
-          sx={{
-            display: "flex",
-            height: `calc(100vh - ${APPBAR_H}px)`,
-            overflow: "hidden",
-          }}
-        >
-          {/* Left/Main */}
           <Box
             sx={{
-              flex: 1,
-              minWidth: 0,
-              height: "100%",
-              minHeight: 0,
-              overflow: "hidden",
-              p: { xs: 1.5, sm: 2 },
-              pr: { md: 2 },
               display: "flex",
-              flexDirection: "column",
-              gap: 1.5,
+              height: `calc(100vh - ${APPBAR_H}px)`,
+              overflow: "hidden",
             }}
           >
-            {/* Video Stage */}
-            <Paper
-              variant="outlined"
+            {/* Left/Main */}
+            <Box
               sx={{
                 flex: 1,
+                minWidth: 0,
+                height: "100%",
                 minHeight: 0,
-                borderRadius: 3,
-                borderColor: "rgba(255,255,255,0.08)",
-                bgcolor: "rgba(255,255,255,0.04)",
-                position: "relative",
                 overflow: "hidden",
+                p: { xs: 1.5, sm: 2 },
+                pr: { md: 2 },
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.5,
               }}
             >
-              {/* Pinned badge */}
-              <Box sx={{ position: "absolute", top: 12, left: 12, zIndex: 3 }}>
-                <Chip size="small" label={meeting.roomLabel} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
-              </Box>
-
-
-
-              {/* Main participant */}
-              {/* ✅ Host Video (background) */}
-              {stageHasVideo && (
-                <Box
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    zIndex: 0,
-                    borderRadius: 2,
-                    overflow: "hidden",
-                    bgcolor: "rgba(0,0,0,0.85)",
-                  }}
-                >
-                  {hasScreenshare ? (
-                    <ScreenShareVideo
-                      participant={activeScreenShareParticipant}
-                      meeting={dyteMeeting}
-                    />
-                  ) : (
-                    <ParticipantVideo
-                      key={pinnedRaw?.id}
-                      participant={pinnedRaw}
-                      meeting={dyteMeeting}
-                      isSelf={pinnedIsSelf}
-                    />
-                  )}
-                </Box>
-              )}
-
-              {/* Main participant (keep your UI, but hide center avatar when video exists) */}
-              <Box
+              {/* Video Stage */}
+              <Paper
+                variant="outlined"
                 sx={{
+                  flex: 1,
+                  minHeight: 0,
+                  borderRadius: 3,
+                  borderColor: "rgba(255,255,255,0.08)",
+                  bgcolor: "rgba(255,255,255,0.04)",
                   position: "relative",
-                  zIndex: 1,
-                  height: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexDirection: "column",
-                  gap: 1.25,
+                  overflow: "hidden",
                 }}
               >
-                {!stageHasVideo && (
-                  <>
-                    {/* ✅ FIRST PARTICIPANT TILE: Show first participant when alone in lounge instead of welcome message */}
-                    {isBreakout && !latestPinnedHost && breakoutParticipantCount <= 1 && participants.length > 0 ? (
-                      <>
-                        {/* Display the first participant's tile (the user themselves) */}
-                        <StageMiniTile
-                          p={participants[0]}
-                          meeting={dyteMeeting}
-                          tileW={600}
-                          tileH={450}
-                        />
-                      </>
-                    ) : isBreakout && !latestPinnedHost && breakoutParticipantCount <= 1 ? (
-                      <>
-                        {/* Fallback welcome message if participants not yet available */}
-                        {/* Show logo if available, otherwise show waving hand */}
-                        {activeTableLogoUrl ? (
-                          <Box
+                {/* Pinned badge */}
+                <Box sx={{ position: "absolute", top: 12, left: 12, zIndex: 3 }}>
+                  <Chip size="small" label={meeting.roomLabel} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                </Box>
+
+
+
+                {/* Main participant */}
+                {/* ✅ Host Video (background) */}
+                {stageHasVideo && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 0,
+                      borderRadius: 2,
+                      overflow: "hidden",
+                      bgcolor: "rgba(0,0,0,0.85)",
+                    }}
+                  >
+                    {hasScreenshare ? (
+                      <ScreenShareVideo
+                        participant={activeScreenShareParticipant}
+                        meeting={dyteMeeting}
+                      />
+                    ) : (
+                      <ParticipantVideo
+                        key={pinnedRaw?.id}
+                        participant={pinnedRaw}
+                        meeting={dyteMeeting}
+                        isSelf={pinnedIsSelf}
+                      />
+                    )}
+                  </Box>
+                )}
+
+                {/* Main participant (keep your UI, but hide center avatar when video exists) */}
+                <Box
+                  sx={{
+                    position: "relative",
+                    zIndex: 1,
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "column",
+                    gap: 1.25,
+                  }}
+                >
+                  {!stageHasVideo && (
+                    <>
+                      {/* ✅ FIRST PARTICIPANT TILE: Show first participant when alone in lounge instead of welcome message */}
+                      {isBreakout && !latestPinnedHost && breakoutParticipantCount <= 1 && participants.length > 0 ? (
+                        <>
+                          {/* Display the first participant's tile (the user themselves) */}
+                          <StageMiniTile
+                            p={participants[0]}
+                            meeting={dyteMeeting}
+                            tileW={600}
+                            tileH={450}
+                          />
+                        </>
+                      ) : isBreakout && !latestPinnedHost && breakoutParticipantCount <= 1 ? (
+                        <>
+                          {/* Fallback welcome message if participants not yet available */}
+                          {/* Show logo if available, otherwise show waving hand */}
+                          {activeTableLogoUrl ? (
+                            <Box
+                              sx={{
+                                width: 76,
+                                height: 76,
+                                borderRadius: "50%",
+                                bgcolor: "rgba(255,255,255,0.08)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                overflow: "hidden",
+                                border: "2px solid rgba(255,255,255,0.12)",
+                              }}
+                            >
+                              <Box
+                                component="img"
+                                src={activeTableLogoUrl}
+                                alt="Social Lounge Logo"
+                                sx={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            </Box>
+                          ) : (
+                            <Avatar
+                              sx={{
+                                width: 76,
+                                height: 76,
+                                fontSize: 22,
+                                bgcolor: "rgba(255,255,255,0.12)",
+                              }}
+                            >
+                              👋
+                            </Avatar>
+                          )}
+                          <Typography sx={{ fontWeight: 800, fontSize: 18, textAlign: "center" }}>
+                            Welcome to {activeTableName || "Social Lounge"}
+                          </Typography>
+                          <Typography sx={{ opacity: 0.7, fontSize: 13, textAlign: "center", maxWidth: "70%" }}>
+                            You're the first one here. More participants may join you soon.
+                          </Typography>
+                        </>
+                      ) : latestPinnedHost ? (
+                        <>
+                          <Avatar
+                            src={pinnedRaw?.picture} // ✅ Use pinned participant picture
                             sx={{
                               width: 76,
                               height: 76,
-                              borderRadius: "50%",
-                              bgcolor: "rgba(255,255,255,0.08)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              overflow: "hidden",
-                              border: "2px solid rgba(255,255,255,0.12)",
+                              fontSize: 22,
+                              bgcolor: "rgba(255,255,255,0.12)",
                             }}
                           >
-                            <Box
-                              component="img"
-                              src={activeTableLogoUrl}
-                              alt="Social Lounge Logo"
-                              sx={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                              }}
-                            />
-                          </Box>
-                        ) : (
+                            {/* ✅ FIX: Show pinned participant's initials, not host's */}
+                            {initialsFromName(pinnedRaw?.name || meeting.host.name)}
+                          </Avatar>
+
+                          {/* ✅ FIX: Display pinned participant's name and role */}
+                          <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
+                            {pinnedRaw?.name || meeting.host.name}
+                          </Typography>
+                          <Typography sx={{ opacity: 0.7, fontSize: 13 }}>
+                            {pinnedIsHost ? "Host" : "Member"}
+                          </Typography>
+                        </>
+                      ) : isBreakout && breakoutParticipantCount > 1 ? (
+                        <>
                           <Avatar
                             sx={{
                               width: 76,
@@ -11226,537 +11349,494 @@ export default function NewLiveMeeting() {
                               bgcolor: "rgba(255,255,255,0.12)",
                             }}
                           >
-                            👋
+                            👥
                           </Avatar>
-                        )}
-                        <Typography sx={{ fontWeight: 800, fontSize: 18, textAlign: "center" }}>
-                          Welcome to {activeTableName || "Social Lounge"}
-                        </Typography>
-                        <Typography sx={{ opacity: 0.7, fontSize: 13, textAlign: "center", maxWidth: "70%" }}>
-                          You're the first one here. More participants may join you soon.
-                        </Typography>
-                      </>
-                    ) : latestPinnedHost ? (
-                      <>
-                        <Avatar
-                          src={pinnedRaw?.picture} // ✅ Use pinned participant picture
-                          sx={{
-                            width: 76,
-                            height: 76,
-                            fontSize: 22,
-                            bgcolor: "rgba(255,255,255,0.12)",
-                          }}
-                        >
-                          {/* ✅ FIX: Show pinned participant's initials, not host's */}
-                          {initialsFromName(pinnedRaw?.name || meeting.host.name)}
-                        </Avatar>
-
-                        {/* ✅ FIX: Display pinned participant's name and role */}
-                        <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
-                          {pinnedRaw?.name || meeting.host.name}
-                        </Typography>
-                        <Typography sx={{ opacity: 0.7, fontSize: 13 }}>
-                          {pinnedIsHost ? "Host" : "Member"}
-                        </Typography>
-                      </>
-                    ) : isBreakout && breakoutParticipantCount > 1 ? (
-                      <>
-                        <Avatar
-                          sx={{
-                            width: 76,
-                            height: 76,
-                            fontSize: 22,
-                            bgcolor: "rgba(255,255,255,0.12)",
-                          }}
-                        >
-                          👥
-                        </Avatar>
-                        <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
-                          Participants are in the room
-                        </Typography>
-                        <Typography sx={{ opacity: 0.7, fontSize: 13 }}>
-                          Connecting to live tiles...
-                        </Typography>
-                      </>
-                    ) : isBreakout && breakoutParticipantCount === 0 ? (
-                      <>
-                        <Avatar
-                          sx={{
-                            width: 76,
-                            height: 76,
-                            fontSize: 22,
-                            bgcolor: "rgba(255,255,255,0.12)",
-                          }}
-                        >
-                          👤
-                        </Avatar>
-                        <Typography sx={{ fontWeight: 800, fontSize: 18, textAlign: "center" }}>
-                          No one in this stage
-                        </Typography>
-                        <Typography sx={{ opacity: 0.7, fontSize: 13, textAlign: "center" }}>
-                          Waiting for participants to join
-                        </Typography>
-                      </>
-                    ) : (
-                      <>
-                        {eventData?.cover_image ? (
-                          <Box
-                            sx={{
-                              width: 200,
-                              height: 150,
-                              borderRadius: 2,
-                              overflow: "hidden",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              bgcolor: "rgba(255,255,255,0.06)",
-                              border: "1px solid rgba(255,255,255,0.12)",
-                              mb: 2,
-                            }}
-                          >
-                            <Box
-                              component="img"
-                              src={eventData.cover_image}
-                              alt="Event cover"
-                              sx={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                              }}
-                            />
-                          </Box>
-                        ) : (
+                          <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
+                            Participants are in the room
+                          </Typography>
+                          <Typography sx={{ opacity: 0.7, fontSize: 13 }}>
+                            Connecting to live tiles...
+                          </Typography>
+                        </>
+                      ) : isBreakout && breakoutParticipantCount === 0 ? (
+                        <>
                           <Avatar
                             sx={{
                               width: 76,
                               height: 76,
                               fontSize: 22,
-                              bgcolor: "rgba(255,255,255,0.08)",
+                              bgcolor: "rgba(255,255,255,0.12)",
                             }}
                           >
-                            H
+                            👤
                           </Avatar>
-                        )}
-                        <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
-                          Host disconnected
-                        </Typography>
-                        <Typography sx={{ opacity: 0.7, fontSize: 13 }}>
-                          Waiting for host to return
-                        </Typography>
-                      </>
-                    )}
-                  </>
-                )}
+                          <Typography sx={{ fontWeight: 800, fontSize: 18, textAlign: "center" }}>
+                            No one in this stage
+                          </Typography>
+                          <Typography sx={{ opacity: 0.7, fontSize: 13, textAlign: "center" }}>
+                            Waiting for participants to join
+                          </Typography>
+                        </>
+                      ) : (
+                        <>
+                          {eventData?.cover_image ? (
+                            <Box
+                              sx={{
+                                width: 200,
+                                height: 150,
+                                borderRadius: 2,
+                                overflow: "hidden",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                bgcolor: "rgba(255,255,255,0.06)",
+                                border: "1px solid rgba(255,255,255,0.12)",
+                                mb: 2,
+                              }}
+                            >
+                              <Box
+                                component="img"
+                                src={eventData.cover_image}
+                                alt="Event cover"
+                                sx={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            </Box>
+                          ) : (
+                            <Avatar
+                              sx={{
+                                width: 76,
+                                height: 76,
+                                fontSize: 22,
+                                bgcolor: "rgba(255,255,255,0.08)",
+                              }}
+                            >
+                              H
+                            </Avatar>
+                          )}
+                          <Typography sx={{ fontWeight: 800, fontSize: 18 }}>
+                            Host disconnected
+                          </Typography>
+                          <Typography sx={{ opacity: 0.7, fontSize: 13 }}>
+                            Waiting for host to return
+                          </Typography>
+                        </>
+                      )}
+                    </>
+                  )}
 
-                {pinnedHasVideo && (
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      bottom: 12,
-                      left: 12,
-                      right: 12,
-                      zIndex: 2,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 0.25,
-                      pointerEvents: "none",
-                    }}
-                  >
-                    {/* ✅ FIX: Display pinned participant's name and role (not just host's) */}
-                    <Typography sx={{ fontWeight: 900, fontSize: 14, textShadow: "0 2px 10px rgba(0,0,0,0.65)" }}>
-                      {pinnedRaw?.name || meeting.host.name}
-                    </Typography>
-                    <Typography sx={{ opacity: 0.75, fontSize: 12, textShadow: "0 2px 10px rgba(0,0,0,0.65)" }}>
-                      {pinnedIsHost ? "Host" : "Member"}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
+                  {pinnedHasVideo && (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        bottom: 12,
+                        left: 12,
+                        right: 12,
+                        zIndex: 2,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.25,
+                        pointerEvents: "none",
+                      }}
+                    >
+                      {/* ✅ FIX: Display pinned participant's name and role (not just host's) */}
+                      <Typography sx={{ fontWeight: 900, fontSize: 14, textShadow: "0 2px 10px rgba(0,0,0,0.65)" }}>
+                        {pinnedRaw?.name || meeting.host.name}
+                      </Typography>
+                      <Typography sx={{ opacity: 0.75, fontSize: 12, textShadow: "0 2px 10px rgba(0,0,0,0.65)" }}>
+                        {pinnedIsHost ? "Host" : "Member"}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
 
-            </Paper>
+              </Paper>
 
-            {/* Participants strip (Audience + Speaker) */}
-            <Box
-              ref={stageStripRef}
-              sx={{
-                flexShrink: 0,
-                display: "flex",
-                gap: 1,
-                overflowX: "auto",
-                flexWrap: "nowrap",
-                pb: 0.5,
-                ...scrollSx,
-              }}
-            >
-              {stageStripLimited.map((p, idx) => (
-                <StageMiniTile
-                  key={`${p.name}-${idx}`}
-                  p={p}
-                  meeting={dyteMeeting}
-                  tileW={stageTileW}
-                  tileH={stageTileH}
-                />
-
-              ))}
-
-              {stageStripRemaining > 0 && (
-                <Tooltip title="View all participants">
-                  <Paper
-                    variant="outlined"
-                    onClick={() => toggleRightPanel(3)}
-                    sx={{
-                      cursor: "pointer",
-                      flex: "0 0 auto",
-                      width: stageTileW,
-                      height: stageTileH,
-                      borderRadius: 2,
-                      borderColor: "rgba(255,255,255,0.10)",
-                      bgcolor: "rgba(255,255,255,0.05)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Typography sx={{ fontWeight: 900, opacity: 0.9 }}>+{stageStripRemaining} more</Typography>
-                  </Paper>
-                </Tooltip>
-              )}
-            </Box>
-
-
-            {/* Bottom Controls */}
-            <Box
-              sx={{
-                flexShrink: 0,
-                position: "relative",
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {/* Role badge aligned with bottom controls (left) */}
+              {/* Participants strip (Audience + Speaker) */}
               <Box
-                sx={{
-                  position: "absolute",
-                  left: 0,         // change to 12 if you want same inset like stage chip
-                  top: 0,
-                  bottom: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  zIndex: 5,
-                  pointerEvents: "none",
-                }}
-              >
-                <Chip
-                  size="small"
-                  label={isHost ? "As Host" : "As Audience"}
-                  sx={{
-                    bgcolor: "rgba(0,0,0,0.55)",
-                    color: "rgba(255,255,255,0.92)",
-                    border: "1px solid rgba(255,255,255,0.14)",
-                    fontWeight: 700,
-                    height: 26,
-                    "& .MuiChip-label": { px: 1.1, fontSize: 12 },
-                  }}
-                />
-              </Box>
-              <Paper
-                variant="outlined"
+                ref={stageStripRef}
                 sx={{
                   flexShrink: 0,
-                  borderRadius: 999,
-                  borderColor: "rgba(255,255,255,0.08)",
-                  bgcolor: "rgba(0,0,0,0.35)",
-                  backdropFilter: "blur(10px)",
-                  px: 2,
-                  py: 1,
+                  display: "flex",
+                  gap: 1,
+                  overflowX: "auto",
+                  flexWrap: "nowrap",
+                  pb: 0.5,
+                  ...scrollSx,
+                }}
+              >
+                {stageStripLimited.map((p, idx) => (
+                  <StageMiniTile
+                    key={`${p.name}-${idx}`}
+                    p={p}
+                    meeting={dyteMeeting}
+                    tileW={stageTileW}
+                    tileH={stageTileH}
+                  />
+
+                ))}
+
+                {stageStripRemaining > 0 && (
+                  <Tooltip title="View all participants">
+                    <Paper
+                      variant="outlined"
+                      onClick={() => toggleRightPanel(3)}
+                      sx={{
+                        cursor: "pointer",
+                        flex: "0 0 auto",
+                        width: stageTileW,
+                        height: stageTileH,
+                        borderRadius: 2,
+                        borderColor: "rgba(255,255,255,0.10)",
+                        bgcolor: "rgba(255,255,255,0.05)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Typography sx={{ fontWeight: 900, opacity: 0.9 }}>+{stageStripRemaining} more</Typography>
+                    </Paper>
+                  </Tooltip>
+                )}
+              </Box>
+
+
+              {/* Bottom Controls */}
+              <Box
+                sx={{
+                  flexShrink: 0,
+                  position: "relative",
+                  width: "100%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: 1.5,
-                  mx: "auto",
-                  width: { xs: "100%", sm: "auto" },
                 }}
               >
-                <Tooltip title={micOn ? "Mute" : "Unmute"}>
-                  <IconButton
-                    onClick={handleToggleMic}
-                    aria-label="Toggle mic"
-                  >
-                    {micOn ? <MicIcon /> : <MicOffIcon />}
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title={camOn ? "Turn camera off" : "Turn camera on"}>
-                  <IconButton
-                    onClick={handleToggleCamera}
+                {/* Role badge aligned with bottom controls (left) */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: 0,         // change to 12 if you want same inset like stage chip
+                    top: 0,
+                    bottom: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    zIndex: 5,
+                    pointerEvents: "none",
+                  }}
+                >
+                  <Chip
+                    size="small"
+                    label={isHost ? "As Host" : "As Audience"}
                     sx={{
-                      bgcolor: "rgba(255,255,255,0.06)",
-                      "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                      // Optional: Visual feedback if cam is active
-                      color: camOn ? "#fff" : "inherit"
+                      bgcolor: "rgba(0,0,0,0.55)",
+                      color: "rgba(255,255,255,0.92)",
+                      border: "1px solid rgba(255,255,255,0.14)",
+                      fontWeight: 700,
+                      height: 26,
+                      "& .MuiChip-label": { px: 1.1, fontSize: 12 },
                     }}
-                    aria-label="Toggle camera"
-                  >
-                    {camOn ? <VideocamIcon /> : <VideocamOffIcon />}
-                  </IconButton>
-                </Tooltip>
-                {isHost && (
-                  <Tooltip
-                    title={
-                      !hostPerms.screenShare
-                        ? "Screen share disabled by host"
-                        : !canSelfScreenShare
-                          ? "Screen share not allowed"
-                          : (!isHost && hostForceBlock)
-                            ? "Screen share blocked for audience"
-                            : (isScreenSharing ? "Stop sharing" : "Share screen")
-                    }
-                  >
+                  />
+                </Box>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    flexShrink: 0,
+                    borderRadius: 999,
+                    borderColor: "rgba(255,255,255,0.08)",
+                    bgcolor: "rgba(0,0,0,0.35)",
+                    backdropFilter: "blur(10px)",
+                    px: 2,
+                    py: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 1.5,
+                    mx: "auto",
+                    width: { xs: "100%", sm: "auto" },
+                  }}
+                >
+                  <Tooltip title={micOn ? "Mute" : "Unmute"}>
+                    <IconButton
+                      onClick={handleToggleMic}
+                      aria-label="Toggle mic"
+                    >
+                      {micOn ? <MicIcon /> : <MicOffIcon />}
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title={camOn ? "Turn camera off" : "Turn camera on"}>
+                    <IconButton
+                      onClick={handleToggleCamera}
+                      sx={{
+                        bgcolor: "rgba(255,255,255,0.06)",
+                        "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                        // Optional: Visual feedback if cam is active
+                        color: camOn ? "#fff" : "inherit"
+                      }}
+                      aria-label="Toggle camera"
+                    >
+                      {camOn ? <VideocamIcon /> : <VideocamOffIcon />}
+                    </IconButton>
+                  </Tooltip>
+                  {isHost && (
+                    <Tooltip
+                      title={
+                        !hostPerms.screenShare
+                          ? "Screen share disabled by host"
+                          : !canSelfScreenShare
+                            ? "Screen share not allowed"
+                            : (!isHost && hostForceBlock)
+                              ? "Screen share blocked for audience"
+                              : (isScreenSharing ? "Stop sharing" : "Share screen")
+                      }
+                    >
+                      <span>
+                        <IconButton
+                          onClick={toggleScreenShareNow}
+                          disabled={screenShareDisabled}
+                          sx={{
+                            bgcolor: "rgba(255,255,255,0.06)",
+                            "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                            "&.Mui-disabled": { opacity: 0.45 },
+                          }}
+                          aria-label="Share screen"
+                        >
+                          <ScreenShareIcon />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
+
+                  <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : "Chat"}>
                     <span>
                       <IconButton
-                        onClick={toggleScreenShareNow}
-                        disabled={screenShareDisabled}
-                        sx={{
-                          bgcolor: "rgba(255,255,255,0.06)",
-                          "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                          "&.Mui-disabled": { opacity: 0.45 },
+                        onClick={() => {
+                          // ✅ CHAT ICON: Toggle chat open/close
+                          if (isChatActive) closeRightPanel();
+                          else toggleRightPanel(0);
                         }}
-                        aria-label="Share screen"
+                        sx={{
+                          bgcolor: isChatActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                          "&:hover": { bgcolor: isChatActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                          opacity: hostPerms.chat ? 1 : 0.7,
+                        }}
+                        aria-label="Chat"
                       >
-                        <ScreenShareIcon />
+                        <Badge
+                          variant="dot"
+                          color="error"
+                          overlap="circular"
+                          invisible={!showAnyPanelDot}
+                          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                        >
+                          <ChatBubbleOutlineIcon />
+                        </Badge>
                       </IconButton>
                     </span>
                   </Tooltip>
-                )}
 
-                <Tooltip title={!hostPerms.chat ? "Chat disabled by host" : "Chat"}>
-                  <span>
+                  <Tooltip title={isQnaActive ? "Close Q&A" : "Open Q&A"}>
                     <IconButton
                       onClick={() => {
-                        // ✅ CHAT ICON: Toggle chat open/close
-                        if (isChatActive) closeRightPanel();
-                        else toggleRightPanel(0);
+                        // toggle behavior: if Q&A is open on tab=1, close panel
+                        if (isQnaActive) closeRightPanel();
+                        else toggleRightPanel(1);
                       }}
                       sx={{
-                        bgcolor: isChatActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                        "&:hover": { bgcolor: isChatActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
-                        opacity: hostPerms.chat ? 1 : 0.7,
+                        bgcolor: isQnaActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                        "&:hover": { bgcolor: isQnaActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
                       }}
-                      aria-label="Chat"
+                      aria-label="Q&A"
                     >
                       <Badge
                         variant="dot"
                         color="error"
                         overlap="circular"
-                        invisible={!showAnyPanelDot}
+                        invisible={!(qnaUnreadCount > 0 && !isQnaActive)}
                         anchorOrigin={{ vertical: "top", horizontal: "right" }}
                       >
-                        <ChatBubbleOutlineIcon />
+                        <QuestionAnswerIcon />
                       </Badge>
                     </IconButton>
-                  </span>
-                </Tooltip>
+                  </Tooltip>
 
-                <Tooltip title={isQnaActive ? "Close Q&A" : "Open Q&A"}>
-                  <IconButton
-                    onClick={() => {
-                      // toggle behavior: if Q&A is open on tab=1, close panel
-                      if (isQnaActive) closeRightPanel();
-                      else toggleRightPanel(1);
-                    }}
-                    sx={{
-                      bgcolor: isQnaActive ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                      "&:hover": { bgcolor: isQnaActive ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
-                    }}
-                    aria-label="Q&A"
-                  >
-                    <Badge
-                      variant="dot"
-                      color="error"
-                      overlap="circular"
-                      invisible={!(qnaUnreadCount > 0 && !isQnaActive)}
-                      anchorOrigin={{ vertical: "top", horizontal: "right" }}
-                    >
-                      <QuestionAnswerIcon />
-                    </Badge>
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title={isPanelOpen && tab === 3 ? "Close Participants" : "Open Participants"}>
-                  <IconButton
-                    onClick={() => {
-                      // toggle behavior: if Participants is open on tab=3, close panel
-                      if (isPanelOpen && tab === 3) closeRightPanel();
-                      else toggleRightPanel(3);
-                    }}
-                    sx={{
-                      bgcolor: (isPanelOpen && tab === 3) ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                      "&:hover": { bgcolor: (isPanelOpen && tab === 3) ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
-                    }}
-                    aria-label="Participants"
-                  >
-                    <Badge
-                      variant="dot"
-                      color="error"
-                      overlap="circular"
-                      invisible={!showMembersDot}
-                      anchorOrigin={{ vertical: "top", horizontal: "right" }}
-                    >
-                      <GroupIcon />
-                    </Badge>
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Social Lounge">
-                  <IconButton
-                    onClick={openLoungeOverlay}
-                    sx={{
-                      bgcolor: "rgba(255,255,255,0.06)",
-                      "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                      mx: 0.5
-                    }}
-                  >
-                    <SocialLoungeIcon />
-                  </IconButton>
-                </Tooltip>
-
-                {isHost && (
-                  <Tooltip title="Breakout Control">
+                  <Tooltip title={isPanelOpen && tab === 3 ? "Close Participants" : "Open Participants"}>
                     <IconButton
-                      onClick={() => setIsBreakoutControlsOpen(true)}
+                      onClick={() => {
+                        // toggle behavior: if Participants is open on tab=3, close panel
+                        if (isPanelOpen && tab === 3) closeRightPanel();
+                        else toggleRightPanel(3);
+                      }}
+                      sx={{
+                        bgcolor: (isPanelOpen && tab === 3) ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                        "&:hover": { bgcolor: (isPanelOpen && tab === 3) ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                      }}
+                      aria-label="Participants"
+                    >
+                      <Badge
+                        variant="dot"
+                        color="error"
+                        overlap="circular"
+                        invisible={!showMembersDot}
+                        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                      >
+                        <GroupIcon />
+                      </Badge>
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Social Lounge">
+                    <IconButton
+                      onClick={openLoungeOverlay}
                       sx={{
                         bgcolor: "rgba(255,255,255,0.06)",
                         "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                        mx: 0.5,
-                        color: "#ff9800"
+                        mx: 0.5
                       }}
                     >
-                      <ShuffleIcon />
+                      <SocialLoungeIcon />
                     </IconButton>
                   </Tooltip>
-                )}
 
-                {/* ✅ Separate Side Panel Toggle */}
-                <Tooltip title={isPanelOpen ? "Close Sidebar" : "Open Sidebar"}>
-                  <IconButton
-                    onClick={() => {
-                      if (isPanelOpen) closeRightPanel();
-                      else toggleRightPanel(tab); // Open to last used tab
-                    }}
-                    sx={{
-                      bgcolor: isPanelOpen ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
-                      "&:hover": { bgcolor: isPanelOpen ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
-                      mx: 0.5
-                    }}
-                    aria-label="Toggle Sidebar"
-                  >
-                    <ViewSidebarIcon />
-                  </IconButton>
-                </Tooltip>
+                  {isHost && (
+                    <Tooltip title="Breakout Control">
+                      <IconButton
+                        onClick={() => setIsBreakoutControlsOpen(true)}
+                        sx={{
+                          bgcolor: "rgba(255,255,255,0.06)",
+                          "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                          mx: 0.5,
+                          color: "#ff9800"
+                        }}
+                      >
+                        <ShuffleIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
 
-                <Tooltip title="Leave meeting">
-                  <IconButton
-                    onClick={handleLeaveMeetingClick}
-                    sx={{
-                      bgcolor: "rgba(244,67,54,0.22)",
-                      "&:hover": { bgcolor: "rgba(244,67,54,0.30)" },
-                    }}
-                    aria-label="Leave meeting"
-                  >
-                    <CallEndIcon />
-                  </IconButton>
-                </Tooltip>
+                  {/* ✅ Separate Side Panel Toggle */}
+                  <Tooltip title={isPanelOpen ? "Close Sidebar" : "Open Sidebar"}>
+                    <IconButton
+                      onClick={() => {
+                        if (isPanelOpen) closeRightPanel();
+                        else toggleRightPanel(tab); // Open to last used tab
+                      }}
+                      sx={{
+                        bgcolor: isPanelOpen ? "rgba(20,184,177,0.22)" : "rgba(255,255,255,0.06)",
+                        "&:hover": { bgcolor: isPanelOpen ? "rgba(20,184,177,0.30)" : "rgba(255,255,255,0.10)" },
+                        mx: 0.5
+                      }}
+                      aria-label="Toggle Sidebar"
+                    >
+                      <ViewSidebarIcon />
+                    </IconButton>
+                  </Tooltip>
 
-                {/* ✅ Leave Table Button (Only in Breakout) - Moved to right end with Label */}
-                {isBreakout && (
-                  <Button
-                    variant="contained"
-                    onClick={handleLeaveBreakout}
-                    startIcon={<LogoutIcon />}
-                    sx={{
-                      ml: 1,
-                      bgcolor: "#ef4444",
-                      color: "white",
-                      borderRadius: 10,
-                      textTransform: "none",
-                      fontWeight: 700,
-                      px: 2,
-                      "&:hover": { bgcolor: "#dc2626" },
-                      whiteSpace: "nowrap"
-                    }}
-                  >
-                    Leave Table
-                  </Button>
-                )}
-              </Paper>
-            </Box>
-          </Box>
+                  <Tooltip title="Leave meeting">
+                    <IconButton
+                      onClick={handleLeaveMeetingClick}
+                      sx={{
+                        bgcolor: "rgba(244,67,54,0.22)",
+                        "&:hover": { bgcolor: "rgba(244,67,54,0.30)" },
+                      }}
+                      aria-label="Leave meeting"
+                    >
+                      <CallEndIcon />
+                    </IconButton>
+                  </Tooltip>
 
-          {/* Right Panel (Desktop) */}
-          {isMdUp && (
-            <Box sx={{ display: "flex", flexDirection: "row", height: `calc(100vh - ${APPBAR_H}px)`, position: "sticky", top: APPBAR_H }}>
-              {/* Content Panel (Collapsible) */}
-              {rightPanelOpen && (
-                <Box
-                  sx={{
-                    width: RIGHT_PANEL_W - 70, // 350px left for content
-                    borderLeft: "1px solid rgba(255,255,255,0.08)",
-                    bgcolor: "rgba(0,0,0,0.25)",
-                    backdropFilter: "blur(10px)",
-                    height: "100%",
-                    overflow: "hidden",
-                    // (optional) to match the “padded card” look:
-                    p: 2,
-                    boxSizing: "border-box",
-                  }}
-                >
-                  <Paper
-                    variant="outlined"
-                    sx={{
-                      height: "100%",
-                      minHeight: 0,
-                      borderRadius: 3,
-                      borderColor: "rgba(255,255,255,0.08)",
-                      bgcolor: "rgba(255,255,255,0.03)",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {SidebarMainContent}
-                  </Paper>
-                </Box>
-              )}
-
-              {/* Icon Rail (Always Visible) */}
-              <Box sx={{ height: "100%" }}>
-                {SidebarIconRail}
+                  {/* ✅ Leave Table Button (Only in Breakout) - Moved to right end with Label */}
+                  {isBreakout && (
+                    <Button
+                      variant="contained"
+                      onClick={handleLeaveBreakout}
+                      startIcon={<LogoutIcon />}
+                      sx={{
+                        ml: 1,
+                        bgcolor: "#ef4444",
+                        color: "white",
+                        borderRadius: 10,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        px: 2,
+                        "&:hover": { bgcolor: "#dc2626" },
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      Leave Table
+                    </Button>
+                  )}
+                </Paper>
               </Box>
             </Box>
-          )}
 
-          {/* Right Panel (Mobile Drawer) */}
-          {!isMdUp && (
-            <Drawer
-              anchor="right"
-              open={rightOpen}
-              onClose={() => setRightOpen(false)}
-              PaperProps={{
-                sx: {
-                  width: { xs: "92vw", sm: 420 },
-                  bgcolor: "rgba(0,0,0,0.85)",
-                  borderLeft: "1px solid rgba(255,255,255,0.08)",
+            {/* Right Panel (Desktop) */}
+            {isMdUp && (
+              <Box sx={{ display: "flex", flexDirection: "row", height: `calc(100vh - ${APPBAR_H}px)`, position: "sticky", top: APPBAR_H }}>
+                {/* Content Panel (Collapsible) */}
+                {rightPanelOpen && (
+                  <Box
+                    sx={{
+                      width: RIGHT_PANEL_W - 70, // 350px left for content
+                      borderLeft: "1px solid rgba(255,255,255,0.08)",
+                      bgcolor: "rgba(0,0,0,0.25)",
+                      backdropFilter: "blur(10px)",
+                      height: "100%",
+                      overflow: "hidden",
+                      // (optional) to match the “padded card” look:
+                      p: 2,
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        height: "100%",
+                        minHeight: 0,
+                        borderRadius: 3,
+                        borderColor: "rgba(255,255,255,0.08)",
+                        bgcolor: "rgba(255,255,255,0.03)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {SidebarMainContent}
+                    </Paper>
+                  </Box>
+                )}
 
-                  // ✅ FORCE WHITE TEXT ONLY IN MOBILE RIGHT PANEL
-                  color: "#fff",
-                  "&, & *": { color: "#fff" },
-                },
-              }}
-            >
-              {RightPanelContent}
-            </Drawer>
-          )}
-        </Box>
+                {/* Icon Rail (Always Visible) */}
+                <Box sx={{ height: "100%" }}>
+                  {SidebarIconRail}
+                </Box>
+              </Box>
+            )}
+
+            {/* Right Panel (Mobile Drawer) */}
+            {!isMdUp && (
+              <Drawer
+                anchor="right"
+                open={rightOpen}
+                onClose={() => setRightOpen(false)}
+                PaperProps={{
+                  sx: {
+                    width: { xs: "92vw", sm: 420 },
+                    bgcolor: "rgba(0,0,0,0.85)",
+                    borderLeft: "1px solid rgba(255,255,255,0.08)",
+
+                    // ✅ FORCE WHITE TEXT ONLY IN MOBILE RIGHT PANEL
+                    color: "#fff",
+                    "&, & *": { color: "#fff" },
+                  },
+                }}
+              >
+                {RightPanelContent}
+              </Drawer>
+            )}
+          </Box>
         )}
         {/* Member Info Dialog - Redesigned */}
         <Dialog
