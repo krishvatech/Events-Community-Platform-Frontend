@@ -2615,7 +2615,6 @@ export default function AdminPostsPage() {
       question: m.question || "",
       options,
       tags: m.tags || [],
-      tags: m.tags || [],
       __source: "feed",            // marker (optional)
       __feed_item_id: row.id,      // marker (optional)
       actor: {

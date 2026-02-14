@@ -886,7 +886,7 @@ function CommentsDialog({ open, postId, onClose, isPostOwner }) {
   async function getMeId() {
     try { const r = await fetch(`${API_ROOT}/users/me/`, { headers: authHeader() }); const d = await r.json(); return d?.id; } catch { return null; }
   }
-  function normalizeUser(u) { if (!u) return { id: null, name: "User", avatar: "" }; const id = u.id || u.user_id; const name = u.name || u.full_name || u.username || "User"; const avatar = toAbsolute(u.user_image || u.avatar || u.user_image_url); return { id, name, avatar }; }
+  function normalizeUser(u) { if (!u) return { id: null, name: "User", avatar: "" }; const id = u.id || u.user_id; const name = u.name || u.full_name || u.username || "User"; const avatar = toAbsolute(u.avatar_url || u.user_image || u.avatar || u.user_image_url); const kycStatus = u.kyc_status || ""; return { id, name, avatar, kycStatus }; }
   function normalizeComment(c, currentUserId) { const author = normalizeUser(c.author || c.user); const replies = (c.replies || []).map(r => normalizeComment(r, currentUserId)); return { id: c.id, created: c.created_at, body: c.text || c.body || "", author, likedByMe: !!(c.liked || c.liked_by_me), likeCount: Number(c.like_count || c.likes || 0), canDelete: !!((author.id && currentUserId && author.id === currentUserId) || isPostOwner), replies }; }
   async function fetchComments(pid, uid) { try { const r = await fetch(`${API_ROOT}/engagements/comments/?target_type=activity_feed.feeditem&target_id=${pid}`, { headers: authHeader() }); if (!r.ok) return []; const j = await r.json(); const rootsRaw = j.results || []; const roots = rootsRaw.map(r => ({ ...normalizeComment(r, uid), replies: [] })); await Promise.all(roots.map(async (root) => { try { const rr = await fetch(`${API_ROOT}/engagements/comments/?parent=${root.id}`, { headers: authHeader() }); const jj = await rr.json(); root.replies = (jj.results || []).map(x => normalizeComment(x, uid)); } catch { } })); return roots; } catch { return []; } }
 
@@ -955,7 +955,10 @@ function CommentsDialog({ open, postId, onClose, isPostOwner }) {
         <Avatar src={c.author.avatar} sx={{ width: 32, height: 32 }} />
         <Box sx={{ flex: 1 }}>
           <Box sx={{ bgcolor: "action.hover", p: 1.5, borderRadius: 2 }}>
-            <Typography variant="subtitle2" fontWeight={700}>{c.author.name}</Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <Typography variant="subtitle2" fontWeight={700}>{c.author.name}</Typography>
+              {c.author.kycStatus === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+            </Stack>
             <Typography variant="body2">{c.body}</Typography>
           </Box>
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5, ml: 1 }}>
@@ -1096,12 +1099,24 @@ function LikesDialog({ open, postId, onClose }) {
               }
 
               const avatarRaw =
+                r.actor_avatar ||
+                u.actor_avatar ||
+                u.avatar_url ||
                 profile.user_image_url ||
                 profile.user_image ||
+                profile.avatar ||
                 u.user_image ||
                 u.avatar ||
+                u.profile_pic ||
                 r.user_image ||
+                r.user_avatar ||
                 r.avatar ||
+                "";
+
+              const kycStatus =
+                u.kyc_status ||
+                profile.kyc_status ||
+                r.kyc_status ||
                 "";
 
               // 2) reaction info from backend
@@ -1116,6 +1131,7 @@ function LikesDialog({ open, postId, onClose }) {
                 id,
                 name: displayName.trim(),
                 avatar: toAbsolute(avatarRaw),
+                kycStatus,
                 reactionId,
                 reactionEmoji: def.emoji,
                 reactionLabel: def.label,
@@ -1183,7 +1199,17 @@ function LikesDialog({ open, postId, onClose }) {
                 <ListItemAvatar>
                   <Avatar src={u.avatar} />
                 </ListItemAvatar>
-                <ListItemText primary={u.name} secondary={u.headline} />
+                <ListItemText
+                  primary={
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Typography variant="body2">{u.name}</Typography>
+                      {u.kycStatus === "approved" && (
+                        <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />
+                      )}
+                    </Stack>
+                  }
+                  secondary={u.headline}
+                />
                 {u.reactionEmoji && (
                   <ListItemSecondaryAction>
                     <Tooltip title={u.reactionLabel || ""}>
@@ -1239,9 +1265,10 @@ function SharesDialog({ open, postId, onClose }) {
             id: u.id,
             name: displayName.trim(),
             avatar: toAbsolute(
-              u.user_image || u.avatar || p.user_image_url || p.user_image || ""
+              u.avatar_url || u.user_image || u.avatar || p.user_image_url || p.user_image || ""
             ),
             headline: u.headline || u.job_title || p.headline || "",
+            kycStatus: u.kyc_status || p.kyc_status || "",
             reactionId,
             reactionEmoji: def.emoji,
             reactionLabel: def.label,
@@ -1259,7 +1286,7 @@ function SharesDialog({ open, postId, onClose }) {
         setUsers(uniqueById);
       }).catch(() => setUsers([])).finally(() => setLoading(false));
   }, [open, postId]);
-  return (<Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"> <DialogTitle>Shared by</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : users.map(u => (<ListItem key={u.id}> <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar> <ListItemText primary={u.name} secondary={u.headline} /> </ListItem>))} {!loading && !users.length && <Typography p={2} color="text.secondary">No shares yet.</Typography>} </DialogContent> <DialogActions><Button onClick={onClose}>Close</Button></DialogActions> </Dialog>);
+  return (<Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"> <DialogTitle>Shared by</DialogTitle> <DialogContent dividers> {loading ? <LinearProgress /> : users.map(u => (<ListItem key={u.id}> <ListItemAvatar><Avatar src={u.avatar} /></ListItemAvatar> <ListItemText primary={<Stack direction="row" spacing={0.5} alignItems="center"><Typography variant="body2">{u.name}</Typography>{(u.kycStatus === "approved" || u.kycStatus === "verified") && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}</Stack>} secondary={u.headline} /> </ListItem>))} {!loading && !users.length && <Typography p={2} color="text.secondary">No shares yet.</Typography>} </DialogContent> <DialogActions><Button onClick={onClose}>Close</Button></DialogActions> </Dialog>);
 }
 
 // --- NEW COMPONENT: Share To Friend Dialog ---
@@ -1287,7 +1314,10 @@ function ShareToFriendDialog({ open, onClose, postId }) {
             const clean = rows.map(r => {
               // Normalize friend object
               const u = r.friend || r.user || r;
-              const img = u.avatar || u.user_image || u.user_image_url || "";
+              // Check avatar_url specifically from the API response example
+              const img = u.avatar_url || u.avatar || u.user_image || u.user_image_url || "";
+              const kycStatus = u.kyc_status || "";
+
               const first = u.first_name || u.firstName || "";
               const last = u.last_name || u.lastName || "";
               const displayName =
@@ -1299,7 +1329,8 @@ function ShareToFriendDialog({ open, onClose, postId }) {
                 id: u.id,
                 name: displayName,
                 avatar: toAbsolute(img),
-                headline: u.headline || u.bio || ""
+                headline: u.headline || u.bio || "",
+                kycStatus,
               }
             });
             setFriends(clean);
@@ -1330,7 +1361,7 @@ function ShareToFriendDialog({ open, onClose, postId }) {
         body: JSON.stringify({
           target_type: "activity_feed.feeditem",
           target_id: postId,
-          user_ids: selected // Sending array of user IDs
+          to_users: selected // Sending array of user IDs
         })
       });
       onClose();
@@ -1360,7 +1391,15 @@ function ShareToFriendDialog({ open, onClose, postId }) {
             {filtered.map(f => (
               <ListItem key={f.id} onClick={() => handleToggle(f.id)}>
                 <ListItemAvatar><Avatar src={f.avatar} /></ListItemAvatar>
-                <ListItemText primary={f.name} secondary={f.headline} />
+                <ListItemText
+                  primary={
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Typography variant="body1">{f.name}</Typography>
+                      {f.kycStatus === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                    </Stack>
+                  }
+                  secondary={f.headline}
+                />
                 <ListItemSecondaryAction>
                   <Checkbox edge="end" checked={selected.includes(f.id)} onChange={() => handleToggle(f.id)} />
                 </ListItemSecondaryAction>
