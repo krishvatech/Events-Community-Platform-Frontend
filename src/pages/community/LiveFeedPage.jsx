@@ -1997,7 +1997,14 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
         f?.avatar || f?.avatar_url || f?.user_image || f?.user_image_url || f?.image || f?.photo || ""
       );
 
-      return { id, name, avatar };
+      const kycStatus =
+        u?.kyc_status ||
+        u?.kycStatus ||
+        u?.profile?.kyc_status ||
+        f?.kyc_status ||
+        "not_started";
+
+      return { id, name, avatar, kycStatus };
     }).filter(x => x.id);
   }
 
@@ -2183,7 +2190,16 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
                 }>
                   <ListItemButton onClick={() => toggle(f.id)}>
                     <ListItemAvatar><Avatar src={f.avatar} /></ListItemAvatar>
-                    <ListItemText primary={f.name} />
+                    <ListItemText
+                      primary={
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <Typography variant="body1">{f.name}</Typography>
+                          {(f.kycStatus === "approved" || f.kycStatus === "verified") && (
+                            <VerifiedIcon color="primary" sx={{ fontSize: 16 }} />
+                          )}
+                        </Stack>
+                      }
+                    />
                   </ListItemButton>
                 </ListItem>
               ))}
@@ -3474,7 +3490,16 @@ export default function LiveFeedPage({
           u?.profile?.avatar || u?.profile?.avatar_url || u?.profile?.user_image || u?.profile?.user_image_url ||
           row.actor_avatar || row.avatar || row.avatar_url || row.user_image || row.user_image_url || row.image || row.photo || ""
         );
-        return { id: id2, name, avatar };
+        const kycStatus =
+          u?.kyc_status ||
+          u?.kycStatus ||
+          u?.profile?.kyc_status ||
+          u?.profile?.kycStatus ||
+          row.kyc_status ||
+          row.kycStatus ||
+          null;
+
+        return { id: id2, name, avatar, kyc_status: kycStatus };
       });
 
       // [FIX] Deduplicate users by ID using a Map
@@ -4039,7 +4064,16 @@ export default function LiveFeedPage({
                     <ListItemAvatar>
                       <Avatar src={u.avatar}>{(u.name || "U").slice(0, 1)}</Avatar>
                     </ListItemAvatar>
-                    <ListItemText primary={u.name} />
+                    <ListItemText
+                      primary={
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <Typography variant="body1">{u.name}</Typography>
+                          {(u.kyc_status === "approved" || u.kyc_status === "verified") && (
+                            <VerifiedIcon color="primary" sx={{ fontSize: 16 }} />
+                          )}
+                        </Stack>
+                      }
+                    />
                   </ListItem>
                 ))}
               </List>

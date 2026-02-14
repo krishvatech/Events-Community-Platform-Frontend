@@ -1681,7 +1681,20 @@ export default function MyPostsPage() {
       const res = await fetch(`${API_ROOT}/communities/${myCommunityId}/posts/create/`, { method: "POST", headers: authHeader(), body: fd });
       if (!res.ok) throw new Error("Create failed");
       const data = await res.json();
-      const uiPost = mapCreateResponseToUiPost({ ...data, community_id: myCommunityId });
+      // MERGE 'me' info so it doesn't show "You" or missing avatar
+      const uiPost = mapCreateResponseToUiPost({
+        ...data,
+        community_id: myCommunityId,
+        actor: me, // Force actor to be current user
+        author: me, // Force author to be current user
+      });
+      // Override manual fallback if map function defaults to "You"
+      uiPost.actor_name = me?.name || me?.full_name || me?.username || "Me";
+      uiPost.actor_avatar = me?.avatar || me?.user_image || me?.profile?.user_image_url || "";
+      uiPost.actor_headline = me?.headline || me?.profile?.headline || "";
+      // PostCard expects 'actor_kyc_status'
+      uiPost.actor_kyc_status = me?.kyc_status || me?.profile?.kyc_status || "approved";
+
       setPosts((prev) => [uiPost, ...prev]); setCreateOpen(false);
     } catch (e) { alert("Failed to create post. " + e.message); }
   };
