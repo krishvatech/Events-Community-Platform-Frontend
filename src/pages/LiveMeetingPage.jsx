@@ -4052,11 +4052,14 @@ export default function NewLiveMeeting() {
         } else if (msg.type === "late_joiner_notification") {
           // Host gets a notification that a new participant joined during breakout
           console.log("[MainSocket] Late joiner notification:", msg.notification);
-          showSnackbar(
-            `${msg.notification.participant_name} joined and is in the Main Room.`,
-            "info",
-            { onClick: () => setLoungeOpen(true) }
-          );
+          // ✅ FIX: Only show notification to host/publisher role
+          if (role === "publisher") {
+            showSnackbar(
+              `${msg.notification.participant_name} joined and is in the Main Room.`,
+              "info",
+              { onClick: () => setLoungeOpen(true) }
+            );
+          }
         } else if (msg.type === "waiting_for_breakout_assignment") {
           // Participant receives message that they are waiting for assignment
           console.log("[MainSocket] Waiting for breakout assignment");
@@ -6477,6 +6480,27 @@ export default function NewLiveMeeting() {
       };
     });
   }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables, assignedRoleByIdentity]);
+
+  // ✅ Build available participants for manual assignment (all meeting participants except self)
+  const availableParticipantsForAssign = useMemo(() => {
+    if (!participants || participants.length === 0) return [];
+
+    // Filter to include all participants in the meeting, excluding the current user (host/self)
+    return participants
+      .filter((p) => {
+        // Must be in meeting
+        if (!p.inMeeting) return false;
+        // Exclude self (the current user)
+        if (dyteMeeting?.self?.id && p.id === dyteMeeting.self.id) return false;
+        return true;
+      })
+      .map((p) => ({
+        user_id: p.id,
+        full_name: p.name,
+        username: p.name,
+        email: p._raw?.email || p._raw?.user_email || "",
+      }));
+  }, [participants, dyteMeeting?.self?.id]);
 
   const breakoutParticipantCount = useMemo(() => {
     if (!isBreakout) return 0;
@@ -12304,8 +12328,8 @@ export default function NewLiveMeeting() {
             }
             sendMainSocketAction(data);
           }}
-          onlineCount={onlineUsers.length}
-          onlineUsers={onlineUsers}
+          onlineCount={availableParticipantsForAssign.length}
+          onlineUsers={availableParticipantsForAssign}
           loungeTables={loungeTables}
           debugMessage={serverDebugMessage}
         // Removing these props from passing down as they are no longer handled by BreakoutControls UI

@@ -40,10 +40,10 @@ const LateJoinerNotification = ({ notification, onAssign, onDismiss }) => {
     <Card
       sx={{
         mb: 2,
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #5a78ff 0%, #3f5fc3 100%)',
         color: 'white',
         borderRadius: 2,
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+        boxShadow: '0 4px 20px rgba(90, 120, 255, 0.25)',
       }}
     >
       <CardHeader
@@ -89,7 +89,7 @@ const LateJoinerNotification = ({ notification, onAssign, onDismiss }) => {
                     variant={selectedRoomId === room.id ? 'filled' : 'outlined'}
                     sx={{
                       backgroundColor: selectedRoomId === room.id ? 'white' : 'transparent',
-                      color: selectedRoomId === room.id ? '#667eea' : 'white',
+                      color: selectedRoomId === room.id ? '#5a78ff' : 'white',
                       borderColor: 'white',
                     }}
                   />
@@ -141,7 +141,7 @@ const LateJoinerNotification = ({ notification, onAssign, onDismiss }) => {
           disabled={!selectedRoomId}
           sx={{
             backgroundColor: 'white',
-            color: '#667eea',
+            color: '#5a78ff',
             fontWeight: 'bold',
             '&:hover': {
               backgroundColor: '#f5f5f5',
