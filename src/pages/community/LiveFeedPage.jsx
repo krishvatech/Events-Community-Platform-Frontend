@@ -31,6 +31,14 @@ import { Tabs, Tab, ListItemSecondaryAction } from "@mui/material";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import { isOwnerUser, isStaffUser } from "../../utils/adminRole.js";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import localizedFormat from "dayjs/plugin/localizedFormat";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(localizedFormat);
 
 const BORDER = "#e2e8f0";
 // LinkedIn-style reactions 
@@ -589,8 +597,10 @@ function engageTargetOf(post) {
   return { type: null, id: Number(post.id) };
 }
 
-function formatWhen(ts) {
-  try { return new Date(ts).toLocaleString(); } catch { return ts; }
+function formatWhen(ts, tz) {
+  if (!ts) return "";
+  const zone = tz || dayjs.tz.guess();
+  return dayjs(ts).tz(zone).format('L LT');
 }
 
 function getCountFromPage(j) {
@@ -1058,7 +1068,7 @@ function EventBlock({ post, onOpen }) {
         </Tooltip>
       </Stack>
       <Typography variant="caption" color="text.secondary">
-        {post.event?.when ? new Date(post.event.when).toLocaleString() : ""}{post.event?.where ? ` · ${post.event.where}` : ""}
+        {post.event?.when ? formatWhen(post.event.when, post.userTimezone) : ""}{post.event?.where ? ` · ${post.event.where}` : ""}
       </Typography>
 
       {post.text && <ClampedText text={post.text} maxLines={5} mt={1} />}
@@ -1381,7 +1391,7 @@ function CommentItem({
           )}
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+          {formatWhen(c.created_at, c.userTimezone)}
         </Typography>
         {c.is_under_review && (
           <Chip size="small" label="Under Review" variant="outlined" />
@@ -1879,7 +1889,7 @@ function CommentsDialog({
               {visibleRoots.map(c => (
                 <CommentItem
                   key={c.id}
-                  c={c}
+                  c={{ ...c, userTimezone: me?.timezone }} // Pass timezone down
                   myId={myId}
                   isAdmin={isAdmin}
                   onToggleLike={toggleCommentLike}
@@ -1926,7 +1936,7 @@ function CommentsDialog({
               {roots.map(c => (
                 <CommentItem
                   key={c.id}
-                  c={c}
+                  c={{ ...c, userTimezone: me?.timezone }} // Pass timezone down
                   myId={myId}
                   isAdmin={isAdmin}
                   onToggleLike={toggleCommentLike}
@@ -2279,7 +2289,7 @@ function ReportDialog({ open, onClose, onSubmit, loading, targetLabel }) {
 
 
 // ---- POST CARD ----
-function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId, viewerIsStaff, onReport, commentsEnabled }) {
+function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId, viewerIsStaff, onReport, commentsEnabled, userTimezone }) {
   const [local, setLocal] = React.useState(post);
   const [userHasLiked, setUserHasLiked] = React.useState(!!post.user_has_liked);
   const [commentsOpen, setCommentsOpen] = React.useState(false);
@@ -2490,7 +2500,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
 
 
             <Typography variant="caption" color="text.secondary" noWrap>
-              · {formatWhen(post.created_at)}
+              · {formatWhen(post.created_at, userTimezone)}
             </Typography>
           </Stack>
         </Box>
@@ -2619,7 +2629,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
 
               {post.type === "event" && (
                 <EventBlock
-                  post={post}
+                  post={{ ...post, userTimezone }} // Pass timezone down to event block
                   onOpen={() => {
                     const eventId =
                       post?.engage?.id ??
@@ -3939,6 +3949,7 @@ export default function LiveFeedPage({
                       viewerIsStaff={viewerIsStaff}
                       onReport={handleReport}
                       commentsEnabled={p.group_id ? (groupCommentsEnabled[p.group_id] !== false) : true}
+                      userTimezone={me?.timezone}
                     />
                   </Box>
                   {/* After 4 posts: mutual connections */}
