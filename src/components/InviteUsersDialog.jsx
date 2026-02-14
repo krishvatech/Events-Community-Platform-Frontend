@@ -22,6 +22,7 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import GroupIcon from "@mui/icons-material/Group";
 import PersonIcon from "@mui/icons-material/Person";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import { toast } from "react-toastify";
 
 // Define API constants (reusing existing patterns)
@@ -240,7 +241,31 @@ export default function InviteUsersDialog({ open, onClose, eventId }) {
                     {results.map((item) => {
                         const isSelected = tab === 0 ? selectedUsers.has(item.id) : selectedGroups.has(item.id);
                         const labelId = `checkbox-list-label-${item.id}`;
-                        const avatarUrl = item.avatar || (item.profile && item.profile.avatar); // Handle varied user structures
+
+                        // User Data Logic
+                        let primaryText = item.name || "Unknown";
+                        let secondaryText = `${item.member_count || 0} members`;
+                        let avatarUrl = item.avatar || "";
+                        let isVerified = false;
+
+                        if (tab === 0) {
+                            // It's a User
+                            const first = item.first_name || "";
+                            const last = item.last_name || "";
+                            const full = `${first} ${last}`.trim();
+                            primaryText = full || item.username || "Unknown";
+                            secondaryText = item.email || "";
+
+                            // Avatar from profile
+                            avatarUrl = item.profile?.user_image_url || item.profile?.user_image || "";
+
+                            // KYC Status
+                            const kyc = item.profile?.kyc_status;
+                            isVerified = kyc === "approved" || kyc === "verified";
+                        } else {
+                            // It's a Group
+                            avatarUrl = item.logo || "";
+                        }
 
                         return (
                             <ListItem
@@ -249,13 +274,20 @@ export default function InviteUsersDialog({ open, onClose, eventId }) {
                                 onClick={() => handleToggle(item)}
                             >
                                 <ListItemAvatar>
-                                    <Avatar src={avatarUrl} alt={item.username || item.name}>
-                                        {(item.username || item.name || "?")[0].toUpperCase()}
+                                    <Avatar src={avatarUrl} alt={primaryText}>
+                                        {primaryText.charAt(0).toUpperCase()}
                                     </Avatar>
                                 </ListItemAvatar>
                                 <ListItemText
-                                    primary={tab === 0 ? (item.username || "Unknown") : (item.name || "Unknown Group")}
-                                    secondary={tab === 0 ? item.email : `${item.member_count || 0} members`} // Assuming member_count might exist or be added
+                                    primary={
+                                        <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            {primaryText}
+                                            {isVerified && (
+                                                <VerifiedIcon color="primary" sx={{ fontSize: 16 }} />
+                                            )}
+                                        </Box>
+                                    }
+                                    secondary={secondaryText}
                                 />
                                 <Checkbox
                                     edge="end"
