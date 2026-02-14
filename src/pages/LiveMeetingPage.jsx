@@ -6908,7 +6908,15 @@ export default function NewLiveMeeting() {
         getJoinedParticipants().find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
         participants.find((x) => getParticipantUserKey(x?._raw || x) === primaryHostKey) ||
         (dyteMeeting?.self && getParticipantUserKey(dyteMeeting.self) === primaryHostKey ? dyteMeeting.self : null);
-      if (creatorHost) return creatorHost?._raw || creatorHost;
+      // ✅ FIX: Don't pin creator host if they're occupying a breakout room
+      // In main view, only pin if they're actually in main room
+      if (creatorHost && !creatorHost.isOccupyingLounge) {
+        console.log("[LatestPinnedHost] ✅ Pinning creator host from main room:", creatorHost.name);
+        return creatorHost?._raw || creatorHost;
+      } else if (creatorHost && creatorHost.isOccupyingLounge) {
+        console.log("[LatestPinnedHost] ❌ Creator host is in breakout room, not pinning in main view:", creatorHost.name);
+        // Fall through to find other participants
+      }
     }
 
     // ✅ FORCE for primary host only: use self as source of truth
@@ -7011,9 +7019,24 @@ export default function NewLiveMeeting() {
           console.log("[LatestPinnedHost] Host found in breakout - pinning host:", hostParticipant.name);
           p = hostParticipant;
         } else {
-          // In main view, use the host as pinned
-          console.log("[LatestPinnedHost] Found host in main view, using as pinned host:", hostParticipant.name);
-          p = hostParticipant;
+          // ✅ FIX: In main view, verify host is actually in main room
+          // Don't leak breakout room participants into main room video feed
+          // Only pin if they're NOT occupying a lounge (not in a breakout room)
+          console.log("[LatestPinnedHost] DEBUG: Checking host in main view:", {
+            hostName: hostParticipant.name,
+            isOccupyingLounge: hostParticipant.isOccupyingLounge,
+            id: hostParticipant.id,
+            inMeeting: hostParticipant.inMeeting,
+            preset: hostParticipant.presetName
+          });
+          if (!hostParticipant.isOccupyingLounge) {
+            console.log("[LatestPinnedHost] ✅ PINNING: Found host in main room, using as pinned host:", hostParticipant.name);
+            p = hostParticipant;
+          } else {
+            console.log("[LatestPinnedHost] ❌ BLOCKING: Host found but is in breakout room - not pinning in main view:", hostParticipant.name);
+            // Don't pin - leave for fallback logic which will handle empty main room
+            p = null;
+          }
         }
       }
     }
