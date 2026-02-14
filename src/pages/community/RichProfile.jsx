@@ -1156,6 +1156,8 @@ function ProfileReactionsDialog({ open, onClose, postId }) {
               POST_REACTIONS.find((r) => r.id === reactionId) ||
               POST_REACTIONS[0];
 
+            const isVerified = isVerifiedStatus(u.kyc_status || u.profile?.kyc_status);
+
             return {
               id,
               name,
@@ -1163,6 +1165,7 @@ function ProfileReactionsDialog({ open, onClose, postId }) {
               reactionId,
               reactionEmoji: reactionDef.emoji,
               reactionLabel: reactionDef.label,
+              isVerified,
             };
           })
           .filter(Boolean);
@@ -1239,7 +1242,14 @@ function ProfileReactionsDialog({ open, onClose, postId }) {
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
-                      primary={u.name}
+                      primary={
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <Typography variant="body1">{u.name}</Typography>
+                          {u.isVerified && (
+                            <VerifiedIcon color="primary" sx={{ fontSize: 16 }} />
+                          )}
+                        </Stack>
+                      }
                       secondary={
                         u.reactionEmoji
                           ? `${u.reactionEmoji} ${u.reactionLabel}`
@@ -1360,8 +1370,13 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
         author.user_image ||
         author.user_image_url ||
         author.image ||
+        author.image ||
         author.photo ||
         "";
+
+      const isVerified = isVerifiedStatus(
+        author.kyc_status || author.profile?.kyc_status
+      );
 
       // 🔴 IMPORTANT: normalize parent id from various possible fields
       const parentId =
@@ -1380,6 +1395,7 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
         parentId,          // normalized parent id
         authorName: name,
         authorAvatar: avatar,
+        isVerified,
         children: [],
       });
     });
@@ -1513,9 +1529,14 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
             {(c.authorName || "U").slice(0, 1)}
           </Avatar>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle2">
-              {c.authorName}
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Typography variant="subtitle2">
+                {c.authorName}
+              </Typography>
+              {c.isVerified && (
+                <VerifiedIcon color="primary" sx={{ fontSize: 14 }} />
+              )}
+            </Stack>
             <Typography
               variant="body2"
               sx={{ whiteSpace: "pre-wrap" }}
@@ -1750,7 +1771,11 @@ function ProfileShareDialog({ open, onClose, postId, authorId, groupId, onShared
           f?.photo ||
           "";
 
-        return { id, name, avatar };
+        const isVerified = isVerifiedStatus(
+          u?.kyc_status || u?.profile?.kyc_status || f?.kyc_status
+        );
+
+        return { id, name, avatar, isVerified };
       })
       .filter((x) => x.id);
   }
@@ -1921,7 +1946,16 @@ function ProfileShareDialog({ open, onClose, postId, authorId, groupId, onShared
                     <ListItemAvatar>
                       <Avatar src={f.avatar}>{(f.name || "U").slice(0, 1)}</Avatar>
                     </ListItemAvatar>
-                    <ListItemText primary={f.name} />
+                    <ListItemText
+                      primary={
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <Typography variant="body1">{f.name}</Typography>
+                          {f.isVerified && (
+                            <VerifiedIcon color="primary" sx={{ fontSize: 16 }} />
+                          )}
+                        </Stack>
+                      }
+                    />
                   </ListItemButton>
                 </ListItem>
               ))}
@@ -1984,7 +2018,11 @@ function ProfileShareRecipientsDialog({ open, onClose, postId }) {
       u.image ||
       "";
 
-    return id ? { id, name, avatar } : null;
+    const isVerified = isVerifiedStatus(
+      u.kyc_status || u.profile?.kyc_status
+    );
+
+    return id ? { id, name, avatar, isVerified } : null;
   }
 
 
@@ -2059,9 +2097,14 @@ function ProfileShareRecipientsDialog({ open, onClose, postId }) {
                 </ListItemAvatar>
                 <ListItemText
                   primary={
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {u.name}
-                    </Typography>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {u.name}
+                      </Typography>
+                      {u.isVerified && (
+                        <VerifiedIcon color="primary" sx={{ fontSize: 16 }} />
+                      )}
+                    </Stack>
                   }
                 />
               </ListItem>
