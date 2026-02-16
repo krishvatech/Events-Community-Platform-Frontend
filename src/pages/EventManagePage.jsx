@@ -147,7 +147,7 @@ const fmtDateRange = (start, end) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Resources", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings"];
+const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Session", "Resources", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms Tables", "Social Lounge"];
 const MEMBERS_PER_PAGE = 10;
 const RESOURCES_PER_PAGE = 5;
@@ -174,6 +174,27 @@ export default function EventManagePage() {
   const [registrations, setRegistrations] = useState([]);
   const [registrationsLoading, setRegistrationsLoading] = useState(false);
   const [registrationsError, setRegistrationsError] = useState("");
+
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState("");
+  const [sessionEditOpen, setSessionEditOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [sessionDeleteDialogOpen, setSessionDeleteDialogOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState(null);
+  const [sessionActionLoading, setSessionActionLoading] = useState(false);
+
+  // Add Session state
+  const [addSessionOpen, setAddSessionOpen] = useState(false);
+  const [newSessionData, setNewSessionData] = useState({
+    title: "",
+    description: "",
+    session_date: "",
+    start_time: "",
+    end_time: "",
+    session_type: "main",
+  });
+  const [addSessionLoading, setAddSessionLoading] = useState(false);
 
   const [tab, setTab] = useState(0);
   const [mobileTabsOpen, setMobileTabsOpen] = useState(false);
@@ -355,6 +376,61 @@ export default function EventManagePage() {
     loadRegs();
     return () => controller.abort();
   }, [eventId, isOwner, regsRefresh]);
+
+  // ---- load sessions (owner only, for multi-day events) ----
+  useEffect(() => {
+    if (!eventId || !isOwner) return;
+
+    // Only fetch sessions if explicitly a multi-day event
+    if (event && !event.is_multi_day) return;
+
+    const token = getToken();
+    const controller = new AbortController();
+
+    const loadSessions = async () => {
+      setSessionsLoading(true);
+      setSessionsError("");
+      try {
+        const headers = {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
+
+        console.log("🔄 Fetching sessions for event:", eventId, "is_multi_day:", event?.is_multi_day);
+
+        const res = await fetch(
+          `${API_ROOT}/events/${eventId}/sessions/`,
+          { headers, signal: controller.signal }
+        );
+        const json = await res.json().catch(() => []);
+
+        console.log("📊 Sessions API response:", json, "status:", res.status);
+
+        if (!res.ok) {
+          throw new Error(json?.detail || `HTTP ${res.status}`);
+        }
+
+        let data = [];
+        if (Array.isArray(json)) {
+          data = json;
+        } else if (json && Array.isArray(json.results)) {
+          data = json.results;
+        }
+
+        console.log("✅ Sessions loaded:", data.length, "sessions");
+        setSessions(data);
+      } catch (e) {
+        if (e.name === "AbortError") return;
+        console.error("❌ Failed to load sessions:", e);
+        setSessionsError(e?.message || "Unable to load sessions");
+      } finally {
+        setSessionsLoading(false);
+      }
+    };
+
+    loadSessions();
+    return () => controller.abort();
+  }, [eventId, isOwner, event]);
 
   // ---- load MY registration (for staff/attendee view) ----
   useEffect(() => {
@@ -735,6 +811,25 @@ export default function EventManagePage() {
       toast.error(e.message);
     } finally {
       setAddParticipantLoading(false);
+    }
+  };
+
+  // ---- Refresh event after editing ----
+  const refreshEvent = async () => {
+    if (!eventId) return;
+    try {
+      const token = getToken();
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const res = await fetch(`${API_ROOT}/events/${eventId}/`, { headers });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json) {
+        setEvent(json);
+      }
+    } catch (e) {
+      console.error("Failed to refresh event:", e);
     }
   };
 
@@ -1850,6 +1945,425 @@ export default function EventManagePage() {
     );
   };
 
+  // ---- Session management handlers ----
+  const openSessionEdit = (session) => {
+    setSelectedSession(session);
+    setSessionEditOpen(true);
+  };
+
+  const closeSessionEdit = () => {
+    setSessionEditOpen(false);
+    setSelectedSession(null);
+  };
+
+  const handleSessionUpdate = async (updatedSession) => {
+    // Validate required fields
+    if (!updatedSession.title?.trim()) {
+      toast.error("Session title is required");
+      return;
+    }
+
+    if (!updatedSession.start_time || !updatedSession.end_time) {
+      toast.error("Start and end times are required");
+      return;
+    }
+
+    // Validate end time > start time
+    const startTime = new Date(updatedSession.start_time);
+    const endTime = new Date(updatedSession.end_time);
+    if (endTime <= startTime) {
+      toast.error("End time must be after start time");
+      return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    setSessionActionLoading(true);
+    try {
+      const res = await fetch(
+        `${API_ROOT}/events/${eventId}/sessions/${selectedSession.id}/`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(updatedSession),
+        }
+      );
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+
+      // Update sessions list with the updated session
+      setSessions(sessions.map(s => s.id === selectedSession.id ? json : s));
+      toast.success("Session updated successfully");
+      closeSessionEdit();
+    } catch (e) {
+      toast.error(e?.message || "Failed to update session");
+    } finally {
+      setSessionActionLoading(false);
+    }
+  };
+
+  const openDeleteSessionDialog = (session) => {
+    setSessionToDelete(session);
+    setSessionDeleteDialogOpen(true);
+  };
+
+  const closeDeleteSessionDialog = () => {
+    setSessionDeleteDialogOpen(false);
+    setSessionToDelete(null);
+  };
+
+  const handleSessionDelete = async () => {
+    const token = getToken();
+    if (!token) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    setSessionActionLoading(true);
+    try {
+      const res = await fetch(
+        `${API_ROOT}/events/${eventId}/sessions/${sessionToDelete.id}/`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+
+      // Remove session from list
+      setSessions(sessions.filter(s => s.id !== sessionToDelete.id));
+      toast.success("Session deleted successfully");
+      closeDeleteSessionDialog();
+    } catch (e) {
+      toast.error(e?.message || "Failed to delete session");
+    } finally {
+      setSessionActionLoading(false);
+    }
+  };
+
+  // ---- Helper function to validate session times ----
+  const isSessionTimeInvalid = () => {
+    if (!newSessionData.start_time || !newSessionData.end_time) {
+      return false; // Not filled yet, don't show error
+    }
+    const startTime = new Date(newSessionData.start_time);
+    const endTime = new Date(newSessionData.end_time);
+    return endTime <= startTime;
+  };
+
+  // ---- Helper function to get validation error message ----
+  const getSessionTimeErrorMessage = () => {
+    if (!newSessionData.start_time || !newSessionData.end_time) {
+      return "";
+    }
+    if (isSessionTimeInvalid()) {
+      return "End time must be after start time";
+    }
+    return "";
+  };
+
+  // ---- Add Session handler ----
+  const handleAddSession = async () => {
+    if (!newSessionData.title.trim()) {
+      toast.error("Session title is required");
+      return;
+    }
+
+    if (!newSessionData.session_date || !newSessionData.start_time || !newSessionData.end_time) {
+      toast.error("Session date and times are required");
+      return;
+    }
+
+    // Validate end time > start time
+    if (isSessionTimeInvalid()) {
+      toast.error("End time must be after start time");
+      return;
+    }
+
+    // Validate session_date matches start_time date
+    const startTimeDate = dayjs(newSessionData.start_time).format("YYYY-MM-DD");
+    if (newSessionData.session_date !== startTimeDate) {
+      toast.error("Session date must match the start time date");
+      return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    setAddSessionLoading(true);
+    try {
+      const res = await fetch(`${API_ROOT}/events/${eventId}/sessions/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newSessionData),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const errorMsg = json?.detail || json?.title?.[0] || `HTTP ${res.status}`;
+        throw new Error(errorMsg);
+      }
+
+      // Add new session to list
+      setSessions([...sessions, json]);
+      toast.success("Session created successfully");
+
+      // Reset form and close dialog
+      setNewSessionData({
+        title: "",
+        description: "",
+        session_date: "",
+        start_time: "",
+        end_time: "",
+        session_type: "main",
+      });
+      setAddSessionOpen(false);
+    } catch (e) {
+      toast.error(e?.message || "Failed to create session");
+    } finally {
+      setAddSessionLoading(false);
+    }
+  };
+
+  const renderSessions = () => {
+    // Only show for multi-day events and owners
+    if (!event?.is_multi_day) {
+      return (
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            p: { xs: 2, sm: 3 },
+            bgcolor: "background.paper",
+          }}
+        >
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+            Sessions
+          </Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Sessions are only available for multi-day events.
+          </Typography>
+        </Paper>
+      );
+    }
+
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+          p: { xs: 2, sm: 3 },
+          bgcolor: "background.paper",
+        }}
+      >
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ mb: 2 }}
+          spacing={1.5}
+        >
+          <Box>
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 600, mb: 0.25 }}
+            >
+              SESSIONS
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              All sessions scheduled for this multi-day event.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Chip
+              size="small"
+              label={sessions.length}
+              sx={{ bgcolor: "grey.100", color: "text.secondary" }}
+            />
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => setAddSessionOpen(true)}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+            >
+              Add Session
+            </Button>
+          </Stack>
+        </Stack>
+
+        {sessionsLoading ? (
+          <Box sx={{ py: 4, textAlign: "center" }}>
+            <CircularProgress size={22} />
+          </Box>
+        ) : (
+          <TableContainer
+            sx={{
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+              overflow: "hidden",
+            }}
+          >
+            <Table size="small">
+              <TableHead>
+                <TableRow
+                  sx={{
+                    bgcolor: "grey.50",
+                    "& th": { fontSize: 13, color: "text.secondary" },
+                  }}
+                >
+                  <TableCell>Date</TableCell>
+                  <TableCell>Title</TableCell>
+                  <TableCell>Time</TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    Type
+                  </TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    Status
+                  </TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {sessions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      <Typography
+                        variant="body2"
+                        sx={{ color: "text.secondary", py: 2 }}
+                      >
+                        No sessions found. Create a session to get started.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sessions
+                    .sort(
+                      (a, b) =>
+                        new Date(a.start_time) - new Date(b.start_time)
+                    )
+                    .map((session) => {
+                      const sessionDate = session.session_date
+                        ? dayjs(session.session_date).format("MMM D, YYYY")
+                        : "—";
+                      const timeRange = session.start_time && session.end_time
+                        ? `${dayjs(session.start_time).format("h:mm A")} – ${dayjs(
+                          session.end_time
+                        ).format("h:mm A")}`
+                        : "—";
+                      const statusColor =
+                        session.is_live ? "error" : "default";
+                      const statusLabel = session.is_live ? "Live" : "Scheduled";
+
+                      return (
+                        <TableRow key={session.id} hover>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {sessionDate}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {session.title}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontSize: 12 }}>
+                              {timeRange}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                            <Chip
+                              size="small"
+                              label={
+                                session.session_type
+                                  ? session.session_type
+                                    .split("_")
+                                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                                    .join(" ")
+                                  : "Main"
+                              }
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                            <Chip
+                              size="small"
+                              label={statusLabel}
+                              color={statusColor}
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => openSessionEdit(session)}
+                                disabled={sessionActionLoading}
+                                title="Edit session"
+                              >
+                                <EditRoundedIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => openDeleteSessionDialog(session)}
+                                disabled={sessionActionLoading}
+                                title="Delete session"
+                              >
+                                <DeleteOutlineRoundedIcon fontSize="small" />
+                              </IconButton>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+
+        {sessionsError && (
+          <Typography
+            variant="body2"
+            sx={{ color: "error.main", mt: 2 }}
+          >
+            {sessionsError}
+          </Typography>
+        )}
+      </Paper>
+    );
+  };
+
   const renderResources = () => (
     <Paper
       elevation={0}
@@ -2259,10 +2773,11 @@ export default function EventManagePage() {
                 <>
                   {tab === 0 && renderOverview()}
                   {tab === 1 && renderMembers()}
-                  {tab === 2 && renderResources()}
-                  {tab === 3 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                  {tab === 4 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
-                  {tab === 5 && renderLoungeSettings()}
+                  {tab === 2 && renderSessions()}
+                  {tab === 3 && renderResources()}
+                  {tab === 4 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                  {tab === 5 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                  {tab === 6 && renderLoungeSettings()}
                 </>
               ) : (
                 <>
@@ -2319,6 +2834,8 @@ export default function EventManagePage() {
             onUpdated={(updated) => {
               setEvent(updated);
               setEditOpen(false);
+              // Refresh event to ensure all fields (including is_multi_day) are latest
+              setTimeout(() => refreshEvent(), 500);
             }}
           />
         )}
@@ -2743,6 +3260,290 @@ export default function EventManagePage() {
               sx={{ textTransform: "none" }}
             >
               {addParticipantLoading ? "Adding..." : "Add"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Add Session Dialog */}
+        <Dialog
+          open={addSessionOpen}
+          onClose={() => {
+            setAddSessionOpen(false);
+            setNewSessionData({
+              title: "",
+              description: "",
+              session_date: "",
+              start_time: "",
+              end_time: "",
+              session_type: "main",
+            });
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>Create New Session</DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
+            <Stack spacing={2}>
+              <TextField
+                fullWidth
+                label="Session Title *"
+                value={newSessionData.title}
+                onChange={(e) =>
+                  setNewSessionData({ ...newSessionData, title: e.target.value })
+                }
+                size="small"
+                placeholder="e.g., Opening Keynote, Workshop, Networking"
+              />
+              <TextField
+                fullWidth
+                label="Description"
+                value={newSessionData.description}
+                onChange={(e) =>
+                  setNewSessionData({ ...newSessionData, description: e.target.value })
+                }
+                multiline
+                rows={3}
+                size="small"
+              />
+              <FormControl size="small" fullWidth>
+                <Select
+                  value={newSessionData.session_type}
+                  onChange={(e) =>
+                    setNewSessionData({ ...newSessionData, session_type: e.target.value })
+                  }
+                  label="Type"
+                >
+                  <MenuItem value="main">Main Session</MenuItem>
+                  <MenuItem value="breakout">Breakout Session</MenuItem>
+                  <MenuItem value="workshop">Workshop</MenuItem>
+                  <MenuItem value="networking">Networking</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label="Session Date *"
+                type="date"
+                value={newSessionData.session_date}
+                onChange={(e) =>
+                  setNewSessionData({ ...newSessionData, session_date: e.target.value })
+                }
+                size="small"
+                InputLabelProps={{ shrink: true }}
+                helperText="Auto-synced with start time date"
+                inputProps={{
+                  min: event?.start_time ? dayjs(event.start_time).format("YYYY-MM-DD") : "",
+                  max: event?.end_time ? dayjs(event.end_time).format("YYYY-MM-DD") : "",
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Start Time *"
+                type="datetime-local"
+                value={newSessionData.start_time ? dayjs(newSessionData.start_time).format("YYYY-MM-DDTHH:mm") : ""}
+                onChange={(e) => {
+                  // Convert local datetime string to ISO UTC datetime
+                  const localDateTime = dayjs(e.target.value, "YYYY-MM-DDTHH:mm");
+                  const utcDateTime = localDateTime.utc().toISOString();
+                  const dateStr = localDateTime.format("YYYY-MM-DD");
+                  // Auto-sync session_date with start_time date (local date)
+                  setNewSessionData({
+                    ...newSessionData,
+                    start_time: utcDateTime,
+                    session_date: dateStr
+                  });
+                }}
+                size="small"
+                InputLabelProps={{ shrink: true }}
+                helperText="Must be within event date range"
+              />
+              <TextField
+                fullWidth
+                label="End Time *"
+                type="datetime-local"
+                value={newSessionData.end_time ? dayjs(newSessionData.end_time).format("YYYY-MM-DDTHH:mm") : ""}
+                onChange={(e) => {
+                  // Convert local datetime string to ISO UTC datetime
+                  const localDateTime = dayjs(e.target.value, "YYYY-MM-DDTHH:mm");
+                  const utcDateTime = localDateTime.utc().toISOString();
+                  setNewSessionData({ ...newSessionData, end_time: utcDateTime });
+                }}
+                size="small"
+                InputLabelProps={{ shrink: true }}
+                error={isSessionTimeInvalid()}
+                helperText={getSessionTimeErrorMessage() || "Must be after start time"}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => {
+                setAddSessionOpen(false);
+                setNewSessionData({
+                  title: "",
+                  description: "",
+                  session_date: "",
+                  start_time: "",
+                  end_time: "",
+                  session_type: "main",
+                });
+              }}
+              sx={{ textTransform: "none" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSession}
+              variant="contained"
+              disabled={
+                addSessionLoading ||
+                !newSessionData.title.trim() ||
+                !newSessionData.session_date ||
+                !newSessionData.start_time ||
+                !newSessionData.end_time ||
+                isSessionTimeInvalid()
+              }
+              sx={{ textTransform: "none" }}
+            >
+              {addSessionLoading ? "Creating..." : "Create Session"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Session Edit Dialog */}
+        <Dialog
+          open={sessionEditOpen}
+          onClose={closeSessionEdit}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>Edit Session</DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
+            {selectedSession && (
+              <Stack spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Title"
+                  value={selectedSession.title}
+                  onChange={(e) =>
+                    setSelectedSession({ ...selectedSession, title: e.target.value })
+                  }
+                  size="small"
+                />
+                <TextField
+                  fullWidth
+                  label="Description"
+                  value={selectedSession.description}
+                  onChange={(e) =>
+                    setSelectedSession({ ...selectedSession, description: e.target.value })
+                  }
+                  multiline
+                  rows={3}
+                  size="small"
+                />
+                <FormControl size="small" fullWidth>
+                  <Select
+                    value={selectedSession.session_type || "main"}
+                    onChange={(e) =>
+                      setSelectedSession({ ...selectedSession, session_type: e.target.value })
+                    }
+                    label="Type"
+                  >
+                    <MenuItem value="main">Main Session</MenuItem>
+                    <MenuItem value="breakout">Breakout Session</MenuItem>
+                    <MenuItem value="workshop">Workshop</MenuItem>
+                    <MenuItem value="networking">Networking</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  fullWidth
+                  label="Session Date"
+                  type="date"
+                  value={selectedSession.session_date || ""}
+                  onChange={(e) =>
+                    setSelectedSession({ ...selectedSession, session_date: e.target.value })
+                  }
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  fullWidth
+                  label="Start Time"
+                  type="datetime-local"
+                  value={selectedSession.start_time ? dayjs(selectedSession.start_time).format("YYYY-MM-DDTHH:mm") : ""}
+                  onChange={(e) => {
+                    // Convert local datetime string to ISO UTC datetime
+                    const localDateTime = dayjs(e.target.value, "YYYY-MM-DDTHH:mm");
+                    const utcDateTime = localDateTime.utc().toISOString();
+                    const dateStr = localDateTime.format("YYYY-MM-DD");
+                    // Auto-sync session_date with start_time date (local date)
+                    setSelectedSession({
+                      ...selectedSession,
+                      start_time: utcDateTime,
+                      session_date: dateStr
+                    });
+                  }}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  helperText="Must be within event date range"
+                />
+                <TextField
+                  fullWidth
+                  label="End Time"
+                  type="datetime-local"
+                  value={selectedSession.end_time ? dayjs(selectedSession.end_time).format("YYYY-MM-DDTHH:mm") : ""}
+                  onChange={(e) => {
+                    // Convert local datetime string to ISO UTC datetime
+                    const localDateTime = dayjs(e.target.value, "YYYY-MM-DDTHH:mm");
+                    const utcDateTime = localDateTime.utc().toISOString();
+                    setSelectedSession({ ...selectedSession, end_time: utcDateTime });
+                  }}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  error={selectedSession.end_time && selectedSession.start_time && new Date(selectedSession.end_time) <= new Date(selectedSession.start_time)}
+                  helperText={selectedSession.end_time && selectedSession.start_time && new Date(selectedSession.end_time) <= new Date(selectedSession.start_time) ? "End time must be after start time" : "Must be after start time"}
+                />
+              </Stack>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={closeSessionEdit} sx={{ textTransform: "none" }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => handleSessionUpdate(selectedSession)}
+              variant="contained"
+              disabled={sessionActionLoading}
+              sx={{ textTransform: "none" }}
+            >
+              {sessionActionLoading ? "Saving..." : "Save"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Session Delete Confirmation Dialog */}
+        <Dialog
+          open={sessionDeleteDialogOpen}
+          onClose={closeDeleteSessionDialog}
+        >
+          <DialogTitle sx={{ fontWeight: 700 }}>Delete Session</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to delete the session "<strong>{sessionToDelete?.title}</strong>"?
+              This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={closeDeleteSessionDialog} sx={{ textTransform: "none" }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSessionDelete}
+              variant="contained"
+              color="error"
+              disabled={sessionActionLoading}
+              sx={{ textTransform: "none" }}
+            >
+              {sessionActionLoading ? "Deleting..." : "Delete"}
             </Button>
           </DialogActions>
         </Dialog>

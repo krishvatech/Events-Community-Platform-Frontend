@@ -59,6 +59,8 @@ import { useSecondTick } from "../utils/useGracePeriodTimer";
 import ParticipantForm from "../components/ParticipantForm";
 import ParticipantList from "../components/ParticipantList";
 import RecordVoiceOverRoundedIcon from "@mui/icons-material/RecordVoiceOverRounded";
+import SessionDialog from "../components/SessionDialog";
+import SessionList from "../components/SessionList";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -245,8 +247,11 @@ const slugify = (s) =>
     .replace(/^-+|-+$/g, "");
 const toUTCISO = (date, time, tz) => {
   if (!date || !time || !tz) return null;
-  const dt = dayjs.tz(`${date}T${time}:00`, tz);
-  return dt.isValid() ? dt.toDate().toISOString() : null;
+  const dayjsString = `${date}T${time}:00`;
+  const dt = dayjs.tz(dayjsString, tz);
+  const result = dt.isValid() ? dt.toDate().toISOString() : null;
+  // console.log("🔧 toUTCISO conversion:", { date, time, tz, dayjsString, dtValid: dt.isValid(), result });
+  return result;
 };
 
 // --- Schedule defaults: always hour-aligned (HH:00) and default duration 2 hours ---
@@ -348,6 +353,27 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [participantDialogOpen, setParticipantDialogOpen] = React.useState(false);
   const [editingParticipantIndex, setEditingParticipantIndex] = React.useState(null);
 
+  // Sessions (for multi-day events)
+  const [sessions, setSessions] = React.useState([]);
+  const [sessionDialogOpen, setSessionDialogOpen] = React.useState(false);
+  const [editingSessionIndex, setEditingSessionIndex] = React.useState(null);
+  const [actualEventStartTime, setActualEventStartTime] = React.useState(null);
+  const [actualEventEndTime, setActualEventEndTime] = React.useState(null);
+
+  // 🔴 DEBUG: Wrapper to track startTime changes
+  const originalSetStartTime = setStartTime;
+  const debugSetStartTime = (val) => {
+    console.log("🔴 setStartTime being called with:", {
+      newValue: val,
+      currentValue: startTime,
+      sessionsLength: sessions.length,
+      stack: new Error().stack
+    });
+    originalSetStartTime(val);
+  };
+  // Override setStartTime with debug version for debugging (comment out in production)
+  // const setStartTime = debugSetStartTime;
+
   const slugifyLocal = (s) =>
     (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const iso = (d, t) => (d && t ? dayjs(`${d}T${t}:00`).toISOString() : null);
@@ -364,6 +390,15 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setResPublishDate(sch.startDate);
     setResPublishTime(sch.startTime);
   }, [open]);
+
+  // 🔴 DEBUG: Log when sessions array changes
+  React.useEffect(() => {
+    console.log("🔴 sessions array changed. Current state:", {
+      sessions: sessions.map(s => ({ title: s.title, _startTime: s._startTime, _endTime: s._endTime })),
+      formStartTime: startTime,
+      formEndTime: endTime,
+    });
+  }, [sessions]);
 
   // 🔹 NEW: reset all fields back to defaults after successful create
   const resetForm = () => {
@@ -415,6 +450,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setParticipantDialogOpen(false);
     setEditingParticipantIndex(null);
 
+    // Sessions
+    setSessions([]);
+    setSessionDialogOpen(false);
+    setEditingSessionIndex(null);
+    setActualEventStartTime(null);
+    setActualEventEndTime(null);
+
     setErrors({});
   };
 
@@ -454,6 +496,18 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (!validate()) return;
     setSubmitting(true);
 
+    // 🔴 CRITICAL FIX: Create immutable string copies IMMEDIATELY
+    // This prevents any async state changes from affecting our values
+    const safeStartDate = String(startDate);
+    const safeStartTime = String(startTime);
+    const safeEndDate = String(endDate);
+    const safeEndTime = String(endTime);
+    const safeTimezone = String(timezone);
+
+    console.log("🔴 SAFE COPIES CREATED (immutable):", {
+      safeStartDate, safeStartTime, safeEndDate, safeEndTime, safeTimezone
+    });
+
     const fd = new FormData();
     fd.append("community_id", String(communityId));
     fd.append("status", "published");
@@ -467,9 +521,24 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("format", format);
     fd.append("price", String(isFree ? 0 : (price ?? 0)));
     fd.append("is_free", String(isFree));
-    fd.append("timezone", timezone);
-    fd.append("start_time", toUTCISO(startDate, startTime, timezone));
-    fd.append("end_time", toUTCISO(endDate, endTime, timezone));
+    fd.append("is_multi_day", String(isMultiDay));
+    fd.append("timezone", safeTimezone);
+
+    // DEBUG: Log exact state values before conversion
+    const startISO = toUTCISO(safeStartDate, safeStartTime, safeTimezone);
+    const endISO = toUTCISO(safeEndDate, safeEndTime, safeTimezone);
+    console.log("🔍 Form Submission Debug - Using SAFE values:", {
+      safeStartDate,
+      safeStartTime,
+      safeEndDate,
+      safeEndTime,
+      safeTimezone,
+      startISO,
+      endISO,
+    });
+
+    fd.append("start_time", startISO);
+    fd.append("end_time", endISO);
     fd.append("recording_url", "");
 
     if (replayAvailable) {
@@ -536,6 +605,18 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     }
 
     try {
+      // DEBUG: Log FormData contents before sending to backend
+      console.log("🚀 FINAL FormData being sent to backend:", {
+        start_time_value: fd.get("start_time"),
+        end_time_value: fd.get("end_time"),
+        title: fd.get("title"),
+        timezone: fd.get("timezone"),
+        safe_startDate: safeStartDate,
+        safe_startTime: safeStartTime,
+        safe_endDate: safeEndDate,
+        safe_endTime: safeEndTime,
+      });
+
       const res = await fetch(`${API_ROOT}/events/`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -553,8 +634,81 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         throw new Error(msg);
       }
 
+      const eventId = json.id;
+
+      // Store actual event times from database for session validation
+      setActualEventStartTime(json.start_time);
+      setActualEventEndTime(json.end_time);
+
+      // Log event times for debugging
+      console.log("Event created with times:", {
+        startTime: json.start_time,
+        endTime: json.end_time,
+        timezone: json.timezone,
+      });
+      console.log("Session times being sent:", sessions.map(s => ({
+        title: s.title,
+        startTime: s.startTime,
+        endTime: s.endTime,
+      })));
+
+      // Create sessions if this is a multi-day event
+      if (isMultiDay && sessions.length > 0) {
+        for (let idx = 0; idx < sessions.length; idx++) {
+          const session = sessions[idx];
+          const sessionPayload = {
+            title: session.title,
+            description: session.description,
+            session_date: session.startDate,
+            start_time: session.startTime,
+            end_time: session.endTime,
+            session_type: session.sessionType,
+            display_order: idx,
+            use_parent_meeting: true, // By default, use parent event's meeting
+          };
+
+          console.log(`📤 Session ${idx} payload being sent:`, {
+            title: session.title,
+            start_time: session.startTime,
+            end_time: session.endTime,
+            eventStart: json.start_time,
+            eventEnd: json.end_time,
+          });
+
+          const sessionRes = await fetch(`${API_ROOT}/events/${eventId}/sessions/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(sessionPayload),
+          });
+
+          const sessionJson = await sessionRes.json().catch(() => ({}));
+          if (!sessionRes.ok) {
+            console.error(`Failed to create session ${idx}:`, sessionJson);
+
+            // Extract validation error messages
+            let errorMsg = `Failed to create session: ${session.title}`;
+            if (sessionJson && typeof sessionJson === 'object') {
+              const errors = Object.entries(sessionJson)
+                .map(([key, value]) => {
+                  const msg = Array.isArray(value) ? value.join(", ") : value;
+                  return `${key}: ${msg}`;
+                })
+                .join(" | ");
+              if (errors) errorMsg = errors;
+            }
+            throw new Error(errorMsg);
+          }
+        }
+      }
+
       onCreated?.(json);
-      setToast({ open: true, type: "success", msg: "Event created. Resources attached." });
+      const msg = isMultiDay && sessions.length > 0
+        ? `Event created with ${sessions.length} session(s). Resources attached.`
+        : "Event created. Resources attached.";
+      setToast({ open: true, type: "success", msg });
 
       // 🔹 CLEAR FORM FOR NEXT TIME
       resetForm();
@@ -1076,15 +1230,13 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 value={startDate}
                 onChange={(e) => {
                   const v = e.target.value;
+                  console.log("📅 Start Date Changed:", { previousStartDate: startDate, newStartDate: v, isMultiDay });
                   setStartDate(v);
-                  if (isMultiDay) {
-                    const next = computeEndFromStart(v, startTime, 2);
-                    setEndDate(next.endDate);
-                    setEndTime(next.endTime);
-                  } else {
+                  if (!isMultiDay) {
                     // Single day: force end date same as start
                     setEndDate(v);
                   }
+                  // Removed auto-calculation for multi-day to let user set times manually
                 }}
                 fullWidth
                 InputLabelProps={{ shrink: true }}
@@ -1096,7 +1248,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Grid>
             {isMultiDay && (
               <Grid item xs={12} md={6}>
-                <TextField label="End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} fullWidth
+                <TextField label="End Date" type="date" value={endDate} onChange={(e) => {
+                  const v = e.target.value;
+                  console.log("📅 End Date Changed:", { previousEndDate: endDate, newEndDate: v });
+                  setEndDate(v);
+                }} fullWidth
                   InputLabelProps={{ shrink: true }}
                   InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
                   // 🔻 show error when end < start
@@ -1113,10 +1269,15 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 <TimePicker label="Start time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${startTime}`)}
                   onChange={(v) => {
                     const newStart = v ? dayjs(v).second(0).format("HH:mm") : startTime;
+                    console.log("⏰ Start Time Changed:", {
+                      dayjsValue: v ? dayjs(v).toString() : null,
+                      previousStartTime: startTime,
+                      newStartTime: newStart,
+                      formatted: v ? dayjs(v).second(0).format("HH:mm") : "null"
+                    });
+                    console.trace("🔴 setStartTime STACK TRACE:");
                     setStartTime(newStart);
-                    const next = computeEndFromStart(startDate, newStart, 2);
-                    setEndDate(next.endDate);
-                    setEndTime(next.endTime);
+                    // Removed auto-calculation to let user set times manually
                   }}
                   slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
@@ -1126,10 +1287,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 <TimePicker label="End time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${endTime}`)}
                   onChange={(v) => {
                     const newEnd = v ? dayjs(v).second(0).format("HH:mm") : endTime;
+                    console.log("⏰ End Time Changed:", {
+                      dayjsValue: v ? dayjs(v).toString() : null,
+                      previousEndTime: endTime,
+                      newEndTime: newEnd,
+                      formatted: v ? dayjs(v).second(0).format("HH:mm") : "null"
+                    });
                     setEndTime(newEnd);
-                    if (startDate && endDate && startDate === endDate && newEnd <= startTime) {
-                      setEndDate(dayjs(startDate).add(1, "day").format("YYYY-MM-DD"));
-                    }
+                    // Removed auto-date-advancement logic to give user full control
                   }}
                   slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
@@ -1151,6 +1316,51 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Grid>
           </Grid>
         </Paper>
+
+        {/* ===== Sessions (Multi-Day Events) ===== */}
+        {isMultiDay && (
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
+            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <CalendarMonthRoundedIcon color="action" />
+                <Typography variant="h6" className="font-semibold">
+                  Sessions
+                </Typography>
+              </Stack>
+              <Button
+                size="small"
+                startIcon={<AddRoundedIcon />}
+                onClick={() => {
+                  setEditingSessionIndex(null);
+                  setSessionDialogOpen(true);
+                }}
+                sx={{ backgroundColor: "#10b8a6", color: "white", "&:hover": { backgroundColor: "#0ea5a4" } }}
+              >
+                Add Session
+              </Button>
+            </Stack>
+
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              Break your multi-day event into individual sessions
+            </Typography>
+
+            {sessions.length > 0 && (
+              <Box mb={2}>
+                <SessionList
+                  sessions={sessions}
+                  onEdit={(session, idx) => {
+                    setEditingSessionIndex(idx);
+                    setSessionDialogOpen(true);
+                  }}
+                  onDelete={(session, idx) => {
+                    setSessions(prev => prev.filter((_, i) => i !== idx));
+                    setToast({ open: true, type: "success", msg: "Session removed" });
+                  }}
+                />
+              </Box>
+            )}
+          </Paper>
+        )}
 
         {/* ===== Speakers & Hosts ===== */}
         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
@@ -1409,6 +1619,49 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         }
         existingParticipants={participants}
       />
+
+      {/* Session Dialog */}
+      <SessionDialog
+        open={sessionDialogOpen}
+        onClose={() => {
+          setSessionDialogOpen(false);
+          setEditingSessionIndex(null);
+        }}
+        onSubmit={(sessionData) => {
+          console.log("🟢 SessionDialog onSubmit called with sessionData:", {
+            title: sessionData.title,
+            _startTime: sessionData._startTime,
+            _endTime: sessionData._endTime,
+            startTime: sessionData.startTime,
+            endTime: sessionData.endTime,
+          });
+          if (editingSessionIndex !== null) {
+            // Edit existing
+            setSessions(prev => prev.map((s, i) =>
+              i === editingSessionIndex ? sessionData : s
+            ));
+            setToast({ open: true, type: "success", msg: "Session updated" });
+          } else {
+            // Add new
+            console.log("🟢 Adding new session. Current startTime before setSessions:", startTime);
+            setSessions(prev => {
+              console.log("🟢 Inside setSessions callback. startTime is:", startTime);
+              return [...prev, sessionData];
+            });
+            setToast({ open: true, type: "success", msg: "Session added" });
+          }
+          setSessionDialogOpen(false);
+          setEditingSessionIndex(null);
+        }}
+        initialData={
+          editingSessionIndex !== null
+            ? sessions[editingSessionIndex]
+            : null
+        }
+        eventStartTime={actualEventStartTime || toUTCISO(startDate, startTime, timezone)}
+        eventEndTime={actualEventEndTime || toUTCISO(endDate, endTime, timezone)}
+        timezone={timezone}
+      />
     </Dialog>
   );
 }
@@ -1464,6 +1717,11 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const [participants, setParticipants] = useState([]);
   const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
   const [editingParticipantIndex, setEditingParticipantIndex] = useState(null);
+
+  // Sessions (for multi-day events)
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState("");
 
   // image handling - Update Logo / Picture (original branding image)
   const [logoImageFile, setLogoImageFile] = useState(null);
@@ -1613,6 +1871,49 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
       cancelled = true;
     };
   }, [open, event?.id, token, normalizeParticipantsFromEvent]);
+
+  // Fetch sessions for multi-day events
+  useEffect(() => {
+    if (!open || !event?.id || !isMultiDay) return;
+
+    let cancelled = false;
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    const loadSessions = async () => {
+      setSessionsLoading(true);
+      setSessionsError("");
+      try {
+        const res = await fetch(`${API_ROOT}/events/${event.id}/sessions/`, { headers });
+        const json = await res.json().catch(() => []);
+        if (!res.ok) {
+          setSessionsError(json?.detail || "Failed to load sessions");
+          return;
+        }
+        if (cancelled) return;
+
+        let data = [];
+        if (Array.isArray(json)) {
+          data = json;
+        } else if (json && Array.isArray(json.results)) {
+          data = json.results;
+        }
+        setSessions(data);
+      } catch (err) {
+        console.error("Error loading sessions:", err);
+        setSessionsError(err?.message || "Unable to load sessions");
+      } finally {
+        setSessionsLoading(false);
+      }
+    };
+
+    loadSessions();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, event?.id, token, isMultiDay]);
 
   const slugifyLocal = (s) =>
     (s || "")
@@ -2236,47 +2537,108 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
               </Grid>
             </Grid>
 
-            {/* ===== Speakers & Hosts ===== */}
-            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-              <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-                <RecordVoiceOverRoundedIcon color="action" />
-                <Typography variant="h6" className="font-semibold">
-                  Speakers & Hosts
-                </Typography>
-              </Stack>
+            {/* ===== Sessions & Speakers Layout ===== */}
+            <Grid container spacing={2}>
+              {/* ===== Sessions (Multi-day Events) ===== */}
+              {isMultiDay && (
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 h-full" sx={{ display: "flex", flexDirection: "column" }}>
+                    <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                      <CalendarMonthRoundedIcon color="action" />
+                      <Typography variant="h6" className="font-semibold">
+                        Sessions
+                      </Typography>
+                    </Stack>
 
-              <Typography variant="body2" color="text.secondary" mb={2}>
-                Add speakers, moderators, or hosts for this event
-              </Typography>
+                    <Typography variant="body2" color="text.secondary" mb={2}>
+                      Sessions scheduled for this multi-day event
+                    </Typography>
 
-              {participants.length > 0 && (
-                <Box mb={2}>
-                  <ParticipantList
-                    participants={participants}
-                    onEdit={(p, idx) => {
-                      setEditingParticipantIndex(idx);
-                      setParticipantDialogOpen(true);
-                    }}
-                    onRemove={(p, idx) => {
-                      setParticipants(prev => prev.filter((_, i) => i !== idx));
-                      setToast({ open: true, type: "success", msg: "Participant removed" });
-                    }}
-                  />
-                </Box>
+                    {sessionsLoading ? (
+                      <Box sx={{ py: 2, textAlign: "center" }}>
+                        <CircularProgress size={20} />
+                      </Box>
+                    ) : sessionsError ? (
+                      <Typography variant="body2" color="error" mb={2}>
+                        {sessionsError}
+                      </Typography>
+                    ) : sessions.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" mb={2}>
+                        No sessions created yet. Go to the Sessions tab to create one.
+                      </Typography>
+                    ) : (
+                      <Box mb={2} sx={{ overflowY: "auto", maxHeight: "300px", pr: 1.5, "&::-webkit-scrollbar": { width: "6px" }, "&::-webkit-scrollbar-track": { bgcolor: "transparent" }, "&::-webkit-scrollbar-thumb": { bgcolor: "#ccc", borderRadius: "3px" } }}>
+                        {sessions.map((session, idx) => (
+                          <Box key={idx} sx={{ p: 2, mb: 1.5, border: "1px solid #ddd", borderRadius: 1, bgcolor: "#fafafa" }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: "#333" }}>
+                              {session.title}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "#888", display: "block", mb: 0.5 }}>
+                              {dayjs(session.session_date).format("MMM DD, YYYY")} • {dayjs(session.start_time).format("h:mm A")} - {dayjs(session.end_time).format("h:mm A")}
+                            </Typography>
+                            {session.description && (
+                              <Typography variant="caption" sx={{ color: "#999", display: "block", mb: 0.75 }}>
+                                {session.description}
+                              </Typography>
+                            )}
+                            <Chip
+                              label={session.session_type || "main"}
+                              size="small"
+                              variant="outlined"
+                              sx={{ height: 22, fontSize: "0.7rem", textTransform: "lowercase" }}
+                            />
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Paper>
+                </Grid>
               )}
 
-              <Button
-                variant="outlined"
-                startIcon={<AddRoundedIcon />}
-                onClick={() => {
-                  setEditingParticipantIndex(null);
-                  setParticipantDialogOpen(true);
-                }}
-                fullWidth
-              >
-                Add Participant
-              </Button>
-            </Paper>
+              {/* ===== Speakers & Hosts ===== */}
+              <Grid size={{ xs: 12, md: isMultiDay ? 6 : 12 }}>
+                <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 h-full" sx={{ display: "flex", flexDirection: "column" }}>
+                  <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                    <RecordVoiceOverRoundedIcon color="action" />
+                    <Typography variant="h6" className="font-semibold">
+                      Speakers & Hosts
+                    </Typography>
+                  </Stack>
+
+                  <Typography variant="body2" color="text.secondary" mb={2}>
+                    Add speakers, moderators, or hosts for this event
+                  </Typography>
+
+                  {participants.length > 0 && (
+                    <Box mb={2} sx={{ overflowY: "auto", maxHeight: "400px" }}>
+                      <ParticipantList
+                        participants={participants}
+                        onEdit={(p, idx) => {
+                          setEditingParticipantIndex(idx);
+                          setParticipantDialogOpen(true);
+                        }}
+                        onRemove={(p, idx) => {
+                          setParticipants(prev => prev.filter((_, i) => i !== idx));
+                          setToast({ open: true, type: "success", msg: "Participant removed" });
+                        }}
+                      />
+                    </Box>
+                  )}
+
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddRoundedIcon />}
+                    onClick={() => {
+                      setEditingParticipantIndex(null);
+                      setParticipantDialogOpen(true);
+                    }}
+                    fullWidth
+                  >
+                    Add Participant
+                  </Button>
+              </Paper>
+            </Grid>
+            </Grid>
           </Grid>
         </DialogContent>
 
