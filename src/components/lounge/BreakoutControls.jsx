@@ -45,9 +45,11 @@ export default function BreakoutControls({
             alert("Please select a room");
             return;
         }
+        const userIdsArray = Array.from(selectedParticipants);
+        console.log("[BreakoutControls] Assigning users:", userIdsArray, "to room:", selectedRoom);
         onAction({
             action: 'manual_assign',
-            user_ids: Array.from(selectedParticipants),
+            user_ids: userIdsArray,
             table_id: selectedRoom
         });
         setSelectedParticipants(new Set());

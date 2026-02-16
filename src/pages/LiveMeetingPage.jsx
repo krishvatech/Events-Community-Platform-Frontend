@@ -4026,10 +4026,16 @@ export default function NewLiveMeeting() {
           console.log("[MainSocket] Breakout restore failed:", msg.message);
           showSnackbar(msg.message || "Your previous breakout room is no longer available", "warning");
         } else if (msg.type === "server_debug") {
-          // Show a toast or console log if host
+          // Show debug message to host
+          console.log("[SERVER_DEBUG]", msg.message);
           if (isHost) {
-            console.log("[SERVER_DEBUG]", msg.message);
+            // Show as both state and snackbar for better visibility
             setServerDebugMessage(msg.message);
+            // Determine severity based on message content
+            const severity = msg.message.includes("❌") || msg.message.includes("Error") || msg.message.includes("failed") ? "error"
+                           : msg.message.includes("✅") || msg.message.includes("Success") ? "success"
+                           : "info";
+            showSnackbar(msg.message, severity);
             // Clear message after 10 seconds
             setTimeout(() => setServerDebugMessage(""), 10000);
           }
@@ -4268,6 +4274,11 @@ export default function NewLiveMeeting() {
       }
     };
 
+    ws.onerror = (err) => {
+      console.error("[MainSocket] Error:", err);
+      console.warn("[MainSocket] Pending actions will be retried on reconnect:", pendingMainSocketActionsRef.current.length);
+    };
+
     ws.onclose = (e) => {
       console.log("[MainSocket] Disconnected");
       console.log("[MainSocket] Close event:", {
@@ -4275,11 +4286,13 @@ export default function NewLiveMeeting() {
         reason: e.reason,
         wasClean: e.wasClean,
         eventId: eventId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        pendingActions: pendingMainSocketActionsRef.current.length
       });
       mainSocketRef.current = null;
       mainSocketReadyRef.current = false;
-      pendingMainSocketActionsRef.current = [];
+      // ✅ IMPORTANT: Keep pending actions so they can be sent when socket reconnects
+      // DO NOT clear pendingMainSocketActionsRef.current here
     };
 
     return () => {
@@ -6529,12 +6542,24 @@ export default function NewLiveMeeting() {
         if (dyteMeeting?.self?.id && p.id === dyteMeeting.self.id) return false;
         return true;
       })
-      .map((p) => ({
-        user_id: p.id,
-        full_name: p.name,
-        username: p.name,
-        email: p._raw?.email || p._raw?.user_email || "",
-      }));
+      .map((p) => {
+        // Extract the actual database user_id from the participant metadata
+        const databaseUserId =
+          p._raw?.customParticipantId ||
+          p._raw?.userId ||
+          p._raw?.user_id ||
+          p.clientSpecificId ||
+          p.userId ||
+          parseInt(p.id) || // Fallback to parsed participant ID
+          p.id;
+
+        return {
+          user_id: databaseUserId,  // ✅ Use actual database user ID
+          full_name: p.name,
+          username: p.name,
+          email: p._raw?.email || p._raw?.user_email || "",
+        };
+      });
   }, [participants, dyteMeeting?.self?.id]);
 
   const breakoutParticipantCount = useMemo(() => {
@@ -12441,6 +12466,7 @@ export default function NewLiveMeeting() {
           open={isBreakoutControlsOpen}
           onClose={() => setIsBreakoutControlsOpen(false)}
           onAction={(data) => {
+            console.log("[BreakoutControls] Action received:", data);
             if (data?.action === "speed_networking_start") {
               // Legacy/confusing call - redirecting or ignoring.
               // Ideally we shouldn't receive this from current UI anymore.
@@ -12451,7 +12477,16 @@ export default function NewLiveMeeting() {
               stopSpeedNetworking({ announce: true }); // We can keep stop functionality just in case
               return;
             }
-            sendMainSocketAction(data);
+
+            // ✅ Send action and provide feedback
+            const sent = sendMainSocketAction(data);
+            if (sent) {
+              console.log("[BreakoutControls] Action sent successfully:", data.action);
+              showSnackbar(`${data.action === "manual_assign" ? "Assigning participant..." : "Processing..."} `, "info");
+            } else {
+              console.warn("[BreakoutControls] Action queued or failed:", data.action);
+              showSnackbar(`Action queued. Will send when connection is ready.`, "warning");
+            }
           }}
           onlineCount={availableParticipantsForAssign.length}
           onlineUsers={availableParticipantsForAssign}
