@@ -214,6 +214,7 @@ function toCard(ev) {
     live_ended_at: ev.live_ended_at,
     show_participants_before_event: ev.show_participants_before_event,
     show_participants_after_event: ev.show_participants_after_event,
+    timezone: ev.timezone,
   };
 }
 
@@ -255,6 +256,25 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const isPreEventLounge = isPreEventLoungeOpen(ev);
   const isPostEventLounge = isPostEventLoungeOpen(ev);
   const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+
+  // Timezone logic
+  const organizerTimezone = ev.timezone;
+  const timeFormat = "h:mm A";
+  const dateFormat = "MMM D, YYYY";
+
+  const orgStartObj = (ev.start && organizerTimezone) ? dayjs(ev.start).tz(organizerTimezone) : dayjs(ev.start);
+  const orgEndObj = (ev.end && organizerTimezone) ? dayjs(ev.end).tz(organizerTimezone) : dayjs(ev.end);
+  const orgDateStr = orgStartObj.format(dateFormat);
+  const orgTimeRangeKey = `${orgStartObj.format(timeFormat)} – ${orgEndObj.format(timeFormat)}`;
+
+  const localStartObj = dayjs(ev.start).local();
+  const localEndObj = dayjs(ev.end).local();
+  const localDateStr = localStartObj.format(dateFormat);
+  const localTimeRangeKey = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
+
+  const userTimezoneName = dayjs.tz.guess();
+  const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
+  const showYourTime = ev.event_format === 'virtual' && organizerTimezone && timesDiffer;
 
   const handleRegisterCard = async () => {
     const token =
@@ -368,12 +388,24 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               <CalendarMonthIcon fontSize="small" className="text-teal-700" />
               {dayjs(ev.start).format("MMMM D, YYYY")}
             </span>
-            {ev.end && (
-              <span className="inline-flex items-center gap-2">
-                <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                {dayjs(ev.start).format("h:mm A")} – {dayjs(ev.end).format("h:mm A")}
+            <span className="inline-flex items-center gap-2">
+              <AccessTimeIcon fontSize="small" className="text-teal-700" />
+              <span>
+                {/* Primary: Organizer Time + Location */}
+                <span className="block font-medium text-neutral-900">
+                  {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
+                </span>
+
+                {/* Secondary: Your Time */}
+                {showYourTime && (
+                  <span className="block mt-1.5 text-xs text-neutral-600">
+                    <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                    {localDateStr} {localTimeRangeKey}
+                    <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
+                  </span>
+                )}
               </span>
-            )}
+            </span>
           </div>
 
           {ev.location && (
@@ -528,6 +560,26 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const isPostEventLounge = isPostEventLoungeOpen(ev);
   const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
 
+  // Timezone logic
+  // Timezone logic
+  const organizerTimezone = ev.timezone;
+  const timeFormat = "h:mm A";
+  const dateFormat = "MMM D, YYYY";
+
+  const orgStartObj = (ev.start && organizerTimezone) ? dayjs(ev.start).tz(organizerTimezone) : dayjs(ev.start);
+  const orgEndObj = (ev.end && organizerTimezone) ? dayjs(ev.end).tz(organizerTimezone) : dayjs(ev.end);
+  const orgDateStr = orgStartObj.format(dateFormat);
+  const orgTimeRangeKey = `${orgStartObj.format(timeFormat)} – ${orgEndObj.format(timeFormat)}`;
+
+  const localStartObj = dayjs(ev.start).local();
+  const localEndObj = dayjs(ev.end).local();
+  const localDateStr = localStartObj.format(dateFormat);
+  const localTimeRangeKey = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
+
+  const userTimezoneName = dayjs.tz.guess();
+  const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
+  const showYourTime = ev.event_format === 'virtual' && organizerTimezone && timesDiffer;
+
   const handleRegisterRow = async () => {
     const token =
       localStorage.getItem("access_token") ||
@@ -641,8 +693,21 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                 {ev.end && (
                   <span className="inline-flex items-center gap-2">
                     <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                    {dayjs(ev.start).format("h:mm A")} -{" "}
-                    {dayjs(ev.end).format("h:mm A")}
+                    <span>
+                      {/* Primary: Organizer Time + Location */}
+                      <span className="block font-medium text-neutral-900">
+                        {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
+                      </span>
+
+                      {/* Secondary: Your Time */}
+                      {showYourTime && (
+                        <span className="block mt-1.5 text-xs text-neutral-600">
+                          <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                          {localDateStr} {localTimeRangeKey}
+                          <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
+                        </span>
+                      )}
+                    </span>
                   </span>
                 )}
 
