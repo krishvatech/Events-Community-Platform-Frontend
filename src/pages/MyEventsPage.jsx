@@ -23,6 +23,7 @@ import Grid from '@mui/material/Grid';
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
+import { useJoinLiveState } from "../utils/sessionJoinLogic";
 
 // ---------------------- API base + helpers (kept) ----------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -116,10 +117,34 @@ function statusChip(status) {
 
 // ---------------------- Event Card (kept, with small MOD) ----------------------
 function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJoining, hideStatusChip }) {
-  const status = computeStatus(ev);
-  const chip = statusChip(status);
+  console.log(`[EventCard] Rendering event ${ev.id} (${ev.title}), is_multi_day=${ev.is_multi_day}`);
+
   const [imgFailed, setImgFailed] = useState(false);
   const isHost = Boolean(reg?.is_host);
+
+  // ✅ NEW: Use session-based join logic for multi-day events
+  console.log(`[EventCard] Event ${ev.id} input data:`, {
+    is_multi_day: ev.is_multi_day,
+    has_sessions: !!ev.sessions,
+    sessions_count: ev.sessions?.length,
+    sessions: ev.sessions,
+  });
+  const joinState = useJoinLiveState(ev);
+  console.log(`[EventCard] Event ${ev.id} joinState:`, joinState);
+
+  // For multi-day events, determine status from joinState instead of computeStatus
+  let status = computeStatus(ev);
+  if (ev.is_multi_day && joinState) {
+    // Map joinState status to display status
+    if (joinState.status === "in_session" || joinState.status === "session_starting_soon") {
+      status = "live";
+    } else if (joinState.status === "waiting_for_session") {
+      status = "upcoming";
+    } else if (joinState.status === "event_ended") {
+      status = "past";
+    }
+  }
+  const chip = statusChip(status);
 
   return (
     <Paper
@@ -216,7 +241,38 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
             const isPreEventLounge = isPreEventLoungeOpen(ev);
             const canShowActiveJoin = isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
 
-            // 1) LIVE or within 15 min before start → active Join button
+            // ✅ NEW: For multi-day events with sessions, use session-based logic
+            // For single-day events, use existing logic
+            if (ev.is_multi_day) {
+              console.log(`[EventCard] Event ${ev.id}: is_multi_day=true, joinState=`, joinState);
+              if (joinState) {
+                console.log(`[EventCard] Event ${ev.id}: Using session-based join logic:`, joinState.buttonText);
+                // Multi-day event: show session-based button
+                return (
+                  <Button
+                    onClick={() => onJoinLive?.(ev, isHost, joinState.sessionId)}
+                    disabled={isJoining || !joinState.enabled}
+                    variant={joinState.enabled ? "contained" : "outlined"}
+                    sx={{
+                      textTransform: "none",
+                      backgroundColor: joinState.enabled ? "#10B8A6" : undefined,
+                      "&:hover": { backgroundColor: joinState.enabled ? "#0EA5A4" : undefined },
+                      py: 0.5,
+                      px: 1.25,
+                      borderRadius: 2,
+                    }}
+                  >
+                    {isHost && joinState.enabled
+                      ? (isJoining ? "Opening Host Access..." : "Join as Host")
+                      : (isJoining ? `${joinState.buttonText}...` : joinState.buttonText)}
+                  </Button>
+                );
+              } else {
+                console.warn(`[EventCard] Event ${ev.id}: is_multi_day=true but joinState is undefined!`);
+              }
+            }
+
+            // 1) LIVE or within 15 min before start → active Join button (SINGLE-DAY EVENTS)
             if (canShowActiveJoin) {
               return (
                 <Button
