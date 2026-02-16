@@ -2541,7 +2541,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
             <Grid container spacing={2}>
               {/* ===== Sessions (Multi-day Events) ===== */}
               {isMultiDay && (
-                <Grid size={{ xs: 12, md: 6 }}>
+                <Grid size={{ xs: 12 }}>
                   <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 h-full" sx={{ display: "flex", flexDirection: "column" }}>
                     <Stack direction="row" alignItems="center" spacing={1} mb={2}>
                       <CalendarMonthRoundedIcon color="action" />
@@ -2596,7 +2596,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
               )}
 
               {/* ===== Speakers & Hosts ===== */}
-              <Grid size={{ xs: 12, md: isMultiDay ? 6 : 12 }}>
+              <Grid size={{ xs: 12 }}>
                 <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 h-full" sx={{ display: "flex", flexDirection: "column" }}>
                   <Stack direction="row" alignItems="center" spacing={1} mb={2}>
                     <RecordVoiceOverRoundedIcon color="action" />
