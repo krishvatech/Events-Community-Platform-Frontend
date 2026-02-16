@@ -41,7 +41,7 @@ import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
 import { apiClient } from "../utils/api";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
-import { getNextUpcomingSession } from "../utils/timezoneUtils";
+import { getNextUpcomingSession, formatSessionTimeRange } from "../utils/timezoneUtils";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -409,17 +409,42 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         <span className="block font-medium text-neutral-900 mb-1">
                           {ev.location || "Virtual"}
                         </span>
-                        {/* Show next upcoming session */}
+                        {/* Show next upcoming session with timezone handling */}
                         {(() => {
-                          const nextSession = getNextUpcomingSession(ev, ev.timezone);
-                          return nextSession ? (
-                            <span className="block text-xs text-neutral-600" style={{ lineHeight: 1.4 }}>
-                              {nextSession}
-                            </span>
-                          ) : (
-                            <span className="block text-xs text-neutral-600">
-                              All sessions completed
-                            </span>
+                          // Find next upcoming session
+                          const now = new Date();
+                          const nextSession = ev.sessions.find(s => new Date(s.end_time) > now);
+
+                          if (!nextSession) {
+                            return (
+                              <span className="block text-xs text-neutral-600">
+                                All sessions completed
+                              </span>
+                            );
+                          }
+
+                          const sessionTimeRange = formatSessionTimeRange(
+                            nextSession.start_time,
+                            nextSession.end_time,
+                            ev.timezone
+                          );
+
+                          return (
+                            <>
+                              {/* Primary: Organizer Time */}
+                              <span className="block text-xs font-medium text-neutral-900" style={{ lineHeight: 1.4 }}>
+                                {sessionTimeRange.primary}
+                              </span>
+
+                              {/* Secondary: Your Time */}
+                              {sessionTimeRange.secondary && (
+                                <span className="block mt-1 text-xs text-neutral-600">
+                                  <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                                  {sessionTimeRange.secondary.label.replace('Your Time: ', '')}
+                                  <span className="text-neutral-400 ml-1">({sessionTimeRange.secondary.timezone})</span>
+                                </span>
+                              )}
+                            </>
                           );
                         })()}
                       </div>

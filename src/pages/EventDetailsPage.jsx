@@ -27,7 +27,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import { getNextUpcomingSession } from "../utils/timezoneUtils";
+import { formatSessionTimeRange } from "../utils/timezoneUtils";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -475,15 +475,55 @@ export default function EventDetailsPage() {
                                   </Typography>
                                 </Box>
                                 {(() => {
-                                  const nextSession = getNextUpcomingSession(event, event.timezone);
-                                  return nextSession ? (
-                                    <Typography variant="body2" sx={{ fontSize: '0.875rem', ml: 3.5 }}>
-                                      {nextSession}
-                                    </Typography>
-                                  ) : (
-                                    <Typography variant="body2" sx={{ fontSize: '0.875rem', ml: 3.5, color: 'text.secondary' }}>
-                                      All sessions completed
-                                    </Typography>
+                                  // Find the next upcoming session
+                                  const now = new Date();
+                                  const nextSession = event.sessions?.find(s => {
+                                    const endTime = new Date(s.end_time);
+                                    return endTime > now;
+                                  });
+
+                                  if (!nextSession) {
+                                    return (
+                                      <Typography variant="body2" sx={{ fontSize: '0.875rem', ml: 3.5, color: 'text.secondary' }}>
+                                        All sessions completed
+                                      </Typography>
+                                    );
+                                  }
+
+                                  // Format session times with timezone handling
+                                  const sessionTimeRange = formatSessionTimeRange(
+                                    nextSession.start_time,
+                                    nextSession.end_time,
+                                    event.timezone
+                                  );
+
+                                  return (
+                                    <>
+                                      {/* Primary: Organizer Time */}
+                                      <Typography variant="body2" sx={{ fontSize: '0.875rem', ml: 3.5, fontWeight: 500 }}>
+                                        {sessionTimeRange.primary}
+                                      </Typography>
+
+                                      {/* Secondary: Your Time */}
+                                      {sessionTimeRange.secondary && (
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            display: 'block',
+                                            ml: 3.5,
+                                            mt: 0.5,
+                                            fontSize: '0.8rem',
+                                            color: '#4b5563'
+                                          }}
+                                        >
+                                          <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span>{" "}
+                                          {sessionTimeRange.secondary.label.replace('Your Time: ', '')}
+                                          <span style={{ color: '#9ca3af', marginLeft: '4px' }}>
+                                            ({sessionTimeRange.secondary.timezone})
+                                          </span>
+                                        </Typography>
+                                      )}
+                                    </>
                                   );
                                 })()}
                               </Box>

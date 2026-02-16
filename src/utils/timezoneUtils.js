@@ -85,6 +85,59 @@ export const getSessionTimesDisplay = (event, organizerTimezone, separator = "\n
 };
 
 /**
+ * Formats a session time with both organizer timezone and user's local timezone
+ * Returns object with primary (organizer) and secondary (user local) time display
+ *
+ * @param {string} sessionStartTime - Session start time (ISO format)
+ * @param {string} sessionEndTime - Session end time (ISO format)
+ * @param {string} organizerTimezone - Organizer's timezone
+ * @returns {Object} { primary: "formatted organizer time", secondary: { label: "Your Time: ...", timezone: "..." } or null }
+ *
+ * Example output:
+ * {
+ *   primary: "Feb 15, 2026 | 2:00 PM – 3:00 PM",
+ *   secondary: { label: "Your Time: Feb 15, 2026 | 8:30 PM – 9:30 PM", timezone: "America/New_York" }
+ * }
+ */
+export const formatSessionTimeRange = (sessionStartTime, sessionEndTime, organizerTimezone) => {
+  try {
+    const dateFormat = "MMM D, YYYY";
+    const timeFormat = "h:mm A";
+
+    // Organizer's timezone (if provided)
+    const orgStartObj = (sessionStartTime && organizerTimezone)
+      ? dayjs(sessionStartTime).tz(organizerTimezone)
+      : dayjs(sessionStartTime);
+    const orgEndObj = (sessionEndTime && organizerTimezone)
+      ? dayjs(sessionEndTime).tz(organizerTimezone)
+      : dayjs(sessionEndTime);
+    const orgDateStr = orgStartObj.format(dateFormat);
+    const orgTimeRangeStr = `${orgStartObj.format(timeFormat)} – ${orgEndObj.format(timeFormat)}`;
+
+    // User's local timezone
+    const localStartObj = dayjs(sessionStartTime).local();
+    const localEndObj = dayjs(sessionEndTime).local();
+    const localDateStr = localStartObj.format(dateFormat);
+    const localTimeRangeStr = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
+
+    // Check if times differ between organizer and user timezone
+    const userTimezoneName = dayjs.tz.guess();
+    const timesDiffer = (orgTimeRangeStr !== localTimeRangeStr) || (orgDateStr !== localDateStr);
+
+    return {
+      primary: `${orgDateStr} | ${orgTimeRangeStr}`,
+      secondary: timesDiffer ? {
+        label: `Your Time: ${localDateStr} | ${localTimeRangeStr}`,
+        timezone: userTimezoneName
+      } : null
+    };
+  } catch (error) {
+    console.warn("Error formatting session time range:", error);
+    return { primary: "", secondary: null };
+  }
+};
+
+/**
  * Gets the next upcoming session for a multi-day event
  * Returns formatted string for the nearest future session, or null if no upcoming sessions
  * Past sessions are excluded

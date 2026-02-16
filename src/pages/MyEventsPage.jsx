@@ -24,7 +24,7 @@ import RegisteredActions from "../components/RegisteredActions.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
-import { getNextUpcomingSession } from "../utils/timezoneUtils";
+import { getNextUpcomingSession, formatSessionTimeRange } from "../utils/timezoneUtils";
 
 // ---------------------- API base + helpers (kept) ----------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -256,7 +256,10 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 
             // For multi-day events with sessions, show only the next upcoming session
             if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
-              const nextSession = getNextUpcomingSession(ev, ev.timezone);
+              // Find next upcoming session
+              const now = new Date();
+              const nextSession = ev.sessions.find(s => new Date(s.end_time) > now);
+
               return (
                 <div>
                   {/* Show location */}
@@ -268,15 +271,40 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                     {ev.location || "Virtual"}
                   </Typography>
 
-                  {/* Show next upcoming session */}
+                  {/* Show next upcoming session with timezone handling */}
                   {nextSession ? (
-                    <Typography
-                      variant="caption"
-                      className="block text-xs text-neutral-600"
-                      sx={{ fontSize: 11, lineHeight: 1.4 }}
-                    >
-                      {nextSession}
-                    </Typography>
+                    (() => {
+                      const sessionTimeRange = formatSessionTimeRange(
+                        nextSession.start_time,
+                        nextSession.end_time,
+                        ev.timezone
+                      );
+                      return (
+                        <>
+                          {/* Primary: Organizer Time */}
+                          <Typography
+                            variant="caption"
+                            className="block text-xs font-medium text-slate-900"
+                            sx={{ fontSize: 11, lineHeight: 1.4 }}
+                          >
+                            {sessionTimeRange.primary}
+                          </Typography>
+
+                          {/* Secondary: Your Time */}
+                          {sessionTimeRange.secondary && (
+                            <Typography
+                              variant="caption"
+                              className="block mt-1 text-xs text-neutral-600"
+                              sx={{ fontSize: 11 }}
+                            >
+                              <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                              {sessionTimeRange.secondary.label.replace('Your Time: ', '')}
+                              <span className="text-neutral-400 ml-1">({sessionTimeRange.secondary.timezone})</span>
+                            </Typography>
+                          )}
+                        </>
+                      );
+                    })()
                   ) : (
                     <Typography
                       variant="caption"

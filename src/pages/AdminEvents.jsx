@@ -61,7 +61,7 @@ import ParticipantList from "../components/ParticipantList";
 import RecordVoiceOverRoundedIcon from "@mui/icons-material/RecordVoiceOverRounded";
 import SessionDialog from "../components/SessionDialog";
 import SessionList from "../components/SessionList";
-import { getNextUpcomingSession } from "../utils/timezoneUtils";
+import { getNextUpcomingSession, formatSessionTimeRange } from "../utils/timezoneUtils";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -2949,17 +2949,42 @@ function AdminEventCard({
                     {ev.location || "Virtual"}
                   </span>
 
-                  {/* Show next upcoming session */}
+                  {/* Show next upcoming session with timezone handling */}
                   {(() => {
-                    const nextSession = getNextUpcomingSession(ev, organizerTimezone);
-                    return nextSession ? (
-                      <span className="block text-xs text-neutral-600" style={{ lineHeight: 1.4 }}>
-                        {nextSession}
-                      </span>
-                    ) : (
-                      <span className="block text-xs text-neutral-600">
-                        All sessions completed
-                      </span>
+                    // Find next upcoming session
+                    const now = new Date();
+                    const nextSession = ev.sessions?.find(s => new Date(s.end_time) > now);
+
+                    if (!nextSession) {
+                      return (
+                        <span className="block text-xs text-neutral-600">
+                          All sessions completed
+                        </span>
+                      );
+                    }
+
+                    const sessionTimeRange = formatSessionTimeRange(
+                      nextSession.start_time,
+                      nextSession.end_time,
+                      organizerTimezone
+                    );
+
+                    return (
+                      <>
+                        {/* Primary: Organizer Time */}
+                        <span className="block text-xs font-medium text-slate-900" style={{ lineHeight: 1.4 }}>
+                          {sessionTimeRange.primary}
+                        </span>
+
+                        {/* Secondary: Your Time */}
+                        {sessionTimeRange.secondary && (
+                          <span className="block mt-1 text-xs text-neutral-600">
+                            <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                            {sessionTimeRange.secondary.label.replace('Your Time: ', '')}
+                            <span className="text-neutral-400 ml-1">({sessionTimeRange.secondary.timezone})</span>
+                          </span>
+                        )}
+                      </>
                     );
                   })()}
                 </div>
