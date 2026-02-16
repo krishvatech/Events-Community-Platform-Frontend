@@ -246,6 +246,16 @@ export const patchStaff = (id, is_staff) =>
 export const bulkSetStaff = (ids, is_staff) =>
   apiClient.post(`${ADMIN_USERS_BASE}/bulk-set-staff/`, { ids, is_staff }).then((r) => r.data);
 
+export const createAdminUser = (data) =>
+  apiClient.post(`${ADMIN_USERS_BASE}/`, data).then((r) => r.data);
+
+export const updateAdminUser = (id, data) =>
+  apiClient.patch(`${ADMIN_USERS_BASE}/${id}/`, data).then((r) => r.data);
+
+export const deleteAdminUser = (id) =>
+  apiClient.delete(`${ADMIN_USERS_BASE}/${id}/`).then((r) => r.data);
+
+
 
 
 // ======================= KYC - DIDIT =============================

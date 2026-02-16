@@ -1,19 +1,167 @@
 import * as React from "react";
-import { isOwnerUser } from "../utils/adminRole";
+import { isOwnerUser, getCurrentUserCandidate } from "../utils/adminRole";
 import {
     Box, Container, Typography, TextField, InputAdornment,
     Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
     Paper, Switch, Chip, IconButton, Tooltip, Button, Stack,
-    CircularProgress, Pagination, Avatar, Skeleton
+    CircularProgress, Pagination, Avatar, Skeleton,
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    FormControlLabel, Checkbox, FormControl, FormLabel,
+    Alert
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import VerifiedIcon from "@mui/icons-material/Verified";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import PersonRemoveRoundedIcon from "@mui/icons-material/PersonRemoveRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
-import { listAdminUsers, patchStaff, bulkSetStaff } from "../utils/api";
-import { useLocation } from "react-router-dom";
+import AddIcon from "@mui/icons-material/Add";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EmailIcon from "@mui/icons-material/Email";
+
+import { listAdminUsers, patchStaff, bulkSetStaff, createAdminUser, updateAdminUser, deleteAdminUser } from "../utils/api";
+import { useLocation, useParams } from "react-router-dom";
+
+
+// Simple Dialog for Creating/Editing Users
+function UserDialog({ open, onClose, mode, initialData, onSave, loading }) {
+    const [formData, setFormData] = React.useState({
+        email: "",
+        first_name: "",
+        last_name: "",
+        is_staff: false,
+        is_superuser: false,
+        is_active: true
+    });
+    const [error, setError] = React.useState(null);
+
+    React.useEffect(() => {
+        if (open) {
+            setError(null);
+            if (mode === "edit" && initialData) {
+                setFormData({
+                    email: initialData.email || "",
+                    first_name: initialData.first_name || "",
+                    last_name: initialData.last_name || "",
+                    is_staff: initialData.is_staff || false,
+                    is_superuser: initialData.is_superuser || false,
+                    is_active: initialData.is_active ?? true // default true if undefined
+                });
+            } else {
+                setFormData({
+                    email: "",
+                    first_name: "",
+                    last_name: "",
+                    is_staff: true,      // default to staff for invite
+                    is_superuser: false,
+                    is_active: true
+                });
+            }
+        }
+    }, [open, mode, initialData]);
+
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
+
+        setFormData(prev => {
+            const updates = { [name]: type === "checkbox" ? checked : value };
+
+            // Logic: If checking "Superuser", automatically check "Staff"
+            if (name === "is_superuser" && checked) {
+                updates.is_staff = true;
+            }
+            // Logic: If unchecking "Staff", automatically uncheck "Superuser" (since superusers must be staff)
+            if (name === "is_staff" && !checked) {
+                updates.is_superuser = false;
+            }
+
+            return { ...prev, ...updates };
+        });
+    };
+
+    const handleSubmit = () => {
+        if (!formData.email || !formData.first_name || !formData.last_name) {
+            setError("Email, First Name, and Last Name are required.");
+            return;
+        }
+        onSave(formData, setError);
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>
+                {mode === "create" ? "Invite New User" : "Edit User"}
+            </DialogTitle>
+            <DialogContent dividers>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                <Stack spacing={2}>
+                    <TextField
+                        label="Email Address"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        fullWidth
+                        required
+                        disabled={mode === "edit"} // Prevent changing email on edit for now (simpler)
+                        helperText={mode === "create" ? "An invitation with credentials will be sent to this email." : ""}
+                    />
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                        <TextField
+                            label="First Name"
+                            name="first_name"
+                            value={formData.first_name}
+                            onChange={handleChange}
+                            fullWidth
+                            required
+                        />
+                        <TextField
+                            label="Last Name"
+                            name="last_name"
+                            value={formData.last_name}
+                            onChange={handleChange}
+                            fullWidth
+                            required
+                        />
+                    </Stack>
+
+                    <FormControl component="fieldset" variant="standard" sx={{ mt: 2 }}>
+                        <FormLabel component="legend">Roles & Status</FormLabel>
+                        <Stack direction="row" spacing={2} flexWrap="wrap">
+                            <FormControlLabel
+                                control={
+                                    <Switch checked={formData.is_staff} onChange={handleChange} name="is_staff" />
+                                }
+                                label="Staff"
+                            />
+                            <FormControlLabel
+                                control={
+                                    <Checkbox checked={formData.is_superuser} onChange={handleChange} name="is_superuser" color="secondary" />
+                                }
+                                label="Superuser (Platform Admin)"
+                            />
+                            {mode === "edit" && (
+                                <FormControlLabel
+                                    control={
+                                        <Switch checked={formData.is_active} onChange={handleChange} name="is_active" color="info" />
+                                    }
+                                    label="Active"
+                                />
+                            )}
+                        </Stack>
+                    </FormControl>
+                </Stack>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose} disabled={loading}>Cancel</Button>
+                <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+                    {loading ? <CircularProgress size={24} /> : (mode === "create" ? "Send Invitation" : "Save Changes")}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
 
 export default function AdminStaffPage() {
 
@@ -39,11 +187,28 @@ export default function AdminStaffPage() {
     const [rows, setRows] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [q, setQ] = React.useState("");
+    const [currentUser, setCurrentUser] = React.useState(null);
+
+    React.useEffect(() => {
+        const u = getCurrentUserCandidate();
+        setCurrentUser(u);
+    }, []);
+
     const [selected, setSelected] = React.useState(new Set());
 
-    // ✅ pagination state
+    // Pagination state
     const [page, setPage] = React.useState(1);
-    const rowsPerPage = 6;
+    const rowsPerPage = 10;
+
+    // Dialog State
+    const [dialogOpen, setDialogOpen] = React.useState(false);
+    const [dialogMode, setDialogMode] = React.useState("create"); // 'create' | 'edit'
+    const [editingUser, setEditingUser] = React.useState(null);
+    const [actionLoading, setActionLoading] = React.useState(false);
+
+    // Delete Dialog State
+    const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+    const [userToDelete, setUserToDelete] = React.useState(null);
 
     const fetchData = React.useCallback(async () => {
         setLoading(true);
@@ -52,7 +217,7 @@ export default function AdminStaffPage() {
             if (communityId) params.community_id = communityId;
             const data = await listAdminUsers(params);
             setRows(data.results ?? data);
-            setPage(1);          // ✅ reset to first page on new data
+            setPage(1);          // reset to first page on new data
         } finally {
             setLoading(false);
         }
@@ -60,30 +225,64 @@ export default function AdminStaffPage() {
 
     React.useEffect(() => { fetchData(); }, [fetchData]);
 
-    const toggleStaff = async (user, next) => {
-        const snapshot = rows.slice();
-        setRows(prev => prev.map(r => (r.id === user.id ? { ...r, is_staff: next } : r)));
-        try {
-            await patchStaff(user.id, next);
-        } catch {
-            setRows(snapshot); // revert on error
-        }
+    const handleOpenCreate = () => {
+        setDialogMode("create");
+        setEditingUser(null);
+        setDialogOpen(true);
     };
 
-    const bulk = async (flag) => {
-        const ids = Array.from(selected);
-        if (!ids.length) return;
-        setLoading(true);
+    const handleOpenEdit = (user) => {
+        setDialogMode("edit");
+        setEditingUser(user);
+        setDialogOpen(true);
+    };
+
+    const handleDialogClose = () => {
+        setDialogOpen(false);
+        setEditingUser(null);
+    };
+
+    const handleSaveUser = async (data, setError) => {
+        setActionLoading(true);
         try {
-            await bulkSetStaff(ids, flag);
+            if (dialogMode === "create") {
+                await createAdminUser(data);
+            } else {
+                await updateAdminUser(editingUser.id, data);
+            }
             await fetchData();
-            setSelected(new Set());
+            handleDialogClose();
+        } catch (err) {
+            console.error("Failed to save user", err);
+            const msg = err.response?.data?.detail || err.response?.data?.email?.[0] || "Failed to save user.";
+            setError(msg);
         } finally {
-            setLoading(false);
+            setActionLoading(false);
         }
     };
 
-    // ✅ slice rows for current page
+    const confirmDeleteUser = (user) => {
+        setUserToDelete(user);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleExecuteDelete = async () => {
+        if (!userToDelete) return;
+        setActionLoading(true);
+        try {
+            await deleteAdminUser(userToDelete.id);
+            await fetchData();
+            setDeleteDialogOpen(false);
+            setUserToDelete(null);
+        } catch (err) {
+            alert("Failed to delete user: " + (err.response?.data?.detail || err.message));
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+
+    // slice rows for current page
     const totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
     const startIndex = (page - 1) * rowsPerPage;
     const paginatedRows = rows.slice(startIndex, startIndex + rowsPerPage);
@@ -95,10 +294,10 @@ export default function AdminStaffPage() {
                     className="col-span-12"
                     sx={{
                         width: "100%",
-                        maxWidth: "100%",   // ✅ let the table span like Resources
+                        maxWidth: "100%",
                     }}
                 >
-                    {/* Header – same style as Admin Events page */}
+                    {/* Header */}
                     <Box
                         className="mb-4"
                         sx={{
@@ -109,7 +308,7 @@ export default function AdminStaffPage() {
                         }}
                     >
                         <Avatar sx={{ bgcolor: "#0ea5a4" }}>
-                            {("A")[0].toUpperCase()}
+                            <AdminPanelSettingsRoundedIcon />
                         </Avatar>
 
                         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -117,11 +316,11 @@ export default function AdminStaffPage() {
                                 Staff Management
                             </Typography>
                             <Typography className="text-slate-500">
-                                Grant or remove staff access for your community members.
+                                Be careful! Granting staff or superuser access gives significant permissions.
                             </Typography>
                         </Box>
 
-                        {/* Right side – bulk actions, like Events “Create Event” button */}
+                        {/* Actions */}
                         <Box
                             sx={{
                                 width: { xs: "100%", sm: "auto" },
@@ -132,41 +331,20 @@ export default function AdminStaffPage() {
                             }}
                         >
                             <Button
-                                size="small"
                                 variant="contained"
-                                startIcon={<PersonAddAlt1RoundedIcon />}
-                                onClick={() => bulk(true)}
-                                disabled={!selected.size || loading}
-                                sx={{
-                                    textTransform: "none",
-                                    borderRadius: 999,
-                                    px: 1.5,
-                                }}
+                                color="primary"
+                                startIcon={<AddIcon />}
+                                onClick={handleOpenCreate}
+                                sx={{ borderRadius: 8, textTransform: "none" }}
                             >
-                                Make staff
-                            </Button>
-
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                color="warning"
-                                startIcon={<PersonRemoveRoundedIcon />}
-                                onClick={() => bulk(false)}
-                                disabled={!selected.size || loading}
-                                sx={{
-                                    textTransform: "none",
-                                    borderRadius: 999,
-                                    px: 1.5,
-                                }}
-                            >
-                                Remove staff
+                                Invite User
                             </Button>
                         </Box>
                     </Box>
 
                     <TextField
                         size="small"
-                        placeholder="Search users"
+                        placeholder="Search users..."
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
                         InputProps={{
@@ -179,198 +357,185 @@ export default function AdminStaffPage() {
                         sx={{ mb: 2, width: { xs: "100%", md: "100%", lg: 360 } }}
                     />
 
-                    {loading ? (
-                        <>
-                            <TableContainer component={Paper} variant="outlined">
-                                <Table>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell
-                                                width={40}
-                                                sx={{ display: { xs: "none", lg: "table-cell" } }}
-                                            />
-                                            <TableCell>User</TableCell>
-                                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                                                Email
+                    <TableContainer component={Paper} variant="outlined">
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>User</TableCell>
+                                    <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                                        Email
+                                    </TableCell>
+                                    <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                                        Last Login
+                                    </TableCell>
+                                    <TableCell align="center">Status</TableCell>
+                                    <TableCell align="right">Actions</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {loading ? (
+                                    Array.from({ length: 5 }).map((_, idx) => (
+                                        <TableRow key={idx}>
+                                            <TableCell colSpan={6}>
+                                                <Skeleton height={40} />
                                             </TableCell>
-                                            <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                                                Last Login
-                                            </TableCell>
-                                            <TableCell align="center">Staff</TableCell>
                                         </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {Array.from({ length: rowsPerPage }).map((_, idx) => (
-                                            <TableRow key={idx}>
-                                                {/* Checkbox column */}
-                                                <TableCell
-                                                    sx={{ display: { xs: "none", lg: "table-cell" } }}
-                                                >
-                                                    <Skeleton variant="rounded" width={18} height={18} />
-                                                </TableCell>
+                                    ))
+                                ) : (
+                                    paginatedRows.map((u) => (
+                                        <TableRow key={u.id} hover>
 
-                                                {/* User */}
-                                                <TableCell>
-                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                        <Skeleton
-                                                            variant="rounded"
-                                                            width={80}
-                                                            height={24}
-                                                        />
-                                                        <Skeleton
-                                                            variant="rounded"
-                                                            width={70}
-                                                            height={24}
-                                                        />
-                                                    </Stack>
-                                                </TableCell>
-
-                                                {/* Email */}
-                                                <TableCell
-                                                    sx={{ display: { xs: "none", sm: "table-cell" } }}
-                                                >
-                                                    <Skeleton
-                                                        variant="text"
-                                                        width="80%"
-                                                        height={20}
-                                                    />
-                                                </TableCell>
-
-                                                {/* Last login */}
-                                                <TableCell
-                                                    sx={{ display: { xs: "none", lg: "table-cell" } }}
-                                                >
-                                                    <Skeleton
-                                                        variant="text"
-                                                        width="60%"
-                                                        height={20}
-                                                    />
-                                                </TableCell>
-
-                                                {/* Staff switch */}
-                                                <TableCell align="center">
-                                                    <Skeleton
-                                                        variant="rounded"
-                                                        width={36}
-                                                        height={20}
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        </>
-                    ) : (
-                        <>
-                            <TableContainer component={Paper} variant="outlined">
-                                <Table>
-                                    <TableHead>
-                                        <TableRow>
-                                            {/* Checkbox column – only on large desktop */}
-                                            <TableCell
-                                                width={40}
-                                                sx={{ display: { xs: "none", lg: "table-cell" } }}
-                                            ></TableCell>
-
-                                            <TableCell>User</TableCell>
-
-                                            {/* Email – show from tablet upwards */}
-                                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                                                Email
-                                            </TableCell>
-
-                                            {/* Last Login – only big desktop */}
-                                            <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                                                Last Login
-                                            </TableCell>
-
-                                            <TableCell align="center">Staff</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {paginatedRows.map((u) => (
-                                            <TableRow key={u.id} hover>
-                                                <TableCell
-                                                    sx={{ display: { xs: "none", lg: "table-cell" } }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selected.has(u.id)}
-                                                        onChange={(e) => {
-                                                            const s = new Set(selected);
-                                                            e.target.checked ? s.add(u.id) : s.delete(u.id);
-                                                            setSelected(s);
-                                                        }}
-                                                    />
-                                                </TableCell>
-
-                                                {/* User */}
-                                                <TableCell>
-                                                    <Stack direction="row" spacing={2} alignItems="center">
-                                                        <Avatar
-                                                            src={u.avatar_url}
-                                                            alt={u.username}
-                                                            sx={{ width: 40, height: 40 }}
-                                                        >
-                                                            {u.username?.[0]?.toUpperCase()}
-                                                        </Avatar>
-                                                        <Box>
-                                                            <Stack direction="row" spacing={0.5} alignItems="center">
-                                                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                                                    {(u.first_name || u.last_name) ? `${u.first_name} ${u.last_name}`.trim() : u.username}
-                                                                </Typography>
-                                                                {u.profile?.kyc_status === "approved" && (
-                                                                    <Tooltip title="Identity Verified">
-                                                                        <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
-                                                                    </Tooltip>
-                                                                )}
-                                                            </Stack>
-                                                            {u.is_superuser && (
-                                                                <Chip size="small" color="secondary" label="Superuser" sx={{ height: 20, fontSize: "0.65rem", mt: 0.5 }} />
+                                            {/* User */}
+                                            <TableCell>
+                                                <Stack direction="row" spacing={2} alignItems="center">
+                                                    <Avatar
+                                                        src={u.avatar_url}
+                                                        alt={u.username}
+                                                        sx={{ width: 40, height: 40 }}
+                                                    >
+                                                        {u.username?.[0]?.toUpperCase()}
+                                                    </Avatar>
+                                                    <Box>
+                                                        <Stack direction="row" spacing={0.5} alignItems="center">
+                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                                                {(u.first_name || u.last_name) ? `${u.first_name} ${u.last_name}`.trim() : u.username}
+                                                            </Typography>
+                                                            {u.profile?.kyc_status === "approved" && (
+                                                                <Tooltip title="Identity Verified">
+                                                                    <VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />
+                                                                </Tooltip>
                                                             )}
-                                                        </Box>
+                                                        </Stack>
+                                                        <Stack direction="row" spacing={0.5} mt={0.5}>
+                                                            {u.is_superuser && (
+                                                                <Chip size="small" color="secondary" label="Superuser" sx={{ height: 20, fontSize: "0.65rem" }} />
+                                                            )}
+                                                            {!u.is_active && (
+                                                                <Chip size="small" label="Inactive" sx={{ height: 20, fontSize: "0.65rem" }} />
+                                                            )}
+                                                        </Stack>
+                                                    </Box>
+                                                </Stack>
+                                            </TableCell>
+
+                                            {/* Email */}
+                                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                                                {u.email || "—"}
+                                            </TableCell>
+
+                                            {/* Last login */}
+                                            <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
+                                                {u.last_login ? new Date(u.last_login).toLocaleString() : "—"}
+                                            </TableCell>
+
+                                                {/* Status instead of Switch */}
+                                                <TableCell align="center">
+                                                    {u.is_superuser ? (
+                                                        <Chip label="Superuser" color="secondary" size="small" variant="filled" />
+                                                    ) : u.is_staff ? (
+                                                        <Chip label="Staff" color="success" size="small" variant="outlined" />
+                                                    ) : (
+                                                        <Chip label="User" size="small" variant="outlined" />
+                                                    )}
+                                                </TableCell>
+
+                                                {/* Actions */}
+                                                <TableCell align="right">
+                                                    <Stack direction="row" justifyContent="flex-end">
+                                                        <Tooltip title="Edit Details">
+                                                            <span>
+                                                                <IconButton 
+                                                                    size="small" 
+                                                                    onClick={() => handleOpenEdit(u)}
+                                                                    disabled={currentUser && currentUser.id === u.id}
+                                                                >
+                                                                    <EditIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                        <Tooltip title="Delete User">
+                                                            <span>
+                                                                <IconButton 
+                                                                    size="small" 
+                                                                    color="error" 
+                                                                    onClick={() => confirmDeleteUser(u)}
+                                                                    disabled={currentUser && currentUser.id === u.id}
+                                                                >
+                                                                    <DeleteIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
                                                     </Stack>
                                                 </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                                {!loading && paginatedRows.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                            <Typography color="text.secondary">No users found.</Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
 
-                                                {/* Email – hide on very small screens */}
-                                                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                                                    {u.email || "—"}
-                                                </TableCell>
-
-                                                {/* Last login – show from lg and up */}
-                                                <TableCell sx={{ display: { xs: "none", lg: "table-cell" } }}>
-                                                    {u.last_login ? new Date(u.last_login).toLocaleString() : "—"}
-                                                </TableCell>
-
-                                                {/* Staff switch */}
-                                                <TableCell align="center">
-                                                    <Switch
-                                                        checked={Boolean(u.is_staff)}
-                                                        onChange={(e) => toggleStaff(u, e.target.checked)}
-                                                        disabled={u.is_superuser}
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-
-                            {/* ✅ Pagination control */}
-                            {rows.length > rowsPerPage && (
-                                <Box mt={2} display="flex" justifyContent="flex-end">
-                                    <Pagination
-                                        count={totalPages}
-                                        page={page}
-                                        onChange={(_, value) => setPage(value)}
-                                        color="primary"
-                                        size="small"
-                                    />
-                                </Box>
-                            )}
-                        </>
+                    {/* Pagination control */}
+                    {rows.length > rowsPerPage && (
+                        <Box mt={2} display="flex" justifyContent="flex-end">
+                            <Pagination
+                                count={totalPages}
+                                page={page}
+                                onChange={(_, value) => setPage(value)}
+                                color="primary"
+                                size="small"
+                            />
+                        </Box>
                     )}
+
+                    {/* Create/Edit Helper Dialog */}
+                    <UserDialog
+                        open={dialogOpen}
+                        onClose={handleDialogClose}
+                        mode={dialogMode}
+                        initialData={editingUser}
+                        onSave={handleSaveUser}
+                        loading={actionLoading}
+                    />
+
+                    {/* Delete Confirmation Dialog */}
+                    <Dialog
+                        open={deleteDialogOpen}
+                        onClose={() => setDeleteDialogOpen(false)}
+                        maxWidth="xs"
+                        fullWidth
+                    >
+                        <DialogTitle>Delete User?</DialogTitle>
+                        <DialogContent>
+                            <Typography variant="body2" color="text.secondary">
+                                Are you sure you want to delete <strong>{userToDelete?.username || userToDelete?.email}</strong>?
+                            </Typography>
+                            <Alert severity="warning" sx={{ mt: 2 }}>
+                                This action is permanent. The user will be removed from the platform.
+                            </Alert>
+
+                        </DialogContent>
+                        <DialogActions>
+                            <Button onClick={() => setDeleteDialogOpen(false)} color="inherit" disabled={actionLoading}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleExecuteDelete}
+                                color="error"
+                                variant="contained"
+                                disabled={actionLoading}
+                                startIcon={actionLoading ? <CircularProgress size={20} color="inherit" /> : null}
+                            >
+                                {actionLoading ? "Deleting..." : "Delete User"}
+                            </Button>
+                        </DialogActions>
+                    </Dialog>
                 </Box>
             </Box>
         </Container>
