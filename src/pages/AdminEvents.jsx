@@ -2636,8 +2636,8 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                   >
                     Add Participant
                   </Button>
-              </Paper>
-            </Grid>
+                </Paper>
+              </Grid>
             </Grid>
           </Grid>
         </DialogContent>
@@ -2745,6 +2745,27 @@ function AdminEventCard({
         ? "Lounge"
         : joinLabel.split(" ")[0];
 
+  // Timezone logic
+  const organizerTimezone = ev.timezone;
+  const timeFormat = "h:mm A";
+  const dateFormat = "MMM D, YYYY";
+
+  const orgStartObj = (ev.start_time && organizerTimezone) ? dayjs(ev.start_time).tz(organizerTimezone) : dayjs(ev.start_time);
+  const orgEndObj = (ev.end_time && organizerTimezone) ? dayjs(ev.end_time).tz(organizerTimezone) : dayjs(ev.end_time);
+  const orgDateStr = orgStartObj.format(dateFormat);
+  const orgTimeRangeKey = `${orgStartObj.format(timeFormat)} – ${orgEndObj.format(timeFormat)}`;
+
+  const localStartObj = dayjs(ev.start_time).local();
+  const localEndObj = dayjs(ev.end_time).local();
+  const localDateStr = localStartObj.format(dateFormat);
+  const localTimeRangeKey = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
+
+  const userTimezoneName = dayjs.tz.guess();
+  const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
+  // Check both format fields just in case
+  const isVirtual = ev.format === 'virtual' || ev.event_format === 'virtual';
+  const showYourTime = isVirtual && organizerTimezone && timesDiffer;
+
   const handleOpenDetails = () => {
     if (!ev?.id) return;
     navigate(`/admin/events/${ev.id}`, { state: { event: ev } });
@@ -2826,13 +2847,21 @@ function AdminEventCard({
           {ev.title}
         </Typography>
 
-        <p
-          className="text-sm text-slate-500 truncate"
-          title={`${fmtDateRange(ev.start_time, ev.end_time)}${ev.location ? ` • ${ev.location}` : ""}`}
-        >
-          {fmtDateRange(ev.start_time, ev.end_time)}
-          {ev.location ? ` • ${ev.location}` : ""}
-        </p>
+        <div className="text-sm text-slate-500">
+          {/* Primary: Organizer Time + Location */}
+          <span className="block font-medium text-slate-900">
+            {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
+          </span>
+
+          {/* Secondary: Your Time */}
+          {showYourTime && (
+            <span className="block mt-1.5 text-xs text-neutral-600">
+              <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+              {localDateStr} {localTimeRangeKey}
+              <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
+            </span>
+          )}
+        </div>
 
         {/* Actions – stop click bubbling so buttons don't trigger card navigation */}
         <Box
