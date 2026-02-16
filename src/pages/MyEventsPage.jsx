@@ -24,6 +24,7 @@ import RegisteredActions from "../components/RegisteredActions.jsx";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
+import { getNextUpcomingSession } from "../utils/timezoneUtils";
 
 // ---------------------- API base + helpers (kept) ----------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -244,6 +245,52 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 
         <div className="text-sm text-slate-500">
           {(() => {
+            // DEBUG: Log event data to see what we're receiving
+            console.log(`[EventCard Debug] Event "${ev.title}":`, {
+              is_multi_day: ev.is_multi_day,
+              sessions_present: !!ev.sessions,
+              sessions_count: ev.sessions?.length || 0,
+              sessions: ev.sessions,
+              timezone: ev.timezone,
+            });
+
+            // For multi-day events with sessions, show only the next upcoming session
+            if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
+              const nextSession = getNextUpcomingSession(ev, ev.timezone);
+              return (
+                <div>
+                  {/* Show location */}
+                  <Typography
+                    variant="caption"
+                    className="block font-medium text-slate-900 mb-1"
+                    sx={{ fontSize: 12.5 }}
+                  >
+                    {ev.location || "Virtual"}
+                  </Typography>
+
+                  {/* Show next upcoming session */}
+                  {nextSession ? (
+                    <Typography
+                      variant="caption"
+                      className="block text-xs text-neutral-600"
+                      sx={{ fontSize: 11, lineHeight: 1.4 }}
+                    >
+                      {nextSession}
+                    </Typography>
+                  ) : (
+                    <Typography
+                      variant="caption"
+                      className="block text-xs text-neutral-600"
+                      sx={{ fontSize: 11 }}
+                    >
+                      All sessions completed
+                    </Typography>
+                  )}
+                </div>
+              );
+            }
+
+            // For single-day events, show overall event time
             const dateRange = fmtDateRange(ev.start_time, ev.end_time, ev.timezone);
             return (
               <>

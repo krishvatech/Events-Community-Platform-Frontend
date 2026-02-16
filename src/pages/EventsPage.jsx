@@ -41,6 +41,7 @@ import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
 import { apiClient } from "../utils/api";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
+import { getNextUpcomingSession } from "../utils/timezoneUtils";
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
@@ -391,19 +392,59 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
             <span className="inline-flex items-center gap-2">
               <AccessTimeIcon fontSize="small" className="text-teal-700" />
               <span>
-                {/* Primary: Organizer Time + Location */}
-                <span className="block font-medium text-neutral-900">
-                  {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
-                </span>
+                {(() => {
+                  // DEBUG: Log event data
+                  console.log(`[EventsPage EventCard Debug] Event "${ev.title}":`, {
+                    is_multi_day: ev.is_multi_day,
+                    sessions_present: !!ev.sessions,
+                    sessions_count: ev.sessions?.length || 0,
+                    timezone: ev.timezone,
+                  });
 
-                {/* Secondary: Your Time */}
-                {showYourTime && (
-                  <span className="block mt-1.5 text-xs text-neutral-600">
-                    <span className="font-semibold text-teal-700">Your Time:</span>{" "}
-                    {localDateStr} {localTimeRangeKey}
-                    <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
-                  </span>
-                )}
+                  // For multi-day events with sessions, show only the next upcoming session
+                  if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
+                    return (
+                      <div>
+                        {/* Show location for multi-day */}
+                        <span className="block font-medium text-neutral-900 mb-1">
+                          {ev.location || "Virtual"}
+                        </span>
+                        {/* Show next upcoming session */}
+                        {(() => {
+                          const nextSession = getNextUpcomingSession(ev, ev.timezone);
+                          return nextSession ? (
+                            <span className="block text-xs text-neutral-600" style={{ lineHeight: 1.4 }}>
+                              {nextSession}
+                            </span>
+                          ) : (
+                            <span className="block text-xs text-neutral-600">
+                              All sessions completed
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    );
+                  }
+
+                  // Single-day events
+                  return (
+                    <>
+                      {/* Primary: Organizer Time + Location (for single-day) */}
+                      <span className="block font-medium text-neutral-900">
+                        {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
+                      </span>
+
+                      {/* Secondary: Your Time */}
+                      {showYourTime && (
+                        <span className="block mt-1.5 text-xs text-neutral-600">
+                          <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                          {localDateStr} {localTimeRangeKey}
+                          <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
               </span>
             </span>
           </div>

@@ -61,6 +61,7 @@ import ParticipantList from "../components/ParticipantList";
 import RecordVoiceOverRoundedIcon from "@mui/icons-material/RecordVoiceOverRounded";
 import SessionDialog from "../components/SessionDialog";
 import SessionList from "../components/SessionList";
+import { getNextUpcomingSession } from "../utils/timezoneUtils";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -499,6 +500,18 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     if (!validate()) return;
     setSubmitting(true);
 
+    // 🔴 DEBUG: Log sessions state at submission time
+    console.log("🚨 AT FORM SUBMISSION - Sessions state:", {
+      isMultiDay,
+      sessionsCount: sessions.length,
+      sessions: sessions.map(s => ({
+        title: s.title,
+        _startDate: s._startDate,
+        startTime: s.startTime,
+        endTime: s.endTime,
+      })),
+    });
+
     // 🔴 CRITICAL FIX: Create immutable string copies IMMEDIATELY
     // This prevents any async state changes from affecting our values
     const safeStartDate = String(startDate);
@@ -608,24 +621,53 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     }
 
     // Add sessions_input for multi-day events (atomic with event creation)
+    // 🚨 CRITICAL: Check for mismatch between isMultiDay flag and sessions data
+    if (sessions.length > 0 && !isMultiDay) {
+      console.warn(
+        "⚠️ WARNING: Sessions exist but isMultiDay is FALSE!",
+        { sessionsCount: sessions.length, isMultiDay },
+        "This may cause sessions to not be saved. Did you toggle Multi-Day OFF after adding sessions?"
+      );
+    }
+
+    console.log("🔍 Sessions condition check:", {
+      isMultiDay,
+      "sessions.length": sessions.length,
+      "isMultiDay && sessions.length > 0": isMultiDay && sessions.length > 0,
+    });
+
     if (isMultiDay && sessions.length > 0) {
+      console.log("✅ Condition TRUE - Processing sessions");
       const sessionsData = sessions.map((s, idx) => {
-        const sessionStart = toUTCISO(s.startDate, s.startTime, safeTimezone);
-        const sessionEnd = toUTCISO(s.startDate, s.endTime, safeTimezone);
+        // SessionDialog returns data with both ISO fields (startTime, endTime) and display fields (_startDate, _startTime, _endDate, _endTime)
+        // Use the ISO fields directly since they're already timezone-converted
         return {
           title: s.title,
           description: s.description || "",
           session_type: s.sessionType || "main",
-          session_date: s.startDate,
-          start_time: sessionStart,
-          end_time: sessionEnd,
+          session_date: s._startDate,  // Use display field for session_date
+          start_time: s.startTime,     // Already ISO from SessionDialog
+          end_time: s.endTime,         // Already ISO from SessionDialog
           display_order: idx,
           use_parent_meeting: true,
         };
       });
 
       console.log("Sending sessions_input data:", sessionsData);
-      fd.append("sessions_input", JSON.stringify(sessionsData));
+      console.log("Sessions being sent:", {
+        count: sessionsData.length,
+        sessions: sessionsData.map(s => ({
+          title: s.title,
+          session_date: s.session_date,
+          start_time: s.start_time,
+          end_time: s.end_time,
+        })),
+      });
+      const sessionsJSON = JSON.stringify(sessionsData);
+      fd.append("sessions_input", sessionsJSON);
+      console.log("📤 sessions_input JSON appended to FormData:", sessionsJSON);
+    } else {
+      console.log("❌ Condition FALSE - Not processing sessions");
     }
 
     try {
@@ -635,6 +677,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         end_time_value: fd.get("end_time"),
         title: fd.get("title"),
         timezone: fd.get("timezone"),
+        sessions_input_present: fd.get("sessions_input") ? "✅ YES" : "❌ NO",
         safe_startDate: safeStartDate,
         safe_startTime: safeStartTime,
         safe_endDate: safeEndDate,
@@ -2888,19 +2931,60 @@ function AdminEventCard({
         </Typography>
 
         <div className="text-sm text-slate-500">
-          {/* Primary: Organizer Time + Location */}
-          <span className="block font-medium text-slate-900">
-            {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
-          </span>
+          {(() => {
+            // DEBUG: Log event data
+            console.log(`[AdminEventCard Debug] Event "${ev.title}":`, {
+              is_multi_day: ev.is_multi_day,
+              sessions_present: !!ev.sessions,
+              sessions_count: ev.sessions?.length || 0,
+              timezone: organizerTimezone,
+            });
 
-          {/* Secondary: Your Time */}
-          {showYourTime && (
-            <span className="block mt-1.5 text-xs text-neutral-600">
-              <span className="font-semibold text-teal-700">Your Time:</span>{" "}
-              {localDateStr} {localTimeRangeKey}
-              <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
-            </span>
-          )}
+            // For multi-day events with sessions, show only the next upcoming session
+            if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
+              return (
+                <div>
+                  {/* Show location */}
+                  <span className="block font-medium text-slate-900 mb-1">
+                    {ev.location || "Virtual"}
+                  </span>
+
+                  {/* Show next upcoming session */}
+                  {(() => {
+                    const nextSession = getNextUpcomingSession(ev, organizerTimezone);
+                    return nextSession ? (
+                      <span className="block text-xs text-neutral-600" style={{ lineHeight: 1.4 }}>
+                        {nextSession}
+                      </span>
+                    ) : (
+                      <span className="block text-xs text-neutral-600">
+                        All sessions completed
+                      </span>
+                    );
+                  })()}
+                </div>
+              );
+            }
+
+            // Single-day events
+            return (
+              <>
+                {/* Primary: Organizer Time + Location (for single-day events) */}
+                <span className="block font-medium text-slate-900">
+                  {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
+                </span>
+
+                {/* Secondary: Your Time */}
+                {showYourTime && (
+                  <span className="block mt-1.5 text-xs text-neutral-600">
+                    <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                    {localDateStr} {localTimeRangeKey}
+                    <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
+                  </span>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         {/* Actions – stop click bubbling so buttons don't trigger card navigation */}

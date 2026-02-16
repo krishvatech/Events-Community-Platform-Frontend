@@ -27,6 +27,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import { getNextUpcomingSession } from "../utils/timezoneUtils";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -463,22 +464,49 @@ export default function EventDetailsPage() {
 
                         {/* Date & Time Display */}
                         {(event.start_time || event.end_time) && (
-                          <Stack direction="row" spacing={3} alignItems="center" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-                              <Typography variant="body2">
-                                {dayjs(event.start_time).format("MMMM D, YYYY")}
-                              </Typography>
-                            </Stack>
-                            {event.end_time && (
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <AccessTimeIcon fontSize="small" className="text-teal-700" />
-                                <Typography variant="body2">
-                                  {dayjs(event.start_time).format("h:mm A")} – {dayjs(event.end_time).format("h:mm A")}
-                                </Typography>
+                          <>
+                            {/* For multi-day events with sessions, show only the next upcoming session */}
+                            {event.is_multi_day && event.sessions && event.sessions.length > 0 ? (
+                              <Box sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                                  <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                                  <Typography variant="body2" fontWeight={500}>
+                                    Next Session:
+                                  </Typography>
+                                </Box>
+                                {(() => {
+                                  const nextSession = getNextUpcomingSession(event, event.timezone);
+                                  return nextSession ? (
+                                    <Typography variant="body2" sx={{ fontSize: '0.875rem', ml: 3.5 }}>
+                                      {nextSession}
+                                    </Typography>
+                                  ) : (
+                                    <Typography variant="body2" sx={{ fontSize: '0.875rem', ml: 3.5, color: 'text.secondary' }}>
+                                      All sessions completed
+                                    </Typography>
+                                  );
+                                })()}
+                              </Box>
+                            ) : (
+                              /* For single-day events, show overall event time */
+                              <Stack direction="row" spacing={3} alignItems="center" sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                                  <Typography variant="body2">
+                                    {dayjs(event.start_time).format("MMMM D, YYYY")}
+                                  </Typography>
+                                </Stack>
+                                {event.end_time && (
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <AccessTimeIcon fontSize="small" className="text-teal-700" />
+                                    <Typography variant="body2">
+                                      {dayjs(event.start_time).format("h:mm A")} – {dayjs(event.end_time).format("h:mm A")}
+                                    </Typography>
+                                  </Stack>
+                                )}
                               </Stack>
                             )}
-                          </Stack>
+                          </>
                         )}
                         {event?.location ? (
                           <Stack direction="row" spacing={0.75} alignItems="center">
