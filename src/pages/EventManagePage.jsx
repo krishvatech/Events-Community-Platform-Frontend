@@ -807,6 +807,7 @@ export default function EventManagePage() {
       setSearchQuery("");
       setUserOptions([]);
       setRegsRefresh(prev => prev + 1);
+      refreshEvent();
     } catch (e) {
       toast.error(e.message);
     } finally {

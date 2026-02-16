@@ -291,6 +291,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [format, setFormat] = React.useState("virtual");
   const [price, setPrice] = React.useState();
   const [isFree, setIsFree] = React.useState(true);
+  const [maxParticipants, setMaxParticipants] = React.useState(""); // New state
 
   const today = dayjs().format("YYYY-MM-DD");
   const defaultSchedule = React.useMemo(() => getDefaultSchedule(2), []);
@@ -417,6 +418,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setFormat("virtual");
     setPrice(0);
     setIsFree(true);
+    setMaxParticipants(""); // Reset max participants
 
     setIsMultiDay(false);
     setStartDate(sch.startDate);
@@ -537,6 +539,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     fd.append("format", format);
     fd.append("price", String(isFree ? 0 : (price ?? 0)));
     fd.append("is_free", String(isFree));
+    if (maxParticipants) {
+      fd.append("max_participants", String(maxParticipants));
+    } else {
+      fd.append("max_participants", ""); // Send empty string to clear/set null
+    }
     fd.append("is_multi_day", String(isMultiDay));
     fd.append("timezone", safeTimezone);
 
@@ -936,7 +943,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         {/* Row 2: Free Event & Price */}
         <Grid container spacing={3} sx={{ mb: 3 }}>
           {/* Free Event Checkbox */}
-          <Grid item xs={12} sm={6} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
+          <Grid item xs={12} sm={4} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
             <FormControlLabel
               control={<Switch checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />}
               label="Free Event"
@@ -944,7 +951,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             />
           </Grid>
           {/* Price Field */}
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <TextField
               label="Price ($)"
               type="number"
@@ -955,6 +962,18 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               error={!!errors.price}
               helperText={errors.price}
               disabled={isFree}
+            />
+          </Grid>
+          {/* Max Participants Field */}
+          <Grid item xs={12} sm={4}>
+            <TextField
+              label="Max Participants"
+              type="number"
+              value={maxParticipants}
+              onChange={(e) => setMaxParticipants(e.target.value)}
+              inputProps={{ min: 1, step: 1 }}
+              fullWidth
+              helperText="Leave empty for unlimited"
             />
           </Grid>
         </Grid>
@@ -1744,6 +1763,8 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     typeof event?.price === "number" ? event.price : Number(event?.price || 0)
   );
   const [isFree, setIsFree] = useState(event?.is_free || false);
+  const [maxParticipants, setMaxParticipants] = useState(event?.max_participants || "");
+
 
   const [isMultiDay, setIsMultiDay] = useState(() => {
     if (!initialStart || !initialEnd) return false;
@@ -1869,6 +1890,8 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     setFormat((event?.format || "virtual").toLowerCase());
     setPrice(typeof event?.price === "number" ? event.price : Number(event?.price || 0));
     setIsFree(event?.is_free || false);
+    setMaxParticipants(event?.max_participants || "");
+
 
     const start = event?.start_time ? dayjs(event.start_time).tz(tz) : dayjs();
     const end = event?.end_time ? dayjs(event.end_time).tz(tz) : start.add(2, "hour");
@@ -2046,6 +2069,11 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
     fd.append("format", format);
     fd.append("price", String(isFree ? 0 : (price ?? 0)));
     fd.append("is_free", String(isFree));
+    if (maxParticipants) {
+      fd.append("max_participants", String(maxParticipants));
+    } else {
+      fd.append("max_participants", "");
+    }
     fd.append("timezone", timezone);
     fd.append("start_time", combineToISO(startDate, startTime));
     fd.append("end_time", combineToISO(endDate, endTime));
@@ -2306,6 +2334,14 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                 inputProps={{ min: 0, step: "0.01" }}
                 error={!!errors.price} helperText={errors.price}
                 disabled={isFree}
+                sx={{ mt: 0.5, mb: 2 }}
+              />
+
+              <TextField
+                label="Max Participants" type="number" fullWidth
+                value={maxParticipants} onChange={(e) => setMaxParticipants(e.target.value)}
+                inputProps={{ min: 1, step: 1 }}
+                helperText="Leave empty for unlimited"
                 sx={{ mt: 0.5, mb: 2 }}
               />
 

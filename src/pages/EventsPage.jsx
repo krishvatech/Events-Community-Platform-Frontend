@@ -23,7 +23,8 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PlaceIcon from "@mui/icons-material/Place";
 import GroupsIcon from "@mui/icons-material/Groups";
-import { FormControl, Select, MenuItem } from "@mui/material";
+import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
+import { FormControl, Select, MenuItem, Typography } from "@mui/material";
 import dayjs from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -53,6 +54,23 @@ const todayISO = () => dayjs().format("YYYY-MM-DD");
 // ————————————————————————————————————————
 // Helpers
 // ————————————————————————————————————————
+
+function EventFullToast() {
+  return (
+    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
+      <CancelRoundedIcon fontSize="large" sx={{ color: "#fff", mt: 0.5 }} />
+      <Box>
+        <Typography variant="subtitle1" fontWeight="bold" color="inherit" sx={{ lineHeight: 1.2, mb: 0.5 }}>
+          Event Full
+        </Typography>
+        <Typography variant="body2" color="inherit" sx={{ opacity: 0.9, lineHeight: 1.4 }}>
+          This event has reached maximum capacity. No more seats are available.
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
 function priceStr(p) {
   if (p === 0) return "Free";
   try {
@@ -294,6 +312,21 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         headers: { "Content-Type": "application/json", ...authHeaders() },
       });
       if (!res.ok) {
+        if (res.status === 409) {
+          toast.error(<EventFullToast />, {
+            position: "top-center",
+            autoClose: 5000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            progress: undefined,
+            theme: "colored",
+            icon: false,
+            style: { borderRadius: "12px", padding: "16px" }
+          });
+          return;
+        }
         const msg = await res.text();
         toast.error(`Registration failed (${res.status}): ${msg}`);
         return;
@@ -662,6 +695,21 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
         headers: { "Content-Type": "application/json", ...authHeaders() },
       });
       if (!res.ok) {
+        if (res.status === 409) {
+          toast.error(<EventFullToast />, {
+            position: "top-center",
+            autoClose: 5000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            progress: undefined,
+            theme: "colored",
+            icon: false,
+            style: { borderRadius: "12px", padding: "16px" }
+          });
+          return;
+        }
         const msg = await res.text();
         toast.error(`Registration failed (${res.status}): ${msg}`);
         return;
