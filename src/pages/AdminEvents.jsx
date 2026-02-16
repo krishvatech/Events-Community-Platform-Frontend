@@ -298,6 +298,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   const [endDate, setEndDate] = React.useState(defaultSchedule.endDate);
   const [startTime, setStartTime] = React.useState(defaultSchedule.startTime);
   const [endTime, setEndTime] = React.useState(defaultSchedule.endTime);
+  // Store single-day times to restore when toggling back
+  const [singleDayStartTime] = React.useState(defaultSchedule.startTime);
+  const [singleDayEndTime] = React.useState(defaultSchedule.endTime);
   const [timezone, setTimezone] = React.useState(getBrowserTimezone());
 
   const timezoneOptions = React.useMemo(() => {
@@ -1214,8 +1217,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               control={<Switch checked={isMultiDay} onChange={(e) => {
                 const v = e.target.checked;
                 setIsMultiDay(v);
-                if (!v) {
-                  // If switching to Single Day, force end date to equal start date
+                if (v) {
+                  // If switching to Multi-Day, set default times to 12:00 AM
+                  setStartTime("00:00");
+                  setEndTime("00:00");
+                } else {
+                  // If switching to Single Day, restore original single-day times and force end date to equal start date
+                  setStartTime(singleDayStartTime);
+                  setEndTime(singleDayEndTime);
                   setEndDate(startDate);
                 }
               }} />}
@@ -1266,7 +1275,12 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker label="Start time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${startTime}`)}
+                <TimePicker
+                  label="Start time *"
+                  ampm
+                  minutesStep={1}
+                  disabled={isMultiDay}
+                  value={dayjs(`1970-01-01T${startTime}`)}
                   onChange={(v) => {
                     const newStart = v ? dayjs(v).second(0).format("HH:mm") : startTime;
                     console.log("⏰ Start Time Changed:", {
@@ -1284,7 +1298,12 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             </Grid>
             <Grid item xs={12} md={4}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker label="End time *" ampm minutesStep={1} value={dayjs(`1970-01-01T${endTime}`)}
+                <TimePicker
+                  label="End time *"
+                  ampm
+                  minutesStep={1}
+                  disabled={isMultiDay}
+                  value={dayjs(`1970-01-01T${endTime}`)}
                   onChange={(v) => {
                     const newEnd = v ? dayjs(v).second(0).format("HH:mm") : endTime;
                     console.log("⏰ End Time Changed:", {
@@ -1702,6 +1721,9 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
   const [endDate, setEndDate] = useState(initialEnd.format("YYYY-MM-DD"));
   const [startTime, setStartTime] = useState(initialStart.format("HH:mm"));
   const [endTime, setEndTime] = useState(initialEnd.format("HH:mm"));
+  // Store single-day times to restore when toggling back
+  const [singleDayStartTime] = useState(initialStart.format("HH:mm"));
+  const [singleDayEndTime] = useState(initialEnd.format("HH:mm"));
 
   const [timezone, setTimezone] = useState(initialTimezone);
   const timezoneOptions = useMemo(() => {
@@ -2455,7 +2477,16 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                 control={<Switch checked={isMultiDay} onChange={(e) => {
                   const v = e.target.checked;
                   setIsMultiDay(v);
-                  if (!v) setEndDate(startDate);
+                  if (v) {
+                    // If switching to Multi-Day, set default times to 12:00 AM
+                    setStartTime("00:00");
+                    setEndTime("00:00");
+                  } else {
+                    // If switching to Single Day, restore original single-day times and force end date to equal start date
+                    setStartTime(singleDayStartTime);
+                    setEndTime(singleDayEndTime);
+                    setEndDate(startDate);
+                  }
                 }} />}
                 label="Multi-day event?"
               />
@@ -2492,6 +2523,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                   <Grid size={{ xs: 12, md: 4 }}>
                     <TimePicker
                       label="Start time *" ampm minutesStep={1}
+                      disabled={isMultiDay}
                       value={dayjs(`1970-01-01T${startTime}`)}
                       onChange={(val) => {
                         const newStart = val ? dayjs(val).second(0).format("HH:mm") : startTime;
@@ -2506,6 +2538,7 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                   <Grid size={{ xs: 12, md: 4 }}>
                     <TimePicker
                       label="End time *" ampm minutesStep={1}
+                      disabled={isMultiDay}
                       value={dayjs(`1970-01-01T${endTime}`)}
                       onChange={(val) => {
                         const newEnd = val ? dayjs(val).second(0).format("HH:mm") : endTime;
