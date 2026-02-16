@@ -607,6 +607,27 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       });
     }
 
+    // Add sessions_input for multi-day events (atomic with event creation)
+    if (isMultiDay && sessions.length > 0) {
+      const sessionsData = sessions.map((s, idx) => {
+        const sessionStart = toUTCISO(s.startDate, s.startTime, safeTimezone);
+        const sessionEnd = toUTCISO(s.startDate, s.endTime, safeTimezone);
+        return {
+          title: s.title,
+          description: s.description || "",
+          session_type: s.sessionType || "main",
+          session_date: s.startDate,
+          start_time: sessionStart,
+          end_time: sessionEnd,
+          display_order: idx,
+          use_parent_meeting: true,
+        };
+      });
+
+      console.log("Sending sessions_input data:", sessionsData);
+      fd.append("sessions_input", JSON.stringify(sessionsData));
+    }
+
     try {
       // DEBUG: Log FormData contents before sending to backend
       console.log("🚀 FINAL FormData being sent to backend:", {
@@ -628,6 +649,11 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         console.error("Request error response:", json); // Log full error to console
+        // Handle session-specific validation errors
+        if (json?.sessions_input && Array.isArray(json.sessions_input)) {
+          const sessionErrors = json.sessions_input.join("; ");
+          throw new Error(`Sessions validation failed: ${sessionErrors}`);
+        }
         const msg =
           json?.detail ||
           Object.entries(json)
@@ -643,69 +669,14 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
       setActualEventStartTime(json.start_time);
       setActualEventEndTime(json.end_time);
 
-      // Log event times for debugging
-      console.log("Event created with times:", {
+      // Log event and sessions created atomically
+      console.log("Event created with sessions (atomic):", {
+        eventId: json.id,
         startTime: json.start_time,
         endTime: json.end_time,
         timezone: json.timezone,
+        sessionsCount: json.sessions?.length || 0,
       });
-      console.log("Session times being sent:", sessions.map(s => ({
-        title: s.title,
-        startTime: s.startTime,
-        endTime: s.endTime,
-      })));
-
-      // Create sessions if this is a multi-day event
-      if (isMultiDay && sessions.length > 0) {
-        for (let idx = 0; idx < sessions.length; idx++) {
-          const session = sessions[idx];
-          const sessionPayload = {
-            title: session.title,
-            description: session.description,
-            session_date: session.startDate,
-            start_time: session.startTime,
-            end_time: session.endTime,
-            session_type: session.sessionType,
-            display_order: idx,
-            use_parent_meeting: true, // By default, use parent event's meeting
-          };
-
-          console.log(`📤 Session ${idx} payload being sent:`, {
-            title: session.title,
-            start_time: session.startTime,
-            end_time: session.endTime,
-            eventStart: json.start_time,
-            eventEnd: json.end_time,
-          });
-
-          const sessionRes = await fetch(`${API_ROOT}/events/${eventId}/sessions/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify(sessionPayload),
-          });
-
-          const sessionJson = await sessionRes.json().catch(() => ({}));
-          if (!sessionRes.ok) {
-            console.error(`Failed to create session ${idx}:`, sessionJson);
-
-            // Extract validation error messages
-            let errorMsg = `Failed to create session: ${session.title}`;
-            if (sessionJson && typeof sessionJson === 'object') {
-              const errors = Object.entries(sessionJson)
-                .map(([key, value]) => {
-                  const msg = Array.isArray(value) ? value.join(", ") : value;
-                  return `${key}: ${msg}`;
-                })
-                .join(" | ");
-              if (errors) errorMsg = errors;
-            }
-            throw new Error(errorMsg);
-          }
-        }
-      }
 
       onCreated?.(json);
       const msg = isMultiDay && sessions.length > 0
@@ -1218,9 +1189,27 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 const v = e.target.checked;
                 setIsMultiDay(v);
                 if (v) {
-                  // If switching to Multi-Day, set default times to 12:00 AM
-                  setStartTime("00:00");
-                  setEndTime("00:00");
+                  // If switching to Multi-Day, set Start Time to 10 minutes ahead of current time in selected timezone
+                  // and End Time to 12:00 AM
+                  try {
+                    const currentTimeInTz = dayjs().tz(timezone || 'UTC');
+                    const startTimeInTz = currentTimeInTz.add(10, 'minutes').second(0).millisecond(0);
+                    const startTimeStr = startTimeInTz.format("HH:mm");
+                    setStartTime(startTimeStr);
+                    setEndTime("00:00");
+                    console.log("🕐 Multi-Day toggle ON: Set Start Time to current time + 10 minutes", {
+                      timezone,
+                      currentTime: currentTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
+                      startTime: startTimeStr,
+                      startTimeFullISO: startTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
+                    });
+                  } catch (error) {
+                    console.error("❌ Error calculating start time:", error);
+                    // Fallback to current local time if timezone calculation fails
+                    const currentTime = dayjs().add(10, 'minutes').second(0).millisecond(0);
+                    setStartTime(currentTime.format("HH:mm"));
+                    setEndTime("00:00");
+                  }
                 } else {
                   // If switching to Single Day, restore original single-day times and force end date to equal start date
                   setStartTime(singleDayStartTime);
@@ -2478,9 +2467,27 @@ export function EditEventDialog({ open, onClose, event, onUpdated }) {
                   const v = e.target.checked;
                   setIsMultiDay(v);
                   if (v) {
-                    // If switching to Multi-Day, set default times to 12:00 AM
-                    setStartTime("00:00");
-                    setEndTime("00:00");
+                    // If switching to Multi-Day, set Start Time to 10 minutes ahead of current time in selected timezone
+                    // and End Time to 12:00 AM
+                    try {
+                      const currentTimeInTz = dayjs().tz(timezone || 'UTC');
+                      const startTimeInTz = currentTimeInTz.add(10, 'minutes').second(0).millisecond(0);
+                      const startTimeStr = startTimeInTz.format("HH:mm");
+                      setStartTime(startTimeStr);
+                      setEndTime("00:00");
+                      console.log("🕐 Multi-Day toggle ON (Edit): Set Start Time to current time + 10 minutes", {
+                        timezone,
+                        currentTime: currentTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
+                        startTime: startTimeStr,
+                        startTimeFullISO: startTimeInTz.format("YYYY-MM-DD HH:mm:ss"),
+                      });
+                    } catch (error) {
+                      console.error("❌ Error calculating start time (Edit):", error);
+                      // Fallback to current local time if timezone calculation fails
+                      const currentTime = dayjs().add(10, 'minutes').second(0).millisecond(0);
+                      setStartTime(currentTime.format("HH:mm"));
+                      setEndTime("00:00");
+                    }
                   } else {
                     // If switching to Single Day, restore original single-day times and force end date to equal start date
                     setStartTime(singleDayStartTime);

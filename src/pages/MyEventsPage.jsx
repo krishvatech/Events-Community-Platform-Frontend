@@ -54,16 +54,40 @@ import timezone from "dayjs/plugin/timezone";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-function fmtDateRange(startISO, endISO) {
+function fmtDateRange(startISO, endISO, organizerTimezone) {
   try {
-    const start = dayjs(startISO);
-    const end = dayjs(endISO);
-    const sameDay = start.isSame(end, 'day');
-    const left = start.format("MMM D, YYYY h:mm A");
-    const right = end.format("h:mm A");
-    return sameDay ? `${left} – ${right}` : `${left} → ${end.format("MMM D, YYYY h:mm A")}`;
+    const dateFormat = "MMM D, YYYY";
+    const timeFormat = "h:mm A";
+
+    // Organizer's timezone (if provided)
+    const orgStartObj = (startISO && organizerTimezone)
+      ? dayjs(startISO).tz(organizerTimezone)
+      : dayjs(startISO);
+    const orgEndObj = (endISO && organizerTimezone)
+      ? dayjs(endISO).tz(organizerTimezone)
+      : dayjs(endISO);
+    const orgDateStr = orgStartObj.format(dateFormat);
+    const orgTimeRangeKey = `${orgStartObj.format(timeFormat)} – ${orgEndObj.format(timeFormat)}`;
+
+    // User's local timezone
+    const localStartObj = dayjs(startISO).local();
+    const localEndObj = dayjs(endISO).local();
+    const localDateStr = localStartObj.format(dateFormat);
+    const localTimeRangeKey = `${localStartObj.format(timeFormat)} – ${localEndObj.format(timeFormat)}`;
+
+    // Check if times differ
+    const userTimezoneName = dayjs.tz.guess();
+    const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
+
+    return {
+      primary: `${orgDateStr} ${orgTimeRangeKey}`,
+      secondary: timesDiffer ? {
+        label: `Your Time: ${localDateStr} ${localTimeRangeKey}`,
+        timezone: userTimezoneName
+      } : null
+    };
   } catch {
-    return "";
+    return { primary: "", secondary: null };
   }
 }
 
@@ -218,15 +242,36 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
           {ev.title}
         </Typography>
 
-        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12.5 }}>
-          {fmtDateRange(ev.start_time, ev.end_time)}
-          {ev.location && (
-            <>
-              <br />
-              {ev.location}
-            </>
-          )}
-        </Typography>
+        <div className="text-sm text-slate-500">
+          {(() => {
+            const dateRange = fmtDateRange(ev.start_time, ev.end_time, ev.timezone);
+            return (
+              <>
+                {/* Primary: Organizer Time + Location */}
+                <Typography
+                  variant="caption"
+                  className="block font-medium text-slate-900"
+                  sx={{ fontSize: 12.5 }}
+                >
+                  {`${dateRange.primary} • ${ev.location || "Virtual"}`}
+                </Typography>
+
+                {/* Secondary: Your Time */}
+                {dateRange.secondary && (
+                  <Typography
+                    variant="caption"
+                    className="block mt-1 text-xs text-neutral-600"
+                    sx={{ fontSize: 11 }}
+                  >
+                    <span className="font-semibold text-teal-700">Your Time:</span>{" "}
+                    {dateRange.secondary.label}
+                    <span className="text-neutral-400 ml-1">({dateRange.secondary.timezone})</span>
+                  </Typography>
+                )}
+              </>
+            );
+          })()}
+        </div>
 
         {/* Actions stick to bottom to keep equal heights */}
         <Box sx={{ mt: "auto", display: "flex", gap: 1 }}>
