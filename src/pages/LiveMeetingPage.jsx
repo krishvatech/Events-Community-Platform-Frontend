@@ -9610,47 +9610,70 @@ export default function NewLiveMeeting() {
                           <ListItem
                             key={idx}
                             disablePadding
-                            secondaryAction={
-                              <Stack direction="row" spacing={0.75} alignItems="center">
-                                {/* MIC ICON - GREEN when ON, RED when OFF - Read Only */}
-                                <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
-                                  <IconButton
-                                    size="small"
-                                    disabled
-                                    sx={{
-                                      bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                      border: "1px solid",
-                                      borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                      color: m.mic ? "#22c55e" : "#ef4444",
-                                      padding: "6px",
-                                      "&:hover": {
-                                        bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                                      }
-                                    }}
-                                  >
-                                    {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
-                                  </IconButton>
-                                </Tooltip>
+                          >
+                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
+                              <ListItemAvatar>
+                                <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+                                  {initialsFromName(m.name)}
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText
+                                primary={
+                                  <Stack spacing={1}>
+                                    <Stack direction="row" spacing={0.8} alignItems="center">
+                                      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{m.name}{isSelfMember(m) ? " (You)" : ""}</Typography>
+                                      {(() => {
+                                        const userId = m._raw?.customParticipantId || m.id;
+                                        if (userId && !participantKycCache[userId]) {
+                                          fetchAndCacheKycStatus(userId);
+                                        }
+                                        const isVerified = participantKycCache[userId] === "approved";
+                                        return isVerified ? (
+                                          <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
+                                        ) : null;
+                                      })()}
+                                      <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                                    </Stack>
+                                    <Stack direction="row" spacing={0.75} alignItems="center">
+                                      {/* MIC ICON - GREEN when ON, RED when OFF - Read Only */}
+                                      <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
+                                        <IconButton
+                                          size="small"
+                                          disabled
+                                          sx={{
+                                            bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                            border: "1px solid",
+                                            borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                            color: m.mic ? "#22c55e" : "#ef4444",
+                                            padding: "6px",
+                                            "&:hover": {
+                                              bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                            }
+                                          }}
+                                        >
+                                          {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                                        </IconButton>
+                                      </Tooltip>
 
-                                {/* CAMERA ICON - GREEN when ON, RED when OFF - Read Only */}
-                                <Tooltip title={m.cam ? "Camera on" : "Camera off"}>
-                                  <IconButton
-                                    size="small"
-                                    disabled
-                                    sx={{
-                                      bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                      border: "1px solid",
-                                      borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                      color: m.cam ? "#22c55e" : "#ef4444",
-                                      padding: "6px",
-                                      "&:hover": {
-                                        bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                                      }
-                                    }}
-                                  >
-                                    {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
-                                  </IconButton>
-                                </Tooltip>
+                                      {/* CAMERA ICON - GREEN when ON, RED when OFF - Read Only */}
+                                      <Tooltip title={m.cam ? "Camera on" : "Camera off"}>
+                                        <IconButton
+                                          size="small"
+                                          disabled
+                                          sx={{
+                                            bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                            border: "1px solid",
+                                            borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                            color: m.cam ? "#22c55e" : "#ef4444",
+                                            padding: "6px",
+                                            "&:hover": {
+                                              bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                            }
+                                          }}
+                                        >
+                                          {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
+                                        </IconButton>
+                                      </Tooltip>
 
                                 {/* Audience can DM Host; Host should NOT see message icon on own name */}
                                 {!isHost && (
@@ -9692,30 +9715,53 @@ export default function NewLiveMeeting() {
                                     <MoreVertIcon fontSize="small" />
                                   </IconButton>
                                 )}
-                              </Stack>
-                            }
-                          >
-                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1 }}>
-                              <ListItemAvatar>
-                                <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
-                                  {initialsFromName(m.name)}
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText
-                                primary={
-                                  <Stack direction="row" spacing={0.8} alignItems="center">
-                                    <Typography sx={{ fontWeight: 700, fontSize: 13 }}>{truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}</Typography>
-                                    {(() => {
-                                      const userId = m._raw?.customParticipantId || m.id;
-                                      if (userId && !participantKycCache[userId]) {
-                                        fetchAndCacheKycStatus(userId);
-                                      }
-                                      const isVerified = participantKycCache[userId] === "approved";
-                                      return isVerified ? (
-                                        <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
-                                      ) : null;
-                                    })()}
-                                    <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                                      {/* Audience can DM Host; Host should NOT see message icon on own name */}
+                                      {!isHost && (
+                                        <Tooltip title="Send Message">
+                                          <IconButton
+                                            size="small"
+                                            sx={{ color: "#fff" }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleOpenPrivateChat(m);
+                                            }}
+                                          >
+                                            <Badge
+                                              variant="dot"
+                                              color="error"
+                                              overlap="circular"
+                                              invisible={
+                                                !privateUnreadByUserId[
+                                                String(
+                                                  m.clientSpecificId ||
+                                                  m._raw?.clientSpecificId ||
+                                                  m._raw?.client_specific_id ||
+                                                  m._raw?.customParticipantId ||
+                                                  m.id
+                                                )
+                                                ] && !privateUnreadByUserId[String(m.id)]
+                                              }
+                                            >
+                                              <ChatBubbleOutlineIcon fontSize="small" />
+                                            </Badge>
+                                          </IconButton>
+                                        </Tooltip>
+                                      )}
+
+                                      {/* Host actions for other hosts (Bring to Main Stage / Clear / Kick / Ban) */}
+                                      {isHost && !isSelfMember(m) && (
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenParticipantMenu(e, m);
+                                          }}
+                                          sx={{ color: "rgba(255,255,255,0.7)" }}
+                                        >
+                                          <MoreVertIcon fontSize="small" />
+                                        </IconButton>
+                                      )}
+                                    </Stack>
                                   </Stack>
                                 }
                               />
@@ -9900,67 +9946,8 @@ export default function NewLiveMeeting() {
                           <ListItem
                             key={idx}
                             disablePadding
-                            secondaryAction={
-                              <Stack direction="row" spacing={0.75} alignItems="center">
-                                {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
-                                  <IconButton
-                                    size="small"
-                                    onClick={isHost && !isSelfMember(m) ? () => forceMuteParticipant(m) : undefined}
-                                    disabled={!isHost || isSelfMember(m)}
-                                    sx={{
-                                      bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                      border: "1px solid",
-                                      borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                      color: m.mic ? "#22c55e" : "#ef4444",
-                                      padding: "6px",
-                                      cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                      "&:hover": {
-                                        bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                                      }
-                                    }}
-                                  >
-                                    {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
-                                  </IconButton>
-                                </Tooltip>
-
-                                {/* CAMERA ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
-                                  <IconButton
-                                    size="small"
-                                    onClick={isHost && !isSelfMember(m) ? () => forceCameraOffParticipant(m) : undefined}
-                                    disabled={!isHost || isSelfMember(m)}
-                                    sx={{
-                                      bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                      border: "1px solid",
-                                      borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                      color: m.cam ? "#22c55e" : "#ef4444",
-                                      padding: "6px",
-                                      cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                      "&:hover": {
-                                        bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                                      }
-                                    }}
-                                  >
-                                    {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
-                                  </IconButton>
-                                </Tooltip>
-
-                                {/* KICK/BAN MENU for Host */}
-                                {isHost && !isSelfMember(m) && (
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => handleOpenParticipantMenu(e, m)}
-                                    sx={{ color: "rgba(255,255,255,0.7)" }}
-                                  >
-                                    <MoreVertIcon fontSize="small" />
-                                  </IconButton>
-                                )}
-
-                              </Stack>
-                            }
                           >
-                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1 }}>
+                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
                               <ListItemAvatar>
                                 <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
                                   {initialsFromName(m.name)}
@@ -9968,21 +9955,88 @@ export default function NewLiveMeeting() {
                               </ListItemAvatar>
                               <ListItemText
                                 primary={
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                    <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
-                                      {truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}
-                                    </Typography>
-                                    {(() => {
-                                      const userId = m._raw?.customParticipantId || m.id;
-                                      if (userId && !participantKycCache[userId]) {
-                                        fetchAndCacheKycStatus(userId);
-                                      }
-                                      const isVerified = participantKycCache[userId] === "approved";
-                                      return isVerified ? (
-                                        <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
-                                      ) : null;
-                                    })()}
-                                  </Box>
+                                  <Stack spacing={1}>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
+                                        {m.name}{isSelfMember(m) ? " (You)" : ""}
+                                      </Typography>
+                                      {(() => {
+                                        const userId = m._raw?.customParticipantId || m.id;
+                                        if (userId && !participantKycCache[userId]) {
+                                          fetchAndCacheKycStatus(userId);
+                                        }
+                                        const isVerified = participantKycCache[userId] === "approved";
+                                        return isVerified ? (
+                                          <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
+                                        ) : null;
+                                      })()}
+                                    </Box>
+                                    <Stack direction="row" spacing={0.75} alignItems="center">
+                                      {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
+                                      <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (isHost && !isSelfMember(m)) forceMuteParticipant(m);
+                                          }}
+                                          disabled={!isHost || isSelfMember(m)}
+                                          sx={{
+                                            bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                            border: "1px solid",
+                                            borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                            color: m.mic ? "#22c55e" : "#ef4444",
+                                            padding: "4px",
+                                            cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                            "&:hover": {
+                                              bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                            }
+                                          }}
+                                        >
+                                          {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                                        </IconButton>
+                                      </Tooltip>
+
+                                      {/* CAMERA ICON - GREEN when ON, RED when OFF - Clickable for Host */}
+                                      <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (isHost && !isSelfMember(m)) forceCameraOffParticipant(m);
+                                          }}
+                                          disabled={!isHost || isSelfMember(m)}
+                                          sx={{
+                                            bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                            border: "1px solid",
+                                            borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                            color: m.cam ? "#22c55e" : "#ef4444",
+                                            padding: "4px",
+                                            cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                            "&:hover": {
+                                              bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                            }
+                                          }}
+                                        >
+                                          {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
+                                        </IconButton>
+                                      </Tooltip>
+
+                                      {/* KICK/BAN MENU for Host */}
+                                      {isHost && !isSelfMember(m) && (
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenParticipantMenu(e, m);
+                                          }}
+                                          sx={{ color: "rgba(255,255,255,0.7)" }}
+                                        >
+                                          <MoreVertIcon fontSize="small" />
+                                        </IconButton>
+                                      )}
+                                    </Stack>
+                                  </Stack>
                                 }
                                 secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
                               />
@@ -10037,94 +10091,8 @@ export default function NewLiveMeeting() {
                         <ListItem
                           key={idx}
                           disablePadding
-                          secondaryAction={
-                            <Stack direction="row" spacing={0.75} alignItems="center">
-                              {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                              <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
-                                <IconButton
-                                  size="small"
-                                  onClick={isHost && !isSelfMember(m) ? () => forceMuteParticipant(m) : undefined}
-                                  disabled={!isHost || isSelfMember(m)}
-                                  sx={{
-                                    bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                    border: "1px solid",
-                                    borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                    color: m.mic ? "#22c55e" : "#ef4444",
-                                    padding: "4px",
-                                    cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                    "&:hover": {
-                                      bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                                    }
-                                  }}
-                                >
-                                  {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
-                                </IconButton>
-                              </Tooltip>
-
-                              {/* CAMERA ICON - GREEN when ON, RED when OFF - Read-only for self, Clickable for Host on others */}
-                              <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
-                                <IconButton
-                                  size="small"
-                                  onClick={(isHost && !isSelfMember(m)) ? () => forceCameraOffParticipant(m) : undefined}
-                                  disabled={!isHost || isSelfMember(m)}
-                                  sx={{
-                                    bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                    border: "1px solid",
-                                    borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-                                    color: m.cam ? "#22c55e" : "#ef4444",
-                                    padding: "4px",
-                                    cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
-                                    opacity: isSelfMember(m) ? 0.6 : 1,
-                                    "&:hover": {
-                                      bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                                    }
-                                  }}
-                                >
-                                  {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
-                                </IconButton>
-                              </Tooltip>
-
-                              {/* MESSAGE ICON */}
-                              {!isSelfMember(m) && (
-                                <Tooltip title="Send Message">
-                                  <IconButton size="small" sx={{ color: "#fff" }} onClick={() => handleOpenPrivateChat(m)}>
-                                    <Badge
-                                      variant="dot"
-                                      color="error"
-                                      overlap="circular"
-                                      invisible={
-                                        !privateUnreadByUserId[
-                                        String(
-                                          m.clientSpecificId ||
-                                          m._raw?.clientSpecificId ||
-                                          m._raw?.client_specific_id ||
-                                          m._raw?.customParticipantId ||
-                                          m.id
-                                        )
-                                        ] && !privateUnreadByUserId[String(m.id)]
-                                      }
-                                    >
-                                      <ChatBubbleOutlineIcon fontSize="small" />
-                                    </Badge>
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-
-                              {/* KICK/BAN MENU for Host */}
-                              {isHost && !isSelfMember(m) && (
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => handleOpenParticipantMenu(e, m)}
-                                  sx={{ color: "rgba(255,255,255,0.7)" }}
-                                >
-                                  <MoreVertIcon fontSize="small" />
-                                </IconButton>
-                              )}
-
-                            </Stack>
-                          }
                         >
-                          <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, pr: 14 }}>
+                          <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
                             <ListItemAvatar>
                               <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
                                 {initialsFromName(m.name)}
@@ -10132,23 +10100,123 @@ export default function NewLiveMeeting() {
                             </ListItemAvatar>
                             <ListItemText
                               primary={
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                  <Typography noWrap sx={{ fontWeight: 700, fontSize: 13 }}>
-                                    {truncateDisplayName(m.name)}{isSelfMember(m) ? " (You)" : ""}
-                                  </Typography>
-                                  {(() => {
-                                    const userId = m._raw?.customParticipantId || m.id;
-                                    if (userId && !participantKycCache[userId]) {
-                                      fetchAndCacheKycStatus(userId);
-                                    }
-                                    const isVerified = participantKycCache[userId] === "approved";
-                                    return isVerified ? (
-                                      <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
-                                    ) : null;
-                                  })()}
-                                </Box>
+                                <Stack spacing={1}>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Typography noWrap sx={{ fontWeight: 700, fontSize: 13 }}>
+                                      {m.name}{isSelfMember(m) ? " (You)" : ""}
+                                    </Typography>
+                                    {(() => {
+                                      const userId = m._raw?.customParticipantId || m.id;
+                                      if (userId && !participantKycCache[userId]) {
+                                        fetchAndCacheKycStatus(userId);
+                                      }
+                                      const isVerified = participantKycCache[userId] === "approved";
+                                      return isVerified ? (
+                                        <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
+                                      ) : null;
+                                    })()}
+                                  </Box>
+                                  <Stack direction="row" spacing={0.75} alignItems="center">
+                                    {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
+                                    <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (isHost && !isSelfMember(m)) forceMuteParticipant(m);
+                                        }}
+                                        disabled={!isHost || isSelfMember(m)}
+                                        sx={{
+                                          bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                          border: "1px solid",
+                                          borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                          color: m.mic ? "#22c55e" : "#ef4444",
+                                          padding: "4px",
+                                          cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                          "&:hover": {
+                                            bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                          }
+                                        }}
+                                      >
+                                        {m.mic ? <MicIcon fontSize="small" /> : <MicOffIcon fontSize="small" />}
+                                      </IconButton>
+                                    </Tooltip>
+
+                                    {/* CAMERA ICON - GREEN when ON, RED when OFF - Read-only for self, Clickable for Host on others */}
+                                    <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (isHost && !isSelfMember(m)) forceCameraOffParticipant(m);
+                                        }}
+                                        disabled={!isHost || isSelfMember(m)}
+                                        sx={{
+                                          bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                                          border: "1px solid",
+                                          borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+                                          color: m.cam ? "#22c55e" : "#ef4444",
+                                          padding: "4px",
+                                          cursor: (isHost && !isSelfMember(m)) ? "pointer" : "default",
+                                          opacity: isSelfMember(m) ? 0.6 : 1,
+                                          "&:hover": {
+                                            bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                                          }
+                                        }}
+                                      >
+                                        {m.cam ? <VideocamIcon fontSize="small" /> : <VideocamOffIcon fontSize="small" />}
+                                      </IconButton>
+                                    </Tooltip>
+
+                                    {/* MESSAGE ICON */}
+                                    {!isSelfMember(m) && (
+                                      <Tooltip title="Send Message">
+                                        <IconButton
+                                          size="small"
+                                          sx={{ color: "#fff" }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenPrivateChat(m);
+                                          }}
+                                        >
+                                          <Badge
+                                            variant="dot"
+                                            color="error"
+                                            overlap="circular"
+                                            invisible={
+                                              !privateUnreadByUserId[
+                                              String(
+                                                m.clientSpecificId ||
+                                                m._raw?.clientSpecificId ||
+                                                m._raw?.client_specific_id ||
+                                                m._raw?.customParticipantId ||
+                                                m.id
+                                              )
+                                              ] && !privateUnreadByUserId[String(m.id)]
+                                            }
+                                          >
+                                            <ChatBubbleOutlineIcon fontSize="small" />
+                                          </Badge>
+                                        </IconButton>
+                                      </Tooltip>
+                                    )}
+
+                                    {/* KICK/BAN MENU for Host */}
+                                    {isHost && !isSelfMember(m) && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenParticipantMenu(e, m);
+                                        }}
+                                        sx={{ color: "rgba(255,255,255,0.7)" }}
+                                      >
+                                        <MoreVertIcon fontSize="small" />
+                                      </IconButton>
+                                    )}
+                                  </Stack>
+                                </Stack>
                               }
-                              secondary={<Typography noWrap sx={{ fontSize: 12, opacity: 0.7 }}>Audience</Typography>}
                             />
                           </ListItemButton>
                         </ListItem>
