@@ -11,13 +11,26 @@ import {
     CircularProgress,
     Button,
     Tabs,
-    Tab
+    Tab,
+    Slider,
+    Switch,
+    FormControlLabel,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    LinearProgress,
+    Card,
+    CardContent,
+    Alert
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PersonIcon from '@mui/icons-material/Person';
 import GroupIcon from '@mui/icons-material/Group';
+import TuneIcon from '@mui/icons-material/Tune';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
@@ -37,6 +50,10 @@ export default function SpeedNetworkingHostPanel({
     const [expanded, setExpanded] = useState(true);
     const [removing, setRemoving] = useState(null);
     const [selectedTab, setSelectedTab] = useState('waiting');
+    const [criteriaConfig, setCriteriaConfig] = useState(null);
+    const [savingCriteria, setSavingCriteria] = useState(false);
+    const [matchPreview, setMatchPreview] = useState(null);
+    const [loadingPreview, setLoadingPreview] = useState(false);
 
     const fetchQueue = async () => {
         if (!session?.id) {
@@ -136,6 +153,104 @@ export default function SpeedNetworkingHostPanel({
         }
     };
 
+    const fetchCriteriaConfig = async () => {
+        if (!session?.id) return;
+        try {
+            const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/`.replace(/([^:]\/)\/+/g, "$1");
+            const res = await fetch(url, { headers: authHeader() });
+            if (res.ok) {
+                const sessionData = await res.json();
+                setCriteriaConfig(sessionData.criteria_config);
+                console.log('[HostPanel] Fetched criteria config:', sessionData.criteria_config);
+            }
+        } catch (err) {
+            console.error('[HostPanel] Error fetching criteria config:', err);
+        }
+    };
+
+    const fetchMatchPreview = async () => {
+        if (!session?.id) return;
+        try {
+            setLoadingPreview(true);
+            const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/match_preview/`.replace(/([^:]\/)\/+/g, "$1");
+            console.log('[HostPanel] Fetching match preview from:', url);
+            const res = await fetch(url, { headers: authHeader() });
+            if (res.ok) {
+                const data = await res.json();
+                setMatchPreview(data);
+                console.log('[HostPanel] Match preview received:', data);
+            } else {
+                const errorData = await res.json().catch(() => ({}));
+                console.error('[HostPanel] API error:', res.status, errorData);
+                setMatchPreview(null); // Don't show card if API fails
+            }
+        } catch (err) {
+            console.error('[HostPanel] Error fetching match preview:', err);
+            setMatchPreview(null); // Don't show card on error
+        } finally {
+            setLoadingPreview(false);
+        }
+    };
+
+    const handleSaveCriteria = async () => {
+        if (!session?.id || !criteriaConfig) return;
+        try {
+            setSavingCriteria(true);
+            const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/update_criteria/`.replace(/([^:]\/)\/+/g, "$1");
+            const res = await fetch(url, {
+                method: 'PATCH',
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ criteria_config: criteriaConfig })
+            });
+            if (res.ok) {
+                console.log('[HostPanel] Criteria saved successfully');
+                // Refresh preview after saving
+                await fetchMatchPreview();
+            } else {
+                const errorData = await res.json();
+                console.error('[HostPanel] Failed to save criteria:', errorData);
+                alert('Failed to save criteria: ' + (errorData.error || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error('[HostPanel] Error saving criteria:', err);
+            alert('Error saving criteria: ' + err.message);
+        } finally {
+            setSavingCriteria(false);
+        }
+    };
+
+    const handleNormalizeWeights = () => {
+        if (!criteriaConfig) return;
+        const enabledCriteria = Object.entries(criteriaConfig)
+            .filter(([_, config]) => config.enabled)
+            .map(([key, _]) => key);
+
+        if (enabledCriteria.length === 0) return;
+
+        const totalWeight = enabledCriteria.reduce((sum, key) => sum + (criteriaConfig[key].weight || 0), 0);
+        if (totalWeight === 0) return;
+
+        const normalized = { ...criteriaConfig };
+        enabledCriteria.forEach(key => {
+            normalized[key] = {
+                ...normalized[key],
+                weight: parseFloat((normalized[key].weight / totalWeight).toFixed(2))
+            };
+        });
+        setCriteriaConfig(normalized);
+    };
+
+    // Load criteria config when tab changes to settings
+    useEffect(() => {
+        if (selectedTab === 'settings') {
+            if (!criteriaConfig) {
+                fetchCriteriaConfig();
+            }
+            // Always refetch preview when on settings tab
+            fetchMatchPreview();
+        }
+    }, [selectedTab, queueEntries]);
+
     // Calculate stats
     const waitingCount = queueEntries.filter(e => !e.current_match).length;
     const matchedCount = queueEntries.filter(e => e.current_match).length;
@@ -225,6 +340,7 @@ export default function SpeedNetworkingHostPanel({
                         <Tab label={`Waiting (${waitingCount})`} value="waiting" />
                         <Tab label={`Active Matches (${matchedPairs.length})`} value="active" />
                         <Tab label={`Past Matches (${pastMatches.length})`} value="past" />
+                        <Tab label="Settings" value="settings" />
                     </Tabs>
 
                     {loading ? (
@@ -503,6 +619,439 @@ export default function SpeedNetworkingHostPanel({
                                         </Typography>
                                     )}
                                 </>
+                            )}
+
+                            {/* Settings Tab */}
+                            {selectedTab === 'settings' && (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {/* Criteria Config Cards */}
+                                    {criteriaConfig && (
+                                        <>
+                                            {['skill', 'experience', 'location', 'education'].map((criterion) => {
+                                                const config = criteriaConfig[criterion];
+                                                if (!config) return null;
+
+                                                const matchTypeOptions = {
+                                                    skill: ['Complementary', 'Similar'],
+                                                    experience: ['Peer', 'Mentorship', 'Mixed'],
+                                                    location: ['Exact City', 'Radius', 'Timezone'],
+                                                    education: ['Same Level', 'Complementary Fields', 'Hierarchical']
+                                                };
+
+                                                const matchTypeKeyMap = {
+                                                    skill: { 'Complementary': 'complementary', 'Similar': 'similar' },
+                                                    experience: { 'Peer': 'peer', 'Mentorship': 'mentorship', 'Mixed': 'mixed' },
+                                                    location: { 'Exact City': 'exact_city', 'Radius': 'radius', 'Timezone': 'timezone' },
+                                                    education: { 'Same Level': 'same_level', 'Complementary Fields': 'complementary_fields', 'Hierarchical': 'hierarchical' }
+                                                };
+
+                                                const reverseMapKey = {
+                                                    skill: { 'complementary': 'Complementary', 'similar': 'Similar' },
+                                                    experience: { 'peer': 'Peer', 'mentorship': 'Mentorship', 'mixed': 'Mixed' },
+                                                    location: { 'exact_city': 'Exact City', 'radius': 'Radius', 'timezone': 'Timezone' },
+                                                    education: { 'same_level': 'Same Level', 'complementary_fields': 'Complementary Fields', 'hierarchical': 'Hierarchical' }
+                                                };
+
+                                                return (
+                                                    <Card key={criterion} sx={{
+                                                        bgcolor: 'rgba(255,255,255,0.05)',
+                                                        borderRadius: 2,
+                                                        border: '1px solid rgba(255,255,255,0.1)'
+                                                    }}>
+                                                        <CardContent>
+                                                            <Box sx={{
+                                                                display: 'flex',
+                                                                justifyContent: 'space-between',
+                                                                alignItems: 'center',
+                                                                mb: 2
+                                                            }}>
+                                                                <Typography sx={{
+                                                                    color: '#fff',
+                                                                    fontWeight: 600,
+                                                                    fontSize: 14,
+                                                                    textTransform: 'capitalize'
+                                                                }}>
+                                                                    {criterion}
+                                                                </Typography>
+                                                                <FormControlLabel
+                                                                    control={
+                                                                        <Switch
+                                                                            checked={config.enabled || false}
+                                                                            onChange={(e) => {
+                                                                                const newConfig = { ...criteriaConfig };
+                                                                                newConfig[criterion].enabled = e.target.checked;
+                                                                                setCriteriaConfig(newConfig);
+                                                                            }}
+                                                                            size="small"
+                                                                        />
+                                                                    }
+                                                                    label={config.enabled ? 'Enabled' : 'Disabled'}
+                                                                    sx={{ color: 'rgba(255,255,255,0.7)', mr: 0 }}
+                                                                />
+                                                            </Box>
+
+                                                            {config.enabled && (
+                                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                                    {/* Weight Slider */}
+                                                                    <Box>
+                                                                        <Box sx={{
+                                                                            display: 'flex',
+                                                                            justifyContent: 'space-between',
+                                                                            mb: 1
+                                                                        }}>
+                                                                            <Typography sx={{
+                                                                                color: 'rgba(255,255,255,0.7)',
+                                                                                fontSize: 12
+                                                                            }}>
+                                                                                Weight
+                                                                            </Typography>
+                                                                            <Typography sx={{
+                                                                                color: '#fff',
+                                                                                fontSize: 12,
+                                                                                fontWeight: 500
+                                                                            }}>
+                                                                                {Math.round((config.weight || 0) * 100)}%
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        <Slider
+                                                                            value={(config.weight || 0) * 100}
+                                                                            onChange={(e, newValue) => {
+                                                                                const newConfig = { ...criteriaConfig };
+                                                                                newConfig[criterion].weight = newValue / 100;
+                                                                                setCriteriaConfig(newConfig);
+                                                                            }}
+                                                                            min={0}
+                                                                            max={100}
+                                                                            step={5}
+                                                                            sx={{
+                                                                                color: '#5a78ff',
+                                                                                '& .MuiSlider-track': { bgcolor: '#5a78ff' }
+                                                                            }}
+                                                                        />
+                                                                    </Box>
+
+                                                                    {/* Required Switch */}
+                                                                    <FormControlLabel
+                                                                        control={
+                                                                            <Switch
+                                                                                checked={config.required || false}
+                                                                                onChange={(e) => {
+                                                                                    const newConfig = { ...criteriaConfig };
+                                                                                    newConfig[criterion].required = e.target.checked;
+                                                                                    setCriteriaConfig(newConfig);
+                                                                                }}
+                                                                                size="small"
+                                                                            />
+                                                                        }
+                                                                        label="Required"
+                                                                        sx={{ color: 'rgba(255,255,255,0.7)' }}
+                                                                    />
+
+                                                                    {/* Threshold Slider (only if required) */}
+                                                                    {config.required && (
+                                                                        <Box>
+                                                                            <Box sx={{
+                                                                                display: 'flex',
+                                                                                justifyContent: 'space-between',
+                                                                                mb: 1
+                                                                            }}>
+                                                                                <Typography sx={{
+                                                                                    color: 'rgba(255,255,255,0.7)',
+                                                                                    fontSize: 12
+                                                                                }}>
+                                                                                    Threshold
+                                                                                </Typography>
+                                                                                <Typography sx={{
+                                                                                    color: '#fff',
+                                                                                    fontSize: 12,
+                                                                                    fontWeight: 500
+                                                                                }}>
+                                                                                    {config.threshold || 40}%
+                                                                                </Typography>
+                                                                            </Box>
+                                                                            <Slider
+                                                                                value={config.threshold || 40}
+                                                                                onChange={(e, newValue) => {
+                                                                                    const newConfig = { ...criteriaConfig };
+                                                                                    newConfig[criterion].threshold = newValue;
+                                                                                    setCriteriaConfig(newConfig);
+                                                                                }}
+                                                                                min={0}
+                                                                                max={100}
+                                                                                step={5}
+                                                                                sx={{
+                                                                                    color: '#22c55e',
+                                                                                    '& .MuiSlider-track': { bgcolor: '#22c55e' }
+                                                                                }}
+                                                                            />
+                                                                        </Box>
+                                                                    )}
+
+                                                                    {/* Match Type Selector */}
+                                                                    <FormControl fullWidth size="small">
+                                                                        <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                                                                            {criterion === 'skill' ? 'Match Mode' : 'Match Type'}
+                                                                        </InputLabel>
+                                                                        <Select
+                                                                            value={reverseMapKey[criterion]?.[config.match_mode || config.match_type || config.match_strategy] || ''}
+                                                                            onChange={(e) => {
+                                                                                const newConfig = { ...criteriaConfig };
+                                                                                const keyName =
+                                                                                    criterion === 'skill' ? 'match_mode' :
+                                                                                    criterion === 'experience' ? 'match_type' :
+                                                                                    criterion === 'location' ? 'match_strategy' :
+                                                                                    'match_type';
+                                                                                newConfig[criterion][keyName] = matchTypeKeyMap[criterion][e.target.value];
+                                                                                setCriteriaConfig(newConfig);
+                                                                            }}
+                                                                            label={criterion === 'skill' ? 'Match Mode' : 'Match Type'}
+                                                                            sx={{
+                                                                                color: '#fff',
+                                                                                '& .MuiOutlinedInput-notchedOutline': {
+                                                                                    borderColor: 'rgba(255,255,255,0.2)'
+                                                                                },
+                                                                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                                                    borderColor: 'rgba(255,255,255,0.3)'
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            {matchTypeOptions[criterion]?.map(opt => (
+                                                                                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                                                                            ))}
+                                                                        </Select>
+                                                                    </FormControl>
+                                                                </Box>
+                                                            )}
+                                                        </CardContent>
+                                                    </Card>
+                                                );
+                                            })}
+
+                                            {/* Normalize and Save Buttons */}
+                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                                <Button
+                                                    variant="outlined"
+                                                    onClick={handleNormalizeWeights}
+                                                    sx={{
+                                                        color: '#5a78ff',
+                                                        borderColor: '#5a78ff',
+                                                        flex: 1,
+                                                        '&:hover': { bgcolor: 'rgba(90,120,255,0.1)' }
+                                                    }}
+                                                >
+                                                    Normalize Weights
+                                                </Button>
+                                                <Button
+                                                    variant="contained"
+                                                    onClick={handleSaveCriteria}
+                                                    disabled={savingCriteria}
+                                                    sx={{
+                                                        bgcolor: '#22c55e',
+                                                        color: '#000',
+                                                        flex: 1,
+                                                        '&:hover': { bgcolor: '#16a34a' }
+                                                    }}
+                                                >
+                                                    {savingCriteria ? <CircularProgress size={20} /> : 'Save'}
+                                                </Button>
+                                            </Box>
+
+                                            {/* Match Preview Card */}
+                                            {(matchPreview || loadingPreview) && (
+                                                <Card sx={{
+                                                    bgcolor: 'rgba(90,120,255,0.1)',
+                                                    borderRadius: 2,
+                                                    border: '1px solid rgba(90,120,255,0.3)'
+                                                }}>
+                                                    <CardContent>
+                                                        <Box sx={{
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
+                                                            mb: 2
+                                                        }}>
+                                                            <Typography sx={{
+                                                                color: '#fff',
+                                                                fontWeight: 600,
+                                                                fontSize: 14
+                                                            }}>
+                                                                Match Preview
+                                                            </Typography>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={fetchMatchPreview}
+                                                                disabled={loadingPreview}
+                                                            >
+                                                                {loadingPreview ? (
+                                                                    <CircularProgress size={20} />
+                                                                ) : (
+                                                                    <RefreshIcon sx={{ color: '#5a78ff', fontSize: 18 }} />
+                                                                )}
+                                                            </IconButton>
+                                                        </Box>
+
+                                                        {loadingPreview ? (
+                                                            <Box sx={{ textAlign: 'center', py: 2 }}>
+                                                                <CircularProgress size={24} />
+                                                                <Typography sx={{
+                                                                    color: 'rgba(255,255,255,0.7)',
+                                                                    fontSize: 12,
+                                                                    mt: 1
+                                                                }}>
+                                                                    Calculating preview...
+                                                                </Typography>
+                                                            </Box>
+                                                        ) : matchPreview?.total_waiting < 2 ? (
+                                                            <Typography sx={{
+                                                                color: 'rgba(255,255,255,0.7)',
+                                                                fontSize: 13,
+                                                                textAlign: 'center',
+                                                                py: 2
+                                                            }}>
+                                                                Need at least 2 users in queue to preview matches
+                                                            </Typography>
+                                                        ) : (
+                                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                                            {/* Waiting Users */}
+                                                            <Box>
+                                                                <Typography sx={{
+                                                                    color: 'rgba(255,255,255,0.7)',
+                                                                    fontSize: 12,
+                                                                    mb: 0.5
+                                                                }}>
+                                                                    Waiting Users: <span style={{ color: '#fff', fontWeight: 600 }}>{matchPreview.total_waiting}</span>
+                                                                </Typography>
+                                                            </Box>
+
+                                                            {/* Potential Pairs */}
+                                                            <Box>
+                                                                <Typography sx={{
+                                                                    color: 'rgba(255,255,255,0.7)',
+                                                                    fontSize: 12,
+                                                                    mb: 0.5
+                                                                }}>
+                                                                    Potential Pairs: <span style={{ color: '#fff', fontWeight: 600 }}>{matchPreview.potential_pairs}</span>
+                                                                </Typography>
+                                                            </Box>
+
+                                                            {/* Match Rate with Progress Bar */}
+                                                            <Box>
+                                                                <Box sx={{
+                                                                    display: 'flex',
+                                                                    justifyContent: 'space-between',
+                                                                    mb: 0.5
+                                                                }}>
+                                                                    <Typography sx={{
+                                                                        color: 'rgba(255,255,255,0.7)',
+                                                                        fontSize: 12
+                                                                    }}>
+                                                                        Matchable Pairs
+                                                                    </Typography>
+                                                                    <Typography sx={{
+                                                                        color: '#22c55e',
+                                                                        fontSize: 12,
+                                                                        fontWeight: 600
+                                                                    }}>
+                                                                        {matchPreview.matchable_pairs}/{matchPreview.potential_pairs} ({matchPreview.match_rate}%)
+                                                                    </Typography>
+                                                                </Box>
+                                                                <LinearProgress
+                                                                    variant="determinate"
+                                                                    value={matchPreview.match_rate}
+                                                                    sx={{
+                                                                        bgcolor: 'rgba(255,255,255,0.1)',
+                                                                        '& .MuiLinearProgress-bar': {
+                                                                            bgcolor: matchPreview.match_rate > 75 ? '#22c55e' : matchPreview.match_rate > 50 ? '#f59e0b' : '#ef4444'
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </Box>
+
+                                                            {/* Avg Score with Progress Bar */}
+                                                            <Box>
+                                                                <Box sx={{
+                                                                    display: 'flex',
+                                                                    justifyContent: 'space-between',
+                                                                    mb: 0.5
+                                                                }}>
+                                                                    <Typography sx={{
+                                                                        color: 'rgba(255,255,255,0.7)',
+                                                                        fontSize: 12
+                                                                    }}>
+                                                                        Avg Match Quality
+                                                                    </Typography>
+                                                                    <Typography sx={{
+                                                                        color: '#fff',
+                                                                        fontSize: 12,
+                                                                        fontWeight: 600
+                                                                    }}>
+                                                                        {matchPreview.avg_score}%
+                                                                    </Typography>
+                                                                </Box>
+                                                                <LinearProgress
+                                                                    variant="determinate"
+                                                                    value={matchPreview.avg_score}
+                                                                    sx={{
+                                                                        bgcolor: 'rgba(255,255,255,0.1)',
+                                                                        '& .MuiLinearProgress-bar': {
+                                                                            bgcolor: '#5a78ff'
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </Box>
+
+                                                            {/* Score Distribution */}
+                                                            <Box>
+                                                                <Typography sx={{
+                                                                    color: 'rgba(255,255,255,0.7)',
+                                                                    fontSize: 12,
+                                                                    mb: 1
+                                                                }}>
+                                                                    Score Distribution
+                                                                </Typography>
+                                                                <Box sx={{
+                                                                    display: 'grid',
+                                                                    gridTemplateColumns: 'repeat(4, 1fr)',
+                                                                    gap: 0.5
+                                                                }}>
+                                                                    {[
+                                                                        { label: '0-25', value: matchPreview.score_distribution['0-25'] },
+                                                                        { label: '26-50', value: matchPreview.score_distribution['26-50'] },
+                                                                        { label: '51-75', value: matchPreview.score_distribution['51-75'] },
+                                                                        { label: '76-100', value: matchPreview.score_distribution['76-100'] }
+                                                                    ].map(({ label, value }) => (
+                                                                        <Box key={label} sx={{
+                                                                            textAlign: 'center',
+                                                                            p: 1,
+                                                                            bgcolor: 'rgba(255,255,255,0.05)',
+                                                                            borderRadius: 1,
+                                                                            border: '1px solid rgba(255,255,255,0.1)'
+                                                                        }}>
+                                                                            <Typography sx={{
+                                                                                color: 'rgba(255,255,255,0.7)',
+                                                                                fontSize: 10
+                                                                            }}>
+                                                                                {label}
+                                                                            </Typography>
+                                                                            <Typography sx={{
+                                                                                color: '#fff',
+                                                                                fontWeight: 600,
+                                                                                fontSize: 13
+                                                                            }}>
+                                                                                {value}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                    ))}
+                                                                </Box>
+                                                            </Box>
+                                                        </Box>
+                                                        )}
+                                                    </CardContent>
+                                                </Card>
+                                            )}
+                                        </>
+                                    )}
+                                </Box>
                             )}
                         </>
                     )}
