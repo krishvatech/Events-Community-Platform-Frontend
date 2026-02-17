@@ -91,12 +91,24 @@ export function isPostEventLoungeOpen(event) {
  * @param {Object} event - Event object with timing and waiting room info
  * @param {Boolean} isLive - Is event currently live?
  * @param {Boolean} isJoining - Is user currently joining?
+ * @param {Object} userRegistration - Optional: User's event registration with admission_status
  * @returns {String} Button text to display
  */
-export function getJoinButtonText(event, isLive, isJoining) {
+export function getJoinButtonText(event, isLive, isJoining, userRegistration = null) {
   if (isJoining) return "Joining…";
 
   if (!event) return "Join";
+
+  // ✅ NEW: Check if user has been admitted to waiting room
+  // If user's admission_status is "admitted", they can join live (no need for waiting room)
+  if (userRegistration?.admission_status === "admitted") {
+    return "Join Live";
+  }
+
+  // ✅ NEW: If user was rejected, show rejected state
+  if (userRegistration?.admission_status === "rejected") {
+    return "Application Declined";
+  }
 
   // Pre-event lounge (if configured and open)
   if (isPreEventLoungeOpen(event)) {

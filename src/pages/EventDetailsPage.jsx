@@ -201,6 +201,9 @@ export default function EventDetailsPage() {
   const [speedNetworkingSessionId, setSpeedNetworkingSessionId] = useState(null);
   const [checkingSpeedNetworking, setCheckingSpeedNetworking] = useState(false);
 
+  // ✅ NEW: Real-time admission status updates
+  const [admissionStatus, setAdmissionStatus] = useState(null);
+
 
   const handleShowParticipants = async () => {
     setShowParticipantsDialog(true);

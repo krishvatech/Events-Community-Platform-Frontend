@@ -410,7 +410,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                 >
                   {isHost
                     ? (isJoining ? "Opening Host Access..." : "Join as Host")
-                    : getJoinButtonText(ev, isLive, isJoining)}
+                    : getJoinButtonText(ev, isLive, isJoining, reg)}
                 </Button>
               );
             }
@@ -698,6 +698,48 @@ export default function MyEventsPage() {
     };
   }, [page, tab, q, token]); // Re-run when page/tab/q changes
 
+  // ✅ NEW: Refresh registration status when page regains focus
+  // This ensures button text updates when user returns from live meeting after admission
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log("[MyEvents] Page regained focus - refreshing registrations...");
+
+      // Refresh all current registrations
+      if (myRegistrations && Object.keys(myRegistrations).length > 0) {
+        const refreshRegs = {};
+        Promise.all(
+          Object.entries(myRegistrations).map(async ([eventId, reg]) => {
+            try {
+              const regUrl = new URL(urlJoin(API_BASE, "/event-registrations/"));
+              regUrl.searchParams.set("event", String(eventId));
+              const rRes = await fetch(regUrl.toString(), {
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+              });
+              if (rRes.ok) {
+                const rData = await rRes.json();
+                const rList = asList(rData);
+                if (rList.length > 0) {
+                  refreshRegs[eventId] = rList[0];
+                  console.log(`[MyEvents] ✅ Updated registration for event ${eventId}:`, rList[0].admission_status);
+                }
+              }
+            } catch (e) {
+              console.warn(`[MyEvents] Failed to refresh registration for event ${eventId}:`, e);
+            }
+          })
+        ).then(() => {
+          setMyRegistrations(prev => ({ ...prev, ...refreshRegs }));
+        });
+      }
+    };
+
+    // Listen for page focus
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [token, myRegistrations]);
 
   // PAGINATION: derive current page slice
   // With server-side pagination, 'events' IS the page slice.

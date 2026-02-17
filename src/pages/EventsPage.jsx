@@ -581,7 +581,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                   disabled={!canShowActiveJoin}
                   className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                 >
-                  {canShowActiveJoin ? getJoinButtonText(ev, isLive, false) : "Join (Not Live Yet)"}
+                  {canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)"}
                 </Button>
               )}
               {/* Show Cancel Registration button only for free events */}
@@ -896,7 +896,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                         disabled={!canShowActiveJoin}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                       >
-                        {canShowActiveJoin ? getJoinButtonText(ev, isLive, false) : "Join (Not Live Yet)"}
+                        {canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)"}
                       </Button>
                     )}
                     {/* Show Cancel Registration button only for free events */}
@@ -1264,6 +1264,56 @@ export default function EventsPage() {
     })();
     return () => ctrl.abort();
   }, []);
+
+  // ✅ NEW: Refresh registration status when page regains focus
+  // This ensures button text updates when user returns from live meeting after admission
+  useEffect(() => {
+    const token =
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("access");
+
+    if (!token) return; // Not logged in
+
+    const handleFocus = () => {
+      console.log("[EventsPage] Page regained focus - refreshing registrations...");
+
+      // Refresh all current registrations
+      if (myRegistrations && Object.keys(myRegistrations).length > 0) {
+        const refreshRegs = {};
+        Promise.all(
+          Object.entries(myRegistrations).map(async ([eventId, reg]) => {
+            try {
+              const regUrl = new URL(`${API_BASE}/event-registrations/`);
+              regUrl.searchParams.set("event", String(eventId));
+              const rRes = await fetch(regUrl.toString(), {
+                headers: {
+                  "Content-Type": "application/json",
+                  ...authHeaders(),
+                },
+              });
+              if (rRes.ok) {
+                const rData = await rRes.json();
+                const rList = Array.isArray(rData?.results) ? rData.results : (Array.isArray(rData) ? rData : []);
+                if (rList.length > 0) {
+                  refreshRegs[eventId] = rList[0];
+                  console.log(`[EventsPage] ✅ Updated registration for event ${eventId}:`, rList[0].admission_status);
+                }
+              }
+            } catch (e) {
+              console.warn(`[EventsPage] Failed to refresh registration for event ${eventId}:`, e);
+            }
+          })
+        ).then(() => {
+          setMyRegistrations(prev => ({ ...prev, ...refreshRegs }));
+        });
+      }
+    };
+
+    // Listen for page focus
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [myRegistrations]);
 
   // ✅ Locations based on currently displayed events (rawEvents = your current page results)
   const locationsFromEvents = useMemo(() => {

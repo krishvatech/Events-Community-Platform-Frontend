@@ -4192,6 +4192,28 @@ export default function NewLiveMeeting() {
               timestamp: msg.timestamp,
             });
           }
+        } else if (msg.type === "admission_status_changed") {
+          // ✅ NEW: Handle real-time admission status change
+          // When host admits user, button should change from "Join Waiting Room" to "Join Live"
+          console.log("[MainSocket] ✅ Admission status changed:", msg.admission_status);
+
+          const newStatus = msg.admission_status;
+          setWaitingRoomStatus(newStatus);
+
+          if (newStatus === "admitted") {
+            // User was admitted - exit waiting room and enter meeting
+            console.log("[MainSocket] ✅ User admitted! Exiting waiting room...");
+            setWaitingRoomActive(false);
+            showSnackbar("You have been admitted to the meeting! 🎉", "success");
+          } else if (newStatus === "rejected") {
+            // User was rejected from the meeting
+            console.log("[MainSocket] ❌ User rejected from meeting");
+            showSnackbar("Your request to join has been declined by the host.", "error");
+            // Optionally redirect after delay
+            setTimeout(() => {
+              navigate(`/community/${currentCommunitySlug}/events/${eventId}`);
+            }, 3000);
+          }
         } else if (msg.type === "lounge_state" || msg.type === "welcome") {
           if (msg.online_users) setOnlineUsers(msg.online_users);
           const tableState =
