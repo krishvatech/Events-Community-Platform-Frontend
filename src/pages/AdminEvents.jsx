@@ -774,6 +774,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           <Box className="flex items-start mb-3">
             <TextField
               label="Name of the Event *"
+              placeholder="Enter event name"
+              InputLabelProps={{ shrink: true }}
               value={title}
               onChange={(e) => {
                 const v = e.target.value;
@@ -788,6 +790,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
           <TextField
             label="Description *"
+            placeholder="Enter event description..."
+            InputLabelProps={{ shrink: true }}
             multiline
             minRows={3}
             value={description}
@@ -909,6 +913,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           ) : (
             <TextField
               label="Location *"
+              placeholder="Enter location (City, Country)"
+              InputLabelProps={{ shrink: true }}
               value={location}
               onChange={(e) => {
                 setLocation(e.target.value);
@@ -954,6 +960,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           <Grid item xs={12} sm={4}>
             <TextField
               label="Price ($)"
+              placeholder="0.00"
+              InputLabelProps={{ shrink: true }}
               type="number"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
@@ -968,6 +976,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           <Grid item xs={12} sm={4}>
             <TextField
               label="Max Participants"
+              placeholder="e.g., 100"
+              InputLabelProps={{ shrink: true }}
               type="number"
               value={maxParticipants}
               onChange={(e) => setMaxParticipants(e.target.value)}
@@ -1544,10 +1554,26 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           {/* NEW: Resource metadata (applies to any type) */}
           <Grid container spacing={2} sx={{ mt: 2 }}>
             <Grid item xs={12} md={6}>
-              <TextField label="Title" value={resTitle} onChange={(e) => setResTitle(e.target.value)} fullWidth />
+              <TextField
+                label="Title"
+                placeholder="Enter resource title"
+                InputLabelProps={{ shrink: true }}
+                value={resTitle}
+                onChange={(e) => setResTitle(e.target.value)}
+                fullWidth
+              />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField label="Description" value={resDesc} onChange={(e) => setResDesc(e.target.value)} fullWidth multiline minRows={1} />
+              <TextField
+                label="Description"
+                placeholder="Enter resource description"
+                InputLabelProps={{ shrink: true }}
+                value={resDesc}
+                onChange={(e) => setResDesc(e.target.value)}
+                fullWidth
+                multiline
+                minRows={1}
+              />
             </Grid>
             <Grid item xs={12}>
               <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>Tags</Typography>
