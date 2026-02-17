@@ -102,6 +102,7 @@ import MainRoomPeek from "../components/lounge/MainRoomPeek.jsx";
 import PostEventLoungeScreen from "../components/lounge/PostEventLoungeScreen.jsx";
 import NotificationHistoryPanel from "../components/lounge/NotificationHistoryPanel.jsx";
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
+import SpeedNetworkingSessionPrompt from "../components/speed-networking/SpeedNetworkingSessionPrompt.jsx";
 import BannedParticipantsDialog from "../components/live-meeting/BannedParticipantsDialog.jsx";
 import WaitingRoomAnnouncements from "../components/live-meeting/WaitingRoomAnnouncements.jsx";
 import WaitingRoomControls from "../components/live-meeting/WaitingRoomControls.jsx";
@@ -2062,6 +2063,12 @@ export default function NewLiveMeeting() {
   const [loungeOpen, setLoungeOpen] = useState(false);
   const [showSpeedNetworking, setShowSpeedNetworking] = useState(false);
   const [speedNetworkingNotification, setSpeedNetworkingNotification] = useState(null); // ✅ Notification message
+
+  // ✅ NEW: Speed Networking Session Prompt State
+  const [sessionStartNotification, setSessionStartNotification] = useState(null); // {sessionId, durationMinutes, timestamp}
+  const [showNetworkingPrompt, setShowNetworkingPrompt] = useState(false); // Show/hide modal
+  const [networkingSessionId, setNetworkingSessionId] = useState(null); // Current session ID
+
   const [lastMessage, setLastMessage] = useState(null);
   const [isPostEventLounge, setIsPostEventLounge] = useState(false); // ✅ Track post-event lounge mode
   const [postEventLoungeClosingTime, setPostEventLoungeClosingTime] = useState(null); // ✅ Track closing time
@@ -4266,6 +4273,29 @@ export default function NewLiveMeeting() {
           if (!endHandledRef.current) {
             handleMeetingEnd("ended", { explicitEnd: false });
           }
+        } else if (msg.type === "speed_networking_session_started") {
+          // ✅ NEW: Handle Speed Networking Session Started
+          console.log("[MainSocket] 🎉 Speed Networking session started!", msg.data);
+          setNetworkingSessionId(msg.data.session_id);
+          setSessionStartNotification({
+            sessionId: msg.data.session_id,
+            sessionName: msg.data.session_name || 'Speed Networking Session',
+            durationMinutes: msg.data.duration_minutes,
+            timestamp: Date.now()
+          });
+          setShowNetworkingPrompt(true);
+          showSnackbar("Speed Networking has started! Join now to network with others.", "success");
+        } else if (msg.type === "speed_networking_match_found") {
+          // ✅ NEW: Handle Speed Networking Match Found (for participants already in networking)
+          console.log("[MainSocket] 🤝 Match found!", msg.data);
+          // This will be handled by SpeedNetworkingZone component
+          setLastMessage(msg);
+        } else if (msg.type === "speed_networking_session_ended") {
+          // ✅ NEW: Handle Speed Networking Session Ended
+          console.log("[MainSocket] Networking session ended");
+          setShowNetworkingPrompt(false);
+          setNetworkingSessionId(null);
+          showSnackbar("Speed Networking session has ended", "info");
         } else {
           console.log("[MainSocket] Other message type:", msg.type, msg);
         }
@@ -12515,6 +12545,32 @@ export default function NewLiveMeeting() {
             lastMessage={lastMessage}
           />
         </Dialog>
+
+        {/* ✅ Speed Networking Session Prompt Modal */}
+        <SpeedNetworkingSessionPrompt
+          open={showNetworkingPrompt}
+          sessionData={sessionStartNotification}
+          onJoinNetworking={() => {
+            // ✅ FIXED: Only redirect to Speed Networking screen
+            // Do NOT join queue here - let SpeedNetworkingZone handle it
+            // Users will join queue only after clicking the green "JOIN SPEED NETWORKING" button
+            console.log("[Modal] Redirecting to Speed Networking screen (not joining queue yet)");
+            setShowNetworkingPrompt(false);
+            setShowSpeedNetworking(true);
+          }}
+          onJoinLounge={() => {
+            setShowNetworkingPrompt(false);
+            showSnackbar("You can join the networking session anytime from the controls", "info");
+          }}
+          onLeave={() => {
+            setShowNetworkingPrompt(false);
+            // Leave meeting logic
+            if (dyteMeeting) {
+              dyteMeeting.leaveRoom();
+            }
+          }}
+          isLoading={false}
+        />
 
         {/* ✅ Main Room Peek (when seated at a lounge table) */}
         {activeTableId && dyteMeeting && !isPostEventLounge && showMainRoomPeek && (
