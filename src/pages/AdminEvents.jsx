@@ -79,10 +79,7 @@ import {
   API_ORIGIN
 } from "../utils/eventUtils";
 import EditEventForm from "../components/EditEventForm";
-import RecordVoiceOverRoundedIcon from "@mui/icons-material/RecordVoiceOverRounded";
-import SessionDialog from "../components/SessionDialog";
-import SessionList from "../components/SessionList";
-import { getNextUpcomingSession, formatSessionTimeRange } from "../utils/timezoneUtils";
+
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
