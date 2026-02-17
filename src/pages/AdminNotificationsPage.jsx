@@ -74,6 +74,8 @@ const ENDPOINTS = {
   // CHANGED: Removed "?status=pending" to fetch ALL name requests (history)
   nameRequestsList: () => `${API_ROOT}/auth/admin/name-requests/`,
   nameRequestDecide: (id) => `${API_ROOT}/auth/admin/name-requests/${id}/decide/`,
+  verificationRequestsList: () => `${API_ROOT}/users/admin/verification-requests/`,
+  verificationRequestDecide: (id) => `${API_ROOT}/users/admin/verification-request/${id}/decide/`,
 };
 
 // ---- Data Loaders ----
@@ -100,6 +102,35 @@ async function loadNameChangeRequests() {
         reason: req.reason
       },
       // CHANGED: If status is NOT pending, treat it as "read" (so it has white background)
+      read_at: req.status === 'pending' ? null : (req.updated_at || new Date().toISOString()),
+    }));
+    return { items, count: items.length };
+  } catch (e) {
+    return { items: [], count: 0 };
+  }
+}
+
+async function loadVerificationRequests() {
+  if (!isOwnerUser()) return { items: [], count: 0 };
+  try {
+    const res = await fetch(ENDPOINTS.verificationRequestsList(), { headers: { Accept: "application/json", ...authHeader() } });
+    if (!res.ok) return { items: [], count: 0 };
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : data?.results || [];
+    // Only show pending ones for notifications normally, or all if we treat them like name requests
+    const items = rows.map((req) => ({
+      id: `verif-${req.id}`,
+      real_id: req.id,
+      _source: "verification_request",
+      type: "verification_request",
+      status: req.status,
+      created_at: req.created_at,
+      actor_name: req.user_details?.username || req.user_details?.full_name || "User",
+      actor_avatar: req.user_details?.user_image_url || "",
+      user_id: req.user,
+      data: {
+        reason: req.reason
+      },
       read_at: req.status === 'pending' ? null : (req.updated_at || new Date().toISOString()),
     }));
     return { items, count: items.length };
@@ -234,8 +265,10 @@ function formatTime(iso) {
 function profileHref(n) { return (n?.user_id || n?.actor_id) ? `/community/rich-profile/${n.user_id || n.actor_id}` : "#"; }
 function groupHref(n) { return n?.group?.id ? `/community/groups/${n.group.id}` : "#"; }
 
+const VERIF_ICON = <BadgeRoundedIcon style={{ fontSize: 12 }} />;
+
 // --- Sub-Component: Notification Row ---
-function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMarkRead }) {
+function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDecideVerif, onMarkRead }) {
   // Logic: It's "read" if it has a read_at date AND it is not pending. 
   // Pending items are always highlighted (teal background).
   const isRead = !!n.read_at && n.status !== 'pending';
@@ -292,6 +325,10 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
               <>
                 <Box component="span" fontWeight={700}>{n.actor_name}</Box> requested a name change from <b>{n.data.old_name}</b> to <b>{n.data.new_name}</b>.
               </>
+            ) : n.type === "verification_request" ? (
+              <>
+                <Box component="span" fontWeight={700}>{n.actor_name}</Box> requested verification renewal.
+              </>
             ) : n.type === "join_request" ? (
               <>
                 <Box component="span" fontWeight={700}>{n.actor_name}</Box> requested to join <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
@@ -341,24 +378,29 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
           {/* Subtext Row: Kind Badge + Date */}
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
             {n.type === "name_change" && <Chip label="Identity Request" size="small" icon={<BadgeRoundedIcon style={{ fontSize: 12 }} />} sx={{ height: 20, fontSize: 10, bgcolor: '#394d79ff', color: 'white', '& .MuiChip-label': { px: 0.5 }, '& .MuiChip-icon': { color: 'white', ml: 0.5 } }} />}
+            {n.type === "verification_request" && <Chip label="Verification Request" size="small" icon={VERIF_ICON} sx={{ height: 20, fontSize: 10, bgcolor: '#7c3aed', color: 'white', '& .MuiChip-label': { px: 0.5 }, '& .MuiChip-icon': { color: 'white', ml: 0.5 } }} />}
             <Typography variant="caption" color="text.secondary">{formatTime(n.created_at)}</Typography>
           </Stack>
 
           {/* Special Data: Reason */}
-          {n.type === "name_change" && n.data?.reason && (
+          {(n.type === "name_change" || n.type === "verification_request") && n.data?.reason && (
             <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#64748b', fontStyle: 'italic' }}>
               "{n.data.reason}"
             </Typography>
           )}
 
           {/* ACTION BUTTONS (Only if pending) */}
-          {n.status === 'pending' && (n.type === "name_change" || n.type === "join_request") && (
+          {n.status === 'pending' && (n.type === "name_change" || n.type === "join_request" || n.type === "verification_request") && (
             <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
               <Button
                 size="small"
                 variant="contained"
                 disabled={busy}
-                onClick={() => n.type === "name_change" ? onDecideName(n, "approved") : onApprove(n)}
+                onClick={() => {
+                  if (n.type === "name_change") return onDecideName(n, "approved");
+                  if (n.type === "verification_request") return onDecideVerif(n, "approved");
+                  return onApprove(n);
+                }}
                 startIcon={<CheckCircleOutlineIcon />}
                 sx={{ textTransform: "none", borderRadius: 2, bgcolor: TEAL, '&:hover': { bgcolor: TEAL }, px: 2 }}
               >
@@ -368,7 +410,11 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onMa
                 size="small"
                 variant="outlined"
                 disabled={busy}
-                onClick={() => n.type === "name_change" ? onDecideName(n, "rejected") : onReject(n)}
+                onClick={() => {
+                  if (n.type === "name_change") return onDecideName(n, "rejected");
+                  if (n.type === "verification_request") return onDecideVerif(n, "rejected");
+                  return onReject(n);
+                }}
                 startIcon={<HighlightOffIcon />}
                 sx={{ textTransform: "none", borderRadius: 2, color: 'text.secondary', borderColor: BORDER, '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } }}
               >
@@ -462,7 +508,7 @@ export default function AdminNotificationsPage() {
 
   const syncUnread = React.useCallback((nextItems) => {
     const unread = nextItems.filter((x) =>
-      (x.type === "join_request" || x.type === "name_change")
+      (x.type === "join_request" || x.type === "name_change" || x.type === "verification_request")
         ? x.status === "pending"
         : !x.read_at
     ).length;
@@ -503,6 +549,7 @@ export default function AdminNotificationsPage() {
 
       // Filter-specific loading
       if (tab === "name_change") out = await loadNameChangeRequests();
+      else if (tab === "verification_request") out = await loadVerificationRequests();
       else if (tab === "join_request") out = await loadJoinRequests();
       else if (tab === "member_joined") out = await loadMemberJoined(onlyUnread);
       else if (tab === "group_created") out = await loadGroupCreated(onlyUnread);
@@ -514,25 +561,28 @@ export default function AdminNotificationsPage() {
       else if (tab === "system") out = await loadStandardNotifications(onlyUnread, "system");
       else {
         // "all" tab - load everything
-        const [reqs, joined, created, names, standard] = await Promise.all([
+        const [reqs, joined, created, names, verifs, standard] = await Promise.all([
           loadJoinRequests(),
           loadMemberJoined(onlyUnread),
           loadGroupCreated(onlyUnread),
           loadNameChangeRequests(),
+          loadVerificationRequests(),
           loadStandardNotifications(onlyUnread),
         ]);
         out.items = [
           ...names.items,
+          ...verifs.items,
           ...reqs.items,
           ...joined.items,
           ...created.items,
           ...standard.items
         ].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+        // Wait, let's fix the array destructuring
         out.count = out.items.length;
 
         if (onlyUnread) {
           out.items = out.items.filter((x) =>
-            (x.type === "join_request" || x.type === "name_change")
+            (x.type === "join_request" || x.type === "name_change" || x.type === "verification_request")
               ? x.status === "pending"
               : !x.read_at
           );
@@ -540,7 +590,7 @@ export default function AdminNotificationsPage() {
         }
       }
 
-      const unread = out.items.filter((x) => (x.type === "join_request" || x.type === "name_change") ? x.status === "pending" : !x.read_at).length;
+      const unread = out.items.filter((x) => (x.type === "join_request" || x.type === "name_change" || x.type === "verification_request") ? x.status === "pending" : !x.read_at).length;
       setUnreadCount(unread);
       try {
         localStorage.setItem("admin_unread_notifications", String(unread));
@@ -684,6 +734,28 @@ export default function AdminNotificationsPage() {
     } catch (e) { setToast({ open: true, type: "error", msg: "Error" }); } finally { setBusyId(null); }
   };
 
+  const decideVerification = async (n, status) => {
+    setBusyId(n.id);
+    try {
+      const res = await fetch(ENDPOINTS.verificationRequestDecide(n.real_id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ status: status }),
+      });
+      if (!res.ok) throw new Error("Failed");
+
+      setItems((prev) => {
+        const next = prev.map((x) =>
+          x.id === n.id ? { ...x, status, read_at: new Date().toISOString() } : x
+        );
+        syncUnread(next);
+        return next;
+      });
+      setToast({ open: true, type: "success", msg: `Verification ${status}.` });
+      setTimeout(fetchData, 1500);
+    } catch { setToast({ open: true, type: "error", msg: "Error" }); } finally { setBusyId(null); }
+  };
+
   return (
     <Container maxWidth="xl" disableGutters sx={{ px: { xs: 0, sm: 0 }, pt: 6, pb: 6 }}>
 
@@ -726,6 +798,7 @@ export default function AdminNotificationsPage() {
           <Select value={tab} onChange={(e) => setTab(e.target.value)} sx={{ borderRadius: 2, bgcolor: 'white', '& .MuiSelect-select': { py: 1, fontSize: '0.9rem', fontWeight: 500 } }}>
             <MenuItem value="all">All Notifications</MenuItem>
             <MenuItem value="name_change">Identity Requests</MenuItem>
+            <MenuItem value="verification_request">Verification Requests</MenuItem>
             <MenuItem value="join_request">Join Requests</MenuItem>
             <MenuItem value="member_joined">User Joined</MenuItem>
             <MenuItem value="group_created">Group Created</MenuItem>
@@ -767,6 +840,7 @@ export default function AdminNotificationsPage() {
                   onApprove={approveJoin}
                   onReject={rejectJoin}
                   onDecideName={decideNameChange}
+                  onDecideVerif={decideVerification}
                   onMarkRead={markRead}
                 />
               ))}
