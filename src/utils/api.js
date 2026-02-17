@@ -322,6 +322,31 @@ export const decideNameRequest = (id, status, admin_note = "") =>
   apiClient.post(`${ADMIN_NAME_REQUESTS_BASE}/${id}/decide/`, { status, admin_note }).then((r) => r.data);
 
 
+// ===================== Admin • Verification Requests =====================
+const VERIFICATION_REQUESTS_BASE = "/users/admin/verification-requests";
+const VERIFICATION_HISTORY_BASE = "/users/admin/verification-history";
+
+/**
+ * Get verification history for a user.
+ */
+export const getVerificationHistory = (userId) =>
+  apiClient.get(`${VERIFICATION_HISTORY_BASE}/${userId}/`).then((r) => r.data);
+
+/**
+ * List all verification renewal requests.
+ * Supports filtering: { status: 'pending' }
+ */
+export const getVerificationRequests = (params = {}) =>
+  apiClient.get(`${VERIFICATION_REQUESTS_BASE}/`, { params }).then((r) => r.data);
+
+/**
+ * Approve or Reject a verification request.
+ * Payload: { status: 'approved' | 'rejected', admin_note: "..." }
+ */
+export const decideVerificationRequest = (requestId, status, admin_note = "") =>
+  apiClient.post(`/users/admin/verification-request/${requestId}/decide/`, { status, admin_note }).then((r) => r.data);
+
+
 // ===================== Admin • KYC Verifications =====================
 const ADMIN_KYC_BASE = "/auth/admin/kyc";
 

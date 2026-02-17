@@ -714,7 +714,7 @@ function SectionCard({ title, action, children, sx }) {
   );
 }
 
-function VerificationCard({ status, onVerify }) {
+function VerificationCard({ status, pendingRequest, onVerify, onRenew }) {
   const isVerified = status === "approved";
   const isPending = status === "pending" || status === "review";
   const today = new Date().toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' });
@@ -739,8 +739,19 @@ function VerificationCard({ status, onVerify }) {
                 Verified Profile
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Your profile has been verified on {today}. This will provide you with more benefits of the community platform.
+                Your profile is verified. This provides you with more benefits of the community platform.
               </Typography>
+            </Box>
+
+            {/* Renewal Section */}
+            <Box sx={{ mt: 1 }}>
+              {pendingRequest ? (
+                <Chip label="Renewal Pending" color="warning" variant="outlined" />
+              ) : (
+                <Button variant="text" size="small" onClick={onRenew}>
+                  Apply for New Verification
+                </Button>
+              )}
             </Box>
           </>
         ) : isPending ? (
@@ -1339,7 +1350,10 @@ export default function ProfilePage() {
     bio: "", headline: "", job_title: "", company: "", location: "",
     skillsText: "", linksText: "", avatar: "", kyc_status: "not_started",
     legal_name_locked: false, kyc_decline_reason: "", directory_hidden: false,
+    pending_verification_request: false,
   });
+
+  const [renewalOpen, setRenewalOpen] = useState(false);
 
   const [aboutBioExpanded, setAboutBioExpanded] = useState(false);
   const [aboutBioShowToggle, setAboutBioShowToggle] = useState(false);
@@ -1693,6 +1707,7 @@ export default function ProfilePage() {
           legal_name_locked: prof.legal_name_locked || false,
           kyc_decline_reason: prof.kyc_decline_reason || "",
           directory_hidden: prof.directory_hidden || false,
+          pending_verification_request: prof.pending_verification_request || false,
         });
       } catch (e) {
         if (e?.name === "AbortError") return;
@@ -3144,7 +3159,12 @@ export default function ProfilePage() {
                   <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
                     {/* LEFT COLUMN */}
                     <Grid item xs={12} lg={6}>
-                      <VerificationCard status={form.kyc_status} onVerify={handleStartKYC} />
+                      <VerificationCard
+                        status={form.kyc_status}
+                        pendingRequest={form.pending_verification_request}
+                        onVerify={handleStartKYC}
+                        onRenew={() => setRenewalOpen(true)}
+                      />
                       <SectionCard
                         title="About"
                         action={
@@ -5697,6 +5717,76 @@ export default function ProfilePage() {
       <Snackbar open={snack.open} autoHideDuration={3500} onClose={() => setSnack({ ...snack, open: false })}>
         <Alert onClose={() => setSnack({ ...snack, open: false })} severity={snack.sev} variant="filled" sx={{ width: "100%" }}>{snack.msg}</Alert>
       </Snackbar>
+
+      <RenewalDialog
+        open={renewalOpen}
+        onClose={(success) => {
+          setRenewalOpen(false);
+          if (success) {
+            setForm(prev => ({ ...prev, pending_verification_request: true }));
+          }
+        }}
+        showToast={showNotification}
+      />
     </div >
+  );
+}
+
+// -------------------- Renewal Dialog --------------------
+function RenewalDialog({ open, onClose, showToast }) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) {
+      showToast("error", "Please provide a reason.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/users/me/verification-request/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...tokenHeader() },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || "Failed to submit request.");
+
+      showToast("success", "Renewal request submitted successfully.");
+      onClose(true); // true = success
+    } catch (e) {
+      showToast("error", e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={() => onClose(false)} fullWidth maxWidth="sm">
+      <DialogTitle>Apply for New Verification</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          If you need to update your verified identity (e.g. significant legal name change not covered by name request, or re-verification required), please explain why.
+        </Typography>
+        <TextField
+          label="Reason for new verification"
+          fullWidth
+          multiline
+          minRows={3}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="I got married and my last name changed..."
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+          Note: If approved, your current verification status will be reset and you will need to complete the verification process again.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => onClose(false)} disabled={loading}>Cancel</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={loading}>
+          {loading ? "Submitting..." : "Submit"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

@@ -23,6 +23,7 @@ import {
   Alert,
   Avatar,
   Skeleton,
+  CircularProgress,
   Tabs,
   Tab,
   Grid,
@@ -40,6 +41,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import SearchIcon from "@mui/icons-material/Search";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 
+import HistoryIcon from '@mui/icons-material/History';
 import {
   getAdminNameRequests,
   decideNameRequest,
@@ -47,6 +49,9 @@ import {
   overrideKYCStatus,
   resetKYCProcess,
   manualApproveKYC,
+  getVerificationRequests,
+  decideVerificationRequest,
+  getVerificationHistory // New API
 } from "../utils/api";
 
 // Helper to color-code statuses
@@ -129,6 +134,31 @@ export default function AdminNameRequestsPage() {
   const [kycTotal, setKycTotal] = useState(0);
   const [kycSearch, setKycSearch] = useState("");
 
+  // Renewal Requests State
+  const [renewalRequests, setRenewalRequests] = useState([]);
+  const [loadingRenewals, setLoadingRenewals] = useState(true);
+  const [renewalPage, setRenewalPage] = useState(0);
+  const [renewalRowsPerPage, setRenewalRowsPerPage] = useState(8);
+  const [renewalTotal, setRenewalTotal] = useState(0);
+  const [renewalSearch, setRenewalSearch] = useState(""); // Renewal Actions
+  const [renewalActionDialog, setRenewalActionDialog] = useState({ open: false, request: null, type: null });
+  const [renewalNote, setRenewalNote] = useState("");
+  const [renewalProcessing, setRenewalProcessing] = useState(false);
+
+  // History Dialog
+  const [historyDialog, setHistoryDialog] = useState({ open: false, userId: null, history: [], loading: false });
+
+  const fetchHistory = async (userId) => {
+    setHistoryDialog({ open: true, userId, history: [], loading: true });
+    try {
+      const data = await getVerificationHistory(userId);
+      setHistoryDialog(prev => ({ ...prev, history: data, loading: false }));
+    } catch (err) {
+      console.error("Failed to fetch history", err);
+      setHistoryDialog(prev => ({ ...prev, loading: false }));
+    }
+  };
+
   const openKycDetails = (v) => setKycDetailsDialog({ open: true, verification: v });
   const closeKycDetails = () => setKycDetailsDialog({ open: false, verification: null });
 
@@ -193,6 +223,27 @@ export default function AdminNameRequestsPage() {
     }
   };
 
+  const fetchRenewalRequests = async () => {
+    setLoadingRenewals(true);
+    try {
+      const params = {
+        ordering: "-created_at",
+        page: renewalPage + 1,
+        page_size: renewalRowsPerPage,
+      };
+      if (renewalSearch) params.search = renewalSearch;
+
+      const data = await getVerificationRequests(params);
+      const list = data.results || (Array.isArray(data) ? data : []);
+      setRenewalRequests(list);
+      setRenewalTotal(data.count || list.length);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingRenewals(false);
+    }
+  };
+
   useEffect(() => {
     fetchRequests();
   }, [requestsPage, requestsRowsPerPage, requestsSearch]);
@@ -200,6 +251,10 @@ export default function AdminNameRequestsPage() {
   useEffect(() => {
     fetchKycVerifications();
   }, [kycStatusFilter, kycPage, kycRowsPerPage, kycSearch]);
+
+  useEffect(() => {
+    fetchRenewalRequests();
+  }, [renewalPage, renewalRowsPerPage, renewalSearch]);
 
   const handleOpenAction = (req, type) => {
     setActionDialog({ open: true, request: req, type });
@@ -320,11 +375,28 @@ export default function AdminNameRequestsPage() {
     }
   };
 
+  const submitRenewalDecision = async () => {
+    if (!renewalActionDialog.request || !renewalActionDialog.type) return;
+    setRenewalProcessing(true);
+    try {
+      await decideVerificationRequest(renewalActionDialog.request.id, renewalActionDialog.type, renewalNote);
+      setRenewalRequests(prev => prev.map(r => r.id === renewalActionDialog.request.id ? { ...r, status: renewalActionDialog.type, admin_note: renewalNote } : r));
+      setRenewalActionDialog({ open: false, request: null, type: null });
+    } catch (e) {
+      console.error(e);
+      // maybe show error toast
+    } finally {
+      setRenewalProcessing(false);
+    }
+  };
+
   const handleRefresh = () => {
     if (tabValue === 0) {
       fetchRequests();
-    } else {
+    } else if (tabValue === 1) {
       fetchKycVerifications();
+    } else if (tabValue === 2) {
+      fetchRenewalRequests();
     }
   };
 
@@ -373,6 +445,7 @@ export default function AdminNameRequestsPage() {
         <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
           <Tab label="Name Change Requests" />
           <Tab label="KYC Verifications" />
+          <Tab label="Renewal Requests" />
         </Tabs>
       </Box>
 
@@ -801,6 +874,99 @@ export default function AdminNameRequestsPage() {
         </Paper>
       </TabPanel>
 
+      {/* Tab 3: Renewal Requests */}
+      <TabPanel value={tabValue} index={2}>
+        <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+          <TextField
+            size="small"
+            placeholder="Search renewals..."
+            variant="outlined"
+            value={renewalSearch}
+            onChange={(e) => setRenewalSearch(e.target.value)}
+            InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>) }}
+            sx={{ width: 250 }}
+          />
+        </Stack>
+        <Paper variant="outlined">
+          <TableContainer>
+            <Table>
+              <TableHead sx={{ bgcolor: "grey.50" }}>
+                <TableRow>
+                  <TableCell>User</TableCell>
+                  <TableCell>Reason</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Created At</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loadingRenewals ? (
+                  <TableRow><TableCell colSpan={5} align="center">Loading...</TableCell></TableRow>
+                ) : (
+                  <>
+                    {renewalRequests.length === 0 && <TableRow><TableCell colSpan={5} align="center">No requests found.</TableCell></TableRow>}
+                    {renewalRequests.map((req) => (
+                      <TableRow key={req.id} hover>
+                        <TableCell>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                            <Avatar src={req.user_details?.avatar || ""} alt={req.user_details?.first_name}>
+                              {(req.user_details?.first_name || "U")[0]}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="body2" fontWeight={500}>
+                                {req.user_details?.full_name || req.user_details?.username}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">{req.user_details?.email}</Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
+                        <TableCell sx={{ maxWidth: 300 }}>
+                          <Typography variant="body2" noWrap title={req.reason}>{req.reason}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={req.status.toUpperCase()} size="small" color={getStatusColor(req.status)} />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(req.created_at).toLocaleDateString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                            <IconButton size="small" onClick={() => fetchHistory(req.user)}>
+                              <HistoryIcon />
+                            </IconButton>
+                            {req.status === 'pending' && (
+                              <>
+                                <IconButton color="success" size="small" onClick={() => { setRenewalNote(""); setRenewalActionDialog({ open: true, request: req, type: "approved" }); }}>
+                                  <CheckCircleIcon />
+                                </IconButton>
+                                <IconButton color="error" size="small" onClick={() => { setRenewalNote(""); setRenewalActionDialog({ open: true, request: req, type: "rejected" }); }}>
+                                  <CancelIcon />
+                                </IconButton>
+                              </>
+                            )}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            component="div"
+            count={renewalTotal}
+            page={renewalPage}
+            onPageChange={(e, p) => setRenewalPage(p)}
+            rowsPerPage={renewalRowsPerPage}
+            onRowsPerPageChange={(e) => { setRenewalRowsPerPage(parseInt(e.target.value, 10)); setRenewalPage(0); }}
+            rowsPerPageOptions={[8, 16, 24]}
+          />
+        </Paper>
+      </TabPanel>
+
       {/* Name Change Decision Dialog */}
       <Dialog open={actionDialog.open} onClose={handleCloseAction} fullWidth maxWidth="xs">
         <DialogTitle>
@@ -1190,6 +1356,72 @@ export default function AdminNameRequestsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Renewal Decision Dialog */}
+      <Dialog open={renewalActionDialog.open} onClose={() => setRenewalActionDialog({ ...renewalActionDialog, open: false })} fullWidth maxWidth="xs">
+        <DialogTitle>{renewalActionDialog.type === "approved" ? "Approve Renewal" : "Reject Renewal"}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" paragraph>
+            {renewalActionDialog.type === "approved"
+              ? "Approving this request will RESET the user's current verified status and allow them to re-verify."
+              : "Rejecting this request will keep the user's current status."}
+          </Typography>
+          <TextField
+            label="Admin Note"
+            fullWidth multiline rows={3}
+            value={renewalNote}
+            onChange={(e) => setRenewalNote(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRenewalActionDialog({ ...renewalActionDialog, open: false })}>Cancel</Button>
+          <Button variant="contained" color={renewalActionDialog.type === "approved" ? "success" : "error"} onClick={submitRenewalDecision} disabled={renewalProcessing}>
+            {renewalProcessing ? "Processing..." : "Confirm"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Verification History Dialog */}
+      <Dialog open={historyDialog.open} onClose={() => setHistoryDialog({ ...historyDialog, open: false })} fullWidth maxWidth="sm">
+        <DialogTitle>Verification History</DialogTitle>
+        <DialogContent dividers>
+          {historyDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>
+          ) : historyDialog.history.length === 0 ? (
+            <Typography align="center" color="text.secondary">No history found.</Typography>
+          ) : (
+            <Stack spacing={2}>
+              {historyDialog.history.map((item) => (
+                <Paper key={item.id} variant="outlined" sx={{ p: 2 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                    <Chip label={item.kyc_status.toUpperCase()} size="small" color={getStatusColor(item.kyc_status)} />
+                    <Typography variant="caption" color="text.secondary">
+                      Archived: {new Date(item.archived_at).toLocaleDateString()}
+                    </Typography>
+                  </Stack>
+                  {item.kyc_manual_reason && (
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      <strong>Note:</strong> {item.kyc_manual_reason}
+                    </Typography>
+                  )}
+                  <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+                    Archived By: {item.archived_by_details?.username || "System"}
+                  </Typography>
+                  {item.kyc_didit_raw_payload && Object.keys(item.kyc_didit_raw_payload).length > 0 && (
+                    <Button size="small" variant="outlined" sx={{ mt: 1 }} onClick={() => openKycDetails({ ...item, verification: item, kyc_didit_raw_payload: item.kyc_didit_raw_payload })}>
+                      View Details
+                    </Button>
+                  )}
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHistoryDialog({ ...historyDialog, open: false })}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
     </Box >
   );
 }
