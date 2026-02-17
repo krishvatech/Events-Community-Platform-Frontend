@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Avatar, Box, Button, Chip, LinearProgress,
   MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Pagination, Dialog,
-  DialogTitle, DialogContent, DialogActions, Popper, Skeleton, Container
+  DialogTitle, DialogContent, DialogActions, Popper, Skeleton, Container, Tooltip
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
@@ -879,7 +879,9 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
               label={g.visibility === "private" ? "Private" : "Public"}
               icon={
                 g.visibility === "public" && (g.join_policy === "approval" || g.join_policy === "public_approval")
-                  ? <LockRounded sx={{ fontSize: 16, color: "#f97316 !important" }} />
+                  ? <Tooltip title="Approval needed for membership - Request to join">
+                    <LockRounded sx={{ fontSize: 16, color: "#f97316 !important" }} />
+                  </Tooltip>
                   : undefined
               }
               className={

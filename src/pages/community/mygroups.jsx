@@ -23,6 +23,7 @@ import {
     IconButton,
     Popper,
     Chip,
+    Tooltip,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import Skeleton from "@mui/material/Skeleton";
@@ -652,7 +653,9 @@ function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
                                 {isPrivate ? "Private" : "Public"}
                             </Typography>
                             {isApproval && (
-                                <LockRounded sx={{ fontSize: 14, color: "#f97316" }} />
+                                <Tooltip title="Approval needed for membership - Request to join">
+                                    <LockRounded sx={{ fontSize: 14, color: "#f97316" }} />
+                                </Tooltip>
                             )}
                         </Stack>
                         {memberStatus && (
