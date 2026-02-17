@@ -46,7 +46,7 @@ import {
   Autocomplete,
 } from "@mui/material";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
-import { EditEventDialog } from "./AdminEvents.jsx";
+import EditEventForm from "../components/EditEventForm.jsx";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
@@ -147,7 +147,7 @@ const fmtDateRange = (start, end) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Session", "Resources", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings"];
+const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Session", "Resources", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms Tables", "Social Lounge"];
 const MEMBERS_PER_PAGE = 10;
 const RESOURCES_PER_PAGE = 5;
@@ -2593,6 +2593,31 @@ export default function EventManagePage() {
     </Paper >
   );
 
+  const renderEdit = () => {
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          overflow: "hidden", // containment
+        }}
+      >
+        <EditEventForm
+          event={event}
+          onUpdated={(updated) => {
+            setEvent(updated);
+            toast.success("Event updated successfully");
+            // optional: switch back to overview or stay
+          }}
+          onCancel={() => setTab(0)} // Go back to Overview
+        />
+      </Paper>
+    );
+  };
+
   // ---- render ----
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "grey.50" }}>
@@ -2650,7 +2675,7 @@ export default function EventManagePage() {
               <Button
                 variant="outlined"
                 startIcon={<EditNoteRoundedIcon fontSize="small" />}
-                onClick={() => setEditOpen(true)}
+                onClick={() => setTab(tabLabels.indexOf("Edit") !== -1 ? tabLabels.indexOf("Edit") : 0)}
                 sx={{
                   borderRadius: 999,
                   textTransform: "none",
@@ -2779,6 +2804,7 @@ export default function EventManagePage() {
                   {tab === 4 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
                   {tab === 5 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
                   {tab === 6 && renderLoungeSettings()}
+                  {tab === 7 && renderEdit()}
                 </>
               ) : (
                 <>
@@ -2827,19 +2853,7 @@ export default function EventManagePage() {
           </>
         )}
 
-        {isOwner && event && (
-          <EditEventDialog
-            open={editOpen}
-            onClose={() => setEditOpen(false)}
-            event={event}
-            onUpdated={(updated) => {
-              setEvent(updated);
-              setEditOpen(false);
-              // Refresh event to ensure all fields (including is_multi_day) are latest
-              setTimeout(() => refreshEvent(), 500);
-            }}
-          />
-        )}
+
 
         {/* global error snackbar for event load */}
         <Snackbar
