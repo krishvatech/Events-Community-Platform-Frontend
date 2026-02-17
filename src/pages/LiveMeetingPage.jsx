@@ -2294,6 +2294,10 @@ export default function NewLiveMeeting() {
   const [recordingId, setRecordingId] = useState("");
   const [isRecordingPaused, setIsRecordingPaused] = useState(false);
   const [recordingAnchorEl, setRecordingAnchorEl] = useState(null);
+  const [cancelRecordingOpen, setCancelRecordingOpen] = useState(false);
+  const [isCancellingRecording, setIsCancellingRecording] = useState(false);
+  const [cancelRecordingStep, setCancelRecordingStep] = useState(1);
+  const [cancelRecordingText, setCancelRecordingText] = useState("");
   const [activeTableId, setActiveTableId] = useState(null);
   const activeTableIdRef = useRef(null); // ✅ Ref for socket access
   const [activeTableName, setActiveTableName] = useState("");
@@ -3542,6 +3546,39 @@ export default function NewLiveMeeting() {
     }
   }, [eventId, showSnackbar]);
 
+  const handleCancelRecordingClick = useCallback(() => {
+    setRecordingAnchorEl(null);
+    setCancelRecordingStep(1);
+    setCancelRecordingText("");
+    setCancelRecordingOpen(true);
+  }, []);
+
+  const executeCancelRecording = useCallback(async () => {
+    if (!eventId) return;
+    setIsCancellingRecording(true);
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/cancel-recording/`), {
+        method: "DELETE",
+        headers: { ...authHeader() },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.detail || "Failed to cancel recording");
+
+      setIsRecording(false);
+      setRecordingId("");
+      setIsRecordingPaused(false);
+      setCancelRecordingOpen(false);
+      setCancelRecordingStep(1);
+      setCancelRecordingText("");
+      showSnackbar("Recording permanently deleted", "success");
+    } catch (err) {
+      console.error("Error cancelling recording:", err);
+      showSnackbar(err.message || "Failed to cancel recording", "error");
+    } finally {
+      setIsCancellingRecording(false);
+    }
+  }, [eventId, showSnackbar]);
+
   const getJoinedParticipants = useCallback(() => {
     const participantsObj = dyteMeeting?.participants;
     if (!participantsObj) return [];
@@ -4362,8 +4399,10 @@ export default function NewLiveMeeting() {
             paused: "Recording paused",
             resumed: "Recording resumed",
             stopped: "Recording stopped",
+            cancelled: "Recording cancelled and deleted",
           };
-          showSnackbar(actionMessages[msg.action] || "Recording status changed", "info");
+          const severity = msg.action === "cancelled" ? "warning" : "info";
+          showSnackbar(actionMessages[msg.action] || "Recording status changed", severity);
         } else if (msg.type === "meeting_ended") {
           // ✅ NEW: Handle meeting end notification from backend
           // This message is broadcast when host ends meeting or auto-end conditions trigger
@@ -12137,6 +12176,10 @@ export default function NewLiveMeeting() {
                           <ListItemIcon><StopCircleIcon fontSize="small" sx={{ color: "#f44336" }} /></ListItemIcon>
                           <ListItemText>Stop Recording</ListItemText>
                         </MenuItem>
+                        <MenuItem onClick={handleCancelRecordingClick} sx={{ color: "error.main" }}>
+                          <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon>
+                          <ListItemText>Cancel Recording</ListItemText>
+                        </MenuItem>
                       </Menu>
                     </>
                   )}
@@ -12671,6 +12714,90 @@ export default function NewLiveMeeting() {
             <Button onClick={executeBan} variant="contained" color="error">
               Ban User
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={cancelRecordingOpen}
+          onClose={() => !isCancellingRecording && setCancelRecordingOpen(false)}
+          PaperProps={MODAL_PAPER_PROPS}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, color: "error.main", fontWeight: 700 }}>
+            <DeleteOutlineIcon color="error" />
+            Cancel Recording?
+          </DialogTitle>
+          <DialogContent>
+            {cancelRecordingStep === 1 ? (
+              <>
+                <Typography sx={{ mb: 1.5 }}>
+                  This will <strong>permanently delete</strong> the recording.
+                </Typography>
+                <Typography variant="body2" sx={{ color: "error.main", bgcolor: "rgba(244,67,54,0.1)", p: 1.5, borderRadius: 1, border: "1px solid rgba(244,67,54,0.3)", mb: 1 }}>
+                  Warning: This action cannot be undone.
+                </Typography>
+                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+                  If you want to keep the recording, choose Stop Recording instead.
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Typography sx={{ mb: 1.25 }}>
+                  Type <strong>DELETE</strong> to confirm permanent deletion.
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={cancelRecordingText}
+                  onChange={(e) => setCancelRecordingText(e.target.value)}
+                  placeholder="DELETE"
+                  disabled={isCancellingRecording}
+                  autoFocus
+                  sx={{
+                    "& .MuiInputBase-input": {
+                      color: "#fff",
+                    },
+                    "& .MuiInputBase-input::placeholder": {
+                      color: "rgba(255,255,255,0.45)",
+                      opacity: 1,
+                    },
+                  }}
+                />
+              </>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => {
+                setCancelRecordingOpen(false);
+                setCancelRecordingStep(1);
+                setCancelRecordingText("");
+              }}
+              disabled={isCancellingRecording}
+              sx={{ color: "rgba(255,255,255,0.7)" }}
+            >
+              Keep Recording
+            </Button>
+            {cancelRecordingStep === 1 ? (
+              <Button
+                onClick={() => setCancelRecordingStep(2)}
+                variant="contained"
+                color="error"
+                disabled={isCancellingRecording}
+              >
+                Continue
+              </Button>
+            ) : (
+              <Button
+                onClick={executeCancelRecording}
+                variant="contained"
+                color="error"
+                disabled={isCancellingRecording || cancelRecordingText !== "DELETE"}
+                startIcon={isCancellingRecording ? <CircularProgress size={16} /> : <DeleteOutlineIcon />}
+              >
+                {isCancellingRecording ? "Deleting..." : "Delete Forever"}
+              </Button>
+            )}
           </DialogActions>
         </Dialog>
         <LoungeOverlay
