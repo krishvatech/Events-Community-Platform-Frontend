@@ -22,7 +22,9 @@ import {
     LinearProgress,
     Card,
     CardContent,
-    Alert
+    Alert,
+    Autocomplete,
+    TextField
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -54,6 +56,10 @@ export default function SpeedNetworkingHostPanel({
     const [savingCriteria, setSavingCriteria] = useState(false);
     const [matchPreview, setMatchPreview] = useState(null);
     const [loadingPreview, setLoadingPreview] = useState(false);
+    const [testUserAId, setTestUserAId] = useState(null);
+    const [testUserBId, setTestUserBId] = useState(null);
+    const [testMatchResult, setTestMatchResult] = useState(null);
+    const [testingMatch, setTestingMatch] = useState(false);
 
     const fetchQueue = async () => {
         if (!session?.id) {
@@ -240,6 +246,36 @@ export default function SpeedNetworkingHostPanel({
         setCriteriaConfig(normalized);
     };
 
+    const handleTestMatchScore = async () => {
+        if (!session?.id || !testUserAId || !testUserBId) return;
+        try {
+            setTestingMatch(true);
+            const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/test_match_score/`.replace(/([^:]\/)\/+/g, "$1");
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_a_id: testUserAId,
+                    user_b_id: testUserBId
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setTestMatchResult(data);
+                console.log('[HostPanel] Test match score result:', data);
+            } else {
+                const errorData = await res.json().catch(() => ({}));
+                console.error('[HostPanel] Failed to test match score:', errorData);
+                alert('Failed to test match score: ' + (errorData.error || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error('[HostPanel] Error testing match score:', err);
+            alert('Error testing match score: ' + err.message);
+        } finally {
+            setTestingMatch(false);
+        }
+    };
+
     // Load criteria config when tab changes to settings
     useEffect(() => {
         if (selectedTab === 'settings') {
@@ -340,6 +376,7 @@ export default function SpeedNetworkingHostPanel({
                         <Tab label={`Waiting (${waitingCount})`} value="waiting" />
                         <Tab label={`Active Matches (${matchedPairs.length})`} value="active" />
                         <Tab label={`Past Matches (${pastMatches.length})`} value="past" />
+                        <Tab label="Test Match" value="test" />
                         <Tab label="Settings" value="settings" />
                     </Tabs>
 
@@ -446,6 +483,24 @@ export default function SpeedNetworkingHostPanel({
                                                         border: '1px solid rgba(34,197,94,0.3)'
                                                     }}
                                                 >
+                                                    {/* Config Version Indicator */}
+                                                    {match.config_version !== undefined && session?.config_version !== undefined && (
+                                                        <Box sx={{ mb: 1 }}>
+                                                            <Chip
+                                                                label={
+                                                                    match.config_version === session.config_version
+                                                                        ? 'Current Config'
+                                                                        : `Old Config (v${match.config_version})`
+                                                                }
+                                                                color={match.config_version === session.config_version ? 'success' : 'warning'}
+                                                                size="small"
+                                                                sx={{
+                                                                    height: 24,
+                                                                    fontSize: 11
+                                                                }}
+                                                            />
+                                                        </Box>
+                                                    )}
                                                     <Box sx={{
                                                         display: 'flex',
                                                         alignItems: 'center',
@@ -501,6 +556,41 @@ export default function SpeedNetworkingHostPanel({
                                                             </Avatar>
                                                         </Box>
                                                     </Box>
+
+                                                    {/* Match Quality Display */}
+                                                    {match.match_probability !== undefined && (
+                                                        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <Typography sx={{
+                                                                color: 'rgba(255,255,255,0.7)',
+                                                                fontSize: 11
+                                                            }}>
+                                                                Quality:
+                                                            </Typography>
+                                                            <LinearProgress
+                                                                variant="determinate"
+                                                                value={match.match_probability || 0}
+                                                                sx={{
+                                                                    flex: 1,
+                                                                    height: 4,
+                                                                    borderRadius: 2,
+                                                                    bgcolor: 'rgba(255,255,255,0.1)',
+                                                                    '& .MuiLinearProgress-bar': {
+                                                                        bgcolor: match.match_probability > 75 ? '#22c55e' : match.match_probability > 50 ? '#f59e0b' : '#ef4444',
+                                                                        borderRadius: 2
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <Typography sx={{
+                                                                color: '#fff',
+                                                                fontSize: 11,
+                                                                fontWeight: 600,
+                                                                minWidth: 30,
+                                                                textAlign: 'right'
+                                                            }}>
+                                                                {(match.match_probability || 0).toFixed(0)}%
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
                                                 </Box>
                                             ))}
                                         </Box>
@@ -621,12 +711,267 @@ export default function SpeedNetworkingHostPanel({
                                 </>
                             )}
 
+                            {/* Test Match Tab */}
+                            {selectedTab === 'test' && (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <Alert severity="info" sx={{ bgcolor: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' }}>
+                                        <Typography sx={{ fontSize: 13, color: '#fff' }}>
+                                            Select two users from the waiting queue to preview their match score with current criteria settings.
+                                        </Typography>
+                                    </Alert>
+
+                                    {/* User Selection */}
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <Autocomplete
+                                            options={queueEntries.filter(e => !e.current_match).map(e => ({
+                                                id: e.user.id,
+                                                label: `${e.user.first_name || e.user.username}`,
+                                                user: e.user
+                                            }))}
+                                            getOptionLabel={(option) => option.label}
+                                            value={testUserAId ? { id: testUserAId, label: queueEntries.find(e => e.user.id === testUserAId)?.user?.first_name || 'User A' } : null}
+                                            onChange={(e, value) => setTestUserAId(value?.id || null)}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="Select User A"
+                                                    size="small"
+                                                    sx={{
+                                                        '& .MuiOutlinedInput-root': {
+                                                            color: '#fff',
+                                                            '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' }
+                                                        },
+                                                        '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,0.4)' },
+                                                        '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' }
+                                                    }}
+                                                />
+                                            )}
+                                        />
+
+                                        <Autocomplete
+                                            options={queueEntries.filter(e => !e.current_match && e.user.id !== testUserAId).map(e => ({
+                                                id: e.user.id,
+                                                label: `${e.user.first_name || e.user.username}`,
+                                                user: e.user
+                                            }))}
+                                            getOptionLabel={(option) => option.label}
+                                            value={testUserBId ? { id: testUserBId, label: queueEntries.find(e => e.user.id === testUserBId)?.user?.first_name || 'User B' } : null}
+                                            onChange={(e, value) => setTestUserBId(value?.id || null)}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="Select User B"
+                                                    size="small"
+                                                    sx={{
+                                                        '& .MuiOutlinedInput-root': {
+                                                            color: '#fff',
+                                                            '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' }
+                                                        },
+                                                        '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,0.4)' },
+                                                        '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' }
+                                                    }}
+                                                />
+                                            )}
+                                        />
+
+                                        <Button
+                                            variant="contained"
+                                            onClick={handleTestMatchScore}
+                                            disabled={!testUserAId || !testUserBId || testingMatch}
+                                            sx={{
+                                                bgcolor: '#5a78ff',
+                                                color: '#fff',
+                                                '&:hover': { bgcolor: '#4a68ef' }
+                                            }}
+                                        >
+                                            {testingMatch ? <CircularProgress size={20} sx={{ mr: 1 }} /> : ''}
+                                            {testingMatch ? 'Testing...' : 'Test Match Score'}
+                                        </Button>
+                                    </Box>
+
+                                    {/* Test Result */}
+                                    {testMatchResult && (
+                                        <Card sx={{
+                                            bgcolor: 'rgba(90,120,255,0.1)',
+                                            borderRadius: 2,
+                                            border: '1px solid rgba(90,120,255,0.3)'
+                                        }}>
+                                            <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                <Box sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    pb: 1,
+                                                    borderBottom: '1px solid rgba(255,255,255,0.1)'
+                                                }}>
+                                                    <Typography sx={{
+                                                        color: '#fff',
+                                                        fontWeight: 600,
+                                                        fontSize: 14
+                                                    }}>
+                                                        Match Score Results
+                                                    </Typography>
+                                                    <Chip
+                                                        label={`v${testMatchResult.config_version || 1}`}
+                                                        size="small"
+                                                        sx={{
+                                                            height: 20,
+                                                            fontSize: 10,
+                                                            bgcolor: 'rgba(255,255,255,0.1)',
+                                                            color: 'rgba(255,255,255,0.7)'
+                                                        }}
+                                                    />
+                                                </Box>
+
+                                                {/* User Pair */}
+                                                <Box sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    gap: 2
+                                                }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
+                                                        <Avatar sx={{ width: 32, height: 32 }}>
+                                                            {testMatchResult.user_a?.name?.charAt(0) || 'A'}
+                                                        </Avatar>
+                                                        <Typography sx={{ color: '#fff', fontSize: 13, fontWeight: 500 }}>
+                                                            {testMatchResult.user_a?.name}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>↔</Typography>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, justifyContent: 'flex-end' }}>
+                                                        <Typography sx={{ color: '#fff', fontSize: 13, fontWeight: 500 }}>
+                                                            {testMatchResult.user_b?.name}
+                                                        </Typography>
+                                                        <Avatar sx={{ width: 32, height: 32 }}>
+                                                            {testMatchResult.user_b?.name?.charAt(0) || 'B'}
+                                                        </Avatar>
+                                                    </Box>
+                                                </Box>
+
+                                                {/* Score and Probability */}
+                                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                                                    <Box sx={{
+                                                        p: 1,
+                                                        bgcolor: 'rgba(255,255,255,0.05)',
+                                                        borderRadius: 1,
+                                                        border: '1px solid rgba(255,255,255,0.1)',
+                                                        textAlign: 'center'
+                                                    }}>
+                                                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>
+                                                            Score
+                                                        </Typography>
+                                                        <Typography sx={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>
+                                                            {(testMatchResult.score || 0).toFixed(1)}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box sx={{
+                                                        p: 1,
+                                                        bgcolor: 'rgba(255,255,255,0.05)',
+                                                        borderRadius: 1,
+                                                        border: '1px solid rgba(255,255,255,0.1)',
+                                                        textAlign: 'center'
+                                                    }}>
+                                                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>
+                                                            Probability
+                                                        </Typography>
+                                                        <Typography sx={{
+                                                            color: (testMatchResult.probability || 0) > 75 ? '#22c55e' : (testMatchResult.probability || 0) > 50 ? '#f59e0b' : '#ef4444',
+                                                            fontSize: 16,
+                                                            fontWeight: 700
+                                                        }}>
+                                                            {(testMatchResult.probability || 0).toFixed(1)}%
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+
+                                                {/* Score Breakdown */}
+                                                {testMatchResult.breakdown && (
+                                                    <Box sx={{
+                                                        display: 'grid',
+                                                        gridTemplateColumns: 'repeat(2, 1fr)',
+                                                        gap: 1
+                                                    }}>
+                                                        {Object.entries(testMatchResult.breakdown).map(([criterion, score]) => (
+                                                            <Box key={criterion} sx={{
+                                                                p: 1,
+                                                                bgcolor: 'rgba(255,255,255,0.05)',
+                                                                borderRadius: 1,
+                                                                border: '1px solid rgba(255,255,255,0.1)'
+                                                            }}>
+                                                                <Typography sx={{
+                                                                    color: 'rgba(255,255,255,0.7)',
+                                                                    fontSize: 10,
+                                                                    textTransform: 'capitalize'
+                                                                }}>
+                                                                    {criterion}
+                                                                </Typography>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+                                                                    <LinearProgress
+                                                                        variant="determinate"
+                                                                        value={score || 0}
+                                                                        sx={{
+                                                                            flex: 1,
+                                                                            height: 4,
+                                                                            borderRadius: 2,
+                                                                            bgcolor: 'rgba(255,255,255,0.1)',
+                                                                            mr: 1,
+                                                                            '& .MuiLinearProgress-bar': {
+                                                                                bgcolor: score > 75 ? '#22c55e' : score > 50 ? '#f59e0b' : '#ef4444',
+                                                                                borderRadius: 2
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    <Typography sx={{
+                                                                        color: '#fff',
+                                                                        fontSize: 11,
+                                                                        fontWeight: 600,
+                                                                        minWidth: 25,
+                                                                        textAlign: 'right'
+                                                                    }}>
+                                                                        {(score || 0).toFixed(0)}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </Box>
+                                                        ))}
+                                                    </Box>
+                                                )}
+
+                                                {!testMatchResult.is_valid && (
+                                                    <Alert severity="warning" sx={{
+                                                        bgcolor: 'rgba(245,158,11,0.1)',
+                                                        borderColor: 'rgba(245,158,11,0.3)',
+                                                        mt: 1
+                                                    }}>
+                                                        <Typography sx={{ fontSize: 12, color: '#fff' }}>
+                                                            ⚠ Match may not meet all criteria requirements
+                                                        </Typography>
+                                                    </Alert>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                </Box>
+                            )}
+
                             {/* Settings Tab */}
                             {selectedTab === 'settings' && (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                     {/* Criteria Config Cards */}
                                     {criteriaConfig && (
                                         <>
+                                            {/* Section Title */}
+                                            <Typography sx={{
+                                                color: '#fff',
+                                                fontWeight: 600,
+                                                fontSize: 13,
+                                                mt: 1,
+                                                textTransform: 'uppercase',
+                                                letterSpacing: 0.5
+                                            }}>
+                                                Matching Criteria
+                                            </Typography>
+
                                             {['skill', 'experience', 'location', 'education'].map((criterion) => {
                                                 const config = criteriaConfig[criterion];
                                                 if (!config) return null;
@@ -826,6 +1171,144 @@ export default function SpeedNetworkingHostPanel({
                                                     </Card>
                                                 );
                                             })}
+
+                                            {/* Additional Factors Section */}
+                                            <Box sx={{
+                                                mt: 3,
+                                                pt: 2,
+                                                borderTop: '1px solid rgba(255,255,255,0.1)'
+                                            }}>
+                                                <Typography sx={{
+                                                    color: '#fff',
+                                                    fontWeight: 600,
+                                                    fontSize: 13,
+                                                    mb: 2,
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: 0.5
+                                                }}>
+                                                    Advanced Settings
+                                                </Typography>
+
+                                                <Alert severity="info" sx={{
+                                                    bgcolor: 'rgba(59,130,246,0.1)',
+                                                    borderColor: 'rgba(59,130,246,0.3)',
+                                                    mb: 2
+                                                }}>
+                                                    <Typography sx={{ fontSize: 12, color: '#fff' }}>
+                                                        💡 Fine-tune advanced matching parameters to optimize match quality
+                                                    </Typography>
+                                                </Alert>
+
+                                                {/* Serendipity/Luck Factor */}
+                                                <Card sx={{
+                                                    bgcolor: 'rgba(255,255,255,0.05)',
+                                                    borderRadius: 2,
+                                                    border: '1px solid rgba(255,255,255,0.1)',
+                                                    mb: 1.5
+                                                }}>
+                                                    <CardContent>
+                                                        <Box sx={{
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
+                                                            mb: 2
+                                                        }}>
+                                                            <Typography sx={{
+                                                                color: '#fff',
+                                                                fontWeight: 600,
+                                                                fontSize: 14
+                                                            }}>
+                                                                Serendipity Factor
+                                                            </Typography>
+                                                            <Tooltip title="Add randomness to encourage surprising connections">
+                                                                <Typography sx={{
+                                                                    color: 'rgba(255,255,255,0.5)',
+                                                                    fontSize: 11
+                                                                }}>
+                                                                    ?
+                                                                </Typography>
+                                                            </Tooltip>
+                                                        </Box>
+                                                        <Box>
+                                                            <Box sx={{
+                                                                display: 'flex',
+                                                                justifyContent: 'space-between',
+                                                                mb: 1
+                                                            }}>
+                                                                <Typography sx={{
+                                                                    color: 'rgba(255,255,255,0.7)',
+                                                                    fontSize: 12
+                                                                }}>
+                                                                    Random Element Weight
+                                                                </Typography>
+                                                                <Typography sx={{
+                                                                    color: '#fff',
+                                                                    fontSize: 12,
+                                                                    fontWeight: 500
+                                                                }}>
+                                                                    {Math.round((criteriaConfig?.random_factor || 0) * 100)}%
+                                                                </Typography>
+                                                            </Box>
+                                                            <Slider
+                                                                value={(criteriaConfig?.random_factor || 0) * 100}
+                                                                onChange={(e, newValue) => {
+                                                                    const newConfig = { ...criteriaConfig };
+                                                                    newConfig.random_factor = newValue / 100;
+                                                                    setCriteriaConfig(newConfig);
+                                                                }}
+                                                                min={0}
+                                                                max={30}
+                                                                step={1}
+                                                                sx={{
+                                                                    color: '#f59e0b',
+                                                                    '& .MuiSlider-track': { bgcolor: '#f59e0b' }
+                                                                }}
+                                                            />
+                                                            <Typography sx={{
+                                                                color: 'rgba(255,255,255,0.5)',
+                                                                fontSize: 11,
+                                                                mt: 1
+                                                            }}>
+                                                                Recommended: 5-15% for organic matching
+                                                            </Typography>
+                                                        </Box>
+                                                    </CardContent>
+                                                </Card>
+
+                                                {/* Matching Recency Preference */}
+                                                <Card sx={{
+                                                    bgcolor: 'rgba(255,255,255,0.05)',
+                                                    borderRadius: 2,
+                                                    border: '1px solid rgba(255,255,255,0.1)'
+                                                }}>
+                                                    <CardContent>
+                                                        <FormControlLabel
+                                                            control={
+                                                                <Switch
+                                                                    checked={criteriaConfig?.prefer_new_users !== false}
+                                                                    onChange={(e) => {
+                                                                        const newConfig = { ...criteriaConfig };
+                                                                        newConfig.prefer_new_users = e.target.checked;
+                                                                        setCriteriaConfig(newConfig);
+                                                                    }}
+                                                                    size="small"
+                                                                />
+                                                            }
+                                                            label={
+                                                                <Box>
+                                                                    <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>
+                                                                        Prioritize New Users
+                                                                    </Typography>
+                                                                    <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+                                                                        Match users who recently joined first
+                                                                    </Typography>
+                                                                </Box>
+                                                            }
+                                                            sx={{ color: 'rgba(255,255,255,0.7)', width: '100%' }}
+                                                        />
+                                                    </CardContent>
+                                                </Card>
+                                            </Box>
 
                                             {/* Normalize and Save Buttons */}
                                             <Box sx={{ display: 'flex', gap: 1 }}>

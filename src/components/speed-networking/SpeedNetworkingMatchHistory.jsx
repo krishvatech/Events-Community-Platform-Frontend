@@ -29,6 +29,12 @@ function authHeader() {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Add cache-busting query parameter for URLs that need fresh data
+function addCacheBust(url) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}_cb=${Date.now()}`;
+}
+
 export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
     const navigate = useNavigate();
     const [matches, setMatches] = useState([]);
@@ -40,8 +46,20 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
     // State to track friend request status for each match partner
     const [friendStatusMap, setFriendStatusMap] = useState({}); // { [userId]: 'none' | 'pending_outgoing' | 'friends' }
 
+    // Poll for past matches every 5 seconds to detect completed matches
     useEffect(() => {
+        if (!sessionId || !eventId) return;
+
+        // Initial fetch
         fetchUserMatches();
+
+        // Poll every 5 seconds when session is active
+        const interval = setInterval(() => {
+            console.log("[MatchHistory] Polling for updated past matches...");
+            fetchUserMatches();
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, [eventId, sessionId]);
 
     const fetchUserMatches = async () => {
@@ -52,7 +70,8 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
         try {
             setLoading(true);
-            const url = `${API_ROOT}/events/${eventId}/speed-networking/${sessionId}/user-matches/`.replace(/([^:]\/)\/+/g, "$1");
+            let url = `${API_ROOT}/events/${eventId}/speed-networking/${sessionId}/user-matches/`.replace(/([^:]\/)\/+/g, "$1");
+            url = addCacheBust(url); // Add cache-bust for fresh match data
             const res = await fetch(url, { headers: authHeader() });
 
             if (!res.ok) {

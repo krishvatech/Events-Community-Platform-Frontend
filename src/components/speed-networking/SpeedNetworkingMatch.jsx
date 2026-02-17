@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button, LinearProgress } from '@mui/material';
+import { Box, Typography, Button, LinearProgress, Collapse, Chip } from '@mui/material';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useDyteClient, DyteProvider } from '@dytesdk/react-web-core';
 import { DyteMeeting } from '@dytesdk/react-ui-kit';
 
@@ -46,6 +48,7 @@ export default function SpeedNetworkingMatch({
     const [meeting, initMeeting] = useDyteClient();
     const [timeRemaining, setTimeRemaining] = useState(session.duration_minutes * 60);
     const [videoError, setVideoError] = useState(null);
+    const [showBreakdown, setShowBreakdown] = useState(false);
     const autoAdvanceTriggeredRef = useRef(false);
 
     // Inject Dyte UI styles to ensure Chat and controls are always visible
@@ -185,9 +188,16 @@ export default function SpeedNetworkingMatch({
                 borderBottom: '1px solid rgba(255,255,255,0.1)'
             }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography sx={{ color: '#fff', fontWeight: 700 }}>
-                        Talking with: <span style={{ color: '#5a78ff' }}>{partner?.first_name || partner?.username || 'Partner'}</span>
-                    </Typography>
+                    <Box>
+                        <Typography sx={{ color: '#fff', fontWeight: 700 }}>
+                            Talking with: <span style={{ color: '#5a78ff' }}>{partner?.first_name || partner?.username || 'Partner'}</span>
+                        </Typography>
+                        {match?.match_probability && (
+                            <Typography sx={{ color: '#22c55e', fontSize: 12, mt: 0.5 }}>
+                                ✓ {match.match_probability.toFixed(0)}% match probability
+                            </Typography>
+                        )}
+                    </Box>
                     <Typography sx={{
                         color: timeRemaining < 30 ? '#ef4444' : '#22c55e',
                         fontWeight: 700,
@@ -209,6 +219,63 @@ export default function SpeedNetworkingMatch({
                         }
                     }}
                 />
+
+                {/* Score Breakdown */}
+                {match?.match_breakdown && (
+                    <Box sx={{ mt: 1 }}>
+                        <Button
+                            size="small"
+                            onClick={() => setShowBreakdown(!showBreakdown)}
+                            sx={{
+                                color: 'rgba(255,255,255,0.6)',
+                                fontSize: 11,
+                                textTransform: 'none',
+                                p: 0,
+                                '&:hover': { color: '#fff' }
+                            }}
+                            endIcon={showBreakdown ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
+                        >
+                            Match Score Details
+                        </Button>
+
+                        <Collapse in={showBreakdown}>
+                            <Box sx={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(4, 1fr)',
+                                gap: 1,
+                                mt: 1,
+                                p: 1,
+                                bgcolor: 'rgba(0,0,0,0.3)',
+                                borderRadius: 1
+                            }}>
+                                {Object.entries(match.match_breakdown).map(([criterion, score]) => (
+                                    <Box key={criterion} sx={{ textAlign: 'center' }}>
+                                        <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', textTransform: 'capitalize' }}>
+                                            {criterion}
+                                        </Typography>
+                                        <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#fff', mt: 0.3 }}>
+                                            {score.toFixed(0)}
+                                        </Typography>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={score}
+                                            sx={{
+                                                height: 3,
+                                                borderRadius: 2,
+                                                mt: 0.5,
+                                                bgcolor: 'rgba(255,255,255,0.1)',
+                                                '& .MuiLinearProgress-bar': {
+                                                    bgcolor: score > 75 ? '#22c55e' : score > 50 ? '#f59e0b' : '#ef4444',
+                                                    borderRadius: 2
+                                                }
+                                            }}
+                                        />
+                                    </Box>
+                                ))}
+                            </Box>
+                        </Collapse>
+                    </Box>
+                )}
             </Box>
 
             {/* Dyte Meeting Area */}

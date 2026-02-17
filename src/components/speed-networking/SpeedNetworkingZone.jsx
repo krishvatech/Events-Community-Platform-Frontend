@@ -12,6 +12,12 @@ function authHeader() {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Add cache-busting query parameter for URLs that need fresh data
+function addCacheBust(url) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}_cb=${Date.now()}`;
+}
+
 export default function SpeedNetworkingZone({
     eventId,
     isAdmin,
@@ -32,7 +38,7 @@ export default function SpeedNetworkingZone({
         const fetchUser = async () => {
             try {
                 const url = `${API_ROOT}/users/me/`.replace(/([^:]\/)\/+/g, "$1");
-                const res = await fetch(url, { headers: authHeader() });
+                const res = await fetch(url, { headers: authHeader(false) }); // User info doesn't need no-cache
                 if (res.ok) {
                     const data = await res.json();
                     setCurrentUser(data);
@@ -48,7 +54,8 @@ export default function SpeedNetworkingZone({
     const fetchActiveSession = useCallback(async () => {
         setError(null); // Clear previous errors on retry
         try {
-            const url = `${API_ROOT}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
+            let url = `${API_ROOT}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
+            url = addCacheBust(url); // Add cache-bust parameter for fresh data
             const res = await fetch(url, {
                 headers: authHeader()
             });
@@ -67,43 +74,63 @@ export default function SpeedNetworkingZone({
         }
     }, [eventId]);
 
+    // Normalize message type: convert dots to underscores (Channels convention)
+    const normalizeMessageType = (type) => {
+        return type?.replace(/\./g, '_') || '';
+    };
+
     // Handle WebSocket messages
     useEffect(() => {
         if (!lastMessage) return;
 
-        console.log("[SpeedNetworking] Processing WebSocket message:", {
-            type: lastMessage.type,
-            hasData: !!lastMessage.data,
+        const normalizedType = normalizeMessageType(lastMessage.type);
+        const messageData = lastMessage.data || {};
+
+        console.log("[SpeedNetworking] WebSocket message received:", {
+            original: lastMessage.type,
+            normalized: normalizedType,
             timestamp: new Date().toISOString()
         });
 
-        const messageType = lastMessage.type;
-        const messageData = lastMessage.data || {};
-
-        if (messageType === 'speed_networking.match_found' || messageType === 'speed_networking_match_found') {
-            console.log("[SpeedNetworking] Match found via WebSocket!");
+        // Match found
+        if (normalizedType === 'speed_networking_match_found') {
+            console.log("[SpeedNetworking] ✅ Match found!");
             const wsMatch = lastMessage.match || messageData.match || messageData;
             setCurrentMatch(wsMatch);
             setInQueue(false);
             if (onEnterMatch) {
                 onEnterMatch(wsMatch);
             }
-        } else if (messageType === 'speed_networking.match_ended' || messageType === 'speed_networking_match_ended') {
-            console.log("[SpeedNetworking] Match ended via WebSocket. Return to queue.");
+        }
+        // Match ended - CRITICAL: Update UI immediately AND refresh session
+        else if (normalizedType === 'speed_networking_match_ended') {
+            console.log("[SpeedNetworking] ✅ Match ended! Updating UI...");
             setCurrentMatch(null);
             setInQueue(true);
-        } else if (messageType === 'speed_networking.session_ended' || messageType === 'speed_networking_session_ended') {
+
+            // Refresh session after short delay to ensure backend has processed
+            setTimeout(() => {
+                console.log("[SpeedNetworking] Refreshing session after match end...");
+                fetchActiveSession();
+            }, 100);
+        }
+        // Session ended
+        else if (normalizedType === 'speed_networking_session_ended') {
+            console.log("[SpeedNetworking] Session ended");
             setSession(prev => prev ? { ...prev, status: 'ENDED' } : prev);
             setCurrentMatch(null);
             setInQueue(false);
-        } else if (messageType === 'speed_networking.session_started' || messageType === 'speed_networking_session_started') {
-            // Session started message will be picked up by polling mechanism
-        } else if (messageType === 'speed_networking_queue_update' || messageType === 'speed_networking.queue_update') {
-            console.log("[SpeedNetworking] Queue update via WebSocket", {
-                messageType,
+        }
+        // Session started
+        else if (normalizedType === 'speed_networking_session_started') {
+            console.log("[SpeedNetworking] Session started");
+            // Will be picked up by polling mechanism
+        }
+        // Queue update
+        else if (normalizedType === 'speed_networking_queue_update') {
+            console.log("[SpeedNetworking] Queue update:", {
                 queue_count: messageData.queue_count,
-                active_matches_count: messageData.active_matches_count,
-                timestamp: new Date().toISOString()
+                active_matches_count: messageData.active_matches_count
             });
             const d = messageData;
             setSession(prev => prev ? {
@@ -112,7 +139,47 @@ export default function SpeedNetworkingZone({
                 active_matches_count: d.active_matches_count ?? prev.active_matches_count
             } : prev);
         }
-    }, [lastMessage, onEnterMatch]);
+    }, [lastMessage, onEnterMatch, fetchActiveSession]);
+
+    // Monitor match status changes (fallback: detect when match ended server-side)
+    useEffect(() => {
+        if (!currentMatch || !session?.id) return;
+
+        const checkMatchStatus = async () => {
+            try {
+                // Check if match is still ACTIVE
+                let url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/my-match/`.replace(/([^:]\/)\/+/g, "$1");
+                url = addCacheBust(url); // Add cache-bust for fresh status
+                const res = await fetch(url, {
+                    headers: authHeader()
+                });
+
+                if (res.status === 404 || res.status === 400) {
+                    // Match ended or user no longer in queue
+                    console.log("[SpeedNetworking] Match ended (detected via polling)");
+                    setCurrentMatch(null);
+                    setInQueue(true);
+                    return;
+                }
+
+                if (!res.ok) return;
+
+                const data = await res.json();
+
+                // If we got a different match, our current match must have ended
+                if (data.id && data.id !== currentMatch.id) {
+                    console.log("[SpeedNetworking] New match assigned, old match ended");
+                    setCurrentMatch(data);
+                }
+            } catch (err) {
+                console.debug('[SpeedNetworking] Error checking match status:', err);
+            }
+        };
+
+        // Poll every 2 seconds while in active match (faster than general queue polling)
+        const interval = setInterval(checkMatchStatus, 2000);
+        return () => clearInterval(interval);
+    }, [currentMatch, session?.id, eventId]);
 
     // When session ends, immediately clear queue and match states
     useEffect(() => {
@@ -195,7 +262,8 @@ export default function SpeedNetworkingZone({
         setLoading(true);
 
         try {
-            const url = `${API_ROOT}/events/${eventId}/speed-networking/matches/${matchId}/next/`.replace(/([^:]\/)\/+/g, "$1");
+            let url = `${API_ROOT}/events/${eventId}/speed-networking/matches/${matchId}/next/`.replace(/([^:]\/)\/+/g, "$1");
+            url = addCacheBust(url); // Add cache-bust for fresh result
             const res = await fetch(url, {
                 method: 'POST',
                 headers: authHeader()
@@ -207,13 +275,20 @@ export default function SpeedNetworkingZone({
                 throw new Error(data.error || 'Failed to get next match');
             }
 
+            // CRITICAL: Refresh session immediately after match end
+            // This ensures the match moves from "Active" to "Past" sections
+            setTimeout(() => {
+                console.log("[SpeedNetworking] Match ended, refreshing session...");
+                fetchActiveSession();
+            }, 500);
+
             setLoading(false);
         } catch (err) {
             console.error('[SpeedNetworking] Error getting next match:', err);
             setError(err.message);
             setLoading(false);
         }
-    }, [currentMatch, eventId]);
+    }, [currentMatch, eventId, fetchActiveSession]);
 
     // Poll for current match when in queue (only if waiting)
     // WebSocket will notify of matches, but polling is fallback for reliability
@@ -222,7 +297,8 @@ export default function SpeedNetworkingZone({
 
         const pollInterval = setInterval(async () => {
             try {
-                const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/my-match/`.replace(/([^:]\/)\/+/g, "$1");
+                let url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/my-match/`.replace(/([^:]\/)\/+/g, "$1");
+                url = addCacheBust(url); // Add cache-bust for fresh data
                 const res = await fetch(url, {
                     headers: authHeader()
                 });
@@ -263,7 +339,8 @@ export default function SpeedNetworkingZone({
 
         const pollInterval = setInterval(async () => {
             try {
-                const url = `${API_ROOT}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
+                let url = `${API_ROOT}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
+                url = addCacheBust(url); // Add cache-bust for fresh data
                 const res = await fetch(url, { headers: authHeader() });
 
                 if (res.ok) {
