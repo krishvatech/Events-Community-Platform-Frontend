@@ -165,6 +165,41 @@ export default function EventManagePage() {
   const [eventLoading, setEventLoading] = useState(!initialEvent);
   const [eventError, setEventError] = useState("");
 
+  // New: Current Viewer State for Timezone
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    // 1. Try to get from localStorage
+    try {
+      const stored = JSON.parse(localStorage.getItem("user"));
+      if (stored) {
+        setCurrentUser(stored);
+        // If we have a stored user, we can also try to refresh it in background
+        // to ensure we have the latest profile.timezone
+      }
+    } catch { }
+
+    // 2. Fetch fresh "me" to get latest profile settings (timezone)
+    const fetchMe = async () => {
+      const token = getToken();
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_ROOT}/users/me/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setCurrentUser(json);
+          // Optional: update localStorage so other pages see it too
+          localStorage.setItem("user", JSON.stringify(json));
+        }
+      } catch (err) {
+        console.warn("Failed to refresh current user for timezone", err);
+      }
+    };
+    fetchMe();
+  }, []);
+
   const [editOpen, setEditOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogAction, setDialogAction] = useState(null); // 'deregister' | 'approve' | 'reject'
@@ -1818,8 +1853,14 @@ export default function EventManagePage() {
                     pagedMembers.map((r) => {
                       const name = r.user_name || r.user_email || "Unnamed";
                       const email = r.user_email || "";
+
+                      // TIMEZONE LOGIC:
+                      // 1. Viewer's profile timezone
+                      // 2. Viewer's browser timezone (fallback)
+                      const userTz = currentUser?.profile?.timezone || dayjs.tz.guess();
+
                       const purchased = r.registered_at
-                        ? new Date(r.registered_at).toLocaleString()
+                        ? dayjs(r.registered_at).tz(userTz).format("M/D/YYYY, h:mm:ss A z")
                         : "";
                       const regKyc =
                         r.user_kyc_status ||
