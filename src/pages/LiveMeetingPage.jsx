@@ -60,6 +60,10 @@ import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import ScreenShareIcon from "@mui/icons-material/ScreenShare";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import LogoutIcon from "@mui/icons-material/Logout"; // <--- ADDED for Leave Table
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import StopCircleIcon from "@mui/icons-material/StopCircle";
+import PauseCircleIcon from "@mui/icons-material/PauseCircle";
+import PlayCircleIcon from "@mui/icons-material/PlayCircle";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import AnnouncementIcon from "@mui/icons-material/Announcement"; // ✅ NEW for waiting room announcements
@@ -2286,6 +2290,10 @@ export default function NewLiveMeeting() {
   const [dbStatus, setDbStatus] = useState("draft");
   const [eventTitle, setEventTitle] = useState("Live Meeting");
   const [isBreakout, setIsBreakout] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingId, setRecordingId] = useState("");
+  const [isRecordingPaused, setIsRecordingPaused] = useState(false);
+  const [recordingAnchorEl, setRecordingAnchorEl] = useState(null);
   const [activeTableId, setActiveTableId] = useState(null);
   const activeTableIdRef = useRef(null); // ✅ Ref for socket access
   const [activeTableName, setActiveTableName] = useState("");
@@ -3459,6 +3467,81 @@ export default function NewLiveMeeting() {
     }
   };
 
+  const handleStartRecording = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/start-recording/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.detail || "Failed to start recording");
+      setIsRecording(true);
+      setRecordingId(data.recording_id || "");
+      setIsRecordingPaused(false);
+      showSnackbar("Recording started", "success");
+    } catch (err) {
+      console.error("Error starting recording:", err);
+      showSnackbar(err.message || "Failed to start recording", "error");
+    }
+  }, [eventId, showSnackbar]);
+
+  const handlePauseRecording = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/pause-recording/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.detail || "Failed to pause recording");
+      setIsRecordingPaused(true);
+      setRecordingAnchorEl(null);
+      showSnackbar("Recording paused", "success");
+    } catch (err) {
+      console.error("Error pausing recording:", err);
+      showSnackbar(err.message || "Failed to pause recording", "error");
+    }
+  }, [eventId, showSnackbar]);
+
+  const handleResumeRecording = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/resume-recording/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.detail || "Failed to resume recording");
+      setIsRecordingPaused(false);
+      setRecordingAnchorEl(null);
+      showSnackbar("Recording resumed", "success");
+    } catch (err) {
+      console.error("Error resuming recording:", err);
+      showSnackbar(err.message || "Failed to resume recording", "error");
+    }
+  }, [eventId, showSnackbar]);
+
+  const handleStopRecording = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/stop-recording/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.detail || "Failed to stop recording");
+      setIsRecording(false);
+      setRecordingId("");
+      setIsRecordingPaused(false);
+      setRecordingAnchorEl(null);
+      showSnackbar("Recording stopped", "success");
+    } catch (err) {
+      console.error("Error stopping recording:", err);
+      showSnackbar(err.message || "Failed to stop recording", "error");
+    }
+  }, [eventId, showSnackbar]);
+
   const getJoinedParticipants = useCallback(() => {
     const participantsObj = dyteMeeting?.participants;
     if (!participantsObj) return [];
@@ -3679,6 +3762,13 @@ export default function NewLiveMeeting() {
       }
     })();
   }, [slug]);
+
+  useEffect(() => {
+    if (!eventData) return;
+    setIsRecording(eventData.is_recording || false);
+    setRecordingId(eventData.rtk_recording_id || "");
+    setIsRecordingPaused(Boolean(eventData.recording_paused_at));
+  }, [eventData]);
 
 
   // ---------- Join Dyte via your backend ----------
@@ -4261,6 +4351,19 @@ export default function NewLiveMeeting() {
             console.log("[MainSocket] ✅ Meeting went LIVE via WebSocket - updating dbStatus");
             setDbStatus("live");
           }
+        } else if (msg.type === "recording_status_changed") {
+          console.log("[MainSocket] Recording status changed:", msg);
+          setIsRecording(Boolean(msg.is_recording));
+          setRecordingId(msg.recording_id || "");
+          setIsRecordingPaused(Boolean(msg.is_paused));
+
+          const actionMessages = {
+            started: "Recording started",
+            paused: "Recording paused",
+            resumed: "Recording resumed",
+            stopped: "Recording stopped",
+          };
+          showSnackbar(actionMessages[msg.action] || "Recording status changed", "info");
         } else if (msg.type === "meeting_ended") {
           // ✅ NEW: Handle meeting end notification from backend
           // This message is broadcast when host ends meeting or auto-end conditions trigger
@@ -7400,14 +7503,16 @@ export default function NewLiveMeeting() {
       title: eventTitle,
       live: dbStatus === "live",
       timer: joinElapsedLabel,
-      recording: true,
+      recording: isRecording,
+      recordingPaused: isRecordingPaused,
+      recordingId,
       roomLabel: isBreakout ? "Breakout" : "Pinned",
       host: {
         name: latestPinnedHost?.name || (isBreakout ? "Breakout Room" : "Waiting for host"),
         role: latestPinnedHost ? (isBreakout ? "Member" : "Host") : (isBreakout ? "Member" : "Disconnected"),
       },
     }),
-    [eventTitle, dbStatus, latestPinnedHost, joinElapsedLabel, isBreakout]
+    [eventTitle, dbStatus, latestPinnedHost, joinElapsedLabel, isBreakout, isRecording, isRecordingPaused, recordingId]
   );
   const meeting = meetingMeta;
 
@@ -11140,7 +11245,17 @@ export default function NewLiveMeeting() {
 
               <Chip size="small" label={meeting.timer} sx={headerChipSx} />
 
-              {meeting.recording && <Chip size="small" label="Recording" sx={headerChipSx} />}
+              {meeting.recording && (
+                <Chip
+                  size="small"
+                  label={meeting.recordingPaused ? "Recording Paused" : "Recording"}
+                  sx={{
+                    ...headerChipSx,
+                    bgcolor: meeting.recordingPaused ? "rgba(255,152,0,0.2)" : "rgba(244,67,54,0.2)",
+                    borderColor: meeting.recordingPaused ? "rgba(255,152,0,0.4)" : "rgba(244,67,54,0.4)",
+                  }}
+                />
+              )}
             </Stack>
 
             {/* ✅ Notification History Bell Icon (Host Only) */}
@@ -11965,6 +12080,65 @@ export default function NewLiveMeeting() {
                         <ShuffleIcon />
                       </IconButton>
                     </Tooltip>
+                  )}
+
+                  {isHost && (
+                    <>
+                      <Tooltip title={!isRecording ? "Start Recording" : isRecordingPaused ? "Recording Paused - Click for options" : "Recording Active - Click for options"}>
+                        <IconButton
+                          onClick={(e) => {
+                            if (!isRecording) handleStartRecording();
+                            else setRecordingAnchorEl(e.currentTarget);
+                          }}
+                          sx={{
+                            bgcolor: !isRecording ? "rgba(255,255,255,0.06)" : isRecordingPaused ? "rgba(255,152,0,0.22)" : "rgba(244,67,54,0.22)",
+                            "&:hover": { bgcolor: !isRecording ? "rgba(255,255,255,0.10)" : isRecordingPaused ? "rgba(255,152,0,0.30)" : "rgba(244,67,54,0.30)" },
+                            mx: 0.5,
+                            color: !isRecording ? "#fff" : isRecordingPaused ? "#ff9800" : "#f44336",
+                          }}
+                        >
+                          {!isRecording ? (
+                            <FiberManualRecordIcon />
+                          ) : isRecordingPaused ? (
+                            <PauseCircleIcon />
+                          ) : (
+                            <FiberManualRecordIcon
+                              sx={{
+                                animation: "recordingPulse 1.5s ease-in-out infinite",
+                                "@keyframes recordingPulse": {
+                                  "0%, 100%": { opacity: 1 },
+                                  "50%": { opacity: 0.5 },
+                                },
+                              }}
+                            />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+
+                      <Menu
+                        anchorEl={recordingAnchorEl}
+                        open={Boolean(recordingAnchorEl)}
+                        onClose={() => setRecordingAnchorEl(null)}
+                        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+                        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+                      >
+                        {isRecordingPaused ? (
+                          <MenuItem onClick={handleResumeRecording}>
+                            <ListItemIcon><PlayCircleIcon fontSize="small" sx={{ color: "#4caf50" }} /></ListItemIcon>
+                            <ListItemText>Resume Recording</ListItemText>
+                          </MenuItem>
+                        ) : (
+                          <MenuItem onClick={handlePauseRecording}>
+                            <ListItemIcon><PauseCircleIcon fontSize="small" sx={{ color: "#ff9800" }} /></ListItemIcon>
+                            <ListItemText>Pause Recording</ListItemText>
+                          </MenuItem>
+                        )}
+                        <MenuItem onClick={handleStopRecording}>
+                          <ListItemIcon><StopCircleIcon fontSize="small" sx={{ color: "#f44336" }} /></ListItemIcon>
+                          <ListItemText>Stop Recording</ListItemText>
+                        </MenuItem>
+                      </Menu>
+                    </>
                   )}
 
                   {/* ✅ Separate Side Panel Toggle */}
