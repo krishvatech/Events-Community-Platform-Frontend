@@ -46,6 +46,7 @@ import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
+import RichProfile from "./community/RichProfile";
 
 // -------------------- Constants for Dropdowns --------------------
 const CEFR_OPTIONS = [
@@ -1204,7 +1205,9 @@ function IsoLanguageAutocomplete({ value, onChange }) {
 // -------------------- Page --------------------
 export default function ProfilePage() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  // Public View Toggle State
+  const [isPublicView, setIsPublicView] = useState(false);
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: "", sev: "success" });
@@ -1690,6 +1693,7 @@ export default function ProfilePage() {
         if (!alive) return;
         const prof = data?.profile || {};
         setForm({
+          id: data?.id,
           first_name: data?.first_name || "",
           last_name: data?.last_name || "",
           email: data?.email || "",
@@ -2979,6 +2983,10 @@ export default function ProfilePage() {
     setExpOpen(true);
   }
 
+  if (isPublicView) {
+    return <RichProfile userId={form.id} viewAsPublic={true} onBack={() => setIsPublicView(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
@@ -3135,8 +3143,17 @@ export default function ProfilePage() {
                         )}
                       </Box>
 
-                      {/* --- EDIT BUTTON (Identity) --- */}
-                      <Box sx={{ ml: "auto", display: "flex", alignItems: "center" }}>
+                      {/* --- EDIT BUTTONS --- */}
+                      <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<PublicOutlinedIcon />}
+                          onClick={() => setIsPublicView(true)}
+                          sx={{ textTransform: "none", borderRadius: 2, mr: 1 }}
+                        >
+                          View as Public
+                        </Button>
                         <Tooltip title="Identity Details">
                           <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
                             <EditRoundedIcon fontSize="small" />

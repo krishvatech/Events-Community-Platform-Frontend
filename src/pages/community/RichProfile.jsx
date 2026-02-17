@@ -2123,9 +2123,10 @@ function ProfileShareRecipientsDialog({ open, onClose, postId }) {
 
 
 
-export default function RichProfile() {
+export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }) {
   // IMPORTANT: use :userId from /community/rich-profile/:userId
-  const { userId } = useParams();
+  const { userId: paramUserId } = useParams();
+  const userId = propUserId || paramUserId;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -2140,8 +2141,9 @@ export default function RichProfile() {
   const me = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
   }, []);
-  const isMe = String(me?.id || "") === String(userId || "");
-  const viewerIsStaff = isAdminUser();
+  // If viewAsPublic is true, we force isMe to false so the UI renders as if viewing a stranger
+  const isMe = !viewAsPublic && String(me?.id || "") === String(userId || "");
+  const viewerIsStaff = !viewAsPublic && isAdminUser();
   const viewerIsVerified = isVerifiedStatus(me?.profile?.kyc_status || me?.kyc_status);
   const [sharesGroup, setSharesGroup] = useState(false);
 
@@ -2537,7 +2539,7 @@ export default function RichProfile() {
     let alive = true;
     (async () => {
       // 🚧 Private: if not me and not friends, don’t fetch any posts
-      if (!isMe && (friendStatus || "").toLowerCase() !== "friends") {
+      if (!isMe && !viewAsPublic && (friendStatus || "").toLowerCase() !== "friends") {
         setPosts([]);
         setPostsLoading(false);
         return;
@@ -2579,6 +2581,11 @@ export default function RichProfile() {
     let alive = true;
     if (isMe) {
       setFriendStatus("self");
+      setFriendLoading(false);
+      return;
+    }
+    if (viewAsPublic) {
+      setFriendStatus("none");
       setFriendLoading(false);
       return;
     }
@@ -3194,7 +3201,10 @@ export default function RichProfile() {
                 <Box sx={{ display: 'flex' }}>
                   <Button
                     startIcon={<ArrowBackRoundedIcon />}
-                    onClick={() => navigate("/community?view=members")}
+                    onClick={() => {
+                      if (onBack) onBack();
+                      else navigate("/community?view=members");
+                    }}
                     sx={{
                       textTransform: "none",
                       color: "text.primary",
@@ -3204,7 +3214,7 @@ export default function RichProfile() {
                       "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
                     }}
                   >
-                    Back to Explore Members
+                    {viewAsPublic ? "Exit Public View" : "Back to Explore Members"}
                   </Button>
                 </Box>
 
@@ -3240,7 +3250,7 @@ export default function RichProfile() {
                     </Box>
 
                     {/* Right-side actions */}
-                    {!isMe && (
+                    {!isMe && !viewAsPublic && (
                       <Box sx={{ mt: 1.5, display: "flex", justifyContent: "flex-end", ml: "auto", gap: 1 }}>
                         <IconButton
                           size="small"
@@ -3337,7 +3347,7 @@ export default function RichProfile() {
                   <Divider />
                   {tab === 0 && (
                     <CardContent>
-                      {(!isMe && (friendStatus || "").toLowerCase() !== "friends") ? (
+                      {(!isMe && !viewAsPublic && (friendStatus || "").toLowerCase() !== "friends") ? (
                         <Box sx={{ textAlign: "center", py: 6 }}>
                           <Typography variant="h6" sx={{ mb: 0.5 }}>This account is private</Typography>
                           <Typography variant="body2" color="text.secondary">
