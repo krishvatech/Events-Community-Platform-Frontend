@@ -24,6 +24,8 @@ import EventDetailsPage from "./pages/EventDetailsPage.jsx";
 import LiveMeetingPage from "./pages/LiveMeetingPage.jsx";
 import Footer from "./components/Footer.jsx";
 import MyRecordingsPage from "./pages/MyRecordingsPage.jsx"
+import RecordingsLibrary from "./pages/RecordingsLibrary.jsx";
+import EditRecordingPage from "./pages/EditRecordingPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import ResourceDetailsPage from "./pages/ResourceDetailsPage.jsx";
 import CommunityHubPage from "./pages/CommunityHubPage.jsx";
@@ -203,6 +205,8 @@ const AppShell = () => {
           <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
           <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
+          <Route path="/account/recordings-library" element={<RequireAuth><RecordingsLibrary /></RequireAuth>} />
+          <Route path="/events/:id/edit-recording" element={<RequireAuth><EditRecordingPage /></RequireAuth>} />
 
           {/* ADD THIS ROUTE FOR RESOURCE DETAILS */}
           <Route path="/resource/:id" element={<RequireAuth><ResourceDetailsPage /></RequireAuth>} />
