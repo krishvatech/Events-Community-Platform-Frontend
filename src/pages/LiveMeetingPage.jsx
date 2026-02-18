@@ -2364,6 +2364,13 @@ export default function NewLiveMeeting() {
     loungeTables.filter(t => t.category === 'LOUNGE' || !t.category),
     [loungeTables]
   );
+  const hasConfiguredSocialLounge = loungeOnlyTables.length > 0;
+  const participantCanAccessSocialLounge = Boolean(
+    role !== "publisher" &&
+    hasConfiguredSocialLounge &&
+    isLoungeCurrentlyOpen
+  );
+  const showSocialLoungeToolbarAction = isHost || participantCanAccessSocialLounge;
 
   const breakoutOnlyTables = useMemo(() =>
     loungeTables.filter(t => t.category === 'BREAKOUT'),
@@ -10627,7 +10634,7 @@ export default function NewLiveMeeting() {
         roleLabel={role === "publisher" ? "Host" : "Audience"}
         waitingRoomImage={eventData?.waiting_room_image || null}
         timezone={getBrowserTimezone()}
-        loungeAvailable={preEventLoungeOpen}
+        loungeAvailable={role === "publisher" ? preEventLoungeOpen : participantCanAccessSocialLounge}
         loungeStatusLabel={loungeOpenStatus?.reason || "Pre-event networking"}
         isLoungeOpen={isLoungeCurrentlyOpen}
         onOpenLounge={openLoungeOverlay}
@@ -10786,7 +10793,11 @@ export default function NewLiveMeeting() {
           roleLabel={role === "publisher" ? "Host" : "Audience"}
           waitingRoomImage={eventData?.waiting_room_image || null}
           timezone={getBrowserTimezone()}
-          loungeAvailable={(waitingRoomLoungeAllowed || waitingRoomNetworkingAllowed) && loungeOpenStatus?.status === "OPEN"}
+          loungeAvailable={
+            role === "publisher"
+              ? (waitingRoomLoungeAllowed || waitingRoomNetworkingAllowed) && loungeOpenStatus?.status === "OPEN"
+              : (waitingRoomLoungeAllowed || waitingRoomNetworkingAllowed) && participantCanAccessSocialLounge
+          }
           loungeStatusLabel={loungeOpenStatus?.reason || ""}
           onOpenLounge={openLoungeOverlay}
           isHost={role === "publisher"}
@@ -12092,18 +12103,20 @@ export default function NewLiveMeeting() {
                     </IconButton>
                   </Tooltip>
 
-                  <Tooltip title="Social Lounge">
-                    <IconButton
-                      onClick={openLoungeOverlay}
-                      sx={{
-                        bgcolor: "rgba(255,255,255,0.06)",
-                        "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                        mx: 0.5
-                      }}
-                    >
-                      <SocialLoungeIcon />
-                    </IconButton>
-                  </Tooltip>
+                  {showSocialLoungeToolbarAction && (
+                    <Tooltip title="Social Lounge">
+                      <IconButton
+                        onClick={openLoungeOverlay}
+                        sx={{
+                          bgcolor: "rgba(255,255,255,0.06)",
+                          "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                          mx: 0.5
+                        }}
+                      >
+                        <SocialLoungeIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
 
                   {isHost && (
                     <Tooltip title="Breakout Control">
