@@ -84,6 +84,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
     );
     const [isFree, setIsFree] = useState(event?.is_free || false);
     const [maxParticipants, setMaxParticipants] = useState(event?.max_participants || "");
+    const [loungeTableCapacity, setLoungeTableCapacity] = useState(event?.lounge_table_capacity || 4);
 
 
     const [isMultiDay, setIsMultiDay] = useState(() => {
@@ -214,6 +215,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         setPrice(typeof event?.price === "number" ? event.price : Number(event?.price || 0));
         setIsFree(event?.is_free || false);
         setMaxParticipants(event?.max_participants || "");
+        setLoungeTableCapacity(event?.lounge_table_capacity || 4);
 
 
         const start = event?.start_time ? dayjs(event.start_time).tz(tz) : dayjs();
@@ -391,6 +393,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         } else {
             fd.append("max_participants", "");
         }
+        fd.append("lounge_table_capacity", String(loungeTableCapacity || 4));
         fd.append("timezone", timezone);
         fd.append("start_time", combineToISO(startDate, startTime));
         fd.append("end_time", combineToISO(endDate, endTime));
@@ -656,6 +659,14 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                         value={maxParticipants} onChange={(e) => setMaxParticipants(e.target.value)}
                         inputProps={{ min: 1, step: 1 }}
                         helperText="Leave empty for unlimited"
+                        sx={{ mt: 0.5, mb: 2 }}
+                    />
+
+                    <TextField
+                        label="Max Participants per Table (Social Lounge)" type="number" fullWidth
+                        value={loungeTableCapacity} onChange={(e) => setLoungeTableCapacity(e.target.value)}
+                        inputProps={{ min: 1, step: 1 }}
+                        helperText="Default is 4"
                         sx={{ mt: 0.5, mb: 2 }}
                     />
 

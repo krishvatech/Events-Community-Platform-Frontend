@@ -224,8 +224,8 @@ const LoungeTable = ({
                                 sx={{
                                     cursor:
                                         !slot.participant &&
-                                        !isUserAtThisTable &&
-                                        slot.seatIndex !== undefined
+                                            !isUserAtThisTable &&
+                                            slot.seatIndex !== undefined
                                             ? 'pointer'
                                             : 'default',
                                 }}
@@ -328,7 +328,12 @@ const LoungeTable = ({
                         },
                     }}
                 >
-                    {shouldDisableJoin ? 'Lounge Closed' : 'Join'}
+                    {shouldDisableJoin
+                        ? 'Lounge Closed'
+                        : isFull
+                            ? `Table Full (${Object.keys(table.participants || {}).length}/${maxSeats})`
+                            : `Join (${Object.keys(table.participants || {}).length}/${maxSeats})`
+                    }
                 </Button>
             )}
         </Paper>
