@@ -1290,15 +1290,19 @@ function SharesDialog({ open, postId, onClose }) {
 }
 
 // --- NEW COMPONENT: Share To Friend Dialog ---
+// --- UPDATED COMPONENT: Share To Friend/Group Dialog ---
 function ShareToFriendDialog({ open, onClose, postId }) {
+  const [tab, setTab] = React.useState(0);
   const [friends, setFriends] = React.useState([]);
+  const [groups, setGroups] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
-  const [selected, setSelected] = React.useState([]);
+  const [selected, setSelected] = React.useState([]); // stores user IDs or group IDs depending on tab
   const [search, setSearch] = React.useState("");
   const [sending, setSending] = React.useState(false);
 
+  // Fetch Friends
   React.useEffect(() => {
-    if (!open) return;
+    if (!open || tab !== 0) return;
     setLoading(true);
     // Try multiple friend endpoints
     const endpoints = [`${API_ROOT}/friends/`, `${API_ROOT}/relationships/friends/`, `${API_ROOT}/users/friends/`];
@@ -1342,9 +1346,44 @@ function ShareToFriendDialog({ open, onClose, postId }) {
       if (!found) setFriends([]);
       setLoading(false);
     })();
-  }, [open]);
+  }, [open, tab]);
 
-  const filtered = friends.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
+  // Fetch Groups
+  React.useEffect(() => {
+    if (!open || tab !== 1) return;
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(`${API_ROOT}/groups/joined-groups/`, { headers: authHeader() });
+        if (res.ok) {
+          const data = await res.json();
+          const rows = Array.isArray(data) ? data : (data.results || []);
+          // Filter for active members only
+          const activeGroups = rows.filter(g => g.membership_status === "active").map(g => ({
+            id: g.id,
+            name: g.name,
+            avatar: toAbsolute(g.logo || g.cover_image || ""), // Use logo or cover as avatar
+            headline: `${g.member_count || 0} members`,
+            isGroup: true
+          }));
+          setGroups(activeGroups);
+        }
+      } catch (e) {
+        console.error("Failed to fetch groups", e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [open, tab]);
+
+  // clear selection when switching tabs
+  React.useEffect(() => {
+    setSelected([]);
+    setSearch("");
+  }, [tab, open]);
+
+  const listData = tab === 0 ? friends : groups;
+  const filtered = listData.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
 
   const handleToggle = (id) => {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -1354,20 +1393,26 @@ function ShareToFriendDialog({ open, onClose, postId }) {
     if (selected.length === 0) return;
     setSending(true);
     try {
-      // Generic share endpoint - assumes backend handles creating activity or message
+      const payload = {
+        target_type: "activity_feed.feeditem",
+        target_id: postId,
+      };
+
+      if (tab === 0) {
+        payload.to_users = selected;
+      } else {
+        payload.to_groups = selected;
+      }
+
       await fetch(`${API_ROOT}/engagements/shares/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({
-          target_type: "activity_feed.feeditem",
-          target_id: postId,
-          to_users: selected // Sending array of user IDs
-        })
+        body: JSON.stringify(payload)
       });
       onClose();
       setSelected([]);
     } catch (e) {
-      alert("Shared (mock): Verify your backend /api/engagements/shares/ endpoint accepts user_ids.");
+      alert("Share failed. Please try again.");
       onClose();
     } finally {
       setSending(false);
@@ -1376,26 +1421,43 @@ function ShareToFriendDialog({ open, onClose, postId }) {
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Share with Contacts</DialogTitle>
+      <DialogTitle>Share Post</DialogTitle>
+
+      <Tabs
+        value={tab}
+        onChange={(e, v) => setTab(v)}
+        variant="fullWidth"
+        textColor="primary"
+        indicatorColor="primary"
+        sx={{ borderBottom: 1, borderColor: "divider" }}
+      >
+        <Tab label="Contacts" />
+        <Tab label="Groups" />
+      </Tabs>
+
       <DialogContent dividers sx={{ p: 0 }}>
         <Box sx={{ p: 2, pb: 1 }}>
           <TextField
-            fullWidth size="small" placeholder="Search Contacts..."
+            fullWidth size="small" placeholder={tab === 0 ? "Search Contacts..." : "Search Groups..."}
             value={search} onChange={e => setSearch(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
           />
         </Box>
         {loading ? <LinearProgress /> : (
           <List sx={{ height: 300, overflow: 'auto' }}>
-            {filtered.length === 0 && <Typography p={2} align="center" color="text.secondary">No friends found.</Typography>}
+            {filtered.length === 0 && <Typography p={2} align="center" color="text.secondary">No {tab === 0 ? "contacts" : "groups"} found.</Typography>}
             {filtered.map(f => (
-              <ListItem key={f.id} onClick={() => handleToggle(f.id)}>
-                <ListItemAvatar><Avatar src={f.avatar} /></ListItemAvatar>
+              <ListItem key={f.id} onClick={() => handleToggle(f.id)} button>
+                <ListItemAvatar>
+                  <Avatar src={f.avatar} variant={f.isGroup ? "rounded" : "circular"}>
+                    {f.name.charAt(0)}
+                  </Avatar>
+                </ListItemAvatar>
                 <ListItemText
                   primary={
                     <Stack direction="row" spacing={0.5} alignItems="center">
                       <Typography variant="body1">{f.name}</Typography>
-                      {f.kycStatus === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                      {f.kycStatus === "approved" && !f.isGroup && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
                     </Stack>
                   }
                   secondary={f.headline}
