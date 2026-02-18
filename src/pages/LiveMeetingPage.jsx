@@ -244,6 +244,21 @@ const normalizeRole = (raw = "") => {
   return r.includes("publisher") || r.includes("host") || r.includes("admin") ? "publisher" : "audience";
 };
 
+const DEFAULT_MOOD_EMOJIS = [
+  "😀", "😄", "😁", "😎", "😊", "🙂", "🤩", "😍",
+  "🤔", "😌", "😴", "😇", "🙌", "👏", "👍", "🔥",
+  "🚀", "💯", "🎉", "❤️", "💙", "💚", "🤝", "🙏",
+  "😅", "😬", "😐", "😕", "😮", "😢", "😭", "😡",
+];
+const EMOJI_DESCRIPTIONS = {
+  "😀": "grinning", "😄": "happy", "😁": "smile", "😎": "cool", "😊": "blush", "🙂": "pleasant",
+  "🤩": "excited", "😍": "love", "🤔": "thinking", "😌": "relaxed", "😴": "sleepy", "😇": "angelic",
+  "🙌": "celebration", "👏": "applause", "👍": "thumbs up", "🔥": "fire", "🚀": "rocket", "💯": "hundred",
+  "🎉": "party", "❤️": "heart", "💙": "blue heart", "💚": "green heart", "🤝": "handshake", "🙏": "thankful",
+  "😅": "relief", "😬": "awkward", "😐": "neutral", "😕": "confused", "😮": "surprised", "😢": "sad",
+  "😭": "crying", "😡": "angry",
+};
+
 // ==============================
 
 function TabPanel({ value, index, children }) {
@@ -2174,6 +2189,20 @@ export default function NewLiveMeeting() {
   const [memberInfoOpen, setMemberInfoOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [participantKycCache, setParticipantKycCache] = useState({}); // Cache for kyc_status by userId
+  const [moodMap, setMoodMap] = useState({});
+  const [allowedMoods, setAllowedMoods] = useState(DEFAULT_MOOD_EMOJIS);
+  const [recentMoods, setRecentMoods] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("webinar_recent_moods") || "[]");
+      return Array.isArray(raw) ? raw.slice(0, 10) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [moodAnchorEl, setMoodAnchorEl] = useState(null);
+  const [moodSearch, setMoodSearch] = useState("");
+  const moodUpdateInFlightRef = useRef(false);
+  const lastMoodSentAtRef = useRef(0);
 
   const fetchAndCacheKycStatus = useCallback((userId) => {
     if (!userId || participantKycCache[userId] !== undefined) return; // Already cached
@@ -2450,6 +2479,92 @@ export default function NewLiveMeeting() {
   const [dyteMeeting, initMeeting] = useDyteClient();
   const [initDone, setInitDone] = useState(false);
   const selfPermissions = useDytePermissions(dyteMeeting);
+  const myParticipantKey = useMemo(
+    () => getParticipantUserKey(dyteMeeting?.self),
+    [dyteMeeting?.self]
+  );
+
+  const syncMoodMapFromApi = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/moods/`), {
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const rows = Array.isArray(data?.moods) ? data.moods : [];
+      if (Array.isArray(data?.allowed_moods) && data.allowed_moods.length) {
+        setAllowedMoods(data.allowed_moods);
+      }
+
+      setMoodMap((prev) => {
+        const next = { ...prev };
+        rows.forEach((row) => {
+          const userKey = row?.user_id !== undefined && row?.user_id !== null ? `id:${String(row.user_id)}` : "";
+          if (userKey && row?.mood) next[userKey] = row.mood;
+        });
+        return next;
+      });
+    } catch {
+      // best-effort sync
+    }
+  }, [eventId]);
+
+  const persistRecentMood = useCallback((mood) => {
+    if (!mood) return;
+    setRecentMoods((prev) => {
+      const next = [mood, ...prev.filter((x) => x !== mood)].slice(0, 10);
+      localStorage.setItem("webinar_recent_moods", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const applyMood = useCallback(
+    async (moodValue) => {
+      if (!eventId || !myParticipantKey) return;
+      const now = Date.now();
+      if (now - lastMoodSentAtRef.current < 1500 || moodUpdateInFlightRef.current) return;
+      lastMoodSentAtRef.current = now;
+      moodUpdateInFlightRef.current = true;
+
+      const previous = moodMap[myParticipantKey] || null;
+      const nextMood = moodValue || null;
+      setMoodMap((prev) => ({ ...prev, [myParticipantKey]: nextMood }));
+
+      try {
+        const method = nextMood ? "PUT" : "DELETE";
+        const res = await fetch(toApiUrl(`events/${eventId}/mood/`), {
+          method,
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: nextMood ? JSON.stringify({ mood: nextMood }) : undefined,
+        });
+        if (!res.ok) {
+          setMoodMap((prev) => ({ ...prev, [myParticipantKey]: previous }));
+          return;
+        }
+
+        if (nextMood) {
+          persistRecentMood(nextMood);
+          dyteMeeting?.participants?.broadcastMessage?.("mood-updated", {
+            userKey: myParticipantKey,
+            mood: nextMood,
+            ts: Date.now(),
+          });
+        } else {
+          dyteMeeting?.participants?.broadcastMessage?.("mood-updated", {
+            userKey: myParticipantKey,
+            mood: null,
+            ts: Date.now(),
+          });
+        }
+      } catch {
+        setMoodMap((prev) => ({ ...prev, [myParticipantKey]: previous }));
+      } finally {
+        moodUpdateInFlightRef.current = false;
+      }
+    },
+    [dyteMeeting, eventId, moodMap, myParticipantKey, persistRecentMood]
+  );
 
   // Dual connection for main room peek
   const [mainDyteMeeting, initMainMeeting] = useDyteClient();
@@ -6089,11 +6204,33 @@ export default function NewLiveMeeting() {
       if (type === "spotlight-clear") {
         setSpotlightTarget(null);
       }
+
+      if (type === "mood-updated" && payload?.userKey) {
+        setMoodMap((prev) => ({ ...prev, [payload.userKey]: payload?.mood || null }));
+      }
     };
 
     dyteMeeting.participants?.on?.("broadcastedMessage", handleBroadcast);
     return () => dyteMeeting.participants?.off?.("broadcastedMessage", handleBroadcast);
   }, [dyteMeeting, getJoinedParticipants, activeTableId, isLiveEventSocialLounge]);
+
+  useEffect(() => {
+    if (!eventId || !roomJoined) return;
+    syncMoodMapFromApi();
+    const t = setInterval(syncMoodMapFromApi, 20000);
+    return () => clearInterval(t);
+  }, [eventId, roomJoined, syncMoodMapFromApi]);
+
+  useEffect(() => {
+    return () => {
+      if (!eventId || !myParticipantKey) return;
+      fetch(toApiUrl(`events/${eventId}/mood/`), {
+        method: "DELETE",
+        headers: { ...authHeader() },
+        keepalive: true,
+      }).catch(() => { });
+    };
+  }, [eventId, myParticipantKey]);
 
   // ✅ If Host leaves MAIN MEETING, show waiting state for audience
   // NOTE: This should NOT trigger when host leaves a breakout room
@@ -6790,10 +6927,11 @@ export default function NewLiveMeeting() {
         picture: p.picture || p.avatar || p.profilePicture || metaPicture || "", // ✅ Extract picture
         inMeeting: Boolean(p.inMeeting),
         isOccupyingLounge: Boolean(p.isOccupyingLounge),
+        mood: participantUserKey ? (moodMap[participantUserKey] || null) : null,
         _raw: p,
       };
     });
-  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables, assignedRoleByIdentity]);
+  }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables, assignedRoleByIdentity, moodMap]);
 
   // ✅ Build available participants for manual assignment (all meeting participants except self)
   const availableParticipantsForAssign = useMemo(() => {
@@ -9033,6 +9171,112 @@ export default function NewLiveMeeting() {
   }, [groupedMembers?.audience, selfDyteId]);
 
   const isSelfMember = (m) => Boolean(selfDyteId && m?.id === selfDyteId);
+  const moodPickerOpen = Boolean(moodAnchorEl);
+  const moodSearchNormalized = String(moodSearch || "").trim().toLowerCase();
+  const filteredMoodOptions = useMemo(() => {
+    if (!moodSearchNormalized) return allowedMoods;
+    return allowedMoods.filter((m) => {
+      const desc = EMOJI_DESCRIPTIONS[m] || "";
+      return desc.includes(moodSearchNormalized) || m.includes(moodSearchNormalized);
+    });
+  }, [allowedMoods, moodSearchNormalized]);
+
+  const renderMemberAvatar = useCallback((member) => {
+    const mine = isSelfMember(member);
+    const mood = member?.mood || null;
+    const avatarNode = (
+      <Badge
+        overlap="circular"
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        badgeContent={
+          mood ? (
+            <Box
+              sx={{
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                fontSize: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                bgcolor: "rgba(0,0,0,0.75)",
+                border: "1px solid rgba(255,255,255,0.25)",
+              }}
+            >
+              {mood}
+            </Box>
+          ) : null
+        }
+      >
+        <Avatar src={member?.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
+          {initialsFromName(member?.name)}
+        </Avatar>
+      </Badge>
+    );
+
+    if (!mine) return avatarNode;
+    return (
+      <Tooltip title="Set your mood">
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMoodAnchorEl(e.currentTarget);
+          }}
+          sx={{ p: 0.1 }}
+        >
+          {avatarNode}
+        </IconButton>
+      </Tooltip>
+    );
+  }, [isSelfMember]);
+  const renderMoodTrigger = useCallback((member, label = "🙂 Mood") => {
+    if (!isSelfMember(member)) return null;
+    return (
+      <Button
+        size="small"
+        variant="outlined"
+        onClick={(e) => {
+          e.stopPropagation();
+          setMoodAnchorEl(e.currentTarget);
+        }}
+        sx={{
+          minWidth: "auto",
+          px: 0.8,
+          py: 0.2,
+          lineHeight: 1,
+          fontSize: 11,
+          borderColor: "rgba(255,255,255,0.25)",
+          color: "rgba(255,255,255,0.9)",
+        }}
+      >
+        {label}
+      </Button>
+    );
+  }, [isSelfMember]);
+  const renderMoodRow = useCallback((member) => {
+    const mood = member?.mood || null;
+    const isSelf = isSelfMember(member);
+    if (mood) {
+      return (
+        <Stack direction="row" spacing={0.8} alignItems="center">
+          <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>
+            {mood}
+          </Typography>
+          {renderMoodTrigger(member, "Edit Mood")}
+        </Stack>
+      );
+    }
+    if (!isSelf) return null;
+    return (
+      <Stack direction="row" spacing={0.8} alignItems="center" sx={{ minHeight: 22 }}>
+        <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>
+          How are you today?
+        </Typography>
+        {renderMoodTrigger(member, "🙂 Set Mood")}
+      </Stack>
+    );
+  }, [isSelfMember, renderMoodTrigger]);
 
   // Others only (Audience + Speaker), host is pinned already
   const stageOthers = useMemo(() => {
@@ -9969,9 +10213,7 @@ export default function NewLiveMeeting() {
                           >
                             <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
                               <ListItemAvatar>
-                                <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
-                                  {initialsFromName(m.name)}
-                                </Avatar>
+                                {renderMemberAvatar(m)}
                               </ListItemAvatar>
                               <ListItemText
                                 primary={
@@ -9990,6 +10232,7 @@ export default function NewLiveMeeting() {
                                       })()}
                                       <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
                                     </Stack>
+                                    {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Read Only */}
                                       <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
@@ -10305,9 +10548,7 @@ export default function NewLiveMeeting() {
                           >
                             <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
                               <ListItemAvatar>
-                                <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
-                                  {initialsFromName(m.name)}
-                                </Avatar>
+                                {renderMemberAvatar(m)}
                               </ListItemAvatar>
                               <ListItemText
                                 primary={
@@ -10327,6 +10568,7 @@ export default function NewLiveMeeting() {
                                         ) : null;
                                       })()}
                                     </Box>
+                                    {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
                                       <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
@@ -10450,9 +10692,7 @@ export default function NewLiveMeeting() {
                         >
                           <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
                             <ListItemAvatar>
-                              <Avatar src={m.picture} sx={{ bgcolor: "rgba(255,255,255,0.14)" }}>
-                                {initialsFromName(m.name)}
-                              </Avatar>
+                              {renderMemberAvatar(m)}
                             </ListItemAvatar>
                             <ListItemText
                               primary={
@@ -10472,6 +10712,7 @@ export default function NewLiveMeeting() {
                                       ) : null;
                                     })()}
                                   </Box>
+                                  {renderMoodRow(m)}
                                   <Stack direction="row" spacing={0.75} alignItems="center">
                                     {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
                                     <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
@@ -13196,6 +13437,83 @@ export default function NewLiveMeeting() {
             onAssign={handleAssignFromHistory}
             assigningParticipantId={assigningParticipantId}
           />
+        </Popover>
+
+        <Popover
+          open={moodPickerOpen}
+          anchorEl={moodAnchorEl}
+          onClose={() => {
+            setMoodAnchorEl(null);
+            setMoodSearch("");
+          }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
+          PaperProps={{
+            sx: {
+              p: 1.2,
+              width: 280,
+              bgcolor: "rgba(9, 14, 24, 0.96)",
+              border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 2,
+            },
+          }}
+        >
+          <Stack spacing={1}>
+            <TextField
+              size="small"
+              placeholder="Search mood"
+              value={moodSearch}
+              onChange={(e) => setMoodSearch(e.target.value)}
+            />
+
+            {!!recentMoods.length && !moodSearchNormalized && (
+              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                {recentMoods.slice(0, 6).map((m) => (
+                  <IconButton
+                    key={`recent-${m}`}
+                    size="small"
+                    onClick={() => {
+                      applyMood(m);
+                      setMoodAnchorEl(null);
+                      setMoodSearch("");
+                    }}
+                    sx={{ fontSize: 18 }}
+                  >
+                    {m}
+                  </IconButton>
+                ))}
+              </Stack>
+            )}
+
+            <Stack direction="row" spacing={0.4} flexWrap="wrap" useFlexGap>
+              {filteredMoodOptions.map((m) => (
+                <Tooltip key={m} title={EMOJI_DESCRIPTIONS[m] || "mood"}>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      applyMood(m);
+                      setMoodAnchorEl(null);
+                      setMoodSearch("");
+                    }}
+                    sx={{ fontSize: 18 }}
+                  >
+                    {m}
+                  </IconButton>
+                </Tooltip>
+              ))}
+            </Stack>
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => {
+                applyMood(null);
+                setMoodAnchorEl(null);
+                setMoodSearch("");
+              }}
+            >
+              Clear Mood
+            </Button>
+          </Stack>
         </Popover>
 
         {/* ✅ NEW: Announcement Dialog */}
