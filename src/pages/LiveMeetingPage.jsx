@@ -4174,8 +4174,8 @@ export default function NewLiveMeeting() {
             setServerDebugMessage(msg.message);
             // Determine severity based on message content
             const severity = msg.message.includes("❌") || msg.message.includes("Error") || msg.message.includes("failed") ? "error"
-                           : msg.message.includes("✅") || msg.message.includes("Success") ? "success"
-                           : "info";
+              : msg.message.includes("✅") || msg.message.includes("Success") ? "success"
+                : "info";
             showSnackbar(msg.message, severity);
             // Clear message after 10 seconds
             setTimeout(() => setServerDebugMessage(""), 10000);
@@ -8610,7 +8610,14 @@ export default function NewLiveMeeting() {
     setQnaError("");
 
     try {
-      const res = await fetch(toApiUrl(`interactions/questions/?event_id=${encodeURIComponent(eventId)}`), {
+      let url = `interactions/questions/?event_id=${encodeURIComponent(eventId)}`;
+      // Check for active table (Social Lounge / Breakout)
+      // If activeTableId is present, we are in a specific room context
+      if (activeTableId) {
+        url += `&lounge_table_id=${activeTableId}`;
+      }
+
+      const res = await fetch(toApiUrl(url), {
         headers: { "Content-Type": "application/json", ...authHeader() },
       });
       if (!res.ok) throw new Error("Failed to load questions.");
@@ -8630,7 +8637,7 @@ export default function NewLiveMeeting() {
     } finally {
       if (!silent) setQnaLoading(false);
     }
-  }, [eventId]);
+  }, [eventId, activeTableId]);
 
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
@@ -8643,11 +8650,30 @@ export default function NewLiveMeeting() {
   // WS live updates while Q&A tab open
   useEffect(() => {
     const isQnATabActive = (tab === 1) && (isPanelOpen === true);
-    if (!eventId) return;
+    if (!eventId) return; // Wait for eventId
+    // Optimization: Only connect if tab is active OR if backend supports background updates?
+    // Current logic connects always? No, let's check.
+    // The previous code didn't check isQnATabActive for connection start?
+    // Wait, line 8645 defined isQnATabActive but didn't use it to return early?
+    // Ah, it didn't return early! It connected even if tab closed?
+    // "const isQnATabActive = (tab === 1) && (isPanelOpen === true);" was unused in previous code block?
+    // No, checking previous code: 
+    // 8645: const isQnATabActive = ...
+    // 8646: if (!eventId) return;
+    // It proceeded to connect!
+    // But `setQnaUnreadCount` logic relies on `isQnATabActive` ref (isQnaActiveRef.current).
+    // So we KEEP the connection open to receive unread counts. Correct.
+
     const API_RAW = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
     const WS_ROOT = API_RAW.replace(/^http/, "ws").replace(/\/api\/?$/, "");
     const token = getToken();
-    const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+    let qs = token ? `?token=${encodeURIComponent(token)}` : "";
+
+    // Add lounge_table_id to query params if active
+    if (activeTableId) {
+      qs += (qs ? "&" : "?") + `lounge_table_id=${activeTableId}`;
+    }
+
     const wsUrl = `${WS_ROOT}/ws/events/${eventId}/qna/${qs}`;
 
     const ws = new WebSocket(wsUrl);
@@ -8669,6 +8695,17 @@ export default function NewLiveMeeting() {
         if (msg.type === "qna.question") {
           const senderId = String(msg.user_id ?? msg.uid ?? "");
           const meId = String(myUserIdRef.current || "");
+          // Check if this new question belongs to the current view
+          // If we receive a question for a different table (shouldn't happen due to server filtering, but good for safety)
+          // msg.lounge_table_id should match activeTableId
+          const msgTableId = msg.lounge_table_id ? String(msg.lounge_table_id) : null;
+          const currentTableId = activeTableId ? String(activeTableId) : null;
+
+          if (msgTableId !== currentTableId) {
+            // Ignore messages from other rooms if leakage happens
+            return;
+          }
+
           const active = Boolean(isQnaActiveRef.current);
 
           // If I'm NOT on Q&A tab, and this question is from someone else → show dot
@@ -8686,6 +8723,7 @@ export default function NewLiveMeeting() {
               upvote_count: msg.upvote_count ?? 0,
               user_upvoted: false,
               upvoters: msg.upvoters ?? [],
+              lounge_table_id: msg.lounge_table_id, // Store it
               created_at: msg.created_at,
             };
             return [newQ, ...prev];
@@ -8722,7 +8760,7 @@ export default function NewLiveMeeting() {
     };
 
     return () => ws.close();
-  }, [tab, isPanelOpen, eventId]);
+  }, [tab, isPanelOpen, eventId, activeTableId]); // Re-connect when activeTableId changes
 
   const submitQuestion = async () => {
     const content = newQuestion.trim();
@@ -8732,10 +8770,15 @@ export default function NewLiveMeeting() {
     setQnaError("");
 
     try {
+      const payload = { event: eventId, content };
+      if (activeTableId) {
+        payload.lounge_table = activeTableId;
+      }
+
       const res = await fetch(toApiUrl("interactions/questions/"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ event: eventId, content }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to create question.");
       setNewQuestion("");
@@ -9903,46 +9946,46 @@ export default function NewLiveMeeting() {
                                         </IconButton>
                                       </Tooltip>
 
-                                {/* Audience can DM Host; Host should NOT see message icon on own name */}
-                                {!isHost && (
-                                  <Tooltip title="Send Message">
-                                    <IconButton
-                                      size="small"
-                                      sx={{ color: "#fff" }}
-                                      onClick={() => handleOpenPrivateChat(m)}
-                                    >
-                                      <Badge
-                                        variant="dot"
-                                        color="error"
-                                        overlap="circular"
-                                        invisible={
-                                          !privateUnreadByUserId[
-                                          String(
-                                            m.clientSpecificId ||
-                                            m._raw?.clientSpecificId ||
-                                            m._raw?.client_specific_id ||
-                                            m._raw?.customParticipantId ||
-                                            m.id
-                                          )
-                                          ] && !privateUnreadByUserId[String(m.id)]
-                                        }
-                                      >
-                                        <ChatBubbleOutlineIcon fontSize="small" />
-                                      </Badge>
-                                    </IconButton>
-                                  </Tooltip>
-                                )}
+                                      {/* Audience can DM Host; Host should NOT see message icon on own name */}
+                                      {!isHost && (
+                                        <Tooltip title="Send Message">
+                                          <IconButton
+                                            size="small"
+                                            sx={{ color: "#fff" }}
+                                            onClick={() => handleOpenPrivateChat(m)}
+                                          >
+                                            <Badge
+                                              variant="dot"
+                                              color="error"
+                                              overlap="circular"
+                                              invisible={
+                                                !privateUnreadByUserId[
+                                                String(
+                                                  m.clientSpecificId ||
+                                                  m._raw?.clientSpecificId ||
+                                                  m._raw?.client_specific_id ||
+                                                  m._raw?.customParticipantId ||
+                                                  m.id
+                                                )
+                                                ] && !privateUnreadByUserId[String(m.id)]
+                                              }
+                                            >
+                                              <ChatBubbleOutlineIcon fontSize="small" />
+                                            </Badge>
+                                          </IconButton>
+                                        </Tooltip>
+                                      )}
 
-                                {/* Host actions for other hosts (Bring to Main Stage / Clear / Kick / Ban) */}
-                                {isHost && !isSelfMember(m) && (
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => handleOpenParticipantMenu(e, m)}
-                                    sx={{ color: "rgba(255,255,255,0.7)" }}
-                                  >
-                                    <MoreVertIcon fontSize="small" />
-                                  </IconButton>
-                                )}
+                                      {/* Host actions for other hosts (Bring to Main Stage / Clear / Kick / Ban) */}
+                                      {isHost && !isSelfMember(m) && (
+                                        <IconButton
+                                          size="small"
+                                          onClick={(e) => handleOpenParticipantMenu(e, m)}
+                                          sx={{ color: "rgba(255,255,255,0.7)" }}
+                                        >
+                                          <MoreVertIcon fontSize="small" />
+                                        </IconButton>
+                                      )}
                                       {/* Audience can DM Host; Host should NOT see message icon on own name */}
                                       {!isHost && (
                                         <Tooltip title="Send Message">
