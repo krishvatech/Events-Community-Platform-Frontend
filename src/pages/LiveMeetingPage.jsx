@@ -2303,6 +2303,8 @@ export default function NewLiveMeeting() {
   const [activeTableName, setActiveTableName] = useState("");
   const [activeTableLogoUrl, setActiveTableLogoUrl] = useState(""); // ✅ Store table logo
   const [eventData, setEventData] = useState(null); // ✅ Store full event data (images, timezone, etc.)
+  const [mainRoomSupportStatus, setMainRoomSupportStatus] = useState(null);
+  const [assistanceCooldownUntil, setAssistanceCooldownUntil] = useState(0);
   const currentUserId = useMemo(() => String(getMyUserIdFromJwt() || ""), []);
   const primaryHostUserId = useMemo(
     () => String(eventData?.created_by_id || ""),
@@ -2337,7 +2339,7 @@ export default function NewLiveMeeting() {
 
     ingest(groups.hosts || groups.host || [], "Host");
     ingest(groups.speakers || groups.speaker || [], "Speaker");
-    ingest(groups.moderators || groups.moderator || [], "Speaker");
+    ingest(groups.moderators || groups.moderator || [], "Moderator");
 
     return map;
   }, [eventData?.event_participants]);
@@ -2371,6 +2373,16 @@ export default function NewLiveMeeting() {
     isLoungeCurrentlyOpen
   );
   const showSocialLoungeToolbarAction = isHost || participantCanAccessSocialLounge;
+  const isMainRoomSupportMissing = Boolean(
+    !isBreakout &&
+    role !== "publisher" &&
+    mainRoomSupportStatus &&
+    mainRoomSupportStatus.has_host_or_moderator_in_main_room === false
+  );
+  const assistanceCooldownRemaining = Math.max(
+    0,
+    Math.ceil((assistanceCooldownUntil - Date.now()) / 1000)
+  );
 
   const breakoutOnlyTables = useMemo(() =>
     loungeTables.filter(t => t.category === 'BREAKOUT'),
@@ -4180,6 +4192,44 @@ export default function NewLiveMeeting() {
             // Clear message after 10 seconds
             setTimeout(() => setServerDebugMessage(""), 10000);
           }
+        } else if (msg.type === "main_room_support_status") {
+          if (msg.status) {
+            setMainRoomSupportStatus(msg.status);
+          }
+        } else if (msg.type === "assistance_requested") {
+          // Hosts/moderators receive high-priority assistance alerts.
+          const requesterName = msg.requester_name || "A participant";
+          showSnackbar(`${requesterName} needs assistance in the Main Room.`, "warning");
+        } else if (msg.type === "assistance_request_ack") {
+          if (msg.ok) {
+            const seconds = Number(msg.cooldown_seconds || 60);
+            setAssistanceCooldownUntil(Date.now() + seconds * 1000);
+            showSnackbar("Assistance request sent to hosts/moderators.", "success");
+          } else if (msg.reason === "cooldown_active") {
+            const seconds = Number(msg.cooldown_seconds || 60);
+            setAssistanceCooldownUntil(Date.now() + seconds * 1000);
+            showSnackbar(`Please wait ${seconds}s before requesting again.`, "info");
+          } else if (msg.reason === "no_active_hosts_or_moderators") {
+            showSnackbar("No active host/moderator is currently available.", "warning");
+          } else if (msg.reason === "privileged_user_not_allowed") {
+            showSnackbar("Hosts/Moderators cannot use Request Assistance.", "info");
+          } else if (msg.reason === "not_in_main_room") {
+            showSnackbar("Request Assistance is available only in the Main Room.", "info");
+          } else if (msg.reason === "not_registered") {
+            showSnackbar("You are not registered for this event.", "error");
+          } else if (msg.reason === "not_online") {
+            showSnackbar("Your presence is still syncing. Please try again.", "warning");
+          } else if (msg.reason === "event_ended") {
+            showSnackbar("This event has ended.", "info");
+          } else if (msg.reason === "rejected") {
+            showSnackbar("You are not eligible to request assistance for this event.", "error");
+          } else if (msg.reason === "banned") {
+            showSnackbar("Assistance request is unavailable for this account.", "error");
+          } else if (msg.reason === "server_error") {
+            showSnackbar("Server error while sending assistance request.", "error");
+          } else {
+            showSnackbar(`Unable to send assistance request (${msg.reason || "unknown"}).`, "error");
+          }
         } else if (msg.type === "breakout_timer") {
           setBreakoutTimer(msg.duration);
         } else if (msg.type === "breakout_announcement") {
@@ -4358,6 +4408,9 @@ export default function NewLiveMeeting() {
           }
           if (msg.lounge_open_status) {
             setLoungeOpenStatus(msg.lounge_open_status);
+          }
+          if (msg.main_room_support_status) {
+            setMainRoomSupportStatus(msg.main_room_support_status);
           }
 
           // ✅ FIX: Don't clear active table state while participant is in breakout room
@@ -4560,6 +4613,18 @@ export default function NewLiveMeeting() {
     console.warn("[MainSocket] Unable to send action; socket state:", ws?.readyState, payload);
     return false;
   }, []);
+
+  const requestMainRoomAssistance = useCallback(() => {
+    if (isHost || isBreakout) return;
+    if (assistanceCooldownRemaining > 0) {
+      showSnackbar(`Please wait ${assistanceCooldownRemaining}s before requesting again.`, "info");
+      return;
+    }
+    const sent = sendMainSocketAction({ action: "request_assistance" });
+    if (!sent) {
+      showSnackbar("Connection is re-establishing. Assistance request queued.", "warning");
+    }
+  }, [isHost, isBreakout, assistanceCooldownRemaining, sendMainSocketAction]);
 
   // ✅ Handle assignment from notification history
   const handleAssignFromHistory = useCallback((participantId, roomId) => {
@@ -11912,6 +11977,22 @@ export default function NewLiveMeeting() {
 
               </Paper>
 
+              {isMainRoomSupportMissing && (
+                <Alert
+                  severity="info"
+                  sx={{
+                    mt: 1,
+                    mb: 0.5,
+                    bgcolor: "rgba(20,184,177,0.12)",
+                    border: "1px solid rgba(20,184,177,0.35)",
+                    color: "rgba(255,255,255,0.92)",
+                    "& .MuiAlert-icon": { color: "#14b8a6" },
+                  }}
+                >
+                  Hosts/Moderators are currently in Breakout Rooms or Social Lounges. Please wait.
+                </Alert>
+              )}
+
               {/* Participants strip (Audience + Speaker) */}
               <Box
                 ref={stageStripRef}
@@ -12158,6 +12239,36 @@ export default function NewLiveMeeting() {
                       >
                         <SocialLoungeIcon />
                       </IconButton>
+                    </Tooltip>
+                  )}
+
+                  {!isHost &&
+                    !isBreakout &&
+                    !isEventOwner &&
+                    !["Host", "Moderator", "Speaker"].includes(
+                      assignedRoleByIdentity.get(`id:${String(currentUserId)}`) || ""
+                    ) && (
+                    <Tooltip
+                      title={
+                        assistanceCooldownRemaining > 0
+                          ? `Request Assistance (${assistanceCooldownRemaining}s)`
+                          : "Request Assistance"
+                      }
+                    >
+                      <span>
+                        <IconButton
+                          onClick={requestMainRoomAssistance}
+                          disabled={assistanceCooldownRemaining > 0}
+                          sx={{
+                            bgcolor: "rgba(255,255,255,0.06)",
+                            "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                            mx: 0.5,
+                            "&.Mui-disabled": { opacity: 0.45 },
+                          }}
+                        >
+                          <SupportAgentIcon />
+                        </IconButton>
+                      </span>
                     </Tooltip>
                   )}
 
