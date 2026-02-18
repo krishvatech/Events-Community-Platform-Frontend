@@ -124,6 +124,10 @@ const statusChip = (status) => {
       return { label: "Upcoming", color: "success", bg: "rgba(34,197,94,0.08)" };
     case "past":
       return { label: "Past", color: "default", bg: "rgba(148,163,184,0.16)" };
+    case "deregistered":
+      return { label: "Deregistered", color: "default", bg: "rgba(100,116,139,0.16)" };
+    case "cancelled":
+      return { label: "Cancelled", color: "default", bg: "rgba(100,116,139,0.16)" };
     default:
       return { label: "—", color: "default", bg: "rgba(148,163,184,0.16)" };
   }
@@ -760,8 +764,9 @@ export default function EventManagePage() {
       let method = "POST";
 
       if (dialogAction === "deregister") {
-        url = `${API_ROOT}/event-registrations/${selectedReg.id}/`;
-        method = "DELETE";
+        url = `${API_ROOT}/event-registrations/${selectedReg.id}/deregister/`;
+      } else if (dialogAction === "reinstate") {
+        url = `${API_ROOT}/event-registrations/${selectedReg.id}/reinstate/`;
       } else if (dialogAction === "approve") {
         url = `${API_ROOT}/event-registrations/${selectedReg.id}/approve_cancellation/`;
       } else if (dialogAction === "reject") {
@@ -777,7 +782,17 @@ export default function EventManagePage() {
 
       // Update local state
       if (dialogAction === "deregister") {
-        setRegistrations((prev) => prev.filter((r) => r.id !== selectedReg.id));
+        setRegistrations((prev) =>
+          prev.map((r) =>
+            r.id === selectedReg.id ? { ...r, status: "deregistered" } : r
+          )
+        );
+      } else if (dialogAction === "reinstate") {
+        setRegistrations((prev) =>
+          prev.map((r) =>
+            r.id === selectedReg.id ? { ...r, status: "registered" } : r
+          )
+        );
       } else if (dialogAction === "approve") {
         setRegistrations((prev) =>
           prev.map((r) =>
@@ -2038,8 +2053,11 @@ export default function EventManagePage() {
                           <TableCell>
                             <Chip
                               size="small"
-                              label={r.status || 'registered'}
-                              color={r.status === 'cancellation_requested' ? 'warning' : (r.status === 'cancelled' ? 'default' : 'success')}
+                              label={r.status === 'deregistered' ? 'Deregistered' : (r.status || 'registered')}
+                              color={
+                                r.status === 'cancellation_requested' ? 'warning' :
+                                  (r.status === 'cancelled' || r.status === 'deregistered' ? 'default' : 'success')
+                              }
                               variant="outlined"
                             />
                           </TableCell>
@@ -2048,13 +2066,23 @@ export default function EventManagePage() {
                           </TableCell>
                           <TableCell align="right">
                             <Stack direction="row" justifyContent="flex-end" spacing={1}>
-                              <Button
-                                size="small"
-                                color="error"
-                                onClick={() => openDialog("deregister", r)}
-                              >
-                                Deregister
-                              </Button>
+                              {['registered', 'cancellation_requested'].includes(r.status) ? (
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  onClick={() => openDialog("deregister", r)}
+                                >
+                                  Deregister
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="small"
+                                  color="primary"
+                                  onClick={() => openDialog("reinstate", r)}
+                                >
+                                  Reinstate
+                                </Button>
+                              )}
 
                               {!(Number(event?.price) === 0 || event?.is_free) && (
                                 <>
@@ -3356,12 +3384,14 @@ export default function EventManagePage() {
             {dialogAction === "deregister" && "Deregister User?"}
             {dialogAction === "approve" && "Approve Cancellation?"}
             {dialogAction === "reject" && "Reject Request?"}
+            {dialogAction === "reinstate" && "Reinstate User?"}
           </DialogTitle>
           <DialogContent>
             <DialogContentText>
               {dialogAction === "deregister" && "Are you sure you want to remove this user from the event?"}
               {dialogAction === "approve" && "This will approve the cancellation and refund process. Proceed?"}
               {dialogAction === "reject" && "This will reject the cancellation request. The user will remain registered."}
+              {dialogAction === "reinstate" && "Are you sure you want to reinstate this user? They will be added back to the event."}
             </DialogContentText>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -3377,11 +3407,11 @@ export default function EventManagePage() {
               onClick={handleConfirmAction}
               disabled={actionLoading}
               variant="contained"
-              color={dialogAction === "approve" ? "success" : "error"}
+              color={dialogAction === "approve" || dialogAction === "reinstate" ? "success" : "error"}
               className="rounded-full normal-case px-4"
               autoFocus
             >
-              {actionLoading ? "Processing..." : "Confirm"}
+              {actionLoading ? "Processing..." : (dialogAction === "reinstate" ? "Reinstate" : "Confirm")}
             </Button>
           </DialogActions>
         </Dialog>

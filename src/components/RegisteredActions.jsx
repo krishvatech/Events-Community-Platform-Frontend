@@ -36,6 +36,11 @@ export default function RegisteredActions({ ev, reg, onUnregistered, onCancelReq
         return null;
     }
 
+    // If already cancelled or deregistered, don't show actions (User should see Register button instead)
+    if (reg?.status === 'cancelled' || reg?.status === 'deregistered') {
+        return null;
+    }
+
     const handleOpen = (type) => {
         setActionType(type);
         setOpen(true);
