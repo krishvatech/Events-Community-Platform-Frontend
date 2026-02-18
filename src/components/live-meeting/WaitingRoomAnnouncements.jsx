@@ -7,6 +7,7 @@ import {
   Collapse,
   IconButton,
   Stack,
+  Chip,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import AnnouncementIcon from "@mui/icons-material/Announcement";
@@ -40,6 +41,8 @@ export default function WaitingRoomAnnouncements({
     const newAnnouncement = {
       id,
       ...announcement,
+      announcement_id: announcement.announcement_id || null,  // ✅ Server ID
+      is_edited: false,  // ✅ Track if announcement has been edited
       addedAt: new Date(),
     };
 
@@ -60,6 +63,24 @@ export default function WaitingRoomAnnouncements({
     setAnnouncements((prev) => prev.filter((a) => a.id !== id));
   };
 
+  // ✅ NEW: Update announcement (called from socket event when host edits)
+  const updateAnnouncement = (announcement_id, newMessage, updatedAt) => {
+    setAnnouncements((prev) =>
+      prev.map((a) =>
+        a.announcement_id === announcement_id
+          ? { ...a, message: newMessage, is_edited: true, updated_at: updatedAt }
+          : a
+      )
+    );
+  };
+
+  // ✅ NEW: Delete announcement (called from socket event when host deletes)
+  const deleteAnnouncement = (announcement_id) => {
+    setAnnouncements((prev) =>
+      prev.filter((a) => a.announcement_id !== announcement_id)
+    );
+  };
+
   // ✅ NEW: Clear all announcements (when user admitted/rejected/leaves)
   const clearAllAnnouncements = () => {
     setAnnouncements([]);
@@ -68,7 +89,9 @@ export default function WaitingRoomAnnouncements({
   return {
     addAnnouncement,
     removeAnnouncement,
-    clearAllAnnouncements, // ✅ NEW: Clear when user admitted/rejected/leaves
+    updateAnnouncement,  // ✅ NEW: Called from socket event
+    deleteAnnouncement,  // ✅ NEW: Called from socket event
+    clearAllAnnouncements,
     AnnouncementsUI: (
       <Box sx={{ width: "100%", mb: 2 }}>
         <Stack spacing={1}>
@@ -93,17 +116,29 @@ export default function WaitingRoomAnnouncements({
                   }}
                 />
                 <Box sx={{ flex: 1 }}>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: theme.palette.text.secondary,
-                      display: "block",
-                      mb: 0.5,
-                    }}
-                  >
-                    {announcement.sender_name || "Host"} •{" "}
-                    {new Date(announcement.timestamp).toLocaleTimeString()}
-                  </Typography>
+                  <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.5 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: theme.palette.text.secondary,
+                      }}
+                    >
+                      {announcement.sender_name || "Host"} •{" "}
+                      {new Date(announcement.timestamp).toLocaleTimeString()}
+                    </Typography>
+                    {announcement.is_edited && (
+                      <Chip
+                        label="Edited"
+                        size="small"
+                        sx={{
+                          fontSize: "0.65rem",
+                          height: 18,
+                          bgcolor: "rgba(255,255,255,0.15)",
+                          color: theme.palette.text.secondary,
+                        }}
+                      />
+                    )}
+                  </Stack>
                   <Typography
                     variant="body2"
                     sx={{

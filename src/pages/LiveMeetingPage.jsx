@@ -2099,6 +2099,13 @@ export default function NewLiveMeeting() {
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
   const [announcementText, setAnnouncementText] = useState("");
   const [announcementSending, setAnnouncementSending] = useState(false);
+
+  // ✅ NEW: Announcement Management State (edit/delete)
+  const [sentAnnouncements, setSentAnnouncements] = useState([]);  // Host's sent announcements
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);  // {id, message} | null
+  const [deleteConfirmAnnouncementId, setDeleteConfirmAnnouncementId] = useState(null);  // id | null
+  const [announcementActionLoading, setAnnouncementActionLoading] = useState(false);
+
   const isPanelOpen = isMdUp ? rightPanelOpen : rightOpen;
   const isChatActive = isPanelOpen && tab === 0 && hostPerms.chat;
   const isQnaActive = isPanelOpen && tab === 1;
@@ -2554,6 +2561,7 @@ export default function NewLiveMeeting() {
   const [mainDyteMeeting, initMainMeeting] = useDyteClient();
   const [mainRoomAuthToken, setMainRoomAuthToken] = useState(null);
   const [isInBreakoutRoom, setIsInBreakoutRoom] = useState(false);
+  const [mainRoomPeekVisible, setMainRoomPeekVisible] = useState(true);
   const [showMainRoomPeek, setShowMainRoomPeek] = useState(true);
   const [mainRoomPeekPosition, setMainRoomPeekPosition] = useState({ x: 0, y: 80 });
   const [hasMovedMainRoomPeek, setHasMovedMainRoomPeek] = useState(false);
@@ -2568,6 +2576,10 @@ export default function NewLiveMeeting() {
   const mainInitInFlightRef = useRef(false); // ✅ Track if main meeting init is in flight to prevent concurrent calls
 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const mainRoomPeekPrefKey = useMemo(
+    () => `main-room-peek-visible:${String(eventId || "")}`,
+    [eventId]
+  );
 
   const canSelfScreenShare =
     selfPermissions?.canProduceScreenshare === "ALLOWED"; // Dyte permission string
@@ -3225,8 +3237,29 @@ export default function NewLiveMeeting() {
   }, [isInBreakoutRoom]);
 
   useEffect(() => {
+    if (!eventId) return;
+    try {
+      const raw = sessionStorage.getItem(mainRoomPeekPrefKey);
+      if (raw === "0") setMainRoomPeekVisible(false);
+      else if (raw === "1") setMainRoomPeekVisible(true);
+    } catch {
+      // ignore storage issues
+    }
+  }, [eventId, mainRoomPeekPrefKey]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    try {
+      sessionStorage.setItem(mainRoomPeekPrefKey, mainRoomPeekVisible ? "1" : "0");
+    } catch {
+      // ignore storage issues
+    }
+  }, [eventId, mainRoomPeekPrefKey, mainRoomPeekVisible]);
+
+  useEffect(() => {
     if (activeTableId && isInBreakoutRoom) {
       setShowMainRoomPeek(true);
+      setMainRoomPeekVisible(true);
       setHasMovedMainRoomPeek(false);
     }
   }, [activeTableId, isInBreakoutRoom]);
@@ -4470,10 +4503,27 @@ export default function NewLiveMeeting() {
           console.log("[MainSocket] Received waiting room announcement:", msg.message);
           if (waitingRoomAnnouncementsRef.current) {
             waitingRoomAnnouncementsRef.current.addAnnouncement({
+              announcement_id: msg.announcement_id,  // ✅ Include server ID
               message: msg.message,
               sender_name: msg.sender_name,
               timestamp: msg.timestamp,
             });
+          }
+        } else if (msg.type === "waiting_room_announcement_update") {
+          // ✅ NEW: Handle announcement edits
+          console.log("[MainSocket] Announcement updated:", msg.announcement_id);
+          if (waitingRoomAnnouncementsRef.current) {
+            waitingRoomAnnouncementsRef.current.updateAnnouncement(
+              msg.announcement_id,
+              msg.message,
+              msg.updated_at
+            );
+          }
+        } else if (msg.type === "waiting_room_announcement_delete") {
+          // ✅ NEW: Handle announcement deletions
+          console.log("[MainSocket] Announcement deleted:", msg.announcement_id);
+          if (waitingRoomAnnouncementsRef.current) {
+            waitingRoomAnnouncementsRef.current.deleteAnnouncement(msg.announcement_id);
           }
         } else if (msg.type === "admission_status_changed") {
           // ✅ NEW: Handle real-time admission status change
@@ -4818,6 +4868,19 @@ export default function NewLiveMeeting() {
           return;
         }
         const data = await res.json();
+
+        // ✅ NEW: Store announcement with server ID for edit/delete management
+        if (data.announcement_id) {
+          setSentAnnouncements((prev) => [{
+            id: data.announcement_id,
+            message: data.message,
+            sender_name: data.sender_name,
+            created_at: data.created_at,
+            updated_at: data.created_at,
+            is_edited: false,
+          }, ...prev]);
+        }
+
         showSnackbar(
           `Announcement sent to ${data.recipients || 0} participant(s)`,
           "success"
@@ -4830,8 +4893,80 @@ export default function NewLiveMeeting() {
     [eventId, showSnackbar]
   );
 
+  // ✅ NEW: Fetch sent announcements (for host management and refresh/reconnect recovery)
+  const fetchSentAnnouncements = useCallback(async () => {
+    if (!eventId || !isHost) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/announcements/`), {
+        headers: { ...authHeader() },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSentAnnouncements(data);
+    } catch (e) {
+      console.warn("[Announcement] Failed to fetch sent announcements:", e);
+    }
+  }, [eventId, isHost]);
+
+  // ✅ NEW: Update announcement (edit) via API and broadcast to waiting room
+  const updateAnnouncementAPI = useCallback(async (id, newMessage) => {
+    if (!eventId || !id || !newMessage?.trim()) return;
+    setAnnouncementActionLoading(true);
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/announcements/${id}/`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ message: newMessage.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showSnackbar(err?.detail || "Failed to update announcement", "error");
+        return;
+      }
+      const data = await res.json();
+      setSentAnnouncements((prev) =>
+        prev.map((a) => a.id === id ? { ...a, message: data.message, updated_at: data.updated_at, is_edited: true } : a)
+      );
+      showSnackbar("Announcement updated", "success");
+      setEditingAnnouncement(null);
+      setAnnouncementText("");
+      setAnnouncementDialogOpen(false);
+    } catch (e) {
+      showSnackbar("Failed to update announcement", "error");
+    } finally {
+      setAnnouncementActionLoading(false);
+    }
+  }, [eventId, showSnackbar]);
+
+  // ✅ NEW: Delete announcement via API and broadcast to waiting room
+  const deleteAnnouncementAPI = useCallback(async (id) => {
+    if (!eventId || !id) return;
+    setAnnouncementActionLoading(true);
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/announcements/${id}/delete/`), {
+        method: "DELETE",
+        headers: { ...authHeader() },
+      });
+      if (!res.ok) {
+        showSnackbar("Failed to delete announcement", "error");
+        return;
+      }
+      setSentAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      showSnackbar("Announcement deleted", "success");
+      setDeleteConfirmAnnouncementId(null);
+    } catch (e) {
+      showSnackbar("Failed to delete announcement", "error");
+    } finally {
+      setAnnouncementActionLoading(false);
+    }
+  }, [eventId, showSnackbar]);
+
   useEffect(() => {
     if (!eventId || !isHost || !eventData?.waiting_room_enabled) return;
+
+    // ✅ NEW: Fetch sent announcements on mount (for refresh/reconnect recovery)
+    fetchSentAnnouncements();
+
     let alive = true;
     const poll = async () => {
       if (!alive) return;
@@ -4860,7 +4995,7 @@ export default function NewLiveMeeting() {
       alive = false;
       clearInterval(t);
     };
-  }, [eventId, isHost, eventData?.waiting_room_enabled]);
+  }, [eventId, isHost, eventData?.waiting_room_enabled, fetchSentAnnouncements]);
 
   // ✅ Filter out lounge occupants from waiting room display
   // Users in the Social Lounge should NOT appear in the waiting room section
@@ -10204,17 +10339,22 @@ export default function NewLiveMeeting() {
                                     </Stack>
                                     {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
-                                      {/* MIC ICON - GREEN when ON, RED when OFF - Read Only */}
-                                      <Tooltip title={m.mic ? "Mic on" : "Mic off"}>
+                                      {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host (self) */}
+                                      <Tooltip title={isHost && isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
                                         <IconButton
                                           size="small"
-                                          disabled
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (isHost && isSelfMember(m)) handleToggleMic();
+                                          }}
+                                          disabled={!isHost || !isSelfMember(m)}
                                           sx={{
                                             bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                             border: "1px solid",
                                             borderColor: m.mic ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                             color: m.mic ? "#22c55e" : "#ef4444",
                                             padding: "6px",
+                                            cursor: (isHost && isSelfMember(m)) ? "pointer" : "default",
                                             "&:hover": {
                                               bgcolor: m.mic ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                             }
@@ -10224,17 +10364,22 @@ export default function NewLiveMeeting() {
                                         </IconButton>
                                       </Tooltip>
 
-                                      {/* CAMERA ICON - GREEN when ON, RED when OFF - Read Only */}
-                                      <Tooltip title={m.cam ? "Camera on" : "Camera off"}>
+                                      {/* CAMERA ICON - GREEN when ON, RED when OFF - Clickable for Host (self) */}
+                                      <Tooltip title={isHost && isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
                                         <IconButton
                                           size="small"
-                                          disabled
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (isHost && isSelfMember(m)) handleToggleCamera();
+                                          }}
+                                          disabled={!isHost || !isSelfMember(m)}
                                           sx={{
                                             bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                             border: "1px solid",
                                             borderColor: m.cam ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
                                             color: m.cam ? "#22c55e" : "#ef4444",
                                             padding: "6px",
+                                            cursor: (isHost && isSelfMember(m)) ? "pointer" : "default",
                                             "&:hover": {
                                               bgcolor: m.cam ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
                                             }
@@ -10251,49 +10396,6 @@ export default function NewLiveMeeting() {
                                             size="small"
                                             sx={{ color: "#fff" }}
                                             onClick={() => handleOpenPrivateChat(m)}
-                                          >
-                                            <Badge
-                                              variant="dot"
-                                              color="error"
-                                              overlap="circular"
-                                              invisible={
-                                                !privateUnreadByUserId[
-                                                String(
-                                                  m.clientSpecificId ||
-                                                  m._raw?.clientSpecificId ||
-                                                  m._raw?.client_specific_id ||
-                                                  m._raw?.customParticipantId ||
-                                                  m.id
-                                                )
-                                                ] && !privateUnreadByUserId[String(m.id)]
-                                              }
-                                            >
-                                              <ChatBubbleOutlineIcon fontSize="small" />
-                                            </Badge>
-                                          </IconButton>
-                                        </Tooltip>
-                                      )}
-
-                                      {/* Host actions for other hosts (Bring to Main Stage / Clear / Kick / Ban) */}
-                                      {isHost && !isSelfMember(m) && (
-                                        <IconButton
-                                          size="small"
-                                          onClick={(e) => handleOpenParticipantMenu(e, m)}
-                                          sx={{ color: "rgba(255,255,255,0.7)" }}
-                                        >
-                                          <MoreVertIcon fontSize="small" />
-                                        </IconButton>
-                                      )}
-                                      {/* Audience can DM Host; Host should NOT see message icon on own name */}
-                                      {!isHost && (
-                                        <Tooltip title="Send Message">
-                                          <IconButton
-                                            size="small"
-                                            sx={{ color: "#fff" }}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleOpenPrivateChat(m);
-                                            }}
                                           >
                                             <Badge
                                               variant="dot"
@@ -10402,6 +10504,62 @@ export default function NewLiveMeeting() {
                           </Button>
                         </Stack>
                       )}
+
+                      {/* ✅ NEW: Sent Announcements Panel (Host Management) */}
+                      {isHost && sentAnnouncements.length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography sx={{ fontSize: 11, fontWeight: 700, opacity: 0.6, mb: 1, textTransform: "uppercase" }}>
+                            Sent Announcements ({sentAnnouncements.length})
+                          </Typography>
+                          <Stack spacing={0.75}>
+                            {sentAnnouncements.map((ann) => (
+                              <Paper key={ann.id} variant="outlined" sx={{
+                                px: 1.25, py: 1,
+                                bgcolor: "rgba(100, 200, 255, 0.06)",
+                                borderColor: "rgba(100, 200, 255, 0.2)",
+                                borderRadius: 1.5,
+                              }}>
+                                <Stack direction="row" alignItems="flex-start" spacing={1}>
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.85)", wordBreak: "break-word", mb: 0.5 }}>
+                                      {ann.message}
+                                    </Typography>
+                                    <Stack direction="row" spacing={0.5} alignItems="center">
+                                      <Typography sx={{ fontSize: 10, opacity: 0.5 }}>
+                                        {new Date(ann.created_at).toLocaleTimeString()}
+                                      </Typography>
+                                      {ann.is_edited && (
+                                        <Chip label="Edited" size="small" sx={{ fontSize: 9, height: 16, bgcolor: "rgba(255,255,255,0.1)" }} />
+                                      )}
+                                    </Stack>
+                                  </Box>
+                                  <Stack direction="row" spacing={0.25} sx={{ flexShrink: 0 }}>
+                                    <Tooltip title="Edit">
+                                      <IconButton size="small" sx={{ color: "rgba(100,200,255,0.8)" }}
+                                        onClick={() => {
+                                          setEditingAnnouncement({ id: ann.id, message: ann.message });
+                                          setAnnouncementText(ann.message);
+                                          setAnnouncementDialogOpen(true);
+                                        }}
+                                      >
+                                        <EditRoundedIcon sx={{ fontSize: 14 }} />
+                                      </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Delete">
+                                      <IconButton size="small" sx={{ color: "rgba(239,68,68,0.8)" }}
+                                        onClick={() => setDeleteConfirmAnnouncementId(ann.id)}
+                                      >
+                                        <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </Stack>
+                                </Stack>
+                              </Paper>
+                            ))}
+                          </Stack>
+                        </Box>
+                      )}
+
                       <Paper
                         variant="outlined"
                         sx={{
@@ -11646,6 +11804,29 @@ export default function NewLiveMeeting() {
                 />
               )}
             </Stack>
+            {activeTableId && dyteMeeting && !isPostEventLounge && !mainRoomPeekVisible && (
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => {
+                  setMainRoomPeekVisible(true);
+                  setShowMainRoomPeek(true);
+                }}
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 700,
+                  borderRadius: 999,
+                  px: 1.2,
+                  py: 0.4,
+                  minWidth: 0,
+                  bgcolor: "#14b8b1",
+                  whiteSpace: "nowrap",
+                  "&:hover": { bgcolor: "#0e8e88" },
+                }}
+              >
+                Restore Main Room View
+              </Button>
+            )}
 
             {/* ✅ Notification History Bell Icon (Host Only) */}
             {isHost && (
@@ -13304,7 +13485,7 @@ export default function NewLiveMeeting() {
         />
 
         {/* ✅ Main Room Peek (when seated at a lounge table) */}
-        {activeTableId && dyteMeeting && !isPostEventLounge && showMainRoomPeek && (
+        {activeTableId && dyteMeeting && !isPostEventLounge && mainRoomPeekVisible && showMainRoomPeek && (
           <Box
             ref={mainRoomPeekRef}
             sx={{
@@ -13318,7 +13499,7 @@ export default function NewLiveMeeting() {
             <MainRoomPeek
               mainDyteMeeting={mainDyteMeeting}
               isInBreakout={isInBreakoutRoom}
-              onClose={() => setShowMainRoomPeek(false)}
+              onClose={() => setMainRoomPeekVisible(false)}
               onHeaderPointerDown={handleMainRoomPeekDragStart}
               isDragging={isDraggingMainRoomPeek}
               pinnedParticipantId={pinnedRaw?.id}
@@ -13516,12 +13697,13 @@ export default function NewLiveMeeting() {
           </Stack>
         </Popover>
 
-        {/* ✅ NEW: Announcement Dialog */}
+        {/* ✅ NEW: Announcement Dialog (Create & Edit) */}
         <Dialog
           open={announcementDialogOpen}
           onClose={() => {
             setAnnouncementDialogOpen(false);
             setAnnouncementText("");
+            setEditingAnnouncement(null);
           }}
           maxWidth="sm"
           fullWidth
@@ -13541,7 +13723,7 @@ export default function NewLiveMeeting() {
               borderBottom: "1px solid rgba(255,255,255,0.08)",
             }}
           >
-            📢 Send Announcement
+            {editingAnnouncement ? "✏️ Edit Announcement" : "📢 Send Announcement"}
           </DialogTitle>
           <DialogContent sx={{ pt: 2.5 }}>
             <Typography
@@ -13552,7 +13734,9 @@ export default function NewLiveMeeting() {
                 display: "block",
               }}
             >
-              Send a message to all {filteredWaitingRoomCount} waiting participant(s)
+              {editingAnnouncement
+                ? "Update your announcement for all waiting participant(s)"
+                : `Send a message to all ${filteredWaitingRoomCount} waiting participant(s)`}
             </Typography>
 
             <TextField
@@ -13619,20 +13803,26 @@ export default function NewLiveMeeting() {
             <Button
               onClick={async () => {
                 if (!announcementText.trim()) return;
-                setAnnouncementSending(true);
-                try {
-                  await sendAnnouncement(announcementText);
-                  setAnnouncementDialogOpen(false);
-                  setAnnouncementText("");
-                } finally {
-                  setAnnouncementSending(false);
+
+                // ✅ NEW: Handle both create and edit modes
+                if (editingAnnouncement) {
+                  await updateAnnouncementAPI(editingAnnouncement.id, announcementText);
+                } else {
+                  setAnnouncementSending(true);
+                  try {
+                    await sendAnnouncement(announcementText);
+                    setAnnouncementDialogOpen(false);
+                    setAnnouncementText("");
+                  } finally {
+                    setAnnouncementSending(false);
+                  }
                 }
               }}
               variant="contained"
               disabled={
-                announcementSending || !announcementText.trim() || announcementText.length > 1000
+                announcementActionLoading || announcementSending || !announcementText.trim() || announcementText.length > 1000
               }
-              startIcon={announcementSending ? <CircularProgress size={20} /> : <AnnouncementIcon />}
+              startIcon={announcementActionLoading || announcementSending ? <CircularProgress size={20} /> : <AnnouncementIcon />}
               sx={{
                 bgcolor: "rgba(100, 200, 255, 0.8)",
                 color: "#fff",
@@ -13648,7 +13838,48 @@ export default function NewLiveMeeting() {
                 },
               }}
             >
-              {announcementSending ? "Sending..." : "Send"}
+              {announcementActionLoading || announcementSending ? "Saving..." : editingAnnouncement ? "Update" : "Send"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* ✅ NEW: Delete Announcement Confirmation Dialog */}
+        <Dialog
+          open={Boolean(deleteConfirmAnnouncementId)}
+          onClose={() => setDeleteConfirmAnnouncementId(null)}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              bgcolor: "rgba(15, 23, 42, 0.95)",
+              border: "1px solid rgba(255,255,255,0.10)",
+            },
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>
+            Delete Announcement?
+          </DialogTitle>
+          <DialogContent>
+            <Typography sx={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>
+              This announcement will be immediately removed for all participants in the waiting room. This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 2.5, pb: 2 }}>
+            <Button
+              onClick={() => setDeleteConfirmAnnouncementId(null)}
+              sx={{ color: "rgba(255,255,255,0.65)", textTransform: "none" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => deleteAnnouncementAPI(deleteConfirmAnnouncementId)}
+              variant="contained"
+              color="error"
+              disabled={announcementActionLoading}
+              startIcon={announcementActionLoading ? <CircularProgress size={16} /> : <DeleteOutlineRoundedIcon />}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              Delete
             </Button>
           </DialogActions>
         </Dialog>
