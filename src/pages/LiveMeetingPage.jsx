@@ -9290,7 +9290,10 @@ export default function NewLiveMeeting() {
                 (isRoomChatActive
                   ? `Room Chat${activeRoomLabel ? `: ${activeRoomLabel}` : ""}`
                   : "Public Chat")}
-              {tab === 1 && "Q&A"}
+              {tab === 1 &&
+                (activeTableId
+                  ? `Room Q&A${activeRoomLabel ? `: ${activeRoomLabel}` : ""}`
+                  : "Q&A")}
               {tab === 2 && "Polls"}
               {tab === 3 && "Participants"}
             </Typography>
@@ -9306,11 +9309,11 @@ export default function NewLiveMeeting() {
             {hostPerms.chat && (
               <TabPanel value={tab} index={0}>
                 <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
-                  {isRoomChatActive && (
+                  {/* {isRoomChatActive && (
                     <Typography sx={{ fontSize: 12, opacity: 0.7, mb: 1 }}>
                       Room chat is limited to people seated in {activeRoomLabel || "this room"}.
                     </Typography>
-                  )}
+                  )} */}
                   {chatError && (
                     <Typography color="error" sx={{ mb: 1 }}>
                       {chatError}
@@ -9641,7 +9644,18 @@ export default function NewLiveMeeting() {
 
             {/* Q&A */}
             <TabPanel value={tab} index={1}>
-              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+              {/* <Box sx={{ p: 2, pb: 0 }}>
+                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5 }}>
+                  Q&A: {activeTableId && loungeTables.find(t => t.id === activeTableId)?.name ? loungeTables.find(t => t.id === activeTableId).name : "Main Room"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
+                  {activeTableId
+                    ? `Room Q&A is limited to people seated in ${activeRoomLabel || "this room"}.`
+                    : "Questions here are visible to everyone in the main room."}
+                </Typography>
+              </Box> */}
+
+              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 2, pb: 2, ...scrollSx }}>
                 {qnaError && (
                   <Typography color="error" sx={{ mb: 1 }}>
                     {qnaError}
@@ -9891,11 +9905,17 @@ export default function NewLiveMeeting() {
               >
                 <TextField
                   fullWidth
-                  placeholder="Ask a question..."
+                  placeholder={activeTableId ? "Type to room..." : "Ask a question..."}
                   size="small"
                   value={newQuestion}
                   disabled={qnaSubmitting}
                   onChange={(e) => setNewQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      submitQuestion();
+                    }
+                  }}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
@@ -9905,7 +9925,7 @@ export default function NewLiveMeeting() {
                           onClick={submitQuestion}
                           disabled={qnaSubmitting || newQuestion.trim().length === 0}
                         >
-                          <SendIcon fontSize="small" />
+                          {qnaSubmitting ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
                         </IconButton>
                       </InputAdornment>
                     ),
@@ -12248,29 +12268,29 @@ export default function NewLiveMeeting() {
                     !["Host", "Moderator", "Speaker"].includes(
                       assignedRoleByIdentity.get(`id:${String(currentUserId)}`) || ""
                     ) && (
-                    <Tooltip
-                      title={
-                        assistanceCooldownRemaining > 0
-                          ? `Request Assistance (${assistanceCooldownRemaining}s)`
-                          : "Request Assistance"
-                      }
-                    >
-                      <span>
-                        <IconButton
-                          onClick={requestMainRoomAssistance}
-                          disabled={assistanceCooldownRemaining > 0}
-                          sx={{
-                            bgcolor: "rgba(255,255,255,0.06)",
-                            "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
-                            mx: 0.5,
-                            "&.Mui-disabled": { opacity: 0.45 },
-                          }}
-                        >
-                          <SupportAgentIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  )}
+                      <Tooltip
+                        title={
+                          assistanceCooldownRemaining > 0
+                            ? `Request Assistance (${assistanceCooldownRemaining}s)`
+                            : "Request Assistance"
+                        }
+                      >
+                        <span>
+                          <IconButton
+                            onClick={requestMainRoomAssistance}
+                            disabled={assistanceCooldownRemaining > 0}
+                            sx={{
+                              bgcolor: "rgba(255,255,255,0.06)",
+                              "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                              mx: 0.5,
+                              "&.Mui-disabled": { opacity: 0.45 },
+                            }}
+                          >
+                            <SupportAgentIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
 
                   {isHost && (
                     <Tooltip title="Breakout Control">
