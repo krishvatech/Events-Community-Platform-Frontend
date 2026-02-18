@@ -1380,7 +1380,7 @@ function ShareToFriendDialog({ open, onClose, postId }) {
       <DialogContent dividers sx={{ p: 0 }}>
         <Box sx={{ p: 2, pb: 1 }}>
           <TextField
-            fullWidth size="small" placeholder="Search friends..."
+            fullWidth size="small" placeholder="Search Contacts..."
             value={search} onChange={e => setSearch(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
           />

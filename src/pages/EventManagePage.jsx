@@ -65,6 +65,8 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
+import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
+import { useSecondTick } from "../utils/useGracePeriodTimer";
 
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
@@ -146,6 +148,22 @@ const fmtDateRange = (start, end) => {
   }
 };
 
+
+// Allow join X minutes before the event start (used for staff view)
+const canJoinEarly = (ev, minutes = 15) => {
+  if (!ev?.start_time) return false;
+
+  const startMs = new Date(ev.start_time).getTime();
+  if (!Number.isFinite(startMs)) return false;
+
+  const now = Date.now();
+  const diff = startMs - now;           // ms until start
+  const windowMs = minutes * 60 * 1000; // e.g. 15 minutes
+
+  // true only if event hasn't started yet, but is within the early-join window
+  return diff > 0 && diff <= windowMs;
+};
+
 // ---- Tabs / pagination ----
 const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Session", "Resources", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms Tables", "Social Lounge"];
@@ -167,6 +185,9 @@ export default function EventManagePage() {
 
   // New: Current Viewer State for Timezone
   const [currentUser, setCurrentUser] = useState(null);
+
+  // Force re-render every second to keep join button text current
+  useSecondTick();
 
   useEffect(() => {
     // 1. Try to get from localStorage
@@ -218,6 +239,12 @@ export default function EventManagePage() {
   const [sessionDeleteDialogOpen, setSessionDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState(null);
   const [sessionActionLoading, setSessionActionLoading] = useState(false);
+
+  // Hosting/Joining State
+  const [hostingId, setHostingId] = useState(null);
+  const [joiningId, setJoiningId] = useState(null);
+  const [errOpen, setErrOpen] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
 
   // Add Session state
   const [addSessionOpen, setAddSessionOpen] = useState(false);
@@ -850,6 +877,37 @@ export default function EventManagePage() {
     }
   };
 
+  // ---- Host / Join Handlers ----
+  const onHost = async () => {
+    if (!event?.id) return;
+    setHostingId(event.id);
+    try {
+      const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=publisher`;
+      window.open(livePath, "_blank");
+    } catch (e) {
+      setErrMsg(e?.message || "Unable to start live meeting.");
+      setErrOpen(true);
+    } finally {
+      setHostingId(null);
+    }
+  };
+
+  const handleJoinLive = async () => {
+    if (!event?.id) return;
+    setJoiningId(event.id);
+    try {
+      const isPreEventLounge = isPreEventLoungeOpen(event);
+      const isPostEventLounge = isPostEventLoungeOpen(event);
+      const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=audience`;
+      navigate(livePath, { state: { event, openLounge: isPreEventLounge || isPostEventLounge, preEventLounge: isPreEventLounge } });
+    } catch (e) {
+      setErrMsg(e?.message || "Unable to join live.");
+      setErrOpen(true);
+    } finally {
+      setJoiningId(null);
+    }
+  };
+
   // ---- Refresh event after editing ----
   const refreshEvent = async () => {
     if (!eventId) return;
@@ -871,6 +929,16 @@ export default function EventManagePage() {
 
   // ---- derived values ----
   const status = useMemo(() => computeStatus(event || {}), [event]);
+
+  // Logic for Join Button (Staff / Admin view context)
+  const isPostEventLounge = isPostEventLoungeOpen(event);
+  const isPast = (status === "past" || event?.status === "ended") && !isPostEventLounge;
+  const isLive = status === "live" && event?.status !== "ended";
+  const isWithinEarlyJoinWindow = canJoinEarly(event, 15);
+  const isPreEventLounge = isPreEventLoungeOpen(event);
+  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+
+  const joinLabel = getJoinButtonText(event, isLive, false, myReg);
   const statusMeta = statusChip(status);
   const avatarLetter = (event?.title?.[0] || "E").toUpperCase();
 
@@ -1129,6 +1197,64 @@ export default function EventManagePage() {
                   </Stack>
                 )}
               </Stack>
+
+              {/* Host / Join Button (Overview) */}
+              <Box sx={{ mb: 2 }}>
+                {isOwner ? (
+                  <Button
+                    onClick={onHost}
+                    startIcon={<LiveTvRoundedIcon />}
+                    variant="contained"
+                    fullWidth
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: "none",
+                      bgcolor: "#10b8a6",
+                      py: 1,
+                      fontSize: 15,
+                      fontWeight: 600,
+                      "&:hover": { bgcolor: "#0ea5a4" },
+                    }}
+                    disabled={!!hostingId}
+                  >
+                    {hostingId ? (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <CircularProgress size={20} color="inherit" />
+                        <span>Starting...</span>
+                      </Stack>
+                    ) : (
+                      "Host Event"
+                    )}
+                  </Button>
+                ) : (
+                  canShowActiveJoin && (
+                    <Button
+                      onClick={handleJoinLive}
+                      variant="contained"
+                      fullWidth
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: "none",
+                        bgcolor: "#10b8a6",
+                        py: 1,
+                        fontSize: 15,
+                        fontWeight: 600,
+                        "&:hover": { bgcolor: "#0ea5a4" },
+                      }}
+                      disabled={!!joiningId}
+                    >
+                      {joiningId ? (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <CircularProgress size={20} color="inherit" />
+                          <span>Joining...</span>
+                        </Stack>
+                      ) : (
+                        joinLabel
+                      )}
+                    </Button>
+                  )
+                )}
+              </Box>
 
               <Divider sx={{ mb: 2 }} />
 
@@ -2725,6 +2851,50 @@ export default function EventManagePage() {
               >
                 Edit
               </Button>
+            )}
+
+            {isOwner ? (
+              // Host Button for Owner
+              <Button
+                onClick={onHost}
+                startIcon={<LiveTvRoundedIcon />}
+                variant="contained"
+                sx={{
+                  borderRadius: 999,
+                  textTransform: "none",
+                  px: 2.5,
+                  bgcolor: "#10b8a6",
+                  "&:hover": { bgcolor: "#0ea5a4" },
+                }}
+                disabled={!!hostingId}
+              >
+                {hostingId ? <CircularProgress size={18} color="inherit" /> : "Host"}
+              </Button>
+            ) : (
+              // Join Button for Staff/Member
+              canShowActiveJoin && (
+                <Button
+                  onClick={handleJoinLive}
+                  variant="contained"
+                  sx={{
+                    borderRadius: 999,
+                    textTransform: "none",
+                    px: 2.5,
+                    bgcolor: "#10b8a6",
+                    "&:hover": { bgcolor: "#0ea5a4" },
+                  }}
+                  disabled={!!joiningId}
+                >
+                  {joiningId ? (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <CircularProgress size={18} color="inherit" />
+                      <span>Joining...</span>
+                    </Stack>
+                  ) : (
+                    joinLabel
+                  )}
+                </Button>
+              )
             )}
 
             <Button
