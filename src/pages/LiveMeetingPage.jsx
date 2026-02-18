@@ -98,6 +98,7 @@ import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useDyteClient, DyteProvider } from "@dytesdk/react-web-core";
+import EmojiPicker from "emoji-picker-react";
 
 import { DyteParticipantsAudio } from "@dytesdk/react-ui-kit";
 import LoungeOverlay from "../components/lounge/LoungeOverlay.jsx";
@@ -244,20 +245,6 @@ const normalizeRole = (raw = "") => {
   return r.includes("publisher") || r.includes("host") || r.includes("admin") ? "publisher" : "audience";
 };
 
-const DEFAULT_MOOD_EMOJIS = [
-  "😀", "😄", "😁", "😎", "😊", "🙂", "🤩", "😍",
-  "🤔", "😌", "😴", "😇", "🙌", "👏", "👍", "🔥",
-  "🚀", "💯", "🎉", "❤️", "💙", "💚", "🤝", "🙏",
-  "😅", "😬", "😐", "😕", "😮", "😢", "😭", "😡",
-];
-const EMOJI_DESCRIPTIONS = {
-  "😀": "grinning", "😄": "happy", "😁": "smile", "😎": "cool", "😊": "blush", "🙂": "pleasant",
-  "🤩": "excited", "😍": "love", "🤔": "thinking", "😌": "relaxed", "😴": "sleepy", "😇": "angelic",
-  "🙌": "celebration", "👏": "applause", "👍": "thumbs up", "🔥": "fire", "🚀": "rocket", "💯": "hundred",
-  "🎉": "party", "❤️": "heart", "💙": "blue heart", "💚": "green heart", "🤝": "handshake", "🙏": "thankful",
-  "😅": "relief", "😬": "awkward", "😐": "neutral", "😕": "confused", "😮": "surprised", "😢": "sad",
-  "😭": "crying", "😡": "angry",
-};
 
 // ==============================
 
@@ -2190,7 +2177,6 @@ export default function NewLiveMeeting() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [participantKycCache, setParticipantKycCache] = useState({}); // Cache for kyc_status by userId
   const [moodMap, setMoodMap] = useState({});
-  const [allowedMoods, setAllowedMoods] = useState(DEFAULT_MOOD_EMOJIS);
   const [recentMoods, setRecentMoods] = useState(() => {
     try {
       const raw = JSON.parse(localStorage.getItem("webinar_recent_moods") || "[]");
@@ -2200,7 +2186,6 @@ export default function NewLiveMeeting() {
     }
   });
   const [moodAnchorEl, setMoodAnchorEl] = useState(null);
-  const [moodSearch, setMoodSearch] = useState("");
   const moodUpdateInFlightRef = useRef(false);
   const lastMoodSentAtRef = useRef(0);
 
@@ -2493,9 +2478,6 @@ export default function NewLiveMeeting() {
       if (!res.ok) return;
       const data = await res.json();
       const rows = Array.isArray(data?.moods) ? data.moods : [];
-      if (Array.isArray(data?.allowed_moods) && data.allowed_moods.length) {
-        setAllowedMoods(data.allowed_moods);
-      }
 
       setMoodMap((prev) => {
         const next = { ...prev };
@@ -6221,17 +6203,6 @@ export default function NewLiveMeeting() {
     return () => clearInterval(t);
   }, [eventId, roomJoined, syncMoodMapFromApi]);
 
-  useEffect(() => {
-    return () => {
-      if (!eventId || !myParticipantKey) return;
-      fetch(toApiUrl(`events/${eventId}/mood/`), {
-        method: "DELETE",
-        headers: { ...authHeader() },
-        keepalive: true,
-      }).catch(() => { });
-    };
-  }, [eventId, myParticipantKey]);
-
   // ✅ If Host leaves MAIN MEETING, show waiting state for audience
   // NOTE: This should NOT trigger when host leaves a breakout room
   useEffect(() => {
@@ -9172,14 +9143,6 @@ export default function NewLiveMeeting() {
 
   const isSelfMember = (m) => Boolean(selfDyteId && m?.id === selfDyteId);
   const moodPickerOpen = Boolean(moodAnchorEl);
-  const moodSearchNormalized = String(moodSearch || "").trim().toLowerCase();
-  const filteredMoodOptions = useMemo(() => {
-    if (!moodSearchNormalized) return allowedMoods;
-    return allowedMoods.filter((m) => {
-      const desc = EMOJI_DESCRIPTIONS[m] || "";
-      return desc.includes(moodSearchNormalized) || m.includes(moodSearchNormalized);
-    });
-  }, [allowedMoods, moodSearchNormalized]);
 
   const renderMemberAvatar = useCallback((member) => {
     const mine = isSelfMember(member);
@@ -13444,29 +13407,69 @@ export default function NewLiveMeeting() {
           anchorEl={moodAnchorEl}
           onClose={() => {
             setMoodAnchorEl(null);
-            setMoodSearch("");
           }}
           anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
           transformOrigin={{ vertical: "top", horizontal: "left" }}
           PaperProps={{
             sx: {
               p: 1.2,
-              width: 280,
+              width: 360,
               bgcolor: "rgba(9, 14, 24, 0.96)",
               border: "1px solid rgba(255,255,255,0.14)",
               borderRadius: 2,
+              "& .EmojiPickerReact": {
+                "--epr-bg-color": "#111420",
+                "--epr-picker-border-color": "rgba(255,255,255,0.12)",
+                "--epr-search-border-color": "rgba(255,255,255,0.12)",
+                "--epr-search-input-bg-color": "rgba(255,255,255,0.06)",
+                "--epr-search-input-text-color": "rgba(255,255,255,0.92)",
+                "--epr-category-label-bg-color": "#111420",
+                "--epr-category-label-text-color": "rgba(255,255,255,0.74)",
+                "--epr-text-color": "rgba(255,255,255,0.88)",
+                "--epr-hover-bg-color": "rgba(40, 190, 190, 0.14)",
+                borderRadius: "14px",
+                boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
+              },
+              "& .EmojiPickerReact *::-webkit-scrollbar": {
+                width: "10px",
+                height: "10px",
+              },
+              "& .EmojiPickerReact *::-webkit-scrollbar-track": {
+                background: "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",
+                borderRadius: "999px",
+              },
+              "& .EmojiPickerReact *::-webkit-scrollbar-thumb": {
+                background: "linear-gradient(180deg, #1fd1c7, #0ea5a5)",
+                borderRadius: "999px",
+                border: "2px solid rgba(8,12,20,0.95)",
+              },
+              "& .EmojiPickerReact *::-webkit-scrollbar-thumb:hover": {
+                background: "linear-gradient(180deg, #39e3da, #14b8a6)",
+              },
+              "& .EmojiPickerReact *": {
+                scrollbarWidth: "thin",
+                scrollbarColor: "#14b8a6 rgba(255,255,255,0.06)",
+              },
             },
           }}
         >
           <Stack spacing={1}>
-            <TextField
-              size="small"
-              placeholder="Search mood"
-              value={moodSearch}
-              onChange={(e) => setMoodSearch(e.target.value)}
+            <EmojiPicker
+              width="100%"
+              height={320}
+              theme="dark"
+              searchDisabled={false}
+              skinTonesDisabled
+              previewConfig={{ showPreview: false }}
+              onEmojiClick={(emojiData) => {
+                const value = emojiData?.emoji;
+                if (!value) return;
+                applyMood(value);
+                setMoodAnchorEl(null);
+              }}
             />
 
-            {!!recentMoods.length && !moodSearchNormalized && (
+            {!!recentMoods.length && (
               <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                 {recentMoods.slice(0, 6).map((m) => (
                   <IconButton
@@ -13475,7 +13478,6 @@ export default function NewLiveMeeting() {
                     onClick={() => {
                       applyMood(m);
                       setMoodAnchorEl(null);
-                      setMoodSearch("");
                     }}
                     sx={{ fontSize: 18 }}
                   >
@@ -13484,31 +13486,12 @@ export default function NewLiveMeeting() {
                 ))}
               </Stack>
             )}
-
-            <Stack direction="row" spacing={0.4} flexWrap="wrap" useFlexGap>
-              {filteredMoodOptions.map((m) => (
-                <Tooltip key={m} title={EMOJI_DESCRIPTIONS[m] || "mood"}>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      applyMood(m);
-                      setMoodAnchorEl(null);
-                      setMoodSearch("");
-                    }}
-                    sx={{ fontSize: 18 }}
-                  >
-                    {m}
-                  </IconButton>
-                </Tooltip>
-              ))}
-            </Stack>
             <Button
               size="small"
               variant="text"
               onClick={() => {
                 applyMood(null);
                 setMoodAnchorEl(null);
-                setMoodSearch("");
               }}
             >
               Clear Mood
