@@ -70,7 +70,7 @@ export default function AdminRecordingDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [listLoading, setListLoading] = useState(false);
     const [error, setError] = useState("");
-    const [filterTab, setFilterTab] = useState(0); // 0=All, 1=Joined Live, 2=Watched Replay
+    const [filterTab, setFilterTab] = useState(0); // 0=All, 1=Joined Live, 2=Watched Replay, 3=Did Not Attend
 
     // Pagination state
     const [page, setPage] = useState(1);
@@ -104,6 +104,7 @@ export default function AdminRecordingDetailsPage() {
 
                 if (filterTab === 1) url.searchParams.set("status", "joined_live");
                 if (filterTab === 2) url.searchParams.set("status", "watched_replay");
+                if (filterTab === 3) url.searchParams.set("status", "did_not_attend");
 
                 const resReg = await fetch(url.toString(), {
                     headers: getTokenHeader(),
@@ -158,11 +159,28 @@ export default function AdminRecordingDetailsPage() {
                 headers: getTokenHeader(),
             });
             if (!res.ok) throw new Error("Failed to export CSV");
+
+            // Try to get filename from header
+            let filename = `Event_${id}_details.csv`;
+            const disposition = res.headers.get('Content-Disposition');
+            if (disposition && disposition.indexOf('attachment') !== -1) {
+                const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                const matches = filenameRegex.exec(disposition);
+                if (matches != null && matches[1]) {
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            } else {
+                // Fallback: use event title if available
+                if (event?.title) {
+                    filename = `${event.title.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_')}_details.csv`;
+                }
+            }
+
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `registrations-event-${id}.csv`;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -211,6 +229,7 @@ export default function AdminRecordingDetailsPage() {
             total: registrations.length,
             joinedLive: registrations.filter((r) => r.joined_live).length,
             watchedReplay: registrations.filter((r) => r.watched_replay).length,
+            didNotAttend: registrations.filter((r) => !r.joined_live && !r.watched_replay).length,
         };
     }, [registrations]);
 
@@ -295,6 +314,10 @@ export default function AdminRecordingDetailsPage() {
                             <Typography variant="h4" className="font-bold text-blue-600">{stats.watchedReplay}</Typography>
                             <Typography variant="body2" color="text.secondary">Watched Replay</Typography>
                         </Paper>
+                        <Paper elevation={0} className="border border-slate-200 rounded-xl p-4 flex-1 text-center">
+                            <Typography variant="h4" className="font-bold text-slate-500">{stats.didNotAttend}</Typography>
+                            <Typography variant="body2" color="text.secondary">Did Not Attend</Typography>
+                        </Paper>
                     </Box>
                 </Grid>
 
@@ -312,6 +335,7 @@ export default function AdminRecordingDetailsPage() {
                                 <Tab label="All" />
                                 <Tab label="Joined Live" />
                                 <Tab label="Watched Replay" />
+                                <Tab label="Did Not Attend" />
                             </Tabs>
                         </Box>
 
@@ -346,10 +370,10 @@ export default function AdminRecordingDetailsPage() {
                                                                     reg.kyc_status ||
                                                                     ""
                                                                 ) && (
-                                                                    <VerifiedIcon
-                                                                        sx={{ fontSize: 16, color: "#22d3ee", ml: 0.5, verticalAlign: "middle" }}
-                                                                    />
-                                                                )}
+                                                                        <VerifiedIcon
+                                                                            sx={{ fontSize: 16, color: "#22d3ee", ml: 0.5, verticalAlign: "middle" }}
+                                                                        />
+                                                                    )}
                                                             </Typography>
                                                             <Typography variant="caption" className="text-slate-500">
                                                                 {reg.user_email}
