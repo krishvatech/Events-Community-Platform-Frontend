@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography, CircularProgress, Backdrop, Button, TextField } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import SettingsIcon from '@mui/icons-material/Settings';
 import LoungeGrid from './LoungeGrid';
 import MainRoomPeek from './MainRoomPeek';
 import LateJoinerNotification from './LateJoinerNotification';
@@ -12,7 +13,7 @@ function getToken() {
     return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
 }
 
-const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, dyteMeeting, onParticipantClick, onJoinMain }) => {
+const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnterBreakout, dyteMeeting, onParticipantClick, onJoinMain, onOpenSettings }) => {
     const [tables, setTables] = useState([]);
     const [breakoutTables, setBreakoutTables] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -125,7 +126,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     useEffect(() => {
         if (open) {
             fetchLoungeState();
-            const interval = setInterval(fetchLoungeState, 10000); // 10s auto-sync
+            const interval = setInterval(fetchLoungeState, 5000); // 5s auto-sync (socket handles instant updates)
             return () => clearInterval(interval);
         }
     }, [open, fetchLoungeState]);
@@ -268,6 +269,10 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     }
 
                     // The fetchLoungeState will get latest data
+                    fetchLoungeState();
+                } else if (msg.type === "lounge_settings_update") {
+                    // Host changed lounge settings - immediately refresh status banner
+                    console.log("[Lounge] Settings updated, refreshing lounge state immediately...");
                     fetchLoungeState();
                 } else if (msg.type === "error") {
                     console.error("[Lounge] Backend Error:", msg.message);
@@ -616,7 +621,7 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                 }}
             >
                 <Box sx={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Box sx={{ ml: 2 }}>
                             <Typography variant="h5" sx={{ color: 'white', fontWeight: 700 }}>
                                 Social Lounge & Networking
@@ -633,9 +638,16 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                                 </Typography>
                             </Box>
                         </Box>
-                        <IconButton onClick={onClose} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.05)' }}>
-                            <CloseIcon />
-                        </IconButton>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            {isAdmin && (
+                                <IconButton onClick={onOpenSettings} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.05)' }}>
+                                    <SettingsIcon />
+                                </IconButton>
+                            )}
+                            <IconButton onClick={onClose} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.05)' }}>
+                                <CloseIcon />
+                            </IconButton>
+                        </Box>
                     </Box>
 
                     {loading ? (

@@ -111,6 +111,7 @@ import SpeedNetworkingSessionPrompt from "../components/speed-networking/SpeedNe
 import BannedParticipantsDialog from "../components/live-meeting/BannedParticipantsDialog.jsx";
 import WaitingRoomAnnouncements from "../components/live-meeting/WaitingRoomAnnouncements.jsx";
 import WaitingRoomControls from "../components/live-meeting/WaitingRoomControls.jsx";
+import LoungeSettingsDialog from "../components/live-meeting/LoungeSettingsDialog.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
 import { getUserName } from "../utils/authStorage.js";
@@ -2280,6 +2281,7 @@ export default function NewLiveMeeting() {
   const eventFromState = location?.state?.event || null;
 
   // ---------- Old logic states (real) ----------
+  const [loungeSettingsOpen, setLoungeSettingsOpen] = useState(false);
   const [eventId, setEventId] = useState(null);
   const [role, setRole] = useState("audience"); // 'publisher' | 'audience'
   const isHost = role === "publisher";
@@ -8856,6 +8858,11 @@ export default function NewLiveMeeting() {
       try {
         const msg = JSON.parse(event.data);
 
+        if (msg.type === "lounge_settings_update") {
+          console.log("[WS] Lounge settings updated:", msg.settings);
+          setEventData((prev) => ({ ...prev, ...msg.settings }));
+        }
+
         if (msg.type === "qna.upvote") {
           setQuestions((prev) =>
             prev.map((q) =>
@@ -13199,10 +13206,20 @@ export default function NewLiveMeeting() {
           isAdmin={isHost}
           dyteMeeting={dyteMeeting}
           onParticipantClick={openLoungeParticipantInfo}
+          onOpenSettings={() => setLoungeSettingsOpen(true)}
           onEnterBreakout={async (newToken, tableId, tableName, logoUrl) => {
             await applyBreakoutToken(newToken, tableId, tableName, logoUrl); // ✅ Pass logo URL
           }}
           onJoinMain={forceRejoinMainFromLounge}
+        />
+        <LoungeSettingsDialog
+          open={loungeSettingsOpen}
+          onClose={() => setLoungeSettingsOpen(false)}
+          event={eventData}
+          onSaved={(savedSettings) => {
+            // Immediately update eventData so dialog shows correct values when reopened
+            setEventData((prev) => ({ ...prev, ...savedSettings }));
+          }}
         />
 
         {/* ✅ Breakout Controls (Host Only) */}
