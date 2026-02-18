@@ -1209,13 +1209,13 @@ export default function EventManagePage() {
                     sx={{
                       borderRadius: 2,
                       textTransform: "none",
-                      bgcolor: "#10b8a6",
+                      bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
                       py: 1,
                       fontSize: 15,
                       fontWeight: 600,
-                      "&:hover": { bgcolor: "#0ea5a4" },
+                      "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
                     }}
-                    disabled={!!hostingId}
+                    disabled={!!hostingId || isPast}
                   >
                     {hostingId ? (
                       <Stack direction="row" spacing={1} alignItems="center">
@@ -1223,7 +1223,7 @@ export default function EventManagePage() {
                         <span>Starting...</span>
                       </Stack>
                     ) : (
-                      "Host Event"
+                      isPast ? "Event Ended" : "Host Event"
                     )}
                   </Button>
                 ) : (
@@ -2863,12 +2863,12 @@ export default function EventManagePage() {
                   borderRadius: 999,
                   textTransform: "none",
                   px: 2.5,
-                  bgcolor: "#10b8a6",
-                  "&:hover": { bgcolor: "#0ea5a4" },
+                  bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
+                  "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
                 }}
-                disabled={!!hostingId}
+                disabled={!!hostingId || isPast}
               >
-                {hostingId ? <CircularProgress size={18} color="inherit" /> : "Host"}
+                {hostingId ? <CircularProgress size={18} color="inherit" /> : (isPast ? "Ended" : "Host")}
               </Button>
             ) : (
               // Join Button for Staff/Member

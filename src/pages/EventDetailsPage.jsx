@@ -13,6 +13,9 @@ import {
   Skeleton,
   Tabs,
   Tab,
+  Avatar,
+  AvatarGroup,
+  Tooltip,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
@@ -203,6 +206,54 @@ export default function EventDetailsPage() {
 
   // ✅ NEW: Real-time admission status updates
   const [admissionStatus, setAdmissionStatus] = useState(null);
+
+  // Participant Preview
+  const [previewParticipants, setPreviewParticipants] = useState([]);
+
+  useEffect(() => {
+    if (!event?.id) return;
+
+    // Check visibility rules
+    const owner = isOwnerUser();
+    const staff = isStaffUser();
+
+    // Robust status check
+    const status = computeStatus(event);
+    const isBefore = status === 'upcoming';
+    const isAfter = status === 'past'; // includes ended manually or time passed
+
+    let canView = true;
+    if (!owner && !staff) {
+      if (isBefore && event.show_participants_before_event === false) canView = false;
+      else if (isAfter && event.show_participants_after_event === false) canView = false;
+    }
+
+    if (!canView) {
+      setPreviewParticipants([]);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchPreview = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/events/${event.id}/participants/?limit=5`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json();
+          // If the API returns a paginated response, handle it, otherwise assume array
+          const list = Array.isArray(data) ? data : (data.results || []);
+          setPreviewParticipants(list);
+        }
+      } catch (err) {
+        console.error("Failed to load participant preview", err);
+      }
+    };
+
+    fetchPreview();
+    return () => { cancelled = true; };
+  }, [event?.id, token, event?.start_time, event?.end_time, event?.show_participants_before_event, event?.show_participants_after_event]);
 
 
   const handleShowParticipants = async () => {
@@ -561,14 +612,15 @@ export default function EventDetailsPage() {
                         ) : null}
 
                         {/* Participant Count */}
+                        {/* Participant Count & Preview */}
                         {Number.isFinite(event.registrations_count) && (() => {
                           const owner = isOwnerUser();
                           const staff = isStaffUser();
-                          const now = Date.now();
-                          const s = event.start_time ? parseDateSafe(event.start_time).getTime() : 0;
-                          const e = event.end_time ? parseDateSafe(event.end_time).getTime() : 0;
-                          const isBefore = s && now < s;
-                          const isAfter = e && now > e;
+
+                          // Robust status check
+                          const status = computeStatus(event);
+                          const isBefore = status === 'upcoming';
+                          const isAfter = status === 'past'; // includes ended manually or time passed
 
                           let canView = true;
                           if (!owner && !staff) {
@@ -578,19 +630,63 @@ export default function EventDetailsPage() {
 
                           if (canView) {
                             return (
-                              <Stack direction="row" spacing={0.75} alignItems="center"
-                                sx={{ cursor: 'pointer', '&:hover': { color: 'teal' }, transition: 'color 0.2s' }}
+                              <Box
                                 onClick={handleShowParticipants}
+                                sx={{
+                                  mt: 1,
+                                  p: 1.5,
+                                  border: '1px solid',
+                                  borderColor: 'grey.200',
+                                  borderRadius: 2,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  '&:hover': {
+                                    bgcolor: 'grey.50',
+                                    borderColor: 'primary.main',
+                                  }
+                                }}
                               >
-                                <GroupsIcon fontSize="small" className="text-teal-700" />
-                                <Typography variant="body2" color="text.secondary" sx={{ '&:hover': { color: 'teal' } }}>
-                                  {event.registrations_count} registered
-                                </Typography>
-                              </Stack>
+                                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                  <Stack direction="row" spacing={1.5} alignItems="center">
+                                    <AvatarGroup
+                                      max={5}
+                                      sx={{
+                                        '& .MuiAvatar-root': {
+                                          width: 32,
+                                          height: 32,
+                                          fontSize: '0.875rem',
+                                          border: '2px solid #fff'
+                                        }
+                                      }}
+                                    >
+                                      {previewParticipants.map((p) => (
+                                        <Tooltip key={p.id} title={p.user_name || "User"}>
+                                          <Avatar
+                                            src={p.user_avatar_url}
+                                            alt={p.user_name || "User"}
+                                          >
+                                            {(p.user_name?.[0] || "U").toUpperCase()}
+                                          </Avatar>
+                                        </Tooltip>
+                                      ))}
+                                    </AvatarGroup>
+                                    <Box>
+                                      <Typography variant="body2" fontWeight={600} color="text.primary">
+                                        {event.registrations_count} people registered
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        Click to view list
+                                      </Typography>
+                                    </Box>
+                                  </Stack>
+                                  <GroupsIcon sx={{ color: 'text.secondary', opacity: 0.5 }} />
+                                </Stack>
+                              </Box>
                             );
                           } else {
+                            // Hidden view logic (just count, no click)
                             return (
-                              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default' }}>
+                              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ cursor: 'default', opacity: 0.7 }}>
                                 <GroupsIcon fontSize="small" className="text-teal-700" />
                                 <Typography variant="body2" color="text.secondary">
                                   {event.registrations_count} registered
