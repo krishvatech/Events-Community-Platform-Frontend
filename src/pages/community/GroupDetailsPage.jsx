@@ -2565,7 +2565,25 @@ function OverviewTab({ group }) {
       <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 2 }}>
         <Typography variant="h6" gutterBottom>Details</Typography>
         <Typography variant="body2">Visibility: {group.visibility}</Typography>
-        {group.parent_group && (
+        {group.parent_groups?.length > 0 ? (
+          <Box>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>Parent Groups:</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              {group.parent_groups.map(pg => (
+                <Chip
+                  key={pg.id}
+                  label={pg.name}
+                  size="small"
+                  component={RouterLink}
+                  to={`/community/groups/${pg.id}`}
+                  clickable
+                  variant={pg.is_primary ? "filled" : "outlined"}
+                  color={pg.is_primary ? "secondary" : "default"}
+                />
+              ))}
+            </Stack>
+          </Box>
+        ) : group.parent_group && (
           <Typography variant="body2">
             Parent Group: <b>{group.parent_group.name}</b>
           </Typography>
@@ -3413,9 +3431,25 @@ export default function GroupDetailsPage() {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {group?.member_count || 0} Members
-                    {group?.parent_group && (
+                    {group?.parent_groups?.length > 0 ? (
                       <>
-                        {" â€¢ Subgroup of "}
+                        {" • Subgroup of "}
+                        {group.parent_groups.map((pg, idx) => (
+                          <React.Fragment key={pg.id}>
+                            {idx > 0 && ", "}
+                            <Link
+                              component={RouterLink}
+                              to={`/community/groups/${pg.id}`}
+                              sx={{ fontWeight: 600, color: "inherit", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                            >
+                              {pg.name}
+                            </Link>
+                          </React.Fragment>
+                        ))}
+                      </>
+                    ) : group?.parent_group && (
+                      <>
+                        {" • Subgroup of "}
                         <Link
                           component={RouterLink}
                           to={`/community/groups/${group.parent_group.id}`}

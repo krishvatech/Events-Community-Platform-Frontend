@@ -5,7 +5,7 @@ import {
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
     TextField, Typography, Switch, FormControlLabel, CircularProgress,
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup, Badge,
-    IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar
+    IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar, Autocomplete
 } from "@mui/material";
 import { useParams, useNavigate } from "react-router-dom";
 import { isOwnerUser } from "../utils/adminRole";
@@ -3207,8 +3207,8 @@ export default function GroupManagePage() {
     const [isStaffUser, setIsStaffUser] = React.useState(false);
     // Is this group a child (has a parent)?
     const isChildGroup = Boolean(group?.parent_id || group?.parent?.id || group?.parent);
-    // Show Sub-groups tab only on top-level groups
-    const showSubgroupsTab = !isChildGroup;
+    // Relations Tab (replaces "Sub-groups")
+    const showRelationsTab = true;
     // Show Notifications tab only when Public + Approval
     const showNotificationsTab =
         (group?.visibility === "public" && group?.join_policy === "approval") ||
@@ -3249,9 +3249,10 @@ export default function GroupManagePage() {
     }, [group]);
 
     // If this is a child group, never allow tab index 2 (Sub-groups)
-    React.useEffect(() => {
+    // REMOVED: We now allow relations tab for everyone
+    /* React.useEffect(() => {
         if (!showSubgroupsTab && tab === 2) setTab(0);
-    }, [showSubgroupsTab, tab]);
+    }, [showSubgroupsTab, tab]); */
     const [members, setMembers] = React.useState([]);
     const [memLoading, setMemLoading] = React.useState(true);
     const [memError, setMemError] = React.useState("");
@@ -3265,6 +3266,93 @@ export default function GroupManagePage() {
     const [subLoading, setSubLoading] = React.useState(true);
     const [subError, setSubError] = React.useState("");
     const [addSubOpen, setAddSubOpen] = React.useState(false);
+
+    // Relations Support (Parent/Child links)
+    const [parentLinks, setParentLinks] = React.useState([]);
+    const [childLinks, setChildLinks] = React.useState([]);
+    const [relLoading, setRelLoading] = React.useState(false);
+    const [requestParentOpen, setRequestParentOpen] = React.useState(false);
+
+    const fetchRelations = React.useCallback(async () => {
+        if (!group?.id) return;
+        setRelLoading(true);
+        try {
+            // 1. My Parents (links where I am child)
+            const pRes = await fetch(`${API_ROOT}/groups/${group.id}/parent-links/`, { headers: { Authorization: `Bearer ${token}` } });
+            const pData = await pRes.json().catch(() => []);
+            if (pRes.ok && Array.isArray(pData)) setParentLinks(pData);
+
+            // 2. My Children Requests (links where I am parent)
+            const cRes = await fetch(`${API_ROOT}/groups/${group.id}/child-links/`, { headers: { Authorization: `Bearer ${token}` } });
+            const cData = await cRes.json().catch(() => []);
+            if (cRes.ok && Array.isArray(cData)) setChildLinks(cData);
+
+        } catch (e) {
+            console.error("Failed to load relations", e);
+        } finally {
+            setRelLoading(false);
+        }
+    }, [group?.id, token]);
+
+    // Load relations when tab is active
+    React.useEffect(() => {
+        if (tab === 2) fetchRelations();
+    }, [tab, fetchRelations]);
+
+    // Parent Link Actions
+    const _doParentLinkAction = async (linkId, action) => {
+        try {
+            let method = "POST";
+            if (action === "remove") method = "DELETE";
+            const res = await fetch(`${API_ROOT}/groups/${group.id}/parent-links/${linkId}/${action}/`, {
+                method,
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: method === "POST" ? "{}" : undefined
+            });
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.detail || "Failed");
+            }
+            fetchRelations();
+            fetchSubgroups(); // Also refresh All Subgroups list
+            if (action === "approve") fetchGroup();
+            const msg = action === 'remove' ? 'Link removed' : `Link ${action}d successfully`;
+            showSnackbar(msg, "success");
+        } catch (e) {
+            showSnackbar(e.message, "error");
+        }
+    };
+
+    const handleParentLinkAction = (linkId, action) => {
+        const verb = action === 'remove' ? 'remove' : action;
+        const title = verb === 'remove' ? 'Remove Link' : verb.charAt(0).toUpperCase() + verb.slice(1) + ' Link';
+        openConfirmDialog(title, `Are you sure you want to ${verb} this link?`, () => _doParentLinkAction(linkId, action));
+    };
+
+    // Request Parent Link
+    const [reqParentId, setReqParentId] = React.useState("");
+    const handleRequestLink = async () => {
+        if (!reqParentId) return;
+        try {
+            const pid = parseInt(String(reqParentId).trim());
+            if (isNaN(pid)) throw new Error("Parent Group ID must be a number");
+
+            const res = await fetch(`${API_ROOT}/groups/${group.id}/parent-links/request/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ parent_id: pid })
+            });
+            const d = await res.json();
+            if (!res.ok) throw new Error(d.detail || "Failed");
+
+            setRequestParentOpen(false);
+            setReqParentId("");
+            fetchRelations();
+            showSnackbar("Request sent! Pending parent approval.", "success");
+        } catch (e) {
+            showSnackbar(e.message, "error");
+        }
+    };
 
     // ----- Notifications tab (local-only settings) -----
     const [notifyEnabled, setNotifyEnabled] = React.useState(true);
@@ -3288,6 +3376,16 @@ export default function GroupManagePage() {
     const [deletingGroup, setDeletingGroup] = React.useState(false);
     const [confirmName, setConfirmName] = React.useState("");
     React.useEffect(() => { if (!deleteGroupOpen) setConfirmName(""); }, [deleteGroupOpen]);
+
+    // --- Modern UI: Confirm Dialog + Snackbar state (replaces window.confirm / alert) ---
+    const [confirmDialog, setConfirmDialog] = React.useState({ open: false, title: "", content: "", onConfirm: null });
+    const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "info" });
+
+    const showSnackbar = (message, severity = "info") => setSnackbar({ open: true, message, severity });
+    const handleSnackbarClose = (_, reason) => { if (reason !== 'clickaway') setSnackbar(p => ({ ...p, open: false })); };
+    const openConfirmDialog = (title, content, onConfirm) => setConfirmDialog({ open: true, title, content, onConfirm });
+    const closeConfirmDialog = () => setConfirmDialog(p => ({ ...p, open: false }));
+    const executeConfirmAction = () => { confirmDialog.onConfirm?.(); closeConfirmDialog(); };
 
     // When group loads/changes, infer initial chat state from backend shape
     React.useEffect(() => {
@@ -3668,8 +3766,8 @@ export default function GroupManagePage() {
     }, [group, idOrSlug, token]);
 
     React.useEffect(() => {
-        if (group && showSubgroupsTab) fetchSubgroups();
-    }, [group, showSubgroupsTab, fetchSubgroups]);
+        if (group && tab === 2) fetchSubgroups();
+    }, [group, tab, fetchSubgroups]);
 
     const [busyUserId, setBusyUserId] = React.useState(null);
     const [roleErrorOpen, setRoleErrorOpen] = React.useState(false);
@@ -3677,6 +3775,57 @@ export default function GroupManagePage() {
 
     const [requestInfoOpen, setRequestInfoOpen] = React.useState(false);
     const [requestInfoMessage, setRequestInfoMessage] = React.useState("");
+
+    // Parent Search State
+    const [parentSearchQuery, setParentSearchQuery] = React.useState("");
+    const [parentOptions, setParentOptions] = React.useState([]);
+    const [parentSearchLoading, setParentSearchLoading] = React.useState(false);
+    const [selectedParent, setSelectedParent] = React.useState(null);
+
+    React.useEffect(() => {
+        if (!requestParentOpen) return; // Only search when dialog is open
+        if (!parentSearchQuery || parentSearchQuery.length < 2) {
+            setParentOptions([]);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            setParentSearchLoading(true);
+            try {
+                // Ensure we get enough results to be useful
+                const res = await fetch(`${API_ROOT}/groups/?search=${encodeURIComponent(parentSearchQuery)}&page_size=20`, {
+                    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const results = data.results || data;
+                    // Filter out current group and existing parents/links
+                    // Note regarding parent_links: we might want to check them too, but backend handles strict checks.
+                    // Main thing is don't show itself.
+                    const forbiddenIds = new Set([group?.id]);
+                    if (group?.parent_id) forbiddenIds.add(group.parent_id);
+                    // Also filter out already linked parents if we have that list in memory? 
+                    // parentLinks is available in scope.
+                    parentLinks.forEach(l => forbiddenIds.add(l.parent_group?.id));
+
+                    setParentOptions(results.filter(g => !forbiddenIds.has(g.id)));
+                }
+            } catch (e) {
+                console.error("Failed to search groups", e);
+            } finally {
+                setParentSearchLoading(false);
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [parentSearchQuery, token, group, requestParentOpen, parentLinks]);
+
+    // Update reqParentId when selection changes
+    React.useEffect(() => {
+        if (selectedParent) {
+            setReqParentId(selectedParent.id);
+        } else {
+            setReqParentId("");
+        }
+    }, [selectedParent]);
 
 
     // Posts tab state
@@ -4635,8 +4784,8 @@ export default function GroupManagePage() {
                                 <Tab label="Overview" value={0} />
                                 <Tab label="Members" value={1} />
 
-                                {showSubgroupsTab ? (
-                                    <Tab label="Sub-groups" value={2} />
+                                {showRelationsTab ? (
+                                    <Tab label="Relations" value={2} />
                                 ) : (
                                     // keep index #2 but hide it so other tabs keep their indices
                                     <Tab sx={{ display: "none" }} disabled value={2} />
@@ -4944,78 +5093,200 @@ export default function GroupManagePage() {
                                     </Paper>
                                 )}
 
-                                {/* Sub-groups tab */}
-                                {showSubgroupsTab && tab === 2 && (
-                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                                        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
-                                            <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
-                                            {canCreateSubgroups && (
-                                                <Button
-                                                    variant="contained"
-                                                    className="rounded-xl"
-                                                    sx={{ textTransform: "none", backgroundColor: "#10b981", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                                    onClick={() => setAddSubOpen(true)}
-                                                    startIcon={<AddRoundedIcon />}
-                                                >
-                                                    Add sub-group
-                                                </Button>
-                                            )}
-                                        </Stack>
-
-                                        {subLoading ? (
-                                            <LinearProgress />
-                                        ) : subError ? (
-                                            <Alert severity="error">{subError}</Alert>
-                                        ) : visibleSubgroups.length === 0 ? (
-                                            <Typography className="text-slate-500">
-                                                {isOwnerRole || isAdminRole
-                                                    ? "No sub-groups yet."
-                                                    : "You haven't joined any sub-groups yet."}
-                                            </Typography>
-                                        ) : (
-                                            <Stack spacing={1.5}>
-                                                {visibleSubgroups.map((sg) => (
-                                                    <Paper key={sg.id || sg.slug} variant="outlined" className="p-2 rounded-xl">
-                                                        <Stack direction="row" alignItems="center" spacing={2} justifyContent="space-between">
-                                                            <Stack direction="row" alignItems="center" spacing={2}>
-                                                                <Avatar
-                                                                    variant="circular"
-                                                                    src={bust(sg.cover_image)}
-                                                                    alt={sg.name || "Group"}
-                                                                >
-                                                                    {(sg.name || "?").charAt(0).toUpperCase()}
-                                                                </Avatar>
-                                                                <Box>
-                                                                    <Typography className="font-semibold">{sg.name}</Typography>
-                                                                    <Typography variant="caption" className="text-slate-500">
-                                                                        {(sg.visibility === "private" ? "Private" : "Public")} •{" "}
-                                                                        {(sg.member_count ?? sg.members_count ?? 0)} members
-                                                                    </Typography>
-                                                                </Box>
-                                                            </Stack>
-                                                            <Button
-                                                                size="small"
-                                                                variant="text"
-                                                                endIcon={<OpenInNewRoundedIcon />}
-                                                                onClick={() => navigate(`/groups/${sg.slug || sg.id}`)}
-                                                            >
-                                                                Open
-                                                            </Button>
-                                                        </Stack>
-                                                    </Paper>
-                                                ))}
+                                {/* Relations tab */}
+                                {showRelationsTab && tab === 2 && (
+                                    <Stack spacing={3}>
+                                        {/* 1. Parent Groups */}
+                                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                            <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                                <Typography variant="h6" className="font-semibold">Parent Groups</Typography>
+                                                {canEditGroup && (
+                                                    <Button
+                                                        variant="contained"
+                                                        size="small"
+                                                        className="rounded-xl"
+                                                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                        onClick={() => setRequestParentOpen(true)}
+                                                        startIcon={<LinkRoundedIcon />}
+                                                    >
+                                                        Link to Parent
+                                                    </Button>
+                                                )}
                                             </Stack>
-                                        )}
+                                            <Typography variant="body2" className="text-slate-500 mb-3">
+                                                Other groups this group belongs to (in addition to Primary Parent).
+                                            </Typography>
 
-                                        {canCreateSubgroups && (
-                                            <AddSubgroupDialog
-                                                open={addSubOpen}
-                                                onClose={() => setAddSubOpen(false)}
-                                                parentGroup={group}
-                                                onCreated={(g) => { setSubgroups((prev) => [g, ...prev]); }}
-                                            />
-                                        )}
-                                    </Paper>
+                                            {relLoading && parentLinks.length === 0 ? <LinearProgress /> : parentLinks.length === 0 ? (
+                                                <Typography className="text-slate-500 italic mb-2">No additional parent groups.</Typography>
+                                            ) : (
+                                                <Stack spacing={1}>
+                                                    {parentLinks.map(link => (
+                                                        <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-slate-200">
+                                                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                                <Stack direction="row" alignItems="center" spacing={2}>
+                                                                    {/* Using simple Avatar fallback */}
+                                                                    <Avatar variant="rounded" sx={{ width: 40, height: 40 }}>{link.parent_group?.name?.[0]}</Avatar>
+                                                                    <Box>
+                                                                        <Typography className="font-semibold">
+                                                                            {link.parent_group.name}
+                                                                            <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>(ID: {link.parent_group.id})</Typography>
+                                                                        </Typography>
+                                                                        <Stack direction="row" spacing={1} alignItems="center">
+                                                                            <Chip
+                                                                                label={link.status.toUpperCase()}
+                                                                                size="small"
+                                                                                color={link.status === 'approved' ? 'success' : link.status === 'rejected' ? 'error' : 'warning'}
+                                                                                variant="outlined"
+                                                                                sx={{ height: 20, fontSize: '0.7rem' }}
+                                                                            />
+                                                                            <Typography variant="caption" className="text-slate-500">
+                                                                                {link.status === 'pending' ? `Requested by ${link.requested_by?.name}` :
+                                                                                    link.status === 'approved' ? `Reviewed by ${link.reviewed_by?.name}` : ''}
+                                                                            </Typography>
+                                                                        </Stack>
+                                                                    </Box>
+                                                                </Stack>
+                                                                {canEditGroup && (
+                                                                    <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
+                                                                )}
+                                                            </Stack>
+                                                        </Paper>
+                                                    ))}
+                                                </Stack>
+                                            )}
+                                        </Paper>
+
+                                        {/* 2. Subgroups */}
+                                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                            <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                                <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
+                                                {canCreateSubgroups && (
+                                                    <Button
+                                                        variant="contained"
+                                                        className="rounded-xl"
+                                                        sx={{ textTransform: "none", backgroundColor: "#10b981", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                        onClick={() => setAddSubOpen(true)}
+                                                        startIcon={<AddRoundedIcon />}
+                                                    >
+                                                        Add sub-group
+                                                    </Button>
+                                                )}
+                                            </Stack>
+
+                                            {/* Incoming Requests */}
+                                            {childLinks.filter(l => l.status === 'pending').length > 0 && (
+                                                <Box className="mb-4">
+                                                    <Typography variant="subtitle2" className="text-orange-700 font-bold mb-2">Pending Link Requests</Typography>
+                                                    <Stack spacing={1}>
+                                                        {childLinks.filter(l => l.status === 'pending').map(link => (
+                                                            <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-orange-200 bg-orange-50">
+                                                                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                                    <Stack direction="row" alignItems="center" spacing={2}>
+                                                                        <Avatar>{link.child_group?.name?.[0]}</Avatar>
+                                                                        <Box>
+                                                                            <Typography className="font-semibold">{link.child_group.name}</Typography>
+                                                                            <Typography variant="caption" className="text-slate-600">
+                                                                                Request from <span className="font-medium">{link.requested_by?.name}</span>
+                                                                            </Typography>
+                                                                        </Box>
+                                                                    </Stack>
+                                                                    <Stack direction="row" spacing={1}>
+                                                                        <Button size="small" variant="contained" color="success" onClick={() => handleParentLinkAction(link.id, 'approve')}>Approve</Button>
+                                                                        <Button size="small" variant="outlined" color="error" onClick={() => handleParentLinkAction(link.id, 'reject')}>Reject</Button>
+                                                                    </Stack>
+                                                                </Stack>
+                                                            </Paper>
+                                                        ))}
+                                                    </Stack>
+                                                    <Divider className="my-3" />
+                                                </Box>
+                                            )}
+
+                                            {/* Linked Subgroups Management */}
+                                            {childLinks.filter(l => l.status === 'approved').length > 0 && (
+                                                <Box className="mb-4">
+                                                    <Typography variant="subtitle2" className="text-slate-600 mb-2">Linked Subgroups (via Association)</Typography>
+                                                    <Stack spacing={1}>
+                                                        {childLinks.filter(l => l.status === 'approved').map(link => (
+                                                            <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-slate-200 bg-slate-50">
+                                                                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                                    <Stack direction="row" alignItems="center" spacing={2}>
+                                                                        <Avatar sx={{ width: 32, height: 32 }}>{link.child_group?.name?.[0]}</Avatar>
+                                                                        <Box>
+                                                                            <Typography className="font-semibold text-sm">{link.child_group.name}</Typography>
+                                                                        </Box>
+                                                                    </Stack>
+                                                                    <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
+                                                                </Stack>
+                                                            </Paper>
+                                                        ))}
+                                                    </Stack>
+                                                    <Divider className="my-3" />
+                                                </Box>
+
+                                            )}
+
+                                            <Typography variant="subtitle2" className="text-slate-600 mb-2">All Subgroups (Primary & Linked)</Typography>
+
+                                            {subLoading ? (
+                                                <LinearProgress />
+                                            ) : subError ? (
+                                                <Alert severity="error">{subError}</Alert>
+                                            ) : visibleSubgroups.length === 0 ? (
+                                                <Typography className="text-slate-500">
+                                                    {isOwnerRole || isAdminRole
+                                                        ? "No sub-groups yet."
+                                                        : "You haven't joined any sub-groups yet."}
+                                                </Typography>
+                                            ) : (
+                                                <Stack spacing={1.5}>
+                                                    {visibleSubgroups.map((sg) => (
+                                                        <Paper key={sg.id || sg.slug} variant="outlined" className="p-2 rounded-xl">
+                                                            <Stack direction="row" alignItems="center" spacing={2} justifyContent="space-between">
+                                                                <Stack direction="row" alignItems="center" spacing={2}>
+                                                                    <Avatar
+                                                                        variant="circular"
+                                                                        src={bust(sg.cover_image)}
+                                                                        alt={sg.name || "Group"}
+                                                                    >
+                                                                        {(sg.name || "?").charAt(0).toUpperCase()}
+                                                                    </Avatar>
+                                                                    <Box>
+                                                                        <Typography className="font-semibold">{sg.name}</Typography>
+                                                                        <Typography variant="caption" className="text-slate-500">
+                                                                            {(sg.visibility === "private" ? "Private" : "Public")} •{" "}
+                                                                            {(sg.member_count ?? sg.members_count ?? 0)} members
+                                                                        </Typography>
+                                                                    </Box>
+                                                                </Stack>
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="text"
+                                                                    endIcon={<OpenInNewRoundedIcon />}
+                                                                    onClick={() => navigate(`/groups/${sg.slug || sg.id}`)}
+                                                                >
+                                                                    Open
+                                                                </Button>
+                                                            </Stack>
+                                                        </Paper>
+                                                    ))}
+                                                </Stack>
+                                            )}
+
+                                            {canCreateSubgroups && (
+                                                <AddSubgroupDialog
+                                                    open={addSubOpen}
+                                                    onClose={() => setAddSubOpen(false)}
+                                                    parentGroup={group}
+                                                    onCreated={(g) => { setSubgroups((prev) => [g, ...prev]); }}
+                                                />
+                                            )}
+                                        </Paper>
+
+
+
+                                    </Stack>
                                 )}
 
                                 {tab === 3 && (
@@ -5778,7 +6049,8 @@ export default function GroupManagePage() {
                                 <Stack spacing={1}>
                                     {GROUP_TAB_LABELS.map((label, index) => {
                                         // Respect your existing visibility rules
-                                        if (index === 2 && !showSubgroupsTab) return null;
+                                        // Relations tab is now always visible
+                                        // if (index === 2 && !showSubgroupsTab) return null;
                                         if (index === 3 && !canSeeSettingsTab) return null;
                                         if (index === NOTIF_TAB_INDEX && !canSeeNotificationsTab) return null;
 
@@ -6349,6 +6621,85 @@ export default function GroupManagePage() {
                     {/* ↑↑↑ END of pasted original content ↑↑↑ */}
                 </main>
                 {/* 👇 ADD THIS ANYWHERE INSIDE RETURN (typically here) */}
+                {/* Request Parent Link Dialog */}
+                <Dialog open={requestParentOpen} onClose={() => setRequestParentOpen(false)}>
+                    <DialogTitle>Link to Parent Group</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText className="mb-4">
+                            Search for the parent group you want to link to.
+                        </DialogContentText>
+                        <Autocomplete
+                            options={parentOptions}
+                            loading={parentSearchLoading}
+                            getOptionLabel={(option) => option.name || ""}
+                            onInputChange={(_, newInputValue) => setParentSearchQuery(newInputValue)}
+                            onChange={(_, newValue) => setSelectedParent(newValue)}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Search Parent Group"
+                                    variant="outlined"
+                                    fullWidth
+                                    InputProps={{
+                                        ...params.InputProps,
+                                        endAdornment: (
+                                            <React.Fragment>
+                                                {parentSearchLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                {params.InputProps.endAdornment}
+                                            </React.Fragment>
+                                        ),
+                                    }}
+                                />
+                            )}
+                            renderOption={(props, option) => (
+                                <li {...props} key={option.id}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <Avatar
+                                            src={option.cover_image || option.image}
+                                            alt={option.name}
+                                            sx={{ width: 24, height: 24, fontSize: 12 }}
+                                        >
+                                            {option.name?.charAt(0)}
+                                        </Avatar>
+                                        <Box>
+                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                {option.name}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {option.member_count} members • {option.visibility}
+                                            </Typography>
+                                        </Box>
+                                    </Stack>
+                                </li>
+                            )}
+                        />
+                        <TextField
+                            margin="dense"
+                            label="Selected Group ID"
+                            fullWidth
+                            type="number"
+                            variant="outlined"
+                            value={reqParentId}
+                            disabled
+                            helperText="ID will be automatically populated from search"
+                            InputProps={{
+                                readOnly: true,
+                            }}
+                            sx={{ mt: 2, display: 'none' }} // Hidden but keeping state binding conceptually
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setRequestParentOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={handleRequestLink}
+                            disabled={!reqParentId || String(reqParentId).trim() === ""}
+                            variant="contained"
+                        >
+                            Send Request
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
                 <EditGroupDialog
                     open={editOpen}
                     group={group}
@@ -6406,20 +6757,46 @@ export default function GroupManagePage() {
                     </DialogActions>
                 </Dialog>
 
-                {/* Modern Snackbar for messages */}
+                {/* Modern Confirmation Dialog */}
+                <Dialog
+                    open={confirmDialog.open}
+                    onClose={closeConfirmDialog}
+                    maxWidth="xs"
+                    fullWidth
+                    PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+                >
+                    <DialogTitle sx={{ fontWeight: 700, pb: 0 }}>{confirmDialog.title}</DialogTitle>
+                    <DialogContent sx={{ pt: 1 }}>
+                        <DialogContentText>{confirmDialog.content}</DialogContentText>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+                        <Button onClick={closeConfirmDialog} variant="outlined" sx={{ textTransform: "none", borderRadius: 2 }}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={executeConfirmAction}
+                            variant="contained"
+                            sx={{ textTransform: "none", borderRadius: 2, backgroundColor: "#10b981", "&:hover": { backgroundColor: "#059669" } }}
+                        >
+                            Confirm
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Modern Snackbar for notifications */}
                 <Snackbar
-                    open={snack.open}
-                    autoHideDuration={6000}
-                    onClose={handleSnackClose}
+                    open={snackbar.open}
+                    autoHideDuration={4000}
+                    onClose={handleSnackbarClose}
                     anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
                 >
                     <Alert
-                        onClose={handleSnackClose}
-                        severity={snack.severity}
+                        onClose={handleSnackbarClose}
+                        severity={snackbar.severity}
                         sx={{ width: "100%", borderRadius: 2 }}
                         variant="filled"
                     >
-                        {snack.message}
+                        {snackbar.message}
                     </Alert>
                 </Snackbar>
             </div>

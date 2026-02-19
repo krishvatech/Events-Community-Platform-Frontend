@@ -218,6 +218,34 @@ async function loadGroupCreated(onlyUnread) {
   } catch { return { items: [], count: 0 }; }
 }
 
+async function loadParentLinkNotifications(onlyUnread) {
+  try {
+    const [reqRes, appRes] = await Promise.all([
+      fetch(ENDPOINTS.notifList({ kind: "parent_link_request", unread: onlyUnread ? 1 : undefined, page_size: 50 }), { headers: { Accept: "application/json", ...authHeader() } }),
+      fetch(ENDPOINTS.notifList({ kind: "parent_link_approved", unread: onlyUnread ? 1 : undefined, page_size: 50 }), { headers: { Accept: "application/json", ...authHeader() } }),
+    ]);
+    const mapRow = (n) => ({
+      id: n.id,
+      _source: "notif",
+      type: n.kind || n?.data?.type,
+      status: n.state || (n.is_read ? "read" : "pending"),
+      created_at: n.created_at,
+      actor_id: n?.actor?.id,
+      actor_name: n?.actor?.display_name || n?.actor?.username || "System",
+      actor_avatar: n?.actor?.avatar_url || "",
+      title: n.title || "",
+      description: n.description || "",
+      group: { id: n?.data?.child_group_id, name: n?.data?.child_group_name || `#${n?.data?.child_group_id}` },
+      data: n.data || {},
+      read_at: n?.is_read ? n.created_at : null,
+    });
+    const reqList = reqRes.ok ? ((await reqRes.json().catch(() => ({}))).results || []).map(mapRow) : [];
+    const appList = appRes.ok ? ((await appRes.json().catch(() => ({}))).results || []).map(mapRow) : [];
+    const items = [...reqList, ...appList].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    return { items, count: items.length };
+  } catch { return { items: [], count: 0 }; }
+}
+
 async function loadStandardNotifications(onlyUnread, kindFilter) {
   try {
     const res = await fetch(
@@ -336,6 +364,14 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
             ) : n.type === "member_joined" ? (
               <>
                 <Box component="span" fontWeight={700}>{n.actor_name}</Box> joined <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
+              </>
+            ) : n.type === "parent_link_request" ? (
+              <>
+                🔗 <Box component="span" fontWeight={700}>{n.data?.child_group_name || n.actor_name}</Box> sent a parent link request to join <Box component={Link} to={n.data?.parent_group_id ? `/community/groups/${n.data.parent_group_id}` : "#"} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n.data?.parent_group_name || "your group"}</Box>.
+              </>
+            ) : n.type === "parent_link_approved" ? (
+              <>
+                ✅ Link request from <Box component="span" fontWeight={700}>{n.data?.child_group_name || n.group?.name}</Box> to <Box component={Link} to={n.data?.parent_group_id ? `/community/groups/${n.data.parent_group_id}` : "#"} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n.data?.parent_group_name || "parent group"}</Box> was <b>approved</b>.
               </>
             ) : n.type === "friend_request" ? (
               <>
@@ -559,15 +595,17 @@ export default function AdminNotificationsPage() {
       else if (tab === "reaction") out = await loadStandardNotifications(onlyUnread, "reaction");
       else if (tab === "event") out = await loadStandardNotifications(onlyUnread, "event");
       else if (tab === "system") out = await loadStandardNotifications(onlyUnread, "system");
+      else if (tab === "parent_link") out = await loadParentLinkNotifications(onlyUnread);
       else {
         // "all" tab - load everything
-        const [reqs, joined, created, names, verifs, standard] = await Promise.all([
+        const [reqs, joined, created, names, verifs, standard, parentLinks] = await Promise.all([
           loadJoinRequests(),
           loadMemberJoined(onlyUnread),
           loadGroupCreated(onlyUnread),
           loadNameChangeRequests(),
           loadVerificationRequests(),
           loadStandardNotifications(onlyUnread),
+          loadParentLinkNotifications(onlyUnread),
         ]);
         out.items = [
           ...names.items,
@@ -575,7 +613,8 @@ export default function AdminNotificationsPage() {
           ...reqs.items,
           ...joined.items,
           ...created.items,
-          ...standard.items
+          ...standard.items,
+          ...parentLinks.items,
         ].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
         // Wait, let's fix the array destructuring
         out.count = out.items.length;
@@ -802,6 +841,7 @@ export default function AdminNotificationsPage() {
             <MenuItem value="join_request">Join Requests</MenuItem>
             <MenuItem value="member_joined">User Joined</MenuItem>
             <MenuItem value="group_created">Group Created</MenuItem>
+            <MenuItem value="parent_link">🔗 Group Link Requests</MenuItem>
             <Divider />
             <MenuItem value="friend_request">Friend Requests</MenuItem>
             <MenuItem value="mention">Mentions</MenuItem>
