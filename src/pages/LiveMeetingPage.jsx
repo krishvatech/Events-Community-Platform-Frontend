@@ -112,6 +112,7 @@ import BannedParticipantsDialog from "../components/live-meeting/BannedParticipa
 import WaitingRoomAnnouncements from "../components/live-meeting/WaitingRoomAnnouncements.jsx";
 import WaitingRoomControls from "../components/live-meeting/WaitingRoomControls.jsx";
 import LoungeSettingsDialog from "../components/live-meeting/LoungeSettingsDialog.jsx";
+import RoomLocationBadge from "../components/RoomLocationBadge.jsx";
 import { cognitoRefreshSession } from "../utils/cognitoAuth.js";
 import { getRefreshToken } from "../utils/api.js";
 import { getUserName } from "../utils/authStorage.js";
@@ -348,6 +349,47 @@ function getParticipantUserKey(participant) {
 
   const name = raw.name || participant.name || "";
   return name ? `name:${String(name).toLowerCase()}` : "";
+}
+
+// ✅ PHASE 1: Helper to extract backend user ID from participant
+function getBackendUserId(participant) {
+  if (!participant) return null;
+
+  return (
+    participant.customParticipantId ||
+    participant._raw?.customParticipantId ||
+    participant.clientSpecificId ||
+    participant._raw?.client_specific_id ||
+    null
+  );
+}
+
+// ✅ PHASE 1: Match Dyte participant to backend user in lounge tables
+function findUserIdForDyteParticipant(dyteParticipantId, loungeTables, participantIdMapRef) {
+  if (!dyteParticipantId || !loungeTables) return null;
+
+  // Check cache first
+  const cached = participantIdMapRef.current?.get(dyteParticipantId);
+  if (cached) return cached;
+
+  // Search lounge tables
+  for (const table of loungeTables) {
+    if (!table.participants || !Array.isArray(table.participants)) continue;
+
+    const participant = table.participants.find(
+      p => String(p.dyte_participant_id || p.dyteParticipantId) === String(dyteParticipantId)
+    );
+
+    if (participant) {
+      const userId = String(participant.user_id || participant.userId);
+      if (participantIdMapRef.current) {
+        participantIdMapRef.current.set(dyteParticipantId, userId);
+      }
+      return userId;
+    }
+  }
+
+  return null;
 }
 
 
@@ -1848,6 +1890,9 @@ export default function NewLiveMeeting() {
   const [rightOpen, setRightOpen] = useState(false); // mobile drawer
   const [tab, setTab] = useState(0);
 
+  // ✅ Participant visibility filter for Host (Phase 5)
+  const [participantRoomFilter, setParticipantRoomFilter] = useState("all"); // "all" | "main" | "breakout" | "lounge"
+
   // ✅ Host permissions (synced to Dyte permissions)
   const [hostPerms, setHostPerms] = useState({
     chat: true,
@@ -2340,6 +2385,17 @@ export default function NewLiveMeeting() {
   const activeTableIdRef = useRef(null); // ✅ Ref for socket access
   const [activeTableName, setActiveTableName] = useState("");
   const [activeTableLogoUrl, setActiveTableLogoUrl] = useState(""); // ✅ Store table logo
+
+  // ✅ PHASE 1: Participant Visibility - Room Location Tracking
+  const [participantRoomMap, setParticipantRoomMap] = useState(new Map());
+  // Map<dyte_participant_id, { type: "main"|"breakout"|"lounge", roomId, roomName, roomCategory }>
+
+  const participantIdMapRef = useRef(new Map());
+  // Map<backend_user_id, dyte_participant_id> for ID matching
+
+  const lastParticipantSyncRef = useRef(0);
+  // Track last sync timestamp for validation
+
   const [eventData, setEventData] = useState(null); // ✅ Store full event data (images, timezone, etc.)
   const [mainRoomSupportStatus, setMainRoomSupportStatus] = useState(null);
   const [assistanceCooldownUntil, setAssistanceCooldownUntil] = useState(0);
@@ -4625,6 +4681,80 @@ export default function NewLiveMeeting() {
               navigate(`/community/${currentCommunitySlug}/events/${eventId}`);
             }, 3000);
           }
+        } else if (msg.type === "participant_location_update") {
+          // ✅ PHASE 2: Handle when a user joins/leaves/switches rooms
+          console.log("[MainSocket] Participant location update:", msg);
+
+          if (!msg.updates || !Array.isArray(msg.updates)) return;
+
+          const newRoomMap = new Map(participantRoomMap);
+          let mapChanged = false;
+
+          for (const update of msg.updates) {
+            const { user_id, dyte_participant_id, current_room, action } = update;
+
+            // Cache the user_id → dyte_participant_id mapping
+            if (user_id && dyte_participant_id) {
+              participantIdMapRef.current.set(dyte_participant_id, user_id);
+            }
+
+            if (action === "left" || !current_room) {
+              // User left the meeting or a room
+              if (dyte_participant_id && newRoomMap.has(dyte_participant_id)) {
+                newRoomMap.delete(dyte_participant_id);
+                mapChanged = true;
+                console.log(`[MainSocket] Participant ${user_id} left room`);
+              }
+            } else {
+              // User joined or switched rooms
+              if (dyte_participant_id) {
+                newRoomMap.set(dyte_participant_id, {
+                  type: current_room.type || "main",
+                  roomId: current_room.room_id || null,
+                  roomName: current_room.room_name || "Main Room",
+                  roomCategory: current_room.room_category || null,
+                  lastUpdate: msg.timestamp || Date.now()
+                });
+                mapChanged = true;
+                console.log(`[MainSocket] Participant ${user_id} in ${current_room.type}: ${current_room.room_name}`);
+              }
+            }
+          }
+
+          if (mapChanged) {
+            setParticipantRoomMap(newRoomMap);
+          }
+
+        } else if (msg.type === "participant_location_sync") {
+          // ✅ PHASE 2: Full sync (on reconnect or initial load)
+          console.log("[MainSocket] Received participant location sync:", msg);
+
+          if (!msg.participants || !Array.isArray(msg.participants)) return;
+
+          const newRoomMap = new Map();
+
+          for (const p of msg.participants) {
+            const { dyte_participant_id, user_id, current_room } = p;
+
+            if (user_id && dyte_participant_id) {
+              participantIdMapRef.current.set(dyte_participant_id, user_id);
+            }
+
+            if (dyte_participant_id && current_room) {
+              newRoomMap.set(dyte_participant_id, {
+                type: current_room.type || "main",
+                roomId: current_room.room_id || null,
+                roomName: current_room.room_name || "Main Room",
+                roomCategory: current_room.room_category || null,
+                lastUpdate: msg.timestamp || Date.now()
+              });
+            }
+          }
+
+          setParticipantRoomMap(newRoomMap);
+          lastParticipantSyncRef.current = Date.now();
+          console.log("[MainSocket] Participant location sync complete");
+
         } else if (msg.type === "lounge_state" || msg.type === "welcome") {
           if (msg.online_users) setOnlineUsers(msg.online_users);
           const tableState =
@@ -5095,6 +5225,8 @@ export default function NewLiveMeeting() {
   }, [waitingRoomQueue, loungeTables]);
 
   const filteredWaitingRoomCount = filteredWaitingRoomQueue.length;
+
+  // ✅ PHASE 3: Keep participantRoomMap in sync with loungeTables state
 
   useEffect(() => {
     if (!isHost || !eventData?.waiting_room_enabled) return;
@@ -7218,6 +7350,80 @@ export default function NewLiveMeeting() {
       };
     });
   }, [dyteMeeting, getJoinedParticipants, isHost, pinnedHost, hostIdHint, participantsTick, loungeTables, assignedRoleByIdentity, moodMap]);
+
+  // ✅ Phase 3: Sync loungeTables with participantRoomMap
+  useEffect(() => {
+    if (loungeTables.length === 0 || !participants || participants.length === 0) return;
+
+    const newRoomMap = new Map(participantRoomMap);
+
+    // For each table, update room location for all participants
+    for (const table of loungeTables) {
+      const roomType = table.category === "BREAKOUT" ? "breakout" : "lounge";
+      const roomName = table.name || `${table.category} Room ${table.id}`;
+
+      // Update all participants in this table
+      if (table.participants) {
+        const participantsList = Array.isArray(table.participants)
+          ? table.participants
+          : Object.values(table.participants);
+
+        for (const tableParticipant of participantsList) {
+          const userId = String(tableParticipant.user_id || tableParticipant.userId);
+
+          // Find the corresponding Dyte participant
+          const dyteParticipant = participants.find(p => {
+            const pUserId = getBackendUserId(p);
+            return pUserId && String(pUserId) === userId;
+          });
+
+          if (dyteParticipant && dyteParticipant.id) {
+            newRoomMap.set(dyteParticipant.id, {
+              type: roomType,
+              roomId: String(table.id),
+              roomName: roomName,
+              roomCategory: table.category,
+              lastUpdate: Date.now()
+            });
+
+            // Update cache
+            participantIdMapRef.current.set(dyteParticipant.id, userId);
+          }
+        }
+      }
+    }
+
+    // Also mark main room participants (not in any lounge table)
+    const loungeUserIds = new Set();
+    for (const table of loungeTables) {
+      if (table.participants) {
+        const participantsList = Array.isArray(table.participants)
+          ? table.participants
+          : Object.values(table.participants);
+        for (const p of participantsList) {
+          loungeUserIds.add(String(p.user_id || p.userId));
+        }
+      }
+    }
+
+    for (const p of participants) {
+      const pUserId = getBackendUserId(p);
+      if (pUserId && !loungeUserIds.has(String(pUserId))) {
+        // ✅ Always update to Main Room if not in any lounge (catches participants leaving lounges)
+        if (p.inMeeting) {
+          newRoomMap.set(p.id, {
+            type: "main",
+            roomId: null,
+            roomName: "Main Room",
+            roomCategory: null,
+            lastUpdate: Date.now()
+          });
+        }
+      }
+    }
+
+    setParticipantRoomMap(newRoomMap);
+  }, [loungeTables, participants]);
 
   // ✅ Build available participants for manual assignment (all meeting participants except self)
   const availableParticipantsForAssign = useMemo(() => {
@@ -9433,21 +9639,89 @@ export default function NewLiveMeeting() {
     }
 
     const hostIdSet = new Set(host.map((p) => p.id));
+    // ✅ PHASE 4: Host in main room should see ALL participants (including those in breakout/lounge)
     const speakers = participants.filter(
-      (p) => !hostIdSet.has(p.id) && p.role === "Speaker" && p.inMeeting && (isBreakout || !p.isOccupyingLounge)
+      (p) => !hostIdSet.has(p.id) && p.role === "Speaker" && p.inMeeting && (isBreakout || isHost || !p.isOccupyingLounge)
     );
     const audience = participants.filter(
-      (p) => !hostIdSet.has(p.id) && p.role !== "Speaker" && p.inMeeting && (isBreakout || !p.isOccupyingLounge)
+      (p) => !hostIdSet.has(p.id) && p.role !== "Speaker" && p.inMeeting && (isBreakout || isHost || !p.isOccupyingLounge)
     );
 
+    // ✅ PHASE 4: For host, enhance with room location
+    if (isHost && !isBreakout) {
+      // Host in main room: show all with locations
+      return {
+        host: host.map(p => ({
+          ...p,
+          _roomLocation: participantRoomMap.get(p.id) || {
+            type: "main",
+            roomId: null,
+            roomName: "Main Room"
+          }
+        })),
+        speakers: speakers.map(p => ({
+          ...p,
+          _roomLocation: participantRoomMap.get(p.id) || {
+            type: "main",
+            roomId: null,
+            roomName: "Main Room"
+          }
+        })),
+        audience: audience.map(p => ({
+          ...p,
+          _roomLocation: participantRoomMap.get(p.id) || {
+            type: "main",
+            roomId: null,
+            roomName: "Main Room"
+          }
+        }))
+      };
+    }
+
+    // Regular participant or breakout view: keep original behavior
     return { host, speakers, audience };
-  }, [participants, pinnedHost, hostIdHint, isHost, dyteMeeting?.self?.id, isBreakout]);
+  }, [
+    participants,
+    pinnedHost,
+    hostIdHint,
+    isHost,
+    dyteMeeting?.self?.id,
+    isBreakout,
+    participantRoomMap  // ✅ PHASE 4: Added dependency
+  ]);
+
 
   // --- Self helpers for Members UI ---
   const selfDyteId = dyteMeeting?.self?.id || null;
 
+  // ✅ Phase 5: Apply room filter to groupedMembers
+  const filteredGroupedMembers = useMemo(() => {
+    if (!isHost || isBreakout) return groupedMembers;
+
+    if (participantRoomFilter === "all") {
+      return groupedMembers;
+    }
+
+    // Filter participants based on room type
+    const filterByRoomType = (participants) => {
+      return participants.filter(p => {
+        const roomType = p._roomLocation?.type || "main";
+        if (participantRoomFilter === "main") return roomType === "main";
+        if (participantRoomFilter === "breakout") return roomType === "breakout";
+        if (participantRoomFilter === "lounge") return roomType === "lounge";
+        return true;
+      });
+    };
+
+    return {
+      host: filterByRoomType(groupedMembers.host || []),
+      speakers: filterByRoomType(groupedMembers.speakers || []),
+      audience: filterByRoomType(groupedMembers.audience || [])
+    };
+  }, [groupedMembers, participantRoomFilter, isHost, isBreakout]);
+
   const audienceMembersSorted = useMemo(() => {
-    const arr = [...(groupedMembers?.audience || [])];
+    const arr = [...(filteredGroupedMembers?.audience || [])];
 
     // put self on top (only matters for Audience view, host won't be inside audience anyway)
     arr.sort((a, b) => {
@@ -9459,7 +9733,7 @@ export default function NewLiveMeeting() {
     });
 
     return arr;
-  }, [groupedMembers?.audience, selfDyteId]);
+  }, [filteredGroupedMembers?.audience, selfDyteId]);
 
   const isSelfMember = (m) => Boolean(selfDyteId && m?.id === selfDyteId);
   const moodPickerOpen = Boolean(moodAnchorEl);
@@ -10475,6 +10749,65 @@ export default function NewLiveMeeting() {
             {/* MEMBERS */}
             <TabPanel value={tab} index={3}>
               <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+                {/* ✅ Phase 5: Filter controls for Host (in main room) - 2x2 Grid */}
+                {isHost && !isBreakout && (
+                  <Stack sx={{ mb: 2 }}>
+                    <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                      {[
+                        { value: "all", label: "All" },
+                        { value: "main", label: "Main Room" },
+                      ].map((filter) => (
+                        <Button
+                          key={filter.value}
+                          size="small"
+                          variant={participantRoomFilter === filter.value ? "contained" : "outlined"}
+                          onClick={() => setParticipantRoomFilter(filter.value)}
+                          sx={{
+                            flex: 1,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            borderColor: "rgba(255,255,255,0.2)",
+                            color: participantRoomFilter === filter.value ? "#fff" : "rgba(255,255,255,0.7)",
+                            bgcolor: participantRoomFilter === filter.value ? "primary.main" : "transparent",
+                            "&:hover": {
+                              borderColor: "rgba(255,255,255,0.4)",
+                              bgcolor: participantRoomFilter === filter.value ? "primary.dark" : "rgba(255,255,255,0.05)",
+                            },
+                          }}
+                        >
+                          {filter.label}
+                        </Button>
+                      ))}
+                    </Stack>
+                    <Stack direction="row" spacing={1}>
+                      {[
+                        { value: "breakout", label: "Breakout Rooms" },
+                        { value: "lounge", label: "Social Lounges" },
+                      ].map((filter) => (
+                        <Button
+                          key={filter.value}
+                          size="small"
+                          variant={participantRoomFilter === filter.value ? "contained" : "outlined"}
+                          onClick={() => setParticipantRoomFilter(filter.value)}
+                          sx={{
+                            flex: 1,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            borderColor: "rgba(255,255,255,0.2)",
+                            color: participantRoomFilter === filter.value ? "#fff" : "rgba(255,255,255,0.7)",
+                            bgcolor: participantRoomFilter === filter.value ? "primary.main" : "transparent",
+                            "&:hover": {
+                              borderColor: "rgba(255,255,255,0.4)",
+                              bgcolor: participantRoomFilter === filter.value ? "primary.dark" : "rgba(255,255,255,0.05)",
+                            },
+                          }}
+                        >
+                          {filter.label}
+                        </Button>
+                      ))}
+                    </Stack>
+                  </Stack>
+                )}
                 <Stack spacing={2}>
                   <Box>
                     <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8, mb: 1 }}>
@@ -10489,7 +10822,7 @@ export default function NewLiveMeeting() {
                       }}
                     >
                       <List dense disablePadding>
-                        {groupedMembers.host.map((m, idx) => (
+                        {(isHost && !isBreakout ? filteredGroupedMembers.host : groupedMembers.host).map((m, idx) => (
                           <ListItem
                             key={idx}
                             disablePadding
@@ -10515,6 +10848,14 @@ export default function NewLiveMeeting() {
                                       })()}
                                       <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
                                     </Stack>
+                                    {/* ✅ Phase 5: Room location badge below name */}
+                                    {isHost && !isBreakout && m._roomLocation && (
+                                      <RoomLocationBadge
+                                        type={m._roomLocation.type}
+                                        roomName={m._roomLocation.roomName}
+                                        size="small"
+                                      />
+                                    )}
                                     {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host (self) */}
@@ -10835,7 +11176,7 @@ export default function NewLiveMeeting() {
                   <Box>
                     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
                       <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
-                        SPEAKERS ({groupedMembers.speakers.length})
+                        SPEAKERS ({(isHost && !isBreakout ? filteredGroupedMembers.speakers : groupedMembers.speakers).length})
                       </Typography>
                     </Stack>
                     <Paper
@@ -10847,7 +11188,7 @@ export default function NewLiveMeeting() {
                       }}
                     >
                       <List dense disablePadding>
-                        {groupedMembers.speakers.map((m, idx) => (
+                        {(isHost && !isBreakout ? filteredGroupedMembers.speakers : groupedMembers.speakers).map((m, idx) => (
                           <ListItem
                             key={idx}
                             disablePadding
@@ -10874,6 +11215,14 @@ export default function NewLiveMeeting() {
                                         ) : null;
                                       })()}
                                     </Box>
+                                    {/* ✅ Phase 5: Room location badge below name */}
+                                    {isHost && !isBreakout && m._roomLocation && (
+                                      <RoomLocationBadge
+                                        type={m._roomLocation.type}
+                                        roomName={m._roomLocation.roomName}
+                                        size="small"
+                                      />
+                                    )}
                                     {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
@@ -10953,7 +11302,7 @@ export default function NewLiveMeeting() {
 
                   <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
                     <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
-                      AUDIENCE ({groupedMembers.audience.length})
+                      AUDIENCE ({(isHost && !isBreakout ? filteredGroupedMembers.audience : groupedMembers.audience).length})
                     </Typography>
                     <Stack direction="row" spacing={1}>
                       {isHost && (
@@ -11018,6 +11367,14 @@ export default function NewLiveMeeting() {
                                       ) : null;
                                     })()}
                                   </Box>
+                                  {/* ✅ Phase 5: Room location badge below name */}
+                                  {isHost && !isBreakout && m._roomLocation && (
+                                    <RoomLocationBadge
+                                      type={m._roomLocation.type}
+                                      roomName={m._roomLocation.roomName}
+                                      size="small"
+                                    />
+                                  )}
                                   {renderMoodRow(m)}
                                   <Stack direction="row" spacing={0.75} alignItems="center">
                                     {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
