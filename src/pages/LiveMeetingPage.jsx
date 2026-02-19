@@ -8771,6 +8771,8 @@ export default function NewLiveMeeting() {
   const [privateInput, setPrivateInput] = useState("");
   const [privateConversationId, setPrivateConversationId] = useState(null); // <--- NEW
   const [privateChatLoading, setPrivateChatLoading] = useState(false);      // <--- NEW
+  const [editingMsgId, setEditingMsgId] = useState(null);
+  const [editText, setEditText] = useState("");
   const privateChatBottomRef = useRef(null); // To auto-scroll
 
   const handleOpenPrivateChat = async (member) => {
@@ -8867,6 +8869,71 @@ export default function NewLiveMeeting() {
     }
   };
 
+  const handleStartEdit = (msg) => {
+    setEditingMsgId(msg.id);
+    setEditText(msg.body);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMsgId(null);
+    setEditText("");
+  };
+
+  const handleSaveEdit = async (msgId) => {
+    const text = editText.trim();
+    if (!text) return;
+
+    try {
+      const res = await fetch(
+        toApiUrl(`messaging/conversations/${privateConversationId}/messages/${msgId}/`),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ body: text }),
+        }
+      );
+
+      if (res.ok) {
+        const updatedMsg = await res.json();
+        setPrivateMessages((prev) =>
+          prev.map((m) => (m.id === msgId ? updatedMsg : m))
+        );
+        setEditingMsgId(null);
+        setEditText("");
+      } else {
+        console.error("Failed to edit message");
+      }
+    } catch (e) {
+      console.error("Edit message error:", e);
+    }
+  };
+
+  const handleDeleteMessage = async (msgId) => {
+    try {
+      const res = await fetch(
+        toApiUrl(`messaging/conversations/${privateConversationId}/messages/${msgId}/`),
+        {
+          method: "DELETE",
+          headers: { ...authHeader() },
+        }
+      );
+
+      if (res.ok) {
+        setPrivateMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId
+              ? { ...m, is_deleted: true, body: "This message was deleted" }
+              : m
+          )
+        );
+      } else {
+        console.error("Failed to delete message");
+      }
+    } catch (e) {
+      console.error("Delete message error:", e);
+    }
+  };
+
   useEffect(() => {
     if (!myUserId) return;
 
@@ -8943,9 +9010,7 @@ export default function NewLiveMeeting() {
 
         const unread = Number(data?.unread_count || 0);
 
-        // If you want ALWAYS refresh, remove this if-block.
-        if (unread <= 0) return;
-
+        // Always fetch messages to capture edits/deletes from sender
         // 2) Fetch latest messages
         const msgRes = await fetch(
           toApiUrl(`messaging/conversations/${privateConversationId}/messages/`),
@@ -8980,6 +9045,58 @@ export default function NewLiveMeeting() {
     };
   }, [privateChatUser, privateConversationId]);
 
+  // ✅ WebSocket listener for real-time edit/delete updates on private messages
+  useEffect(() => {
+    if (!privateChatUser || !privateConversationId) return;
+
+    let alive = true;
+
+    try {
+      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${wsProtocol}//${window.location.host}/ws/messaging/conversations/${privateConversationId}/?token=${getToken()}`;
+      const ws = new WebSocket(wsUrl);
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (!alive) return;
+
+          if (data.type === "message.edited") {
+            setPrivateMessages((prev) =>
+              prev.map((m) =>
+                m.id === data.message.id ? data.message : m
+              )
+            );
+          } else if (data.type === "message.deleted") {
+            setPrivateMessages((prev) =>
+              prev.map((m) =>
+                m.id === data.message.id ? data.message : m
+              )
+            );
+          } else if (data.type === "message.created") {
+            // Add new messages from WebSocket as well
+            if (!privateMessages.some((m) => m.id === data.message.id)) {
+              setPrivateMessages((prev) => [...prev, data.message]);
+            }
+          }
+        } catch (e) {
+          console.warn("[PrivateChat WS] Parse error:", e);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.warn("[PrivateChat WS] Error:", error);
+      };
+
+      return () => {
+        alive = false;
+        ws.close();
+      };
+    } catch (e) {
+      console.warn("[PrivateChat WS] Failed to connect:", e);
+    }
+  }, [privateChatUser, privateConversationId]);
 
   useEffect(() => {
     if (!hostPerms.chat) return;
@@ -10018,23 +10135,143 @@ export default function NewLiveMeeting() {
             ) : (
               <Stack spacing={1.25}>
                 {privateMessages.map((m) => (
-                  <Paper
-                    key={m.id}
-                    variant="outlined"
-                    sx={{
-                      p: 1.25,
-                      maxWidth: "85%",
-                      alignSelf: m.mine ? "flex-end" : "flex-start",
-                      bgcolor: m.mine ? "rgba(20,184,177,0.15)" : "rgba(255,255,255,0.03)",
-                      borderColor: m.mine ? "rgba(20,184,177,0.3)" : "rgba(255,255,255,0.08)",
-                      borderRadius: 2,
-                    }}
-                  >
-                    <Typography sx={{ fontSize: 13, opacity: 0.9 }}>{m.body}</Typography>
-                    <Typography sx={{ fontSize: 10, opacity: 0.5, textAlign: "right", mt: 0.5 }}>
-                      {formatChatTime(m.created_at)}
-                    </Typography>
-                  </Paper>
+                  <Stack key={m.id} alignItems={m.mine ? "flex-end" : "flex-start"} spacing={0.25}>
+                    {/* Edit mode */}
+                    {editingMsgId === m.id ? (
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 1.25,
+                          maxWidth: "85%",
+                          bgcolor: "rgba(20,184,177,0.1)",
+                          borderColor: "rgba(20,184,177,0.4)",
+                          borderRadius: 2,
+                        }}
+                      >
+                        <TextField
+                          fullWidth
+                          multiline
+                          maxRows={4}
+                          size="small"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          sx={{
+                            mb: 1,
+                            "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.05)" },
+                          }}
+                        />
+                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={handleCancelEdit}
+                            sx={{ fontSize: "11px", px: 1 }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => handleSaveEdit(m.id)}
+                            disabled={!editText.trim()}
+                            sx={{ fontSize: "11px", px: 1 }}
+                          >
+                            Save
+                          </Button>
+                        </Stack>
+                      </Paper>
+                    ) : (
+                      <Box
+                        sx={{
+                          position: "relative",
+                          display: "flex",
+                          justifyContent: m.mine ? "flex-end" : "flex-start",
+                          alignItems: "flex-start",
+                          gap: 0.5,
+                          "&:hover .edit-delete-buttons": {
+                            opacity: 1,
+                          },
+                        }}
+                      >
+                        {/* Edit/Delete menu for own messages (before message on hover) */}
+                        {m.mine && !m.is_deleted && (
+                          <Stack
+                            className="edit-delete-buttons"
+                            direction="row"
+                            spacing={0.25}
+                            sx={{
+                              opacity: 0,
+                              transition: "opacity 0.2s",
+                              pt: 0.25,
+                            }}
+                          >
+                            <IconButton
+                              size="small"
+                              onClick={() => handleStartEdit(m)}
+                              sx={{
+                                width: 24,
+                                height: 24,
+                                p: 0.25,
+                                color: "rgba(255,255,255,0.6)",
+                                "&:hover": { color: "rgba(255,255,255,1)", bgcolor: "rgba(255,255,255,0.1)" },
+                              }}
+                              title="Edit message"
+                            >
+                              <EditRoundedIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteMessage(m.id)}
+                              sx={{
+                                width: 24,
+                                height: 24,
+                                p: 0.25,
+                                color: "rgba(255,255,255,0.6)",
+                                "&:hover": { color: "#f44336", bgcolor: "rgba(244,67,54,0.15)" },
+                              }}
+                              title="Delete message"
+                            >
+                              <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Stack>
+                        )}
+
+                        <Paper
+                          variant="outlined"
+                          sx={{
+                            p: 1.25,
+                            maxWidth: "85%",
+                            bgcolor: m.mine ? "rgba(20,184,177,0.15)" : "rgba(255,255,255,0.03)",
+                            borderColor: m.mine ? "rgba(20,184,177,0.3)" : "rgba(255,255,255,0.08)",
+                            borderRadius: 2,
+                            opacity: m.is_deleted ? 0.6 : 1,
+                          }}
+                        >
+                          {/* Message body with deleted/edited states */}
+                          <Typography
+                            sx={{
+                              fontSize: 13,
+                              opacity: m.is_deleted ? 0.6 : 0.9,
+                              fontStyle: m.is_deleted ? "italic" : "normal",
+                              color: m.is_deleted ? "#999" : "inherit",
+                            }}
+                          >
+                            {m.body}
+                          </Typography>
+
+                          {/* Edited label */}
+                          {!m.is_deleted && m.is_edited && (
+                            <Typography sx={{ fontSize: 9, opacity: 0.5, mt: 0.25 }}>Edited</Typography>
+                          )}
+
+                          {/* Timestamp */}
+                          <Typography sx={{ fontSize: 10, opacity: 0.5, textAlign: "right", mt: 0.5, whiteSpace: "nowrap" }}>
+                            {formatChatTime(m.created_at)}
+                          </Typography>
+                        </Paper>
+                      </Box>
+                    )}
+                  </Stack>
                 ))}
                 <div ref={privateChatBottomRef} />
               </Stack>
