@@ -23,6 +23,29 @@ const LoungeTable = ({
     });
     const maxSeats = table.max_seats || 4;
 
+    // ✅ DYNAMIC SIZING BASED ON SEAT COUNT (Production-Ready for 4-40+ seats)
+    // Scales container, table, radius, and seat size based on maxSeats
+    // Formula: Base dimensions increase as seat count increases for proper circular arrangement
+    const getTableDimensions = (seatCount) => {
+        if (seatCount <= 4) return { container: 140, table: 80, radius: 60, seatSize: { empty: 32, occupied: 36 } };
+        if (seatCount <= 6) return { container: 160, table: 90, radius: 70, seatSize: { empty: 30, occupied: 34 } };
+        if (seatCount <= 8) return { container: 180, table: 100, radius: 80, seatSize: { empty: 28, occupied: 32 } };
+        if (seatCount <= 10) return { container: 200, table: 110, radius: 90, seatSize: { empty: 26, occupied: 30 } };
+        if (seatCount <= 12) return { container: 220, table: 120, radius: 100, seatSize: { empty: 24, occupied: 28 } };
+        if (seatCount <= 15) return { container: 240, table: 130, radius: 110, seatSize: { empty: 22, occupied: 26 } };
+        if (seatCount <= 20) return { container: 260, table: 140, radius: 120, seatSize: { empty: 20, occupied: 24 } };
+        // For 20+ seats, scale dynamically based on excess seats
+        const extraSeats = Math.max(0, seatCount - 20);
+        const containerSize = Math.min(260 + (extraSeats * 4), 380);
+        const tableSize = Math.min(140 + (extraSeats * 2), 200);
+        const radiusSize = Math.min(120 + (extraSeats * 2), 170);
+        const seatEmptySize = Math.max(18, 20 - Math.floor(extraSeats / 5));
+        const seatOccupiedSize = Math.max(22, 24 - Math.floor(extraSeats / 5));
+        return { container: containerSize, table: tableSize, radius: radiusSize, seatSize: { empty: seatEmptySize, occupied: seatOccupiedSize } };
+    };
+
+    const tableDimensions = getTableDimensions(maxSeats);
+
     // ✅ NEW: Check if lounge is open
     // For LOUNGE tables: apply lounge availability check
     // For BREAKOUT tables: allow join regardless of lounge status
@@ -66,16 +89,20 @@ const LoungeTable = ({
             elevation={0}
             sx={{
                 p: 2,
-                borderRadius: 4,
+                borderRadius: 3,
                 bgcolor: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 backdropFilter: 'blur(10px)',
                 textAlign: 'center',
                 position: 'relative',
-                minHeight: 280,
+                // ✅ FIXED: All table cards have same dimensions
+                // Grid handles width, we set fixed height
+                height: 420,
+                width: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
+                overflow: 'hidden',
                 transition: 'transform 0.2s, border-color 0.2s',
                 '&:hover': {
                     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -127,32 +154,38 @@ const LoungeTable = ({
                 )}
             </Box>
 
-            {/* Table Visualization */}
+            {/* Table Visualization - Scales based on maxSeats (constrained within card) */}
             <Box
                 sx={{
                     mx: 'auto',
-                    my: 2,
+                    my: 1,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flex: 1,
+                    overflow: 'visible',
+                    maxHeight: 250,
+                    width: '100%',
+                    px: 1,
                 }}
             >
                 <Box
                     sx={{
                         position: 'relative',
-                        width: 140,
-                        height: 140,
+                        width: tableDimensions.container,
+                        height: tableDimensions.container,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        transition: 'width 0.3s ease, height 0.3s ease',
                     }}
                 >
-                    {/* The Table itself */}
+                    {/* The Table itself - Scales dynamically */}
                     <Box
                         sx={{
-                            width: 80,
-                            height: 80,
+                            width: tableDimensions.table,
+                            height: tableDimensions.table,
                             borderRadius: 3,
                             bgcolor: 'rgba(255, 255, 255, 0.1)',
                             border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -160,6 +193,7 @@ const LoungeTable = ({
                             alignItems: 'center',
                             justifyContent: 'center',
                             boxShadow: 'inset 0 0 20px rgba(0,0,0,0.2)',
+                            transition: 'width 0.3s ease, height 0.3s ease',
                         }}
                     >
                         {iconSrc ? (
@@ -180,36 +214,30 @@ const LoungeTable = ({
                         )}
                     </Box>
 
-                    {/* Seats around the table (display up to 5 without overlap) */}
+                    {/* Seats around the table - Always display ALL configured seats */}
                     {(() => {
-                        const entries = Object.entries(table.participants || {})
-                            .map(([seat, participant]) => ({
-                                seat: Number(seat),
-                                participant,
-                            }))
-                            .filter((item) => Number.isFinite(item.seat) && item.participant)
-                            .sort((a, b) => a.seat - b.seat);
-                        // ✅ FIXED SEAT LIMIT: Only 4 seats available (Right, Left, Top, Bottom)
-                        const displayLimit = 4;
-                        const displayParticipants = entries.slice(0, displayLimit);
-                        const displayCount = Math.min(
-                            displayLimit,
-                            Math.max(displayParticipants.length, 1)
-                        );
-                        const availableSeatIndices = [];
-                        for (let i = 0; i < maxSeats; i++) {
-                            if (!table.participants?.[i] && !table.participants?.[String(i)]) {
-                                availableSeatIndices.push(i);
+                        // ✅ PRODUCTION-READY: Render ALL seats based on maxSeats (4, 6, 8, 10, 12, 15, 20, 40+)
+                        // Each seat is positioned evenly in a circle
+                        // Get all participants by seat index
+                        const participants = table.participants || {};
+                        const participantsBySeat = {};
+                        Object.entries(participants).forEach(([seat, participant]) => {
+                            if (participant) {
+                                const seatNum = Number(seat);
+                                if (Number.isFinite(seatNum)) {
+                                    participantsBySeat[seatNum] = participant;
+                                }
                             }
-                        }
+                        });
+
+                        // Create slots for ALL configured seats
+                        // Each slot will be either occupied or empty
                         const slots = [];
-                        for (let i = 0; i < displayCount; i++) {
-                            const occupant = displayParticipants[i];
-                            if (occupant) {
-                                slots.push({ participant: occupant.participant, seatIndex: occupant.seat });
-                            } else {
-                                slots.push({ participant: null, seatIndex: availableSeatIndices.shift() });
-                            }
+                        for (let i = 0; i < maxSeats; i++) {
+                            slots.push({
+                                seatIndex: i,
+                                participant: participantsBySeat[i] || null,
+                            });
                         }
 
                         return slots.map((slot, i) => (
@@ -232,7 +260,9 @@ const LoungeTable = ({
                             >
                                 <LoungeSeat
                                     index={i}
-                                    maxSeats={displayCount}
+                                    maxSeats={maxSeats}
+                                    radius={tableDimensions.radius}
+                                    seatSize={tableDimensions.seatSize}
                                     participant={slot.participant}
                                     onParticipantClick={slot.participant ? onParticipantClick : undefined}
                                 />
@@ -241,47 +271,7 @@ const LoungeTable = ({
                     })()}
                 </Box>
 
-                {(() => {
-                    const totalParticipants = Object.values(table.participants || {}).filter(Boolean).length;
-                    // ✅ Show "+more" when there are more than 4 users (fixed seat limit)
-                    const extraCount = Math.max(0, totalParticipants - 4);
-                    if (extraCount <= 0) return null;
-                    return (
-                        <Box
-                            sx={{
-                                mt: 1.5,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                px: 1.5,
-                                py: 0.75,
-                                borderRadius: 1.5,
-                                bgcolor: 'rgba(90, 120, 255, 0.15)',
-                                border: '1px solid rgba(90, 120, 255, 0.3)',
-                                backdropFilter: 'blur(4px)',
-                                transition: 'all 0.2s ease-in-out',
-                                '&:hover': {
-                                    bgcolor: 'rgba(90, 120, 255, 0.25)',
-                                    borderColor: 'rgba(90, 120, 255, 0.5)',
-                                    boxShadow: '0 0 12px rgba(90, 120, 255, 0.2)',
-                                },
-                                cursor: 'default',
-                            }}
-                            title={`${extraCount} more participant${extraCount !== 1 ? 's' : ''} at this table`}
-                        >
-                            <Typography
-                                sx={{
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    color: 'rgba(255,255,255,0.85)',
-                                    letterSpacing: '0.02em',
-                                }}
-                            >
-                                +{extraCount} more
-                            </Typography>
-                        </Box>
-                    );
-                })()}
+                {/* All seats are now displayed (no "+more" indicator needed) */}
             </Box>
 
             {isUserAtThisTable ? (

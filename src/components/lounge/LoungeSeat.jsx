@@ -19,7 +19,7 @@ const toApiUrl = (pathOrUrl) => {
     }
 };
 
-const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
+const LoungeSeat = ({ participant, index, maxSeats, radius = 60, seatSize = { empty: 32, occupied: 36 }, onParticipantClick }) => {
     const [isVerified, setIsVerified] = useState(false);
 
     // Fetch kyc_status if not available in participant data
@@ -64,34 +64,35 @@ const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
         return () => { isMounted = false; };
     }, [participant]);
 
-    // ✅ FIXED SEAT POSITIONING BASED ON JOIN ORDER
-    // Ensures consistent, balanced, and predictable placement
-    // Seats are assigned in fixed order: RIGHT → LEFT → TOP → BOTTOM
-    // This prevents overlapping and maintains visual balance
+    // ✅ PRODUCTION-READY DYNAMIC SEAT POSITIONING
+    // Calculates seat positions for any table size (4, 6, 8, 10, 12, 15, 20, 40+)
+    // Ensures consistent, balanced, and predictable circular arrangement
     //
-    // Seat Positions:
-    // - 1st user (index 0): RIGHT (0°)
-    // - 2nd user (index 1): LEFT (180°) - opposite to 1st for balance
-    // - 3rd user (index 2): TOP (270°)
-    // - 4th user (index 3): BOTTOM (90°)
-    // - 5+ users: Not placed (shown via "+more" indicator)
+    // Formula: Distribute seats evenly around a 360° circle
+    // startAngle = 270° (top) for better visual balance
+    // angle = startAngle + (360°/maxSeats) * index
 
-    const fixedSeats = [
-        0,                      // 1st user: RIGHT (0°)
-        Math.PI,                // 2nd user: LEFT (180°)
-        (3 * Math.PI) / 2,      // 3rd user: TOP (270°)
-        Math.PI / 2,            // 4th user: BOTTOM (90°)
-    ];
+    const calculateSeatAngle = (seatIndex, totalSeats) => {
+        // Angle per seat in radians (full circle = 2π)
+        const anglePerSeat = (2 * Math.PI) / totalSeats;
 
-    // Get angle from fixed seat, return 0 if beyond 4 users
-    const angle = fixedSeats[index] !== undefined ? fixedSeats[index] : null;
+        // Start from top (270° = 3π/2) for balanced visual layout
+        const startAngle = (3 * Math.PI) / 2;
 
-    const radius = 60; // distance from center of table (pixels)
-    // Only calculate position if angle is defined (user 1-4)
+        // Calculate angle for this specific seat
+        return startAngle + (anglePerSeat * seatIndex);
+    };
+
+    // Get angle for current seat
+    const angle = calculateSeatAngle(index, maxSeats);
+
+    // Calculate position using angle and dynamic radius (passed as prop)
+    // x = radius * cos(angle), y = radius * sin(angle)
     const x = angle !== null ? Math.cos(angle) * radius : 0;
     const y = angle !== null ? Math.sin(angle) * radius : 0;
 
     if (!participant) {
+        // Empty seat - scales based on table size
         return (
             <Box
                 sx={{
@@ -99,11 +100,16 @@ const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
                     top: `calc(50% + ${y}px)`,
                     left: `calc(50% + ${x}px)`,
                     transform: 'translate(-50%, -50%)',
-                    width: 32,
-                    height: 32,
+                    width: seatSize.empty,
+                    height: seatSize.empty,
                     borderRadius: '50%',
                     border: '2px dashed rgba(255,255,255,0.2)',
                     bgcolor: 'rgba(255,255,255,0.05)',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                        borderColor: 'rgba(255,255,255,0.4)',
+                        bgcolor: 'rgba(255,255,255,0.1)',
+                    },
                 }}
             />
         );
@@ -127,6 +133,7 @@ const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
         if (onParticipantClick) onParticipantClick(participant);
     };
 
+    // Occupied seat - scales based on table size
     return (
         <Tooltip
             arrow
@@ -155,11 +162,16 @@ const LoungeSeat = ({ participant, index, maxSeats, onParticipantClick }) => {
                     top: `calc(50% + ${y}px)`,
                     left: `calc(50% + ${x}px)`,
                     transform: 'translate(-50%, -50%)',
-                    width: 36,
-                    height: 36,
+                    width: seatSize.occupied,
+                    height: seatSize.occupied,
                     border: '2px solid #5a78ff',
                     boxShadow: '0 0 10px rgba(90,120,255,0.3)',
                     cursor: onParticipantClick ? 'pointer' : 'default',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                        boxShadow: '0 0 15px rgba(90,120,255,0.6)',
+                        transform: 'translate(-50%, -50%) scale(1.1)',
+                    },
                 }}
             >
                 {participant.username?.[0]?.toUpperCase()}

@@ -625,7 +625,26 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                     <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
                         <Tooltip title="Return to Main Room">
                             <Button
-                                onClick={onClose}
+                                onClick={() => {
+                                    // Check if user is currently at a table
+                                    const isUserAtTable = Object.values(tables).some((table) =>
+                                        Object.values(table.participants || {}).some((p) =>
+                                            String(p.user_id) === String(currentUserId) || p.username === myUsername
+                                        )
+                                    ) || Object.values(breakoutTables).some((table) =>
+                                        Object.values(table.participants || {}).some((p) =>
+                                            String(p.user_id) === String(currentUserId) || p.username === myUsername
+                                        )
+                                    );
+
+                                    // If at a table, leave it first (same as "Leave Table" button)
+                                    if (isUserAtTable) {
+                                        handleLeaveTable(dyteMeeting);
+                                    } else {
+                                        // Otherwise, just close the lounge overlay
+                                        onClose();
+                                    }
+                                }}
                                 startIcon={<ArrowBackIcon />}
                                 sx={{
                                     color: 'white',
