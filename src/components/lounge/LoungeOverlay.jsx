@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography, CircularProgress, Backdrop, Button, TextField } from '@mui/material';
+import { Box, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography, CircularProgress, Backdrop, Button, TextField, Tooltip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LoungeGrid from './LoungeGrid';
 import MainRoomPeek from './MainRoomPeek';
 import LateJoinerNotification from './LateJoinerNotification';
@@ -621,12 +622,36 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                 }}
             >
                 <Box sx={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box sx={{ ml: 2 }}>
+                    <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+                        <Tooltip title="Return to Main Room">
+                            <Button
+                                onClick={onClose}
+                                startIcon={<ArrowBackIcon />}
+                                sx={{
+                                    color: 'white',
+                                    textTransform: 'none',
+                                    fontWeight: 600,
+                                    fontSize: '1rem',
+                                    whiteSpace: 'nowrap',
+                                    transition: 'all 200ms ease',
+                                    '&:hover': {
+                                        bgcolor: 'rgba(255,255,255,0.1)',
+                                        transform: 'translateX(-4px)'
+                                    },
+                                    display: { xs: 'inline-flex', sm: 'inline-flex' },
+                                    minWidth: 'auto',
+                                    px: 1.5,
+                                    py: 1
+                                }}
+                            >
+                                Back to Main Room
+                            </Button>
+                        </Tooltip>
+                        <Box sx={{ ml: 2, flex: 1 }}>
                             <Typography variant="h5" sx={{ color: 'white', fontWeight: 700 }}>
                                 Social Lounge & Networking
                             </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                            {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                                 <Box sx={{
                                     width: 8,
                                     height: 8,
@@ -636,17 +661,21 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
                                     {wsStatus === 'open' ? 'Live Refresh Active' : (wsStatus === 'closed' ? 'Connection Failed' : 'Connecting...')}
                                 </Typography>
-                            </Box>
+                            </Box> */}
                         </Box>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
                             {isAdmin && (
-                                <IconButton onClick={onOpenSettings} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.05)' }}>
-                                    <SettingsIcon />
-                                </IconButton>
+                                <Tooltip title="Settings">
+                                    <IconButton onClick={onOpenSettings} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.05)', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                        <SettingsIcon />
+                                    </IconButton>
+                                </Tooltip>
                             )}
-                            <IconButton onClick={onClose} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.05)' }}>
-                                <CloseIcon />
-                            </IconButton>
+                            <Tooltip title="Close Lounge">
+                                <IconButton onClick={onClose} sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.05)', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                    <CloseIcon />
+                                </IconButton>
+                            </Tooltip>
                         </Box>
                     </Box>
 
