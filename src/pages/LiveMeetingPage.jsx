@@ -1872,6 +1872,21 @@ export default function NewLiveMeeting() {
   const [breakoutTimer, setBreakoutTimer] = useState(null);
   const [breakoutAnnouncement, setBreakoutAnnouncement] = useState("");
   const [showBreakoutAnnouncement, setShowBreakoutAnnouncement] = useState(false);
+  const [isBreakoutEnding, setIsBreakoutEnding] = useState(false); // ✅ Track when host ends breakout to clear timer immediately
+
+  // ✅ PHASE 1: Dual-Timer Foundation for Breakout Room Sessions
+  // Separate tracking for main room and breakout room timers
+  const [mainRoomElapsedSeconds, setMainRoomElapsedSeconds] = useState(0);
+  const [breakoutRoomElapsedSeconds, setBreakoutRoomElapsedSeconds] = useState(0);
+  const [activeTimerType, setActiveTimerType] = useState('main'); // 'main' or 'breakout'
+
+  // Refs to track timer state for accurate calculation
+  const mainRoomElapsedRef = useRef(0);
+  const breakoutRoomElapsedRef = useRef(0);
+  const mainRoomStartTimeRef = useRef(null);
+  const breakoutRoomStartTimeRef = useRef(null);
+  const lastMainRoomSyncRef = useRef(null); // Server sync timestamp for offline calculation
+  const lastBreakoutRoomSyncRef = useRef(null); // Server sync timestamp for offline calculation
 
   // ✅ NEW: Waiting Room Announcements State
   const waitingRoomAnnouncementsRef = useRef(null);
@@ -3126,6 +3141,15 @@ export default function NewLiveMeeting() {
 
         console.log("[LiveMeeting] Applying new breakout token");
 
+        // ✅ PHASE 2: RESET BREAKOUT TIMER ON JOIN
+        // When user joins breakout room, start fresh timer from 0
+        setBreakoutRoomElapsedSeconds(0);
+        breakoutRoomElapsedRef.current = 0;
+        breakoutRoomStartTimeRef.current = Date.now();
+        lastBreakoutRoomSyncRef.current = Date.now();
+        setActiveTimerType('breakout');
+        console.log("[LiveMeeting] ✅ Breakout timer reset to 0:00:00");
+
         // ✅ CRITICAL FIX: Set activeTableId FIRST to prevent race conditions with auto-rejoin effect
         // The auto-rejoin effect checks activeTableId to determine if it should trigger
         // If we set authToken first, it may trigger the effect before activeTableId is set
@@ -3178,6 +3202,16 @@ export default function NewLiveMeeting() {
         setInitDone(false);
         setRoomJoined(false);
         joinedOnceRef.current = false;
+
+        // ✅ PHASE 2: RESTORE MAIN ROOM TIMER ON RETURN
+        // When user returns from breakout, restore the main room timer and switch active timer
+        setActiveTimerType('main');
+        mainRoomStartTimeRef.current = Date.now();
+        lastMainRoomSyncRef.current = Date.now();
+        console.log("[LiveMeeting] ✅ Restored main room timer, current elapsed:", mainRoomElapsedRef.current, "seconds");
+
+        // ✅ TIMER STOP: Reset breakout ending flag so countdown resumes if applicable
+        setIsBreakoutEnding(false);
 
         setIsBreakout(false);
         isBreakoutRef.current = false;
@@ -4363,13 +4397,55 @@ export default function NewLiveMeeting() {
             showSnackbar(`Unable to send assistance request (${msg.reason || "unknown"}).`, "error");
           }
         } else if (msg.type === "breakout_timer") {
-          setBreakoutTimer(msg.duration);
+          // ✅ PHASE 3: ENHANCED DUAL-TIMER WEBSOCKET PROTOCOL
+          // Support both legacy (msg.duration) and new dual-timer format
+          const { duration, elapsedSeconds, activeRoom, mainRoomElapsed, startTime } = msg;
+
+          // Legacy support: if only duration provided, use old breakoutTimer
+          if (duration !== undefined && activeRoom === undefined) {
+            setBreakoutTimer(duration);
+            console.log("[MainSocket] Received legacy breakout_timer:", duration);
+          } else {
+            // ✅ New dual-timer format
+            console.log("[MainSocket] Received dual-timer update:", { activeRoom, breakoutRoomElapsed: elapsedSeconds, mainRoomElapsed, startTime });
+
+            // Sync breakout room timer if in breakout
+            if (activeRoom === 'breakout' && elapsedSeconds !== undefined) {
+              setBreakoutRoomElapsedSeconds(elapsedSeconds);
+              breakoutRoomElapsedRef.current = elapsedSeconds;
+              if (startTime) {
+                breakoutRoomStartTimeRef.current = startTime;
+                lastBreakoutRoomSyncRef.current = Date.now();
+              }
+            }
+
+            // Sync main room timer if we have it
+            if (mainRoomElapsed !== undefined && activeRoom !== 'breakout') {
+              setMainRoomElapsedSeconds(mainRoomElapsed);
+              mainRoomElapsedRef.current = mainRoomElapsed;
+              if (startTime) {
+                mainRoomStartTimeRef.current = startTime;
+                lastMainRoomSyncRef.current = Date.now();
+              }
+            }
+          }
         } else if (msg.type === "breakout_announcement") {
           setBreakoutAnnouncement(msg.message);
           setShowBreakoutAnnouncement(true);
         } else if (msg.type === "breakout_end") {
           // Host has ended all breakouts - return to main room
           console.log("[MainSocket] Received breakout_end - host ended all breakouts");
+
+          // ✅ IMMEDIATE TIMER STOP: Clear all timer states immediately before room transition
+          // This ensures timer stops in real-time without requiring refresh
+          console.log("[MainSocket] ✅ Stopping all breakout timers immediately");
+          setIsBreakoutEnding(true);
+          setBreakoutTimer(null); // Clear legacy timer
+          setBreakoutRoomElapsedSeconds(0); // Clear new dual-timer
+          breakoutRoomElapsedRef.current = 0;
+          breakoutRoomStartTimeRef.current = null;
+          setActiveTimerType('main'); // Switch back to main timer display
+
           // Check both isInBreakoutRoom state AND if user has an active table assigned
           // ✅ Use Refs to access current state inside stale closure
           const inBreakout = isInBreakoutRoomRef.current;
@@ -4385,7 +4461,9 @@ export default function NewLiveMeeting() {
               });
             }
           } else {
-            console.log("[MainSocket] Not in breakout, refreshing lounge state");
+            console.log("[MainSocket] Not in breakout, still clearing timers for consistency");
+            // Even if user is not in breakout, clear timers for late joiners
+            setIsBreakoutEnding(false);
           }
         } else if (msg.type === "late_joiner_notification") {
           // Host gets a notification that a new participant joined during breakout
@@ -5132,6 +5210,106 @@ export default function NewLiveMeeting() {
 
     return () => clearInterval(interval);
   }, [breakoutTimer]);
+
+  // ✅ PHASE 3: DUAL-TIMER COUNTDOWN EFFECT
+  // Handles continuous countdown for both main room and breakout room timers
+  // Uses refs to track local elapsed time and syncs with server updates
+  // ✅ TIMER STOP: Stops immediately when host ends breakout room
+  useEffect(() => {
+    // Stop countdown if breakout is ending or user not in active room
+    if (isBreakoutEnding || (!isInBreakoutRoomRef.current && !roomJoinedRef.current)) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+
+      // ✅ TIMER STOP: Re-check isBreakoutEnding every tick to stop immediately
+      if (isBreakoutEnding) {
+        clearInterval(interval);
+        return;
+      }
+
+      if (activeTimerType === 'breakout' && breakoutRoomStartTimeRef.current) {
+        // Breakout room timer: increment from start time
+        const elapsed = Math.floor((now - breakoutRoomStartTimeRef.current) / 1000);
+        setBreakoutRoomElapsedSeconds(elapsed);
+        breakoutRoomElapsedRef.current = elapsed;
+      } else if (activeTimerType === 'main' && mainRoomStartTimeRef.current) {
+        // Main room timer: increment from stored elapsed + start time
+        const elapsed = mainRoomElapsedRef.current + Math.floor((now - mainRoomStartTimeRef.current) / 1000);
+        setMainRoomElapsedSeconds(elapsed);
+        mainRoomElapsedRef.current = elapsed;
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeTimerType, isInBreakoutRoom, roomJoined, isBreakoutEnding]);
+
+  // ✅ PHASE 3: RECONNECT SYNC EFFECT
+  // Re-syncs timers with server after connection loss
+  useEffect(() => {
+    if (!mainSocketRef.current) return;
+
+    const handleReconnect = () => {
+      console.log('[LiveMeeting] ✅ Socket reconnected, syncing timers with server');
+
+      // Request timer sync from server
+      if (activeTimerType === 'breakout' && isInBreakoutRoomRef.current) {
+        mainSocketRef.current?.emit('action', {
+          action: 'request_timer_sync',
+          room_type: 'breakout',
+          elapsed_seconds: breakoutRoomElapsedRef.current,
+        });
+      } else if (activeTimerType === 'main' && roomJoinedRef.current) {
+        mainSocketRef.current?.emit('action', {
+          action: 'request_timer_sync',
+          room_type: 'main',
+          elapsed_seconds: mainRoomElapsedRef.current,
+        });
+      }
+    };
+
+    // Listen for reconnect event
+    mainSocketRef.current?.on?.('reconnect', handleReconnect);
+    mainSocketRef.current?.on?.('connect', handleReconnect);
+
+    return () => {
+      mainSocketRef.current?.off?.('reconnect', handleReconnect);
+      mainSocketRef.current?.off?.('connect', handleReconnect);
+    };
+  }, [activeTimerType, isInBreakoutRoom, roomJoined]);
+
+  // ✅ TIMER STOP: Handle Edge Cases (Host Disconnect, Late Joins)
+  // If host disconnects during breakout, timer should stop to avoid confusion
+  // If user joins late and breakout has ended, timer should not be visible
+  useEffect(() => {
+    if (!mainSocketRef.current) return;
+
+    const handleSocketDisconnect = () => {
+      console.log('[LiveMeeting] ⚠️ Socket disconnected, stopping breakout timer if active');
+      // If we're in breakout and socket disconnects, pause the timer countdown
+      // until we can confirm breakout status from server
+      if (isInBreakoutRoomRef.current && !isBreakoutEnding) {
+        setIsBreakoutEnding(true);
+        console.log('[LiveMeeting] Paused breakout timer due to socket disconnect');
+      }
+    };
+
+    const handleSocketConnect = () => {
+      // Reset pause flag on reconnect - the reconnect sync effect will handle timer validation
+      if (isBreakoutEnding && isInBreakoutRoomRef.current) {
+        setIsBreakoutEnding(false);
+        console.log('[LiveMeeting] Resumed breakout timer after socket reconnect');
+      }
+    };
+
+    mainSocketRef.current?.on?.('disconnect', handleSocketDisconnect);
+    mainSocketRef.current?.on?.('connect', handleSocketConnect);
+
+    return () => {
+      mainSocketRef.current?.off?.('disconnect', handleSocketDisconnect);
+      mainSocketRef.current?.off?.('connect', handleSocketConnect);
+    };
+  }, [isBreakoutEnding, isInBreakoutRoom]);
 
   // ---------- Init Dyte meeting ----------
   useEffect(() => {
@@ -11681,8 +11859,8 @@ export default function NewLiveMeeting() {
               position: "relative",    // ✅ For absolute centering of timer
             }}
           >
-            {/* ✅ Breakout Timer Centered in Header */}
-            {breakoutTimer !== null && breakoutTimer > 0 && (
+            {/* ✅ Breakout Timer Centered in Header - TIMER STOP: Hidden when host ends breakout */}
+            {breakoutTimer !== null && breakoutTimer > 0 && !isBreakoutEnding && (
               <Box
                 sx={{
                   position: "absolute",
