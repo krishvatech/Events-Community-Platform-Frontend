@@ -3740,6 +3740,46 @@ export default function GroupManagePage() {
         return null;
     }, [group?.current_user?.id, group?.current_user_id]);
 
+    const user = React.useMemo(() => {
+        try {
+            const data = localStorage.getItem("user");
+            return data ? JSON.parse(data) : {};
+        } catch (e) {
+            return {};
+        }
+    }, []);
+
+    // Promotion to Main Group
+    const [promoteDialogOpen, setPromoteDialogOpen] = React.useState(false);
+    const [isPromoting, setIsPromoting] = React.useState(false);
+
+    const handleOpenPromoteDialog = () => setPromoteDialogOpen(true);
+
+    const promoteToMain = async () => {
+        if (!group?.id) return;
+        setIsPromoting(true);
+        try {
+            const res = await fetch(`${API_ROOT}/groups/${group.id}/promote-to-main/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: "{}",
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
+
+            showMessage("Group promoted to independent main group!", "success");
+            setGroup(data); // Update with new data (parent should be null)
+            setPromoteDialogOpen(false);
+        } catch (e) {
+            showMessage(e?.message || "Failed to promote group.", "error");
+        } finally {
+            setIsPromoting(false);
+        }
+    };
+
     // ---- Role helpers for permissions ----
     const myRole = group?.current_user_role || "member";
     const isOwnerRole = myRole === "owner";
@@ -5130,6 +5170,42 @@ export default function GroupManagePage() {
                                         </Stack>
                                         <Divider className="my-3" />
 
+                                        <Divider className="my-3" />
+
+                                        {/* Danger Zone: Only for Sub-groups + Superusers */}
+                                        {isChildGroup && user?.is_superuser && (
+                                            <>
+                                                <Box sx={{ mb: 3 }}>
+                                                    <Typography variant="h6" className="mt-2 mb-3 font-bold text-red-700">
+                                                        Danger Zone
+                                                    </Typography>
+                                                    <Paper variant="outlined" sx={{ p: 3, bgcolor: "#fff0f0", borderColor: "#fecaca" }}>
+                                                        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2}>
+                                                            <Box>
+                                                                <Typography variant="subtitle1" className="font-semibold text-red-900">
+                                                                    Make independent main group
+                                                                </Typography>
+                                                                <Typography variant="body2" className="text-red-700">
+                                                                    Detach this group from its parent. It will become a top-level group.
+                                                                </Typography>
+                                                            </Box>
+                                                            <Button
+                                                                variant="contained"
+                                                                color="error"
+                                                                onClick={handleOpenPromoteDialog}
+                                                                disabled={isPromoting}
+                                                                startIcon={isPromoting ? <CircularProgress size={16} color="inherit" /> : null}
+                                                                sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+                                                            >
+                                                                Promote to Main
+                                                            </Button>
+                                                        </Stack>
+                                                    </Paper>
+                                                </Box>
+                                                <Divider className="my-3" />
+                                            </>
+                                        )}
+
                                         <Stack direction="row" spacing={1}>
                                             {canEditGroup && (
                                                 <Button
@@ -6301,6 +6377,31 @@ export default function GroupManagePage() {
                         <Button onClick={() => setLeaveGroupOpen(false)}>Cancel</Button>
                         <Button onClick={handleLeaveGroup} color="error" variant="contained">
                             Confirm Leave
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                <Dialog open={promoteDialogOpen} onClose={() => setPromoteDialogOpen(false)}>
+                    <DialogTitle className="text-red-700">Promote to Main Group?</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            Are you sure you want to promote <b>{group?.name}</b> to be an independent main group?
+                            <br /><br />
+                            This will <b>detach</b> it from its current parent group. This action cannot be easily undone by group admins.
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setPromoteDialogOpen(false)} disabled={isPromoting} sx={{ textTransform: "none" }}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={promoteToMain}
+                            color="error"
+                            variant="contained"
+                            disabled={isPromoting}
+                            sx={{ textTransform: "none" }}
+                        >
+                            {isPromoting ? "Promoting..." : "Confirm Promotion"}
                         </Button>
                     </DialogActions>
                 </Dialog>
