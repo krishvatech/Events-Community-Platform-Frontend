@@ -506,6 +506,20 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             />
 
             <TextField
+                label="Slug *"
+                placeholder="enter-event-slug"
+                value={slug}
+                onChange={(e) => {
+                    setSlug(slugifyLocal(e.target.value));
+                    setErrors((prev) => ({ ...prev, slug: "" }));
+                }}
+                fullWidth
+                className="mb-3"
+                error={!!errors.slug}
+                helperText={errors.slug || "Use lowercase letters, numbers, and hyphens."}
+            />
+
+            <TextField
                 label="Format"
                 select
                 value={format}
@@ -670,10 +684,6 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                         sx={{ mt: 0.5, mb: 2 }}
                     />
 
-                    {/* keep slug hidden but present */}
-                    <Box sx={{ display: "none" }}>
-                        <TextField label="Slug *" value={slug} onChange={(e) => setSlug(slugifyLocal(e.target.value))} />
-                    </Box>
                 </Grid>
 
                 {/* Images Row - Three Equal Columns */}

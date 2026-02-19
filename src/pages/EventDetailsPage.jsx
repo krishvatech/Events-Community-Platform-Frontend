@@ -1,6 +1,6 @@
 // src/pages/EventDetailsPage.jsx
 import React, { useEffect, useState } from "react";
-import { Link, useParams, useLocation } from "react-router-dom";
+import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Button,
@@ -180,6 +180,7 @@ function a11yProps(index) {
 
 export default function EventDetailsPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const token =
     localStorage.getItem("access_token") ||
     localStorage.getItem("access") ||
@@ -192,6 +193,7 @@ export default function EventDetailsPage() {
   const [event, setEvent] = useState(preload || null);
   const [loading, setLoading] = useState(!preload);
   const [error, setError] = useState(null);
+  const [notFound, setNotFound] = useState(false);
 
   // Participant List Dialog
   const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
@@ -286,26 +288,59 @@ export default function EventDetailsPage() {
     let cancelled = false;
     (async () => {
       try {
-        // Uses the backend filter ?event={id}
-        const res = await fetch(`${API_BASE}/event-registrations/?event=${event.id}`, {
+        // Fetch only the current user's registrations, then pick this event.
+        const res = await fetch(`${API_BASE}/event-registrations/mine/`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
           const results = Array.isArray(data) ? data : (data.results || []);
-          if (results.length > 0) setRegistration(results[0]);
+          const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event.id));
+          setRegistration(mineForEvent || null);
         }
       } catch { }
     })();
     return () => { cancelled = true; };
   }, [event?.id, token]);
 
+  const handleRegister = async () => {
+    if (!event?.id) return;
+    if (!token) {
+      navigate(`/signin?next=/events/${slug}`);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/events/${event.id}/register/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!res.ok) return;
+
+      const mineRes = await fetch(`${API_BASE}/event-registrations/mine/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (mineRes.ok) {
+        const data = await mineRes.json();
+        const results = Array.isArray(data) ? data : (data.results || []);
+        const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event.id));
+        setRegistration(mineForEvent || null);
+      }
+    } catch (_) { }
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function fetchEvent() {
       setLoading(true);
       setError(null);
+      setNotFound(false);
       try {
         // If we came from a list and have the ID, fetch by ID only (avoid slug 404 spam)
         if (fallbackId) {
@@ -321,6 +356,9 @@ export default function EventDetailsPage() {
             setEvent(await res.json());
             setLoading(false);
             return;
+          }
+          if (res.status === 404) {
+            setNotFound(true);
           }
           setError(`Couldn’t load event (HTTP ${res.status}) by id.`);
           setLoading(false);
@@ -340,10 +378,14 @@ export default function EventDetailsPage() {
           setLoading(false);
           return;
         }
+        if (resSlug.status === 404) {
+          setNotFound(true);
+        }
         setError(`Couldn’t load event (HTTP ${resSlug.status}) by slug.`);
         setLoading(false);
       } catch (e) {
         if (!cancelled) {
+          setNotFound(false);
           setError("Network error while loading event.");
           setLoading(false);
         }
@@ -393,6 +435,33 @@ export default function EventDetailsPage() {
   if (loading) {
     return <EventDetailsSkeleton />;
   }
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Container maxWidth="xl" className="py-6 sm:py-8">
+          <Paper elevation={0} className="rounded-2xl border border-slate-200 p-8">
+            <Typography variant="h4" fontWeight={800} sx={{ mb: 1 }}>
+              404
+            </Typography>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+              Event not found
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              The event slug in the URL does not exist or is no longer available.
+            </Typography>
+            <Stack direction="row" spacing={1.5}>
+              <Button component={Link} to="/events" variant="contained" sx={{ textTransform: "none" }}>
+                Go to Events
+              </Button>
+              <Button component={Link} to="/account/events" variant="outlined" sx={{ textTransform: "none" }}>
+                My Events
+              </Button>
+            </Stack>
+          </Paper>
+        </Container>
+      </div>
+    );
+  }
   if (!event) return null;
   const status = computeStatus(event);
   const chip = status === "live"
@@ -410,6 +479,7 @@ export default function EventDetailsPage() {
   const isPreEventLounge = isPreEventLoungeOpen(event);
 
   const canShowActiveJoin = isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+  const canJoinEventNow = isHost || Boolean(registration);
   const canWatch = isPast && !!event.recording_url;
   const desc = event?.description ?? "";
 
@@ -733,7 +803,7 @@ export default function EventDetailsPage() {
                           </Box>
                         )}
 
-                        {canShowActiveJoin ? (
+                        {canShowActiveJoin && canJoinEventNow ? (
                           <Button
                             component={Link}
                             to={livePath}
@@ -747,6 +817,19 @@ export default function EventDetailsPage() {
                             variant="contained"
                           >
                             {isHost ? "Join as Host" : getJoinButtonText(event, isLive, false)}
+                          </Button>
+                        ) : !canJoinEventNow && !isPast ? (
+                          <Button
+                            onClick={handleRegister}
+                            variant="contained"
+                            sx={{
+                              textTransform: "none",
+                              backgroundColor: "#10b8a6",
+                              "&:hover": { backgroundColor: "#0ea5a4" },
+                            }}
+                            className="rounded-xl"
+                          >
+                            Register Now
                           </Button>
                         ) : canWatch ? (
                           <Button

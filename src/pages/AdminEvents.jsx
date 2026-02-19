@@ -185,6 +185,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
   // Event fields
   const [title, setTitle] = React.useState("");
   const [slug, setSlug] = React.useState("");
+  const [slugStatus, setSlugStatus] = React.useState({ checking: false, available: null });
   const [description, setDescription] = React.useState("");
   const [location, setLocation] = React.useState("Germany");
   const [category, setCategory] = React.useState("Workshop");
@@ -368,6 +369,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     const e = {};
     if (!title.trim()) e.title = "Required";
     if (!slug.trim()) e.slug = "Required";
+    else if (slugStatus.checking) e.slug = "Checking slug availability. Please wait.";
+    else if (slugStatus.available === false) e.slug = "This slug is already taken.";
     if (["in_person", "hybrid"].includes(format) && !location.trim()) e.location = "Required";
     if (!description.trim()) e.description = "Required";
     const priceValue = Number(price);
@@ -395,6 +398,44 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     setErrors(e);
     return Object.keys(e).length === 0;
   };
+
+  React.useEffect(() => {
+    const candidate = String(slug || "").trim();
+    if (!candidate) {
+      setSlugStatus({ checking: false, available: null });
+      return;
+    }
+
+    const controller = new AbortController();
+    setSlugStatus({ checking: true, available: null });
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${API_ROOT}/events/slug-availability/?slug=${encodeURIComponent(candidate)}`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            signal: controller.signal,
+          }
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setSlugStatus({ checking: false, available: null });
+          return;
+        }
+        setSlugStatus({ checking: false, available: Boolean(json?.available) });
+      } catch (err) {
+        if (err?.name !== "AbortError") {
+          setSlugStatus({ checking: false, available: null });
+        }
+      }
+    }, 350);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [slug, token]);
 
   const submit = async () => {
     if (!validate()) return;
@@ -701,6 +742,30 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           />
 
           <TextField
+            label="Slug *"
+            placeholder="enter-event-slug"
+            InputLabelProps={{ shrink: true }}
+            value={slug}
+            onChange={(e) => {
+              setSlug(slugifyLocal(e.target.value));
+              setErrors((prev) => ({ ...prev, slug: "" }));
+            }}
+            fullWidth
+            error={!!errors.slug || slugStatus.available === false}
+            helperText={
+              errors.slug ||
+              (slugStatus.checking
+                ? "Checking slug availability..."
+                : slugStatus.available === true
+                  ? "Slug is available."
+                  : slugStatus.available === false
+                    ? "This slug is already taken."
+                    : "Use lowercase letters, numbers, and hyphens.")
+            }
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
             label="Format"
             select
             value={format}
@@ -885,11 +950,6 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             />
           </Grid>
         </Grid>
-
-        {/* hidden slug */}
-        <Box sx={{ display: "none" }}>
-          <TextField label="Slug *" value={slug} onChange={(e) => setSlug(slugifyLocal(e.target.value))} />
-        </Box>
 
         {/* Images Row - Three Equal Columns */}
         <Box

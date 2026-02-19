@@ -46,13 +46,14 @@ import EventManagePage from "./pages/EventManagePage.jsx";
 import AdminCarts from "./pages/AdminCarts.jsx";
 import AdminNameRequestsPage from "./pages/AdminNameRequestsPage.jsx";
 import KYCCallbackPage from "./pages/KYCCallbackPage.jsx";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import SocialOAuthCallback from "./pages/SocialOAuthCallback.jsx";
 import CognitoOAuthCallback from "./pages/CognitoOAuthCallback.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import CmsBridge from "./pages/CmsBridge.jsx";
 import AdminRecordingDetailsPage from "./pages/AdminRecordingDetailsPage.jsx";
+import { CircularProgress } from "@mui/material";
 
 
 function RedirectGroupToAdmin() {
@@ -63,6 +64,45 @@ function RedirectGroupToAdmin() {
 function RedirectGroupDetailsToAdmin() {
   const { groupId } = useParams();
   return <Navigate to={`/admin/community/groups/${groupId}`} replace />;
+}
+
+// Redirect numeric event IDs to slug-based URLs
+function EventIdRedirect() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    // Only redirect if id is numeric
+    if (!/^\d+$/.test(id)) {
+      navigate('/events', { replace: true });
+      return;
+    }
+
+    const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+
+    fetch(`${API_BASE}/events/${id}/`)
+      .then(r => {
+        if (!r.ok) throw new Error('Not found');
+        return r.json();
+      })
+      .then(event => {
+        if (event.slug) {
+          navigate(`/events/${event.slug}`, { replace: true });
+        } else {
+          navigate('/events', { replace: true });
+        }
+      })
+      .catch(() => {
+        navigate('/events', { replace: true });
+      })
+      .finally(() => setLoading(false));
+  }, [id, navigate]);
+
+  if (loading) {
+    return <CircularProgress sx={{ display: 'block', margin: '50px auto' }} />;
+  }
+  return null;
 }
 
 // Auth helper
@@ -186,7 +226,8 @@ const AppShell = () => {
           </Route>
           <Route path="community/groups/:groupId" element={<GroupDetailsPage />} />
           <Route path="/events" element={<EventsPage />} />
-          <Route path="/events/:id" element={<EventDetailsPage />} />
+          <Route path="/events/:slug" element={<EventDetailsPage />} />
+          <Route path="/events/:id" element={<EventIdRedirect />} />
           <Route path="/account/cart" element={<MyCartPage />} />
           <Route path="/community" element={<CommunityHubPage />} />
           <Route path="/groups/:idOrSlug" element={<RequireAuth><RedirectGroupToAdmin /></RequireAuth>} />
@@ -195,7 +236,7 @@ const AppShell = () => {
 
           {/* My Events list and details */}
           <Route path="/account/events" element={<RequireAuth><MyEventsPage /></RequireAuth>} />
-          <Route path="/account/events/:id" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
+          <Route path="/account/events/:slug" element={<RequireAuth><EventDetailsPage /></RequireAuth>} />
 
           {/* LIVE meeting page — no header/footer */}
           <Route path="/live/:meetingId" element={<RequireAuth><LiveMeetingPage /></RequireAuth>} />

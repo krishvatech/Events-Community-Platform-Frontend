@@ -60,16 +60,21 @@ import { ThemeProvider, StyledEngineProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './muiTheme';
 
+// SEO provider
+import { HelmetProvider } from 'react-helmet-async';
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
-        {/* Keep Tailwind look exactly the same; CssBaseline only normalizes defaults */}
-        <CssBaseline />
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ThemeProvider>
-    </StyledEngineProvider>
+    <HelmetProvider>
+      <StyledEngineProvider injectFirst>
+        <ThemeProvider theme={theme}>
+          {/* Keep Tailwind look exactly the same; CssBaseline only normalizes defaults */}
+          <CssBaseline />
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </ThemeProvider>
+      </StyledEngineProvider>
+    </HelmetProvider>
   </React.StrictMode>
 );
