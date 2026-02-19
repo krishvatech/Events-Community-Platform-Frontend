@@ -78,6 +78,14 @@ const ENDPOINTS = {
   verificationRequestDecide: (id) => `${API_ROOT}/users/admin/verification-request/${id}/decide/`,
 };
 
+// ---- Helpers ----
+// Returns the best display name for a user_details object.
+// Priority: first+last name → full_name → username → "User"
+const getUserDisplayName = (u) => {
+  const name = `${u?.first_name || ""} ${u?.last_name || ""}`.trim();
+  return name || u?.full_name || u?.username || "User";
+};
+
 // ---- Data Loaders ----
 async function loadNameChangeRequests() {
   // ✅ Staff should not call superuser-only endpoint
@@ -125,8 +133,8 @@ async function loadVerificationRequests() {
       type: "verification_request",
       status: req.status,
       created_at: req.created_at,
-      actor_name: req.user_details?.username || req.user_details?.full_name || "User",
-      actor_avatar: req.user_details?.user_image_url || "",
+      actor_name: getUserDisplayName(req.user_details),
+      actor_avatar: req.user_details?.avatar_url || req.user_details?.user_image_url || "",
       user_id: req.user,
       data: {
         reason: req.reason

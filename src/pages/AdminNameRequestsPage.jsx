@@ -85,6 +85,13 @@ const getKYCStatusColor = (status) => {
   }
 };
 
+// Returns the best display name for a user_details object.
+// Priority: first+last name → full_name → username → "User"
+const getUserDisplayName = (u) => {
+  const name = `${u?.first_name || ""} ${u?.last_name || ""}`.trim();
+  return name || u?.full_name || u?.username || "User";
+};
+
 function TabPanel({ children, value, index }) {
   return (
     <div role="tabpanel" hidden={value !== index}>
@@ -909,14 +916,16 @@ export default function AdminNameRequestsPage() {
                       <TableRow key={req.id} hover>
                         <TableCell>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <Avatar src={req.user_details?.avatar || ""} alt={req.user_details?.first_name}>
-                              {(req.user_details?.first_name || "U")[0]}
+                            <Avatar src={req.user_details?.avatar_url || req.user_details?.avatar || ""} alt={req.user_details?.first_name}>
+                              {getUserDisplayName(req.user_details)[0]?.toUpperCase() || "U"}
                             </Avatar>
                             <Box>
                               <Typography variant="body2" fontWeight={500}>
-                                {req.user_details?.full_name || req.user_details?.username}
+                                {getUserDisplayName(req.user_details)}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary">{req.user_details?.email}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {req.user_details?.username ? `@${req.user_details.username}` : req.user_details?.email}
+                              </Typography>
                             </Box>
                           </Box>
                         </TableCell>
