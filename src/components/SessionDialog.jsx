@@ -189,7 +189,7 @@ function SessionDialog({
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
 
     const start = startDate.hour(startTime.hour()).minute(startTime.minute());
@@ -220,8 +220,12 @@ function SessionDialog({
       _endTime: endTime.format("HH:mm"),
     };
 
-    onSubmit(sessionData);
-    onClose();
+    try {
+      await onSubmit(sessionData);
+      onClose();
+    } catch (e) {
+      // Parent handles toast/error state. Keep dialog open so user can correct input.
+    }
   };
 
   return (
