@@ -1292,51 +1292,55 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           </Grid>
 
           <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker
-                  label="Start time *"
-                  ampm
-                  minutesStep={1}
-                  disabled={isMultiDay}
-                  value={dayjs(`1970-01-01T${startTime}`)}
-                  onChange={(v) => {
-                    const newStart = v ? dayjs(v).second(0).format("HH:mm") : startTime;
-                    console.log("⏰ Start Time Changed:", {
-                      dayjsValue: v ? dayjs(v).toString() : null,
-                      previousStartTime: startTime,
-                      newStartTime: newStart,
-                      formatted: v ? dayjs(v).second(0).format("HH:mm") : "null"
-                    });
-                    console.trace("🔴 setStartTime STACK TRACE:");
-                    setStartTime(newStart);
-                    // Removed auto-calculation to let user set times manually
-                  }}
-                  slotProps={{ textField: { fullWidth: true } }} />
-              </LocalizationProvider>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker
-                  label="End time *"
-                  ampm
-                  minutesStep={1}
-                  disabled={isMultiDay}
-                  value={dayjs(`1970-01-01T${endTime}`)}
-                  onChange={(v) => {
-                    const newEnd = v ? dayjs(v).second(0).format("HH:mm") : endTime;
-                    console.log("⏰ End Time Changed:", {
-                      dayjsValue: v ? dayjs(v).toString() : null,
-                      previousEndTime: endTime,
-                      newEndTime: newEnd,
-                      formatted: v ? dayjs(v).second(0).format("HH:mm") : "null"
-                    });
-                    setEndTime(newEnd);
-                    // Removed auto-date-advancement logic to give user full control
-                  }}
-                  slotProps={{ textField: { fullWidth: true } }} />
-              </LocalizationProvider>
-            </Grid>
+            {!isMultiDay && (
+              <>
+                <Grid item xs={12} md={4}>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <TimePicker
+                      label="Start time *"
+                      ampm
+                      minutesStep={1}
+                      disabled={isMultiDay}
+                      value={dayjs(`1970-01-01T${startTime}`)}
+                      onChange={(v) => {
+                        const newStart = v ? dayjs(v).second(0).format("HH:mm") : startTime;
+                        console.log("⏰ Start Time Changed:", {
+                          dayjsValue: v ? dayjs(v).toString() : null,
+                          previousStartTime: startTime,
+                          newStartTime: newStart,
+                          formatted: v ? dayjs(v).second(0).format("HH:mm") : "null"
+                        });
+                        console.trace("🔴 setStartTime STACK TRACE:");
+                        setStartTime(newStart);
+                        // Removed auto-calculation to let user set times manually
+                      }}
+                      slotProps={{ textField: { fullWidth: true } }} />
+                  </LocalizationProvider>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <TimePicker
+                      label="End time *"
+                      ampm
+                      minutesStep={1}
+                      disabled={isMultiDay}
+                      value={dayjs(`1970-01-01T${endTime}`)}
+                      onChange={(v) => {
+                        const newEnd = v ? dayjs(v).second(0).format("HH:mm") : endTime;
+                        console.log("⏰ End Time Changed:", {
+                          dayjsValue: v ? dayjs(v).toString() : null,
+                          previousEndTime: endTime,
+                          newEndTime: newEnd,
+                          formatted: v ? dayjs(v).second(0).format("HH:mm") : "null"
+                        });
+                        setEndTime(newEnd);
+                        // Removed auto-date-advancement logic to give user full control
+                      }}
+                      slotProps={{ textField: { fullWidth: true } }} />
+                  </LocalizationProvider>
+                </Grid>
+              </>
+            )}
             <Grid item xs={12} md={4}>
               <Autocomplete
                 fullWidth
