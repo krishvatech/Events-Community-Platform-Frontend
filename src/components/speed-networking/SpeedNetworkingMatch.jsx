@@ -75,8 +75,8 @@ export default function SpeedNetworkingMatch({
             initMeeting({
                 authToken: match.dyte_token,
                 defaults: {
-                    audio: true,
-                    video: true,
+                    audio: false,
+                    video: false,
                 },
             });
             setVideoError(null);
