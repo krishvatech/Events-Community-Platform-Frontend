@@ -250,6 +250,66 @@ const normalizeMessages = (data) => {
   return [...rows].sort(byTimeAsc);
 };
 
+const getMessageEventId = (m) =>
+  m?.event_id ??
+  (typeof m?.event === "object" ? m.event?.id : m?.event) ??
+  null;
+
+const formatEventDateLabel = (eventObj) => {
+  const source =
+    eventObj?.start_time ||
+    eventObj?.start_date ||
+    eventObj?.date ||
+    eventObj?.created_at;
+  if (!source) return "Date unavailable";
+  const dt = new Date(source);
+  if (Number.isNaN(dt.getTime())) return "Date unavailable";
+  return dt.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+};
+
+const formatThreadMessageTime = (currentMsg, prevMsg) => {
+  const ts = currentMsg?.created_at;
+  if (!ts) return "";
+  const now = new Date(ts);
+  if (Number.isNaN(now.getTime())) return "";
+
+  if (!prevMsg) {
+    return now.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  const prev = new Date(prevMsg?.created_at);
+  if (Number.isNaN(prev.getTime())) {
+    return now.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  const sameDay = now.toDateString() === prev.toDateString();
+  const sameEvent = String(getMessageEventId(currentMsg) || "") === String(getMessageEventId(prevMsg) || "");
+
+  if (sameDay && sameEvent) {
+    return now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  return now.toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const getMessageAttachments = (msg) => {
   const arr = Array.isArray(msg?.attachments) ? msg.attachments : [];
   return arr;
@@ -698,6 +758,7 @@ export default function AdminMessagesPage() {
   const [selectedUserId, setSelectedUserId] = React.useState(null);
 
   const [messages, setMessages] = React.useState([]);
+  const [eventMetaById, setEventMetaById] = React.useState({});
   const [loadingMessages, setLoadingMessages] = React.useState(false);
   const [pinned, setPinned] = React.useState([]);
   const [pinsExpanded, setPinsExpanded] = React.useState(false);
@@ -758,6 +819,89 @@ export default function AdminMessagesPage() {
       return {};
     }
   }, []);
+
+  React.useEffect(() => {
+    const eventIds = Array.from(
+      new Set(
+        (messages || [])
+          .map((m) => getMessageEventId(m))
+          .filter((id) => id !== null && id !== undefined && id !== "")
+      )
+    );
+    if (!eventIds.length) return;
+
+    const missing = eventIds.filter((id) => !eventMetaById[id]);
+    if (!missing.length) return;
+
+    let alive = true;
+    (async () => {
+      const fetched = {};
+      await Promise.all(
+        missing.map(async (id) => {
+          try {
+            const res = await fetch(`${API_ROOT}/events/${id}/`, {
+              headers: { Accept: "application/json", ...authHeader() },
+            });
+            if (!res.ok) return;
+            const data = await res.json().catch(() => null);
+            if (data) fetched[id] = data;
+          } catch {
+            // ignore
+          }
+        })
+      );
+      if (!alive || !Object.keys(fetched).length) return;
+      setEventMetaById((prev) => ({ ...prev, ...fetched }));
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [messages, eventMetaById]);
+
+  const timelineMessages = React.useMemo(() => {
+    const rows = Array.isArray(messages) ? messages : [];
+    if (!rows.length) return [];
+
+    const out = [];
+    for (let i = 0; i < rows.length; i += 1) {
+      const m = rows[i];
+      const prev = i > 0 ? rows[i - 1] : null;
+      const next = i < rows.length - 1 ? rows[i + 1] : null;
+
+      const eventId = getMessageEventId(m);
+      const prevEventId = getMessageEventId(prev);
+      const nextEventId = getMessageEventId(next);
+
+      if (eventId && eventId !== prevEventId) {
+        const ev = eventMetaById[eventId] || {};
+        const eventName = ev?.title || ev?.name || `Event ${eventId}`;
+        out.push({
+          id: `sys-start-${eventId}-${m.id}`,
+          _system: true,
+          _systemText: `Messages exchanged during: ${eventName} | ${formatEventDateLabel(ev)}`,
+          created_at: m.created_at,
+        });
+      }
+
+      out.push({
+        ...m,
+        _displayTime: formatThreadMessageTime(m, prev),
+      });
+
+      if (eventId && eventId !== nextEventId) {
+        const ev = eventMetaById[eventId] || {};
+        const eventName = ev?.title || ev?.name || `Event ${eventId}`;
+        out.push({
+          id: `sys-end-${eventId}-${m.id}`,
+          _system: true,
+          _systemText: `Event Ended - ${eventName} | ${formatEventDateLabel(ev)}`,
+          created_at: m.created_at,
+        });
+      }
+    }
+    return out;
+  }, [messages, eventMetaById]);
 
   // load staff (for New Chat)
   const fetchUsers = React.useCallback(async () => {
@@ -2311,7 +2455,7 @@ export default function AdminMessagesPage() {
                       let lastDateKey = null;
                       const meId = me?.id;
 
-                      messages.forEach((m, idx) => {
+                      timelineMessages.forEach((m, idx) => {
                         const created = m.created_at
                           ? new Date(m.created_at)
                           : null;
@@ -2367,6 +2511,31 @@ export default function AdminMessagesPage() {
                           );
                         }
 
+                        if (m._system) {
+                          elems.push(
+                            <Box
+                              key={m.id ?? `sys-${idx}`}
+                              sx={{ textAlign: "center", px: 1, mb: 1 }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  fontSize: 11,
+                                  px: 1.25,
+                                  py: 0.5,
+                                  borderRadius: 999,
+                                  border: "1px solid rgba(148,163,184,0.45)",
+                                  bgcolor: "#f8fafc",
+                                  color: "text.secondary",
+                                }}
+                              >
+                                {m._systemText}
+                              </Typography>
+                            </Box>
+                          );
+                          return;
+                        }
+
                         // ---- message bubble with avatar + time ----
                         const senderId = m.sender_id ?? (typeof m.sender === 'object' ? m.sender?.id : m.sender) ?? m.user_id ?? (typeof m.user === 'object' ? m.user?.id : m.user);
 
@@ -2379,12 +2548,7 @@ export default function AdminMessagesPage() {
                           (!isGroupChat && activeTarget?.id && !isPartner && !!senderId);
 
                         const body = m.body || m.text || m.message || "";
-                        const timeStr = created
-                          ? created.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                          : "";
+                        const timeStr = m._displayTime || "";
 
                         const senderName = mine
                           ? "You"

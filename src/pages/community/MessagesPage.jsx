@@ -791,6 +791,66 @@ const shortPreview = (text, max = 28) => {
   return cleaned.slice(0, max) + "…";
 };
 
+const getMessageEventId = (m) =>
+  m?.event_id ??
+  (typeof m?.event === "object" ? m.event?.id : m?.event) ??
+  null;
+
+const formatEventDateLabel = (eventObj) => {
+  const source =
+    eventObj?.start_time ||
+    eventObj?.start_date ||
+    eventObj?.date ||
+    eventObj?.created_at;
+  if (!source) return "Date unavailable";
+  const dt = new Date(source);
+  if (Number.isNaN(dt.getTime())) return "Date unavailable";
+  return dt.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+};
+
+const formatThreadMessageTime = (currentMsg, prevMsg) => {
+  const ts = currentMsg?.created_at;
+  if (!ts) return "";
+  const now = new Date(ts);
+  if (Number.isNaN(now.getTime())) return "";
+
+  if (!prevMsg) {
+    return now.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  const prev = new Date(prevMsg?.created_at);
+  if (Number.isNaN(prev.getTime())) {
+    return now.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  const sameDay = now.toDateString() === prev.toDateString();
+  const sameEvent = String(getMessageEventId(currentMsg) || "") === String(getMessageEventId(prevMsg) || "");
+
+  if (sameDay && sameEvent) {
+    return now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  return now.toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 
 
 const isDmThread = (thread) => {
@@ -1730,6 +1790,7 @@ export default function MessagesPage() {
 
   // CENTER: chat
   const [messages, setMessages] = React.useState([]); // API: /conversations/:id/messages/
+  const [eventMetaById, setEventMetaById] = React.useState({});
   const [pinned, setPinned] = React.useState([]);
   const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
   const [menuMessage, setMenuMessage] = React.useState(null);
@@ -1881,6 +1942,10 @@ export default function MessagesPage() {
         out.push({
           id: key,
           body: m.body ?? m.text ?? m.message ?? "",
+          event_id:
+            m.event_id ??
+            (typeof m.event === "object" ? m.event?.id : m.event) ??
+            null,
           sender_id:
             m.sender_id ??
             m.user_id ??
@@ -1912,6 +1977,50 @@ export default function MessagesPage() {
   }, [pinned, messages]);
 
 
+  const timelineItems = React.useMemo(() => {
+    const rows = Array.isArray(messages) ? messages : [];
+    if (!rows.length) return [];
+
+    const out = [];
+    for (let i = 0; i < rows.length; i += 1) {
+      const m = rows[i];
+      const prev = i > 0 ? rows[i - 1] : null;
+      const next = i < rows.length - 1 ? rows[i + 1] : null;
+
+      const eventId = getMessageEventId(m);
+      const prevEventId = getMessageEventId(prev);
+      const nextEventId = getMessageEventId(next);
+
+      if (eventId && eventId !== prevEventId) {
+        const ev = eventMetaById[eventId] || {};
+        const eventName = ev?.title || ev?.name || `Event ${eventId}`;
+        out.push({
+          id: `sys-start-${eventId}-${m.id}`,
+          _system: true,
+          _systemText: `Messages exchanged during: ${eventName} | ${formatEventDateLabel(ev)}`,
+          created_at: m.created_at,
+        });
+      }
+
+      out.push({
+        ...m,
+        _time: formatThreadMessageTime(m, prev),
+      });
+
+      if (eventId && eventId !== nextEventId) {
+        const ev = eventMetaById[eventId] || {};
+        const eventName = ev?.title || ev?.name || `Event ${eventId}`;
+        out.push({
+          id: `sys-end-${eventId}-${m.id}`,
+          _system: true,
+          _systemText: `Event Ended - ${eventName} | ${formatEventDateLabel(ev)}`,
+          created_at: m.created_at,
+        });
+      }
+    }
+    return out;
+  }, [messages, eventMetaById]);
+
   const sections = React.useMemo(() => {
     const out = [];
     const by = new Map();
@@ -1931,7 +2040,7 @@ export default function MessagesPage() {
       return new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "short", year: "numeric" }).format(d);
     };
 
-    for (const m of messages) {
+    for (const m of timelineItems) {
       const key = dlabel(m.created_at || Date.now());
       if (!by.has(key)) by.set(key, []);
       by.get(key).push(m);
@@ -1943,7 +2052,7 @@ export default function MessagesPage() {
 
     out.sort((a, b) => new Date(a.items[0].created_at) - new Date(b.items[0].created_at));
     return out;
-  }, [messages]);
+  }, [timelineItems]);
 
   const [draft, setDraft] = React.useState("");
   const [draftAttachments, setDraftAttachments] = React.useState([]);
@@ -1996,6 +2105,43 @@ export default function MessagesPage() {
     () => threads.find((t) => t.id === activeId) || null,
     [threads, activeId]
   );
+
+  React.useEffect(() => {
+    const eventIds = Array.from(
+      new Set(
+        (messages || [])
+          .map((m) => getMessageEventId(m))
+          .filter((id) => id !== null && id !== undefined && id !== "")
+      )
+    );
+    if (!eventIds.length) return;
+
+    const missing = eventIds.filter((id) => !eventMetaById[id]);
+    if (!missing.length) return;
+
+    let alive = true;
+    (async () => {
+      const fetched = {};
+      await Promise.all(
+        missing.map(async (id) => {
+          try {
+            const res = await apiFetch(`${API_ROOT}/events/${id}/`);
+            if (!res.ok) return;
+            const data = await res.json().catch(() => null);
+            if (data) fetched[id] = data;
+          } catch {
+            // ignore
+          }
+        })
+      );
+      if (!alive || !Object.keys(fetched).length) return;
+      setEventMetaById((prev) => ({ ...prev, ...fetched }));
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [messages, eventMetaById]);
 
 
   // --- READ RECEIPT: throttle controls ---
@@ -2530,6 +2676,10 @@ export default function MessagesPage() {
         return {
           id: m.id ?? m.pk ?? m.uuid ?? String(Math.random()),
           body: m.body ?? m.text ?? m.message ?? "",
+          event_id:
+            m.event_id ??
+            (typeof m.event === "object" ? m.event?.id : m.event) ??
+            null,
           sender_id: senderId,
           sender_name: m.sender_name ?? m.sender_display ?? m.senderUsername ?? "",
           sender_display: isMine
@@ -3803,7 +3953,34 @@ export default function MessagesPage() {
                           <Chip size="small" variant="outlined" label={sec.label} />
                         </Stack>
                         {sec.items.map((m, i) => {
-                          const prev = sec.items[i - 1];
+                          if (m._system) {
+                            return (
+                              <Box key={m.id ?? `sys-${sec.label}-${i}`} sx={{ textAlign: "center", my: 0.8 }}>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontSize: 11,
+                                    px: 1.25,
+                                    py: 0.5,
+                                    borderRadius: 999,
+                                    border: "1px solid rgba(148,163,184,0.45)",
+                                    bgcolor: "#f8fafc",
+                                    color: "text.secondary",
+                                  }}
+                                >
+                                  {m._systemText}
+                                </Typography>
+                              </Box>
+                            );
+                          }
+
+                          let prev = null;
+                          for (let j = i - 1; j >= 0; j -= 1) {
+                            if (!sec.items[j]?._system) {
+                              prev = sec.items[j];
+                              break;
+                            }
+                          }
                           const firstOfBlock = !prev || prev.sender_id !== m.sender_id;
                           return (
                             <Bubble

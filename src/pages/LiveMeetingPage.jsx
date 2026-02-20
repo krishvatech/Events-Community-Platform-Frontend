@@ -8993,6 +8993,7 @@ export default function NewLiveMeeting() {
   const [editingMsgId, setEditingMsgId] = useState(null);
   const [editText, setEditText] = useState("");
   const privateChatBottomRef = useRef(null); // To auto-scroll
+  const [privateEventMetaById, setPrivateEventMetaById] = useState({});
 
   const handleOpenPrivateChat = async (member) => {
     setPrivateChatUser(member);
@@ -9073,7 +9074,10 @@ export default function NewLiveMeeting() {
       const res = await fetch(toApiUrl(`messaging/conversations/${privateConversationId}/messages/`), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ body: text }),
+        body: JSON.stringify({
+          body: text,
+          event_id: eventId || undefined,
+        }),
       });
 
       if (res.ok) {
@@ -9295,9 +9299,9 @@ export default function NewLiveMeeting() {
             );
           } else if (data.type === "message.created") {
             // Add new messages from WebSocket as well
-            if (!privateMessages.some((m) => m.id === data.message.id)) {
-              setPrivateMessages((prev) => [...prev, data.message]);
-            }
+            setPrivateMessages((prev) =>
+              prev.some((m) => m.id === data.message.id) ? prev : [...prev, data.message]
+            );
           }
         } catch (e) {
           console.warn("[PrivateChat WS] Parse error:", e);
@@ -9378,6 +9382,46 @@ export default function NewLiveMeeting() {
       privateChatBottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [privateMessages]);
+
+  useEffect(() => {
+    const eventIds = Array.from(
+      new Set(
+        (privateMessages || [])
+          .map((m) => m?.event_id)
+          .filter((id) => id !== null && id !== undefined && id !== "")
+      )
+    );
+    if (!eventIds.length) return;
+
+    const missing = eventIds.filter((id) => !privateEventMetaById[id]);
+    if (!missing.length) return;
+
+    let alive = true;
+    (async () => {
+      const fetched = {};
+      await Promise.all(
+        missing.map(async (id) => {
+          try {
+            const res = await fetch(toApiUrl(`events/${id}/`), {
+              headers: { Accept: "application/json", ...authHeader() },
+            });
+            if (!res.ok) return;
+            const data = await res.json().catch(() => null);
+            if (data) fetched[id] = data;
+          } catch {
+            // no-op
+          }
+        })
+      );
+      if (!alive || !Object.keys(fetched).length) return;
+      setPrivateEventMetaById((prev) => ({ ...prev, ...fetched }));
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [privateMessages, privateEventMetaById]);
+
   // =================================================
 
 
@@ -9577,6 +9621,105 @@ export default function NewLiveMeeting() {
       return "";
     }
   };
+
+  const formatEventDateLabel = (eventObj) => {
+    const source =
+      eventObj?.start_time ||
+      eventObj?.start_date ||
+      eventObj?.date ||
+      eventObj?.created_at;
+    if (!source) return "Date unavailable";
+    const dt = new Date(source);
+    if (Number.isNaN(dt.getTime())) return "Date unavailable";
+    return dt.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+  };
+
+  const formatPrivateMessageTimestamp = (currentMsg, prevMsg) => {
+    const ts = currentMsg?.created_at;
+    if (!ts) return "";
+    const now = new Date(ts);
+    if (Number.isNaN(now.getTime())) return "";
+
+    if (!prevMsg) {
+      return now.toLocaleString([], {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    const prev = new Date(prevMsg?.created_at);
+    if (Number.isNaN(prev.getTime())) {
+      return now.toLocaleString([], {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    const sameDay = now.toDateString() === prev.toDateString();
+    const sameEvent = String(currentMsg?.event_id || "") === String(prevMsg?.event_id || "");
+
+    if (sameDay && sameEvent) {
+      return now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    return now.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const privateTimelineItems = useMemo(() => {
+    const rows = Array.isArray(privateMessages) ? privateMessages : [];
+    if (!rows.length) return [];
+
+    const items = [];
+    for (let i = 0; i < rows.length; i += 1) {
+      const msg = rows[i];
+      const prev = i > 0 ? rows[i - 1] : null;
+      const next = i < rows.length - 1 ? rows[i + 1] : null;
+
+      const eventId = msg?.event_id || null;
+      const prevEventId = prev?.event_id || null;
+      const nextEventId = next?.event_id || null;
+
+      if (eventId && eventId !== prevEventId) {
+        const eventObj = privateEventMetaById[eventId] || {};
+        const eventName = eventObj?.title || eventObj?.name || `Event ${eventId}`;
+        items.push({
+          type: "system",
+          key: `event-start-${eventId}-${msg.id}`,
+          text: `Messages exchanged during: ${eventName} | ${formatEventDateLabel(eventObj)}`,
+        });
+      }
+
+      items.push({
+        type: "message",
+        key: `message-${msg.id}`,
+        msg,
+        prevMessage: prev,
+      });
+
+      if (eventId && eventId !== nextEventId) {
+        const eventObj = privateEventMetaById[eventId] || {};
+        const eventName = eventObj?.title || eventObj?.name || `Event ${eventId}`;
+        items.push({
+          type: "system",
+          key: `event-end-${eventId}-${msg.id}`,
+          text: `Event Ended - ${eventName} | ${formatEventDateLabel(eventObj)}`,
+        });
+      }
+    }
+    return items;
+  }, [privateMessages, privateEventMetaById]);
 
   const getParticipantFromMessage = useCallback((msg) => {
     const senderId =
@@ -10353,8 +10496,30 @@ export default function NewLiveMeeting() {
               </Box>
             ) : (
               <Stack spacing={1.25}>
-                {privateMessages.map((m) => (
-                  <Stack key={m.id} alignItems={m.mine ? "flex-end" : "flex-start"} spacing={0.25}>
+                {privateTimelineItems.map((item) => {
+                  if (item.type === "system") {
+                    return (
+                      <Box key={item.key} sx={{ display: "flex", justifyContent: "center", py: 0.75 }}>
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: 999,
+                            color: "rgba(255,255,255,0.7)",
+                            border: "1px solid rgba(255,255,255,0.14)",
+                            bgcolor: "rgba(255,255,255,0.04)",
+                          }}
+                        >
+                          {item.text}
+                        </Typography>
+                      </Box>
+                    );
+                  }
+
+                  const m = item.msg;
+                  return (
+                  <Stack key={item.key} alignItems={m.mine ? "flex-end" : "flex-start"} spacing={0.25}>
                     {/* Edit mode */}
                     {editingMsgId === m.id ? (
                       <Paper
@@ -10485,13 +10650,13 @@ export default function NewLiveMeeting() {
 
                           {/* Timestamp */}
                           <Typography sx={{ fontSize: 10, opacity: 0.5, textAlign: "right", mt: 0.5, whiteSpace: "nowrap" }}>
-                            {formatChatTime(m.created_at)}
+                            {formatPrivateMessageTimestamp(m, item.prevMessage)}
                           </Typography>
                         </Paper>
                       </Box>
                     )}
                   </Stack>
-                ))}
+                )})}
                 <div ref={privateChatBottomRef} />
               </Stack>
             )}
