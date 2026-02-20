@@ -3921,6 +3921,7 @@ export default function GroupManagePage() {
 
             showMessage("Group promoted to independent main group!", "success");
             setGroup(data); // Update with new data (parent should be null)
+            await fetchRelations(); // Refresh parent links (should be empty now)
             setPromoteDialogOpen(false);
         } catch (e) {
             showMessage(e?.message || "Failed to promote group.", "error");
@@ -4003,8 +4004,11 @@ export default function GroupManagePage() {
     const canModerate = isOwnerRole || isAdminRole || isModeratorRole;
     const canPost = canModerate;
 
-    // ✅ Sub-group creation is restricted to Owner + Admin only
-    const canCreateSubgroups = isOwnerRole;
+    // ✅ Sub-group creation restricted: Owner only AND must not be a child (no parents)
+    const hasParents = isChildGroup || parentLinks.length > 0;
+    const canCreateSubgroups = isOwnerRole && !hasParents;
+
+
 
 
     const canSeeSettingsTab = isOwnerRole || isAdminRole || isModeratorRole;
@@ -5096,193 +5100,272 @@ export default function GroupManagePage() {
                                 {/* Relations tab */}
                                 {showRelationsTab && tab === 2 && (
                                     <Stack spacing={3}>
-                                        {/* 1. Parent Groups */}
-                                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                                            <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
-                                                <Typography variant="h6" className="font-semibold">Parent Groups</Typography>
-                                                {canEditGroup && (
-                                                    <Button
-                                                        variant="contained"
-                                                        size="small"
-                                                        className="rounded-xl"
-                                                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                                        onClick={() => setRequestParentOpen(true)}
-                                                        startIcon={<LinkRoundedIcon />}
-                                                    >
-                                                        Link to Parent
-                                                    </Button>
-                                                )}
-                                            </Stack>
-                                            <Typography variant="body2" className="text-slate-500 mb-3">
-                                                Other groups this group belongs to (in addition to Primary Parent).
-                                            </Typography>
+                                        {/* 0. Primary Parent (if exists) */}
+                                        {isChildGroup && (
+                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                                <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-3">
+                                                    <Box>
+                                                        <Typography variant="h6" className="font-semibold">Primary Parent Group</Typography>
+                                                        <Typography variant="body2" className="text-slate-500">
+                                                            This group is a sub-group of the following parent.
+                                                        </Typography>
+                                                    </Box>
 
-                                            {relLoading && parentLinks.length === 0 ? <LinearProgress /> : parentLinks.length === 0 ? (
-                                                <Typography className="text-slate-500 italic mb-2">No additional parent groups.</Typography>
-                                            ) : (
-                                                <Stack spacing={1}>
-                                                    {parentLinks.map(link => (
-                                                        <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-slate-200">
-                                                            <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                                                <Stack direction="row" alignItems="center" spacing={2}>
-                                                                    {/* Using simple Avatar fallback */}
-                                                                    <Avatar variant="rounded" sx={{ width: 40, height: 40 }}>{link.parent_group?.name?.[0]}</Avatar>
-                                                                    <Box>
-                                                                        <Typography className="font-semibold">
-                                                                            {link.parent_group.name}
-                                                                            <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>(ID: {link.parent_group.id})</Typography>
-                                                                        </Typography>
-                                                                        <Stack direction="row" spacing={1} alignItems="center">
-                                                                            <Chip
-                                                                                label={link.status.toUpperCase()}
-                                                                                size="small"
-                                                                                color={link.status === 'approved' ? 'success' : link.status === 'rejected' ? 'error' : 'warning'}
-                                                                                variant="outlined"
-                                                                                sx={{ height: 20, fontSize: '0.7rem' }}
-                                                                            />
-                                                                            <Typography variant="caption" className="text-slate-500">
-                                                                                {link.status === 'pending' ? `Requested by ${link.requested_by?.name}` :
-                                                                                    link.status === 'approved' ? `Reviewed by ${link.reviewed_by?.name}` : ''}
-                                                                            </Typography>
-                                                                        </Stack>
-                                                                    </Box>
-                                                                </Stack>
-                                                                {canEditGroup && (
-                                                                    <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
-                                                                )}
-                                                            </Stack>
-                                                        </Paper>
-                                                    ))}
+                                                    {/* Promote Action */}
+                                                    {(user?.is_superuser || isOwnerRole || isAdminRole) && (
+                                                        <Button
+                                                            variant="outlined"
+                                                            color="error"
+                                                            size="small"
+                                                            onClick={handleOpenPromoteDialog}
+                                                            disabled={isPromoting}
+                                                            sx={{ textTransform: "none", borderColor: "#ef4444", color: "#ef4444" }}
+                                                        >
+                                                            {isPromoting ? "Promoting..." : "Make Independent"}
+                                                        </Button>
+                                                    )}
                                                 </Stack>
-                                            )}
-                                        </Paper>
+
+                                                {(group.parent_group || group.parent) ? (
+                                                    <Paper variant="outlined" className="p-3 rounded-xl border-slate-200 bg-slate-50">
+                                                        <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                            <Stack direction="row" alignItems="center" spacing={2}>
+                                                                <Avatar
+                                                                    src={(group.parent_group || group.parent).cover_image}
+                                                                    alt={(group.parent_group || group.parent).name}
+                                                                >
+                                                                    {(group.parent_group || group.parent).name?.[0]}
+                                                                </Avatar>
+                                                                <Box>
+                                                                    <Typography className="font-semibold">
+                                                                        {(group.parent_group || group.parent).name}
+                                                                    </Typography>
+                                                                    <Typography variant="caption" className="text-slate-500">
+                                                                        ID: {(group.parent_group || group.parent).id}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </Stack>
+                                                            <Button
+                                                                size="small"
+                                                                endIcon={<OpenInNewRoundedIcon />}
+                                                                onClick={() => navigate(`/groups/${(group.parent_group || group.parent).slug || (group.parent_group || group.parent).id}`)}
+                                                                sx={{ textTransform: "none" }}
+                                                            >
+                                                                View
+                                                            </Button>
+                                                        </Stack>
+                                                    </Paper>
+                                                ) : (
+                                                    <Alert severity="warning">Parent group information is incomplete.</Alert>
+                                                )}
+                                            </Paper>
+                                        )}
+
+                                        {/* 1. Parent Groups - ONLY for Sub-groups */}
+                                        {hasParents && (
+                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                                <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                                    <Typography variant="h6" className="font-semibold">Parent Groups</Typography>
+                                                    <Stack direction="row" spacing={1}>
+                                                        {!isChildGroup && parentLinks.length > 0 && (user?.is_superuser || isOwnerRole || isAdminRole) && (
+                                                            <Button
+                                                                variant="outlined"
+                                                                color="error"
+                                                                size="small"
+                                                                onClick={handleOpenPromoteDialog}
+                                                                disabled={isPromoting}
+                                                                sx={{ textTransform: "none", borderColor: "#ef4444", color: "#ef4444" }}
+                                                            >
+                                                                {isPromoting ? "Promoting..." : "Make Independent"}
+                                                            </Button>
+                                                        )}
+                                                        {canEditGroup && subgroups.length === 0 && childLinks.length === 0 && (
+                                                            <Button
+                                                                variant="contained"
+                                                                size="small"
+                                                                className="rounded-xl"
+                                                                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                                onClick={() => setRequestParentOpen(true)}
+                                                                startIcon={<LinkRoundedIcon />}
+                                                            >
+                                                                Link to Parent
+                                                            </Button>
+                                                        )}
+                                                    </Stack>
+                                                </Stack>
+                                                <Typography variant="body2" className="text-slate-500 mb-3">
+                                                    Other groups this group belongs to (in addition to Primary Parent).
+                                                </Typography>
+
+                                                {relLoading && parentLinks.length === 0 ? <LinearProgress /> : parentLinks.length === 0 ? (
+                                                    <Typography className="text-slate-500 italic mb-2">No additional parent groups.</Typography>
+                                                ) : (
+                                                    <Stack spacing={1}>
+                                                        {parentLinks.map(link => (
+                                                            <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-slate-200">
+                                                                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                                    <Stack direction="row" alignItems="center" spacing={2}>
+                                                                        <Avatar variant="rounded" sx={{ width: 40, height: 40 }}>{link.parent_group?.name?.[0]}</Avatar>
+                                                                        <Box>
+                                                                            <Typography className="font-semibold">
+                                                                                {link.parent_group.name}
+                                                                                <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>(ID: {link.parent_group.id})</Typography>
+                                                                            </Typography>
+                                                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                                                <Chip
+                                                                                    label={link.status.toUpperCase()}
+                                                                                    size="small"
+                                                                                    color={link.status === 'approved' ? 'success' : link.status === 'rejected' ? 'error' : 'warning'}
+                                                                                    variant="outlined"
+                                                                                    sx={{ height: 20, fontSize: '0.7rem' }}
+                                                                                />
+                                                                                <Typography variant="caption" className="text-slate-500">
+                                                                                    {link.status === 'pending' ? `Requested by ${link.requested_by?.name}` :
+                                                                                        link.status === 'approved' ? `Reviewed by ${link.reviewed_by?.name}` : ''}
+                                                                                </Typography>
+                                                                            </Stack>
+                                                                        </Box>
+                                                                    </Stack>
+                                                                    {canEditGroup && (
+                                                                        <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
+                                                                    )}
+                                                                </Stack>
+                                                            </Paper>
+                                                        ))}
+                                                    </Stack>
+                                                )}
+                                            </Paper>
+                                        )}
 
                                         {/* 2. Subgroups */}
-                                        <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                                            <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
-                                                <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
-                                                {canCreateSubgroups && (
-                                                    <Button
-                                                        variant="contained"
-                                                        className="rounded-xl"
-                                                        sx={{ textTransform: "none", backgroundColor: "#10b981", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                                        onClick={() => setAddSubOpen(true)}
-                                                        startIcon={<AddRoundedIcon />}
-                                                    >
-                                                        Add sub-group
-                                                    </Button>
-                                                )}
-                                            </Stack>
+                                        {/* 2. Subgroups - ONLY for Independent/Parent Groups (No parents) */}
+                                        {!hasParents && (
+                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                                <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                                    <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
+                                                    {canCreateSubgroups && (
+                                                        <Button
+                                                            variant="contained"
+                                                            className="rounded-xl"
+                                                            sx={{ textTransform: "none", backgroundColor: "#10b981", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                            onClick={() => setAddSubOpen(true)}
+                                                            startIcon={<AddRoundedIcon />}
+                                                        >
+                                                            Add sub-group
+                                                        </Button>
+                                                    )}
+                                                </Stack>
 
-                                            {/* Incoming Requests */}
-                                            {childLinks.filter(l => l.status === 'pending').length > 0 && (
-                                                <Box className="mb-4">
-                                                    <Typography variant="subtitle2" className="text-orange-700 font-bold mb-2">Pending Link Requests</Typography>
-                                                    <Stack spacing={1}>
-                                                        {childLinks.filter(l => l.status === 'pending').map(link => (
-                                                            <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-orange-200 bg-orange-50">
-                                                                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                {/* Incoming Requests */}
+                                                {childLinks.filter(l => l.status === 'pending').length > 0 && (
+                                                    <Box className="mb-4">
+                                                        <Typography variant="subtitle2" className="text-orange-700 font-bold mb-2">Pending Link Requests</Typography>
+                                                        <Stack spacing={1}>
+                                                            {childLinks.filter(l => l.status === 'pending').map(link => (
+                                                                <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-orange-200 bg-orange-50">
+                                                                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                                        <Stack direction="row" alignItems="center" spacing={2}>
+                                                                            <Avatar>{link.child_group?.name?.[0]}</Avatar>
+                                                                            <Box>
+                                                                                <Typography className="font-semibold">{link.child_group.name}</Typography>
+                                                                                <Typography variant="caption" className="text-slate-600">
+                                                                                    Request from <span className="font-medium">{link.requested_by?.name}</span>
+                                                                                </Typography>
+                                                                            </Box>
+                                                                        </Stack>
+                                                                        <Stack direction="row" spacing={1}>
+                                                                            <Button size="small" variant="contained" color="success" onClick={() => handleParentLinkAction(link.id, 'approve')}>Approve</Button>
+                                                                            <Button size="small" variant="outlined" color="error" onClick={() => handleParentLinkAction(link.id, 'reject')}>Reject</Button>
+                                                                        </Stack>
+                                                                    </Stack>
+                                                                </Paper>
+                                                            ))}
+                                                        </Stack>
+                                                        <Divider className="my-3" />
+                                                    </Box>
+                                                )}
+
+                                                {/* Linked Subgroups Management */}
+                                                {childLinks.filter(l => l.status === 'approved').length > 0 && (
+                                                    <Box className="mb-4">
+                                                        <Typography variant="subtitle2" className="text-slate-600 mb-2">Linked Subgroups (via Association)</Typography>
+                                                        <Stack spacing={1}>
+                                                            {childLinks.filter(l => l.status === 'approved').map(link => (
+                                                                <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-slate-200 bg-slate-50">
+                                                                    <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                                        <Stack direction="row" alignItems="center" spacing={2}>
+                                                                            <Avatar sx={{ width: 32, height: 32 }}>{link.child_group?.name?.[0]}</Avatar>
+                                                                            <Box>
+                                                                                <Typography className="font-semibold text-sm">{link.child_group.name}</Typography>
+                                                                            </Box>
+                                                                        </Stack>
+                                                                        <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
+                                                                    </Stack>
+                                                                </Paper>
+                                                            ))}
+                                                        </Stack>
+                                                        <Divider className="my-3" />
+                                                    </Box>
+
+                                                )}
+
+                                                <Typography variant="subtitle2" className="text-slate-600 mb-2">All Subgroups (Primary & Linked)</Typography>
+
+                                                {subLoading ? (
+                                                    <LinearProgress />
+                                                ) : subError ? (
+                                                    <Alert severity="error">{subError}</Alert>
+                                                ) : visibleSubgroups.length === 0 ? (
+                                                    <Typography className="text-slate-500">
+                                                        {isOwnerRole || isAdminRole
+                                                            ? "No sub-groups yet."
+                                                            : "You haven't joined any sub-groups yet."}
+                                                    </Typography>
+                                                ) : (
+                                                    <Stack spacing={1.5}>
+                                                        {visibleSubgroups.map((sg) => (
+                                                            <Paper key={sg.id || sg.slug} variant="outlined" className="p-2 rounded-xl">
+                                                                <Stack direction="row" alignItems="center" spacing={2} justifyContent="space-between">
                                                                     <Stack direction="row" alignItems="center" spacing={2}>
-                                                                        <Avatar>{link.child_group?.name?.[0]}</Avatar>
+                                                                        <Avatar
+                                                                            variant="circular"
+                                                                            src={bust(sg.cover_image)}
+                                                                            alt={sg.name || "Group"}
+                                                                        >
+                                                                            {(sg.name || "?").charAt(0).toUpperCase()}
+                                                                        </Avatar>
                                                                         <Box>
-                                                                            <Typography className="font-semibold">{link.child_group.name}</Typography>
-                                                                            <Typography variant="caption" className="text-slate-600">
-                                                                                Request from <span className="font-medium">{link.requested_by?.name}</span>
+                                                                            <Typography className="font-semibold">{sg.name}</Typography>
+                                                                            <Typography variant="caption" className="text-slate-500">
+                                                                                {(sg.visibility === "private" ? "Private" : "Public")} •{" "}
+                                                                                {(sg.member_count ?? sg.members_count ?? 0)} members
                                                                             </Typography>
                                                                         </Box>
                                                                     </Stack>
-                                                                    <Stack direction="row" spacing={1}>
-                                                                        <Button size="small" variant="contained" color="success" onClick={() => handleParentLinkAction(link.id, 'approve')}>Approve</Button>
-                                                                        <Button size="small" variant="outlined" color="error" onClick={() => handleParentLinkAction(link.id, 'reject')}>Reject</Button>
-                                                                    </Stack>
-                                                                </Stack>
-                                                            </Paper>
-                                                        ))}
-                                                    </Stack>
-                                                    <Divider className="my-3" />
-                                                </Box>
-                                            )}
-
-                                            {/* Linked Subgroups Management */}
-                                            {childLinks.filter(l => l.status === 'approved').length > 0 && (
-                                                <Box className="mb-4">
-                                                    <Typography variant="subtitle2" className="text-slate-600 mb-2">Linked Subgroups (via Association)</Typography>
-                                                    <Stack spacing={1}>
-                                                        {childLinks.filter(l => l.status === 'approved').map(link => (
-                                                            <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-slate-200 bg-slate-50">
-                                                                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                                                    <Stack direction="row" alignItems="center" spacing={2}>
-                                                                        <Avatar sx={{ width: 32, height: 32 }}>{link.child_group?.name?.[0]}</Avatar>
-                                                                        <Box>
-                                                                            <Typography className="font-semibold text-sm">{link.child_group.name}</Typography>
-                                                                        </Box>
-                                                                    </Stack>
-                                                                    <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
-                                                                </Stack>
-                                                            </Paper>
-                                                        ))}
-                                                    </Stack>
-                                                    <Divider className="my-3" />
-                                                </Box>
-
-                                            )}
-
-                                            <Typography variant="subtitle2" className="text-slate-600 mb-2">All Subgroups (Primary & Linked)</Typography>
-
-                                            {subLoading ? (
-                                                <LinearProgress />
-                                            ) : subError ? (
-                                                <Alert severity="error">{subError}</Alert>
-                                            ) : visibleSubgroups.length === 0 ? (
-                                                <Typography className="text-slate-500">
-                                                    {isOwnerRole || isAdminRole
-                                                        ? "No sub-groups yet."
-                                                        : "You haven't joined any sub-groups yet."}
-                                                </Typography>
-                                            ) : (
-                                                <Stack spacing={1.5}>
-                                                    {visibleSubgroups.map((sg) => (
-                                                        <Paper key={sg.id || sg.slug} variant="outlined" className="p-2 rounded-xl">
-                                                            <Stack direction="row" alignItems="center" spacing={2} justifyContent="space-between">
-                                                                <Stack direction="row" alignItems="center" spacing={2}>
-                                                                    <Avatar
-                                                                        variant="circular"
-                                                                        src={bust(sg.cover_image)}
-                                                                        alt={sg.name || "Group"}
+                                                                    <Button
+                                                                        size="small"
+                                                                        variant="text"
+                                                                        endIcon={<OpenInNewRoundedIcon />}
+                                                                        onClick={() => navigate(`/groups/${sg.slug || sg.id}`)}
                                                                     >
-                                                                        {(sg.name || "?").charAt(0).toUpperCase()}
-                                                                    </Avatar>
-                                                                    <Box>
-                                                                        <Typography className="font-semibold">{sg.name}</Typography>
-                                                                        <Typography variant="caption" className="text-slate-500">
-                                                                            {(sg.visibility === "private" ? "Private" : "Public")} •{" "}
-                                                                            {(sg.member_count ?? sg.members_count ?? 0)} members
-                                                                        </Typography>
-                                                                    </Box>
+                                                                        Open
+                                                                    </Button>
                                                                 </Stack>
-                                                                <Button
-                                                                    size="small"
-                                                                    variant="text"
-                                                                    endIcon={<OpenInNewRoundedIcon />}
-                                                                    onClick={() => navigate(`/groups/${sg.slug || sg.id}`)}
-                                                                >
-                                                                    Open
-                                                                </Button>
-                                                            </Stack>
-                                                        </Paper>
-                                                    ))}
-                                                </Stack>
-                                            )}
+                                                            </Paper>
+                                                        ))}
+                                                    </Stack>
+                                                )}
 
-                                            {canCreateSubgroups && (
-                                                <AddSubgroupDialog
-                                                    open={addSubOpen}
-                                                    onClose={() => setAddSubOpen(false)}
-                                                    parentGroup={group}
-                                                    onCreated={(g) => { setSubgroups((prev) => [g, ...prev]); }}
-                                                />
-                                            )}
-                                        </Paper>
+                                                {canCreateSubgroups && (
+                                                    <AddSubgroupDialog
+                                                        open={addSubOpen}
+                                                        onClose={() => setAddSubOpen(false)}
+                                                        parentGroup={group}
+                                                        onCreated={(g) => { setSubgroups((prev) => [g, ...prev]); }}
+                                                    />
+                                                )}
+                                            </Paper>
+                                        )}
 
 
 
@@ -5443,39 +5526,6 @@ export default function GroupManagePage() {
 
                                         <Divider className="my-3" />
 
-                                        {/* Danger Zone: Only for Sub-groups + Superusers */}
-                                        {isChildGroup && user?.is_superuser && (
-                                            <>
-                                                <Box sx={{ mb: 3 }}>
-                                                    <Typography variant="h6" className="mt-2 mb-3 font-bold text-red-700">
-                                                        Danger Zone
-                                                    </Typography>
-                                                    <Paper variant="outlined" sx={{ p: 3, bgcolor: "#fff0f0", borderColor: "#fecaca" }}>
-                                                        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2}>
-                                                            <Box>
-                                                                <Typography variant="subtitle1" className="font-semibold text-red-900">
-                                                                    Make independent main group
-                                                                </Typography>
-                                                                <Typography variant="body2" className="text-red-700">
-                                                                    Detach this group from its parent. It will become a top-level group.
-                                                                </Typography>
-                                                            </Box>
-                                                            <Button
-                                                                variant="contained"
-                                                                color="error"
-                                                                onClick={handleOpenPromoteDialog}
-                                                                disabled={isPromoting}
-                                                                startIcon={isPromoting ? <CircularProgress size={16} color="inherit" /> : null}
-                                                                sx={{ textTransform: "none", whiteSpace: "nowrap" }}
-                                                            >
-                                                                Promote to Main
-                                                            </Button>
-                                                        </Stack>
-                                                    </Paper>
-                                                </Box>
-                                                <Divider className="my-3" />
-                                            </>
-                                        )}
 
                                         <Stack direction="row" spacing={1}>
                                             {canEditGroup && (
@@ -6800,7 +6850,7 @@ export default function GroupManagePage() {
                     </Alert>
                 </Snackbar>
             </div>
-        </div>
+        </div >
     );
 
 }
