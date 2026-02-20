@@ -1996,12 +1996,12 @@ export default function EventManagePage() {
                       const email = r.user_email || "";
 
                       // TIMEZONE LOGIC:
-                      // 1. Viewer's profile timezone
+                      // 1. Viewer's profile timezone (Host/Admin)
                       // 2. Viewer's browser timezone (fallback)
-                      const userTz = currentUser?.profile?.timezone || dayjs.tz.guess();
+                      const viewerTz = currentUser?.profile?.timezone || dayjs.tz.guess();
 
                       const purchased = r.registered_at
-                        ? dayjs(r.registered_at).tz(userTz).format("M/D/YYYY, h:mm:ss A z")
+                        ? dayjs.utc(r.registered_at).tz(viewerTz).format("M/D/YYYY, h:mm:ss A z")
                         : "";
                       const regKyc =
                         r.user_kyc_status ||
