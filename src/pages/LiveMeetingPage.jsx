@@ -13652,13 +13652,23 @@ export default function NewLiveMeeting() {
                       {/* ✅ FIRST PARTICIPANT TILE: Show first participant when alone in lounge instead of welcome message */}
                       {isBreakout && !latestPinnedHost && breakoutParticipantCount <= 1 && participants.length > 0 ? (
                         <>
-                          {/* Display the first participant's tile (the user themselves) */}
-                          <StageMiniTile
-                            p={participants[0]}
-                            meeting={dyteMeeting}
-                            tileW={600}
-                            tileH={450}
-                          />
+                          <Avatar
+                            src={participants[0]?.picture}
+                            sx={{
+                              width: 76,
+                              height: 76,
+                              fontSize: 22,
+                              bgcolor: "rgba(255,255,255,0.12)",
+                            }}
+                          >
+                            {initialsFromName(participants[0]?.name || "Participant")}
+                          </Avatar>
+                          <Typography sx={{ fontWeight: 800, fontSize: 18, textAlign: "center" }}>
+                            {participants[0]?.name || "Participant"}
+                          </Typography>
+                          <Typography sx={{ opacity: 0.7, fontSize: 13, textAlign: "center" }}>
+                            Member
+                          </Typography>
                         </>
                       ) : isBreakout && !latestPinnedHost && breakoutParticipantCount <= 1 ? (
                         <>
@@ -14271,7 +14281,7 @@ export default function NewLiveMeeting() {
                     </IconButton>
                   </Tooltip>
 
-                  {/* ✅ Leave Break Out Room Button (Only in Breakout) */}
+                  {/* ✅ Contextual leave button for breakout/social lounge */}
                   {isBreakout && (
                     <Button
                       variant="contained"
@@ -14289,7 +14299,7 @@ export default function NewLiveMeeting() {
                         whiteSpace: "nowrap"
                       }}
                     >
-                      Leave Break Out Room
+                      {isInBreakoutTable ? "Leave Breakout Room" : "Leave Table"}
                     </Button>
                   )}
                 </Paper>
