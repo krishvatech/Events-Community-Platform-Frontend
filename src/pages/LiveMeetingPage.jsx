@@ -14953,25 +14953,25 @@ function MemberInfoContent({ selectedMember, onClose }) {
           {initialsFromName(selectedMember.name)}
         </Avatar>
 
-        {/* Show Crown if Host */}
-        {selectedMember.role === "Host" && (
+        {/* Show Mood Emoji Badge */}
+        {selectedMember.mood && (
           <Box
             sx={{
               position: "absolute",
               top: 0,
               right: 0,
-              bgcolor: "#ffb300", // Gold color
+              bgcolor: "rgba(20, 184, 166, 0.2)",
               borderRadius: "50%",
-              width: 24,
-              height: 24,
+              width: 28,
+              height: 28,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              border: "2px solid #0b101a",
+              border: "2px solid #14b8a6",
               boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
             }}
           >
-            <Typography sx={{ fontSize: 12 }}>👑</Typography>
+            <Typography sx={{ fontSize: 16 }}>{selectedMember.mood}</Typography>
           </Box>
         )}
       </Box>
