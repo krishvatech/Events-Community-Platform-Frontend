@@ -1573,8 +1573,9 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
     const id = g?.id ?? row.group_id ?? null;
     if (!id) return null;
     const name = g?.name || g?.title || `Group #${id}`;
-    const avatar = g?.avatar || g?.avatar_url || g?.icon || g?.image || g?.photo || "";
-    return { id, name, avatar };
+    // updated to include logo/cover_image like MyPostsPage
+    const raw = g?.logo || g?.cover_image || g?.avatar || g?.avatar_url || g?.icon || g?.image || g?.photo || "";
+    return { id, name, avatar: absMedia(raw) };
   };
 
   const dedupe = (arr) => {
@@ -1645,6 +1646,7 @@ function SharePickerDialog({ open, onClose, target, onShared }) {
     let gAll = [];
     try {
       const groupUrls = [
+        `${API_ROOT}/groups/joined-groups/`, // Added this endpoint
         `${API_ROOT}/groups/memberships/?me=1&status=member&page_size=200`,
         `${API_ROOT}/groups/memberships/my/?page_size=200`,
         `${API_ROOT}/groups/?member=me&page_size=200`,
