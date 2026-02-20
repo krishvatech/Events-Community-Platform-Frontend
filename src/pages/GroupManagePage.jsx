@@ -1418,6 +1418,18 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
 
     const parentVisibility = String(parentGroup?.visibility || "").toLowerCase();
     const parentJoinPolicy = String(parentGroup?.join_policy || "").toLowerCase();
+
+    React.useEffect(() => {
+        if (open) {
+            if (parentVisibility === "private" && parentJoinPolicy === "invite") {
+                setVisibility("private");
+                setJoinPolicy("invite");
+            } else {
+                setVisibility("public");
+                setJoinPolicy("open");
+            }
+        }
+    }, [open, parentVisibility, parentJoinPolicy]);
     const allowedPolicies = getAllowedJoinPolicies({
         visibility,
         isSubgroup: true,
@@ -1512,7 +1524,11 @@ function AddSubgroupDialog({ open, onClose, parentGroup, onCreated }) {
             onCreated?.({ ...json, _cache: Date.now() });
             // reset form
             setName(""); setSlug(""); setDescription("");
-            setVisibility("public"); setJoinPolicy("open");
+            if (parentVisibility === "private" && parentJoinPolicy === "invite") {
+                setVisibility("private"); setJoinPolicy("invite");
+            } else {
+                setVisibility("public"); setJoinPolicy("open");
+            }
             setImageFile(null); setLocalPreview("");
             onClose?.();
         } catch (e) {
