@@ -1154,7 +1154,35 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
   const [anchorEl, setAnchorEl] = React.useState(null);
   const pickerOpen = Boolean(anchorEl);
 
+  // Liker preview for emoji bubbles
+  const [likerPreview, setLikerPreview] = React.useState([]);
+
   React.useEffect(() => { setLocal(post); }, [post]);
+
+  // Fetch liker preview on mount
+  React.useEffect(() => {
+    const target = engageTargetOf(post);
+    if (!target?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = toApiUrl(`engagements/reactions/?target_type=${encodeURIComponent(target.type || "activity_feed.feeditem")}&target_id=${target.id}&page_size=3`);
+        const r = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } });
+        if (!r.ok || cancelled) return;
+        const j = await r.json();
+        const arr = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
+        if (!cancelled) setLikerPreview(arr.map(it => {
+          const u = it.user || it.actor || it.liker || it;
+          return {
+            id: u.id,
+            name: u.name || u.full_name || u.username,
+            reactionId: it.reaction || it.reaction_type || it.kind || null,
+          };
+        }));
+      } catch { }
+    })();
+    return () => { cancelled = true; };
+  }, [post.id]);
 
   // Moderation status checks
   const moderationStatus = local.moderation_status || (local.is_under_review ? "under_review" : (local.is_removed ? "removed" : null));
@@ -1167,6 +1195,27 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
   const likeBtnLabel = myReactionDef?.label || "Like";
   const likeBtnEmoji = myReactionDef?.emoji || "\u{1F44D}";
   const hasReaction = !!myReactionId;
+
+  // Unique reaction types for emoji bubbles
+  const reactionIds = Array.from(
+    new Set(
+      [
+        ...likerPreview.map(u => u.reactionId).filter(Boolean),
+        myReactionId,
+      ].filter(Boolean)
+    )
+  );
+
+  // "reacted by X and Y others"
+  const likeCount = Number(local.metrics?.likes || 0);
+  const primaryLiker = likerPreview?.[0] || null;
+  const othersCount = Math.max(0, likeCount - 1);
+  const likeLabel =
+    primaryLiker && likeCount > 0
+      ? likeCount === 1
+        ? `reacted by ${primaryLiker.name}`
+        : `reacted by ${primaryLiker.name} and ${othersCount} others`
+      : `${likeCount.toLocaleString()} reactions`;
 
   // Check if user can report this post
   const canReport = !!(viewerId && viewerId !== local.author_id && viewerId !== local.author?.id);
@@ -1318,12 +1367,35 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
       {(local.metrics.likes > 0 || local.metrics.shares > 0) && (
         <Box sx={{ px: 0.5, pt: 0.5, mb: 1 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ cursor: "pointer" }} onClick={() => window.__openLikes?.(engageTargetOf(local))}>
-              <Box sx={{ bgcolor: "primary.main", borderRadius: "50%", p: 0.25, display: "flex" }}>
-                <ThumbUpAltOutlinedIcon sx={{ fontSize: 12, color: "white" }} />
-              </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ "&:hover": { textDecoration: "underline" } }}>
-                {local.metrics.likes} reaction{local.metrics.likes !== 1 ? 's' : ''}
+            <Stack
+              direction="row" spacing={1} alignItems="center"
+              sx={{ cursor: "pointer" }}
+              onClick={() => window.__openLikes?.(engageTargetOf(local))}
+            >
+              <AvatarGroup
+                max={3}
+                sx={{
+                  "& .MuiAvatar-root": {
+                    width: 24,
+                    height: 24,
+                    bgcolor: "#d1d5db",
+                    border: "2px solid #fff",
+                  }
+                }}
+              >
+                {(reactionIds.length ? reactionIds : (likeCount > 0 ? ["like"] : []))
+                  .slice(0, 3)
+                  .map(rid => {
+                    const def = POST_REACTIONS.find(r => r.id === rid) || POST_REACTIONS[0];
+                    return (
+                      <Avatar key={rid} sx={{ bgcolor: "#d1d5db" }}>
+                        <span style={{ fontSize: 14, lineHeight: 1 }}>{def.emoji}</span>
+                      </Avatar>
+                    );
+                  })}
+              </AvatarGroup>
+              <Typography variant="body2" sx={{ "&:hover": { textDecoration: "underline" } }}>
+                {likeLabel}
               </Typography>
             </Stack>
             {local.metrics.shares > 0 && (

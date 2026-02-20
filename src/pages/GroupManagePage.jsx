@@ -2420,7 +2420,8 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                         return {
                             id: u.id,
                             name: u.name || u.full_name || u.username,
-                            avatar: toAbs(u.avatar || u.photo || u.avatar_url || u.image || null)
+                            avatar: toAbs(u.avatar || u.photo || u.avatar_url || u.image || null),
+                            reactionId: it.reaction || it.reaction_type || it.kind || null,
                         };
                     }));
                 }
@@ -2471,20 +2472,29 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
     const handleClosePicker = () => setAnchorEl(null);
     const bumpCommentCount = () => setCounts((c) => ({ ...c, comments: c.comments + 1 }));
 
-    // Text for "Name and X others"
+    // Text for "reacted by Name and X others"
     const likeNames = likerPreview.map(l => l.name).filter(Boolean);
     let likeLine = "";
     if (counts.likes > 0) {
-        if (likeNames.length === 1) {
+        if (likeNames.length >= 1) {
             const others = Math.max(0, counts.likes - 1);
-            likeLine = others > 0 ? `${likeNames[0]} and ${others} others` : likeNames[0];
-        } else if (likeNames.length >= 2) {
-            const others = Math.max(0, counts.likes - 2);
-            likeLine = others > 0 ? `${likeNames[0]} and ${others} others` : `${likeNames[0]} and ${likeNames[1]}`;
+            likeLine = others > 0
+                ? `reacted by ${likeNames[0]} and ${others} others`
+                : `reacted by ${likeNames[0]}`;
         } else {
             likeLine = `${counts.likes} reactions`;
         }
     }
+
+    // Unique reaction types for emoji bubbles
+    const reactionIds = Array.from(
+        new Set(
+            [
+                ...likerPreview.map(u => u.reactionId).filter(Boolean),
+                myReaction,
+            ].filter(Boolean)
+        )
+    );
 
     return (
         <>
@@ -2499,11 +2509,25 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                 >
                     <AvatarGroup
                         max={3}
-                        sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: 12 } }}
+                        sx={{
+                            "& .MuiAvatar-root": {
+                                width: 24,
+                                height: 24,
+                                bgcolor: "#d1d5db",
+                                border: "2px solid #fff",
+                            }
+                        }}
                     >
-                        {likerPreview.slice(0, 3).map(u => (
-                            <Avatar key={u.id} src={u.avatar}>{(u.name || "U").slice(0, 1).toUpperCase()}</Avatar>
-                        ))}
+                        {(reactionIds.length ? reactionIds : (counts.likes > 0 ? ["like"] : []))
+                            .slice(0, 3)
+                            .map(rid => {
+                                const def = POST_REACTIONS.find(r => r.id === rid) || POST_REACTIONS[0];
+                                return (
+                                    <Avatar key={rid} sx={{ bgcolor: "#d1d5db" }}>
+                                        <span style={{ fontSize: 22, lineHeight: 1 }}>{def.emoji}</span>
+                                    </Avatar>
+                                );
+                            })}
                     </AvatarGroup>
                     {!!likeLine && (
                         <Typography variant="body2">{likeLine}</Typography>
