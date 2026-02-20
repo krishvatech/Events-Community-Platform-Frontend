@@ -72,6 +72,7 @@ import CheckRoundedIcon from "@mui/icons-material/CheckRounded"; // <--- ADDED
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded"; // <--- ADDED for KYC verified badge
 import ShuffleIcon from "@mui/icons-material/Shuffle"; // Keep this if used elsewhere
 import Diversity3Icon from "@mui/icons-material/Diversity3"; // New icon for Networking
+import CoffeeIcon from "@mui/icons-material/Coffee"; // Break Mode icon
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -109,6 +110,9 @@ import NotificationHistoryPanel from "../components/lounge/NotificationHistoryPa
 import SpeedNetworkingZone from "../components/speed-networking/SpeedNetworkingZone.jsx";
 import SpeedNetworkingSessionPrompt from "../components/speed-networking/SpeedNetworkingSessionPrompt.jsx";
 import BannedParticipantsDialog from "../components/live-meeting/BannedParticipantsDialog.jsx";
+import BreakModeScreen from "../components/live-meeting/BreakModeScreen.jsx";
+import BreakConfigDialog from "../components/live-meeting/BreakConfigDialog.jsx";
+import HostBreakControls from "../components/live-meeting/HostBreakControls.jsx";
 import WaitingRoomAnnouncements from "../components/live-meeting/WaitingRoomAnnouncements.jsx";
 import WaitingRoomControls from "../components/live-meeting/WaitingRoomControls.jsx";
 import LoungeSettingsDialog from "../components/live-meeting/LoungeSettingsDialog.jsx";
@@ -1592,6 +1596,7 @@ function WaitingRoomScreen({
   eventId = null,
   waitingCount = 0,
   announcementsRef = null,
+  isOnBreak = false,
 }) {
   // ✅ NEW: Initialize announcements component
   const announcementHelper = WaitingRoomAnnouncements({});
@@ -1720,6 +1725,17 @@ function WaitingRoomScreen({
         <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.65)", mb: 2 }}>
           You are in the waiting room. You'll be admitted when the host is ready.
         </Typography>
+
+        {/* Break Indicator Banner */}
+        {isOnBreak && (
+          <Box sx={{ bgcolor: "rgba(255,165,0,0.12)", borderRadius: 2, p: 1.5, mb: 2,
+             border: "1px solid rgba(255,165,0,0.3)", display:"flex", gap:1 }}>
+            <CoffeeIcon sx={{ color:"rgba(255,165,0,0.85)", fontSize:18 }} />
+            <Typography sx={{ fontSize:13, color:"rgba(255,255,255,0.8)" }}>
+              The session is currently on a short break.
+            </Typography>
+          </Box>
+        )}
 
         {/* ✅ NEW: Display waiting room announcements */}
         {announcementHelper && (
@@ -1932,6 +1948,14 @@ export default function NewLiveMeeting() {
   const breakoutRoomStartTimeRef = useRef(null);
   const lastMainRoomSyncRef = useRef(null); // Server sync timestamp for offline calculation
   const lastBreakoutRoomSyncRef = useRef(null); // Server sync timestamp for offline calculation
+
+  // ✅ Break Mode State
+  const [isOnBreak, setIsOnBreak] = useState(false);
+  const [breakRemainingSeconds, setBreakRemainingSeconds] = useState(null);
+  const [breakDurationSeconds, setBreakDurationSeconds] = useState(600);
+  const [loungeEnabledBreaks, setLoungeEnabledBreaks] = useState(false);
+  const [breakConfigOpen, setBreakConfigOpen] = useState(false);
+  const breakTimerRef = useRef(null);
 
   // ✅ NEW: Waiting Room Announcements State
   const waitingRoomAnnouncementsRef = useRef(null);
@@ -2831,8 +2855,35 @@ export default function NewLiveMeeting() {
     }
   }, [dyteMeeting]);
 
+  const enforceSelfBreakMediaLock = useCallback(async () => {
+    if (!dyteMeeting?.self) return;
+    try { await dyteMeeting.self.disableAudio?.(); } catch (e) {
+      console.warn("[LiveMeeting] Failed to disable self audio during break:", e);
+    }
+    try { await dyteMeeting.self.disableVideo?.(); } catch (e) {
+      console.warn("[LiveMeeting] Failed to disable self video during break:", e);
+    }
+    try {
+      const senders = dyteMeeting?.self?.peerConnection?.getSenders?.() || [];
+      for (const sender of senders) {
+        if (sender?.track?.kind === "audio" || sender?.track?.kind === "video") {
+          sender.track.enabled = false;
+        }
+      }
+    } catch (e) {
+      console.warn("[LiveMeeting] Failed to enforce self track disable during break:", e);
+    }
+    setMicOn(false);
+    setCamOn(false);
+  }, [dyteMeeting]);
+
   const handleToggleMic = useCallback(async () => {
     if (!dyteMeeting?.self) return;
+    if (isOnBreak) {
+      showSnackbar("Mic is locked during break.", "info");
+      await enforceSelfBreakMediaLock();
+      return;
+    }
 
     try {
       if (dyteMeeting.self.audioEnabled) {
@@ -2949,7 +3000,7 @@ export default function NewLiveMeeting() {
       // ✅ Save to user preference ref
       userMediaPreferenceRef.current.mic = newState;
     }
-  }, [dyteMeeting]);
+  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak]);
 
   /**
    * Switch to a different video device
@@ -3026,6 +3077,11 @@ export default function NewLiveMeeting() {
 
   const handleToggleCamera = useCallback(async () => {
     if (!dyteMeeting?.self) return;
+    if (isOnBreak) {
+      showSnackbar("Camera is locked during break.", "info");
+      await enforceSelfBreakMediaLock();
+      return;
+    }
 
     try {
       // ✅ CRITICAL FIX: Mark camera as toggled to prevent enforcement loop interference
@@ -3114,7 +3170,7 @@ export default function NewLiveMeeting() {
       // ✅ Save to user preference ref
       userMediaPreferenceRef.current.cam = newState;
     }
-  }, [dyteMeeting]);
+  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak]);
 
   const toggleScreenShareNow = useCallback(async () => {
     if (!dyteMeeting?.self) return;
@@ -3820,6 +3876,47 @@ export default function NewLiveMeeting() {
     }
   }, [eventId, showSnackbar]);
 
+  // Break Mode API Callbacks
+  const handleStartBreak = useCallback(async (durationSeconds) => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/start-break/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ duration_seconds: durationSeconds }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showSnackbar(data?.detail || "Failed to start break.", "error");
+        return;
+      }
+      // WebSocket broadcast will update state reactively
+      console.log("[LiveMeeting] Break started:", data);
+    } catch (e) {
+      console.error("Error starting break:", e);
+      showSnackbar("Network error starting break.", "error");
+    }
+  }, [eventId, showSnackbar]);
+
+  const handleEndBreak = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(toApiUrl(`events/${eventId}/end-break/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showSnackbar(data?.detail || "Failed to end break.", "error");
+        return;
+      }
+      // WebSocket broadcast will update state reactively
+    } catch (e) {
+      console.error("Error ending break:", e);
+      showSnackbar("Network error ending break.", "error");
+    }
+  }, [eventId, showSnackbar]);
+
   const getJoinedParticipants = useCallback(() => {
     const participantsObj = dyteMeeting?.participants;
     if (!participantsObj) return [];
@@ -3890,6 +3987,42 @@ export default function NewLiveMeeting() {
       }
     },
     [dyteMeeting, getAudienceParticipantIds, isHost]
+  );
+
+  const updateAudienceMediaForBreak = useCallback(
+    async (lockMedia) => {
+      if (!isHost || !dyteMeeting) return;
+      const audienceIds = getAudienceParticipantIds();
+      if (audienceIds.length === 0) return;
+      try {
+        await dyteMeeting.participants.updatePermissions(
+          audienceIds,
+          lockMedia
+            ? {
+              canProduceAudio: "NOT_ALLOWED",
+              requestProduceAudio: false,
+              canProduceVideo: "NOT_ALLOWED",
+              requestProduceVideo: false,
+            }
+            : {
+              canProduceAudio: "ALLOWED",
+              requestProduceAudio: true,
+              canProduceVideo: "ALLOWED",
+              requestProduceVideo: true,
+            }
+        );
+      } catch (e) {
+        console.warn("Failed to update break media permissions:", e);
+      }
+      if (lockMedia) {
+        const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+        for (const p of participants) {
+          try { await p?.disableAudio?.(); } catch (_) { }
+          try { await p?.disableVideo?.(); } catch (_) { }
+        }
+      }
+    },
+    [dyteMeeting, getAudienceParticipantIds, getJoinedParticipants, isHost]
   );
 
   const forceMuteParticipant = useCallback(
@@ -4781,6 +4914,15 @@ export default function NewLiveMeeting() {
             setActiveTableName("");
             setRoomChatConversationId(null);
           }
+
+          // Restore break state on reconnect (welcome message includes break state)
+          if (msg.type === "welcome" && msg.is_on_break) {
+            console.log("[MainSocket] Reconnected during active break, remaining:", msg.break_remaining_seconds);
+            setIsOnBreak(true);
+            setBreakDurationSeconds(msg.break_duration_seconds);
+            setBreakRemainingSeconds(msg.break_remaining_seconds);
+            setLoungeEnabledBreaks(msg.lounge_enabled_breaks || false);
+          }
         } else if (msg.type === "message" && msg.data) {
           // Handle broadcast messages (kick/ban)
           const payload = msg.data;
@@ -4877,6 +5019,37 @@ export default function NewLiveMeeting() {
           setShowNetworkingPrompt(false);
           setNetworkingSessionId(null);
           showSnackbar("Speed Networking session has ended", "info");
+        } else if (msg.type === "break_started") {
+          console.log("[MainSocket] Break started:", msg);
+          setIsOnBreak(true);
+          setBreakDurationSeconds(msg.break_duration_seconds);
+          setBreakRemainingSeconds(msg.break_duration_seconds);
+          setLoungeEnabledBreaks(msg.lounge_enabled_breaks || false);
+          enforceSelfBreakMediaLock();
+          if (isHost) updateAudienceMediaForBreak(true);
+
+          if (loungeOpen && !msg.lounge_enabled_breaks) {
+            setLoungeOpen(false);
+            showSnackbar("Social Lounge closed during break.", "info");
+          } else {
+            showSnackbar("Break started. Mic and camera are now disabled.", "info");
+          }
+        } else if (msg.type === "break_ended") {
+          console.log("[MainSocket] Break ended:", msg);
+          setIsOnBreak(false);
+          setBreakRemainingSeconds(null);
+          if (breakTimerRef.current) {
+            clearInterval(breakTimerRef.current);
+            breakTimerRef.current = null;
+          }
+          if (isHost) updateAudienceMediaForBreak(false);
+
+          if (loungeOpen && !msg.lounge_enabled_during) {
+            setLoungeOpen(false);
+            showSnackbar("Break ended — Social Lounge is closed during the session.", "warning");
+          } else {
+            showSnackbar("Break has ended. Mic and camera are now enabled.", "info");
+          }
         } else {
           console.log("[MainSocket] Other message type:", msg.type, msg);
         }
@@ -5342,6 +5515,34 @@ export default function NewLiveMeeting() {
 
     return () => clearInterval(interval);
   }, [breakoutTimer]);
+
+  // Break Mode countdown effect
+  useEffect(() => {
+    if (!isOnBreak || !breakRemainingSeconds) {
+      if (breakTimerRef.current) {
+        clearInterval(breakTimerRef.current);
+        breakTimerRef.current = null;
+      }
+      return;
+    }
+    breakTimerRef.current = setInterval(() => {
+      setBreakRemainingSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(breakTimerRef.current);
+          breakTimerRef.current = null;
+          setIsOnBreak(false); // optimistic clear; Celery broadcasts authoritative break_ended
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (breakTimerRef.current) {
+        clearInterval(breakTimerRef.current);
+        breakTimerRef.current = null;
+      }
+    };
+  }, [isOnBreak]);
 
   // ✅ PHASE 3: DUAL-TIMER COUNTDOWN EFFECT
   // Handles continuous countdown for both main room and breakout room timers
@@ -6882,26 +7083,44 @@ export default function NewLiveMeeting() {
             private: { canSend: hostPerms.chat, text: hostPerms.chat, files: hostPerms.chat },
           },
           polls: { canCreate: hostPerms.polls, canVote: hostPerms.polls },
-          ...(hostMediaLocks.mic
+          ...((hostMediaLocks.mic || isOnBreak)
             ? { canProduceAudio: "NOT_ALLOWED", requestProduceAudio: false }
             : {}),
-          ...(hostMediaLocks.cam
+          ...((hostMediaLocks.cam || isOnBreak)
             ? { canProduceVideo: "NOT_ALLOWED", requestProduceVideo: false }
             : {}),
         });
       } catch (e) {
         console.warn("Failed to sync permissions", e);
       }
-      if (hostMediaLocks.mic) {
+      if (hostMediaLocks.mic || isOnBreak) {
         try { await participant?.disableAudio?.(); } catch { }
       }
-      if (hostMediaLocks.cam) {
+      if (hostMediaLocks.cam || isOnBreak) {
         try { await participant?.disableVideo?.(); } catch { }
       }
     };
     dyteMeeting.participants.joined.on("participantJoined", handleParticipantJoined);
     return () => dyteMeeting.participants.joined.off("participantJoined", handleParticipantJoined);
-  }, [dyteMeeting, hostPerms.chat, hostPerms.polls, hostPerms.screenShare, hostMediaLocks, isHost]);
+  }, [dyteMeeting, hostPerms.chat, hostPerms.polls, hostPerms.screenShare, hostMediaLocks, isHost, isOnBreak]);
+
+  useEffect(() => {
+    if (!dyteMeeting?.self) return;
+    if (isOnBreak) {
+      enforceSelfBreakMediaLock();
+    }
+    if (isHost) {
+      updateAudienceMediaForBreak(isOnBreak);
+    }
+  }, [dyteMeeting, enforceSelfBreakMediaLock, isHost, isOnBreak, updateAudienceMediaForBreak]);
+
+  useEffect(() => {
+    if (!isOnBreak || !dyteMeeting?.self) return;
+    const interval = setInterval(() => {
+      enforceSelfBreakMediaLock();
+    }, 800);
+    return () => clearInterval(interval);
+  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak]);
 
   useEffect(() => {
     if (!dyteMeeting) return;
@@ -10985,7 +11204,16 @@ export default function NewLiveMeeting() {
 
             {/* MEMBERS */}
             <TabPanel value={tab} index={3}>
-              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx }}>
+              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 2, ...scrollSx, opacity: isOnBreak ? 0.65 : 1, transition: "opacity 0.3s" }}>
+                {/* Break Mode Banner */}
+                {isOnBreak && (
+                  <Box sx={{ bgcolor: "rgba(255,165,0,0.12)", borderRadius: 2, p: 1.5, mb: 2, border: "1px solid rgba(255,165,0,0.3)", display: "flex", gap: 1, alignItems: "center" }}>
+                    <CoffeeIcon sx={{ color: "rgba(255,165,0,0.85)", fontSize: 18 }} />
+                    <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
+                      Break in progress. Participant interactions are disabled.
+                    </Typography>
+                  </Box>
+                )}
                 {/* ✅ Phase 5: Filter controls for Host (in main room) - 2x2 Grid */}
                 {isHost && !isBreakout && (
                   <Stack sx={{ mb: 2 }}>
@@ -10999,6 +11227,7 @@ export default function NewLiveMeeting() {
                           size="small"
                           variant={participantRoomFilter === filter.value ? "contained" : "outlined"}
                           onClick={() => setParticipantRoomFilter(filter.value)}
+                          disabled={isOnBreak}
                           sx={{
                             flex: 1,
                             textTransform: "none",
@@ -11026,6 +11255,7 @@ export default function NewLiveMeeting() {
                           size="small"
                           variant={participantRoomFilter === filter.value ? "contained" : "outlined"}
                           onClick={() => setParticipantRoomFilter(filter.value)}
+                          disabled={isOnBreak}
                           sx={{
                             flex: 1,
                             textTransform: "none",
@@ -11084,6 +11314,9 @@ export default function NewLiveMeeting() {
                                         ) : null;
                                       })()}
                                       <Chip size="small" label="Host" sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+                                      {isOnBreak && (
+                                        <Chip size="small" label="On Break" icon={<CoffeeIcon sx={{ fontSize: 13 }} />} sx={{ bgcolor: "rgba(255,165,0,0.15)", borderColor: "rgba(255,165,0,0.3)", border: "1px solid", color: "rgba(255,165,0,0.85)" }} />
+                                      )}
                                     </Stack>
                                     {/* ✅ Phase 5: Room location badge below name */}
                                     {isHost && !isBreakout && m._roomLocation && (
@@ -11096,14 +11329,14 @@ export default function NewLiveMeeting() {
                                     {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host (self) */}
-                                      <Tooltip title={isHost && isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off"))}>
                                         <IconButton
                                           size="small"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             if (isHost && isSelfMember(m)) handleToggleMic();
                                           }}
-                                          disabled={!isHost || !isSelfMember(m)}
+                                          disabled={isOnBreak || !isHost || !isSelfMember(m)}
                                           sx={{
                                             bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                             border: "1px solid",
@@ -11121,14 +11354,14 @@ export default function NewLiveMeeting() {
                                       </Tooltip>
 
                                       {/* CAMERA ICON - GREEN when ON, RED when OFF - Clickable for Host (self) */}
-                                      <Tooltip title={isHost && isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off"))}>
                                         <IconButton
                                           size="small"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             if (isHost && isSelfMember(m)) handleToggleCamera();
                                           }}
-                                          disabled={!isHost || !isSelfMember(m)}
+                                          disabled={isOnBreak || !isHost || !isSelfMember(m)}
                                           sx={{
                                             bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                             border: "1px solid",
@@ -11147,9 +11380,10 @@ export default function NewLiveMeeting() {
 
                                       {/* Audience can DM Host; Host should NOT see message icon on own name */}
                                       {!isHost && (
-                                        <Tooltip title="Send Message">
+                                        <Tooltip title={isOnBreak ? "Disabled during break" : "Send Message"}>
                                           <IconButton
                                             size="small"
+                                            disabled={isOnBreak}
                                             sx={{ color: "#fff" }}
                                             onClick={() => handleOpenPrivateChat(m)}
                                           >
@@ -11179,6 +11413,7 @@ export default function NewLiveMeeting() {
                                       {isHost && !isSelfMember(m) && (
                                         <IconButton
                                           size="small"
+                                          disabled={isOnBreak}
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleOpenParticipantMenu(e, m);
@@ -11437,7 +11672,7 @@ export default function NewLiveMeeting() {
                               <ListItemText
                                 primary={
                                   <Stack spacing={1}>
-                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                                       <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
                                         {m.name}{isSelfMember(m) ? " (You)" : ""}
                                       </Typography>
@@ -11451,6 +11686,9 @@ export default function NewLiveMeeting() {
                                           <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
                                         ) : null;
                                       })()}
+                                      {isOnBreak && (
+                                        <Chip size="small" label="On Break" icon={<CoffeeIcon sx={{ fontSize: 13 }} />} sx={{ bgcolor: "rgba(255,165,0,0.15)", borderColor: "rgba(255,165,0,0.3)", border: "1px solid", color: "rgba(255,165,0,0.85)" }} />
+                                      )}
                                     </Box>
                                     {/* ✅ Phase 5: Room location badge below name */}
                                     {isHost && !isBreakout && m._roomLocation && (
@@ -11463,14 +11701,14 @@ export default function NewLiveMeeting() {
                                     {renderMoodRow(m)}
                                     <Stack direction="row" spacing={0.75} alignItems="center">
                                       {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                      <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off"))}>
                                         <IconButton
                                           size="small"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             if (isHost && !isSelfMember(m)) forceMuteParticipant(m);
                                           }}
-                                          disabled={!isHost || isSelfMember(m)}
+                                          disabled={isOnBreak || !isHost || isSelfMember(m)}
                                           sx={{
                                             bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                             border: "1px solid",
@@ -11488,14 +11726,14 @@ export default function NewLiveMeeting() {
                                       </Tooltip>
 
                                       {/* CAMERA ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                      <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off"))}>
                                         <IconButton
                                           size="small"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             if (isHost && !isSelfMember(m)) forceCameraOffParticipant(m);
                                           }}
-                                          disabled={!isHost || isSelfMember(m)}
+                                          disabled={isOnBreak || !isHost || isSelfMember(m)}
                                           sx={{
                                             bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                             border: "1px solid",
@@ -11516,6 +11754,7 @@ export default function NewLiveMeeting() {
                                       {isHost && !isSelfMember(m) && (
                                         <IconButton
                                           size="small"
+                                          disabled={isOnBreak}
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleOpenParticipantMenu(e, m);
@@ -11547,6 +11786,7 @@ export default function NewLiveMeeting() {
                           <Button
                             size="small"
                             variant="outlined"
+                            disabled={isOnBreak}
                             onClick={() => setBannedDialogOpen(true)}
                             sx={{
                               fontSize: 10,
@@ -11560,13 +11800,13 @@ export default function NewLiveMeeting() {
                             Bans
                           </Button>
                           <Stack direction="row" spacing={0.75}>
-                            <Tooltip title="Mute all">
-                              <IconButton size="small" onClick={forceMuteAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
+                            <Tooltip title={isOnBreak ? "Disabled during break" : "Mute all"}>
+                              <IconButton size="small" disabled={isOnBreak} onClick={forceMuteAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
                                 <MicOffIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Camera off all">
-                              <IconButton size="small" onClick={forceCameraOffAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
+                            <Tooltip title={isOnBreak ? "Disabled during break" : "Camera off all"}>
+                              <IconButton size="small" disabled={isOnBreak} onClick={forceCameraOffAll} sx={{ color: "rgba(255,255,255,0.9)" }}>
                                 <VideocamOffIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
@@ -11589,7 +11829,7 @@ export default function NewLiveMeeting() {
                             <ListItemText
                               primary={
                                 <Stack spacing={1}>
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                                     <Typography noWrap sx={{ fontWeight: 700, fontSize: 13 }}>
                                       {m.name}{isSelfMember(m) ? " (You)" : ""}
                                     </Typography>
@@ -11603,6 +11843,9 @@ export default function NewLiveMeeting() {
                                         <VerifiedRoundedIcon sx={{ fontSize: 14, color: "#14b8a6", flexShrink: 0 }} />
                                       ) : null;
                                     })()}
+                                    {isOnBreak && (
+                                      <Chip size="small" label="On Break" icon={<CoffeeIcon sx={{ fontSize: 13 }} />} sx={{ bgcolor: "rgba(255,165,0,0.15)", borderColor: "rgba(255,165,0,0.3)", border: "1px solid", color: "rgba(255,165,0,0.85)" }} />
+                                    )}
                                   </Box>
                                   {/* ✅ Phase 5: Room location badge below name */}
                                   {isHost && !isBreakout && m._roomLocation && (
@@ -11615,14 +11858,14 @@ export default function NewLiveMeeting() {
                                   {renderMoodRow(m)}
                                   <Stack direction="row" spacing={0.75} alignItems="center">
                                     {/* MIC ICON - GREEN when ON, RED when OFF - Clickable for Host */}
-                                    <Tooltip title={isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off")}>
+                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && !isSelfMember(m) ? (m.mic ? "Mute" : "Unmute") : (m.mic ? "Mic on" : "Mic off"))}>
                                       <IconButton
                                         size="small"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           if (isHost && !isSelfMember(m)) forceMuteParticipant(m);
                                         }}
-                                        disabled={!isHost || isSelfMember(m)}
+                                        disabled={isOnBreak || !isHost || isSelfMember(m)}
                                         sx={{
                                           bgcolor: m.mic ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                           border: "1px solid",
@@ -11640,14 +11883,14 @@ export default function NewLiveMeeting() {
                                     </Tooltip>
 
                                     {/* CAMERA ICON - GREEN when ON, RED when OFF - Read-only for self, Clickable for Host on others */}
-                                    <Tooltip title={isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off")}>
+                                    <Tooltip title={isOnBreak ? "Disabled during break" : (isHost && !isSelfMember(m) ? (m.cam ? "Turn camera off" : "Turn camera on") : (m.cam ? "Camera on" : "Camera off"))}>
                                       <IconButton
                                         size="small"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           if (isHost && !isSelfMember(m)) forceCameraOffParticipant(m);
                                         }}
-                                        disabled={!isHost || isSelfMember(m)}
+                                        disabled={isOnBreak || !isHost || isSelfMember(m)}
                                         sx={{
                                           bgcolor: m.cam ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
                                           border: "1px solid",
@@ -11667,9 +11910,10 @@ export default function NewLiveMeeting() {
 
                                     {/* MESSAGE ICON */}
                                     {!isSelfMember(m) && (
-                                      <Tooltip title="Send Message">
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : "Send Message"}>
                                         <IconButton
                                           size="small"
+                                          disabled={isOnBreak}
                                           sx={{ color: "#fff" }}
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -11702,6 +11946,7 @@ export default function NewLiveMeeting() {
                                     {isHost && !isSelfMember(m) && (
                                       <IconButton
                                         size="small"
+                                        disabled={isOnBreak}
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleOpenParticipantMenu(e, m);
@@ -12073,6 +12318,7 @@ export default function NewLiveMeeting() {
           eventId={eventId}
           waitingCount={filteredWaitingRoomCount || 0}
           announcementsRef={waitingRoomAnnouncementsRef}
+          isOnBreak={isOnBreak}
         />
         <LoungeOverlay
           open={loungeOpen}
@@ -13281,21 +13527,24 @@ export default function NewLiveMeeting() {
                     width: { xs: "100%", sm: "auto" },
                   }}
                 >
-                  <Tooltip title={micOn ? "Mute" : "Unmute"}>
+                  <Tooltip title={isOnBreak ? "Disabled during break" : (micOn ? "Mute" : "Unmute")}>
                     <IconButton
                       onClick={handleToggleMic}
+                      disabled={isOnBreak}
                       aria-label="Toggle mic"
                     >
                       {micOn ? <MicIcon /> : <MicOffIcon />}
                     </IconButton>
                   </Tooltip>
 
-                  <Tooltip title={camOn ? "Turn camera off" : "Turn camera on"}>
+                  <Tooltip title={isOnBreak ? "Disabled during break" : (camOn ? "Turn camera off" : "Turn camera on")}>
                     <IconButton
                       onClick={handleToggleCamera}
+                      disabled={isOnBreak}
                       sx={{
                         bgcolor: "rgba(255,255,255,0.06)",
                         "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                        "&.Mui-disabled": { opacity: 0.45 },
                         // Optional: Visual feedback if cam is active
                         color: camOn ? "#fff" : "inherit"
                       }}
@@ -13468,6 +13717,22 @@ export default function NewLiveMeeting() {
                         }}
                       >
                         <ShuffleIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+
+                  {isHost && !isOnBreak && dbStatus === "live" && (
+                    <Tooltip title="Start Break">
+                      <IconButton
+                        onClick={() => setBreakConfigOpen(true)}
+                        sx={{
+                          bgcolor: "rgba(255,255,255,0.06)",
+                          "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
+                          mx: 0.5,
+                          color: "#8b7355"
+                        }}
+                      >
+                        <CoffeeIcon />
                       </IconButton>
                     </Tooltip>
                   )}
@@ -14151,6 +14416,32 @@ export default function NewLiveMeeting() {
             )}
           </DialogActions>
         </Dialog>
+
+        {/* Participants: Break Mode Full-Screen Overlay */}
+        {isOnBreak && !isHost && dbStatus === "live" && (
+          <BreakModeScreen
+            remainingSeconds={breakRemainingSeconds ?? 0}
+            durationSeconds={breakDurationSeconds}
+            loungeEnabled={loungeEnabledBreaks}
+            onOpenLounge={() => setLoungeOpen(true)}
+          />
+        )}
+
+        {/* Host: Break Mode Floating Control Bar */}
+        {isOnBreak && isHost && (
+          <HostBreakControls
+            remainingSeconds={breakRemainingSeconds ?? 0}
+            onEndBreak={handleEndBreak}
+          />
+        )}
+
+        {/* Break Duration Configuration Dialog */}
+        <BreakConfigDialog
+          open={breakConfigOpen}
+          onClose={() => setBreakConfigOpen(false)}
+          onStartBreak={handleStartBreak}
+        />
+
         <LoungeOverlay
           open={loungeOpen}
           onClose={() => setLoungeOpen(false)}

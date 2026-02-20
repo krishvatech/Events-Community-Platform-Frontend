@@ -823,11 +823,11 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                                     />
                                 </Box>
                             )}
-                            <Box sx={{ px: 4, pb: 2 }}>
+                            {/* <Box sx={{ px: 4, pb: 2 }}>
                                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)' }}>
                                     Debug Info: My ID (JWT): {currentUserId} | My ID (Backend): {myInternalId || 'Waiting...'} | Username: {myUsername || '...'}
                                 </Typography>
-                            </Box>
+                            </Box> */}
                         </Box>
                     )}
 
