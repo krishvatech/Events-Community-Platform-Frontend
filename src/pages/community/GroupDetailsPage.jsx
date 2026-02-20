@@ -2160,13 +2160,13 @@ function MembersTab({ groupId }) {
 
   const [selectedCompanies, setSelectedCompanies] = React.useState([]);
   const [selectedRegions, setSelectedRegions] = React.useState([]);
-  const [selectedTitles, setSelectedTitles] = React.useState([]);
+
   const [selectedIndustries, setSelectedIndustries] = React.useState([]);
   const [selectedCompanySizes, setSelectedCompanySizes] = React.useState([]);
 
   const [globalOptions, setGlobalOptions] = React.useState({
     companies: [],
-    titles: [],
+
     industries: [],
     sizes: [],
     regions: [],
@@ -2207,7 +2207,7 @@ function MembersTab({ groupId }) {
 
         setGlobalOptions({
           companies: data.companies || [],
-          titles: data.titles || [],
+
           industries: data.industries || [],
           sizes: sortedSizes,
           regions: sortedRegions,
@@ -2242,9 +2242,7 @@ function MembersTab({ groupId }) {
     if (selectedRegions.length) {
       list = list.filter((m) => selectedRegions.includes(getCountryFromUser(m.user || m)));
     }
-    if (selectedTitles.length) {
-      list = list.filter((m) => selectedTitles.includes(getJobTitleFromUser(m.user || m)));
-    }
+
     if (selectedIndustries.length) {
       list = list.filter((m) => selectedIndustries.includes(getIndustryFromUser(m.user || m)));
     }
@@ -2271,7 +2269,7 @@ function MembersTab({ groupId }) {
     q,
     selectedCompanies,
     selectedRegions,
-    selectedTitles,
+
     selectedIndustries,
     selectedCompanySizes,
   ]);
@@ -2345,24 +2343,7 @@ function MembersTab({ groupId }) {
               sx={{ flex: 1 }}
             />
 
-            <Autocomplete
-              multiple
-              fullWidth
-              size="small"
-              options={globalOptions.titles}
-              value={selectedTitles}
-              onChange={(_, newValue) => setSelectedTitles(newValue)}
-              filterSelectedOptions
-              disableCloseOnSelect
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Job title"
-                  placeholder={selectedTitles.length ? "" : "All job titles"}
-                />
-              )}
-              sx={{ flex: 1 }}
-            />
+
           </Stack>
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>

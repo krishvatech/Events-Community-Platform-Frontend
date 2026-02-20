@@ -1049,10 +1049,10 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
 
   const [selectedCompanies, setSelectedCompanies] = React.useState([]);
   const [selectedRegions, setSelectedRegions] = React.useState([]);
-  const [selectedTitles, setSelectedTitles] = React.useState([]);
+
   const [globalOptions, setGlobalOptions] = React.useState({
     companies: [],
-    titles: [],
+
     regions: [],
   });
 
@@ -1130,11 +1130,11 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
   const buildMemberFiltersQuery = React.useCallback(() => {
     const params = new URLSearchParams();
     selectedCompanies.forEach((v) => params.append("company", v));
-    selectedTitles.forEach((v) => params.append("title", v));
+
     selectedRegions.forEach((v) => params.append("region", v));
     const qs = params.toString();
     return qs ? `?${qs}` : "";
-  }, [selectedCompanies, selectedTitles, selectedRegions]);
+  }, [selectedCompanies, selectedRegions]);
 
   async function fetchExploreGroups() {
     try {
@@ -1184,7 +1184,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
     Promise.all([fetchExploreGroups(), fetchMyGroups()]).finally(() =>
       setLoading(false)
     );
-  }, [selectedCompanies, selectedRegions, selectedTitles]);
+  }, [selectedCompanies, selectedRegions]);
 
   const handleJoin = async (g) => {
     const visibility = (g.visibility || "").toLowerCase();
@@ -1269,7 +1269,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [q, tabIndex, selectedJoinPolicies, selectedVisibilities, selectedCompanies, selectedRegions, selectedTitles]);
+  }, [q, tabIndex, selectedJoinPolicies, selectedVisibilities, selectedCompanies, selectedRegions]);
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginatedGroups = React.useMemo(() => {
@@ -1391,24 +1391,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   sx={{ flex: 1 }}
                 />
 
-                <Autocomplete
-                  multiple
-                  fullWidth
-                  size="small"
-                  options={globalOptions.titles}
-                  value={selectedTitles}
-                  onChange={(_, newValue) => setSelectedTitles(newValue)}
-                  filterSelectedOptions
-                  disableCloseOnSelect
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Job title"
-                      placeholder={selectedTitles.length ? "" : "All job titles"}
-                    />
-                  )}
-                  sx={{ flex: 1 }}
-                />
+
               </Stack>
 
               <Stack
