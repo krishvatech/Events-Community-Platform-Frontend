@@ -2856,6 +2856,11 @@ export default function NewLiveMeeting() {
   }, [dyteMeeting]);
 
   const enforceSelfBreakMediaLock = useCallback(async () => {
+    // ✅ STATE PRIORITY FIX: Skip lock enforcement for lounge users during break
+    if (isBreakout && isOnBreak) {
+      console.log("[LiveMeeting] Skipping break media lock - user is in lounge during break");
+      return;
+    }
     if (!dyteMeeting?.self) return;
     try { await dyteMeeting.self.disableAudio?.(); } catch (e) {
       console.warn("[LiveMeeting] Failed to disable self audio during break:", e);
@@ -2875,11 +2880,66 @@ export default function NewLiveMeeting() {
     }
     setMicOn(false);
     setCamOn(false);
-  }, [dyteMeeting]);
+  }, [dyteMeeting, isBreakout, isOnBreak]);
+
+  const ensureVideoInputReady = useCallback(async () => {
+    if (!dyteMeeting?.self) return false;
+    if (dyteMeeting.self.videoInput) return true;
+
+    console.log("[LiveMeeting] No video input selected. Attempting camera device initialization...");
+    try {
+      await enumerateDevices();
+    } catch (_) { }
+
+    let availableVideoDevices = [];
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      availableVideoDevices = devices.filter((d) => d.kind === "videoinput" && d.deviceId);
+    } catch (e) {
+      console.warn("[LiveMeeting] Failed to enumerate video devices before enable:", e);
+    }
+
+    if (availableVideoDevices.length === 0) {
+      try {
+        const probe = await navigator.mediaDevices.getUserMedia({ video: true });
+        probe.getTracks().forEach((t) => t.stop());
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableVideoDevices = devices.filter((d) => d.kind === "videoinput" && d.deviceId);
+      } catch (e) {
+        console.warn("[LiveMeeting] Camera permission/device probe failed:", e);
+      }
+    }
+
+    if (availableVideoDevices.length === 0) {
+      // Don't hard-block camera toggle if browser doesn't expose devices reliably.
+      // We'll still try enableVideo() and verify the final SDK state.
+      console.warn("[LiveMeeting] No enumerated video devices; continuing with SDK enable attempt");
+      return true;
+    }
+
+    const preferredDevice =
+      availableVideoDevices.find((d) => d.deviceId === selectedVideoDeviceId) ||
+      availableVideoDevices[0];
+
+    try {
+      if (preferredDevice && typeof dyteMeeting.self.setDevice === "function") {
+        await dyteMeeting.self.setDevice(preferredDevice);
+        setSelectedVideoDeviceId(preferredDevice.deviceId);
+        console.log("[LiveMeeting] Video input initialized using device:", preferredDevice.deviceId);
+        return true;
+      }
+    } catch (e) {
+      console.warn("[LiveMeeting] Failed to set video input device before enable:", e);
+    }
+
+    return Boolean(dyteMeeting.self.videoInput);
+  }, [dyteMeeting, enumerateDevices, selectedVideoDeviceId]);
 
   const handleToggleMic = useCallback(async () => {
     if (!dyteMeeting?.self) return;
-    if (isOnBreak) {
+    // ✅ STATE PRIORITY FIX: Allow mic toggle in lounge rooms during break
+    // Only enforce break media lock on main stage users, not lounge participants
+    if (isOnBreak && !isBreakout) {
       showSnackbar("Mic is locked during break.", "info");
       await enforceSelfBreakMediaLock();
       return;
@@ -3076,30 +3136,45 @@ export default function NewLiveMeeting() {
 
 
   const handleToggleCamera = useCallback(async () => {
-    if (!dyteMeeting?.self) return;
-    if (isOnBreak) {
-      showSnackbar("Camera is locked during break.", "info");
-      await enforceSelfBreakMediaLock();
-      return;
-    }
-
     try {
+      console.log("[LiveMeeting] 🎬 CAMERA ICON CLICKED - START");
+      console.log("[LiveMeeting] Current states - isOnBreak:", isOnBreak, "isBreakout:", isBreakout, "role:", role);
+
+      if (!dyteMeeting?.self) {
+        console.error("[LiveMeeting] ❌ dyteMeeting.self not available");
+        return;
+      }
+
+      // ✅ STATE PRIORITY FIX: Allow camera toggle in lounge rooms during break
+      // Only enforce break media lock on main stage users, not lounge participants
+      if (isOnBreak && !isBreakout) {
+        console.log("[LiveMeeting] Camera locked during break (not in lounge)");
+        showSnackbar("Camera is locked during break.", "info");
+        await enforceSelfBreakMediaLock();
+        return;
+      }
+
       // ✅ CRITICAL FIX: Mark camera as toggled to prevent enforcement loop interference
       cameraToggleTimeRef.current = Date.now();
+      console.log("[LiveMeeting] 📹 Camera toggle - cameraToggleTimeRef set");
+
+      console.log("[LiveMeeting] 📹 Current SDK videoEnabled:", dyteMeeting.self.videoEnabled);
+      console.log("[LiveMeeting] 📹 Video device:", dyteMeeting.self.videoInput);
 
       // ✅ CRITICAL FIX: Use actual Dyte state, not local UI state
       if (dyteMeeting.self.videoEnabled) {
         console.log(
           "[LiveMeeting] 📹 TOGGLING CAMERA OFF - isBreakout:",
           isBreakout,
-          "Disabling video...",
           "Current videoEnabled:",
           dyteMeeting.self.videoEnabled
         );
         // ✅ CRITICAL FIX: Save preference IMMEDIATELY to false, don't wait for SDK response
         userMediaPreferenceRef.current.cam = false;
 
+        console.log("[LiveMeeting] Calling disableVideo()...");
         await dyteMeeting.self.disableVideo();
+        console.log("[LiveMeeting] ✅ disableVideo() completed");
 
         // ✅ CRITICAL: Ensure video track is fully muted at WebRTC level
         // This prevents any lingering video transmission to other participants
@@ -3109,9 +3184,7 @@ export default function NewLiveMeeting() {
           ) || [];
           console.log(
             "[LiveMeeting] Found video senders to disable:",
-            videoSenders.length,
-            "in",
-            isBreakout ? "LOUNGE" : "MAIN ROOM"
+            videoSenders.length
           );
           for (const sender of videoSenders) {
             if (sender.track) {
@@ -3126,27 +3199,57 @@ export default function NewLiveMeeting() {
         // Give SDK time to update internal state
         await new Promise((r) => setTimeout(r, 100));
         const newState = Boolean(dyteMeeting.self.videoEnabled);
-        console.log(
-          "[LiveMeeting] 📹 Video disabled -",
-          isBreakout ? "LOUNGE" : "MAIN",
-          "- SDK reports videoEnabled:",
-          newState,
-          "preference stored as:",
-          false
-        );
+        console.log("[LiveMeeting] After disableVideo - SDK videoEnabled:", newState);
         setCamOn(newState);
       } else {
-        console.log("[LiveMeeting] Enabling video...");
+        console.log("[LiveMeeting] 📹 TOGGLING CAMERA ON");
+        console.log("[LiveMeeting] Current SDK state before enable - videoEnabled:", dyteMeeting.self.videoEnabled);
+        console.log("[LiveMeeting] Video device available:", dyteMeeting.self.videoInput);
+
         // ✅ CRITICAL FIX: Save preference IMMEDIATELY to true
         userMediaPreferenceRef.current.cam = true;
 
-        await dyteMeeting.self.enableVideo();
+        // ✅ LOUNGE/BREAK FIX: ensure a video input is selected before enabling camera
+        if (!dyteMeeting.self.videoInput) {
+          await ensureVideoInputReady();
+        }
+
+        console.log("[LiveMeeting] Calling enableVideo()...");
+
+        // Add timeout to catch hanging calls
+        const enablePromise = dyteMeeting.self.enableVideo?.();
+        if (!enablePromise) {
+          console.error("[LiveMeeting] ❌ enableVideo() is not a function!");
+          throw new Error("enableVideo is not available");
+        }
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("enableVideo() timed out after 5s")), 5000)
+        );
+
+        try {
+          const enableResult = await Promise.race([enablePromise, timeoutPromise]);
+          console.log("[LiveMeeting] ✅ enableVideo() completed, result:", enableResult);
+        } catch (timeoutErr) {
+          console.error("[LiveMeeting] ⚠️ enableVideo error:", timeoutErr?.message);
+          throw timeoutErr;
+        }
+
+        console.log("[LiveMeeting] After enableVideo - SDK videoEnabled:", dyteMeeting.self.videoEnabled);
+
+        // Retry once if SDK still reports disabled
+        if (!dyteMeeting.self.videoEnabled) {
+          console.warn("[LiveMeeting] Video still disabled after first enable attempt. Retrying bootstrap + enable...");
+          await ensureVideoInputReady();
+          await dyteMeeting.self.enableVideo?.();
+        }
 
         // ✅ CRITICAL: Ensure video track is fully enabled at WebRTC level
         try {
           const videoSenders = dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
             (s) => s.track?.kind === "video"
           ) || [];
+          console.log("[LiveMeeting] Video senders found:", videoSenders.length);
           for (const sender of videoSenders) {
             if (sender.track) {
               sender.track.enabled = true;
@@ -3160,17 +3263,31 @@ export default function NewLiveMeeting() {
         // Give SDK time to update internal state
         await new Promise((r) => setTimeout(r, 100));
         const newState = Boolean(dyteMeeting.self.videoEnabled);
+        console.log("[LiveMeeting] After all enable ops - final SDK videoEnabled:", newState);
+        if (!newState) {
+          showSnackbar("Unable to turn on camera. Please check browser/site camera permission.", "warning");
+        }
         setCamOn(newState);
       }
     } catch (e) {
-      console.error("[LiveMeeting] Failed to toggle camera:", e);
+      console.error("[LiveMeeting] ❌ Failed to toggle camera:", e?.message || e);
+      console.error("[LiveMeeting] Full error:", e);
       // Sync UI state with actual Dyte state on error
       const newState = Boolean(dyteMeeting?.self?.videoEnabled);
+      console.log("[LiveMeeting] Setting camOn to:", newState);
       setCamOn(newState);
       // ✅ Save to user preference ref
       userMediaPreferenceRef.current.cam = newState;
     }
-  }, [dyteMeeting, enforceSelfBreakMediaLock, isOnBreak]);
+  }, [
+    dyteMeeting,
+    ensureVideoInputReady,
+    enforceSelfBreakMediaLock,
+    isOnBreak,
+    isBreakout,
+    role,
+    showSnackbar,
+  ]);
 
   const toggleScreenShareNow = useCallback(async () => {
     if (!dyteMeeting?.self) return;
@@ -3992,8 +4109,34 @@ export default function NewLiveMeeting() {
   const updateAudienceMediaForBreak = useCallback(
     async (lockMedia) => {
       if (!isHost || !dyteMeeting) return;
-      const audienceIds = getAudienceParticipantIds();
+      const joinedParticipants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
+      if (joinedParticipants.length === 0) return;
+
+      const isParticipantInLoungeOrBreakout = (participant) => {
+        const roomInfo = participantRoomMap.get(participant?.id);
+        if (roomInfo?.type === "lounge" || roomInfo?.type === "breakout") return true;
+
+        const participantUserId = getBackendUserId(participant);
+        if (!participantUserId) return false;
+
+        return loungeTables.some((table) => {
+          if (!table?.participants) return false;
+          const participantsList = Array.isArray(table.participants)
+            ? table.participants
+            : Object.values(table.participants);
+          return participantsList.some((tableParticipant) => {
+            const tableUserId = tableParticipant?.user_id || tableParticipant?.userId;
+            return tableUserId && String(tableUserId) === String(participantUserId);
+          });
+        });
+      };
+
+      const lockTargets = lockMedia
+        ? joinedParticipants.filter((p) => !isParticipantInLoungeOrBreakout(p))
+        : joinedParticipants;
+      const audienceIds = lockTargets.map((p) => p.id);
       if (audienceIds.length === 0) return;
+
       try {
         await dyteMeeting.participants.updatePermissions(
           audienceIds,
@@ -4015,14 +4158,13 @@ export default function NewLiveMeeting() {
         console.warn("Failed to update break media permissions:", e);
       }
       if (lockMedia) {
-        const participants = getJoinedParticipants().filter((p) => p.id !== dyteMeeting?.self?.id);
-        for (const p of participants) {
+        for (const p of lockTargets) {
           try { await p?.disableAudio?.(); } catch (_) { }
           try { await p?.disableVideo?.(); } catch (_) { }
         }
       }
     },
-    [dyteMeeting, getAudienceParticipantIds, getJoinedParticipants, isHost]
+    [dyteMeeting, getJoinedParticipants, isHost, loungeTables, participantRoomMap]
   );
 
   const forceMuteParticipant = useCallback(
@@ -4456,6 +4598,15 @@ export default function NewLiveMeeting() {
         } else if (msg.type === "breakout_restored") {
           // ✅ NEW: Page reload/reconnect - user is being restored to their previous breakout room
           console.log("[MainSocket] Breakout restored to table", msg.table_id);
+
+          // ✅ RECONNECT FIX: Eagerly mark breakout restoration BEFORE async chain starts
+          // This prevents the welcome message (arriving milliseconds later) from
+          // showing the break screen or clearing activeTableId during the async gap.
+          isBreakoutRef.current = true;
+          setActiveTableId(msg.table_id);
+          setActiveTableName(msg.table_name || `Room ${msg.table_id}`);
+          console.log("[MainSocket] ✅ Eagerly set breakout flags to suppress break screen during reconnect");
+
           showSnackbar(`Restored to ${msg.table_name || "your breakout room"}`, "info");
 
           // 🎥 Restore BOTH breakout room AND main room peek view after page reload
@@ -4916,12 +5067,23 @@ export default function NewLiveMeeting() {
           }
 
           // Restore break state on reconnect (welcome message includes break state)
-          if (msg.type === "welcome" && msg.is_on_break) {
-            console.log("[MainSocket] Reconnected during active break, remaining:", msg.break_remaining_seconds);
-            setIsOnBreak(true);
-            setBreakDurationSeconds(msg.break_duration_seconds);
-            setBreakRemainingSeconds(msg.break_remaining_seconds);
-            setLoungeEnabledBreaks(msg.lounge_enabled_breaks || false);
+          if (msg.type === "welcome") {
+            // ✅ STATE PRIORITY FIX: Process user's lounge table BEFORE break state
+            // If user is in a lounge table, mark breakout state immediately
+            if (msg.user_lounge_table_id && !isBreakoutRef.current) {
+              console.log("[MainSocket] User is in lounge table", msg.user_lounge_table_id, "- suppressing break screen");
+              isBreakoutRef.current = true;
+              setActiveTableId(msg.user_lounge_table_id);
+            }
+
+            // Then restore break state if active
+            if (msg.is_on_break) {
+              console.log("[MainSocket] Reconnected during active break, remaining:", msg.break_remaining_seconds);
+              setIsOnBreak(true);
+              setBreakDurationSeconds(msg.break_duration_seconds);
+              setBreakRemainingSeconds(msg.break_remaining_seconds);
+              setLoungeEnabledBreaks(msg.lounge_enabled_breaks || false);
+            }
           }
         } else if (msg.type === "message" && msg.data) {
           // Handle broadcast messages (kick/ban)
@@ -5025,14 +5187,24 @@ export default function NewLiveMeeting() {
           setBreakDurationSeconds(msg.break_duration_seconds);
           setBreakRemainingSeconds(msg.break_duration_seconds);
           setLoungeEnabledBreaks(msg.lounge_enabled_breaks || false);
-          enforceSelfBreakMediaLock();
-          if (isHost) updateAudienceMediaForBreak(true);
 
-          if (loungeOpen && !msg.lounge_enabled_breaks) {
-            setLoungeOpen(false);
-            showSnackbar("Social Lounge closed during break.", "info");
+          // ✅ STATE PRIORITY FIX: Skip media lock if user is actively in a lounge room
+          // Break media lock should only apply to main stage attendees, not lounge participants
+          if (isBreakoutRef.current) {
+            // User is in a lounge room - preserve their audio/video
+            console.log("[MainSocket] ✅ User is in lounge room - preserving media (not enforcing break media lock)");
+            showSnackbar("A break has started on the main stage. Enjoy the lounge!", "info");
           } else {
-            showSnackbar("Break started. Mic and camera are now disabled.", "info");
+            // User is on main stage - enforce break media lock
+            enforceSelfBreakMediaLock();
+            if (isHost) updateAudienceMediaForBreak(true);
+
+            if (loungeOpen && !msg.lounge_enabled_breaks) {
+              setLoungeOpen(false);
+              showSnackbar("Social Lounge closed during break.", "info");
+            } else {
+              showSnackbar("Break started. Mic and camera are now disabled.", "info");
+            }
           }
         } else if (msg.type === "break_ended") {
           console.log("[MainSocket] Break ended:", msg);
@@ -5043,6 +5215,18 @@ export default function NewLiveMeeting() {
             breakTimerRef.current = null;
           }
           if (isHost) updateAudienceMediaForBreak(false);
+
+          // ✅ BUGFIX: Always clear breakout state when break ends
+          // User is no longer in a breakout room after break ends (they were removed from lounge)
+          setIsBreakout(false);
+          setActiveTableId(null);
+          console.log("[MainSocket] Cleared breakout state - user returned to main room");
+
+          // ✅ BUGFIX: Update lounge state so UI reflects that users were removed from lounge during break
+          if (msg.lounge_state !== undefined) {
+            console.log("[MainSocket] Updating lounge state after break ended:", msg.lounge_state);
+            setLoungeState(msg.lounge_state);
+          }
 
           if (loungeOpen && !msg.lounge_enabled_during) {
             setLoungeOpen(false);
@@ -5689,21 +5873,32 @@ export default function NewLiveMeeting() {
         let videoDefault = role === "publisher" ? false : false; // publishers usually start with video off
 
         if (isBreakout) {
-          // In breakout, use the user's saved preferences, not the hardcoded "enable all" default
-          audioDefault = userMediaPreferenceRef.current.mic;
-          videoDefault = userMediaPreferenceRef.current.cam;
-          console.log(
-            "[LiveMeeting] ⚠️ INITIALIZING BREAKOUT with saved user preferences:",
-            "mic =",
-            audioDefault,
-            "(from ref:",
-            userMediaPreferenceRef.current.mic,
-            "), cam =",
-            videoDefault,
-            "(from ref:",
-            userMediaPreferenceRef.current.cam,
-            ")"
-          );
+          // ✅ STATE PRIORITY FIX: During break in lounge, initialize video devices but start audio OFF
+          // Video MUST be true to initialize devices, even if we show UI as OFF
+          if (isOnBreak) {
+            audioDefault = false;  // Default OFF during break in lounge
+            videoDefault = true;   // ✅ CRITICAL: Must be true to initialize video devices!
+            console.log(
+              "[LiveMeeting] 🔊 INITIALIZING BREAKOUT DURING BREAK - audio OFF, video devices INITIALIZED:",
+              "mic = false (start OFF), cam = true (initialize devices, user can toggle)"
+            );
+          } else {
+            // Outside of break, use the user's saved preferences
+            audioDefault = userMediaPreferenceRef.current.mic;
+            videoDefault = userMediaPreferenceRef.current.cam;
+            console.log(
+              "[LiveMeeting] ⚠️ INITIALIZING BREAKOUT with saved user preferences:",
+              "mic =",
+              audioDefault,
+              "(from ref:",
+              userMediaPreferenceRef.current.mic,
+              "), cam =",
+              videoDefault,
+              "(from ref:",
+              userMediaPreferenceRef.current.cam,
+              ")"
+            );
+          }
         }
 
         console.log(
@@ -5819,7 +6014,7 @@ export default function NewLiveMeeting() {
 
     console.log("[LiveMeeting] ✅ Join effect triggered! dyteMeeting.self exists and initDone is true");
 
-    const onRoomJoined = () => {
+    const onRoomJoined = async () => {
       console.log("[LiveMeeting] ✅ roomJoined event received!");
       setRoomJoined(true);
       if (isBreakoutRef.current) {
@@ -5827,6 +6022,25 @@ export default function NewLiveMeeting() {
         if (breakoutJoinTimeoutRef.current) {
           clearTimeout(breakoutJoinTimeoutRef.current);
           breakoutJoinTimeoutRef.current = null;
+        }
+
+        // ✅ CRITICAL FIX: Disable video right after joining so it starts OFF visually
+        // But video devices are already initialized (videoDefault=true), so enabling will work!
+        if (isOnBreak) {
+          console.log("[LiveMeeting] 🔊 Joined lounge during break - disabling video to start OFF");
+          try {
+            await dyteMeeting.self.disableVideo?.();
+            await dyteMeeting.self.disableAudio?.();
+            const videoReady = await ensureVideoInputReady();
+            if (!videoReady) {
+              console.warn("[LiveMeeting] Camera input still unavailable after lounge join");
+            }
+            setCamOn(false);
+            setMicOn(false);
+            console.log("[LiveMeeting] ✅ Media disabled - user can now toggle on");
+          } catch (e) {
+            console.warn("[LiveMeeting] Error disabling media after join:", e);
+          }
         }
       }
     };
@@ -5904,7 +6118,7 @@ export default function NewLiveMeeting() {
     return () => {
       dyteMeeting.self.off?.("roomJoined", onRoomJoined);
     };
-  }, [dyteMeeting, initDone, dbStatus, role, isBreakout]);
+  }, [dyteMeeting, ensureVideoInputReady, initDone, dbStatus, role, isBreakout, isOnBreak]);
 
   // ✅ NEW: Initialize main room peek AFTER breakout is ready (not during breakout join)
   // This prevents concurrent Dyte init calls that cause "Unsupported concurrent calls" error
@@ -6099,6 +6313,15 @@ export default function NewLiveMeeting() {
   useEffect(() => {
     if (!dyteMeeting?.self) return;
 
+    // ✅ STATE PRIORITY FIX: Skip sync during break + lounge
+    // When user is in a lounge during break, they should control media without constant syncing
+    if (isOnBreak && isBreakout) {
+      console.log(
+        "[LiveMeeting] Skipping media state sync during break + lounge (user has full control)"
+      );
+      return;
+    }
+
     const sync = () => {
       setMicOn(Boolean(dyteMeeting.self.audioEnabled));
       setCamOn(Boolean(dyteMeeting.self.videoEnabled));
@@ -6112,17 +6335,32 @@ export default function NewLiveMeeting() {
       dyteMeeting.self.off?.("audioUpdate", sync);
       dyteMeeting.self.off?.("videoUpdate", sync);
     };
-  }, [dyteMeeting]);
+  }, [dyteMeeting, isOnBreak, isBreakout]);
   useEffect(() => {
     if (!dyteMeeting?.self) return;
+
+    // ✅ STATE PRIORITY FIX: Skip sync during break + lounge
+    if (isOnBreak && isBreakout) {
+      return;
+    }
+
     setMicOn(Boolean(dyteMeeting.self.audioEnabled));
     setCamOn(Boolean(dyteMeeting.self.videoEnabled));
-  }, [dyteMeeting, roomJoined]);
+  }, [dyteMeeting, roomJoined, isOnBreak, isBreakout]);
 
   // ✅ CRITICAL FIX: Explicit media state sync when entering/leaving lounge (breakout)
   // This ensures UI state matches actual media track state when transitioning between rooms
   useEffect(() => {
     if (!dyteMeeting?.self || !isBreakout) return;
+
+    // ✅ STATE PRIORITY FIX: Skip sync during break + lounge
+    // When user is in a lounge during break, maintain their media control without syncing
+    if (isOnBreak) {
+      console.log(
+        "[LiveMeeting] Skipping media sync on breakout entry (user in lounge during break - full control)"
+      );
+      return;
+    }
 
     console.log(
       "[LiveMeeting] Syncing media state in lounge - Audio:",
@@ -6131,16 +6369,26 @@ export default function NewLiveMeeting() {
       dyteMeeting.self.videoEnabled
     );
 
-    // Force sync on breakout entry
+    // Force sync on breakout entry (only outside of break)
     setMicOn(Boolean(dyteMeeting.self.audioEnabled));
     setCamOn(Boolean(dyteMeeting.self.videoEnabled));
-  }, [isBreakout, dyteMeeting?.self?.id]); // Trigger when entering/leaving breakout
+  }, [isBreakout, dyteMeeting?.self?.id, isOnBreak]); // Trigger when entering/leaving breakout
 
   // ✅ CRITICAL FIX: Ensure media tracks are properly muted at WebRTC level when disabled
   // This adds an extra layer of protection specifically for lounge/breakout rooms
   // Run frequently to catch any tracks that get mysteriously re-enabled
   useEffect(() => {
     if (!dyteMeeting?.self || !isBreakout) return;
+
+    // ✅ STATE PRIORITY FIX: Skip enforcement during break + lounge
+    // When user is in a lounge room during a break, they should have full media control
+    // Don't enforce mute if in a lounge during break
+    if (isOnBreak && isBreakout) {
+      console.log(
+        "[LiveMeeting LOUNGE ENFORCEMENT EFFECT] Skipped - user is in lounge during break (full media enabled)"
+      );
+      return;
+    }
 
     // ✅ NEW FIX: Don't enforce if user just toggled camera (within last 500ms)
     // This prevents the enforcement loop from overriding user-intentional toggles
@@ -6273,6 +6521,14 @@ export default function NewLiveMeeting() {
 
     const applyMediaPreferences = async () => {
       try {
+        // ✅ CRITICAL FIX: Skip preference enforcement during lounge + break
+        // User should be able to freely toggle media during break in lounge without
+        // saved preferences overriding their choices
+        if (isOnBreak && isBreakout) {
+          console.log("[LiveMeeting] 🔊 Skipping preference enforcement - user is in lounge during break");
+          return;
+        }
+
         // Use the saved user preferences from the ref
         const userMicPreference = userMediaPreferenceRef.current.mic;
         const userCamPreference = userMediaPreferenceRef.current.cam;
@@ -7074,6 +7330,22 @@ export default function NewLiveMeeting() {
     if (!isHost || !dyteMeeting?.participants?.joined || !dyteMeeting?.self) return;
     const handleParticipantJoined = async (participant) => {
       if (participant.id === dyteMeeting.self?.id) return;
+      const roomInfo = participantRoomMap.get(participant?.id);
+      const participantUserId = getBackendUserId(participant);
+      const isInLoungeOrBreakout =
+        roomInfo?.type === "lounge" ||
+        roomInfo?.type === "breakout" ||
+        loungeTables.some((table) => {
+          if (!table?.participants || !participantUserId) return false;
+          const participantsList = Array.isArray(table.participants)
+            ? table.participants
+            : Object.values(table.participants);
+          return participantsList.some((tableParticipant) => {
+            const tableUserId = tableParticipant?.user_id || tableParticipant?.userId;
+            return tableUserId && String(tableUserId) === String(participantUserId);
+          });
+        });
+      const shouldApplyBreakLock = isOnBreak && !isInLoungeOrBreakout;
       try {
         await dyteMeeting.participants.updatePermissions([participant.id], {
           canProduceScreenshare: "NOT_ALLOWED",
@@ -7083,26 +7355,26 @@ export default function NewLiveMeeting() {
             private: { canSend: hostPerms.chat, text: hostPerms.chat, files: hostPerms.chat },
           },
           polls: { canCreate: hostPerms.polls, canVote: hostPerms.polls },
-          ...((hostMediaLocks.mic || isOnBreak)
+          ...((hostMediaLocks.mic || shouldApplyBreakLock)
             ? { canProduceAudio: "NOT_ALLOWED", requestProduceAudio: false }
             : {}),
-          ...((hostMediaLocks.cam || isOnBreak)
+          ...((hostMediaLocks.cam || shouldApplyBreakLock)
             ? { canProduceVideo: "NOT_ALLOWED", requestProduceVideo: false }
             : {}),
         });
       } catch (e) {
         console.warn("Failed to sync permissions", e);
       }
-      if (hostMediaLocks.mic || isOnBreak) {
+      if (hostMediaLocks.mic || shouldApplyBreakLock) {
         try { await participant?.disableAudio?.(); } catch { }
       }
-      if (hostMediaLocks.cam || isOnBreak) {
+      if (hostMediaLocks.cam || shouldApplyBreakLock) {
         try { await participant?.disableVideo?.(); } catch { }
       }
     };
     dyteMeeting.participants.joined.on("participantJoined", handleParticipantJoined);
     return () => dyteMeeting.participants.joined.off("participantJoined", handleParticipantJoined);
-  }, [dyteMeeting, hostPerms.chat, hostPerms.polls, hostPerms.screenShare, hostMediaLocks, isHost, isOnBreak]);
+  }, [dyteMeeting, hostPerms.chat, hostPerms.polls, hostPerms.screenShare, hostMediaLocks, isHost, isOnBreak, loungeTables, participantRoomMap]);
 
   useEffect(() => {
     if (!dyteMeeting?.self) return;
@@ -11375,7 +11647,10 @@ export default function NewLiveMeeting() {
                   <Box sx={{ bgcolor: "rgba(255,165,0,0.12)", borderRadius: 2, p: 1.5, mb: 2, border: "1px solid rgba(255,165,0,0.3)", display: "flex", gap: 1, alignItems: "center" }}>
                     <CoffeeIcon sx={{ color: "rgba(255,165,0,0.85)", fontSize: 18 }} />
                     <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
-                      Break in progress. Participant interactions are disabled.
+                      {/* ✅ STATE PRIORITY FIX: Show different message if user is in a lounge room */}
+                      {isBreakout
+                        ? "Break is in progress on the main stage. Enjoy your networking in the lounge!"
+                        : "Break in progress. Participant interactions are disabled."}
                     </Typography>
                   </Box>
                 )}
@@ -13692,20 +13967,20 @@ export default function NewLiveMeeting() {
                     width: { xs: "100%", sm: "auto" },
                   }}
                 >
-                  <Tooltip title={isOnBreak ? "Disabled during break" : (micOn ? "Mute" : "Unmute")}>
+                  <Tooltip title={(isOnBreak && !isBreakout) ? "Disabled during break" : (micOn ? "Mute" : "Unmute")}>
                     <IconButton
                       onClick={handleToggleMic}
-                      disabled={isOnBreak}
+                      disabled={isOnBreak && !isBreakout}
                       aria-label="Toggle mic"
                     >
                       {micOn ? <MicIcon /> : <MicOffIcon />}
                     </IconButton>
                   </Tooltip>
 
-                  <Tooltip title={isOnBreak ? "Disabled during break" : (camOn ? "Turn camera off" : "Turn camera on")}>
+                  <Tooltip title={(isOnBreak && !isBreakout) ? "Disabled during break" : (camOn ? "Turn camera off" : "Turn camera on")}>
                     <IconButton
                       onClick={handleToggleCamera}
-                      disabled={isOnBreak}
+                      disabled={isOnBreak && !isBreakout}
                       sx={{
                         bgcolor: "rgba(255,255,255,0.06)",
                         "&:hover": { bgcolor: "rgba(255,255,255,0.10)" },
@@ -13996,7 +14271,7 @@ export default function NewLiveMeeting() {
                     </IconButton>
                   </Tooltip>
 
-                  {/* ✅ Leave Table Button (Only in Breakout) - Moved to right end with Label */}
+                  {/* ✅ Leave Break Out Room Button (Only in Breakout) */}
                   {isBreakout && (
                     <Button
                       variant="contained"
@@ -14014,7 +14289,7 @@ export default function NewLiveMeeting() {
                         whiteSpace: "nowrap"
                       }}
                     >
-                      Leave Table
+                      Leave Break Out Room
                     </Button>
                   )}
                 </Paper>
@@ -14583,7 +14858,9 @@ export default function NewLiveMeeting() {
         </Dialog>
 
         {/* Participants: Break Mode Full-Screen Overlay */}
-        {isOnBreak && !isHost && dbStatus === "live" && (
+        {/* ✅ State hierarchy: lounge session > break > main stage */}
+        {/* Only show break screen if NOT in a lounge room (!isBreakout && !activeTableId) */}
+        {isOnBreak && !isHost && !isBreakout && !activeTableId && dbStatus === "live" && (
           <BreakModeScreen
             remainingSeconds={breakRemainingSeconds ?? 0}
             durationSeconds={breakDurationSeconds}

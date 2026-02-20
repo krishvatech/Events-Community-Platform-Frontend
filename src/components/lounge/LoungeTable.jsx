@@ -282,7 +282,7 @@ const LoungeTable = ({
                     onClick={onLeave}
                     sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
                 >
-                    Leave Table
+                    {isBreakoutTable ? 'Leave Break Out Room' : 'Leave Table'}
                 </Button>
             ) : (
                 <Button
