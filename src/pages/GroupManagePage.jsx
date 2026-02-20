@@ -7,7 +7,7 @@ import {
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup, Badge,
     IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar, Autocomplete
 } from "@mui/material";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { isOwnerUser } from "../utils/adminRole";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
@@ -3206,7 +3206,7 @@ export default function GroupManagePage() {
 
     const [isStaffUser, setIsStaffUser] = React.useState(false);
     // Is this group a child (has a parent)?
-    const isChildGroup = Boolean(group?.parent_id || group?.parent?.id || group?.parent);
+    const isChildGroup = Boolean(group?.parent_group || group?.parent_id || group?.parent?.id || group?.parent);
     // Relations Tab (replaces "Sub-groups")
     const showRelationsTab = true;
     // Show Notifications tab only when Public + Approval
@@ -4878,7 +4878,13 @@ export default function GroupManagePage() {
                                                     {group.parent_group && (
                                                         <div>
                                                             <b>Parent Group: </b>
-                                                            {group.parent_group.name}
+                                                            <Link
+                                                                to={`/admin/groups/${group.parent_group.slug || group.parent_group.id}`}
+                                                                style={{ color: '#10b8a6', textDecoration: 'none', fontWeight: 500 }}
+                                                                className="hover:underline"
+                                                            >
+                                                                {group.parent_group.name}
+                                                            </Link>
                                                         </div>
                                                     )}
                                                     {group.created_by?.name && <div><b>Owner:</b> {group.created_by.name}</div>}
@@ -5100,74 +5106,13 @@ export default function GroupManagePage() {
                                 {/* Relations tab */}
                                 {showRelationsTab && tab === 2 && (
                                     <Stack spacing={3}>
-                                        {/* 0. Primary Parent (if exists) */}
-                                        {isChildGroup && (
-                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                                                <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-3">
-                                                    <Box>
-                                                        <Typography variant="h6" className="font-semibold">Primary Parent Group</Typography>
-                                                        <Typography variant="body2" className="text-slate-500">
-                                                            This group is a sub-group of the following parent.
-                                                        </Typography>
-                                                    </Box>
-
-                                                    {/* Promote Action */}
-                                                    {(user?.is_superuser || isOwnerRole || isAdminRole) && (
-                                                        <Button
-                                                            variant="outlined"
-                                                            color="error"
-                                                            size="small"
-                                                            onClick={handleOpenPromoteDialog}
-                                                            disabled={isPromoting}
-                                                            sx={{ textTransform: "none", borderColor: "#ef4444", color: "#ef4444" }}
-                                                        >
-                                                            {isPromoting ? "Promoting..." : "Make Independent"}
-                                                        </Button>
-                                                    )}
-                                                </Stack>
-
-                                                {(group.parent_group || group.parent) ? (
-                                                    <Paper variant="outlined" className="p-3 rounded-xl border-slate-200 bg-slate-50">
-                                                        <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                                            <Stack direction="row" alignItems="center" spacing={2}>
-                                                                <Avatar
-                                                                    src={(group.parent_group || group.parent).cover_image}
-                                                                    alt={(group.parent_group || group.parent).name}
-                                                                >
-                                                                    {(group.parent_group || group.parent).name?.[0]}
-                                                                </Avatar>
-                                                                <Box>
-                                                                    <Typography className="font-semibold">
-                                                                        {(group.parent_group || group.parent).name}
-                                                                    </Typography>
-                                                                    <Typography variant="caption" className="text-slate-500">
-                                                                        ID: {(group.parent_group || group.parent).id}
-                                                                    </Typography>
-                                                                </Box>
-                                                            </Stack>
-                                                            <Button
-                                                                size="small"
-                                                                endIcon={<OpenInNewRoundedIcon />}
-                                                                onClick={() => navigate(`/groups/${(group.parent_group || group.parent).slug || (group.parent_group || group.parent).id}`)}
-                                                                sx={{ textTransform: "none" }}
-                                                            >
-                                                                View
-                                                            </Button>
-                                                        </Stack>
-                                                    </Paper>
-                                                ) : (
-                                                    <Alert severity="warning">Parent group information is incomplete.</Alert>
-                                                )}
-                                            </Paper>
-                                        )}
-
-                                        {/* 1. Parent Groups - ONLY for Sub-groups */}
-                                        {hasParents && (
+                                        {/* Parent Groups (Both Primary & Linked) */}
+                                        {(isChildGroup || hasParents) && (
                                             <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
                                                 <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                                     <Typography variant="h6" className="font-semibold">Parent Groups</Typography>
                                                     <Stack direction="row" spacing={1}>
-                                                        {!isChildGroup && parentLinks.length > 0 && (user?.is_superuser || isOwnerRole || isAdminRole) && (
+                                                        {(isChildGroup || parentLinks.length > 0) && (user?.is_superuser || isOwnerRole || isAdminRole) && (
                                                             <Button
                                                                 variant="outlined"
                                                                 color="error"
@@ -5194,13 +5139,48 @@ export default function GroupManagePage() {
                                                     </Stack>
                                                 </Stack>
                                                 <Typography variant="body2" className="text-slate-500 mb-3">
-                                                    Other groups this group belongs to (in addition to Primary Parent).
+                                                    Groups this group belongs to.
                                                 </Typography>
 
-                                                {relLoading && parentLinks.length === 0 ? <LinearProgress /> : parentLinks.length === 0 ? (
-                                                    <Typography className="text-slate-500 italic mb-2">No additional parent groups.</Typography>
+                                                {relLoading && parentLinks.length === 0 && !isChildGroup ? <LinearProgress /> : (!isChildGroup && parentLinks.length === 0) ? (
+                                                    <Typography className="text-slate-500 italic mb-2">No parent groups.</Typography>
                                                 ) : (
                                                     <Stack spacing={1}>
+                                                        {isChildGroup && (group.parent_group || group.parent) && (
+                                                            <Paper variant="outlined" className="p-2 rounded-xl border-slate-200 bg-slate-50">
+                                                                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                                                    <Stack direction="row" alignItems="center" spacing={2}>
+                                                                        <Avatar variant="rounded" sx={{ width: 40, height: 40 }} src={(group.parent_group || group.parent).cover_image}>
+                                                                            {(group.parent_group || group.parent).name?.[0]}
+                                                                        </Avatar>
+                                                                        <Box>
+                                                                            <Typography className="font-semibold">
+                                                                                {(group.parent_group || group.parent).name}
+                                                                                <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>(ID: {(group.parent_group || group.parent).id})</Typography>
+                                                                            </Typography>
+                                                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                                                <Chip
+                                                                                    label="PRIMARY PARENT"
+                                                                                    size="small"
+                                                                                    color="primary"
+                                                                                    variant="outlined"
+                                                                                    sx={{ height: 20, fontSize: '0.7rem' }}
+                                                                                />
+                                                                            </Stack>
+                                                                        </Box>
+                                                                    </Stack>
+                                                                    <Button
+                                                                        size="small"
+                                                                        endIcon={<OpenInNewRoundedIcon />}
+                                                                        onClick={() => navigate(`/admin/groups/${(group.parent_group || group.parent).slug || (group.parent_group || group.parent).id}`)}
+                                                                        sx={{ textTransform: "none" }}
+                                                                    >
+                                                                        View
+                                                                    </Button>
+                                                                </Stack>
+                                                            </Paper>
+                                                        )}
+
                                                         {parentLinks.map(link => (
                                                             <Paper key={link.id} variant="outlined" className="p-2 rounded-xl border-slate-200">
                                                                 <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -5226,9 +5206,19 @@ export default function GroupManagePage() {
                                                                             </Stack>
                                                                         </Box>
                                                                     </Stack>
-                                                                    {canEditGroup && (
-                                                                        <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
-                                                                    )}
+                                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                                        <Button
+                                                                            size="small"
+                                                                            endIcon={<OpenInNewRoundedIcon />}
+                                                                            onClick={() => navigate(`/admin/groups/${link.parent_group.slug || link.parent_group.id}`)}
+                                                                            sx={{ textTransform: "none" }}
+                                                                        >
+                                                                            View
+                                                                        </Button>
+                                                                        {canEditGroup && (
+                                                                            <Button size="small" color="error" onClick={() => handleParentLinkAction(link.id, 'remove')}>Unlink</Button>
+                                                                        )}
+                                                                    </Box>
                                                                 </Stack>
                                                             </Paper>
                                                         ))}
