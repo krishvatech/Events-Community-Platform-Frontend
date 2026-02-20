@@ -159,7 +159,13 @@ function SessionDialog({
       }
 
       // Check if session ends after event ends
-      if (end.isAfter(eventEnd)) {
+      let cutoffTime = eventEnd;
+      // If event ends at midnight (00:00), treat it as inclusive of that day (start of next day)
+      if (eventEnd.hour() === 0 && eventEnd.minute() === 0) {
+        cutoffTime = eventEnd.add(1, "day");
+      }
+
+      if (end.isAfter(cutoffTime)) {
         e.endTime = `Session cannot end after event (${eventEnd.format("MMM DD, HH:mm")})`;
       }
 
