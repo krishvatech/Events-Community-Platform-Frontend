@@ -77,12 +77,22 @@ export const computeEndFromStart = (startDate, startTime, durationHours = 2) => 
     return { endDate: end.format("YYYY-MM-DD"), endTime: end.format("HH:mm") };
 };
 
+// Returns true only when time is a well-formed HH:mm string that dayjs accepts.
+export const isValidHHmm = (time) =>
+    typeof time === "string" &&
+    /^\d{2}:\d{2}$/.test(time) &&
+    dayjs(`1970-01-01T${time}:00`).isValid();
+
 export const toUTCISO = (date, time, tz) => {
     if (!date || !time || !tz) return null;
-    const dayjsString = `${date}T${time}:00`;
-    const dt = dayjs.tz(dayjsString, tz);
-    const result = dt.isValid() ? dt.toDate().toISOString() : null;
-    return result;
+    // Reject malformed time strings before they reach dayjs.tz (avoids RangeError)
+    if (!isValidHHmm(time)) return null;
+    try {
+        const dt = dayjs.tz(`${date}T${time}:00`, tz);
+        return dt.isValid() ? dt.toDate().toISOString() : null;
+    } catch {
+        return null;
+    }
 };
 
 export const iso = (d, t) => (d && t ? dayjs(`${d}T${t}:00`).toISOString() : null);

@@ -45,6 +45,7 @@ import {
     TIMEZONE_OPTIONS,
     computeEndFromStart,
     toUTCISO,
+    isValidHHmm,
     API_ROOT,
     COUNTRY_OPTIONS,
     getSelectedCountry,
@@ -429,6 +430,9 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
     const combineToISO = (d, t) => toUTCISO(d, t, timezone);
 
+    // Returns a safe Dayjs value for the TimePicker, or null when the time string is invalid.
+    const pickerValue = (t) => (isValidHHmm(t) ? dayjs(`1970-01-01T${t}:00`) : null);
+
     const validate = () => {
         const e = {};
         if (!title.trim()) e.title = "Required";
@@ -446,11 +450,19 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
             }
         }
 
-        if (startDate && endDate) {
-            const s = dayjs.tz(`${startDate}T${startTime}:00`, timezone);
-            const ed = dayjs.tz(`${endDate}T${endTime}:00`, timezone);
-            if (s.isValid() && ed.isValid() && !ed.isAfter(s)) {
-                // ⛔ End before or same as start → show error on end date + end time
+        // Validate time fields before comparing — never call dayjs.tz on invalid strings
+        if (!isValidHHmm(startTime)) {
+            e.startTime = "Invalid start time (use 1–12 in AM/PM).";
+        }
+        if (!isValidHHmm(endTime)) {
+            e.endTime = "Invalid end time (use 1–12 in AM/PM).";
+        }
+
+        if (!e.startTime && !e.endTime && startDate && endDate) {
+            // Both times are valid — safe to use toUTCISO for comparison
+            const sISO = toUTCISO(startDate, startTime, timezone);
+            const edISO = toUTCISO(endDate, endTime, timezone);
+            if (sISO && edISO && !dayjs(edISO).isAfter(dayjs(sISO))) {
                 e.endTime = "End must be after start";
                 e.endDate = "End must be after start";
             }
@@ -1056,9 +1068,19 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                         <TimePicker
                                             label="Start time *" ampm minutesStep={1}
                                             disabled={isMultiDay}
-                                            value={dayjs(`1970-01-01T${startTime}`)}
+                                            value={pickerValue(startTime)}
                                             onChange={(val) => {
-                                                const newStart = val ? dayjs(val).second(0).format("HH:mm") : startTime;
+                                                if (!val) return; // picker cleared — keep last valid time
+                                                if (!val.isValid()) {
+                                                    // Intermediate / incomplete input — show hint but don't crash
+                                                    setErrors((prev) => ({
+                                                        ...prev,
+                                                        startTime: "Invalid time (use 1–12 in AM/PM).",
+                                                    }));
+                                                    return;
+                                                }
+                                                const newStart = val.second(0).format("HH:mm");
+                                                setErrors((prev) => ({ ...prev, startTime: "" }));
                                                 setStartTime(newStart);
                                                 const next = computeEndFromStart(startDate, newStart, 2);
                                                 setEndDate(next.endDate);
@@ -1071,9 +1093,18 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                         <TimePicker
                                             label="End time *" ampm minutesStep={1}
                                             disabled={isMultiDay}
-                                            value={dayjs(`1970-01-01T${endTime}`)}
+                                            value={pickerValue(endTime)}
                                             onChange={(val) => {
-                                                const newEnd = val ? dayjs(val).second(0).format("HH:mm") : endTime;
+                                                if (!val) return; // picker cleared — keep last valid time
+                                                if (!val.isValid()) {
+                                                    setErrors((prev) => ({
+                                                        ...prev,
+                                                        endTime: "Invalid time (use 1–12 in AM/PM).",
+                                                    }));
+                                                    return;
+                                                }
+                                                const newEnd = val.second(0).format("HH:mm");
+                                                setErrors((prev) => ({ ...prev, endTime: "" }));
                                                 setEndTime(newEnd);
                                                 if (startDate && endDate && startDate === endDate && newEnd <= startTime) {
                                                     setEndDate(dayjs(startDate).add(1, "day").format("YYYY-MM-DD"));
@@ -1108,53 +1139,53 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 {isMultiDay && (
                     <Box sx={{ width: "100%", flexBasis: "100%" }}>
                         <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-                        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                                <CalendarMonthRoundedIcon color="action" />
-                                <Typography variant="h6" className="font-semibold">
-                                    Sessions
-                                </Typography>
-                            </Stack>
-                            <Button
-                                size="small"
-                                startIcon={<AddRoundedIcon />}
-                                onClick={() => {
-                                    setEditingSessionIndex(null);
-                                    setSessionDialogOpen(true);
-                                }}
-                                disabled={sessionSubmitting}
-                                sx={{ backgroundColor: "#10b8a6", color: "white", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                            >
-                                Add Session
-                            </Button>
-                        </Stack>
-
-                        <Typography variant="body2" color="text.secondary" mb={2}>
-                            Break your multi-day event into individual sessions
-                        </Typography>
-
-                        {sessionsLoading ? (
-                            <Box sx={{ py: 2, textAlign: "center" }}>
-                                <CircularProgress size={20} />
-                            </Box>
-                        ) : sessionsError ? (
-                            <Typography variant="body2" color="error" mb={2}>
-                                {sessionsError}
-                            </Typography>
-                        ) : sessions.length > 0 ? (
-                            <Box mb={2}>
-                                <SessionList
-                                    sessions={sessions}
-                                    onEdit={(session, idx) => {
-                                        setEditingSessionIndex(idx);
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+                                <Stack direction="row" alignItems="center" spacing={1}>
+                                    <CalendarMonthRoundedIcon color="action" />
+                                    <Typography variant="h6" className="font-semibold">
+                                        Sessions
+                                    </Typography>
+                                </Stack>
+                                <Button
+                                    size="small"
+                                    startIcon={<AddRoundedIcon />}
+                                    onClick={() => {
+                                        setEditingSessionIndex(null);
                                         setSessionDialogOpen(true);
                                     }}
-                                    onDelete={(session, idx) => {
-                                        deleteSession(session?.id, idx);
-                                    }}
-                                />
-                            </Box>
-                        ) : null}
+                                    disabled={sessionSubmitting}
+                                    sx={{ backgroundColor: "#10b8a6", color: "white", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                >
+                                    Add Session
+                                </Button>
+                            </Stack>
+
+                            <Typography variant="body2" color="text.secondary" mb={2}>
+                                Break your multi-day event into individual sessions
+                            </Typography>
+
+                            {sessionsLoading ? (
+                                <Box sx={{ py: 2, textAlign: "center" }}>
+                                    <CircularProgress size={20} />
+                                </Box>
+                            ) : sessionsError ? (
+                                <Typography variant="body2" color="error" mb={2}>
+                                    {sessionsError}
+                                </Typography>
+                            ) : sessions.length > 0 ? (
+                                <Box mb={2}>
+                                    <SessionList
+                                        sessions={sessions}
+                                        onEdit={(session, idx) => {
+                                            setEditingSessionIndex(idx);
+                                            setSessionDialogOpen(true);
+                                        }}
+                                        onDelete={(session, idx) => {
+                                            deleteSession(session?.id, idx);
+                                        }}
+                                    />
+                                </Box>
+                            ) : null}
                         </Paper>
                     </Box>
                 )}
@@ -1162,44 +1193,44 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 {/* ===== Speakers & Hosts ===== */}
                 <Box sx={{ width: "100%", flexBasis: "100%" }}>
                     <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4 mb-3">
-                    <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-                        <RecordVoiceOverRoundedIcon color="action" />
-                        <Typography variant="h6" className="font-semibold">
-                            Speakers & Hosts
+                        <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+                            <RecordVoiceOverRoundedIcon color="action" />
+                            <Typography variant="h6" className="font-semibold">
+                                Speakers & Hosts
+                            </Typography>
+                        </Stack>
+
+                        <Typography variant="body2" color="text.secondary" mb={2}>
+                            Add speakers, moderators, or hosts for this event
                         </Typography>
-                    </Stack>
 
-                    <Typography variant="body2" color="text.secondary" mb={2}>
-                        Add speakers, moderators, or hosts for this event
-                    </Typography>
+                        {participants.length > 0 && (
+                            <Box mb={2}>
+                                <ParticipantList
+                                    participants={participants}
+                                    onEdit={(p, idx) => {
+                                        setEditingParticipantIndex(idx);
+                                        setParticipantDialogOpen(true);
+                                    }}
+                                    onRemove={(p, idx) => {
+                                        setParticipants(prev => prev.filter((_, i) => i !== idx));
+                                        setToast({ open: true, type: "success", msg: "Participant removed" });
+                                    }}
+                                />
+                            </Box>
+                        )}
 
-                    {participants.length > 0 && (
-                        <Box mb={2}>
-                            <ParticipantList
-                                participants={participants}
-                                onEdit={(p, idx) => {
-                                    setEditingParticipantIndex(idx);
-                                    setParticipantDialogOpen(true);
-                                }}
-                                onRemove={(p, idx) => {
-                                    setParticipants(prev => prev.filter((_, i) => i !== idx));
-                                    setToast({ open: true, type: "success", msg: "Participant removed" });
-                                }}
-                            />
-                        </Box>
-                    )}
-
-                    <Button
-                        variant="outlined"
-                        startIcon={<AddRoundedIcon />}
-                        onClick={() => {
-                            setEditingParticipantIndex(null);
-                            setParticipantDialogOpen(true);
-                        }}
-                        fullWidth
-                    >
-                        Add Participant
-                    </Button>
+                        <Button
+                            variant="outlined"
+                            startIcon={<AddRoundedIcon />}
+                            onClick={() => {
+                                setEditingParticipantIndex(null);
+                                setParticipantDialogOpen(true);
+                            }}
+                            fullWidth
+                        >
+                            Add Participant
+                        </Button>
                     </Paper>
                 </Box>
             </Grid>
@@ -1265,8 +1296,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                         ? sessions[editingSessionIndex]
                         : null
                 }
-                eventStartTime={initialStart.isValid() ? toUTCISO(startDate, startTime, timezone) : null}
-                eventEndTime={initialEnd.isValid() ? toUTCISO(endDate, endTime, timezone) : null}
+                eventStartTime={toUTCISO(startDate, startTime, timezone)}
+                eventEndTime={toUTCISO(endDate, endTime, timezone)}
                 timezone={timezone}
             />
 

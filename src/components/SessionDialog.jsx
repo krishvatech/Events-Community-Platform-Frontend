@@ -32,29 +32,21 @@ const SESSION_TYPES = [
 const toUTCISO = (dayjsDate, tz = "UTC") => {
   if (!dayjsDate || !tz) return null;
   try {
-    // Convert dayjs object to date string + time string
     const date = dayjsDate.format("YYYY-MM-DD");
     const time = dayjsDate.format("HH:mm");
-
-    // Use timezone-aware conversion - same logic as AdminEvents.jsx
     const dt = dayjs.tz(`${date}T${time}:00`, tz);
-
     if (!dt.isValid()) {
       console.error("Invalid datetime:", { date, time, tz });
       return null;
     }
-
-    // Return UTC ISO string
     const iso = dt.toDate().toISOString();
-
     console.log("📤 SessionDialog toUTCISO:", {
       inputDate: date,
       inputTime: time,
       timezone: tz,
       dayjsString: `${date}T${time}:00`,
-      resultISO: iso
+      resultISO: iso,
     });
-
     return iso;
   } catch (e) {
     console.error("toUTCISO error:", e);
@@ -120,14 +112,13 @@ function SessionDialog({
       let defaultStart = dayjs();
 
       if (eventStartTime) {
-        // Use event start time as default session start
         defaultStart = dayjs(eventStartTime);
       } else {
         // Fallback: 9:00 AM today
         defaultStart = dayjs().hour(9).minute(0).second(0);
       }
 
-      const defaultEnd = defaultStart.add(1, "hour"); // 1 hour duration by default
+      const defaultEnd = defaultStart.add(1, "hour");
 
       setStartDate(defaultStart);
       setStartTime(defaultStart);
@@ -140,48 +131,55 @@ function SessionDialog({
     const e = {};
     if (!title.trim()) e.title = "Session title is required";
 
-    const start = startDate.hour(startTime.hour()).minute(startTime.minute());
-    const end = endDate.hour(endTime.hour()).minute(endTime.minute());
-
-    // Validate session end is after start
-    if (!end.isAfter(start)) {
-      e.endTime = "End time must be after start time";
+    // Guard against invalid Dayjs values before combining date + time
+    if (!startTime || !startTime.isValid()) {
+      e.startTime = "Invalid time (use 1–12 in AM/PM).";
+    }
+    if (!endTime || !endTime.isValid()) {
+      e.endTime = "Invalid time (use 1–12 in AM/PM).";
     }
 
-    // Validate session times are within event times
-    if (eventStartTime && eventEndTime) {
-      const eventStart = dayjs(eventStartTime);
-      const eventEnd = dayjs(eventEndTime);
+    if (!e.startTime && !e.endTime) {
+      const start = startDate.hour(startTime.hour()).minute(startTime.minute());
+      const end = endDate.hour(endTime.hour()).minute(endTime.minute());
 
-      // Check if session starts before event starts
-      if (start.isBefore(eventStart)) {
-        e.startTime = `Session cannot start before event (${eventStart.format("MMM DD, HH:mm")})`;
+      // Validate session end is after start
+      if (!end.isAfter(start)) {
+        e.endTime = "End time must be after start time";
       }
 
-      // Check if session ends after event ends
-      let cutoffTime = eventEnd;
-      // If event ends at midnight (00:00), treat it as inclusive of that day (start of next day)
-      if (eventEnd.hour() === 0 && eventEnd.minute() === 0) {
-        cutoffTime = eventEnd.add(1, "day");
-      }
+      // Validate session times are within event times
+      if (eventStartTime && eventEndTime) {
+        const eventStart = dayjs(eventStartTime);
+        const eventEnd = dayjs(eventEndTime);
 
-      if (end.isAfter(cutoffTime)) {
-        e.endTime = `Session cannot end after event (${eventEnd.format("MMM DD, HH:mm")})`;
-      }
+        if (start.isBefore(eventStart)) {
+          e.startTime = `Session cannot start before event (${eventStart.format("MMM DD, HH:mm")})`;
+        }
 
-      // Check if session date is within event date range
-      const eventStartDate = eventStart.startOf("day");
-      const eventEndDate = eventEnd.startOf("day");
-      const sessionStartDate = start.startOf("day");
-      const sessionEndDate = end.startOf("day");
+        let cutoffTime = eventEnd;
+        // If event ends at midnight (00:00), treat it as inclusive of that day
+        if (eventEnd.hour() === 0 && eventEnd.minute() === 0) {
+          cutoffTime = eventEnd.add(1, "day");
+        }
 
-      if (
-        sessionStartDate.isBefore(eventStartDate) ||
-        sessionEndDate.isAfter(eventEndDate)
-      ) {
-        e.startTime = `Session dates must be within event dates (${eventStart.format(
-          "MMM DD"
-        )} - ${eventEnd.format("MMM DD")})`;
+        if (end.isAfter(cutoffTime)) {
+          e.endTime = `Session cannot end after event (${eventEnd.format("MMM DD, HH:mm")})`;
+        }
+
+        const eventStartDate = eventStart.startOf("day");
+        const eventEndDate = eventEnd.startOf("day");
+        const sessionStartDate = start.startOf("day");
+        const sessionEndDate = end.startOf("day");
+
+        if (
+          sessionStartDate.isBefore(eventStartDate) ||
+          sessionEndDate.isAfter(eventEndDate)
+        ) {
+          e.startTime = `Session dates must be within event dates (${eventStart.format(
+            "MMM DD"
+          )} - ${eventEnd.format("MMM DD")})`;
+        }
       }
     }
 
@@ -195,7 +193,6 @@ function SessionDialog({
     const start = startDate.hour(startTime.hour()).minute(startTime.minute());
     const end = endDate.hour(endTime.hour()).minute(endTime.minute());
 
-    // Use timezone-aware conversion to match event time format
     const startISO = toUTCISO(start, timezone);
     const endISO = toUTCISO(end, timezone);
 
@@ -272,7 +269,7 @@ function SessionDialog({
 
           <Box>
             <Typography variant="body2" className="font-semibold mb-2">
-              Start Date & Time
+              Start Date &amp; Time
             </Typography>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -282,8 +279,16 @@ function SessionDialog({
                   slotProps={{ textField: { size: "small", fullWidth: true, error: !!errors.startTime } }}
                 />
                 <TimePicker
-                  value={startTime}
-                  onChange={(time) => setStartTime(time || dayjs())}
+                  value={startTime && startTime.isValid() ? startTime : null}
+                  onChange={(time) => {
+                    if (!time) return; // cleared — keep last valid
+                    if (!time.isValid()) {
+                      setErrors((prev) => ({ ...prev, startTime: "Invalid time (use 1–12 in AM/PM)." }));
+                      return;
+                    }
+                    setErrors((prev) => ({ ...prev, startTime: "" }));
+                    setStartTime(time);
+                  }}
                   ampm
                   slotProps={{ textField: { size: "small", fullWidth: true, error: !!errors.startTime } }}
                 />
@@ -298,7 +303,7 @@ function SessionDialog({
 
           <Box>
             <Typography variant="body2" className="font-semibold mb-2">
-              End Date & Time
+              End Date &amp; Time
             </Typography>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -308,11 +313,18 @@ function SessionDialog({
                   slotProps={{ textField: { size: "small", fullWidth: true } }}
                 />
                 <TimePicker
-                  value={endTime}
-                  onChange={(time) => setEndTime(time || dayjs())}
+                  value={endTime && endTime.isValid() ? endTime : null}
+                  onChange={(time) => {
+                    if (!time) return; // cleared — keep last valid
+                    if (!time.isValid()) {
+                      setErrors((prev) => ({ ...prev, endTime: "Invalid time (use 1–12 in AM/PM)." }));
+                      return;
+                    }
+                    setErrors((prev) => ({ ...prev, endTime: "" }));
+                    setEndTime(time);
+                  }}
                   ampm
-                  slotProps={{ textField: { size: "small", fullWidth: true } }}
-                  error={!!errors.endTime}
+                  slotProps={{ textField: { size: "small", fullWidth: true, error: !!errors.endTime } }}
                 />
               </Stack>
               {errors.endTime && (
