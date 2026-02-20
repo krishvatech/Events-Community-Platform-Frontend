@@ -14970,6 +14970,7 @@ export default function NewLiveMeeting() {
             dyteMeeting={dyteMeeting}
             // Passing down the last WebSocket message to handle matching events
             lastMessage={lastMessage}
+            onMemberInfo={openMemberInfo}
           />
         </Dialog>
 

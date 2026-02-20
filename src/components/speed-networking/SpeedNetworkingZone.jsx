@@ -24,7 +24,8 @@ export default function SpeedNetworkingZone({
     onClose,
     dyteMeeting,
     onEnterMatch,
-    lastMessage
+    lastMessage,
+    onMemberInfo
 }) {
     const [session, setSession] = useState(null);
     const [currentMatch, setCurrentMatch] = useState(null);
@@ -32,6 +33,36 @@ export default function SpeedNetworkingZone({
     const [inQueue, setInQueue] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // Helper to normalize speed networking user shape to member info shape
+    const buildMemberObj = (user) => {
+        if (!user) return null;
+        const name = [user.first_name, user.last_name].filter(Boolean).join(' ').trim()
+                     || user.username || 'User';
+        return {
+            id: user.id,
+            name,
+            picture: user.avatar_url || '',
+            role: 'Audience',
+            job_title: user.job_title || '',
+            company: user.company || '',
+            location: user.location || '',
+            username: user.username,
+            _raw: {
+                customParticipantId: user.id,
+                isKycVerified: user.is_kyc_verified || false,
+            }
+        };
+    };
+
+    // Callback to open member info for speed networking users
+    const handleMemberInfo = useCallback((user) => {
+        if (!onMemberInfo || !user) return;
+        const memberObj = buildMemberObj(user);
+        if (memberObj) {
+            onMemberInfo(memberObj);
+        }
+    }, [onMemberInfo]);
 
     // Fetch current user (to get integer id)
     useEffect(() => {
@@ -506,6 +537,7 @@ export default function SpeedNetworkingZone({
                         onLeave={handleLeaveQueue}
                         loading={loading}
                         currentUserId={currentUser?.id}
+                        onMemberInfo={handleMemberInfo}
                     />
                 ) : inQueue ? (
                     <SpeedNetworkingLobby
@@ -572,6 +604,7 @@ export default function SpeedNetworkingZone({
                             eventId={eventId}
                             session={session}
                             lastMessage={lastMessage}
+                            onMemberInfo={handleMemberInfo}
                         />
                     )}
                 </Box>

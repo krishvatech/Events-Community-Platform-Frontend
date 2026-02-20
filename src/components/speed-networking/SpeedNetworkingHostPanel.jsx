@@ -44,7 +44,8 @@ function authHeader() {
 export default function SpeedNetworkingHostPanel({
     eventId,
     session,
-    lastMessage
+    lastMessage,
+    onMemberInfo
 }) {
     const [queueEntries, setQueueEntries] = useState([]);
     const [pastMatches, setPastMatches] = useState([]);
@@ -404,7 +405,21 @@ export default function SpeedNetworkingHostPanel({
                                                         border: '1px solid rgba(255,255,255,0.08)'
                                                     }}
                                                 >
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
+                                                    <Box
+                                                        onClick={() => onMemberInfo && onMemberInfo(entry.user)}
+                                                        sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 1.5,
+                                                            flex: 1,
+                                                            cursor: onMemberInfo ? 'pointer' : 'default',
+                                                            transition: 'opacity 0.2s',
+                                                            '&:hover': onMemberInfo ? { opacity: 0.85 } : {},
+                                                            padding: 0.5,
+                                                            marginLeft: -0.5,
+                                                            borderRadius: 0.5
+                                                        }}
+                                                    >
                                                         <Avatar
                                                             src={entry.user?.avatar_url}
                                                             alt={entry.user?.first_name}
@@ -508,7 +523,22 @@ export default function SpeedNetworkingHostPanel({
                                                         gap: 1
                                                     }}>
                                                         {/* Participant 1 */}
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+                                                        <Box
+                                                            onClick={() => onMemberInfo && onMemberInfo(match.participant_1)}
+                                                            sx={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 1,
+                                                                flex: 1,
+                                                                minWidth: 0,
+                                                                cursor: onMemberInfo ? 'pointer' : 'default',
+                                                                transition: 'opacity 0.2s',
+                                                                '&:hover': onMemberInfo ? { opacity: 0.85 } : {},
+                                                                padding: 0.5,
+                                                                marginLeft: -0.5,
+                                                                borderRadius: 0.5
+                                                            }}
+                                                        >
                                                             <Avatar
                                                                 alt={match.participant_1?.first_name}
                                                                 sx={{ width: 28, height: 28 }}
@@ -537,7 +567,22 @@ export default function SpeedNetworkingHostPanel({
                                                         </Typography>
 
                                                         {/* Participant 2 */}
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+                                                        <Box
+                                                            onClick={() => onMemberInfo && onMemberInfo(match.participant_2)}
+                                                            sx={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 1,
+                                                                flex: 1,
+                                                                minWidth: 0,
+                                                                cursor: onMemberInfo ? 'pointer' : 'default',
+                                                                transition: 'opacity 0.2s',
+                                                                '&:hover': onMemberInfo ? { opacity: 0.85 } : {},
+                                                                padding: 0.5,
+                                                                marginRight: -0.5,
+                                                                borderRadius: 0.5
+                                                            }}
+                                                        >
                                                             <Typography sx={{
                                                                 color: '#fff',
                                                                 fontSize: 12,
@@ -630,7 +675,22 @@ export default function SpeedNetworkingHostPanel({
                                                         mb: 1
                                                     }}>
                                                         {/* Participant 1 */}
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+                                                        <Box
+                                                            onClick={() => onMemberInfo && onMemberInfo(match.participant_1)}
+                                                            sx={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 1,
+                                                                flex: 1,
+                                                                minWidth: 0,
+                                                                cursor: onMemberInfo ? 'pointer' : 'default',
+                                                                transition: 'opacity 0.2s',
+                                                                '&:hover': onMemberInfo ? { opacity: 0.85 } : {},
+                                                                padding: 0.5,
+                                                                marginLeft: -0.5,
+                                                                borderRadius: 0.5
+                                                            }}
+                                                        >
                                                             <Avatar
                                                                 alt={match.participant_1?.first_name}
                                                                 sx={{ width: 28, height: 28 }}
@@ -659,7 +719,22 @@ export default function SpeedNetworkingHostPanel({
                                                         </Typography>
 
                                                         {/* Participant 2 */}
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+                                                        <Box
+                                                            onClick={() => onMemberInfo && onMemberInfo(match.participant_2)}
+                                                            sx={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 1,
+                                                                flex: 1,
+                                                                minWidth: 0,
+                                                                cursor: onMemberInfo ? 'pointer' : 'default',
+                                                                transition: 'opacity 0.2s',
+                                                                '&:hover': onMemberInfo ? { opacity: 0.85 } : {},
+                                                                padding: 0.5,
+                                                                marginRight: -0.5,
+                                                                borderRadius: 0.5
+                                                            }}
+                                                        >
                                                             <Typography sx={{
                                                                 color: '#fff',
                                                                 fontSize: 12,

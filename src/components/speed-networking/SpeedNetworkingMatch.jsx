@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button, LinearProgress, Collapse, Chip } from '@mui/material';
+import { Box, Typography, Button, LinearProgress, Collapse, Chip, Avatar, Divider, IconButton } from '@mui/material';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import CloseIcon from '@mui/icons-material/Close';
 import { useDyteClient, DyteProvider } from '@dytesdk/react-web-core';
 import { DyteMeeting } from '@dytesdk/react-ui-kit';
 
@@ -43,7 +44,8 @@ export default function SpeedNetworkingMatch({
     onNextMatch,
     onLeave,
     loading,
-    currentUserId
+    currentUserId,
+    onMemberInfo
 }) {
     const [meeting, initMeeting] = useDyteClient();
     const [timeRemaining, setTimeRemaining] = useState(session.duration_minutes * 60);
@@ -177,32 +179,26 @@ export default function SpeedNetworkingMatch({
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
-            bgcolor: '#000',
+            bgcolor: '#070a14',
             position: 'relative'
         }}>
-            {/* Timer Bar */}
+            {/* Top AppBar */}
             <Box sx={{
-                bgcolor: '#1a1a1a',
-                p: 2,
-                zIndex: 10,
-                borderBottom: '1px solid rgba(255,255,255,0.1)'
+                display: 'flex',
+                flexDirection: 'column',
+                bgcolor: 'rgba(5,7,12,0.92)',
+                backdropFilter: 'blur(12px)',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                zIndex: 10
             }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Box>
-                        <Typography sx={{ color: '#fff', fontWeight: 700 }}>
-                            Talking with: <span style={{ color: '#5a78ff' }}>{partner?.first_name || partner?.username || 'Partner'}</span>
-                        </Typography>
-                        {match?.match_probability && (
-                            <Typography sx={{ color: '#22c55e', fontSize: 12, mt: 0.5 }}>
-                                ✓ {match.match_probability.toFixed(0)}% match probability
-                            </Typography>
-                        )}
-                    </Box>
-                    <Typography sx={{
-                        color: timeRemaining < 30 ? '#ef4444' : '#22c55e',
-                        fontWeight: 700,
-                        fontSize: 18
-                    }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, gap: 1 }}>
+                    <IconButton size="small" onClick={onLeave} sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                    <Typography sx={{ flex: 1, color: '#fff', fontWeight: 700, fontSize: 14 }}>
+                        Speed Networking  ·  {session.name || 'Session'}
+                    </Typography>
+                    <Typography sx={{ color: timeRemaining < 30 ? '#ef4444' : '#22c55e', fontWeight: 700, fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>
                         {formatTime(timeRemaining)}
                     </Typography>
                 </Box>
@@ -210,137 +206,91 @@ export default function SpeedNetworkingMatch({
                     variant="determinate"
                     value={progress}
                     sx={{
-                        height: 6,
-                        borderRadius: 3,
-                        bgcolor: 'rgba(255,255,255,0.1)',
+                        height: 3,
+                        bgcolor: 'rgba(255,255,255,0.08)',
                         '& .MuiLinearProgress-bar': {
-                            bgcolor: timeRemaining < 30 ? '#ef4444' : '#22c55e',
-                            borderRadius: 3
+                            bgcolor: timeRemaining < 30 ? '#ef4444' : '#22c55e'
                         }
                     }}
                 />
-
-                {/* Score Breakdown */}
-                {match?.match_breakdown && (
-                    <Box sx={{ mt: 1 }}>
-                        <Button
-                            size="small"
-                            onClick={() => setShowBreakdown(!showBreakdown)}
-                            sx={{
-                                color: 'rgba(255,255,255,0.6)',
-                                fontSize: 11,
-                                textTransform: 'none',
-                                p: 0,
-                                '&:hover': { color: '#fff' }
-                            }}
-                            endIcon={showBreakdown ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
-                        >
-                            Match Score Details
-                        </Button>
-
-                        <Collapse in={showBreakdown}>
-                            <Box sx={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(4, 1fr)',
-                                gap: 1,
-                                mt: 1,
-                                p: 1,
-                                bgcolor: 'rgba(0,0,0,0.3)',
-                                borderRadius: 1
-                            }}>
-                                {Object.entries(match.match_breakdown).map(([criterion, score]) => (
-                                    <Box key={criterion} sx={{ textAlign: 'center' }}>
-                                        <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', textTransform: 'capitalize' }}>
-                                            {criterion}
-                                        </Typography>
-                                        <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#fff', mt: 0.3 }}>
-                                            {score.toFixed(0)}
-                                        </Typography>
-                                        <LinearProgress
-                                            variant="determinate"
-                                            value={score}
-                                            sx={{
-                                                height: 3,
-                                                borderRadius: 2,
-                                                mt: 0.5,
-                                                bgcolor: 'rgba(255,255,255,0.1)',
-                                                '& .MuiLinearProgress-bar': {
-                                                    bgcolor: score > 75 ? '#22c55e' : score > 50 ? '#f59e0b' : '#ef4444',
-                                                    borderRadius: 2
-                                                }
-                                            }}
-                                        />
-                                    </Box>
-                                ))}
-                            </Box>
-                        </Collapse>
-                    </Box>
-                )}
             </Box>
 
-            {/* Dyte Meeting Area */}
-            <Box sx={{
-                flex: 1,
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '100%',
-                height: '100%',
-                minHeight: 0,
-                '& .dyte-meeting': {
-                    width: '100%',
-                    height: '100%'
-                },
-                // Ensure Dyte toolbar doesn't hide controls
-                '& [class*="controlbar"]': {
-                    flexWrap: 'nowrap',
-                    overflowX: 'visible !important'
-                },
-                // Ensure all toolbar buttons are visible
-                '& [class*="control-item"]': {
-                    minWidth: 'auto',
-                    whiteSpace: 'nowrap'
-                }
-            }}>
-                {videoError ? (
-                    <Box sx={{ textAlign: 'center', p: 3, bgcolor: 'rgba(239,68,68,0.1)', borderRadius: 2, border: '1px solid #ef4444' }}>
-                        <Typography variant="h6" color="error" gutterBottom>
-                            {videoError}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                            You can still chat or use audio if available.
-                            <br />
-                            Please check backend logs/keys if testing.
-                        </Typography>
-                    </Box>
-                ) : meeting ? (
-                    <DyteProvider value={meeting}>
-                        <DyteMeeting mode="fill" meeting={meeting} showSetupScreen={false} />
-                    </DyteProvider>
-                ) : (
-                    <Typography sx={{ color: 'rgba(255,255,255,0.3)' }}>Loading Video...</Typography>
-                )}
+            {/* Main Content: Dyte + Partner Profile Sidebar */}
+            <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+                {/* Left: Dyte Meeting */}
+                <Box sx={{
+                    flex: 1,
+                    position: 'relative',
+                    minWidth: 0,
+                    '& .dyte-meeting': {
+                        width: '100%',
+                        height: '100%'
+                    },
+                    '& [class*="controlbar"]': {
+                        flexWrap: 'nowrap',
+                        overflowX: 'visible !important'
+                    },
+                    '& [class*="control-item"]': {
+                        minWidth: 'auto',
+                        whiteSpace: 'nowrap'
+                    }
+                }}>
+                    {videoError ? (
+                        <Box sx={{ textAlign: 'center', p: 3, bgcolor: 'rgba(239,68,68,0.1)', borderRadius: 2, border: '1px solid #ef4444', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+                            <Typography variant="h6" color="error" gutterBottom>
+                                {videoError}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                                You can still chat or use audio if available.
+                                <br />
+                                Please check backend logs/keys if testing.
+                            </Typography>
+                        </Box>
+                    ) : meeting ? (
+                        <DyteProvider value={meeting}>
+                            <DyteMeeting mode="fill" meeting={meeting} showSetupScreen={false} />
+                        </DyteProvider>
+                    ) : (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                            <Typography sx={{ color: 'rgba(255,255,255,0.3)' }}>Loading Video...</Typography>
+                        </Box>
+                    )}
+                </Box>
+
+                {/* Right: Partner Profile Sidebar */}
+                <Box sx={{
+                    width: 300,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    bgcolor: 'rgba(255,255,255,0.03)',
+                    borderLeft: '1px solid rgba(255,255,255,0.08)',
+                    overflow: 'auto'
+                }}>
+                    <PartnerProfileSidebar
+                        partner={partner}
+                        match={match}
+                        onMemberInfo={onMemberInfo}
+                        showBreakdown={showBreakdown}
+                        setShowBreakdown={setShowBreakdown}
+                    />
+                </Box>
             </Box>
 
             {/* Bottom Controls */}
             <Box sx={{
                 p: 2,
-                bgcolor: '#1a1a1a',
+                bgcolor: 'rgba(5,7,12,0.92)',
+                borderTop: '1px solid rgba(255,255,255,0.08)',
                 display: 'flex',
                 justifyContent: 'center',
                 gap: 2,
-                zIndex: 10,
-                borderTop: '1px solid rgba(255,255,255,0.1)'
+                zIndex: 10
             }}>
-
                 <Button
                     variant="contained"
                     startIcon={<SkipNextIcon />}
                     disabled={loading}
-                    onClick={() => {
-                        onNextMatch();
-                    }}
+                    onClick={onNextMatch}
                     sx={{
                         bgcolor: '#5a78ff',
                         '&:hover': { bgcolor: '#4a68ef' },
@@ -354,9 +304,7 @@ export default function SpeedNetworkingMatch({
                     variant="outlined"
                     startIcon={<ExitToAppIcon />}
                     disabled={loading}
-                    onClick={() => {
-                        onLeave();
-                    }}
+                    onClick={onLeave}
                     sx={{
                         borderColor: 'rgba(255,255,255,0.2)',
                         color: '#fff',
@@ -369,6 +317,155 @@ export default function SpeedNetworkingMatch({
                     Leave Session
                 </Button>
             </Box>
+        </Box>
+    );
+}
+
+// Partner Profile Sidebar Component
+function PartnerProfileSidebar({ partner, match, onMemberInfo, showBreakdown, setShowBreakdown }) {
+    return (
+        <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            {/* Header label */}
+            <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                Talking With
+            </Typography>
+
+            {/* Avatar + Name (clickable) */}
+            <Box
+                onClick={() => onMemberInfo && onMemberInfo(partner)}
+                sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 1,
+                    cursor: onMemberInfo ? 'pointer' : 'default',
+                    transition: 'opacity 0.2s',
+                    '&:hover': onMemberInfo ? { opacity: 0.85 } : {}
+                }}
+            >
+                <Avatar
+                    src={partner?.avatar_url || ''}
+                    sx={{
+                        width: 72,
+                        height: 72,
+                        fontSize: 28,
+                        bgcolor: 'rgba(90,120,255,0.3)',
+                        border: '2px solid rgba(90,120,255,0.4)'
+                    }}
+                >
+                    {(partner?.first_name || partner?.username || 'P').charAt(0).toUpperCase()}
+                </Avatar>
+                <Box sx={{ textAlign: 'center' }}>
+                    <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: 16, lineHeight: 1.3 }}>
+                        {[partner?.first_name, partner?.last_name].filter(Boolean).join(' ') || partner?.username || 'Partner'}
+                    </Typography>
+                    {partner?.username && (
+                        <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
+                            @{partner.username}
+                        </Typography>
+                    )}
+                </Box>
+            </Box>
+
+            <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+
+            {/* Match Probability */}
+            {match?.match_probability != null && (
+                <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Match Probability</Typography>
+                        <Typography sx={{ color: '#22c55e', fontSize: 12, fontWeight: 700 }}>
+                            {match.match_probability.toFixed(0)}%
+                        </Typography>
+                    </Box>
+                    <LinearProgress
+                        variant="determinate"
+                        value={match.match_probability}
+                        sx={{
+                            height: 6,
+                            borderRadius: 3,
+                            bgcolor: 'rgba(255,255,255,0.08)',
+                            '& .MuiLinearProgress-bar': {
+                                bgcolor: match.match_probability >= 70 ? '#22c55e' : match.match_probability >= 40 ? '#f59e0b' : '#ef4444',
+                                borderRadius: 3
+                            }
+                        }}
+                    />
+                </Box>
+            )}
+
+            {/* Match Score Breakdown (collapsible) */}
+            {match?.match_breakdown && (
+                <Box>
+                    <Button
+                        size="small"
+                        onClick={() => setShowBreakdown(!showBreakdown)}
+                        endIcon={showBreakdown ? <ExpandLessIcon sx={{ fontSize: 14 }} /> : <ExpandMoreIcon sx={{ fontSize: 14 }} />}
+                        sx={{
+                            color: 'rgba(255,255,255,0.5)',
+                            fontSize: 11,
+                            textTransform: 'none',
+                            p: 0,
+                            '&:hover': { color: '#fff' }
+                        }}
+                    >
+                        Match Score Details
+                    </Button>
+                    <Collapse in={showBreakdown}>
+                        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {Object.entries(match.match_breakdown).map(([criterion, score]) => (
+                                <Box key={criterion}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
+                                        <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', textTransform: 'capitalize' }}>
+                                            {criterion}
+                                        </Typography>
+                                        <Typography sx={{ fontSize: 11, color: '#fff', fontWeight: 600 }}>
+                                            {score.toFixed(0)}
+                                        </Typography>
+                                    </Box>
+                                    <LinearProgress
+                                        variant="determinate"
+                                        value={score}
+                                        sx={{
+                                            height: 3,
+                                            borderRadius: 2,
+                                            bgcolor: 'rgba(255,255,255,0.08)',
+                                            '& .MuiLinearProgress-bar': {
+                                                bgcolor: score > 75 ? '#22c55e' : score > 50 ? '#f59e0b' : '#ef4444',
+                                                borderRadius: 2
+                                            }
+                                        }}
+                                    />
+                                </Box>
+                            ))}
+                        </Box>
+                    </Collapse>
+                </Box>
+            )}
+
+            {/* View Profile button */}
+            {onMemberInfo && (
+                <>
+                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+                    <Button
+                        variant="outlined"
+                        fullWidth
+                        onClick={() => onMemberInfo(partner)}
+                        sx={{
+                            borderColor: 'rgba(90,120,255,0.5)',
+                            color: '#5a78ff',
+                            textTransform: 'none',
+                            borderRadius: 2,
+                            '&:hover': {
+                                borderColor: '#5a78ff',
+                                bgcolor: 'rgba(90,120,255,0.08)'
+                            }
+                        }}
+                    >
+                        View Profile
+                    </Button>
+                </>
+            )}
         </Box>
     );
 }
