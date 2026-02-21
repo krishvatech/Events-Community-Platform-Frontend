@@ -15732,12 +15732,12 @@ function MemberInfoContent({ selectedMember, onClose }) {
           <Box
             sx={{
               position: "absolute",
-              top: 0,
-              right: 0,
+              bottom: -8,
+              right: -8,
               bgcolor: "rgba(20, 184, 166, 0.2)",
               borderRadius: "50%",
-              width: 28,
-              height: 28,
+              width: 44,
+              height: 44,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -15745,7 +15745,7 @@ function MemberInfoContent({ selectedMember, onClose }) {
               boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
             }}
           >
-            <Typography sx={{ fontSize: 16 }}>{selectedMember.mood}</Typography>
+            <Typography sx={{ fontSize: 24 }}>{selectedMember.mood}</Typography>
           </Box>
         )}
       </Box>
