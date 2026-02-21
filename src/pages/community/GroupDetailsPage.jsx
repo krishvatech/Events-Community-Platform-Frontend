@@ -2230,14 +2230,14 @@ function MembersTab({ groupId }) {
   const [loading, setLoading] = React.useState(true);
   const [q, setQ] = React.useState("");
 
-  const [selectedCompanies, setSelectedCompanies] = React.useState([]);
+
   const [selectedRegions, setSelectedRegions] = React.useState([]);
 
   const [selectedIndustries, setSelectedIndustries] = React.useState([]);
   const [selectedCompanySizes, setSelectedCompanySizes] = React.useState([]);
 
   const [globalOptions, setGlobalOptions] = React.useState({
-    companies: [],
+
 
     industries: [],
     sizes: [],
@@ -2278,7 +2278,7 @@ function MembersTab({ groupId }) {
         );
 
         setGlobalOptions({
-          companies: data.companies || [],
+
 
           industries: data.industries || [],
           sizes: sortedSizes,
@@ -2308,9 +2308,7 @@ function MembersTab({ groupId }) {
   const filtered = React.useMemo(() => {
     let list = members;
 
-    if (selectedCompanies.length) {
-      list = list.filter((m) => selectedCompanies.includes(getCompanyFromUser(m.user || m)));
-    }
+
     if (selectedRegions.length) {
       list = list.filter((m) => selectedRegions.includes(getCountryFromUser(m.user || m)));
     }
@@ -2339,7 +2337,6 @@ function MembersTab({ groupId }) {
   }, [
     members,
     q,
-    selectedCompanies,
     selectedRegions,
 
     selectedIndustries,
@@ -2381,25 +2378,6 @@ function MembersTab({ groupId }) {
               multiple
               fullWidth
               size="small"
-              options={globalOptions.companies}
-              value={selectedCompanies}
-              onChange={(_, newValue) => setSelectedCompanies(newValue)}
-              filterSelectedOptions
-              disableCloseOnSelect
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Company"
-                  placeholder={selectedCompanies.length ? "" : "All companies"}
-                />
-              )}
-              sx={{ flex: 1 }}
-            />
-
-            <Autocomplete
-              multiple
-              fullWidth
-              size="small"
               options={globalOptions.regions}
               value={selectedRegions}
               onChange={(_, newValue) => setSelectedRegions(newValue)}
@@ -2414,11 +2392,6 @@ function MembersTab({ groupId }) {
               )}
               sx={{ flex: 1 }}
             />
-
-
-          </Stack>
-
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TextField
               size="small"
               select

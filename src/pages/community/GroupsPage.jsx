@@ -1047,11 +1047,11 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
   const [q, setQ] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
 
-  const [selectedCompanies, setSelectedCompanies] = React.useState([]);
+
   const [selectedRegions, setSelectedRegions] = React.useState([]);
 
   const [globalOptions, setGlobalOptions] = React.useState({
-    companies: [],
+
 
     regions: [],
   });
@@ -1114,7 +1114,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
         const sortedRegions = Array.from(regionSet).sort((a, b) => a.localeCompare(b));
 
         setGlobalOptions({
-          companies: data.companies || [],
+
           titles: data.titles || [],
           regions: sortedRegions,
         });
@@ -1129,12 +1129,12 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
 
   const buildMemberFiltersQuery = React.useCallback(() => {
     const params = new URLSearchParams();
-    selectedCompanies.forEach((v) => params.append("company", v));
+
 
     selectedRegions.forEach((v) => params.append("region", v));
     const qs = params.toString();
     return qs ? `?${qs}` : "";
-  }, [selectedCompanies, selectedRegions]);
+  }, [selectedRegions]);
 
   async function fetchExploreGroups() {
     try {
@@ -1184,7 +1184,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
     Promise.all([fetchExploreGroups(), fetchMyGroups()]).finally(() =>
       setLoading(false)
     );
-  }, [selectedCompanies, selectedRegions]);
+  }, [selectedRegions]);
 
   const handleJoin = async (g) => {
     const visibility = (g.visibility || "").toLowerCase();
@@ -1269,7 +1269,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [q, tabIndex, selectedJoinPolicies, selectedVisibilities, selectedCompanies, selectedRegions]);
+  }, [q, tabIndex, selectedJoinPolicies, selectedVisibilities, selectedRegions]);
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginatedGroups = React.useMemo(() => {
@@ -1357,25 +1357,6 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   multiple
                   fullWidth
                   size="small"
-                  options={globalOptions.companies}
-                  value={selectedCompanies}
-                  onChange={(_, newValue) => setSelectedCompanies(newValue)}
-                  filterSelectedOptions
-                  disableCloseOnSelect
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Company"
-                      placeholder={selectedCompanies.length ? "" : "All companies"}
-                    />
-                  )}
-                  sx={{ flex: 1 }}
-                />
-
-                <Autocomplete
-                  multiple
-                  fullWidth
-                  size="small"
                   options={globalOptions.regions}
                   value={selectedRegions}
                   onChange={(_, newValue) => setSelectedRegions(newValue)}
@@ -1390,14 +1371,6 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   )}
                   sx={{ flex: 1 }}
                 />
-
-
-              </Stack>
-
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1}
-              >
                 <Autocomplete
                   multiple
                   fullWidth
