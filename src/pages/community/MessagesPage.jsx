@@ -808,6 +808,16 @@ const formatEventDateLabel = (eventObj) => {
   return dt.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
 };
 
+const isEventEnded = (eventObj) => {
+  if (!eventObj) return false;
+  // Check status field first (if event was explicitly ended by host)
+  if (eventObj?.status === 'ended') return true;
+  // Fall back to checking end_time (if current time has passed event's scheduled end)
+  const endTime = eventObj?.end_time || eventObj?.ends_at || eventObj?.end_at;
+  if (!endTime) return false;
+  return new Date(endTime) <= new Date();
+};
+
 const formatThreadMessageTime = (currentMsg, prevMsg) => {
   const ts = currentMsg?.created_at;
   if (!ts) return "";
@@ -1993,7 +2003,7 @@ export default function MessagesPage() {
 
       if (eventId && eventId !== prevEventId) {
         const ev = eventMetaById[eventId] || {};
-        const eventName = ev?.title || ev?.name || `Event ${eventId}`;
+        const eventName = ev?.title || ev?.name || ev?.slug || `Event ${eventId}`;
         out.push({
           id: `sys-start-${eventId}-${m.id}`,
           _system: true,
@@ -2009,13 +2019,16 @@ export default function MessagesPage() {
 
       if (eventId && eventId !== nextEventId) {
         const ev = eventMetaById[eventId] || {};
-        const eventName = ev?.title || ev?.name || `Event ${eventId}`;
-        out.push({
-          id: `sys-end-${eventId}-${m.id}`,
-          _system: true,
-          _systemText: `Event Ended - ${eventName} | ${formatEventDateLabel(ev)}`,
-          created_at: m.created_at,
-        });
+        // Only show "Event Ended" divider if the event has actually ended
+        if (isEventEnded(ev)) {
+          const eventName = ev?.title || ev?.name || ev?.slug || `Event ${eventId}`;
+          out.push({
+            id: `sys-end-${eventId}-${m.id}`,
+            _system: true,
+            _systemText: `Event Ended - ${eventName} | ${formatEventDateLabel(ev)}`,
+            created_at: m.created_at,
+          });
+        }
       }
     }
     return out;
@@ -2126,11 +2139,20 @@ export default function MessagesPage() {
         missing.map(async (id) => {
           try {
             const res = await apiFetch(`${API_ROOT}/events/${id}/`);
-            if (!res.ok) return;
-            const data = await res.json().catch(() => null);
-            if (data) fetched[id] = data;
-          } catch {
-            // ignore
+            if (!res.ok) {
+              console.warn(`Failed to fetch event ${id}: HTTP ${res.status}`);
+              return;
+            }
+            const data = await res.json().catch((err) => {
+              console.warn(`Failed to parse event ${id} JSON:`, err);
+              return null;
+            });
+            if (data) {
+              fetched[id] = data;
+              console.log(`✓ Loaded event metadata for ${id}:`, data);
+            }
+          } catch (err) {
+            console.warn(`Error fetching event ${id}:`, err);
           }
         })
       );

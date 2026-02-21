@@ -9677,11 +9677,20 @@ export default function NewLiveMeeting() {
             const res = await fetch(toApiUrl(`events/${id}/`), {
               headers: { Accept: "application/json", ...authHeader() },
             });
-            if (!res.ok) return;
-            const data = await res.json().catch(() => null);
-            if (data) fetched[id] = data;
-          } catch {
-            // no-op
+            if (!res.ok) {
+              console.warn(`Failed to fetch event ${id}: HTTP ${res.status}`);
+              return;
+            }
+            const data = await res.json().catch((err) => {
+              console.warn(`Failed to parse event ${id} JSON:`, err);
+              return null;
+            });
+            if (data) {
+              fetched[id] = data;
+              console.log(`✓ Loaded event metadata for ${id}:`, data);
+            }
+          } catch (err) {
+            console.warn(`Error fetching event ${id}:`, err);
           }
         })
       );
@@ -9949,9 +9958,22 @@ export default function NewLiveMeeting() {
     });
   };
 
+  // Helper to check if an event has actually ended
+  const isEventEnded = useCallback((eventObj) => {
+    if (!eventObj) return false;
+    // Check status field first (if event was explicitly ended by host)
+    if (eventObj?.status === 'ended') return true;
+    // Fall back to checking end_time (if current time has passed event's scheduled end)
+    const endTime = eventObj?.end_time || eventObj?.ends_at || eventObj?.end_at;
+    if (!endTime) return false;
+    return new Date(endTime) <= new Date();
+  }, []);
+
   const privateTimelineItems = useMemo(() => {
     const rows = Array.isArray(privateMessages) ? privateMessages : [];
     if (!rows.length) return [];
+
+    console.log(`[Chat Timeline] Processing ${rows.length} messages`, rows.map(m => ({ id: m.id, event_id: m.event_id, body: m.body?.substring(0, 20) })));
 
     const items = [];
     for (let i = 0; i < rows.length; i += 1) {
@@ -9965,7 +9987,8 @@ export default function NewLiveMeeting() {
 
       if (eventId && eventId !== prevEventId) {
         const eventObj = privateEventMetaById[eventId] || {};
-        const eventName = eventObj?.title || eventObj?.name || `Event ${eventId}`;
+        const eventName = eventObj?.title || eventObj?.name || eventObj?.slug || `Event ${eventId}`;
+        console.log(`[Chat Timeline] Event START divider for event ${eventId}:`, eventName, eventObj);
         items.push({
           type: "system",
           key: `event-start-${eventId}-${msg.id}`,
@@ -9982,16 +10005,23 @@ export default function NewLiveMeeting() {
 
       if (eventId && eventId !== nextEventId) {
         const eventObj = privateEventMetaById[eventId] || {};
-        const eventName = eventObj?.title || eventObj?.name || `Event ${eventId}`;
-        items.push({
-          type: "system",
-          key: `event-end-${eventId}-${msg.id}`,
-          text: `Event Ended - ${eventName} | ${formatEventDateLabel(eventObj)}`,
-        });
+        // Only show "Event Ended" divider if the event has actually ended
+        if (isEventEnded(eventObj)) {
+          const eventName = eventObj?.title || eventObj?.name || eventObj?.slug || `Event ${eventId}`;
+          console.log(`[Chat Timeline] Event ENDED divider for event ${eventId}:`, eventName, eventObj);
+          items.push({
+            type: "system",
+            key: `event-end-${eventId}-${msg.id}`,
+            text: `Event Ended - ${eventName} | ${formatEventDateLabel(eventObj)}`,
+          });
+        } else {
+          console.log(`[Chat Timeline] Event NOT ended for ${eventId}:`, eventObj);
+        }
       }
     }
+    console.log(`[Chat Timeline] Created ${items.length} timeline items`);
     return items;
-  }, [privateMessages, privateEventMetaById]);
+  }, [privateMessages, privateEventMetaById, isEventEnded]);
 
   const getParticipantFromMessage = useCallback((msg) => {
     const senderId =
