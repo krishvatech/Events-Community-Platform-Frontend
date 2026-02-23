@@ -1101,6 +1101,7 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [selected, setSelected] = React.useState(new Set());
+    const [submitting, setSubmitting] = React.useState(false);
 
     const toggle = (id) => {
         if (id === ownerId) return; // 👈 safety
@@ -1137,13 +1138,18 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
 
     const submit = async () => {
         if (selected.size === 0) return;
-        await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/members/add-member/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: JSON.stringify({ user_ids: Array.from(selected) }),
-        });
-        onAdded?.(selected.size);
-        onClose?.();
+        setSubmitting(true);
+        try {
+            await fetch(`${API_ROOT}/groups/${groupIdOrSlug}/members/add-member/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({ user_ids: Array.from(selected) }),
+            });
+            onAdded?.(selected.size);
+            onClose?.();
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -1207,12 +1213,12 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
                 <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
                 <Button
                     onClick={submit}
-                    disabled={selected.size === 0}
+                    disabled={selected.size === 0 || submitting}
                     variant="contained"
                     className="rounded-xl"
                     sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 >
-                    Add {selected.size > 0 ? `(${selected.size})` : ""}
+                    {submitting ? "Adding..." : `Add ${selected.size > 0 ? `(${selected.size})` : ""}`}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -1227,6 +1233,7 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState("");
     const [selected, setSelected] = React.useState(new Set());
+    const [submitting, setSubmitting] = React.useState(false);
 
     const toggle = (id) => {
         if (id === ownerId) return;
@@ -1295,6 +1302,8 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
         // ignore owner id if somehow selected
         const ids = Array.from(selected).map(Number).filter((x) => x !== Number(ownerId));
         if (ids.length === 0) return;
+
+        setSubmitting(true);
         const url = `${API_ROOT}/groups/${groupIdOrSlug}/moderator/request-add-members/`;
         const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 
@@ -1332,6 +1341,8 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
             onRequested?.(ids.length);
             onClose?.();
         } catch (e) {
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -1395,11 +1406,11 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
                 </Typography>
                 <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
                 <Button
-                    onClick={submit} disabled={selected.size === 0}
+                    onClick={submit} disabled={selected.size === 0 || submitting}
                     variant="contained"
                     sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                 >
-                    Send request
+                    {submitting ? "Sending..." : "Send request"}
                 </Button>
             </DialogActions>
         </Dialog>

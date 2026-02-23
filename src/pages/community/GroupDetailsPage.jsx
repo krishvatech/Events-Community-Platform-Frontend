@@ -21,6 +21,7 @@ import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import SearchIcon from "@mui/icons-material/Search";
 import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
@@ -59,6 +60,32 @@ const REPORT_REASONS = [
   { id: "sexual_content", label: "Sexual content" },
   { id: "other", label: "Other" },
 ];
+
+const ROLE_BADGE_CONFIG = {
+  owner: { label: "Owner", className: "bg-slate-200 text-slate-700" },
+  admin: { label: "Admin", className: "bg-teal-50 text-teal-700" },
+  moderator: { label: "Moderator", className: "bg-sky-50 text-sky-700" },
+  member: { label: "Member", className: "bg-slate-100 text-slate-700" },
+};
+
+const RoleBadge = ({ role }) => {
+  const cfg = ROLE_BADGE_CONFIG[role] || ROLE_BADGE_CONFIG.member;
+  return (
+    <Chip
+      size="small"
+      label={cfg.label}
+      sx={{
+        bgcolor: cfg.className.includes("bg-slate-200") ? "#e2e8f0" :
+          cfg.className.includes("bg-teal-50") ? "#f0fdfa" :
+            cfg.className.includes("bg-sky-50") ? "#f0f9ff" : "#f1f5f9",
+        color: cfg.className.includes("text-slate-700") ? "#334155" :
+          cfg.className.includes("text-teal-700") ? "#0f766e" :
+            cfg.className.includes("text-sky-700") ? "#0369a1" : "#334155",
+        fontWeight: 500
+      }}
+    />
+  );
+};
 
 const LINKEDIN_COMPANY_SIZES = [
   "1-10",
@@ -1377,28 +1404,33 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
               sx={{ cursor: "pointer" }}
               onClick={() => window.__openLikes?.(engageTargetOf(local))}
             >
-              <AvatarGroup
-                max={3}
-                sx={{
-                  "& .MuiAvatar-root": {
-                    width: 24,
-                    height: 24,
-                    bgcolor: "#d1d5db",
-                    border: "2px solid #fff",
-                  }
-                }}
-              >
+              <Box sx={{ display: "flex", alignItems: "center" }}>
                 {(reactionIds.length ? reactionIds : (likeCount > 0 ? ["like"] : []))
                   .slice(0, 3)
-                  .map(rid => {
+                  .map((rid, index) => {
                     const def = POST_REACTIONS.find(r => r.id === rid) || POST_REACTIONS[0];
                     return (
-                      <Avatar key={rid} sx={{ bgcolor: "#d1d5db" }}>
-                        <span style={{ fontSize: 14, lineHeight: 1 }}>{def.emoji}</span>
-                      </Avatar>
+                      <Box
+                        key={rid}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 24,
+                          height: 24,
+                          borderRadius: "50%",
+                          bgcolor: "#e5e7eb", // gray-200 background
+                          border: "2px solid #fff",
+                          ml: index > 0 ? -1 : 0, // Negative margin for overlap
+                          zIndex: 3 - index, // Keep first items on top
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.1)", // Subtle shadow for depth
+                        }}
+                      >
+                        <span style={{ fontSize: 13, lineHeight: 1 }}>{def.emoji}</span>
+                      </Box>
                     );
                   })}
-              </AvatarGroup>
+              </Box>
               <Typography variant="body2" sx={{ "&:hover": { textDecoration: "underline" } }}>
                 {likeLabel}
               </Typography>
@@ -2230,10 +2262,316 @@ function PostsTab({ groupId, group, moderatorCanI }) {
   );
 }
 
-function MembersTab({ groupId }) {
+function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, ownerId }) {
+  const [q, setQ] = React.useState("");
+  const [rows, setRows] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [selected, setSelected] = React.useState(new Set());
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const toggle = (id) => {
+    if (String(id) === String(ownerId)) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const fetchUsers = React.useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(toApiUrl(`users-lookup/?search=${encodeURIComponent(q)}&limit=30`), {
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+      });
+      const json = await res.json().catch(() => ([]));
+      if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+      const exist = new Set(existingIds || []);
+      const filtered = (Array.isArray(json) ? json : [])
+        .filter(u => String(u?.id) !== String(ownerId))
+        .filter(u => !exist.has(u.id));
+      setRows(filtered);
+    } catch (e) {
+      setError(String(e?.message || e));
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [q, existingIds, ownerId]);
+
+  React.useEffect(() => { if (open) fetchUsers(); }, [open, fetchUsers]);
+
+  const submit = async () => {
+    if (selected.size === 0) return;
+    setSubmitting(true);
+    try {
+      // Adjust endpoint for actual app (GroupManage uses AddMember/RequestAddMembers)
+      await fetch(toApiUrl(`groups/${groupIdOrSlug}/members/add-member/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ user_ids: Array.from(selected) }),
+      });
+      onAdded?.(selected.size);
+      onClose?.();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ fontWeight: 800 }}>Add members</DialogTitle>
+      <DialogContent dividers>
+        <TextField
+          placeholder="Search users..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          fullWidth
+          size="small"
+          sx={{ mb: 3 }}
+          onKeyDown={(e) => { if (e.key === 'Enter') fetchUsers(); }}
+        />
+
+        {loading ? (
+          <>
+            <LinearProgress />
+            <Typography sx={{ mt: 2, color: "text.secondary" }}>Searching...</Typography>
+          </>
+        ) : error ? (
+          <Alert severity="error">{error}</Alert>
+        ) : rows.length === 0 ? (
+          <Typography sx={{ color: "text.secondary" }}>No users found.</Typography>
+        ) : (
+          <Stack spacing={1} divider={<Divider />}>
+            {rows.map((u) => {
+              const checked = selected.has(u.id);
+              return (
+                <Stack
+                  key={u.id}
+                  direction="row"
+                  alignItems="center"
+                  spacing={2}
+                  sx={{ py: 1, cursor: "pointer", "&:hover": { bgcolor: "action.hover" }, borderRadius: 1, px: 1 }}
+                  onClick={() => toggle(u.id)}
+                >
+                  <Checkbox checked={checked} readOnly />
+                  <Avatar src={toMediaUrl(u.avatar)}>
+                    {(u.name || u.email || "U")[0]}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <Typography fontWeight={500}>{u.name || u.email || u.id}</Typography>
+                      {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: "#10b8a6" }} />}
+                    </Stack>
+                    {u.email && <Typography variant="caption" color="text.secondary">{u.email}</Typography>}
+                  </Box>
+                </Stack>
+              );
+            })}
+          </Stack>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Typography sx={{ flex: 1, color: "text.secondary" }}>
+          {selected.size} selected
+        </Typography>
+        <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
+        <Button
+          onClick={submit}
+          disabled={selected.size === 0 || submitting}
+          variant="contained"
+          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+        >
+          {submitting ? "Adding..." : `Add ${selected.size > 0 ? `(${selected.size})` : ""}`}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onRequested, ownerId }) {
+  const [q, setQ] = React.useState("");
+  const [rows, setRows] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [selected, setSelected] = React.useState(new Set());
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const toggle = (id) => {
+    if (String(id) === String(ownerId)) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const fetchUsers = React.useCallback(async () => {
+    if (!open) return;
+    const term = (q || "").trim();
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const primaryUrl = toApiUrl(`users-lookup/?search=${encodeURIComponent(term)}&limit=30`);
+      const res = await fetch(primaryUrl, {
+        headers: { Accept: "application/json", ...authHeaders() },
+      });
+
+      const json = await res.json().catch(() => ([]));
+      if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
+
+      const items = Array.isArray(json?.results) ? json.results : (Array.isArray(json) ? json : []);
+      const exist = new Set(existingIds || []);
+      setRows(
+        items
+          .filter((u) => String(u?.id) !== String(ownerId))
+          .filter((u) => !exist.has(u.id))
+      );
+    } catch (e) {
+      setError(String(e?.message || e));
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [open, q, existingIds, ownerId]);
+
+  React.useEffect(() => { if (open) fetchUsers(); }, [open, fetchUsers]);
+
+  const submit = async () => {
+    if (selected.size === 0) return;
+
+    const ids = Array.from(selected).map(Number).filter((x) => String(x) !== String(ownerId));
+    if (ids.length === 0) return;
+
+    setSubmitting(true);
+    const url = toApiUrl(`groups/${groupIdOrSlug}/moderator/request-add-members/`);
+    const headers = { "Content-Type": "application/json", ...authHeaders() };
+
+    const groupIdInt = Number(groupIdOrSlug);
+    const maybeGroupId = Number.isFinite(groupIdInt) ? { group_id: groupIdInt } : {};
+
+    try {
+      const bulkBody = JSON.stringify({ user_ids: ids, ...maybeGroupId });
+      let res = await fetch(url, { method: "POST", headers, body: bulkBody });
+      let j = await res.json().catch(() => ({}));
+
+      const needsSingle =
+        !res.ok &&
+        (String(j?.detail || "").toLowerCase().includes("user_id is required") ||
+          j?.user_id === "This field is required.");
+
+      if (needsSingle) {
+        for (const uid of ids) {
+          const body = JSON.stringify({ user_id: uid, ...maybeGroupId });
+          const r = await fetch(url, { method: "POST", headers, body });
+          if (!r.ok) {
+            const jj = await r.json().catch(() => ({}));
+            throw new Error(jj?.detail || `HTTP ${r.status}`);
+          }
+        }
+      } else if (!res.ok) {
+        throw new Error(j?.detail || `HTTP ${res.status}`);
+      }
+
+      onRequested?.(ids.length);
+      onClose?.();
+    } catch (e) {
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ fontWeight: 800 }}>Request to add members</DialogTitle>
+      <DialogContent dividers>
+        <TextField
+          placeholder="Search users..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          fullWidth
+          size="small"
+          sx={{ mb: 3 }}
+          onKeyDown={(e) => { if (e.key === 'Enter') fetchUsers(); }}
+        />
+
+        {loading ? (
+          <>
+            <LinearProgress />
+            <Typography sx={{ mt: 2, color: "text.secondary" }}>Searching...</Typography>
+          </>
+        ) : error ? (
+          <Alert severity="error">{error}</Alert>
+        ) : rows.length === 0 ? (
+          <Typography sx={{ color: "text.secondary" }}>No users found.</Typography>
+        ) : (
+          <Stack spacing={1} divider={<Divider />}>
+            {rows.map((u) => {
+              const checked = selected.has(u.id);
+              return (
+                <Stack
+                  key={u.id}
+                  direction="row"
+                  alignItems="center"
+                  spacing={2}
+                  sx={{ py: 1, cursor: "pointer", "&:hover": { bgcolor: "action.hover" }, borderRadius: 1, px: 1 }}
+                  onClick={() => toggle(u.id)}
+                >
+                  <Checkbox checked={checked} readOnly />
+                  <Avatar src={toMediaUrl(u.avatar)}>
+                    {(u.name || u.email || "U")[0]}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <Typography fontWeight={500}>{u.name || u.email || u.id}</Typography>
+                      {u.is_verified && <VerifiedIcon sx={{ fontSize: 16, color: "#10b8a6" }} />}
+                    </Stack>
+                    {u.email && <Typography variant="caption" color="text.secondary">{u.email}</Typography>}
+                  </Box>
+                </Stack>
+              );
+            })}
+          </Stack>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Typography sx={{ flex: 1, color: "text.secondary" }}>
+          {selected.size} selected
+        </Typography>
+        <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
+        <Button
+          onClick={submit} disabled={selected.size === 0 || submitting}
+          variant="contained"
+          sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+        >
+          {submitting ? "Sending..." : "Send request"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMemberRemoved }) {
   const [members, setMembers] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [q, setQ] = React.useState("");
+
+  // Add members dialog state
+  const [addMembersOpen, setAddMembersOpen] = React.useState(false);
+  const [requestMembersOpen, setRequestMembersOpen] = React.useState(false);
+
+  // Role management menu state
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const [menuMember, setMenuMember] = React.useState(null);
+  const [actionBusy, setActionBusy] = React.useState(false);
+
+  // Export CSV state
+  const [exportingCSV, setExportingCSV] = React.useState(false);
 
 
   const [selectedRegions, setSelectedRegions] = React.useState([]);
@@ -2298,17 +2636,19 @@ function MembersTab({ groupId }) {
     };
   }, []);
 
-  React.useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const r = await fetch(toApiUrl(`groups/${groupId}/members/`), { headers: { Accept: "application/json", ...authHeaders() } });
-        const d = r.ok ? await r.json() : [];
-        setMembers(Array.isArray(d?.results) ? d.results : (Array.isArray(d) ? d : []));
-      } catch { }
-      setLoading(false);
-    })();
+  const fetchMembers = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(toApiUrl(`groups/${groupId}/members/`), { headers: { Accept: "application/json", ...authHeaders() } });
+      const d = r.ok ? await r.json() : [];
+      setMembers(Array.isArray(d?.results) ? d.results : (Array.isArray(d) ? d : []));
+    } catch { }
+    setLoading(false);
   }, [groupId]);
+
+  React.useEffect(() => {
+    fetchMembers();
+  }, [fetchMembers]);
 
   const filtered = React.useMemo(() => {
     let list = members;
@@ -2348,12 +2688,133 @@ function MembersTab({ groupId }) {
     selectedCompanySizes,
   ]);
 
+  const handleMenuClick = (event, member) => {
+    setAnchorEl(event.currentTarget);
+    setMenuMember(member);
+  };
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setMenuMember(null);
+  };
+
+  const handleRoleAction = async (action) => {
+    if (!menuMember || !groupId) return;
+    const uid = menuMember.user?.id || menuMember.user_id || menuMember.id;
+    setActionBusy(true);
+    try {
+      let url = "";
+      let method = "POST";
+      const hdrs = { "Content-Type": "application/json", ...authHeaders() };
+
+      if (action === "remove") {
+        url = toApiUrl(`groups/${groupId}/members/remove-member/`);
+        // The endpoint may expect body: { user_ids: [uid] }
+        await fetch(url, { method, headers: hdrs, body: JSON.stringify({ user_ids: [uid] }) });
+        onMemberRemoved?.(uid);
+      } else {
+        url = toApiUrl(`groups/${groupId}/moderator/update-member-role/`);
+        let newRole = "";
+        if (action === "make_admin") newRole = "admin";
+        if (action === "make_moderator") newRole = "moderator";
+        if (action === "make_member") newRole = "member";
+
+        await fetch(url, { method: "PATCH", headers: hdrs, body: JSON.stringify({ user_id: uid, role: newRole }) });
+      }
+
+      await fetchMembers(); // Refresh list to get updated roles
+    } catch (e) {
+      alert("Action failed.");
+    } finally {
+      setActionBusy(false);
+      handleMenuClose();
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (!groupId) return;
+    setExportingCSV(true);
+    try {
+      const res = await fetch(toApiUrl(`groups/${groupId}/members/export-csv/`), {
+        headers: { Accept: "application/json", ...authHeaders() },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const contentDisposition = res.headers.get("content-disposition");
+      let filename = `group_members.csv`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match) filename = match[1];
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      alert(`Failed to export CSV: ${e?.message || e}`);
+    } finally {
+      setExportingCSV(false);
+    }
+  };
+
   if (loading) {
     return <ListSkeleton count={5} type="short" />;
   }
 
+  const existingIds = members.map((m) => m.user?.id || m.id);
+
   return (
     <Box>
+      {canManageMembers && (
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Members</Typography>
+          <Stack direction="row" spacing={2}>
+            {group?.join_policy !== "open" && group?.join_policy !== "invite" && (
+              <Button
+                variant="outlined"
+                onClick={() => setRequestMembersOpen(true)}
+                startIcon={<PeopleOutlineRoundedIcon />}
+              >
+                Request Add Members
+              </Button>
+            )}
+
+            <Button
+              variant="outlined"
+              onClick={handleExportCSV}
+              disabled={exportingCSV}
+              startIcon={<FileDownloadRoundedIcon />}
+              sx={{
+                textTransform: "none",
+                borderColor: "#10b8a6",
+                color: "#10b8a6",
+                borderRadius: 3,
+              }}
+            >
+              {exportingCSV ? "Exporting..." : "Export CSV"}
+            </Button>
+
+            <Button
+              variant="contained"
+              onClick={() => setAddMembersOpen(true)}
+              sx={{
+                backgroundColor: "#10b8a6",
+                "&:hover": { backgroundColor: "#0ea5a4" },
+                textTransform: "none",
+                borderRadius: 3,
+              }}
+            >
+              Add members
+            </Button>
+          </Stack>
+        </Stack>
+      )}
+
       <Paper
         sx={{
           p: 1.5,
@@ -2471,10 +2932,14 @@ function MembersTab({ groupId }) {
       <List>
         {filtered.map(m => {
           const u = m.user || m;
+          const isOwner = String(m.role).toLowerCase() === "owner";
+          const isSelf = String(u.id) === String(me?.id);
+          const showMenu = canManageMembers && !isOwner && !isSelf;
+
           return (
             <ListItem key={u.id} sx={{ border: "1px solid #eee", borderRadius: 2, mb: 1 }}>
               <ListItemAvatar>
-                <Avatar src={toMediaUrl(u.avatar)} sx={{ width: 40, height: 40 }}>
+                <Avatar src={toMediaUrl(u.avatar || u.user_image)} sx={{ width: 40, height: 40 }}>
                   {(u.name || u.full_name || u.username || "U")[0]}
                 </Avatar>
               </ListItemAvatar>
@@ -2494,12 +2959,62 @@ function MembersTab({ groupId }) {
                     )}
                   </Typography>
                 }
-                secondary={m.role || "Member"}
+                secondary={<RoleBadge role={String(m.role || "member").toLowerCase()} />}
               />
+              {showMenu && (
+                <ListItemSecondaryAction>
+                  <IconButton edge="end" onClick={(e) => handleMenuClick(e, m)}>
+                    <MoreVertRoundedIcon />
+                  </IconButton>
+                </ListItemSecondaryAction>
+              )}
             </ListItem>
           );
         })}
       </List>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        PaperProps={{ elevation: 2, sx: { minWidth: 150, borderRadius: 2 } }}
+      >
+        {String(menuMember?.role || "").toLowerCase() !== "admin" && (
+          <MenuItem onClick={() => handleRoleAction("make_admin")} disabled={actionBusy}>Make Admin</MenuItem>
+        )}
+        {String(menuMember?.role || "").toLowerCase() !== "moderator" && (
+          <MenuItem onClick={() => handleRoleAction("make_moderator")} disabled={actionBusy}>Make Moderator</MenuItem>
+        )}
+        {(String(menuMember?.role || "").toLowerCase() === "admin" || String(menuMember?.role || "").toLowerCase() === "moderator") && (
+          <MenuItem onClick={() => handleRoleAction("make_member")} disabled={actionBusy}>Make Member</MenuItem>
+        )}
+        <MenuItem onClick={() => handleRoleAction("remove")} color="error" sx={{ color: "error.main" }} disabled={actionBusy}>
+          Remove from group
+        </MenuItem>
+      </Menu>
+
+      {addMembersOpen && (
+        <AddMembersDialog
+          open={addMembersOpen}
+          onClose={() => setAddMembersOpen(false)}
+          groupIdOrSlug={groupId}
+          existingIds={existingIds}
+          ownerId={group?.owner?.id || group?.owner_id}
+          onAdded={(count) => {
+            fetchMembers();
+            onMembersAdded?.(count);
+          }}
+        />
+      )}
+      {requestMembersOpen && (
+        <RequestAddMembersDialog
+          open={requestMembersOpen}
+          onClose={() => setRequestMembersOpen(false)}
+          groupIdOrSlug={groupId}
+          existingIds={existingIds}
+          ownerId={group?.owner?.id || group?.owner_id}
+        />
+      )}
     </Box>
   );
 }
@@ -3361,7 +3876,18 @@ export default function GroupDetailsPage() {
   const tabDefs = React.useMemo(() => {
     const items = [
       { label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> },
-      { label: "MEMBERS", icon: <PeopleOutlineRoundedIcon />, render: () => <MembersTab groupId={groupId} /> },
+      {
+        label: "MEMBERS", icon: <PeopleOutlineRoundedIcon />, render: () => (
+          <MembersTab
+            groupId={groupId}
+            group={group}
+            me={me}
+            canManageMembers={canApproveRequests}
+            onMembersAdded={(count) => setGroup((prev) => prev ? { ...prev, member_count: Number(prev.member_count || 0) + count } : prev)}
+            onMemberRemoved={() => setGroup((prev) => prev ? { ...prev, member_count: Math.max(0, Number(prev.member_count || 0) - 1) } : prev)}
+          />
+        )
+      },
       { label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} /> },
     ];
     if (canSeeRequests) {
