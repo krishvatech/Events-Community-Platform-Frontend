@@ -148,6 +148,12 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
         return `${mins}m ${secs}s`;
     };
 
+    const getMatchScorePercent = (rawScore) => {
+        const score = Number(rawScore);
+        if (!Number.isFinite(score)) return null;
+        return Math.max(0, Math.min(100, score));
+    };
+
     if (loading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -298,16 +304,22 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                                                 </Typography>
                                             </Box>
 
-                                            {match.match_score && (
+                                            {match.match_score !== null && match.match_score !== undefined && (
                                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <Typography variant="caption" color="text.secondary" fontWeight={500}>
                                                         MATCH SCORE
                                                     </Typography>
-                                                    <Typography variant="body2" fontWeight={700} sx={{
-                                                        color: match.match_score >= 7 ? '#16a34a' : match.match_score >= 5 ? '#d97706' : '#dc2626',
-                                                    }}>
-                                                        {(match.match_score / 10 * 100).toFixed(0)}%
-                                                    </Typography>
+                                                    {(() => {
+                                                        const scorePercent = getMatchScorePercent(match.match_score);
+                                                        if (scorePercent === null) return null;
+                                                        return (
+                                                            <Typography variant="body2" fontWeight={700} sx={{
+                                                                color: scorePercent >= 70 ? '#16a34a' : scorePercent >= 50 ? '#d97706' : '#dc2626',
+                                                            }}>
+                                                                {scorePercent.toFixed(0)}%
+                                                            </Typography>
+                                                        );
+                                                    })()}
                                                 </Box>
                                             )}
                                         </Stack>
