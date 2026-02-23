@@ -487,11 +487,6 @@ function PartnerProfileSidebar({ partner, match, onMemberInfo, showBreakdown, se
                     <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: 16, lineHeight: 1.3 }}>
                         {[partner?.first_name, partner?.last_name].filter(Boolean).join(' ') || partner?.username || 'Partner'}
                     </Typography>
-                    {partner?.username && (
-                        <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
-                            @{partner.username}
-                        </Typography>
-                    )}
                 </Box>
             </Box>
 
