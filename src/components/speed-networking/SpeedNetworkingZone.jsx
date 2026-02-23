@@ -668,12 +668,6 @@ export default function SpeedNetworkingZone({
                         {session.duration_minutes} min per match • {session.queue_count} in queue
                     </Typography>
                 </Box>
-                <Button
-                    onClick={onClose}
-                    sx={{ color: 'rgba(255,255,255,0.7)' }}
-                >
-                    Close
-                </Button>
             </Box>
 
             {/* Main Content */}
