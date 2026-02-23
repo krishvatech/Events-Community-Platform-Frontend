@@ -878,7 +878,7 @@ export default function EventDetailsPage() {
 
                         )}
 
-                        {registration && (
+                        {registration && status !== "cancelled" && (
                           <Box className="flex justify-center py-2">
                             <RegisteredActions
                               ev={event}

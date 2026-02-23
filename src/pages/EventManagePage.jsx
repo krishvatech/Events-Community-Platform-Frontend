@@ -1018,7 +1018,7 @@ export default function EventManagePage() {
   const isLive = status === "live" && event?.status !== "ended";
   const isWithinEarlyJoinWindow = canJoinEarly(event, 15);
   const isPreEventLounge = isPreEventLoungeOpen(event);
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+  const canShowActiveJoin = (isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge) && status !== "cancelled";
 
   const joinLabel = getJoinButtonText(event, isLive, false, myReg);
   const statusMeta = statusChip(status);
@@ -1397,7 +1397,7 @@ export default function EventManagePage() {
               )}
 
               {/* Self-Management Actions (Leave / Cancel Request) */}
-              {myReg && (
+              {myReg && status !== "cancelled" && (
                 <Box sx={{ mt: 3, mb: 1 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                     Your Registration
@@ -1533,6 +1533,41 @@ export default function EventManagePage() {
                   </Button>
                 </Box>
               </Stack>
+            </Paper>
+          </Grid>
+        )}
+        {/* Cancellation Details (Visible to Owner/Staff if cancelled) */}
+        {status === "cancelled" && (isOwner || isStaff) && (
+          <Grid item xs={12}>
+            <Paper
+              elevation={0}
+              sx={{
+                borderRadius: 3,
+                border: "1px solid",
+                borderColor: "#fecaca",
+                p: { xs: 2, sm: 3 },
+                bgcolor: "#fef2f2",
+              }}
+            >
+              <Box mb={2}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#991b1b", display: 'flex', alignItems: 'center', gap: 1 }}>
+                  Event Cancelled
+                </Typography>
+                {event.cancelled_at && (
+                  <Typography variant="body2" sx={{ color: "#b91c1c", mt: 0.5, fontWeight: 500 }}>
+                    Cancelled on: {new Date(event.cancelled_at).toLocaleDateString()} at {new Date(event.cancelled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Typography>
+                )}
+              </Box>
+
+              <Box sx={{ bgcolor: "rgba(255,255,255,0.6)", p: 2, borderRadius: 2, border: "1px solid #fee2e2" }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#7f1d1d", mb: 0.5 }}>
+                  Cancellation Reason / Message
+                </Typography>
+                <Typography variant="body2" sx={{ color: "#991b1b", whiteSpace: "pre-wrap" }}>
+                  {event.cancellation_message || "No reason provided."}
+                </Typography>
+              </Box>
             </Paper>
           </Grid>
         )}
@@ -2974,21 +3009,38 @@ export default function EventManagePage() {
 
             {isOwner ? (
               // Host Button for Owner
-              <Button
-                onClick={onHost}
-                startIcon={<LiveTvRoundedIcon />}
-                variant="contained"
-                sx={{
-                  borderRadius: 999,
-                  textTransform: "none",
-                  px: 2.5,
-                  bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
-                  "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
-                }}
-                disabled={!!hostingId || isPast}
-              >
-                {hostingId ? <CircularProgress size={18} color="inherit" /> : (isPast ? "Ended" : "Host")}
-              </Button>
+              status === "cancelled" ? (
+                <Button
+                  disabled
+                  variant="outlined"
+                  sx={{
+                    borderRadius: 999,
+                    textTransform: "none",
+                    px: 2.5,
+                    backgroundColor: "#fef2f2 !important",
+                    color: "#b91c1c !important",
+                    borderColor: "#fecaca !important",
+                  }}
+                >
+                  Cancelled
+                </Button>
+              ) : (
+                <Button
+                  onClick={onHost}
+                  startIcon={<LiveTvRoundedIcon />}
+                  variant="contained"
+                  sx={{
+                    borderRadius: 999,
+                    textTransform: "none",
+                    px: 2.5,
+                    bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
+                    "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
+                  }}
+                  disabled={!!hostingId || isPast}
+                >
+                  {hostingId ? <CircularProgress size={18} color="inherit" /> : (isPast ? "Ended" : "Host")}
+                </Button>
+              )
             ) : (
               // Join Button for Staff/Member
               canShowActiveJoin && (

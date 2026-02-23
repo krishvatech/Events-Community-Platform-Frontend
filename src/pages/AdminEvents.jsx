@@ -2131,30 +2131,50 @@ function AdminEventCard({
               ) : (
                 <>
                   {/* Upcoming / Live → Host Now */}
-                  <Button
-                    onClick={() => onHost(ev)}
-                    startIcon={<LiveTvRoundedIcon />}
-                    variant="contained"
-                    className="rounded-xl flex-1"
-                    sx={{
-                      textTransform: "none",
-                      backgroundColor: "#10b8a6",
-                      "&:hover": { backgroundColor: "#0ea5a4" },
-                      minWidth: 0,
-                      px: 1,
-                    }}
-                    disabled={isHosting}
-                  >
-                    {isHosting ? (
-                      <span className="flex items-center gap-2">
-                        <CircularProgress size={18} />
-                      </span>
-                    ) : (
+                  {status === "cancelled" ? (
+                    <Button
+                      disabled
+                      variant="outlined"
+                      className="rounded-xl flex-1"
+                      sx={{
+                        textTransform: "none",
+                        backgroundColor: "#fef2f2 !important",
+                        color: "#b91c1c !important",
+                        borderColor: "#fecaca !important",
+                        minWidth: 0,
+                        px: 1,
+                      }}
+                    >
                       <Box component="span" sx={{ whiteSpace: "nowrap" }}>
-                        Host
+                        Cancelled
                       </Box>
-                    )}
-                  </Button>
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => onHost(ev)}
+                      startIcon={<LiveTvRoundedIcon />}
+                      variant="contained"
+                      className="rounded-xl flex-1"
+                      sx={{
+                        textTransform: "none",
+                        backgroundColor: "#10b8a6",
+                        "&:hover": { backgroundColor: "#0ea5a4" },
+                        minWidth: 0,
+                        px: 1,
+                      }}
+                      disabled={isHosting}
+                    >
+                      {isHosting ? (
+                        <span className="flex items-center gap-2">
+                          <CircularProgress size={18} />
+                        </span>
+                      ) : (
+                        <Box component="span" sx={{ whiteSpace: "nowrap" }}>
+                          Host
+                        </Box>
+                      )}
+                    </Button>
+                  )}
 
                   {/* Upcoming/Live → View Details (Event Manage) */}
                   <Button
@@ -2180,7 +2200,27 @@ function AdminEventCard({
           ) : (
             <>
               {/* STAFF: single full-width button */}
-              {canShowActiveJoin ? (
+              {status === "cancelled" ? (
+                <Button
+                  disabled
+                  variant="outlined"
+                  className="rounded-xl"
+                  fullWidth
+                  sx={{
+                    textTransform: "none",
+                    backgroundColor: "#fef2f2 !important",
+                    color: "#b91c1c !important",
+                    borderColor: "#fecaca !important",
+                  }}
+                >
+                  <Box component="span" sx={{ display: { xs: "none", lg: "inline" }, whiteSpace: "nowrap" }}>
+                    Cancelled
+                  </Box>
+                  <Box component="span" sx={{ display: { xs: "inline", lg: "none" } }}>
+                    Cancelled
+                  </Box>
+                </Button>
+              ) : canShowActiveJoin ? (
                 // Live OR within 15 min before start → Join
                 <Button
                   onClick={() => onJoinLive?.(ev)}
@@ -2306,7 +2346,7 @@ function AdminEventCard({
 
 
           {/* Cancellation / Unregistration Actions (for Staff side) */}
-          {!isOwner && reg && (
+          {!isOwner && reg && status !== "cancelled" && (
             <RegisteredActions
               ev={ev}
               reg={reg}
