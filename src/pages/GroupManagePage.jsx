@@ -5,7 +5,8 @@ import {
     DialogTitle, Divider, Grid, LinearProgress, MenuItem, Paper, Stack, Tab, Tabs,
     TextField, Typography, Switch, FormControlLabel, CircularProgress,
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup, Badge,
-    IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar, Autocomplete
+    IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar, Autocomplete,
+    FormControl, RadioGroup, Radio
 } from "@mui/material";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { isOwnerUser } from "../utils/adminRole";
@@ -3941,8 +3942,12 @@ export default function GroupManagePage() {
     // Promotion to Main Group
     const [promoteDialogOpen, setPromoteDialogOpen] = React.useState(false);
     const [isPromoting, setIsPromoting] = React.useState(false);
+    const [promoteMembershipPolicy, setPromoteMembershipPolicy] = React.useState("keep");
 
-    const handleOpenPromoteDialog = () => setPromoteDialogOpen(true);
+    const handleOpenPromoteDialog = () => {
+        setPromoteMembershipPolicy("keep");
+        setPromoteDialogOpen(true);
+    };
 
     const promoteToMain = async () => {
         if (!group?.id) return;
@@ -3954,12 +3959,17 @@ export default function GroupManagePage() {
                     "Content-Type": "application/json",
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: "{}",
+                body: JSON.stringify({ membership_policy: promoteMembershipPolicy }),
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
 
-            showMessage("Group promoted to independent main group!", "success");
+            if (promoteMembershipPolicy === "remove_child_only" && data._promotion?.removed_parent_memberships !== undefined) {
+                showMessage(`Group promoted! Removed ${data._promotion.removed_parent_memberships} users from former parent group.`, "success");
+            } else {
+                showMessage("Group promoted to independent main group!", "success");
+            }
+
             setGroup(data); // Update with new data (parent should be null)
             await fetchRelations(); // Refresh parent links (should be empty now)
             setPromoteDialogOpen(false);
@@ -6815,11 +6825,32 @@ export default function GroupManagePage() {
                 <Dialog open={promoteDialogOpen} onClose={() => setPromoteDialogOpen(false)}>
                     <DialogTitle className="text-red-700">Promote to Main Group?</DialogTitle>
                     <DialogContent>
-                        <DialogContentText>
+                        <DialogContentText sx={{ mb: 2 }}>
                             Are you sure you want to promote <b>{group?.name}</b> to be an independent main group?
                             <br /><br />
                             This will <b>detach</b> it from its current parent group. This action cannot be easily undone by group admins.
                         </DialogContentText>
+
+                        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 600 }}>
+                            Parent Membership Policy
+                        </Typography>
+                        <FormControl component="fieldset" disabled={isPromoting}>
+                            <RadioGroup
+                                value={promoteMembershipPolicy}
+                                onChange={(e) => setPromoteMembershipPolicy(e.target.value)}
+                            >
+                                <FormControlLabel
+                                    value="keep"
+                                    control={<Radio />}
+                                    label="Keep members in former parent group (recommended)"
+                                />
+                                <FormControlLabel
+                                    value="remove_child_only"
+                                    control={<Radio />}
+                                    label="Remove former parent membership for users who only joined via this child group"
+                                />
+                            </RadioGroup>
+                        </FormControl>
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={() => setPromoteDialogOpen(false)} disabled={isPromoting} sx={{ textTransform: "none" }}>
