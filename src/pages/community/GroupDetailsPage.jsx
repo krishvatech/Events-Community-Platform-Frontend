@@ -875,13 +875,12 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
       try { const me = await getMeCached(); meId = me?.id || me?.user?.id; } catch { }
 
       if (groupId) {
-        // Parallel fetch: Friends & Group Members
         const [myFriends, rawMems] = await Promise.all([
           fetchMyFriends(meId),
           fetchGroupMembers(groupId)
         ]);
 
-        let groupMembers = new Set();
+        const groupMembers = new Set();
         if (rawMems.length > 0) {
           rawMems.forEach(m => {
             const uid = m.user?.id || m.user_id || m.id;
@@ -889,11 +888,8 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
           });
         }
 
-        // â¬‡ï¸ STRICT INTERSECTION: Only show friends who are ALSO group members.
-        // No fallback to 'all friends' if fetch fails.
         const mutuals = myFriends.filter(f => groupMembers.has(String(f.id)));
         setFriends(mutuals);
-
       } else {
         // Non-group posts
         const list = await fetchMyFriends(meId);
@@ -938,7 +934,11 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ ...base, to_users: [...selected] }),
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        const msg = j.detail || j.to_users || j.to_groups || "Could not share this post.";
+        throw new Error(Array.isArray(msg) ? msg[0] : msg);
+      }
 
       setSending(false);
       onShared?.();
@@ -947,7 +947,7 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
       setQuery("");
     } catch (e) {
       setSending(false);
-      alert("Could not share this post. Please check your share endpoint.");
+      alert(e.message || "Could not share this post.");
     }
   }
   return (
@@ -965,10 +965,15 @@ function ShareDialog({ open, onClose, postId, onShared, target, authorId, groupI
           </Typography>
         ) : (
           <>
+            {groupId && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, display: "block" }}>
+                Group posts can only be shared with friends who are members of this group.
+              </Typography>
+            )}
             <TextField
               size="small"
               fullWidth
-              placeholder="Search friendsâ€¦"
+              placeholder="Search friends"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               InputProps={{

@@ -6,7 +6,7 @@ import {
     TextField, Typography, Switch, FormControlLabel, CircularProgress,
     List, ListItem, ListItemAvatar, ListItemText, ButtonGroup, Badge,
     IconButton, Menu, ListItemIcon, Popper, Drawer, Popover, Tooltip, Snackbar, Autocomplete,
-    FormControl, RadioGroup, Radio
+    FormControl, RadioGroup, Radio, Checkbox, ListItemButton
 } from "@mui/material";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { isOwnerUser } from "../utils/adminRole";
@@ -1862,7 +1862,7 @@ function GroupSharesDialog({ open, onClose, groupIdOrSlug, postId }) {
             `${API_ROOT}/engagements/shares/?feed_item=${fid}&page_size=200`,
         ];
 
-        let got = [];
+        let collected = [];
         for (const url of urls) {
             try {
                 const r = await fetch(url, { headers });
@@ -1870,7 +1870,7 @@ function GroupSharesDialog({ open, onClose, groupIdOrSlug, postId }) {
                 const j = await r.json().catch(() => []);
                 const arr = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : j?.data || []);
                 if (arr && arr.length >= 0) {
-                    got = arr.map((it) => {
+                    collected = arr.map((it) => {
                         const u = it.user || it.actor || it.shared_by || it;
                         return {
                             id: u.id ?? it.id,
@@ -1884,7 +1884,15 @@ function GroupSharesDialog({ open, onClose, groupIdOrSlug, postId }) {
             } catch { }
         }
 
-        setRows(got);
+        // de-dupe
+        const seen = new Set();
+        const unique = [];
+        for (const u of collected) {
+            const k = (u.id != null) ? `id:${u.id}` : `name:${(u.name || "").toLowerCase()}`;
+            if (!seen.has(k)) { seen.add(k); unique.push(u); }
+        }
+
+        setRows(unique);
         setLoading(false);
     }, [open, postId]);
 
@@ -2332,11 +2340,179 @@ function GroupCommentsDialog({
     );
 }
 
+// ---------- Share Picker Dialog (Create Share) ----------
+function GroupSharePickerDialog({ open, onClose, groupIdOrSlug, postId, onShared }) {
+    const [loading, setLoading] = React.useState(false);
+    const [sending, setSending] = React.useState(false);
+    const [members, setMembers] = React.useState([]);
+    const [query, setQuery] = React.useState("");
+    const [selected, setSelected] = React.useState(new Set());
+
+    const load = React.useCallback(async () => {
+        if (!open || !groupIdOrSlug) return;
+        setLoading(true);
+
+        try {
+            const token = getToken();
+            const headers = { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+
+            // Fetch current user to exclude
+            let meId = null;
+            try {
+                const meRes = await fetch(`${API_ROOT}/users/me/`, { headers });
+                if (meRes.ok) {
+                    const me = await meRes.json();
+                    meId = me?.id || me?.user?.id;
+                }
+            } catch { }
+
+            // Fetch group members
+            const urls = [
+                `${API_ROOT}/groups/${groupIdOrSlug}/members/?page_size=1000`,
+                `${API_ROOT}/groups/${groupIdOrSlug}/memberships/?page_size=1000`,
+                `${API_ROOT}/group-members/?group=${groupIdOrSlug}&page_size=1000`
+            ];
+
+            let rawMems = [];
+            for (const url of urls) {
+                try {
+                    const r = await fetch(url, { headers });
+                    if (!r.ok) continue;
+                    const j = await r.json();
+                    const mems = Array.isArray(j?.results) ? j.results : j?.members || (Array.isArray(j) ? j : []);
+                    if (mems.length > 0) {
+                        rawMems = mems;
+                        break;
+                    }
+                } catch { }
+            }
+
+            // Normalize
+            const normalized = rawMems.map(m => {
+                const u = m.user || m.profile || m;
+                const id = u?.id ?? m.user_id ?? m.id;
+                const name = u?.name || u?.full_name || (u?.first_name ? `${u.first_name} ${u.last_name || ""}`.trim() : null) || u?.username || `User #${id}`;
+                const avatar = toAbs(u?.avatar || u?.avatar_url || u?.user_image || u?.image || u?.photo || m?.avatar || m?.photo || "");
+                const kyc_status = u?.kyc_status || m?.kyc_status || null;
+                return { id, name, avatar, kyc_status };
+            }).filter(x => x.id && String(x.id) !== String(meId));
+
+            setMembers(normalized);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }, [open, groupIdOrSlug]);
+
+    React.useEffect(() => { load(); }, [load]);
+
+    const filtered = React.useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return members;
+        return members.filter(m => (m.name || "").toLowerCase().includes(q));
+    }, [members, query]);
+
+    function toggle(id) {
+        setSelected(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }
+
+    async function shareNow() {
+        if (!selected.size || !postId) return;
+        setSending(true);
+        try {
+            const token = getToken();
+            const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+
+            const r = await fetch(`${API_ROOT}/engagements/shares/`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    target_type: "activity_feed.feeditem",
+                    target_id: postId,
+                    to_users: [...selected]
+                }),
+            });
+
+            if (!r.ok) {
+                const j = await r.json().catch(() => ({}));
+                const msg = j.detail || j.to_users || j.to_groups || "Could not share this post.";
+                throw new Error(Array.isArray(msg) ? msg[0] : msg);
+            }
+
+            setSending(false);
+            onShared?.(); // Refresh counts
+            onClose?.();
+            setSelected(new Set());
+            setQuery("");
+        } catch (e) {
+            setSending(false);
+            alert(e.message || "Could not share this post.");
+        }
+    }
+
+    return (
+        <Dialog open={!!open} onClose={onClose} maxWidth="sm" fullWidth>
+            <DialogTitle>Share post</DialogTitle>
+            <DialogContent dividers>
+                {loading ? (
+                    <Stack alignItems="center" py={3}><CircularProgress size={22} /></Stack>
+                ) : members.length === 0 ? (
+                    <Typography color="text.secondary">No group members found.</Typography>
+                ) : (
+                    <>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, display: "block" }}>
+                            Group posts can only be shared with members of this group.
+                        </Typography>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            placeholder="Search members…"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            sx={{ mb: 1.5 }}
+                        />
+                        <Divider sx={{ mb: 1 }} />
+                        <List dense disablePadding>
+                            {filtered.map((m) => (
+                                <ListItem key={m.id} disablePadding secondaryAction={
+                                    <Checkbox edge="end" onChange={() => toggle(m.id)} checked={selected.has(m.id)} />
+                                }>
+                                    <ListItemButton onClick={() => toggle(m.id)}>
+                                        <ListItemAvatar><Avatar src={m.avatar} /></ListItemAvatar>
+                                        <ListItemText primary={
+                                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                <span>{m.name}</span>
+                                                {m.kyc_status === "approved" && <VerifiedIcon sx={{ fontSize: 14, color: "#22d3ee" }} />}
+                                            </Stack>
+                                        } />
+                                    </ListItemButton>
+                                </ListItem>
+                            ))}
+                        </List>
+                    </>
+                )}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose} disabled={sending}>Cancel</Button>
+                <Button variant="contained" onClick={shareNow} disabled={!selected.size || sending}>
+                    {sending ? "Sharing…" : "Share"}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
 // ---------- Social row under each post (Updated with Reactions) ----------
 function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
     const [likesOpen, setLikesOpen] = React.useState(false);
     const [commentsOpen, setCommentsOpen] = React.useState(false);
     const [sharesOpen, setSharesOpen] = React.useState(false);
+    const [sharePickerOpen, setSharePickerOpen] = React.useState(false);
 
     // Identify Feed Item ID
     const fid = React.useMemo(() => Number(post.feed_item_id ?? post.id), [post.feed_item_id, post.id]);
@@ -2535,13 +2711,15 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                     )}
                 </Stack>
 
-                <Typography
-                    variant="body2"
-                    onClick={() => setSharesOpen(true)}
-                    sx={{ cursor: "pointer", fontWeight: 700, textTransform: "uppercase", color: "#10b8a6" }}
-                >
-                    {shareCount} Shares
-                </Typography>
+                {shareCount > 0 && (
+                    <Typography
+                        variant="body2"
+                        onClick={() => setSharesOpen(true)}
+                        sx={{ cursor: "pointer", color: "text.secondary", "&:hover": { textDecoration: "underline" } }}
+                    >
+                        {shareCount} {shareCount === 1 ? "share" : "shares"}
+                    </Typography>
+                )}
             </Stack>
 
             {/* BOTTOM ROW — actions (REACTION / COMMENT / SHARE) */}
@@ -2577,7 +2755,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                 <Button
                     size="small"
                     startIcon={<IosShareRoundedIcon />}
-                    onClick={() => setSharesOpen(true)}
+                    onClick={() => setSharePickerOpen(true)}
                     sx={{ textTransform: "uppercase" }}
                 >
                     Share
@@ -2643,6 +2821,14 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post }) {
                 onClose={() => setSharesOpen(false)}
                 groupIdOrSlug={groupIdOrSlug}
                 postId={Number(post.feed_item_id ?? post.id)}
+            />
+
+            <GroupSharePickerDialog
+                open={sharePickerOpen}
+                onClose={() => setSharePickerOpen(false)}
+                groupIdOrSlug={groupIdOrSlug}
+                postId={Number(post.feed_item_id ?? post.id)}
+                onShared={fetchCounts}
             />
         </>
     );
