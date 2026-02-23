@@ -281,9 +281,6 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                                                     </Tooltip>
                                                 )}
                                             </Typography>
-                                            <Typography variant="caption" color="text.secondary" display="block" noWrap>
-                                                @{match.partner.username}
-                                            </Typography>
                                         </Box>
                                     </Box>
 
