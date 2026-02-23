@@ -49,6 +49,7 @@ export default function SpeedNetworkingMatch({
     match,
     session,
     onNextMatch,
+    onMatchTimerExpired,
     onLeave,
     loading,
     currentUserId,
@@ -148,13 +149,16 @@ export default function SpeedNetworkingMatch({
 
             if (remaining === 0 && !autoAdvanceTriggeredRef.current) {
                 autoAdvanceTriggeredRef.current = true;
-                // Auto-advance to next match
-                onNextMatch();
+                if ((session?.buffer_seconds || 0) > 0) {
+                    onMatchTimerExpired?.();
+                } else {
+                    onNextMatch();
+                }
             }
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [match, session, onNextMatch]);
+    }, [match, session, onNextMatch, onMatchTimerExpired]);
 
     // Cleanup on unmount
     useEffect(() => {

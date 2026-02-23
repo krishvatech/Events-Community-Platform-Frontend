@@ -20,6 +20,7 @@ export default function SpeedNetworkingControls({
     const [createOpen, setCreateOpen] = useState(false);
     const [sessionName, setSessionName] = useState('Speed Networking');
     const [duration, setDuration] = useState(3);
+    const [bufferSeconds, setBufferSeconds] = useState(15);
     const [criteriaConfig, setCriteriaConfig] = useState({
         skill: { enabled: true, weight: 35 },
         experience: { enabled: true, weight: 30 },
@@ -109,6 +110,7 @@ export default function SpeedNetworkingControls({
                 body: JSON.stringify({
                     name: sessionName,
                     duration_minutes: duration,
+                    buffer_seconds: bufferSeconds,
                     matching_strategy: 'both',
                     criteria_config: builtCriteriaConfig,
                     status: 'PENDING'
@@ -235,6 +237,28 @@ export default function SpeedNetworkingControls({
                                 },
                                 '& .MuiInputLabel-root': {
                                     color: 'rgba(255,255,255,0.7)'
+                                }
+                            }}
+                        />
+                        <TextField
+                            fullWidth
+                            type="number"
+                            label="Transition time (seconds)"
+                            value={bufferSeconds}
+                            onChange={(e) => setBufferSeconds(Math.max(0, Number.parseInt(e.target.value || '0', 10) || 0))}
+                            slotProps={{ input: { min: 0, max: 60 } }}
+                            helperText="Seconds between rounds to review the last person (0 to skip)"
+                            sx={{
+                                mt: 2,
+                                '& .MuiOutlinedInput-root': {
+                                    color: '#fff',
+                                    bgcolor: 'rgba(255,255,255,0.04)'
+                                },
+                                '& .MuiInputLabel-root': {
+                                    color: 'rgba(255,255,255,0.7)'
+                                },
+                                '& .MuiFormHelperText-root': {
+                                    color: 'rgba(255,255,255,0.5)'
                                 }
                             }}
                         />

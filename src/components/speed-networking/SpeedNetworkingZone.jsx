@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Button, CircularProgress } from '@mui/material';
 import SpeedNetworkingMatch from './SpeedNetworkingMatch';
+import SpeedNetworkingTransition from './SpeedNetworkingTransition';
 import SpeedNetworkingLobby from './SpeedNetworkingLobby';
 import SpeedNetworkingControls from './SpeedNetworkingControls';
 import SpeedNetworkingHostPanel from './SpeedNetworkingHostPanel';
@@ -18,6 +19,19 @@ function addCacheBust(url) {
     return `${url}${separator}_cb=${Date.now()}`;
 }
 
+function isInBufferWindow(match, activeSession) {
+    if (!match || !activeSession) return false;
+    const matchStart = new Date(match.created_at).getTime();
+    if (!Number.isFinite(matchStart)) return false;
+
+    const totalMatchMs = (activeSession.duration_minutes * 60 + (match.extended_by_seconds || 0)) * 1000;
+    const bufferMs = (activeSession.buffer_seconds || 0) * 1000;
+    const matchEndAt = matchStart + totalMatchMs;
+    const now = Date.now();
+
+    return now >= matchEndAt && now < (matchEndAt + bufferMs);
+}
+
 export default function SpeedNetworkingZone({
     eventId,
     isAdmin,
@@ -29,6 +43,7 @@ export default function SpeedNetworkingZone({
 }) {
     const [session, setSession] = useState(null);
     const [currentMatch, setCurrentMatch] = useState(null);
+    const [transitionMatch, setTransitionMatch] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const [inQueue, setInQueue] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -128,6 +143,7 @@ export default function SpeedNetworkingZone({
             console.log("[SpeedNetworking] ✅ Match found!");
             const wsMatch = lastMessage.match || messageData.match || messageData;
             setCurrentMatch(wsMatch);
+            setTransitionMatch(null);
             setInQueue(false);
             if (onEnterMatch) {
                 onEnterMatch(wsMatch);
@@ -136,8 +152,19 @@ export default function SpeedNetworkingZone({
         // Match ended - CRITICAL: Update UI immediately AND refresh session
         else if (normalizedType === 'speed_networking_match_ended') {
             console.log("[SpeedNetworking] ✅ Match ended! Updating UI...");
-            setCurrentMatch(null);
-            setInQueue(true);
+            const shouldShowBuffer =
+                currentMatch &&
+                (session?.buffer_seconds || 0) > 0 &&
+                isInBufferWindow(currentMatch, session);
+
+            if (shouldShowBuffer) {
+                setTransitionMatch(currentMatch);
+                setInQueue(false);
+            } else {
+                setCurrentMatch(null);
+                setTransitionMatch(null);
+                setInQueue(true);
+            }
 
             // Refresh session after short delay to ensure backend has processed
             setTimeout(() => {
@@ -150,6 +177,7 @@ export default function SpeedNetworkingZone({
             console.log("[SpeedNetworking] Session ended");
             setSession(prev => prev ? { ...prev, status: 'ENDED' } : prev);
             setCurrentMatch(null);
+            setTransitionMatch(null);
             setInQueue(false);
         }
         // Session started
@@ -214,7 +242,7 @@ export default function SpeedNetworkingZone({
                 }
             });
         }
-    }, [lastMessage, onEnterMatch, fetchActiveSession]);
+    }, [lastMessage, onEnterMatch, fetchActiveSession, currentMatch, session]);
 
     // Monitor match status changes (fallback: detect when match ended server-side)
     useEffect(() => {
@@ -233,6 +261,7 @@ export default function SpeedNetworkingZone({
                     // Match ended or user no longer in queue
                     console.log("[SpeedNetworking] Match ended (detected via polling)");
                     setCurrentMatch(null);
+                    setTransitionMatch(null);
                     setInQueue(true);
                     return;
                 }
@@ -244,7 +273,14 @@ export default function SpeedNetworkingZone({
                 // If we got a different match, our current match must have ended
                 if (data.id && data.id !== currentMatch.id) {
                     console.log("[SpeedNetworking] New match assigned, old match ended");
-                    setCurrentMatch(data);
+                    if (isInBufferWindow(data, session) && (session.buffer_seconds || 0) > 0) {
+                        setTransitionMatch(data);
+                        setCurrentMatch(data);
+                        setInQueue(false);
+                    } else {
+                        setCurrentMatch(data);
+                        setTransitionMatch(null);
+                    }
                 }
             } catch (err) {
                 console.debug('[SpeedNetworking] Error checking match status:', err);
@@ -254,15 +290,51 @@ export default function SpeedNetworkingZone({
         // Poll every 2 seconds while in active match (faster than general queue polling)
         const interval = setInterval(checkMatchStatus, 2000);
         return () => clearInterval(interval);
-    }, [currentMatch, session?.id, eventId]);
+    }, [currentMatch, session, eventId]);
 
     // When session ends, immediately clear queue and match states
     useEffect(() => {
         if (session && session.status === 'ENDED') {
             setCurrentMatch(null);
+            setTransitionMatch(null);
             setInQueue(false);
         }
     }, [session?.status]);
+
+    const fetchMyMatch = useCallback(async () => {
+        if (!session?.id) return false;
+
+        try {
+            let url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/my-match/`.replace(/([^:]\/)\/+/g, "$1");
+            url = addCacheBust(url);
+            const res = await fetch(url, {
+                headers: authHeader()
+            });
+
+            if (res.status === 404 || res.status === 400) return false;
+            if (!res.ok) return false;
+
+            const data = await res.json();
+            if (!data?.id) return false;
+
+            if (isInBufferWindow(data, session) && (session.buffer_seconds || 0) > 0) {
+                setTransitionMatch(data);
+                setCurrentMatch(data);
+                setInQueue(false);
+            } else {
+                setCurrentMatch(data);
+                setTransitionMatch(null);
+                setInQueue(false);
+                if (onEnterMatch) {
+                    onEnterMatch(data);
+                }
+            }
+            return true;
+        } catch (err) {
+            console.error('[SpeedNetworking] Error fetching my match:', err);
+            return false;
+        }
+    }, [eventId, onEnterMatch, session]);
 
     // Join queue
     const handleJoinQueue = async () => {
@@ -283,11 +355,18 @@ export default function SpeedNetworkingZone({
             }
 
             if (data.status === 'matched') {
-                setCurrentMatch(data.match);
-                setInQueue(false);
-                // Join Dyte room for this match
-                if (onEnterMatch) {
-                    onEnterMatch(data.match);
+                if (isInBufferWindow(data.match, session) && (session.buffer_seconds || 0) > 0) {
+                    setTransitionMatch(data.match);
+                    setCurrentMatch(data.match);
+                    setInQueue(false);
+                } else {
+                    setCurrentMatch(data.match);
+                    setTransitionMatch(null);
+                    setInQueue(false);
+                    // Join Dyte room for this match
+                    if (onEnterMatch) {
+                        onEnterMatch(data.match);
+                    }
                 }
             } else {
                 setInQueue(true);
@@ -315,6 +394,7 @@ export default function SpeedNetworkingZone({
 
             setInQueue(false);
             setCurrentMatch(null);
+            setTransitionMatch(null);
         } catch (err) {
             console.error('[SpeedNetworking] Error leaving queue:', err);
             setError(err.message);
@@ -333,6 +413,7 @@ export default function SpeedNetworkingZone({
         // This ensures immediate UI feedback when timer expires or user clicks "Next Match"
         // The backend API call happens in the background
         setCurrentMatch(null);
+        setTransitionMatch(null);
         setInQueue(true);
         setLoading(true);
 
@@ -365,6 +446,15 @@ export default function SpeedNetworkingZone({
         }
     }, [currentMatch, eventId, fetchActiveSession]);
 
+    const handleMatchTimerExpired = useCallback(() => {
+        setTransitionMatch(currentMatch);
+    }, [currentMatch]);
+
+    const handleTransitionEnd = useCallback(() => {
+        setTransitionMatch(null);
+        handleNextMatch();
+    }, [handleNextMatch]);
+
     // Poll for current match when in queue (only if waiting)
     // WebSocket will notify of matches, but polling is fallback for reliability
     useEffect(() => {
@@ -387,11 +477,18 @@ export default function SpeedNetworkingZone({
                 const data = await res.json();
 
                 if (data.id) {
-                    // Match found!
-                    setCurrentMatch(data);
-                    setInQueue(false);
-                    if (onEnterMatch) {
-                        onEnterMatch(data);
+                    if (isInBufferWindow(data, session) && (session.buffer_seconds || 0) > 0) {
+                        setTransitionMatch(data);
+                        setCurrentMatch(data);
+                        setInQueue(false);
+                    } else {
+                        // Match found!
+                        setCurrentMatch(data);
+                        setTransitionMatch(null);
+                        setInQueue(false);
+                        if (onEnterMatch) {
+                            onEnterMatch(data);
+                        }
                     }
                 }
             } catch (err) {
@@ -400,7 +497,13 @@ export default function SpeedNetworkingZone({
         }, 5000); // Poll every 5 seconds (reduced frequency - WebSocket handles real-time)
 
         return () => clearInterval(pollInterval);
-    }, [inQueue, session?.id, eventId, onEnterMatch]);
+    }, [inQueue, session, eventId, onEnterMatch]);
+
+    useEffect(() => {
+        if (!session?.id || session.status !== 'ACTIVE') return;
+        if (inQueue || currentMatch || transitionMatch) return;
+        fetchMyMatch();
+    }, [session, inQueue, currentMatch, transitionMatch, fetchMyMatch]);
 
     // Initial fetch
     useEffect(() => {
@@ -434,6 +537,7 @@ export default function SpeedNetworkingZone({
                         console.log("[SpeedNetworking] New session detected, updating:", activeSession.id);
                         setSession(activeSession);
                         setCurrentMatch(null);
+                        setTransitionMatch(null);
                         setInQueue(false);
                     } else if (activeSession && activeSession.status !== session.status) {
                         // Same session but status changed
@@ -443,6 +547,7 @@ export default function SpeedNetworkingZone({
                         // If session ended, clear match and queue
                         if (activeSession.status === 'ENDED') {
                             setCurrentMatch(null);
+                            setTransitionMatch(null);
                             setInQueue(false);
                         }
                     } else if (!activeSession && session) {
@@ -450,6 +555,7 @@ export default function SpeedNetworkingZone({
                         console.log("[SpeedNetworking] Current session no longer exists");
                         setSession(prev => prev ? { ...prev, status: 'ENDED' } : prev);
                         setCurrentMatch(null);
+                        setTransitionMatch(null);
                         setInQueue(false);
                     }
                 }
@@ -572,12 +678,20 @@ export default function SpeedNetworkingZone({
 
             {/* Main Content */}
             <Box sx={{ flex: 1, overflow: 'hidden' }}>
-                {currentMatch ? (
+                {transitionMatch ? (
+                    <SpeedNetworkingTransition
+                        match={transitionMatch}
+                        session={session}
+                        currentUserId={currentUser?.id}
+                        onTransitionEnd={handleTransitionEnd}
+                    />
+                ) : currentMatch ? (
                     <SpeedNetworkingMatch
                         key={currentMatch.id}
                         match={currentMatch}
                         session={session}
                         onNextMatch={handleNextMatch}
+                        onMatchTimerExpired={handleMatchTimerExpired}
                         onLeave={handleLeaveQueue}
                         loading={loading}
                         currentUserId={currentUser?.id}
