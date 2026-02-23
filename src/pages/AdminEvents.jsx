@@ -385,7 +385,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     }
 
     const s = dayjs.tz(`${startDate}T${startTime}:00`, timezone);
-    const ed = dayjs.tz(`${endDate}T${endTime}:00`, timezone);
+    const ed = dayjs.tz(`${isMultiDay ? endDate : startDate}T${endTime}:00`, timezone);
     if (s.isValid() && ed.isValid() && !ed.isAfter(s)) {
       // ⛔ End before or same as start → show error on end date + end time
       e.endTime = "End must be after start";
@@ -488,7 +488,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
 
     // DEBUG: Log exact state values before conversion
     const startISO = toUTCISO(safeStartDate, safeStartTime, safeTimezone);
-    const endISO = toUTCISO(safeEndDate, safeEndTime, safeTimezone);
+    const endISO = toUTCISO(isMultiDay ? safeEndDate : safeStartDate, safeEndTime, safeTimezone);
     console.log("🔍 Form Submission Debug - Using SAFE values:", {
       safeStartDate,
       safeStartTime,
@@ -1301,20 +1301,41 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       ampm
                       minutesStep={1}
                       disabled={isMultiDay}
-                      value={dayjs(`1970-01-01T${startTime}`)}
+                      value={(() => {
+                        const dt = dayjs(`1970-01-01T${startTime}:00`);
+                        return dt.isValid() ? dt : null;
+                      })()}
                       onChange={(v) => {
-                        const newStart = v ? dayjs(v).second(0).format("HH:mm") : startTime;
-                        console.log("⏰ Start Time Changed:", {
-                          dayjsValue: v ? dayjs(v).toString() : null,
-                          previousStartTime: startTime,
-                          newStartTime: newStart,
-                          formatted: v ? dayjs(v).second(0).format("HH:mm") : "null"
-                        });
-                        console.trace("🔴 setStartTime STACK TRACE:");
+                        if (!v) return;
+                        if (!v.isValid()) {
+                          setErrors((prev) => ({ ...prev, startTime: "Invalid time (use 1–12 in AM/PM)." }));
+                          return;
+                        }
+                        const newStart = v.second(0).format("HH:mm");
+                        console.log("⏰ Start Time Changed:", { newStartTime: newStart });
+                        setErrors((prev) => ({ ...prev, startTime: "" }));
                         setStartTime(newStart);
-                        // Removed auto-calculation to let user set times manually
+
+                        // Auto-select end time automatic by 1 hour addition
+                        if (startDate) {
+                          const startDt = dayjs(`${startDate}T${newStart}:00`);
+                          if (startDt.isValid()) {
+                            const endDt = startDt.add(1, 'hour');
+                            const newEndDate = isMultiDay ? endDt.format("YYYY-MM-DD") : startDate;
+                            setEndDate(newEndDate);
+                            const newEndStr = endDt.format("HH:mm");
+                            setEndTime(newEndStr);
+
+                            const checkEndDt = dayjs(`${newEndDate}T${newEndStr}:00`);
+                            if (checkEndDt.isValid() && !checkEndDt.isAfter(startDt)) {
+                              setErrors((prev) => ({ ...prev, endTime: "End must be after start" }));
+                            } else {
+                              setErrors((prev) => ({ ...prev, endTime: "" }));
+                            }
+                          }
+                        }
                       }}
-                      slotProps={{ textField: { fullWidth: true } }} />
+                      slotProps={{ textField: { fullWidth: true, error: !!errors.startTime, helperText: errors.startTime } }} />
                   </LocalizationProvider>
                 </Grid>
                 <Grid item xs={12} md={4}>
@@ -1324,19 +1345,31 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                       ampm
                       minutesStep={1}
                       disabled={isMultiDay}
-                      value={dayjs(`1970-01-01T${endTime}`)}
+                      value={(() => {
+                        const dt = dayjs(`1970-01-01T${endTime}:00`);
+                        return dt.isValid() ? dt : null;
+                      })()}
                       onChange={(v) => {
-                        const newEnd = v ? dayjs(v).second(0).format("HH:mm") : endTime;
-                        console.log("⏰ End Time Changed:", {
-                          dayjsValue: v ? dayjs(v).toString() : null,
-                          previousEndTime: endTime,
-                          newEndTime: newEnd,
-                          formatted: v ? dayjs(v).second(0).format("HH:mm") : "null"
-                        });
+                        if (!v) return;
+                        if (!v.isValid()) {
+                          setErrors((prev) => ({ ...prev, endTime: "Invalid time (use 1–12 in AM/PM)." }));
+                          return;
+                        }
+                        const newEnd = v.second(0).format("HH:mm");
+                        console.log("⏰ End Time Changed:", { newEndTime: newEnd });
+
+                        const startDt = dayjs(`${startDate}T${startTime}:00`);
+                        const usedEndDate = isMultiDay ? endDate : startDate;
+                        const endDt = dayjs(`${usedEndDate}T${newEnd}:00`);
+                        if (startDt.isValid() && endDt.isValid() && !endDt.isAfter(startDt)) {
+                          setErrors((prev) => ({ ...prev, endTime: "End must be after start" }));
+                        } else {
+                          setErrors((prev) => ({ ...prev, endTime: "" }));
+                        }
+
                         setEndTime(newEnd);
-                        // Removed auto-date-advancement logic to give user full control
                       }}
-                      slotProps={{ textField: { fullWidth: true } }} />
+                      slotProps={{ textField: { fullWidth: true, error: !!errors.endTime, helperText: errors.endTime } }} />
                   </LocalizationProvider>
                 </Grid>
               </>

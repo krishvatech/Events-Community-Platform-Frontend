@@ -288,6 +288,22 @@ function SessionDialog({
                     }
                     setErrors((prev) => ({ ...prev, startTime: "" }));
                     setStartTime(time);
+
+                    // Auto-select end time automatic by 1 hour addition
+                    if (startDate) {
+                      const startDt = startDate.hour(time.hour()).minute(time.minute());
+                      if (startDt.isValid()) {
+                        const endDt = startDt.add(1, 'hour');
+                        setEndDate(endDt);
+                        setEndTime(endDt);
+
+                        if (!endDt.isAfter(startDt)) {
+                          setErrors((prev) => ({ ...prev, endTime: "End time must be after start time" }));
+                        } else {
+                          setErrors((prev) => ({ ...prev, endTime: "" }));
+                        }
+                      }
+                    }
                   }}
                   ampm
                   slotProps={{ textField: { size: "small", fullWidth: true, error: !!errors.startTime } }}
@@ -320,7 +336,15 @@ function SessionDialog({
                       setErrors((prev) => ({ ...prev, endTime: "Invalid time (use 1–12 in AM/PM)." }));
                       return;
                     }
-                    setErrors((prev) => ({ ...prev, endTime: "" }));
+
+                    const endDt = endDate.hour(time.hour()).minute(time.minute());
+                    const startDt = startDate.hour(startTime.hour()).minute(startTime.minute());
+                    if (!endDt.isAfter(startDt)) {
+                      setErrors((prev) => ({ ...prev, endTime: "End time must be after start time" }));
+                    } else {
+                      setErrors((prev) => ({ ...prev, endTime: "" }));
+                    }
+
                     setEndTime(time);
                   }}
                   ampm

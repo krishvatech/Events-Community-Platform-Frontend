@@ -461,7 +461,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         if (!e.startTime && !e.endTime && startDate && endDate) {
             // Both times are valid — safe to use toUTCISO for comparison
             const sISO = toUTCISO(startDate, startTime, timezone);
-            const edISO = toUTCISO(endDate, endTime, timezone);
+            const edISO = toUTCISO(isMultiDay ? endDate : startDate, endTime, timezone);
             if (sISO && edISO && !dayjs(edISO).isAfter(dayjs(sISO))) {
                 e.endTime = "End must be after start";
                 e.endDate = "End must be after start";
@@ -517,7 +517,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         fd.append("lounge_table_capacity", String(loungeTableCapacity || 4));
         fd.append("timezone", timezone);
         fd.append("start_time", combineToISO(startDate, startTime));
-        fd.append("end_time", combineToISO(endDate, endTime));
+        fd.append("end_time", combineToISO(isMultiDay ? endDate : startDate, endTime));
 
         // Send replay update - explicitly send 'true'/'false' and duration (or empty string/null)
         if (replayAvailable) {
@@ -1082,9 +1082,18 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                                 const newStart = val.second(0).format("HH:mm");
                                                 setErrors((prev) => ({ ...prev, startTime: "" }));
                                                 setStartTime(newStart);
-                                                const next = computeEndFromStart(startDate, newStart, 2);
-                                                setEndDate(next.endDate);
+                                                const next = computeEndFromStart(startDate, newStart, 1);
+                                                const newEndDate = isMultiDay ? next.endDate : startDate;
+                                                setEndDate(newEndDate);
                                                 setEndTime(next.endTime);
+
+                                                const checkStartDt = dayjs(`${startDate}T${newStart}:00`);
+                                                const checkEndDt = dayjs(`${newEndDate}T${next.endTime}:00`);
+                                                if (checkStartDt.isValid() && checkEndDt.isValid() && !checkEndDt.isAfter(checkStartDt)) {
+                                                    setErrors((prev) => ({ ...prev, endTime: "End must be after start" }));
+                                                } else {
+                                                    setErrors((prev) => ({ ...prev, endTime: "" }));
+                                                }
                                             }}
                                             slotProps={{ textField: { fullWidth: true, error: !!errors.startTime, helperText: errors.startTime } }}
                                         />
@@ -1104,11 +1113,17 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                                                     return;
                                                 }
                                                 const newEnd = val.second(0).format("HH:mm");
-                                                setErrors((prev) => ({ ...prev, endTime: "" }));
-                                                setEndTime(newEnd);
-                                                if (startDate && endDate && startDate === endDate && newEnd <= startTime) {
-                                                    setEndDate(dayjs(startDate).add(1, "day").format("YYYY-MM-DD"));
+
+                                                const startDt = dayjs(`${startDate}T${startTime}:00`);
+                                                const usedEndDate = isMultiDay ? endDate : startDate;
+                                                const endDt = dayjs(`${usedEndDate}T${newEnd}:00`);
+                                                if (startDt.isValid() && endDt.isValid() && !endDt.isAfter(startDt)) {
+                                                    setErrors((prev) => ({ ...prev, endTime: "End must be after start" }));
+                                                } else {
+                                                    setErrors((prev) => ({ ...prev, endTime: "" }));
                                                 }
+
+                                                setEndTime(newEnd);
                                             }}
                                             slotProps={{ textField: { fullWidth: true, error: !!errors.endTime, helperText: errors.endTime } }}
                                         />
