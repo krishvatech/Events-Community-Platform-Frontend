@@ -170,6 +170,50 @@ export default function SpeedNetworkingZone({
                 active_matches_count: d.active_matches_count ?? prev.active_matches_count
             } : prev);
         }
+        // Host increased round duration
+        else if (normalizedType === 'speed_networking_duration_updated') {
+            const { new_duration_minutes } = messageData || {};
+            console.log("[SpeedNetworking] Duration updated to:", new_duration_minutes);
+            if (new_duration_minutes) {
+                setSession(prev => prev ? { ...prev, duration_minutes: new_duration_minutes } : prev);
+            }
+        }
+        // One participant requested extension
+        else if (normalizedType === 'speed_networking_extension_requested') {
+            const { match_id, extension_requested_p1, extension_requested_p2 } = messageData || {};
+            console.log("[SpeedNetworking] 🔔 Extension requested on match:", match_id, {
+                p1_requested: extension_requested_p1,
+                p2_requested: extension_requested_p2,
+                current_match_id: currentMatch?.id
+            });
+            setCurrentMatch(prev => {
+                if (prev && String(prev.id) === String(match_id)) {
+                    console.log("[SpeedNetworking] ✅ Updating match with extension request state");
+                    return { ...prev, extension_requested_p1, extension_requested_p2 };
+                } else {
+                    console.log("[SpeedNetworking] ❌ Match ID mismatch - not updating");
+                    return prev;
+                }
+            });
+        }
+        // Both confirmed — extension is live
+        else if (normalizedType === 'speed_networking_extension_applied') {
+            const { match_id, extended_by_seconds, extension_applied } = messageData || {};
+            console.log("[SpeedNetworking] 🎉 Extension applied on match:", match_id, {
+                extended_by_seconds,
+                current_match_id: currentMatch?.id
+            });
+            setCurrentMatch(prev => {
+                if (prev && String(prev.id) === String(match_id)) {
+                    console.log("[SpeedNetworking] ✅ Updating match with extension applied state");
+                    return { ...prev, extended_by_seconds, extension_applied,
+                        extension_requested_p1: true, extension_requested_p2: true };
+                } else {
+                    console.log("[SpeedNetworking] ❌ Match ID mismatch - not updating");
+                    return prev;
+                }
+            });
+        }
     }, [lastMessage, onEnterMatch, fetchActiveSession]);
 
     // Monitor match status changes (fallback: detect when match ended server-side)
@@ -538,6 +582,7 @@ export default function SpeedNetworkingZone({
                         loading={loading}
                         currentUserId={currentUser?.id}
                         onMemberInfo={handleMemberInfo}
+                        eventId={eventId}
                     />
                 ) : inQueue ? (
                     <SpeedNetworkingLobby

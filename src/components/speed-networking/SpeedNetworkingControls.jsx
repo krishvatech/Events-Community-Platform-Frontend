@@ -27,6 +27,41 @@ export default function SpeedNetworkingControls({
         education: { enabled: true, weight: 15 }
     });
     const [loading, setLoading] = useState(false);
+    const [showExtendDialog, setShowExtendDialog] = useState(false);
+    const [newDuration, setNewDuration] = useState('');
+    const [extendError, setExtendError] = useState('');
+
+    const handleExtendDuration = async () => {
+        const val = parseInt(newDuration, 10);
+        if (!val || val <= session.duration_minutes) {
+            setExtendError(`Must be greater than current duration (${session.duration_minutes} min)`);
+            return;
+        }
+        try {
+            setLoading(true);
+            const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/extend-duration/`.replace(/([^:]\/)\/+/g, "$1");
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ duration_minutes: val }),
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                setExtendError(data.error || 'Failed to update duration');
+                return;
+            }
+            setShowExtendDialog(false);
+            setNewDuration('');
+            setExtendError('');
+            if (onSessionUpdated) {
+                onSessionUpdated();
+            }
+        } catch (err) {
+            setExtendError('Network error');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleCreateSession = async () => {
         try {
@@ -444,6 +479,19 @@ export default function SpeedNetworkingControls({
                     <Button
                         variant="contained"
                         size="small"
+                        startIcon={<AddIcon />}
+                        onClick={() => { setNewDuration(String(session.duration_minutes + 1)); setShowExtendDialog(true); setExtendError(''); }}
+                        disabled={loading}
+                        sx={{
+                            bgcolor: '#3b82f6',
+                            '&:hover': { bgcolor: '#2563eb' }
+                        }}
+                    >
+                        Extend Time
+                    </Button>
+                    <Button
+                        variant="contained"
+                        size="small"
                         startIcon={<StopIcon />}
                         onClick={handleStopSession}
                         disabled={loading}
@@ -465,6 +513,31 @@ export default function SpeedNetworkingControls({
                     Session Ended
                 </Typography>
             )}
+
+            {/* Extend Duration Dialog */}
+            <Dialog open={showExtendDialog} onClose={() => setShowExtendDialog(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Increase Round Duration</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Current: {session?.duration_minutes} min. You can only increase the duration.
+                    </Typography>
+                    <TextField
+                        label="New duration (minutes)"
+                        type="number"
+                        value={newDuration}
+                        onChange={e => { setNewDuration(e.target.value); setExtendError(''); }}
+                        inputProps={{ min: (session?.duration_minutes || 1) + 1, max: 60 }}
+                        fullWidth
+                        size="small"
+                        error={!!extendError}
+                        helperText={extendError}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowExtendDialog(false)}>Cancel</Button>
+                    <Button onClick={handleExtendDuration} variant="contained">Apply</Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }

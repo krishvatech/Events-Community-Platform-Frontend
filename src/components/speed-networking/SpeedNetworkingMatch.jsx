@@ -38,6 +38,13 @@ const dyteStyles = `
     }
 `;
 
+const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+
+function authHeader() {
+    const token = localStorage.getItem("access") || localStorage.getItem("access_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function SpeedNetworkingMatch({
     match,
     session,
@@ -45,7 +52,8 @@ export default function SpeedNetworkingMatch({
     onLeave,
     loading,
     currentUserId,
-    onMemberInfo
+    onMemberInfo,
+    eventId
 }) {
     const [meeting, initMeeting] = useDyteClient();
     const [timeRemaining, setTimeRemaining] = useState(session.duration_minutes * 60);
@@ -121,12 +129,15 @@ export default function SpeedNetworkingMatch({
     // Timer countdown
     useEffect(() => {
         autoAdvanceTriggeredRef.current = false;
-        setTimeRemaining(session.duration_minutes * 60);
+
+        // Calculate total duration including any extension
+        const totalSeconds = session.duration_minutes * 60 + (match?.extended_by_seconds || 0);
+        setTimeRemaining(totalSeconds);
 
         const rawStart = match?.started_at || match?.created_at;
         const parsedStart = rawStart ? new Date(rawStart).getTime() : NaN;
         const startTime = Number.isFinite(parsedStart) ? parsedStart : Date.now();
-        const duration = session.duration_minutes * 60 * 1000;
+        const duration = totalSeconds * 1000;
 
         const interval = setInterval(() => {
             const now = Date.now();
@@ -172,7 +183,50 @@ export default function SpeedNetworkingMatch({
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const progress = (timeRemaining / (session.duration_minutes * 60)) * 100;
+    // Extension state
+    const EXTENSION_WINDOW_SECONDS = 60;
+    const isP1 = String(match?.participant_1?.id) === String(currentUserId);
+    const myExtensionRequested = isP1 ? match?.extension_requested_p1 : match?.extension_requested_p2;
+    const partnerExtensionRequested = isP1 ? match?.extension_requested_p2 : match?.extension_requested_p1;
+    const extensionApplied = !!match?.extension_applied;
+    const showExtensionBanner = timeRemaining <= EXTENSION_WINDOW_SECONDS && !extensionApplied;
+
+    const [extensionLoading, setExtensionLoading] = useState(false);
+    const [extensionError, setExtensionError] = useState(null);
+
+    const handleRequestExtension = async () => {
+        // Prevent double-click and multiple requests
+        if (extensionLoading || myExtensionRequested || extensionApplied) {
+            return;
+        }
+
+        setExtensionLoading(true);
+        setExtensionError(null);
+
+        try {
+            const url = `${API_ROOT}/events/${eventId}/speed-networking/matches/${match.id}/request-extension/`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
+            });
+
+            if (!res.ok) {
+                const error = await res.json();
+                setExtensionError(error.error || 'Failed to request extension');
+                console.error('[Extension] API error:', res.status, error);
+                setExtensionLoading(false);
+            }
+            // On success, wait for WebSocket confirmation (extension_requested event will update UI)
+        } catch (err) {
+            setExtensionError('Network error - please try again');
+            console.error('[Extension] Request failed:', err);
+            setExtensionLoading(false);
+        }
+    };
+
+    // Calculate progress with total duration
+    const totalDuration = session.duration_minutes * 60 + (match?.extended_by_seconds || 0);
+    const progress = (timeRemaining / totalDuration) * 100;
 
     return (
         <Box sx={{
@@ -213,6 +267,76 @@ export default function SpeedNetworkingMatch({
                         }
                     }}
                 />
+
+                {/* Extension Banner */}
+                {showExtensionBanner && !extensionApplied && (
+                    <Box sx={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        gap: 1.5, px: 2, py: 0.75,
+                        bgcolor: 'rgba(234,179,8,0.12)',
+                        borderBottom: '1px solid rgba(234,179,8,0.25)'
+                    }}>
+                        {!myExtensionRequested && !partnerExtensionRequested && (
+                            <>
+                                <Typography sx={{ color: '#fbbf24', fontSize: 13 }}>
+                                    Round ending soon
+                                </Typography>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    disabled={extensionLoading}
+                                    onClick={handleRequestExtension}
+                                    sx={{ color: '#fbbf24', borderColor: '#fbbf24', textTransform: 'none', py: 0.25, px: 1.5, fontSize: 12 }}
+                                >
+                                    +{session.duration_minutes} min
+                                </Button>
+                            </>
+                        )}
+                        {myExtensionRequested && !partnerExtensionRequested && (
+                            <Typography sx={{ color: '#fbbf24', fontSize: 13 }}>
+                                Waiting for partner to confirm extension…
+                            </Typography>
+                        )}
+                        {!myExtensionRequested && partnerExtensionRequested && (
+                            <>
+                                <Typography sx={{ color: '#fbbf24', fontSize: 13 }}>
+                                    Partner wants to extend!
+                                </Typography>
+                                <Button
+                                    size="small"
+                                    variant="contained"
+                                    disabled={extensionLoading}
+                                    onClick={handleRequestExtension}
+                                    sx={{ bgcolor: '#fbbf24', color: '#000', textTransform: 'none', py: 0.25, px: 1.5, fontSize: 12, '&:hover': { bgcolor: '#f59e0b' } }}
+                                >
+                                    Confirm +{session.duration_minutes} min
+                                </Button>
+                            </>
+                        )}
+                    </Box>
+                )}
+                {extensionApplied && (
+                    <Box sx={{
+                        textAlign: 'center', py: 0.5,
+                        bgcolor: 'rgba(34,197,94,0.12)',
+                        borderBottom: '1px solid rgba(34,197,94,0.2)'
+                    }}>
+                        <Typography sx={{ color: '#22c55e', fontSize: 12, fontWeight: 600 }}>
+                            Time extended by {session.duration_minutes} min
+                        </Typography>
+                    </Box>
+                )}
+                {extensionError && (
+                    <Box sx={{
+                        textAlign: 'center', py: 0.5,
+                        bgcolor: 'rgba(239,68,68,0.12)',
+                        borderBottom: '1px solid rgba(239,68,68,0.2)'
+                    }}>
+                        <Typography sx={{ color: '#ef4444', fontSize: 12 }}>
+                            {extensionError}
+                        </Typography>
+                    </Box>
+                )}
             </Box>
 
             {/* Main Content: Dyte + Partner Profile Sidebar */}
