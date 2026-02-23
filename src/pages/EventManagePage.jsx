@@ -325,6 +325,7 @@ export default function EventManagePage() {
   const [participantVisibility, setParticipantVisibility] = useState({
     show_participants_before_event: true,
     show_participants_after_event: false,
+    show_speed_networking_match_history: true,
   });
 
   const isOwner = isOwnerUser();
@@ -458,6 +459,7 @@ export default function EventManagePage() {
       setParticipantVisibility({
         show_participants_before_event: event.show_participants_before_event ?? true,
         show_participants_after_event: event.show_participants_after_event ?? false,
+        show_speed_networking_match_history: event.show_speed_networking_match_history ?? true,
       });
     }
   }, [event]);
@@ -1522,6 +1524,20 @@ export default function EventManagePage() {
                     </Box>
                   }
                 />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={participantVisibility.show_speed_networking_match_history}
+                      onChange={(e) => setParticipantVisibility(prev => ({ ...prev, show_speed_networking_match_history: e.target.checked }))}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>Allow participants to view their networking match list after the event</Typography>
+                      <Typography variant="caption" color="text.secondary">Default: On</Typography>
+                    </Box>
+                  }
+                />
                 <Box>
                   <Button
                     variant="contained"
@@ -1764,6 +1780,7 @@ export default function EventManagePage() {
       }
       setEvent((prev) => ({ ...prev, ...newSettings }));
       setParticipantVisibility(prev => ({ ...prev, ...newSettings }));
+      localStorage.setItem(`event_visibility_updated_${eventId}`, String(Date.now()));
       toast.success("Visibility settings updated");
     } catch (e) {
       toast.error(e?.message || "Failed to save visibility settings");

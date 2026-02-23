@@ -47,6 +47,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
     const [error, setError] = useState(null);
     const [sessionName, setSessionName] = useState('');
     const [selectedTab, setSelectedTab] = useState('all');
+    const [historyHidden, setHistoryHidden] = useState(false);
 
     // State to track friend request status for each match partner
     const [friendStatusMap, setFriendStatusMap] = useState({}); // { [userId]: 'none' | 'pending_outgoing' | 'friends' }
@@ -66,7 +67,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
     // Poll for past matches every 5 seconds to detect completed matches
     useEffect(() => {
-        if (!sessionId || !eventId) return;
+        if (!sessionId || !eventId || historyHidden) return;
 
         // Initial fetch
         fetchUserMatches();
@@ -78,10 +79,10 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [eventId, sessionId]);
+    }, [eventId, sessionId, historyHidden]);
 
     useEffect(() => {
-        if (!sessionId || !eventId) return;
+        if (!sessionId || !eventId || historyHidden) return;
 
         let ws = null;
         let reconnectTimer = null;
@@ -144,6 +145,12 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
             let url = `${API_ROOT}/events/${eventId}/speed-networking/${sessionId}/user-matches/`.replace(/([^:]\/)\/+/g, "$1");
             url = addCacheBust(url); // Add cache-bust for fresh match data
             const res = await fetch(url, { headers: authHeader() });
+
+            if (res.status === 403) {
+                setHistoryHidden(true);
+                setLoading(false);
+                return;
+            }
 
             if (!res.ok) {
                 throw new Error('Failed to fetch matches');

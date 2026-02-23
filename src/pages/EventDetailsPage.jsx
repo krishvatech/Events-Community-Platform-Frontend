@@ -1,5 +1,5 @@
 // src/pages/EventDetailsPage.jsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -213,6 +213,23 @@ export default function EventDetailsPage() {
 
   // Participant Preview
   const [previewParticipants, setPreviewParticipants] = useState([]);
+
+  const refreshEventFromServer = useCallback(async () => {
+    if (!event?.id) return;
+    try {
+      const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/`), {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) return;
+      const latest = await res.json();
+      setEvent(latest);
+    } catch (_) {
+      // no-op: keep existing event state on transient network errors
+    }
+  }, [event?.id, token]);
 
   useEffect(() => {
     if (!event?.id) return;
@@ -433,6 +450,45 @@ export default function EventDetailsPage() {
     return () => { cancelled = true; };
   }, [event?.id, token]);
 
+  useEffect(() => {
+    if (!event?.id) return;
+
+    const storageKey = `event_visibility_updated_${event.id}`;
+    const handleFocus = () => {
+      refreshEventFromServer();
+    };
+    const handleStorage = (evt) => {
+      if (evt.key === storageKey) {
+        refreshEventFromServer();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("storage", handleStorage);
+    const intervalId = window.setInterval(() => {
+      refreshEventFromServer();
+    }, 10000);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("storage", handleStorage);
+      window.clearInterval(intervalId);
+    };
+  }, [event?.id, refreshEventFromServer]);
+
+  const isPrivilegedUser = isOwnerUser() || isStaffUser();
+  const canParticipantViewSpeedNetworkingMatchHistory =
+    event?.show_speed_networking_match_history !== false;
+  const showSpeedNetworkingTab =
+    !!speedNetworkingSessionId &&
+    (isPrivilegedUser || canParticipantViewSpeedNetworkingMatchHistory);
+
+  useEffect(() => {
+    if (!showSpeedNetworkingTab && activeTab !== 0) {
+      setActiveTab(0);
+    }
+  }, [showSpeedNetworkingTab, activeTab]);
+
 
   if (loading) {
     return <EventDetailsSkeleton />;
@@ -491,8 +547,6 @@ export default function EventDetailsPage() {
   const refParam = searchParams.get("ref");
   const backLabel = refParam === "my_events" ? "My Events" : "Explore Events";
   const backPath = refParam === "my_events" ? "/account/events" : "/events";
-
-  const showSpeedNetworkingTab = !!speedNetworkingSessionId;
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
