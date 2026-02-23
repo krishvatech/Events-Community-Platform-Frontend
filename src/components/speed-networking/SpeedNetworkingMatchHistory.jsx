@@ -23,10 +23,15 @@ import BlockIcon from '@mui/icons-material/Block';
 import { useNavigate } from 'react-router-dom';
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const WS_ROOT = API_ROOT.replace(/^http/, "ws").replace(/\/api\/?$/, "");
 
 function authHeader() {
     const token = localStorage.getItem("access") || localStorage.getItem("access_token");
     return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function getToken() {
+    return localStorage.getItem("access") || localStorage.getItem("access_token") || "";
 }
 
 // Add cache-busting query parameter for URLs that need fresh data
@@ -46,6 +51,19 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
     // State to track friend request status for each match partner
     const [friendStatusMap, setFriendStatusMap] = useState({}); // { [userId]: 'none' | 'pending_outgoing' | 'friends' }
 
+    const mergeMatches = (incoming, previous = []) => {
+        const map = new Map();
+        [...previous, ...incoming].forEach((match) => {
+            if (!match || match.match_id === null || match.match_id === undefined) return;
+            map.set(String(match.match_id), match);
+        });
+        return Array.from(map.values()).sort((a, b) => {
+            const aTime = a?.ended_at ? new Date(a.ended_at).getTime() : 0;
+            const bTime = b?.ended_at ? new Date(b.ended_at).getTime() : 0;
+            return bTime - aTime;
+        });
+    };
+
     // Poll for past matches every 5 seconds to detect completed matches
     useEffect(() => {
         if (!sessionId || !eventId) return;
@@ -60,6 +78,59 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
         }, 5000);
 
         return () => clearInterval(interval);
+    }, [eventId, sessionId]);
+
+    useEffect(() => {
+        if (!sessionId || !eventId) return;
+
+        let ws = null;
+        let reconnectTimer = null;
+        let closedByCleanup = false;
+
+        const connect = () => {
+            const token = getToken();
+            const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+            const wsUrl = `${WS_ROOT}/ws/events/${eventId}/${qs}`.replace(/([^:]\/)\/+/g, "$1");
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                fetchUserMatches();
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    const normalizedType = (msg?.type || "").replace(/\./g, "_");
+                    const data = msg?.data || {};
+
+                    if (normalizedType === 'speed_networking_match_finalized') {
+                        if (Number(data.session_id) !== Number(sessionId)) return;
+                        if (!data.match) return;
+                        setMatches(prev => mergeMatches([data.match], prev));
+                    } else if (normalizedType === 'speed_networking_match_ended') {
+                        // Fallback consistency: pull latest persisted match list.
+                        fetchUserMatches();
+                    }
+                } catch (err) {
+                    console.error('[MatchHistory] Failed to process WS message:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                if (closedByCleanup) return;
+                reconnectTimer = setTimeout(connect, 1500);
+            };
+        };
+
+        connect();
+
+        return () => {
+            closedByCleanup = true;
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            if (ws && ws.readyState <= WebSocket.OPEN) {
+                ws.close();
+            }
+        };
     }, [eventId, sessionId]);
 
     const fetchUserMatches = async () => {
@@ -79,7 +150,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
             }
 
             const data = await res.json();
-            setMatches(data.matches || []);
+            setMatches(prev => mergeMatches(data.matches || [], prev));
             setSessionName(data.session_name || '');
 
             // Optimistically checking friend status if available in data, otherwise defaults to 'none'

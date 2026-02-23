@@ -41,6 +41,11 @@ function authHeader() {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function addCacheBust(url) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}_cb=${Date.now()}`;
+}
+
 export default function SpeedNetworkingHostPanel({
     eventId,
     session,
@@ -62,6 +67,21 @@ export default function SpeedNetworkingHostPanel({
     const [testMatchResult, setTestMatchResult] = useState(null);
     const [testingMatch, setTestingMatch] = useState(false);
 
+    const mergePastMatches = (incoming, previous = []) => {
+        const map = new Map();
+        [...previous, ...incoming].forEach((match) => {
+            if (!match) return;
+            const key = match.id ?? match.match_id;
+            if (key === null || key === undefined) return;
+            map.set(String(key), match);
+        });
+        return Array.from(map.values()).sort((a, b) => {
+            const aTime = a?.ended_at ? new Date(a.ended_at).getTime() : 0;
+            const bTime = b?.ended_at ? new Date(b.ended_at).getTime() : 0;
+            return bTime - aTime;
+        });
+    };
+
     const fetchQueue = async () => {
         if (!session?.id) {
             console.log('[HostPanel] fetchQueue: session.id not available');
@@ -69,15 +89,17 @@ export default function SpeedNetworkingHostPanel({
         }
         try {
             setLoading(true);
-            const queueUrl = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/queue/`.replace(/([^:]\/)\/+/g, "$1");
-            const sessionUrl = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/`.replace(/([^:]\/)\/+/g, "$1");
+            let queueUrl = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/queue/`.replace(/([^:]\/)\/+/g, "$1");
+            let sessionUrl = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/`.replace(/([^:]\/)\/+/g, "$1");
+            queueUrl = addCacheBust(queueUrl);
+            sessionUrl = addCacheBust(sessionUrl);
 
             console.log('[HostPanel] Fetching queue and session data at', new Date().toISOString());
 
             // Fetch both queue entries and full session data (which includes all matches)
             const [queueRes, sessionRes] = await Promise.all([
-                fetch(queueUrl, { headers: authHeader() }),
-                fetch(sessionUrl, { headers: authHeader() })
+                fetch(queueUrl, { headers: authHeader(), cache: 'no-store' }),
+                fetch(sessionUrl, { headers: authHeader(), cache: 'no-store' })
             ]);
 
             if (queueRes.ok) {
@@ -96,7 +118,7 @@ export default function SpeedNetworkingHostPanel({
                 if (sessionData.matches && Array.isArray(sessionData.matches)) {
                     const past = sessionData.matches.filter(m => m.status === 'COMPLETED' || m.status === 'SKIPPED');
                     console.log('[HostPanel] Extracted', past.length, 'past matches');
-                    setPastMatches(past);
+                    setPastMatches(prev => mergePastMatches(past, prev));
                 }
             } else {
                 console.error('[HostPanel] Session fetch failed with status:', sessionRes.status);
@@ -126,13 +148,33 @@ export default function SpeedNetworkingHostPanel({
             timestamp: new Date().toISOString()
         });
 
-        if (messageType === 'speed_networking_queue_update' || messageType === 'speed_networking.queue_update') {
+        const shouldRefresh =
+            messageType === 'speed_networking_queue_update' ||
+            messageType === 'speed_networking.queue_update' ||
+            messageType === 'speed_networking_match_finalized' ||
+            messageType === 'speed_networking.match_finalized' ||
+            messageType === 'speed_networking_match_ended' ||
+            messageType === 'speed_networking.match_ended';
+
+        if (messageType === 'speed_networking_match_finalized' || messageType === 'speed_networking.match_finalized') {
+            const finalized = lastMessage?.data?.match;
+            if (finalized) {
+                setPastMatches(prev => mergePastMatches([finalized], prev));
+            }
+        }
+
+        if (shouldRefresh) {
             console.log('[HostPanel] Queue update message matched! Scheduling fetchQueue...');
             // Add small delay to ensure database transaction has committed
             setTimeout(() => {
                 console.log('[HostPanel] Calling fetchQueue() after 100ms delay');
                 fetchQueue();
             }, 100);
+            // Follow-up sync for eventual consistency windows.
+            setTimeout(() => {
+                console.log('[HostPanel] Calling fetchQueue() follow-up after 800ms delay');
+                fetchQueue();
+            }, 800);
         } else {
             console.log('[HostPanel] Message type does not match. Expected "speed_networking_queue_update", got:', messageType);
         }
