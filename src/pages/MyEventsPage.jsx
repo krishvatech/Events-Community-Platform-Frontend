@@ -97,6 +97,7 @@ function computeStatus(ev) {
   const s = ev.start_time ? new Date(ev.start_time).getTime() : 0;
   const e = ev.end_time ? new Date(ev.end_time).getTime() : 0;
 
+  if (ev.status === "cancelled") return "cancelled";
   // FIRST check if meeting has been manually ended - return "past" immediately
   if (ev.status === "ended") return "past";
 
@@ -135,6 +136,8 @@ function statusChip(status) {
       return { label: "Upcoming", className: "bg-teal-50 text-teal-700" };
     case "past":
       return { label: "Past", className: "bg-slate-100 text-slate-700" };
+    case "cancelled":
+      return { label: "Cancelled", className: "bg-red-100 text-red-700" };
     default:
       return { label: "—", className: "bg-slate-100 text-slate-700" };
   }
@@ -352,6 +355,27 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
         <Box sx={{ mt: "auto", display: "flex", gap: 1 }}>
           {(() => {
             // derive simple flags from status
+            if (status === "cancelled") {
+              return (
+                <Button
+                  size="small"
+                  disabled
+                  variant="outlined"
+                  sx={{
+                    textTransform: "none",
+                    py: 0.5,
+                    px: 1.25,
+                    borderRadius: 2,
+                    backgroundColor: "#fef2f2 !important",
+                    color: "#b91c1c !important",
+                    borderColor: "#fecaca !important",
+                  }}
+                >
+                  Cancelled
+                </Button>
+              );
+            }
+
             const isPostEventLounge = isPostEventLoungeOpen(ev);
             const isPast = (status === "past" || ev.status === "ended") && !isPostEventLounge;
             const isLive = status === "live" && ev.status !== "ended";
@@ -472,7 +496,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
           })()}
 
           {/* Cancel / Unregister Actions */}
-          {reg && (
+          {reg && status !== "cancelled" && (
             <RegisteredActions
               ev={ev}
               reg={reg}
@@ -604,7 +628,7 @@ export default function MyEventsPage() {
   }, [q, tab]);
 
   // Helper map for tabs -> backend bucket
-  const statusTabMap = { 1: "upcoming", 2: "live", 3: "past" };
+  const statusTabMap = { 1: "upcoming", 2: "live", 3: "past", 4: "cancelled" };
 
   useEffect(() => {
     let cancelled = false;
@@ -821,6 +845,7 @@ export default function MyEventsPage() {
                 <Tab label="Upcoming" />
                 <Tab label="Live" />
                 <Tab label="Past" />
+                <Tab label="Cancelled" />
               </Tabs>
             </Paper>
 

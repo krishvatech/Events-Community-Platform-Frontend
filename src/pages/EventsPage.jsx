@@ -242,6 +242,7 @@ function computeStatus(ev) {
   const s = ev.start ? new Date(ev.start).getTime() : 0;
   const e = ev.end ? new Date(ev.end).getTime() : 0;
 
+  if (ev.status === "cancelled") return "cancelled";
   if (ev.status === "ended") return "past";
   if (ev.is_live && ev.status !== "ended") return "live";
   if (s && e && now >= s && now <= e && ev.status !== "ended") return "live";
@@ -570,7 +571,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
         {/* Hide register button for owner users */}
         {!owner && (
-          ev.isRegistered ? (
+          status === "cancelled" ? (
+            <span className="text-red-600 font-medium bg-red-50 px-3 py-1.5 rounded-full text-sm">Event Cancelled</span>
+          ) : ev.isRegistered ? (
             <div className="flex items-center gap-2">
               {/* Show Join button for virtual/hybrid events */}
               {(ev.event_format === "virtual" || ev.event_format === "hybrid") && (

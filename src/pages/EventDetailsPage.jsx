@@ -71,6 +71,8 @@ function computeStatus(ev) {
   const s = parseDateSafe(ev.start_time)?.getTime() || 0;
   const e = parseDateSafe(ev.end_time)?.getTime() || 0;
 
+  if (ev.status === "cancelled") return "cancelled";
+
   // ✅ match MyEventsPage behavior
   if (ev.status === "ended") return "past";
 
@@ -468,7 +470,9 @@ export default function EventDetailsPage() {
     ? { label: "Live", className: "bg-rose-50 text-rose-700" }
     : status === "upcoming"
       ? { label: "Upcoming", className: "bg-teal-50 text-teal-700" }
-      : { label: "Past", className: "bg-slate-100 text-slate-700" };
+      : status === "cancelled"
+        ? { label: "Cancelled", className: "bg-red-100 text-red-700" }
+        : { label: "Past", className: "bg-slate-100 text-slate-700" };
   // Decide the best join URL:
   const isHost = Boolean(registration?.is_host);
   const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=${isHost ? "publisher" : "audience"}`;
@@ -803,7 +807,16 @@ export default function EventDetailsPage() {
                           </Box>
                         )}
 
-                        {canShowActiveJoin && canJoinEventNow ? (
+                        {status === "cancelled" ? (
+                          <Button
+                            disabled
+                            variant="outlined"
+                            sx={{ textTransform: "none", backgroundColor: "#fef2f2", color: "#b91c1c", borderColor: "#fecaca" }}
+                            className="rounded-xl"
+                          >
+                            Event Cancelled
+                          </Button>
+                        ) : canShowActiveJoin && canJoinEventNow ? (
                           <Button
                             component={Link}
                             to={livePath}

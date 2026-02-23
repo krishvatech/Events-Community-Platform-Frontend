@@ -110,6 +110,8 @@ const computeStatus = (ev) => {
   const s = ev.start_time ? new Date(ev.start_time).getTime() : 0;
   const e = ev.end_time ? new Date(ev.end_time).getTime() : 0;
 
+  if (ev.status === "cancelled") return "cancelled";
+
   // If meeting is manually ended, always treat as past
   if (ev.status === "ended") return "past";
 
@@ -127,6 +129,8 @@ const statusChip = (status) => {
       return { label: "Upcoming", className: "bg-teal-50 text-teal-700" };
     case "past":
       return { label: "Past", className: "bg-slate-100 text-slate-700" };
+    case "cancelled":
+      return { label: "Cancelled", className: "bg-red-100 text-red-700" };
     default:
       return { label: "—", className: "bg-slate-100 text-slate-700" };
   }
@@ -2355,7 +2359,7 @@ function EventsPage() {
   const [errMsg, setErrMsg] = useState("");
 
   // Helpers
-  const statusTabMap = { 1: "upcoming", 2: "live", 3: "past" };
+  const statusTabMap = { 1: "upcoming", 2: "live", 3: "past", 4: "cancelled" };
 
   // Force re-render every second to keep join button text current
   useSecondTick();
@@ -2392,6 +2396,7 @@ function EventsPage() {
           url.searchParams.set("search", q.trim());
         }
 
+        const statusTabMap = { 1: "upcoming", 2: "live", 3: "past", 4: "cancelled" };
         const bucket = statusTabMap[tab];
         if (bucket) {
           url.searchParams.set("bucket", bucket); // upcoming | live | past
@@ -2580,6 +2585,7 @@ function EventsPage() {
           <Tab label="Upcoming" />
           <Tab label="Live" />
           <Tab label="Past" />
+          <Tab label="Cancelled" />
         </Tabs>
       </Paper>
 

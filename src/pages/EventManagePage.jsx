@@ -108,6 +108,7 @@ const computeStatus = (ev) => {
   const s = ev.start_time ? dayjs(ev.start_time).valueOf() : 0;
   const e = ev.end_time ? dayjs(ev.end_time).valueOf() : 0;
 
+  if (ev.status === "cancelled") return "cancelled";
   if (ev.status === "ended") return "past";
   if (ev.is_live && ev.status !== "ended") return "live";
   if (s && e && now >= s && now <= e && ev.status !== "ended") return "live";
@@ -329,6 +330,72 @@ export default function EventManagePage() {
   const isOwner = isOwnerUser();
   const isStaff = isStaffUser();
   const canManageLounge = isOwner || isStaff;
+
+  // Cancel Event State
+  const [cancelEventOpen, setCancelEventOpen] = useState(false);
+  const [cancelEventLoading, setCancelEventLoading] = useState(false);
+  const [cancellationMessage, setCancellationMessage] = useState("");
+  const [recommendedEventId, setRecommendedEventId] = useState("");
+  const [notifyParticipants, setNotifyParticipants] = useState(true);
+  const [hostedEvents, setHostedEvents] = useState([]);
+
+  // Fetch hosted events for recommendation dropdown
+  useEffect(() => {
+    if (!cancelEventOpen || !isOwner) return;
+    const fetchHosted = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+        const res = await fetch(`${API_ROOT}/events/hosted/`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const list = Array.isArray(json) ? json : (json.results || []);
+          // filter out current event
+          setHostedEvents(list.filter(e => e.id !== parseInt(eventId)));
+        }
+      } catch (err) {
+        console.error("Failed to fetch hosted events", err);
+      }
+    };
+    fetchHosted();
+  }, [cancelEventOpen, isOwner, eventId]);
+
+  const handleCancelEvent = async () => {
+    if (!eventId || cancelEventLoading) return;
+    setCancelEventLoading(true);
+    try {
+      const token = getToken();
+      const payload = {
+        cancellation_message: cancellationMessage,
+        notify_participants: notifyParticipants,
+      };
+      if (recommendedEventId) {
+        payload.recommended_event_id = recommendedEventId;
+      }
+
+      const res = await fetch(`${API_ROOT}/events/${eventId}/cancel/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || "Failed to cancel event");
+
+      toast.success("Event cancelled successfully!");
+      setCancelEventOpen(false);
+      refreshEvent(); // refresh to show cancelled status
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCancelEventLoading(false);
+    }
+  };
+
   const [myReg, setMyReg] = useState(null); // New state for my registration
   const resources = event?.resources || [];
   const tabLabels = isOwner ? EVENT_TAB_LABELS : STAFF_EVENT_TAB_LABELS;
@@ -1216,31 +1283,55 @@ export default function EventManagePage() {
               {/* Host / Join Button (Overview) */}
               <Box sx={{ mb: 2 }}>
                 {isOwner ? (
-                  <Button
-                    onClick={onHost}
-                    startIcon={<LiveTvRoundedIcon />}
-                    variant="contained"
-                    fullWidth
-                    sx={{
-                      borderRadius: 2,
-                      textTransform: "none",
-                      bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
-                      py: 1,
-                      fontSize: 15,
-                      fontWeight: 600,
-                      "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
-                    }}
-                    disabled={!!hostingId || isPast}
-                  >
-                    {hostingId ? (
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <CircularProgress size={20} color="inherit" />
-                        <span>Starting...</span>
-                      </Stack>
-                    ) : (
-                      isPast ? "Event Ended" : "Host Event"
+                  <Stack spacing={1.5}>
+                    <Button
+                      onClick={onHost}
+                      startIcon={<LiveTvRoundedIcon />}
+                      variant="contained"
+                      fullWidth
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: "none",
+                        bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
+                        py: 1,
+                        fontSize: 15,
+                        fontWeight: 600,
+                        "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
+                        ...(status === "cancelled" && {
+                          "&.Mui-disabled": {
+                            bgcolor: "#fef2f2",
+                            color: "#b91c1c"
+                          }
+                        })
+                      }}
+                      disabled={!!hostingId || isPast || status === "cancelled"}
+                    >
+                      {hostingId ? (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <CircularProgress size={20} color="inherit" />
+                          <span>Starting...</span>
+                        </Stack>
+                      ) : (
+                        isPast ? "Event Ended" : status === "cancelled" ? "Cancelled" : "Host Event"
+                      )}
+                    </Button>
+                    {status !== "cancelled" && status !== "past" && event.status !== "ended" && event.status !== "cancelled" && (
+                      <Button
+                        onClick={() => setCancelEventOpen(true)}
+                        variant="outlined"
+                        color="error"
+                        fullWidth
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: "none",
+                          fontSize: 15,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Cancel Event
+                      </Button>
                     )}
-                  </Button>
+                  </Stack>
                 ) : (
                   canShowActiveJoin && (
                     <Button
@@ -3811,6 +3902,93 @@ export default function EventManagePage() {
             eventId={eventId}
           />
         )}
+
+        {/* Cancel Event Dialog */}
+        <Dialog
+          open={cancelEventOpen}
+          onClose={() => !cancelEventLoading && setCancelEventOpen(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 800 }}>Cancel Event</DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Are you sure you want to cancel this event? This action will set the event status to "cancelled" and notify all registered participants.
+            </Typography>
+
+            <TextField
+              fullWidth
+              label="Cancellation Message (Optional)"
+              placeholder="Explain why the event is cancelled..."
+              multiline
+              rows={3}
+              value={cancellationMessage}
+              onChange={(e) => setCancellationMessage(e.target.value)}
+              sx={{ mb: 3 }}
+              InputLabelProps={{ shrink: true }}
+            />
+
+            <TextField
+              select
+              fullWidth
+              label="Recommend another event (Optional)"
+              value={recommendedEventId}
+              onChange={(e) => setRecommendedEventId(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ mb: 3 }}
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              {hostedEvents.map((ev) => (
+                <MenuItem key={ev.id} value={ev.id}>
+                  {ev.title} ({dayjs(ev.start_time).format('MMM D')})
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={notifyParticipants}
+                  onChange={(e) => setNotifyParticipants(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  Send cancellation email to participants
+                </Typography>
+              }
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button
+              onClick={() => setCancelEventOpen(false)}
+              disabled={cancelEventLoading}
+              sx={{ textTransform: "none", color: "text.secondary", fontWeight: 600 }}
+            >
+              Keep Event
+            </Button>
+            <Button
+              onClick={handleCancelEvent}
+              disabled={cancelEventLoading}
+              variant="contained"
+              color="error"
+              sx={{ textTransform: "none", borderRadius: 2, fontWeight: 600 }}
+            >
+              {cancelEventLoading ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <CircularProgress size={20} color="inherit" />
+                  <span>Cancelling...</span>
+                </Stack>
+              ) : (
+                "Yes, Cancel Event"
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </Box >
   );
