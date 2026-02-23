@@ -508,6 +508,7 @@ function CityAutocompleteOpenMeteo({ label = "City", value, onSelect }) {
             latitude: x.lat,
             longitude: x.lng,
             label: x.label, // optional
+            timezone: x.timezone || "",
           }))
           .filter((x) => x.name && x.country);
 
@@ -1312,7 +1313,7 @@ export default function ProfilePage() {
   const [websiteErrors, setWebsiteErrors] = useState({});
   const [integrityPromptDismissed, setIntegrityPromptDismissed] = useState(false);
   const [schedulerError, setSchedulerError] = useState("");
-  const [locationForm, setLocationForm] = useState({ city: "", country: "" });
+  const [locationForm, setLocationForm] = useState({ city: "", country: "", timezone: "" });
   const [workOpen, setWorkOpen] = useState(false);
   const [workForm, setWorkForm] = useState({ sector: "", industry: "", employees: "" });
 
@@ -1528,7 +1529,7 @@ export default function ProfilePage() {
     membership_url: "",
   };
   const initialExpForm = {
-    org: "", position: "", city: "", location: "", start: "", end: "", current: false,
+    org: "", position: "", city: "", location: "", timezone: "", start: "", end: "", current: false,
     employment_type: "full_time", work_schedule: "", relationship_to_org: "", career_stage: "",
     work_arrangement: "", description: "", exit_reason: "", sector: "", industry: "", number_of_employees: "",
   };
@@ -2007,7 +2008,7 @@ export default function ProfilePage() {
 
   const openEditLocation = () => {
     const { city, country } = parseLocationString(form.location);
-    setLocationForm({ city, country });
+    setLocationForm({ city, country, timezone: form.timezone || "" });
     setLocationOpen(true);
   };
 
@@ -2397,7 +2398,7 @@ export default function ProfilePage() {
         email: form.email,
         profile: {
           full_name: form.full_name,
-          timezone: form.timezone,
+          timezone: locationForm.timezone || form.timezone,
           bio: form.bio,
           headline: form.headline,
           job_title: form.job_title,
@@ -2412,7 +2413,7 @@ export default function ProfilePage() {
         body: JSON.stringify(payload),
       });
       if (!r.ok) throw new Error("Save failed");
-      setForm((prev) => ({ ...prev, location: locationString }));
+      setForm((prev) => ({ ...prev, location: locationString, timezone: locationForm.timezone || prev.timezone }));
       showNotification("success", "Location updated");
       setLocationOpen(false);
     } catch (e) {
@@ -2642,7 +2643,7 @@ export default function ProfilePage() {
             email: form.email,
             profile: {
               full_name: form.full_name,
-              timezone: form.timezone,
+              timezone: expForm.timezone || form.timezone,
               bio: form.bio,
               headline: form.headline,
               job_title: form.job_title,
@@ -2658,7 +2659,7 @@ export default function ProfilePage() {
             body: JSON.stringify(payload),
           });
           if (resp.ok) {
-            setForm((prev) => ({ ...prev, location: locationString }));
+            setForm((prev) => ({ ...prev, location: locationString, timezone: expForm.timezone || prev.timezone }));
           }
         } catch (err) {
           console.error("Sync failed", err);
@@ -4768,10 +4769,12 @@ export default function ProfilePage() {
                   : null
               }
               onSelect={(place) => {
+                const tz = (place?.timezone || "").trim();
                 setLocationForm((prev) => ({
                   ...prev,
                   city: place?.name || "",
                   country: place?.country || prev.country || "",
+                  timezone: tz ? tz : prev.timezone,
                 }));
               }}
             />
@@ -5108,10 +5111,12 @@ export default function ProfilePage() {
                 : null
             }
             onSelect={(place) => {
+              const tz = (place?.timezone || "").trim();
               setExpForm((prev) => ({
                 ...prev,
                 city: place?.name || "",
                 location: place?.country || prev.location || "", // ✅ auto-fill country
+                timezone: tz ? tz : prev.timezone,
               }));
             }}
           />
