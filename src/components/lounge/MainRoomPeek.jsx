@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Box, IconButton, Tooltip, Typography } from '@mui/material';
+import { Box, IconButton, Tooltip, Typography, Avatar } from '@mui/material';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import UnfoldLessRoundedIcon from '@mui/icons-material/UnfoldLessRounded';
 import UnfoldMoreRoundedIcon from '@mui/icons-material/UnfoldMoreRounded';
@@ -352,21 +352,19 @@ export default function MainRoomPeek({
                                         justifyContent: 'center',
                                         bgcolor: '#1a1a1a'
                                     }}>
-                                        <Box sx={{
-                                            width: 48,
-                                            height: 48,
-                                            borderRadius: '50%',
-                                            bgcolor: '#374151',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: 20,
-                                            fontWeight: 600,
-                                            color: '#fff',
-                                            mb: 1
-                                        }}>
+                                        <Avatar
+                                            src={primaryParticipant.picture || primaryParticipant.avatar || primaryParticipant.profilePicture}
+                                            sx={{
+                                                width: 64,
+                                                height: 64,
+                                                bgcolor: '#374151',
+                                                fontSize: 24,
+                                                fontWeight: 600,
+                                                mb: 1
+                                            }}
+                                        >
                                             {primaryParticipant.name?.[0]?.toUpperCase() || 'U'}
-                                        </Box>
+                                        </Avatar>
                                         <Typography sx={{ color: '#9ca3af', fontSize: 11 }}>
                                             {primaryParticipant.name || 'User'}
                                         </Typography>
