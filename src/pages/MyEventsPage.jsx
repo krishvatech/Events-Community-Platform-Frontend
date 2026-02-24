@@ -124,7 +124,27 @@ function canJoinEarly(ev, minutes = 15) {
   return diff > 0 && diff <= windowMs;
 }
 
+// Calculate total duration of all sessions in minutes
+function calculateTotalDuration(sessions) {
+  if (!Array.isArray(sessions) || sessions.length === 0) return 0;
+  return sessions.reduce((total, session) => {
+    if (!session.start_time || !session.end_time) return total;
+    const start = new Date(session.start_time).getTime();
+    const end = new Date(session.end_time).getTime();
+    const durationMinutes = (end - start) / (1000 * 60);
+    return total + Math.max(0, durationMinutes);
+  }, 0);
+}
 
+// Format duration as "Xh Ym" format
+function formatDuration(totalMinutes) {
+  if (totalMinutes <= 0) return "0m";
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = Math.round(totalMinutes % 60);
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
 
 
 
@@ -259,6 +279,8 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 
             // For multi-day events with sessions, show only the next upcoming session
             if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
+              const totalDurationMinutes = calculateTotalDuration(ev.sessions);
+              const totalDurationStr = formatDuration(totalDurationMinutes);
               // Find next upcoming session
               const now = new Date();
               const nextSession = ev.sessions.find(s => new Date(s.end_time) > now);
@@ -273,6 +295,16 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                   >
                     {ev.location || "Virtual"}
                   </Typography>
+
+                  {/* Show session count and total duration as badges */}
+                  <div className="flex gap-1.5 mb-1.5 flex-wrap">
+                    <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-teal-50 text-teal-700 rounded-full">
+                      {ev.sessions.length} {ev.sessions.length === 1 ? 'Session' : 'Sessions'}
+                    </span>
+                    <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
+                      {totalDurationStr} total
+                    </span>
+                  </div>
 
                   {/* Show next upcoming session with timezone handling */}
                   {nextSession ? (
@@ -317,6 +349,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                       All sessions completed
                     </Typography>
                   )}
+
                 </div>
               );
             }

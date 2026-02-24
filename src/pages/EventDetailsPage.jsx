@@ -483,11 +483,14 @@ export default function EventDetailsPage() {
     !!speedNetworkingSessionId &&
     (isPrivilegedUser || canParticipantViewSpeedNetworkingMatchHistory);
 
+  // ✅ NEW: Show Sessions tab for multi-day events
+  const showSessionsTab = event?.is_multi_day && event?.sessions && event.sessions.length > 0;
+
   useEffect(() => {
-    if (!showSpeedNetworkingTab && activeTab !== 0) {
+    if (!showSpeedNetworkingTab && !showSessionsTab && activeTab !== 0) {
       setActiveTab(0);
     }
-  }, [showSpeedNetworkingTab, activeTab]);
+  }, [showSpeedNetworkingTab, showSessionsTab, activeTab]);
 
 
   if (loading) {
@@ -587,18 +590,21 @@ export default function EventDetailsPage() {
               </Stack>
 
               {/* TABS HEADER - MOVED TO TOP */}
-              {showSpeedNetworkingTab && (
+              {(showSpeedNetworkingTab || showSessionsTab) && (
                 <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
                   <Tabs value={activeTab} onChange={handleTabChange} aria-label="event details tabs">
                     <Tab label="Overview" {...a11yProps(0)} />
-                    <Tab label="Speed Networking" {...a11yProps(1)} />
+                    {showSessionsTab && <Tab label="Sessions" {...a11yProps(1)} />}
+                    {showSpeedNetworkingTab && (
+                      <Tab label="Speed Networking" {...a11yProps(showSessionsTab ? 2 : 1)} />
+                    )}
                   </Tabs>
                 </Box>
               )}
 
               {/* TAB CONTENT: OVERVIEW */}
-              {/* If tabs are hidden (no speed networking), always show content. Otherwise check activeTab === 0 */}
-              {(!showSpeedNetworkingTab || activeTab === 0) && (
+              {/* Only show when activeTab === 0 (or when no tabs exist) */}
+              {((!showSpeedNetworkingTab && !showSessionsTab) || activeTab === 0) && (
                 <Box>
                   {/* EVENT HEADER CARD */}
                   <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden mb-6">
@@ -958,8 +964,60 @@ export default function EventDetailsPage() {
                 </Box>
               )}
 
+              {/* TAB CONTENT: SESSIONS */}
+              {showSessionsTab && activeTab === 1 && (
+                <Paper elevation={0} className="rounded-2xl border border-slate-200">
+                  <Box sx={{ p: 3 }}>
+                    <Typography variant="h6" fontWeight={800} sx={{ mb: 3 }}>
+                      Event Sessions ({event.sessions.length})
+                    </Typography>
+                    <Stack spacing={2}>
+                      {event.sessions.map((session, idx) => (
+                        <Paper key={session.id} elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+                          <Stack spacing={1.5}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="start">
+                              <Box>
+                                <Typography variant="subtitle1" fontWeight={700}>
+                                  {session.title || `Session ${idx + 1}`}
+                                </Typography>
+                                <Chip
+                                  size="small"
+                                  label={session.session_type ? session.session_type.charAt(0).toUpperCase() + session.session_type.slice(1) + ' Session' : 'Session'}
+                                  sx={{ mt: 1 }}
+                                />
+                              </Box>
+                            </Stack>
+
+                            <Stack direction="row" spacing={2} sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                              <Stack direction="row" spacing={0.5} alignItems="center">
+                                <CalendarMonthIcon fontSize="small" sx={{ color: 'teal.700' }} />
+                                <Typography variant="body2">
+                                  {dayjs(session.start_time).format("MMM D, YYYY")}
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" spacing={0.5} alignItems="center">
+                                <AccessTimeIcon fontSize="small" sx={{ color: 'teal.700' }} />
+                                <Typography variant="body2">
+                                  {dayjs(session.start_time).format("h:mm A")} – {dayjs(session.end_time).format("h:mm A")}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+
+                            {session.description && (
+                              <Typography variant="body2" color="text.secondary">
+                                {session.description}
+                              </Typography>
+                            )}
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  </Box>
+                </Paper>
+              )}
+
               {/* TAB CONTENT: SPEED NETWORKING */}
-              {showSpeedNetworkingTab && activeTab === 1 && (
+              {showSpeedNetworkingTab && activeTab === (showSessionsTab ? 2 : 1) && (
                 <Paper elevation={0} className="rounded-2xl border border-slate-200">
                   <Box className="p-5">
                     <SpeedNetworkingMatchHistory eventId={event.id} sessionId={speedNetworkingSessionId} />

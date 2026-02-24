@@ -203,6 +203,39 @@ function humanizeFormat(fmt = "") {
   return fmt.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Calculate total duration of all sessions in minutes
+function calculateTotalDuration(sessions) {
+  if (!Array.isArray(sessions) || sessions.length === 0) return 0;
+  return sessions.reduce((total, session) => {
+    if (!session.start_time || !session.end_time) return total;
+    const start = new Date(session.start_time).getTime();
+    const end = new Date(session.end_time).getTime();
+    const durationMinutes = (end - start) / (1000 * 60);
+    return total + Math.max(0, durationMinutes);
+  }, 0);
+}
+
+// Format duration as "Xh Ym" format
+function formatDuration(totalMinutes) {
+  if (totalMinutes <= 0) return "0m";
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = Math.round(totalMinutes % 60);
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+// Format session type nicely (e.g., "main" -> "Main Session")
+function formatSessionType(type) {
+  const typeMap = {
+    main: "Main Session",
+    breakout: "Breakout Session",
+    workshop: "Workshop",
+    networking: "Networking",
+  };
+  return typeMap[type?.toLowerCase()] || (type || "Session");
+}
+
 function toCard(ev) {
   // map backend fields to the fields your UI already uses
   return {
@@ -234,6 +267,8 @@ function toCard(ev) {
     show_participants_before_event: ev.show_participants_before_event,
     show_participants_after_event: ev.show_participants_after_event,
     timezone: ev.timezone,
+    is_multi_day: ev.is_multi_day || false,  // ✅ NEW: Multi-day event flag
+    sessions: ev.sessions || [],              // ✅ NEW: Event sessions array
   };
 }
 
@@ -276,6 +311,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const isPreEventLounge = isPreEventLoungeOpen(ev);
   const isPostEventLounge = isPostEventLoungeOpen(ev);
   const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+
+  // State for expandable "Read More" section
+  const [expandSessions, setExpandSessions] = React.useState(false);
 
   // Timezone logic
   const organizerTimezone = ev.timezone;
@@ -418,76 +456,120 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         )}
 
         <div className="mt-4 space-y-2 text-neutral-800 text-sm meta-rows sm:min-h-[88px] md:min-h-[96px]">
-          <div className="flex items-center gap-6">
-            <span className="inline-flex items-center gap-2">
-              <CalendarMonthIcon fontSize="small" className="text-teal-700" />
-              {dayjs(ev.start).format("MMMM D, YYYY")}
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <AccessTimeIcon fontSize="small" className="text-teal-700" />
-              <span>
-                {(() => {
-                  // DEBUG: Log event data
-                  console.log(`[EventsPage EventCard Debug] Event "${ev.title}":`, {
-                    is_multi_day: ev.is_multi_day,
-                    sessions_present: !!ev.sessions,
-                    sessions_count: ev.sessions?.length || 0,
-                    timezone: ev.timezone,
-                  });
+          {(() => {
+            // DEBUG: Log event data
+            console.log(`[EventsPage EventCard Debug] Event "${ev.title}":`, {
+              is_multi_day: ev.is_multi_day,
+              sessions_present: !!ev.sessions,
+              sessions_count: ev.sessions?.length || 0,
+              timezone: ev.timezone,
+            });
 
-                  // For multi-day events with sessions, show only the next upcoming session
-                  if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
-                    return (
-                      <div>
-                        {/* Show location for multi-day */}
-                        <span className="block font-medium text-neutral-900 mb-1">
-                          {ev.location || "Virtual"}
-                        </span>
-                        {/* Show next upcoming session with timezone handling */}
-                        {(() => {
-                          // Find next upcoming session
-                          const now = new Date();
-                          const nextSession = ev.sessions.find(s => new Date(s.end_time) > now);
+            // For multi-day events with sessions
+            if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
+              const totalDurationMinutes = calculateTotalDuration(ev.sessions);
+              const totalDurationStr = formatDuration(totalDurationMinutes);
+              const now = new Date();
+              const nextSession = ev.sessions.find(s => new Date(s.end_time) > now);
 
-                          if (!nextSession) {
-                            return (
-                              <span className="block text-xs text-neutral-600">
-                                All sessions completed
+              return (
+                <div className="space-y-2">
+                  {/* Location */}
+                  <div className="flex items-center gap-2">
+                    <span role="img" aria-label="location">📍</span>
+                    <span className="font-medium text-neutral-900">{ev.location || "Virtual"}</span>
+                  </div>
+
+                  {/* Session count and total duration badges */}
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-teal-50 text-teal-700 rounded-full">
+                      {ev.sessions.length} {ev.sessions.length === 1 ? 'Session' : 'Sessions'}
+                    </span>
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full">
+                      {totalDurationStr} total
+                    </span>
+                  </div>
+
+                  {/* Next upcoming session */}
+                  <div className="flex items-center gap-2">
+                    <AccessTimeIcon fontSize="small" className="text-teal-700" />
+                    {nextSession ? (
+                      (() => {
+                        const sessionTimeRange = formatSessionTimeRange(
+                          nextSession.start_time,
+                          nextSession.end_time,
+                          ev.timezone
+                        );
+                        return (
+                          <div className="text-xs">
+                            <span className="font-medium text-neutral-900">{sessionTimeRange.primary}</span>
+                            {sessionTimeRange.secondary && (
+                              <span className="block text-neutral-600 mt-0.5">
+                                <span className="font-semibold text-teal-700">Your Time:</span> {sessionTimeRange.secondary.label.replace('Your Time: ', '')} <span className="text-neutral-400">({sessionTimeRange.secondary.timezone})</span>
                               </span>
+                            )}
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <span className="text-xs text-neutral-600">All sessions completed</span>
+                    )}
+                  </div>
+
+                  {/* Expandable "Read more" section */}
+                  {ev.sessions.length > 1 && (
+                    <div className="pt-1.5 border-t border-neutral-100">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandSessions(!expandSessions);
+                        }}
+                        className="text-xs font-medium text-teal-600 hover:text-teal-700 transition-colors"
+                      >
+                        {expandSessions ? '▼ Show less' : '► Read more'}
+                      </button>
+
+                      {expandSessions && (
+                        <div className="mt-1.5 space-y-1.5 text-xs">
+                          {ev.sessions.map((session, idx) => {
+                            const sessionTimeRange = formatSessionTimeRange(
+                              session.start_time,
+                              session.end_time,
+                              ev.timezone
                             );
-                          }
+                            const sessionDuration = calculateTotalDuration([session]);
+                            const sessionType = formatSessionType(session.session_type);
+                            return (
+                              <div key={idx} className="text-neutral-700 py-1 pl-2 border-l-2 border-teal-200">
+                                <div className="font-medium text-neutral-900">{session.title || `Session ${idx + 1}`}</div>
+                                <div className="text-neutral-500 mt-0.5">
+                                  <span className="inline-block bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded text-xs mr-1.5">{sessionType}</span>
+                                  <span>{sessionTimeRange.primary}</span>
+                                  <span className="ml-1">•</span>
+                                  <span className="ml-1">{formatDuration(sessionDuration)}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
 
-                          const sessionTimeRange = formatSessionTimeRange(
-                            nextSession.start_time,
-                            nextSession.end_time,
-                            ev.timezone
-                          );
-
-                          return (
-                            <>
-                              {/* Primary: Organizer Time */}
-                              <span className="block text-xs font-medium text-neutral-900" style={{ lineHeight: 1.4 }}>
-                                {sessionTimeRange.primary}
-                              </span>
-
-                              {/* Secondary: Your Time */}
-                              {sessionTimeRange.secondary && (
-                                <span className="block mt-1 text-xs text-neutral-600">
-                                  <span className="font-semibold text-teal-700">Your Time:</span>{" "}
-                                  {sessionTimeRange.secondary.label.replace('Your Time: ', '')}
-                                  <span className="text-neutral-400 ml-1">({sessionTimeRange.secondary.timezone})</span>
-                                </span>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    );
-                  }
-
-                  // Single-day events
-                  return (
-                    <>
+            // Single-day events
+            return (
+              <div>
+                <div className="flex items-center gap-6">
+                  <span className="inline-flex items-center gap-2">
+                    <CalendarMonthIcon fontSize="small" className="text-teal-700" />
+                    {dayjs(ev.start).format("MMMM D, YYYY")}
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <AccessTimeIcon fontSize="small" className="text-teal-700" />
+                    <span>
                       {/* Primary: Organizer Time + Location (for single-day) */}
                       <span className="block font-medium text-neutral-900">
                         {orgDateStr} {orgTimeRangeKey} • {ev.location || "Virtual"}
@@ -501,12 +583,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           <span className="text-neutral-400 ml-1">({userTimezoneName})</span>
                         </span>
                       )}
-                    </>
-                  );
-                })()}
-              </span>
-            </span>
-          </div>
+                    </span>
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {ev.location && (
             <div className="flex items-center gap-2">
