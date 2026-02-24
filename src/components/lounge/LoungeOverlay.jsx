@@ -41,6 +41,10 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
     const [lateJoiners, setLateJoiners] = useState([]);
     const [isWaitingForAssignment, setIsWaitingForAssignment] = useState(false);
     const [waitingJoinedAt, setWaitingJoinedAt] = useState(null);
+    const [prevLoungeStatus, setPrevLoungeStatus] = useState(null);
+    const [showLoungeClosed, setShowLoungeClosed] = useState(false);
+    const [isRemoving, setIsRemoving] = useState(false);
+    const [countdownSeconds, setCountdownSeconds] = useState(10);
     const socketRef = useRef(null);
 
     useEffect(() => {
@@ -131,6 +135,79 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
             return () => clearInterval(interval);
         }
     }, [open, fetchLoungeState]);
+
+    // ✅ NEW: Handle lounge closure - when status changes from OPEN to CLOSED
+    useEffect(() => {
+        if (!loungeOpenStatus || isAdmin) return; // Don't show for admin/host
+
+        const currentStatus = loungeOpenStatus.status;
+
+        // Detect transition from OPEN to CLOSED
+        if (prevLoungeStatus === 'OPEN' && currentStatus === 'CLOSED') {
+            console.log("[Lounge] 🚨 Lounge status changed from OPEN to CLOSED");
+            setShowLoungeClosed(true);
+
+            // Auto-leave the lounge table if user is at one
+            handleAutoLeaveLounge();
+        }
+
+        // Update previous status for next comparison
+        setPrevLoungeStatus(currentStatus);
+    }, [loungeOpenStatus?.status, isAdmin]);
+
+    // ✅ NEW: Function to auto-leave lounge when closed
+    const handleAutoLeaveLounge = useCallback(async () => {
+        if (isRemoving || !eventId) return;
+
+        setIsRemoving(true);
+        try {
+            const url = `${API_RAW}/events/${eventId}/lounge-leave-table/`.replace(/([^:]\/)\/+/g, "$1");
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (res.ok) {
+                console.log("[Lounge] ✅ Successfully removed from lounge table");
+                // Refresh table state
+                await fetchLoungeState();
+            } else {
+                console.warn("[Lounge] Failed to leave table:", res.status);
+            }
+        } catch (err) {
+            console.error("[Lounge] Error leaving lounge table:", err);
+        } finally {
+            setIsRemoving(false);
+        }
+    }, [eventId, isRemoving, fetchLoungeState]);
+
+    // ✅ NEW: Auto-redirect countdown timer (10 seconds)
+    useEffect(() => {
+        if (!showLoungeClosed) return;
+
+        // Reset countdown when dialog opens
+        setCountdownSeconds(10);
+
+        const timer = setInterval(() => {
+            setCountdownSeconds((prev) => {
+                if (prev <= 1) {
+                    console.log("[Lounge] Countdown expired, auto-redirecting to main room");
+                    // Auto-close and redirect
+                    setShowLoungeClosed(false);
+                    if (onJoinMain) {
+                        onJoinMain();
+                    }
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [showLoungeClosed, onJoinMain]);
 
     useEffect(() => {
         if (!createIconFile) {
@@ -1159,6 +1236,142 @@ const LoungeOverlay = ({ open, onClose, eventId, currentUserId, isAdmin, onEnter
                         sx={{ textTransform: "none" }}
                     >
                         {deleteSaving ? "Deleting..." : "Delete"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ✅ NEW: Lounge Closed Dialog - Shows when lounge is closed and user is removed */}
+            <Dialog
+                open={showLoungeClosed}
+                onClose={() => {
+                    setShowLoungeClosed(false);
+                    onJoinMain && onJoinMain();
+                }}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: "#0b1628",
+                        backgroundImage: "linear-gradient(135deg, rgba(239,68,68,0.05) 0%, rgba(239,68,68,0.02) 100%)",
+                        color: "#fff",
+                        borderRadius: 2,
+                        border: "1px solid rgba(239,68,68,0.2)",
+                    }
+                }}
+            >
+                <DialogContent sx={{ pt: 3, pb: 2, px: 3 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 2 }}>
+                        {/* Alert Icon */}
+                        <Box sx={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: "50%",
+                            bgcolor: "rgba(239,68,68,0.1)",
+                            border: "2px solid rgba(239,68,68,0.3)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 28
+                        }}>
+                            ⚠️
+                        </Box>
+
+                        {/* Title */}
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: "#fff", mb: 0.5 }}>
+                            Lounge Closed
+                        </Typography>
+
+                        {/* Message */}
+                        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 1 }}>
+                            The host has closed the social lounge for now.
+                        </Typography>
+
+                        {/* Info */}
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mb: 2 }}>
+                            You have been moved back to the main room. The lounge will reopen when the host enables it again.
+                        </Typography>
+
+                        {/* Countdown Timer Box */}
+                        <Box sx={{
+                            width: "100%",
+                            py: 2.5,
+                            px: 2,
+                            bgcolor: "rgba(59,130,246,0.1)",
+                            border: "2px solid rgba(59,130,246,0.3)",
+                            borderRadius: 2,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: 1
+                        }}>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                                Auto-redirecting in
+                            </Typography>
+                            <Box sx={{
+                                width: 80,
+                                height: 80,
+                                borderRadius: "50%",
+                                bgcolor: "rgba(59,130,246,0.2)",
+                                border: "3px solid #3b82f6",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                position: "relative"
+                            }}>
+                                <Typography sx={{
+                                    fontSize: 32,
+                                    fontWeight: 700,
+                                    color: "#3b82f6",
+                                    textAlign: "center"
+                                }}>
+                                    {countdownSeconds}
+                                </Typography>
+                            </Box>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                                seconds
+                            </Typography>
+                        </Box>
+
+                        {/* Loading State */}
+                        {isRemoving && (
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, mt: 1, pt: 1, borderTop: "1px solid rgba(255,255,255,0.1)", width: "100%" }}>
+                                <CircularProgress size={16} sx={{ color: "#60a5fa" }} />
+                                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                                    Moving you back...
+                                </Typography>
+                            </Box>
+                        )}
+                    </Box>
+                </DialogContent>
+
+                <DialogActions sx={{ px: 3, pb: 3, pt: 2, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                    <Button
+                        onClick={() => {
+                            setShowLoungeClosed(false);
+                            setCountdownSeconds(10); // Reset countdown
+                            onJoinMain && onJoinMain();
+                        }}
+                        variant="contained"
+                        fullWidth
+                        disabled={isRemoving}
+                        sx={{
+                            bgcolor: "#3b82f6",
+                            color: "#fff",
+                            textTransform: "none",
+                            fontWeight: 600,
+                            py: 1.2,
+                            borderRadius: 1.5,
+                            fontSize: "0.95rem",
+                            "&:hover": {
+                                bgcolor: "#2563eb"
+                            },
+                            "&:disabled": {
+                                bgcolor: "rgba(59,130,246,0.5)",
+                                color: "rgba(255,255,255,0.5)"
+                            }
+                        }}
+                    >
+                        {isRemoving ? "Processing..." : `Return to Main Room (${countdownSeconds}s)`}
                     </Button>
                 </DialogActions>
             </Dialog>
