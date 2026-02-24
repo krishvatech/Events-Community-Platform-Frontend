@@ -91,7 +91,10 @@ export default function SpeedNetworkingMatch({
             setVideoError(null);
         } else {
             console.error("Missing Dyte Token for match:", match);
-            setVideoError("Video connection unavailable (Server Error)");
+            const errorMessage = match?.dyte_error
+                ? `Video connection failed: ${match.dyte_error}`
+                : "Video connection unavailable (Server Error)";
+            setVideoError(errorMessage);
         }
     }, [match, initMeeting]);
 
