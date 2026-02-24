@@ -2400,6 +2400,7 @@ export default function NewLiveMeeting() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingId, setRecordingId] = useState("");
   const [isRecordingPaused, setIsRecordingPaused] = useState(false);
+  const [autoRecordOnAdmitEnabled, setAutoRecordOnAdmitEnabled] = useState(true);
   const [recordingAnchorEl, setRecordingAnchorEl] = useState(null);
   const [cancelRecordingOpen, setCancelRecordingOpen] = useState(false);
   const [isCancellingRecording, setIsCancellingRecording] = useState(false);
@@ -3993,6 +3994,17 @@ export default function NewLiveMeeting() {
     }
   }, [eventId, showSnackbar]);
 
+  const maybeAutoStartRecordingOnAdmit = useCallback(
+    async (admittedCount) => {
+      const parsedAdmittedCount = Number(admittedCount || 0);
+      if (!autoRecordOnAdmitEnabled) return;
+      if (isRecording) return;
+      if (parsedAdmittedCount <= 0) return;
+      await handleStartRecording();
+    },
+    [autoRecordOnAdmitEnabled, isRecording, handleStartRecording]
+  );
+
   // Break Mode API Callbacks
   const handleStartBreak = useCallback(async (durationSeconds) => {
     if (!eventId) return;
@@ -5362,16 +5374,17 @@ export default function NewLiveMeeting() {
         headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ admit_all: true }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        showSnackbar(err?.detail || "Failed to admit waiting participants", "error");
+        showSnackbar(data?.detail || "Failed to admit waiting participants", "error");
         return;
       }
       showSnackbar("Admitted all waiting participants", "success");
+      await maybeAutoStartRecordingOnAdmit(data?.admitted);
     } catch (e) {
       showSnackbar("Failed to admit waiting participants", "error");
     }
-  }, [eventId, showSnackbar]);
+  }, [eventId, showSnackbar, maybeAutoStartRecordingOnAdmit]);
 
   const admitWaitingUser = useCallback(
     async (userId) => {
@@ -5382,17 +5395,18 @@ export default function NewLiveMeeting() {
           headers: { "Content-Type": "application/json", ...authHeader() },
           body: JSON.stringify({ user_id: userId }),
         });
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          showSnackbar(err?.detail || "Failed to admit participant", "error");
+          showSnackbar(data?.detail || "Failed to admit participant", "error");
           return;
         }
         showSnackbar("Participant admitted", "success");
+        await maybeAutoStartRecordingOnAdmit(data?.admitted);
       } catch {
         showSnackbar("Failed to admit participant", "error");
       }
     },
-    [eventId, showSnackbar]
+    [eventId, showSnackbar, maybeAutoStartRecordingOnAdmit]
   );
 
   const rejectWaitingUser = useCallback(
@@ -11914,6 +11928,18 @@ export default function NewLiveMeeting() {
 
                       {/* Global Waiting Room Actions */}
                       {filteredWaitingRoomCount > 0 && (
+                        <>
+                          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
+                            <Switch
+                              size="small"
+                              checked={autoRecordOnAdmitEnabled}
+                              onChange={(e) => setAutoRecordOnAdmitEnabled(e.target.checked)}
+                            />
+                            <Typography sx={{ fontSize: 11, opacity: 0.85 }}>
+                              Auto-start recording when admitting
+                            </Typography>
+                          </Stack>
+
                         <Stack direction="row" spacing={1} sx={{ mb: 1.5, gap: 0.75, flexWrap: 'wrap' }}>
                           <Button
                             size="small"
@@ -11964,6 +11990,7 @@ export default function NewLiveMeeting() {
                             Announce
                           </Button>
                         </Stack>
+                        </>
                       )}
 
                       {/* ✅ NEW: Sent Announcements Panel (Host Management) */}
