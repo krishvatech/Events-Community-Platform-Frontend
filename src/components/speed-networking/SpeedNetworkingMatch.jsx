@@ -7,6 +7,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CloseIcon from '@mui/icons-material/Close';
 import { useDyteClient, DyteProvider } from '@dytesdk/react-web-core';
 import { DyteMeeting } from '@dytesdk/react-ui-kit';
+import InterestDisplay from './InterestDisplay';
 
 // Style to ensure Dyte UI controls don't overflow and Chat is always visible
 const dyteStyles = `
@@ -494,6 +495,11 @@ function PartnerProfileSidebar({ partner, match, onMemberInfo, showBreakdown, se
             </Box>
 
             <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+
+            {/* Partner's Interests */}
+            {partner?.interests && partner.interests.length > 0 && (
+                <InterestDisplay interests={partner.interests} title="Their Interests" />
+            )}
 
             {/* Match Probability */}
             {match?.match_probability != null && (

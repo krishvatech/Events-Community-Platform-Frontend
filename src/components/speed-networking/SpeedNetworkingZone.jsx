@@ -5,6 +5,7 @@ import SpeedNetworkingTransition from './SpeedNetworkingTransition';
 import SpeedNetworkingLobby from './SpeedNetworkingLobby';
 import SpeedNetworkingControls from './SpeedNetworkingControls';
 import SpeedNetworkingHostPanel from './SpeedNetworkingHostPanel';
+import InterestSelector from './InterestSelector';
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
@@ -48,6 +49,7 @@ export default function SpeedNetworkingZone({
     const [inQueue, setInQueue] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showInterestSelector, setShowInterestSelector] = useState(false);
 
     // Helper to normalize speed networking user shape to member info shape
     const buildMemberObj = (user) => {
@@ -336,8 +338,8 @@ export default function SpeedNetworkingZone({
         }
     }, [eventId, onEnterMatch, session]);
 
-    // Join queue
-    const handleJoinQueue = async () => {
+    // Join queue with interests
+    const handleJoinQueueWithInterests = async (interestIds) => {
         if (!session) return;
 
         try {
@@ -345,7 +347,8 @@ export default function SpeedNetworkingZone({
             const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/join/`.replace(/([^:]\/)\/+/g, "$1");
             const res = await fetch(url, {
                 method: 'POST',
-                headers: { ...authHeader(), 'Content-Type': 'application/json' }
+                headers: { ...authHeader(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interest_ids: interestIds })
             });
 
             const data = await res.json();
@@ -377,6 +380,12 @@ export default function SpeedNetworkingZone({
             setError(err.message);
             setLoading(false);
         }
+    };
+
+    // Show interest selector before joining queue
+    const handleJoinQueue = () => {
+        if (!session) return;
+        setShowInterestSelector(true);
     };
 
     // Leave queue
@@ -762,6 +771,15 @@ export default function SpeedNetworkingZone({
                     )}
                 </Box>
             )}
+
+            {/* Interest Selector Dialog */}
+            <InterestSelector
+                eventId={eventId}
+                sessionId={session?.id}
+                open={showInterestSelector}
+                onClose={() => setShowInterestSelector(false)}
+                onSelectInterests={handleJoinQueueWithInterests}
+            />
         </Box>
     );
 }

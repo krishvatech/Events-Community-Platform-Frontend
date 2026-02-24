@@ -24,7 +24,15 @@ import {
     CardContent,
     Alert,
     Autocomplete,
-    TextField
+    TextField,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Stepper,
+    Step,
+    StepLabel,
+    Stack
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -33,6 +41,9 @@ import PersonIcon from '@mui/icons-material/Person';
 import GroupIcon from '@mui/icons-material/Group';
 import TuneIcon from '@mui/icons-material/Tune';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import InterestTagManager from './InterestTagManager';
+import InterestCriteriaConfig from './InterestCriteriaConfig';
+import CollapsibleMatchingCriteria from './CollapsibleMatchingCriteria';
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
@@ -66,6 +77,11 @@ export default function SpeedNetworkingHostPanel({
     const [testUserBId, setTestUserBId] = useState(null);
     const [testMatchResult, setTestMatchResult] = useState(null);
     const [testingMatch, setTestingMatch] = useState(false);
+
+    // Setup Wizard states
+    const [wizardOpen, setWizardOpen] = useState(false);
+    const [wizardStep, setWizardStep] = useState(0);
+    const [tempCriteriaConfig, setTempCriteriaConfig] = useState(null);
 
     const mergePastMatches = (incoming, previous = []) => {
         const map = new Map();
@@ -317,6 +333,60 @@ export default function SpeedNetworkingHostPanel({
         } finally {
             setTestingMatch(false);
         }
+    };
+
+    // Setup Wizard Handlers
+    const openWizard = () => {
+        setTempCriteriaConfig(criteriaConfig ? { ...criteriaConfig } : {});
+        setWizardStep(0);
+        setWizardOpen(true);
+    };
+
+    const closeWizard = () => {
+        setWizardOpen(false);
+        setWizardStep(0);
+        setTempCriteriaConfig(null);
+    };
+
+    const handleWizardNext = () => {
+        if (wizardStep < 2) {
+            setWizardStep(wizardStep + 1);
+        }
+    };
+
+    const handleWizardBack = () => {
+        if (wizardStep > 0) {
+            setWizardStep(wizardStep - 1);
+        }
+    };
+
+    const handleWizardFinish = async () => {
+        // Save the temp criteria config
+        if (tempCriteriaConfig) {
+            setCriteriaConfig(tempCriteriaConfig);
+            // Save to backend
+            try {
+                setSavingCriteria(true);
+                const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/update_criteria/`.replace(/([^:]\/)\/+/g, "$1");
+                const res = await fetch(url, {
+                    method: 'PATCH',
+                    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ criteria_config: tempCriteriaConfig })
+                });
+                if (res.ok) {
+                    console.log('[HostPanel] Wizard criteria saved successfully');
+                    await fetchMatchPreview();
+                } else {
+                    const errorData = await res.json();
+                    console.error('[HostPanel] Failed to save wizard criteria:', errorData);
+                }
+            } catch (err) {
+                console.error('[HostPanel] Error saving wizard criteria:', err);
+            } finally {
+                setSavingCriteria(false);
+            }
+        }
+        closeWizard();
     };
 
     // Load criteria config when tab changes to settings
@@ -1074,358 +1144,168 @@ export default function SpeedNetworkingHostPanel({
                             {/* Settings Tab */}
                             {selectedTab === 'settings' && (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    {/* Criteria Config Cards */}
+                                    {/* Interest Tags Manager */}
+                                    <InterestTagManager
+                                        eventId={eventId}
+                                        sessionId={session?.id}
+                                        session={session}
+                                    />
+
+                                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+
+                                    {/* Collapsible Matching Criteria Component */}
                                     {criteriaConfig && (
-                                        <>
-                                            {/* Section Title */}
+                                        <CollapsibleMatchingCriteria
+                                            config={criteriaConfig}
+                                            onUpdate={(newConfig) => {
+                                                setCriteriaConfig(newConfig);
+                                                handleSaveCriteria(newConfig);
+                                            }}
+                                            onOpenInterestManager={() => {
+                                                // You can add a ref to InterestTagManager or trigger it via a state
+                                                // For now, this will be a callback placeholder
+                                                console.log('Open Interest Manager');
+                                            }}
+                                        />
+                                    )}
+
+                                    {/* Additional Factors Section */}
+                                    {criteriaConfig && (
+                                        <Box sx={{
+                                            mt: 3,
+                                            pt: 2,
+                                            borderTop: '1px solid rgba(255,255,255,0.1)'
+                                        }}>
                                             <Typography sx={{
                                                 color: '#fff',
                                                 fontWeight: 600,
                                                 fontSize: 13,
-                                                mt: 1,
+                                                mb: 2,
                                                 textTransform: 'uppercase',
                                                 letterSpacing: 0.5
                                             }}>
-                                                Matching Criteria
+                                                Advanced Settings
                                             </Typography>
 
-                                            {['skill', 'experience', 'location', 'education'].map((criterion) => {
-                                                const config = criteriaConfig[criterion];
-                                                if (!config) return null;
-
-                                                const matchTypeOptions = {
-                                                    skill: ['Complementary', 'Similar'],
-                                                    experience: ['Peer', 'Mentorship', 'Mixed'],
-                                                    location: ['Exact City', 'Radius', 'Timezone'],
-                                                    education: ['Same Level', 'Complementary Fields', 'Hierarchical']
-                                                };
-
-                                                const matchTypeKeyMap = {
-                                                    skill: { 'Complementary': 'complementary', 'Similar': 'similar' },
-                                                    experience: { 'Peer': 'peer', 'Mentorship': 'mentorship', 'Mixed': 'mixed' },
-                                                    location: { 'Exact City': 'exact_city', 'Radius': 'radius', 'Timezone': 'timezone' },
-                                                    education: { 'Same Level': 'same_level', 'Complementary Fields': 'complementary_fields', 'Hierarchical': 'hierarchical' }
-                                                };
-
-                                                const reverseMapKey = {
-                                                    skill: { 'complementary': 'Complementary', 'similar': 'Similar' },
-                                                    experience: { 'peer': 'Peer', 'mentorship': 'Mentorship', 'mixed': 'Mixed' },
-                                                    location: { 'exact_city': 'Exact City', 'radius': 'Radius', 'timezone': 'Timezone' },
-                                                    education: { 'same_level': 'Same Level', 'complementary_fields': 'Complementary Fields', 'hierarchical': 'Hierarchical' }
-                                                };
-
-                                                return (
-                                                    <Card key={criterion} sx={{
-                                                        bgcolor: 'rgba(255,255,255,0.05)',
-                                                        borderRadius: 2,
-                                                        border: '1px solid rgba(255,255,255,0.1)'
-                                                    }}>
-                                                        <CardContent>
-                                                            <Box sx={{
-                                                                display: 'flex',
-                                                                justifyContent: 'space-between',
-                                                                alignItems: 'center',
-                                                                mb: 2
-                                                            }}>
-                                                                <Typography sx={{
-                                                                    color: '#fff',
-                                                                    fontWeight: 600,
-                                                                    fontSize: 14,
-                                                                    textTransform: 'capitalize'
-                                                                }}>
-                                                                    {criterion}
-                                                                </Typography>
-                                                                <FormControlLabel
-                                                                    control={
-                                                                        <Switch
-                                                                            checked={config.enabled || false}
-                                                                            onChange={(e) => {
-                                                                                const newConfig = { ...criteriaConfig };
-                                                                                newConfig[criterion].enabled = e.target.checked;
-                                                                                setCriteriaConfig(newConfig);
-                                                                            }}
-                                                                            size="small"
-                                                                        />
-                                                                    }
-                                                                    label={config.enabled ? 'Enabled' : 'Disabled'}
-                                                                    sx={{ color: 'rgba(255,255,255,0.7)', mr: 0 }}
-                                                                />
-                                                            </Box>
-
-                                                            {config.enabled && (
-                                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                                    {/* Weight Slider */}
-                                                                    <Box>
-                                                                        <Box sx={{
-                                                                            display: 'flex',
-                                                                            justifyContent: 'space-between',
-                                                                            mb: 1
-                                                                        }}>
-                                                                            <Typography sx={{
-                                                                                color: 'rgba(255,255,255,0.7)',
-                                                                                fontSize: 12
-                                                                            }}>
-                                                                                Weight
-                                                                            </Typography>
-                                                                            <Typography sx={{
-                                                                                color: '#fff',
-                                                                                fontSize: 12,
-                                                                                fontWeight: 500
-                                                                            }}>
-                                                                                {Math.round((config.weight || 0) * 100)}%
-                                                                            </Typography>
-                                                                        </Box>
-                                                                        <Slider
-                                                                            value={(config.weight || 0) * 100}
-                                                                            onChange={(e, newValue) => {
-                                                                                const newConfig = { ...criteriaConfig };
-                                                                                newConfig[criterion].weight = newValue / 100;
-                                                                                setCriteriaConfig(newConfig);
-                                                                            }}
-                                                                            min={0}
-                                                                            max={100}
-                                                                            step={5}
-                                                                            sx={{
-                                                                                color: '#5a78ff',
-                                                                                '& .MuiSlider-track': { bgcolor: '#5a78ff' }
-                                                                            }}
-                                                                        />
-                                                                    </Box>
-
-                                                                    {/* Required Switch */}
-                                                                    <FormControlLabel
-                                                                        control={
-                                                                            <Switch
-                                                                                checked={config.required || false}
-                                                                                onChange={(e) => {
-                                                                                    const newConfig = { ...criteriaConfig };
-                                                                                    newConfig[criterion].required = e.target.checked;
-                                                                                    setCriteriaConfig(newConfig);
-                                                                                }}
-                                                                                size="small"
-                                                                            />
-                                                                        }
-                                                                        label="Required"
-                                                                        sx={{ color: 'rgba(255,255,255,0.7)' }}
-                                                                    />
-
-                                                                    {/* Threshold Slider (only if required) */}
-                                                                    {config.required && (
-                                                                        <Box>
-                                                                            <Box sx={{
-                                                                                display: 'flex',
-                                                                                justifyContent: 'space-between',
-                                                                                mb: 1
-                                                                            }}>
-                                                                                <Typography sx={{
-                                                                                    color: 'rgba(255,255,255,0.7)',
-                                                                                    fontSize: 12
-                                                                                }}>
-                                                                                    Threshold
-                                                                                </Typography>
-                                                                                <Typography sx={{
-                                                                                    color: '#fff',
-                                                                                    fontSize: 12,
-                                                                                    fontWeight: 500
-                                                                                }}>
-                                                                                    {config.threshold || 40}%
-                                                                                </Typography>
-                                                                            </Box>
-                                                                            <Slider
-                                                                                value={config.threshold || 40}
-                                                                                onChange={(e, newValue) => {
-                                                                                    const newConfig = { ...criteriaConfig };
-                                                                                    newConfig[criterion].threshold = newValue;
-                                                                                    setCriteriaConfig(newConfig);
-                                                                                }}
-                                                                                min={0}
-                                                                                max={100}
-                                                                                step={5}
-                                                                                sx={{
-                                                                                    color: '#22c55e',
-                                                                                    '& .MuiSlider-track': { bgcolor: '#22c55e' }
-                                                                                }}
-                                                                            />
-                                                                        </Box>
-                                                                    )}
-
-                                                                    {/* Match Type Selector */}
-                                                                    <FormControl fullWidth size="small">
-                                                                        <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                                                                            {criterion === 'skill' ? 'Match Mode' : 'Match Type'}
-                                                                        </InputLabel>
-                                                                        <Select
-                                                                            value={reverseMapKey[criterion]?.[config.match_mode || config.match_type || config.match_strategy] || ''}
-                                                                            onChange={(e) => {
-                                                                                const newConfig = { ...criteriaConfig };
-                                                                                const keyName =
-                                                                                    criterion === 'skill' ? 'match_mode' :
-                                                                                    criterion === 'experience' ? 'match_type' :
-                                                                                    criterion === 'location' ? 'match_strategy' :
-                                                                                    'match_type';
-                                                                                newConfig[criterion][keyName] = matchTypeKeyMap[criterion][e.target.value];
-                                                                                setCriteriaConfig(newConfig);
-                                                                            }}
-                                                                            label={criterion === 'skill' ? 'Match Mode' : 'Match Type'}
-                                                                            sx={{
-                                                                                color: '#fff',
-                                                                                '& .MuiOutlinedInput-notchedOutline': {
-                                                                                    borderColor: 'rgba(255,255,255,0.2)'
-                                                                                },
-                                                                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                                                    borderColor: 'rgba(255,255,255,0.3)'
-                                                                                }
-                                                                            }}
-                                                                        >
-                                                                            {matchTypeOptions[criterion]?.map(opt => (
-                                                                                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-                                                                            ))}
-                                                                        </Select>
-                                                                    </FormControl>
-                                                                </Box>
-                                                            )}
-                                                        </CardContent>
-                                                    </Card>
-                                                );
-                                            })}
-
-                                            {/* Additional Factors Section */}
-                                            <Box sx={{
-                                                mt: 3,
-                                                pt: 2,
-                                                borderTop: '1px solid rgba(255,255,255,0.1)'
+                                            <Alert severity="info" sx={{
+                                                bgcolor: 'rgba(59,130,246,0.1)',
+                                                borderColor: 'rgba(59,130,246,0.3)',
+                                                mb: 2
                                             }}>
-                                                <Typography sx={{
-                                                    color: '#fff',
-                                                    fontWeight: 600,
-                                                    fontSize: 13,
-                                                    mb: 2,
-                                                    textTransform: 'uppercase',
-                                                    letterSpacing: 0.5
-                                                }}>
-                                                    Advanced Settings
+                                                <Typography sx={{ fontSize: 12, color: '#fff' }}>
+                                                    💡 Fine-tune advanced matching parameters to optimize match quality
                                                 </Typography>
+                                            </Alert>
 
-                                                <Alert severity="info" sx={{
-                                                    bgcolor: 'rgba(59,130,246,0.1)',
-                                                    borderColor: 'rgba(59,130,246,0.3)',
-                                                    mb: 2
-                                                }}>
-                                                    <Typography sx={{ fontSize: 12, color: '#fff' }}>
-                                                        💡 Fine-tune advanced matching parameters to optimize match quality
-                                                    </Typography>
-                                                </Alert>
-
-                                                {/* Serendipity/Luck Factor */}
-                                                <Card sx={{
-                                                    bgcolor: 'rgba(255,255,255,0.05)',
-                                                    borderRadius: 2,
-                                                    border: '1px solid rgba(255,255,255,0.1)',
-                                                    mb: 1.5
-                                                }}>
-                                                    <CardContent>
+                                            {/* Serendipity/Luck Factor */}
+                                            <Card sx={{
+                                                bgcolor: 'rgba(255,255,255,0.05)',
+                                                borderRadius: 2,
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                mb: 1.5
+                                            }}>
+                                                <CardContent>
+                                                    <Box sx={{
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        mb: 2
+                                                    }}>
+                                                        <Typography sx={{
+                                                            color: '#fff',
+                                                            fontWeight: 600,
+                                                            fontSize: 14
+                                                        }}>
+                                                            Serendipity Factor
+                                                        </Typography>
+                                                        <Tooltip title="Add randomness to encourage surprising connections">
+                                                            <Typography sx={{
+                                                                color: 'rgba(255,255,255,0.5)',
+                                                                fontSize: 11
+                                                            }}>
+                                                                ?
+                                                            </Typography>
+                                                        </Tooltip>
+                                                    </Box>
+                                                    <Box>
                                                         <Box sx={{
                                                             display: 'flex',
                                                             justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                            mb: 2
+                                                            mb: 1
                                                         }}>
                                                             <Typography sx={{
-                                                                color: '#fff',
-                                                                fontWeight: 600,
-                                                                fontSize: 14
+                                                                color: 'rgba(255,255,255,0.7)',
+                                                                fontSize: 12
                                                             }}>
-                                                                Serendipity Factor
+                                                                Random Element Weight
                                                             </Typography>
-                                                            <Tooltip title="Add randomness to encourage surprising connections">
-                                                                <Typography sx={{
-                                                                    color: 'rgba(255,255,255,0.5)',
-                                                                    fontSize: 11
-                                                                }}>
-                                                                    ?
-                                                                </Typography>
-                                                            </Tooltip>
-                                                        </Box>
-                                                        <Box>
-                                                            <Box sx={{
-                                                                display: 'flex',
-                                                                justifyContent: 'space-between',
-                                                                mb: 1
+                                                            <Typography sx={{
+                                                                color: '#fff',
+                                                                fontSize: 12,
+                                                                fontWeight: 500
                                                             }}>
-                                                                <Typography sx={{
-                                                                    color: 'rgba(255,255,255,0.7)',
-                                                                    fontSize: 12
-                                                                }}>
-                                                                    Random Element Weight
-                                                                </Typography>
-                                                                <Typography sx={{
-                                                                    color: '#fff',
-                                                                    fontSize: 12,
-                                                                    fontWeight: 500
-                                                                }}>
-                                                                    {Math.round((criteriaConfig?.random_factor || 0) * 100)}%
-                                                                </Typography>
-                                                            </Box>
-                                                            <Slider
-                                                                value={(criteriaConfig?.random_factor || 0) * 100}
-                                                                onChange={(e, newValue) => {
+                                                                {Math.round((criteriaConfig?.random_factor || 0) * 100)}%
+                                                            </Typography>
+                                                        </Box>
+                                                        <Slider
+                                                            value={(criteriaConfig?.random_factor || 0) * 100}
+                                                            onChange={(e, newValue) => {
+                                                                const newConfig = { ...criteriaConfig };
+                                                                newConfig.random_factor = newValue / 100;
+                                                                setCriteriaConfig(newConfig);
+                                                            }}
+                                                            min={0}
+                                                            max={30}
+                                                            step={1}
+                                                            sx={{
+                                                                color: '#f59e0b',
+                                                                '& .MuiSlider-track': { bgcolor: '#f59e0b' }
+                                                            }}
+                                                        />
+                                                        <Typography sx={{
+                                                            color: 'rgba(255,255,255,0.5)',
+                                                            fontSize: 11,
+                                                            mt: 1
+                                                        }}>
+                                                            Recommended: 5-15% for organic matching
+                                                        </Typography>
+                                                    </Box>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Matching Recency Preference */}
+                                            <Card sx={{
+                                                bgcolor: 'rgba(255,255,255,0.05)',
+                                                borderRadius: 2,
+                                                border: '1px solid rgba(255,255,255,0.1)'
+                                            }}>
+                                                <CardContent>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Switch
+                                                                checked={criteriaConfig?.prefer_new_users !== false}
+                                                                onChange={(e) => {
                                                                     const newConfig = { ...criteriaConfig };
-                                                                    newConfig.random_factor = newValue / 100;
+                                                                    newConfig.prefer_new_users = e.target.checked;
                                                                     setCriteriaConfig(newConfig);
                                                                 }}
-                                                                min={0}
-                                                                max={30}
-                                                                step={1}
-                                                                sx={{
-                                                                    color: '#f59e0b',
-                                                                    '& .MuiSlider-track': { bgcolor: '#f59e0b' }
-                                                                }}
+                                                                size="small"
                                                             />
-                                                            <Typography sx={{
-                                                                color: 'rgba(255,255,255,0.5)',
-                                                                fontSize: 11,
-                                                                mt: 1
-                                                            }}>
-                                                                Recommended: 5-15% for organic matching
-                                                            </Typography>
-                                                        </Box>
-                                                    </CardContent>
-                                                </Card>
-
-                                                {/* Matching Recency Preference */}
-                                                <Card sx={{
-                                                    bgcolor: 'rgba(255,255,255,0.05)',
-                                                    borderRadius: 2,
-                                                    border: '1px solid rgba(255,255,255,0.1)'
-                                                }}>
-                                                    <CardContent>
-                                                        <FormControlLabel
-                                                            control={
-                                                                <Switch
-                                                                    checked={criteriaConfig?.prefer_new_users !== false}
-                                                                    onChange={(e) => {
-                                                                        const newConfig = { ...criteriaConfig };
-                                                                        newConfig.prefer_new_users = e.target.checked;
-                                                                        setCriteriaConfig(newConfig);
-                                                                    }}
-                                                                    size="small"
-                                                                />
-                                                            }
-                                                            label={
-                                                                <Box>
-                                                                    <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>
-                                                                        Prioritize New Users
-                                                                    </Typography>
-                                                                    <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
-                                                                        Match users who recently joined first
-                                                                    </Typography>
-                                                                </Box>
-                                                            }
-                                                            sx={{ color: 'rgba(255,255,255,0.7)', width: '100%' }}
-                                                        />
-                                                    </CardContent>
-                                                </Card>
-                                            </Box>
+                                                        }
+                                                        label={
+                                                            <Box>
+                                                                <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>
+                                                                    Prioritize New Users
+                                                                </Typography>
+                                                                <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+                                                                    Match users who recently joined first
+                                                                </Typography>
+                                                            </Box>
+                                                        }
+                                                        sx={{ color: 'rgba(255,255,255,0.7)', width: '100%' }}
+                                                    />
+                                                </CardContent>
+                                            </Card>
 
                                             {/* Normalize and Save Buttons */}
                                             <Box sx={{ display: 'flex', gap: 1 }}>
@@ -1649,7 +1529,7 @@ export default function SpeedNetworkingHostPanel({
                                                     </CardContent>
                                                 </Card>
                                             )}
-                                        </>
+                                        </Box>
                                     )}
                                 </Box>
                             )}
@@ -1657,6 +1537,402 @@ export default function SpeedNetworkingHostPanel({
                     )}
                 </>
             )}
+
+            {/* Setup Wizard Dialog */}
+            <Dialog
+                open={wizardOpen}
+                onClose={closeWizard}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: '#1f2937',
+                        border: '1px solid rgba(255,255,255,0.1)'
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: '#fff', fontWeight: 700, fontSize: 18 }}>
+                    Setup Wizard
+                </DialogTitle>
+
+                <DialogContent sx={{ color: '#fff', pt: 2 }}>
+                    {/* Stepper */}
+                    <Stepper activeStep={wizardStep} sx={{ mb: 3, '& .MuiStepLabel-label': { color: 'rgba(255,255,255,0.7)' }, '& .MuiStepLabel-label.Mui-active': { color: '#fff' } }}>
+                        <Step>
+                            <StepLabel>Interest Tags</StepLabel>
+                        </Step>
+                        <Step>
+                            <StepLabel>Matching Criteria</StepLabel>
+                        </Step>
+                        <Step>
+                            <StepLabel>Review & Finish</StepLabel>
+                        </Step>
+                    </Stepper>
+
+                    {/* Step 1: Interest Tags Management */}
+                    {wizardStep === 0 && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, mb: 1 }}>
+                                Create and manage interest tags for this session. These tags help participants indicate their goals and interests.
+                            </Typography>
+                            <InterestTagManager
+                                eventId={eventId}
+                                sessionId={session?.id}
+                                session={session}
+                            />
+                        </Box>
+                    )}
+
+                    {/* Step 2: Matching Criteria Configuration */}
+                    {wizardStep === 1 && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, mb: 1 }}>
+                                Configure matching criteria. Enable/disable criteria and adjust weights to fine-tune the matching algorithm.
+                            </Typography>
+
+                            {tempCriteriaConfig && (
+                                <>
+                                    {/* Skill Matching */}
+                                    {tempCriteriaConfig.skill && (
+                                        <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            <CardContent>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'white', flex: 1 }}>
+                                                        🎯 Skill Matching
+                                                    </Typography>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Switch
+                                                                checked={tempCriteriaConfig.skill?.enabled || false}
+                                                                onChange={(e) => {
+                                                                    const newConfig = { ...tempCriteriaConfig };
+                                                                    newConfig.skill = { ...newConfig.skill, enabled: e.target.checked };
+                                                                    setTempCriteriaConfig(newConfig);
+                                                                }}
+                                                            />
+                                                        }
+                                                        label={tempCriteriaConfig.skill?.enabled ? "Enabled" : "Disabled"}
+                                                        sx={{ color: 'white', m: 0 }}
+                                                    />
+                                                </Box>
+                                                {tempCriteriaConfig.skill?.enabled && (
+                                                    <Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                                            <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
+                                                                Weight
+                                                            </Typography>
+                                                            <Typography sx={{ color: '#fff', fontWeight: 600 }}>
+                                                                {(tempCriteriaConfig.skill?.weight * 100).toFixed(0)}%
+                                                            </Typography>
+                                                        </Box>
+                                                        <Slider
+                                                            value={(tempCriteriaConfig.skill?.weight || 0) * 100}
+                                                            onChange={(e, newValue) => {
+                                                                const newConfig = { ...tempCriteriaConfig };
+                                                                newConfig.skill = { ...newConfig.skill, weight: newValue / 100 };
+                                                                setTempCriteriaConfig(newConfig);
+                                                            }}
+                                                            min={0}
+                                                            max={100}
+                                                            step={5}
+                                                            sx={{ color: '#5a78ff' }}
+                                                        />
+                                                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, mt: 1 }}>
+                                                            Matches users with similar skill levels
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Experience Matching */}
+                                    {tempCriteriaConfig.experience && (
+                                        <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            <CardContent>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'white', flex: 1 }}>
+                                                        💼 Experience Matching
+                                                    </Typography>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Switch
+                                                                checked={tempCriteriaConfig.experience?.enabled || false}
+                                                                onChange={(e) => {
+                                                                    const newConfig = { ...tempCriteriaConfig };
+                                                                    newConfig.experience = { ...newConfig.experience, enabled: e.target.checked };
+                                                                    setTempCriteriaConfig(newConfig);
+                                                                }}
+                                                            />
+                                                        }
+                                                        label={tempCriteriaConfig.experience?.enabled ? "Enabled" : "Disabled"}
+                                                        sx={{ color: 'white', m: 0 }}
+                                                    />
+                                                </Box>
+                                                {tempCriteriaConfig.experience?.enabled && (
+                                                    <Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                                            <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
+                                                                Weight
+                                                            </Typography>
+                                                            <Typography sx={{ color: '#fff', fontWeight: 600 }}>
+                                                                {(tempCriteriaConfig.experience?.weight * 100).toFixed(0)}%
+                                                            </Typography>
+                                                        </Box>
+                                                        <Slider
+                                                            value={(tempCriteriaConfig.experience?.weight || 0) * 100}
+                                                            onChange={(e, newValue) => {
+                                                                const newConfig = { ...tempCriteriaConfig };
+                                                                newConfig.experience = { ...newConfig.experience, weight: newValue / 100 };
+                                                                setTempCriteriaConfig(newConfig);
+                                                            }}
+                                                            min={0}
+                                                            max={100}
+                                                            step={5}
+                                                            sx={{ color: '#5a78ff' }}
+                                                        />
+                                                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, mt: 1 }}>
+                                                            Matches users with compatible experience levels
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Location Matching */}
+                                    {tempCriteriaConfig.location && (
+                                        <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            <CardContent>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'white', flex: 1 }}>
+                                                        📍 Location Matching
+                                                    </Typography>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Switch
+                                                                checked={tempCriteriaConfig.location?.enabled || false}
+                                                                onChange={(e) => {
+                                                                    const newConfig = { ...tempCriteriaConfig };
+                                                                    newConfig.location = { ...newConfig.location, enabled: e.target.checked };
+                                                                    setTempCriteriaConfig(newConfig);
+                                                                }}
+                                                            />
+                                                        }
+                                                        label={tempCriteriaConfig.location?.enabled ? "Enabled" : "Disabled"}
+                                                        sx={{ color: 'white', m: 0 }}
+                                                    />
+                                                </Box>
+                                                {tempCriteriaConfig.location?.enabled && (
+                                                    <Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                                            <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
+                                                                Weight
+                                                            </Typography>
+                                                            <Typography sx={{ color: '#fff', fontWeight: 600 }}>
+                                                                {(tempCriteriaConfig.location?.weight * 100).toFixed(0)}%
+                                                            </Typography>
+                                                        </Box>
+                                                        <Slider
+                                                            value={(tempCriteriaConfig.location?.weight || 0) * 100}
+                                                            onChange={(e, newValue) => {
+                                                                const newConfig = { ...tempCriteriaConfig };
+                                                                newConfig.location = { ...newConfig.location, weight: newValue / 100 };
+                                                                setTempCriteriaConfig(newConfig);
+                                                            }}
+                                                            min={0}
+                                                            max={100}
+                                                            step={5}
+                                                            sx={{ color: '#5a78ff' }}
+                                                        />
+                                                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, mt: 1 }}>
+                                                            Matches users in the same geographic area
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Education Matching */}
+                                    {tempCriteriaConfig.education && (
+                                        <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                            <CardContent>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                                                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'white', flex: 1 }}>
+                                                        🎓 Education Matching
+                                                    </Typography>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Switch
+                                                                checked={tempCriteriaConfig.education?.enabled || false}
+                                                                onChange={(e) => {
+                                                                    const newConfig = { ...tempCriteriaConfig };
+                                                                    newConfig.education = { ...newConfig.education, enabled: e.target.checked };
+                                                                    setTempCriteriaConfig(newConfig);
+                                                                }}
+                                                            />
+                                                        }
+                                                        label={tempCriteriaConfig.education?.enabled ? "Enabled" : "Disabled"}
+                                                        sx={{ color: 'white', m: 0 }}
+                                                    />
+                                                </Box>
+                                                {tempCriteriaConfig.education?.enabled && (
+                                                    <Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                                            <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
+                                                                Weight
+                                                            </Typography>
+                                                            <Typography sx={{ color: '#fff', fontWeight: 600 }}>
+                                                                {(tempCriteriaConfig.education?.weight * 100).toFixed(0)}%
+                                                            </Typography>
+                                                        </Box>
+                                                        <Slider
+                                                            value={(tempCriteriaConfig.education?.weight || 0) * 100}
+                                                            onChange={(e, newValue) => {
+                                                                const newConfig = { ...tempCriteriaConfig };
+                                                                newConfig.education = { ...newConfig.education, weight: newValue / 100 };
+                                                                setTempCriteriaConfig(newConfig);
+                                                            }}
+                                                            min={0}
+                                                            max={100}
+                                                            step={5}
+                                                            sx={{ color: '#5a78ff' }}
+                                                        />
+                                                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, mt: 1 }}>
+                                                            Matches users with similar education levels
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Interest-Based Matching */}
+                                    {tempCriteriaConfig.interests && (
+                                        <InterestCriteriaConfig
+                                            config={tempCriteriaConfig}
+                                            onUpdate={(newConfig) => setTempCriteriaConfig(newConfig)}
+                                        />
+                                    )}
+                                </>
+                            )}
+                        </Box>
+                    )}
+
+                    {/* Step 3: Review & Finish */}
+                    {wizardStep === 2 && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Alert severity="info" sx={{
+                                bgcolor: 'rgba(59,130,246,0.1)',
+                                borderColor: 'rgba(59,130,246,0.3)'
+                            }}>
+                                <Typography sx={{ fontSize: 14, color: '#fff' }}>
+                                    Review your configuration and click Finish to save.
+                                </Typography>
+                            </Alert>
+
+                            {/* Summary */}
+                            <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <CardContent>
+                                    <Typography sx={{ color: '#fff', fontWeight: 600, mb: 2 }}>
+                                        Configuration Summary
+                                    </Typography>
+
+                                    {/* Interest Tags Summary */}
+                                    <Box sx={{ mb: 2 }}>
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 600, mb: 1 }}>
+                                            Interest Tags
+                                        </Typography>
+                                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
+                                            Manage tags to help participants indicate their goals and interests.
+                                        </Typography>
+                                    </Box>
+
+                                    <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)', my: 2 }} />
+
+                                    {/* Enabled Criteria */}
+                                    <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 600, mb: 1 }}>
+                                        Enabled Matching Criteria
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                        {tempCriteriaConfig && Object.entries(tempCriteriaConfig).map(([key, config]) => {
+                                            if (key === 'interests') return null;
+                                            if (!config?.enabled) return null;
+                                            return (
+                                                <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'rgba(90,120,255,0.1)', borderRadius: 0.5 }}>
+                                                    <Typography sx={{ color: '#fff', fontSize: 12, textTransform: 'capitalize' }}>
+                                                        {key.replace(/_/g, ' ')}
+                                                    </Typography>
+                                                    <Typography sx={{ color: '#5a78ff', fontWeight: 600, fontSize: 12 }}>
+                                                        {(config.weight * 100).toFixed(0)}%
+                                                    </Typography>
+                                                </Box>
+                                            );
+                                        })}
+                                        {tempCriteriaConfig?.interests?.enabled && (
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, bgcolor: 'rgba(90,120,255,0.1)', borderRadius: 0.5 }}>
+                                                <Typography sx={{ color: '#fff', fontSize: 12 }}>
+                                                    Interest-Based
+                                                </Typography>
+                                                <Typography sx={{ color: '#5a78ff', fontWeight: 600, fontSize: 12 }}>
+                                                    Enabled
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Box>
+                    )}
+                </DialogContent>
+
+                <DialogActions sx={{ gap: 1, p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                    {wizardStep > 0 && (
+                        <Button
+                            onClick={handleWizardBack}
+                            sx={{ color: '#fff', textTransform: 'none' }}
+                        >
+                            Back
+                        </Button>
+                    )}
+                    <Box sx={{ flex: 1 }} />
+                    <Button
+                        onClick={closeWizard}
+                        sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    {wizardStep < 2 ? (
+                        <Button
+                            onClick={handleWizardNext}
+                            variant="contained"
+                            sx={{
+                                bgcolor: '#5a78ff',
+                                color: '#fff',
+                                textTransform: 'none',
+                                '&:hover': { bgcolor: '#4a68ee' }
+                            }}
+                        >
+                            Next
+                        </Button>
+                    ) : (
+                        <Button
+                            onClick={handleWizardFinish}
+                            variant="contained"
+                            disabled={savingCriteria}
+                            sx={{
+                                bgcolor: '#22c55e',
+                                color: '#fff',
+                                textTransform: 'none',
+                                '&:hover': { bgcolor: '#16a34a' }
+                            }}
+                        >
+                            {savingCriteria ? 'Saving...' : 'Finish'}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }
