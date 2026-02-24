@@ -67,6 +67,7 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
+import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
@@ -1462,7 +1463,7 @@ export default function EventManagePage() {
                     size="small"
                     variant="outlined"
                     component="a"
-                    href={event.recording_url}
+                    href={resolveRecordingUrl(event.recording_url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     startIcon={<MovieRoundedIcon />}

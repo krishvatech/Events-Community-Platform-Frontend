@@ -12,10 +12,10 @@ import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineR
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import PlaceIcon from "@mui/icons-material/Place";
+import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
 const API = RAW_API.endsWith("/api") ? RAW_API : `${RAW_API}/api`;
-const S3_BUCKET_URL = "https://events-agora-recordings.s3.eu-central-1.amazonaws.com";
 
 const getTokenHeader = () => {
   const t =
@@ -315,7 +315,7 @@ export default function MyRecordingsPage() {
                           >
                             {canWatch ? (
                               <video
-                                src={`${S3_BUCKET_URL}/${ev.recording_url}`}
+                                src={resolveRecordingUrl(ev.recording_url)}
                                 controls
                                 onPlay={() => handleTrackReplay(ev.id)}
                                 style={{
@@ -407,7 +407,7 @@ export default function MyRecordingsPage() {
                                     variant="contained"
                                     startIcon={<PlayCircleOutlineRoundedIcon />}
                                     component="a"
-                                    href={`${S3_BUCKET_URL}/${ev.recording_url}`}
+                                    href={resolveRecordingUrl(ev.recording_url)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={() => handleTrackReplay(ev.id)}

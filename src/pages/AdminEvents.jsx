@@ -79,6 +79,7 @@ import {
   API_ORIGIN
 } from "../utils/eventUtils";
 import EditEventForm from "../components/EditEventForm";
+import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 
 dayjs.extend(utc);
@@ -2082,7 +2083,7 @@ function AdminEventCard({
                     // Event ended & recording available → Watch Recording
                     <Button
                       component="a"
-                      href={ev.recording_url}
+                      href={resolveRecordingUrl(ev.recording_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       variant="contained"
@@ -2280,7 +2281,7 @@ function AdminEventCard({
                 // Ended + recording → Watch Recording
                 <Button
                   component="a"
-                  href={ev.recording_url}
+                  href={resolveRecordingUrl(ev.recording_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   variant="contained"

@@ -31,6 +31,7 @@ import timezone from "dayjs/plugin/timezone";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import { formatSessionTimeRange } from "../utils/timezoneUtils";
+import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -907,7 +908,7 @@ export default function EventDetailsPage() {
                         ) : canWatch ? (
                           <Button
                             component="a"
-                            href={event.recording_url}
+                            href={resolveRecordingUrl(event.recording_url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             variant="outlined"

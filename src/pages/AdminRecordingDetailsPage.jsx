@@ -31,13 +31,12 @@ import PersonIcon from "@mui/icons-material/Person";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
     .toString()
     .replace(/\/+$/, "");
 const API = RAW_API.endsWith("/api") ? RAW_API : `${RAW_API}/api`;
-const S3_BUCKET_URL =
-    "https://events-agora-recordings.s3.eu-central-1.amazonaws.com";
 
 const getTokenHeader = () => {
     const t =
@@ -235,7 +234,7 @@ export default function AdminRecordingDetailsPage() {
 
     const hasRec = !!event?.recording_url;
     const recordingSrc = hasRec
-        ? `${S3_BUCKET_URL}/${event.recording_url}`
+        ? resolveRecordingUrl(event.recording_url)
         : null;
 
     const handleBack = () => {

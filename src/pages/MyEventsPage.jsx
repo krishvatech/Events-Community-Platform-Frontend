@@ -25,6 +25,7 @@ import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
 import { getNextUpcomingSession, formatSessionTimeRange } from "../utils/timezoneUtils";
+import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 // ---------------------- API base + helpers (kept) ----------------------
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
@@ -478,7 +479,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                 <Button
                   size="small"
                   component="a"
-                  href={ev.recording_url}
+                  href={resolveRecordingUrl(ev.recording_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   variant="contained"

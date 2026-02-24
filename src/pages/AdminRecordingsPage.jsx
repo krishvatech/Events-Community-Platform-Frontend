@@ -25,13 +25,12 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import { resolveRecordingUrl } from "../utils/recordingUrl";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
   .toString()
   .replace(/\/+$/, "");
 const API = RAW_API.endsWith("/api") ? RAW_API : `${RAW_API}/api`;
-const S3_BUCKET_URL =
-  "https://events-agora-recordings.s3.eu-central-1.amazonaws.com";
 
 const getTokenHeader = () => {
   const t =
@@ -402,7 +401,7 @@ export default function AdminRecordingsPage() {
                     >
                       {hasRec ? (
                         <video
-                          src={`${S3_BUCKET_URL}/${ev.recording_url}`}
+                          src={resolveRecordingUrl(ev.recording_url)}
                           controls
                           onClick={(e) => e.stopPropagation()}
                           style={{
