@@ -2586,6 +2586,14 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
     sizes: [],
     regions: [],
   });
+  const ownerId =
+    group?.owner?.id ??
+    group?.owner_id ??
+    group?.created_by?.id ??
+    group?.creator?.id ??
+    group?.created_by_id ??
+    null;
+  const ownerUser = group?.owner || group?.created_by || group?.creator || null;
 
   const getCompanyFromUser = (u) => (u?.company_from_experience || "").trim();
   const getJobTitleFromUser = (u) =>
@@ -2650,8 +2658,28 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
     fetchMembers();
   }, [fetchMembers]);
 
+  const membersWithOwner = React.useMemo(() => {
+    const base = Array.isArray(members) ? members : [];
+    const coerced = base.map((m) => {
+      const uid = m?.user?.id || m?.user_id || m?.id;
+      const role = String(m?.role || "member").toLowerCase();
+      if (ownerId && String(uid) === String(ownerId)) {
+        return { ...m, role: "owner" };
+      }
+      return { ...m, role };
+    });
+
+    if (!ownerId || !ownerUser) return coerced;
+    const hasOwner = coerced.some((m) => {
+      const uid = m?.user?.id || m?.user_id || m?.id;
+      return String(uid) === String(ownerId);
+    });
+
+    return hasOwner ? coerced : [{ user: ownerUser, role: "owner" }, ...coerced];
+  }, [members, ownerId, ownerUser]);
+
   const filtered = React.useMemo(() => {
-    let list = members;
+    let list = membersWithOwner;
 
 
     if (selectedRegions.length) {
@@ -2680,7 +2708,7 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
       return hay.includes(t);
     });
   }, [
-    members,
+    membersWithOwner,
     q,
     selectedRegions,
 
@@ -2766,7 +2794,7 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
     return <ListSkeleton count={5} type="short" />;
   }
 
-  const existingIds = members.map((m) => m.user?.id || m.id);
+  const existingIds = membersWithOwner.map((m) => m.user?.id || m.user_id || m.id);
 
   return (
     <Box>
@@ -2932,9 +2960,10 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
       <List>
         {filtered.map(m => {
           const u = m.user || m;
-          const isOwner = String(m.role).toLowerCase() === "owner";
+          const isOwner = ownerId && String(u.id) === String(ownerId);
           const isSelf = String(u.id) === String(me?.id);
           const showMenu = canManageMembers && !isOwner && !isSelf;
+          const role = isOwner ? "owner" : String(m.role || "member").toLowerCase();
 
           return (
             <ListItem key={u.id} sx={{ border: "1px solid #eee", borderRadius: 2, mb: 1 }}>
@@ -2959,7 +2988,7 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
                     )}
                   </Typography>
                 }
-                secondary={<RoleBadge role={String(m.role || "member").toLowerCase()} />}
+                secondary={<RoleBadge role={role} />}
               />
               {showMenu && (
                 <ListItemSecondaryAction>
@@ -2999,7 +3028,7 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
           onClose={() => setAddMembersOpen(false)}
           groupIdOrSlug={groupId}
           existingIds={existingIds}
-          ownerId={group?.owner?.id || group?.owner_id}
+          ownerId={ownerId}
           onAdded={(count) => {
             fetchMembers();
             onMembersAdded?.(count);
@@ -3012,7 +3041,7 @@ function MembersTab({ groupId, group, me, canManageMembers, onMembersAdded, onMe
           onClose={() => setRequestMembersOpen(false)}
           groupIdOrSlug={groupId}
           existingIds={existingIds}
-          ownerId={group?.owner?.id || group?.owner_id}
+          ownerId={ownerId}
         />
       )}
     </Box>
