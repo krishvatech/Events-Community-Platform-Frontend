@@ -57,6 +57,24 @@ function addCacheBust(url) {
     return `${url}${separator}_cb=${Date.now()}`;
 }
 
+// OPTIMIZATION: Fetch with timeout for host panel
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
+}
+
 export default function SpeedNetworkingHostPanel({
     eventId,
     session,
@@ -180,17 +198,13 @@ export default function SpeedNetworkingHostPanel({
         }
 
         if (shouldRefresh) {
-            console.log('[HostPanel] Queue update message matched! Scheduling fetchQueue...');
-            // Add small delay to ensure database transaction has committed
+            console.log('[HostPanel] Queue update message matched! Fetching queue...');
+            // OPTIMIZATION: Single fetch with delay instead of double fetch
+            // Remove the double 100ms and 800ms delay pattern that was causing excessive API calls
             setTimeout(() => {
-                console.log('[HostPanel] Calling fetchQueue() after 100ms delay');
+                console.log('[HostPanel] Calling fetchQueue() after 300ms delay');
                 fetchQueue();
-            }, 100);
-            // Follow-up sync for eventual consistency windows.
-            setTimeout(() => {
-                console.log('[HostPanel] Calling fetchQueue() follow-up after 800ms delay');
-                fetchQueue();
-            }, 800);
+            }, 300);
         } else {
             console.log('[HostPanel] Message type does not match. Expected "speed_networking_queue_update", got:', messageType);
         }
@@ -395,10 +409,11 @@ export default function SpeedNetworkingHostPanel({
             if (!criteriaConfig) {
                 fetchCriteriaConfig();
             }
-            // Always refetch preview when on settings tab
+            // OPTIMIZATION: Only fetch preview when tab changes, not on every queueEntries change
+            // This prevents waterfall of API calls
             fetchMatchPreview();
         }
-    }, [selectedTab, queueEntries]);
+    }, [selectedTab]);  // FIXED: Removed queueEntries from dependency array
 
     // Calculate stats
     const waitingCount = queueEntries.filter(e => !e.current_match).length;

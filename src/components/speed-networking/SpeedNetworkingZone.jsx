@@ -20,6 +20,24 @@ function addCacheBust(url) {
     return `${url}${separator}_cb=${Date.now()}`;
 }
 
+// OPTIMIZATION: Fetch with timeout to prevent hanging requests for 100+ users
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
+}
+
 function isInBufferWindow(match, activeSession) {
     if (!match || !activeSession) return false;
     const matchStart = new Date(match.created_at).getTime();
@@ -50,6 +68,7 @@ export default function SpeedNetworkingZone({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showInterestSelector, setShowInterestSelector] = useState(false);
+    const [hasInterestTags, setHasInterestTags] = useState(null);
 
     // Helper to normalize speed networking user shape to member info shape
     const buildMemberObj = (user) => {
@@ -289,8 +308,9 @@ export default function SpeedNetworkingZone({
             }
         };
 
-        // Poll every 2 seconds while in active match (faster than general queue polling)
-        const interval = setInterval(checkMatchStatus, 2000);
+        // OPTIMIZATION: Increased from 2s to 10s to handle 100+ concurrent users
+        // WebSocket notifications handle real-time updates; polling is just fallback
+        const interval = setInterval(checkMatchStatus, 10000);  // 10 seconds instead of 2
         return () => clearInterval(interval);
     }, [currentMatch, session, eventId]);
 
@@ -339,7 +359,7 @@ export default function SpeedNetworkingZone({
     }, [eventId, onEnterMatch, session]);
 
     // Join queue with interests
-    const handleJoinQueueWithInterests = async (interestIds) => {
+    const handleJoinQueueWithInterests = useCallback(async (interestIds) => {
         if (!session) return;
 
         try {
@@ -380,13 +400,48 @@ export default function SpeedNetworkingZone({
             setError(err.message);
             setLoading(false);
         }
-    };
+    }, [eventId, session, onEnterMatch]);
 
-    // Show interest selector before joining queue
-    const handleJoinQueue = () => {
+    // Check if interest tags are available
+    const checkInterestTags = useCallback(async () => {
+        if (!session?.id) return false;
+        try {
+            const url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/interest-tags/`.replace(/([^:]\/)\/+/g, "$1");
+            const res = await fetch(url, { headers: authHeader() });
+            if (res.ok) {
+                const data = await res.json();
+                const tags = Array.isArray(data) ? data : data.results || [];
+                return tags.length > 0;
+            }
+            return false;
+        } catch (err) {
+            console.error('Error checking interest tags:', err);
+            return false;
+        }
+    }, [eventId, session?.id]);
+
+    // Show interest selector before joining queue (or join directly if no tags)
+    const handleJoinQueue = useCallback(async () => {
         if (!session) return;
+
+        // Check if interest tags exist
+        if (hasInterestTags === null) {
+            const tagsExist = await checkInterestTags();
+            setHasInterestTags(tagsExist);
+            if (!tagsExist) {
+                // No tags, join directly with empty interests
+                handleJoinQueueWithInterests([]);
+                return;
+            }
+        } else if (!hasInterestTags) {
+            // Already checked and no tags exist, join directly
+            handleJoinQueueWithInterests([]);
+            return;
+        }
+
+        // Tags exist, show selector
         setShowInterestSelector(true);
-    };
+    }, [session, hasInterestTags, checkInterestTags, handleJoinQueueWithInterests]);
 
     // Leave queue
     const handleLeaveQueue = async () => {
@@ -503,7 +558,7 @@ export default function SpeedNetworkingZone({
             } catch (err) {
                 console.error('[SpeedNetworking] Error polling match:', err);
             }
-        }, 5000); // Poll every 5 seconds (reduced frequency - WebSocket handles real-time)
+        }, 15000); // OPTIMIZATION: Increased from 5s to 15s for 100+ user scalability
 
         return () => clearInterval(pollInterval);
     }, [inQueue, session, eventId, onEnterMatch]);
@@ -571,7 +626,7 @@ export default function SpeedNetworkingZone({
             } catch (err) {
                 console.error('[SpeedNetworking] Error polling session status:', err);
             }
-        }, 5000); // Poll every 5 seconds (reduced frequency - WebSocket handles real-time updates)
+        }, 20000); // OPTIMIZATION: Increased from 5s to 20s for 100+ user scalability
 
         return () => clearInterval(pollInterval);
     }, [session?.id, eventId]);

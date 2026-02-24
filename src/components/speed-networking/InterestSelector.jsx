@@ -77,6 +77,13 @@ export default function InterestSelector({
         onClose();
     };
 
+    // Auto-proceed when no interests are available
+    React.useEffect(() => {
+        if (!loading && tags.length === 0 && open) {
+            handleContinue();
+        }
+    }, [loading, tags.length, open]);
+
     const getCategoryColor = (category) => {
         const colors = {
             'investment': '#5a78ff',
@@ -217,7 +224,7 @@ export default function InterestSelector({
                 <Button
                     onClick={handleContinue}
                     variant="contained"
-                    disabled={loading || selected.size === 0}
+                    disabled={loading || (tags.length > 0 && selected.size === 0)}
                     sx={{
                         bgcolor: '#5a78ff',
                         color: '#fff',

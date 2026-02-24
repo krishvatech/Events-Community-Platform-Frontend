@@ -9,7 +9,7 @@ import { useDyteClient, DyteProvider } from '@dytesdk/react-web-core';
 import { DyteMeeting } from '@dytesdk/react-ui-kit';
 import InterestDisplay from './InterestDisplay';
 
-// Style to ensure Dyte UI controls don't overflow and Chat is always visible
+// Style to ensure Dyte UI controls don't overflow
 const dyteStyles = `
     .dyte-meeting-ui {
         width: 100% !important;
@@ -30,12 +30,6 @@ const dyteStyles = `
     [class*="control-item"] {
         min-width: auto !important;
         flex-shrink: 0 !important;
-    }
-    /* Ensure sidebar/chat doesn't get hidden */
-    [class*="sidebar"],
-    [class*="chat"] {
-        visibility: visible !important;
-        opacity: 1 !important;
     }
 `;
 
@@ -63,7 +57,7 @@ export default function SpeedNetworkingMatch({
     const [showBreakdown, setShowBreakdown] = useState(false);
     const autoAdvanceTriggeredRef = useRef(false);
 
-    // Inject Dyte UI styles to ensure Chat and controls are always visible
+    // Inject Dyte UI layout styles
     useEffect(() => {
         const styleElement = document.createElement('style');
         styleElement.textContent = dyteStyles;
