@@ -35,7 +35,7 @@ import AdminResources from "./AdminResources.jsx";
 import AdminNameRequestsPage from "./AdminNameRequestsPage.jsx";
 import EmojiEmotionsRoundedIcon from '@mui/icons-material/EmojiEmotionsRounded';
 import InsertPhotoRoundedIcon from '@mui/icons-material/InsertPhotoRounded';
-import { LocalizationProvider, TimePicker } from "@mui/x-date-pickers";
+import { LocalizationProvider, TimePicker, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import LiveTvRoundedIcon from "@mui/icons-material/LiveTvRounded";
@@ -1256,41 +1256,52 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           </Box>
           <Grid container spacing={2} sx={{ mb: 2 }}>
             <Grid item xs={12} md={isMultiDay ? 6 : 12}>
-              <TextField
-                label={isMultiDay ? "Start Date" : "Date"}
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  console.log("📅 Start Date Changed:", { previousStartDate: startDate, newStartDate: v, isMultiDay });
-                  setStartDate(v);
-                  if (!isMultiDay) {
-                    // Single day: force end date same as start
-                    setEndDate(v);
-                  }
-                  // Removed auto-calculation for multi-day to let user set times manually
-                }}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-                InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
-                // 🔻 show error if needed
-                error={!!errors.startDate}
-                helperText={errors.startDate}
-              />
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker
+                  label={isMultiDay ? "Start Date" : "Date"}
+                  value={startDate ? dayjs(startDate) : null}
+                  onChange={(newValue) => {
+                    const v = newValue ? newValue.format("YYYY-MM-DD") : "";
+                    console.log("📅 Start Date Changed:", { previousStartDate: startDate, newStartDate: v, isMultiDay });
+                    setStartDate(v);
+                    if (!isMultiDay) {
+                      // Single day: force end date same as start
+                      setEndDate(v);
+                    }
+                    // Removed auto-calculation for multi-day to let user set times manually
+                  }}
+                  format="DD/MM/YYYY"
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      error: !!errors.startDate,
+                      helperText: errors.startDate
+                    }
+                  }}
+                />
+              </LocalizationProvider>
             </Grid>
             {isMultiDay && (
               <Grid item xs={12} md={6}>
-                <TextField label="End Date" type="date" value={endDate} onChange={(e) => {
-                  const v = e.target.value;
-                  console.log("📅 End Date Changed:", { previousEndDate: endDate, newEndDate: v });
-                  setEndDate(v);
-                }} fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
-                  // 🔻 show error when end < start
-                  error={!!errors.endDate}
-                  helperText={errors.endDate}
-                />
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    label="End Date"
+                    value={endDate ? dayjs(endDate) : null}
+                    onChange={(newValue) => {
+                      const v = newValue ? newValue.format("YYYY-MM-DD") : "";
+                      console.log("📅 End Date Changed:", { previousEndDate: endDate, newEndDate: v });
+                      setEndDate(v);
+                    }}
+                    format="DD/MM/YYYY"
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        error: !!errors.endDate,
+                        helperText: errors.endDate
+                      }
+                    }}
+                  />
+                </LocalizationProvider>
               </Grid>
             )}
           </Grid>
@@ -1524,16 +1535,20 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           {!resourcesPublishNow && (
             <Grid container spacing={2} sx={{ mb: 1 }}>
               <Grid item xs={12} md={6}>
-                <TextField
-                  label="Publish Date"
-                  type="date"
-                  value={resPublishDate}
-                  onChange={(e) => setResPublishDate(e.target.value)}
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
-                  error={!!errors.resource_publish_at}
-                />
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    label="Publish Date"
+                    value={resPublishDate ? dayjs(resPublishDate) : null}
+                    onChange={(newValue) => setResPublishDate(newValue ? newValue.format("YYYY-MM-DD") : "")}
+                    format="DD/MM/YYYY"
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        error: !!errors.resource_publish_at
+                      }
+                    }}
+                  />
+                </LocalizationProvider>
               </Grid>
               <Grid item xs={12} md={6}>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>

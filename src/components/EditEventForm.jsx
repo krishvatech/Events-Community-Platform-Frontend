@@ -18,7 +18,7 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid"; // v5
 import Autocomplete from "@mui/material/Autocomplete";
-import { LocalizationProvider, TimePicker } from "@mui/x-date-pickers";
+import { LocalizationProvider, TimePicker, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -1035,27 +1035,43 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 </Grid>
 
                 <Grid item xs={12} md={isMultiDay ? 6 : 12}>
-                    <TextField
-                        label={isMultiDay ? "Start Date" : "Date"} type="date" fullWidth
-                        value={startDate} onChange={(e) => {
-                            const v = e.target.value;
-                            setStartDate(v);
-                            if (!isMultiDay) setEndDate(v);
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                        InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
-                        error={!!errors.startDate} helperText={errors.startDate}
-                    />
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                        <DatePicker
+                            label={isMultiDay ? "Start Date" : "Date"}
+                            value={startDate ? dayjs(startDate) : null}
+                            onChange={(newValue) => {
+                                const v = newValue ? newValue.format("YYYY-MM-DD") : "";
+                                setStartDate(v);
+                                if (!isMultiDay) setEndDate(v);
+                            }}
+                            format="DD/MM/YYYY"
+                            slotProps={{
+                                textField: {
+                                    fullWidth: true,
+                                    error: !!errors.startDate,
+                                    helperText: errors.startDate
+                                }
+                            }}
+                        />
+                    </LocalizationProvider>
                 </Grid>
                 {isMultiDay && (
                     <Grid item xs={12} md={6}>
-                        <TextField
-                            label="End Date" type="date" fullWidth
-                            value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                            InputProps={{ endAdornment: <InputAdornment position="end"><CalendarMonthRoundedIcon className="text-slate-400" /></InputAdornment> }}
-                            error={!!errors.endDate} helperText={errors.endDate}
-                        />
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                                label="End Date"
+                                value={endDate ? dayjs(endDate) : null}
+                                onChange={(newValue) => setEndDate(newValue ? newValue.format("YYYY-MM-DD") : "")}
+                                format="DD/MM/YYYY"
+                                slotProps={{
+                                    textField: {
+                                        fullWidth: true,
+                                        error: !!errors.endDate,
+                                        helperText: errors.endDate
+                                    }
+                                }}
+                            />
+                        </LocalizationProvider>
                     </Grid>
                 )}
 

@@ -276,6 +276,7 @@ function SessionDialog({
                 <DatePicker
                   value={startDate}
                   onChange={(date) => setStartDate(date || dayjs())}
+                  format="DD/MM/YYYY"
                   slotProps={{ textField: { size: "small", fullWidth: true, error: !!errors.startTime } }}
                 />
                 <TimePicker
@@ -326,6 +327,7 @@ function SessionDialog({
                 <DatePicker
                   value={endDate}
                   onChange={(date) => setEndDate(date || dayjs())}
+                  format="DD/MM/YYYY"
                   slotProps={{ textField: { size: "small", fullWidth: true } }}
                 />
                 <TimePicker
