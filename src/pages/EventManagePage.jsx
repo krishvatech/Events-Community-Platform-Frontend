@@ -456,10 +456,12 @@ export default function EventManagePage() {
         lounge_enabled_after: event.lounge_enabled_after ?? false,
         lounge_after_buffer: event.lounge_after_buffer ?? 30,
       });
+      const visibilityUpdated = localStorage.getItem(`event_visibility_updated_${event.id}`);
+
       setParticipantVisibility({
-        show_participants_before_event: event.show_participants_before_event ?? true,
+        show_participants_before_event: visibilityUpdated ? (event.show_participants_before_event ?? true) : true,
         show_participants_after_event: event.show_participants_after_event ?? false,
-        show_speed_networking_match_history: event.show_speed_networking_match_history ?? true,
+        show_speed_networking_match_history: visibilityUpdated ? (event.show_speed_networking_match_history ?? true) : true,
       });
     }
   }, [event]);
