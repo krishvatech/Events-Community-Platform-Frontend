@@ -214,10 +214,10 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
           "@supports not (aspect-ratio: 1 / 1)": { height: 200 },
         }}
       >
-        {ev.preview_image && !imgFailed ? (
+        {(ev.cover_image || ev.preview_image) && !imgFailed ? (
           <Link to={`/events/${ev.slug || ev.id}?ref=my_events`} state={{ event: ev }}>
             <img
-              src={toAbs(ev.preview_image)}
+              src={toAbs(ev.cover_image || ev.preview_image)}
               alt={ev.title}
               loading="lazy"
               onError={() => setImgFailed(true)}   // 👈 fallback on broken URL

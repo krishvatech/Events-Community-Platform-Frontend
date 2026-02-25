@@ -1165,10 +1165,10 @@ export default function EventManagePage() {
                 overflow: "hidden",
               }}
             >
-              {event.preview_image && (
+              {(event.cover_image || event.preview_image) && (
                 <Box
                   component="img"
-                  src={toAbs(event.preview_image)}
+                  src={toAbs(event.cover_image || event.preview_image)}
                   alt={event.title}
                   sx={{
                     position: "absolute",

@@ -904,6 +904,7 @@ function mapFeedItem(item) {
         title: m.event_title || m.title || "Event",
         when: m.start_time || m.new_time || m.time || "",
         where: m.venue || m.location || "",
+        preview_image: m.event_preview_image || null,
       },
       // 👇 key line: store where reactions/comments should go
       engage: eventId ? { type: "events.event", id: Number(eventId) } : undefined,
@@ -2480,7 +2481,15 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
     >
       {/* Header */}
       <Stack direction="row" spacing={1.5} alignItems="center">
-        <Avatar src={toMediaUrl(post.group_avatar || post.author?.avatar)} alt={headingTitle} />
+        <Avatar
+          src={toMediaUrl(
+            post.type === "event"
+              ? (post.event?.preview_image || post.group_avatar || post.author?.avatar)
+              : (post.group_avatar || post.author?.avatar)
+          )}
+          alt={headingTitle}
+          variant={post.type === "event" && post.event?.preview_image ? "rounded" : "circular"}
+        />
         <Box sx={{ flex: 1, minWidth: 0 }}>
 
           <Stack direction="row" spacing={0.5} alignItems="center">

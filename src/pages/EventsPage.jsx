@@ -263,6 +263,7 @@ function toCard(ev) {
     title: ev.title,
     description: ev.description,
     image: ev.preview_image,                 // URLField on your model
+    cover_image: ev.cover_image,             // URLField on your model
     start: ev.start_time,                    // DateTimeField
     end: ev.end_time,                        // DateTimeField
     start_time: ev.start_time,
@@ -443,9 +444,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     >
       {/* MEDIA */}
       <Box className="relative w-full h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px] overflow-hidden">
-        {ev.image ? (
+        {(ev.cover_image || ev.image) ? (
           <img
-            src={toAbs(ev.image)}
+            src={toAbs(ev.cover_image || ev.image)}
             alt={ev.title}
             loading="lazy"
             className="absolute inset-0 block w-full h-full object-cover object-center"
@@ -900,9 +901,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
       <div className="md:flex">
         {/* Image / badges */}
         <div className="relative md:w-2/5">
-          {ev.image ? (
+          {(ev.cover_image || ev.image) ? (
             <img
-              src={toAbs(ev.image)}
+              src={toAbs(ev.cover_image || ev.image)}
               alt={ev.title}
               className="w-full h-44 md:h-full object-cover transform-gpu transition-transform duration-700 ease-out group-hover:scale-105 will-change-transform"
             />

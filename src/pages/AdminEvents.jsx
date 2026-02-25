@@ -967,7 +967,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
         >
           {/* Update Logo / Picture */}
           <Box>
-            <Typography variant="subtitle1" className="font-semibold">Update Logo / Picture</Typography>
+            <Typography variant="subtitle1" className="font-semibold">Logo / Picture</Typography>
             <Typography variant="caption" className="text-slate-500 block mb-2">
               Recommended 650x365px - Max 50 MB
             </Typography>
@@ -1876,9 +1876,9 @@ function AdminEventCard({
     >
       {/* Top image area */}
       <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
-        {ev.preview_image ? (
+        {(ev.cover_image || ev.preview_image) ? (
           <img
-            src={toAbs(ev.preview_image)}
+            src={toAbs(ev.cover_image || ev.preview_image)}
             alt={ev.title}
             loading="lazy"
             style={{

@@ -737,10 +737,10 @@ export default function EventDetailsPage() {
                 <Box>
                   {/* EVENT HEADER CARD */}
                   <Paper elevation={0} className="rounded-2xl border border-slate-200 overflow-hidden mb-6">
-                    {event.preview_image ? (
+                    {(event.cover_image || event.preview_image) ? (
                       <Box
                         component="img"
-                        src={toAbs(event.preview_image)}
+                        src={toAbs(event.cover_image || event.preview_image)}
                         alt={event.title}
                         loading="lazy"
                         sx={{
