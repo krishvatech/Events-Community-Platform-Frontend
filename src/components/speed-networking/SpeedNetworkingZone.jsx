@@ -63,7 +63,8 @@ export default function SpeedNetworkingZone({
     dyteMeeting,
     onEnterMatch,
     lastMessage,
-    onMemberInfo
+    onMemberInfo,
+    autoJoinOnOpen = false
 }) {
     const [session, setSession] = useState(null);
     const [currentMatch, setCurrentMatch] = useState(null);
@@ -78,6 +79,7 @@ export default function SpeedNetworkingZone({
     const myMatchAbortRef = useRef(null);
     const sessionPollInFlightRef = useRef(false);
     const matchStatusPollInFlightRef = useRef(false);
+    const autoJoinAttemptedRef = useRef(false);
 
     // Helper to normalize speed networking user shape to member info shape
     const buildMemberObj = (user) => {
@@ -598,6 +600,15 @@ export default function SpeedNetworkingZone({
         if (inQueue || currentMatch || transitionMatch) return;
         fetchMyMatch();
     }, [session, inQueue, currentMatch, transitionMatch, fetchMyMatch]);
+
+    useEffect(() => {
+        if (!autoJoinOnOpen || !session || session.status !== 'ACTIVE') return;
+        if (autoJoinAttemptedRef.current) return;
+        if (inQueue || currentMatch || transitionMatch) return;
+
+        autoJoinAttemptedRef.current = true;
+        handleJoinQueue();
+    }, [autoJoinOnOpen, session, inQueue, currentMatch, transitionMatch, handleJoinQueue]);
 
     // Initial fetch
     useEffect(() => {

@@ -2158,6 +2158,7 @@ export default function NewLiveMeeting() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [loungeOpen, setLoungeOpen] = useState(false);
   const [showSpeedNetworking, setShowSpeedNetworking] = useState(false);
+  const [speedNetworkingAutoJoinTrigger, setSpeedNetworkingAutoJoinTrigger] = useState(0);
   const [speedNetworkingNotification, setSpeedNetworkingNotification] = useState(null); // ✅ Notification message
 
   // ✅ NEW: Speed Networking Session Prompt State
@@ -15365,6 +15366,7 @@ export default function NewLiveMeeting() {
             isAdmin={isHost}
             onClose={() => setShowSpeedNetworking(false)}
             dyteMeeting={dyteMeeting}
+            autoJoinOnOpen={speedNetworkingAutoJoinTrigger}
             // Passing down the last WebSocket message to handle matching events
             lastMessage={lastMessage}
             onMemberInfo={openMemberInfo}
@@ -15376,11 +15378,9 @@ export default function NewLiveMeeting() {
           open={showNetworkingPrompt}
           sessionData={sessionStartNotification}
           onJoinNetworking={() => {
-            // ✅ FIXED: Only redirect to Speed Networking screen
-            // Do NOT join queue here - let SpeedNetworkingZone handle it
-            // Users will join queue only after clicking the green "JOIN SPEED NETWORKING" button
-            console.log("[Modal] Redirecting to Speed Networking screen (not joining queue yet)");
+            console.log("[Modal] Redirecting to Speed Networking screen and auto-joining queue");
             setShowNetworkingPrompt(false);
+            setSpeedNetworkingAutoJoinTrigger(Date.now());
             setShowSpeedNetworking(true);
           }}
           onJoinLounge={() => {
