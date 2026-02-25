@@ -236,6 +236,25 @@ function formatSessionType(type) {
   return typeMap[type?.toLowerCase()] || (type || "Session");
 }
 
+function getSessionDescription(session) {
+  if (!session || typeof session !== "object") return "";
+  return (
+    session.description ||
+    session.session_description ||
+    session.details ||
+    session.summary ||
+    session.agenda ||
+    ""
+  ).toString().trim();
+}
+
+function normalizeSession(session = {}) {
+  return {
+    ...session,
+    description: getSessionDescription(session),
+  };
+}
+
 function toCard(ev) {
   // map backend fields to the fields your UI already uses
   return {
@@ -268,7 +287,7 @@ function toCard(ev) {
     show_participants_after_event: ev.show_participants_after_event,
     timezone: ev.timezone,
     is_multi_day: ev.is_multi_day || false,  // ✅ NEW: Multi-day event flag
-    sessions: ev.sessions || [],              // ✅ NEW: Event sessions array
+    sessions: Array.isArray(ev.sessions) ? ev.sessions.map(normalizeSession) : [], // ✅ NEW: Event sessions array
   };
 }
 
@@ -314,6 +333,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
 
   // State for expandable "Read More" section
   const [expandSessions, setExpandSessions] = React.useState(false);
+  const [expandedSessionDescriptions, setExpandedSessionDescriptions] = React.useState({});
 
   // Timezone logic
   const organizerTimezone = ev.timezone;
@@ -516,45 +536,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     )}
                   </div>
 
-                  {/* Expandable "Read more" section */}
-                  {ev.sessions.length > 1 && (
-                    <div className="pt-1.5 border-t border-neutral-100">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandSessions(!expandSessions);
-                        }}
-                        className="text-xs font-medium text-teal-600 hover:text-teal-700 transition-colors"
-                      >
-                        {expandSessions ? '▼ Show less' : '► Read more'}
-                      </button>
-
-                      {expandSessions && (
-                        <div className="mt-1.5 space-y-1.5 text-xs">
-                          {ev.sessions.map((session, idx) => {
-                            const sessionTimeRange = formatSessionTimeRange(
-                              session.start_time,
-                              session.end_time,
-                              ev.timezone
-                            );
-                            const sessionDuration = calculateTotalDuration([session]);
-                            const sessionType = formatSessionType(session.session_type);
-                            return (
-                              <div key={idx} className="text-neutral-700 py-1 pl-2 border-l-2 border-teal-200">
-                                <div className="font-medium text-neutral-900">{session.title || `Session ${idx + 1}`}</div>
-                                <div className="text-neutral-500 mt-0.5">
-                                  <span className="inline-block bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded text-xs mr-1.5">{sessionType}</span>
-                                  <span>{sessionTimeRange.primary}</span>
-                                  <span className="ml-1">•</span>
-                                  <span className="ml-1">{formatDuration(sessionDuration)}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             }
@@ -634,6 +615,77 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               );
             }
           })()}
+
+          {ev.is_multi_day && ev.sessions?.length > 1 && (
+            <div className="pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandSessions(!expandSessions);
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-100 hover:border-teal-300 transition-colors"
+              >
+                <span className="inline-block h-2 w-2 rounded-full bg-teal-600" aria-hidden="true" />
+                {expandSessions
+                  ? "Hide Full Session Schedule"
+                  : `Read More: View All ${ev.sessions.length} Sessions`}
+              </button>
+
+              {expandSessions && (
+                <div className="mt-2 space-y-1.5 text-xs">
+                  {ev.sessions.map((session, idx) => {
+                    const sessionTimeRange = formatSessionTimeRange(
+                      session.start_time,
+                      session.end_time,
+                      ev.timezone
+                    );
+                    const sessionDuration = calculateTotalDuration([session]);
+                    const sessionType = formatSessionType(session.session_type);
+                    const sessionDescription = getSessionDescription(session);
+                    const isExpanded = Boolean(expandedSessionDescriptions[`${ev.id}-${idx}`]);
+                    const isLongDescription = sessionDescription.length > 140;
+                    return (
+                      <div key={idx} className="text-neutral-700 py-1 pl-2 border-l-2 border-teal-200">
+                        <div className="font-medium text-neutral-900">{session.title || `Session ${idx + 1}`}</div>
+                        <div className="text-neutral-500 mt-0.5">
+                          <span className="inline-block bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded text-xs mr-1.5">{sessionType}</span>
+                          <span>{sessionTimeRange.primary}</span>
+                          <span className="ml-1">•</span>
+                          <span className="ml-1">{formatDuration(sessionDuration)}</span>
+                        </div>
+                        {sessionDescription ? (
+                          <div className="mt-1">
+                            <p className={`text-neutral-600 ${isExpanded ? "" : "line-clamp-2"}`}>
+                              {sessionDescription}
+                            </p>
+                            {isLongDescription && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const key = `${ev.id}-${idx}`;
+                                  setExpandedSessionDescriptions((prev) => ({
+                                    ...prev,
+                                    [key]: !prev[key],
+                                  }));
+                                }}
+                                className="mt-1 inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700 hover:bg-teal-100 transition-colors"
+                              >
+                                {isExpanded ? "Show less" : "Read More"}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-neutral-400 italic">No description provided.</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-auto" />

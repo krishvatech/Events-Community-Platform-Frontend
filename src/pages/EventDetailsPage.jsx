@@ -1,5 +1,5 @@
 // src/pages/EventDetailsPage.jsx
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -137,6 +137,25 @@ function priceStr(p) {
   }
 }
 
+function getSessionDescription(session) {
+  if (!session || typeof session !== "object") return "";
+  return (
+    session.description ||
+    session.session_description ||
+    session.details ||
+    session.summary ||
+    session.agenda ||
+    ""
+  ).toString().trim();
+}
+
+function normalizeSession(session = {}) {
+  return {
+    ...session,
+    description: getSessionDescription(session),
+  };
+}
+
 
 function EventDetailsSkeleton() {
   return (
@@ -241,6 +260,7 @@ export default function EventDetailsPage() {
   // Participant List Dialog
   const [showParticipantsDialog, setShowParticipantsDialog] = useState(false);
   const [participantList, setParticipantList] = useState([]);
+  const [expandedSessionDescriptions, setExpandedSessionDescriptions] = useState({});
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [participantError, setParticipantError] = useState(null);
 
@@ -587,6 +607,10 @@ export default function EventDetailsPage() {
 
   // ✅ NEW: Show Sessions tab for multi-day events
   const showSessionsTab = event?.is_multi_day && event?.sessions && event.sessions.length > 0;
+  const normalizedSessions = useMemo(
+    () => (Array.isArray(event?.sessions) ? event.sessions.map(normalizeSession) : []),
+    [event?.sessions]
+  );
 
   useEffect(() => {
     if (!showSpeedNetworkingTab && !showSessionsTab && activeTab !== 0) {
@@ -1076,11 +1100,16 @@ export default function EventDetailsPage() {
                 <Paper elevation={0} className="rounded-2xl border border-slate-200">
                   <Box sx={{ p: 3 }}>
                     <Typography variant="h6" fontWeight={800} sx={{ mb: 3 }}>
-                      Event Sessions ({event.sessions.length})
+                      Event Sessions ({normalizedSessions.length})
                     </Typography>
                     <Stack spacing={2}>
-                      {event.sessions.map((session, idx) => (
-                        <Paper key={session.id} elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+                      {normalizedSessions.map((session, idx) => {
+                        const sessionDescription = getSessionDescription(session);
+                        const sessionKey = session.id || idx;
+                        const isExpanded = Boolean(expandedSessionDescriptions[sessionKey]);
+                        const isLongDescription = sessionDescription.length > 180;
+                        return (
+                        <Paper key={session.id || idx} elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
                           <Stack spacing={1.5}>
                             <Stack direction="row" justifyContent="space-between" alignItems="start">
                               <Box>
@@ -1110,14 +1139,48 @@ export default function EventDetailsPage() {
                               </Stack>
                             </Stack>
 
-                            {session.description && (
-                              <Typography variant="body2" color="text.secondary">
-                                {session.description}
+                            {sessionDescription ? (
+                              <Box>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{
+                                    ...(isExpanded
+                                      ? {}
+                                      : {
+                                          display: "-webkit-box",
+                                          WebkitBoxOrient: "vertical",
+                                          WebkitLineClamp: 3,
+                                          overflow: "hidden",
+                                        }),
+                                  }}
+                                >
+                                  {sessionDescription}
+                                </Typography>
+                                {isLongDescription && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() =>
+                                      setExpandedSessionDescriptions((prev) => ({
+                                        ...prev,
+                                        [sessionKey]: !prev[sessionKey],
+                                      }))
+                                    }
+                                    sx={{ mt: 1, textTransform: "none", fontWeight: 700 }}
+                                  >
+                                    {isExpanded ? "Show less" : "Read More"}
+                                  </Button>
+                                )}
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" color="text.disabled" sx={{ fontStyle: "italic" }}>
+                                No description provided.
                               </Typography>
                             )}
                           </Stack>
                         </Paper>
-                      ))}
+                      )})}
                     </Stack>
                   </Box>
                 </Paper>
