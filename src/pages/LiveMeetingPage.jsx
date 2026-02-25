@@ -38,6 +38,11 @@ import {
   Snackbar,
   Alert,
   SvgIcon,
+  FormControl,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Backdrop,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
@@ -2173,6 +2178,16 @@ export default function NewLiveMeeting() {
   const [waitingRoomQueue, setWaitingRoomQueue] = useState([]);
   const waitingRoomPrevCountRef = useRef(0);
   const waitingSectionRef = useRef(null);
+
+  // ✅ NEW: Social Lounge Participants & Transition State
+  const [preEventLoungeParticipants, setPreEventLoungeParticipants] = useState([]);
+  const [loungeCountingDown, setLoungeCountingDown] = useState(false);
+  const [loungeCountdownValue, setLoungeCountdownValue] = useState(0);
+  const [loungeCountdownTransition, setLoungeCountdownTransition] = useState("to_waiting_room");
+  const [showLoungeStartDialog, setShowLoungeStartDialog] = useState(false);
+  const [loungeTransitionOption, setLoungeTransitionOption] = useState("to_waiting_room");
+  const [loungeCountdownSeconds, setLoungeCountdownSeconds] = useState(10);
+  const loungeParticipantsSectionRef = useRef(null);
   const breakoutJoinInProgressRef = useRef(false);
   const breakoutJoinTimeoutRef = useRef(null);
   const isBreakoutRef = useRef(false);
@@ -2462,6 +2477,7 @@ export default function NewLiveMeeting() {
 
     return map;
   }, [eventData?.event_participants]);
+
   const [loungeTables, setLoungeTables] = useState([]);
   const [loungeOpenStatus, setLoungeOpenStatus] = useState(null);
   const isLoungeCurrentlyOpen = loungeOpenStatus?.status === "OPEN";
@@ -2567,6 +2583,7 @@ export default function NewLiveMeeting() {
 
   // ---------- Dyte init ----------
   const [dyteMeeting, initMeeting] = useDyteClient();
+
   const [initDone, setInitDone] = useState(false);
   const selfPermissions = useDytePermissions(dyteMeeting);
   const myParticipantKey = useMemo(
@@ -4353,7 +4370,8 @@ export default function NewLiveMeeting() {
       return;
     }
     if ((preEventLoungeOpen || openLoungeFromState || isPostEventWindowOpen) && !joinMainRequested &&
-      (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly)) {
+      (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
+      !authToken && !mainAuthTokenRef.current) {
       // ✅ Log when skipping token fetch due to pre-event lounge
       if (!joinInFlightRef.current) {
         console.log("[LiveMeeting] In lounge-only flow, skipping token fetch");
@@ -4432,7 +4450,9 @@ export default function NewLiveMeeting() {
         setWaitingRoomActive(false);
         setAuthToken(data.authToken);
         mainAuthTokenRef.current = data.authToken;
-        if (data.role) setRole(normalizeRole(data.role));
+        if (data.role) {
+          setRole(normalizeRole(data.role));
+        }
       } catch (e) {
         // ✅ Don't log abort errors - they're expected when switching rooms or on lounge close
         if (e.name === 'AbortError') {
@@ -4967,7 +4987,36 @@ export default function NewLiveMeeting() {
             // User was admitted - exit waiting room and enter meeting
             console.log("[MainSocket] ✅ User admitted! Exiting waiting room...");
             setWaitingRoomActive(false);
+            setLoungeOpen(false);
+            setJoinMainRequested(true);
+            setHostChoseLoungeOnly(false);
+            setJoinRequestTick((v) => v + 1);
+            // If user is currently in lounge/breakout, force return to main room.
+            if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+              console.log("[MainSocket] User admitted while in lounge/breakout - forcing main room transition");
+              applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+                console.warn("[MainSocket] Failed to force return to main room after admit:", e);
+              });
+            }
+            // ✅ NEW: Ensure Dyte is initialized after admission
+            setDbStatus("live");
             showSnackbar("You have been admitted to the meeting! 🎉", "success");
+          } else if (newStatus === "waiting") {
+            // User has been moved back to waiting room.
+            console.log("[MainSocket] User moved to waiting room");
+            setWaitingRoomActive(true);
+            setWaitingRoomStatus("waiting");
+            setLoungeOpen(false);
+            setJoinMainRequested(false);
+            setHostChoseLoungeOnly(false);
+
+            // If currently in lounge/breakout, force leave that room.
+            if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+              applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+                console.warn("[MainSocket] Failed to force return before waiting room:", e);
+              });
+            }
+            showSnackbar("Moved to waiting room", "info");
           } else if (newStatus === "rejected") {
             // User was rejected from the meeting
             console.log("[MainSocket] ❌ User rejected from meeting");
@@ -5095,6 +5144,21 @@ export default function NewLiveMeeting() {
               setBreakDurationSeconds(msg.break_duration_seconds);
               setBreakRemainingSeconds(msg.break_remaining_seconds);
               setLoungeEnabledBreaks(msg.lounge_enabled_breaks || false);
+            }
+
+            // ✅ NEW: Restore participant location on reconnect from current_location field
+            if (msg.current_location) {
+              console.log("[MainSocket] Restoring location on reconnect:", msg.current_location);
+              if (msg.current_location === "social_lounge" && msg.user_lounge_table_id) {
+                // Already handled above - user is in lounge
+                setLoungeOpen(true);
+              } else if (msg.current_location === "waiting_room") {
+                setWaitingRoomActive(true);
+                setWaitingRoomStatus("waiting");
+              } else if (msg.current_location === "main_room") {
+                setWaitingRoomActive(false);
+              }
+              // "pre_event" means user hasn't joined yet
             }
           }
         } else if (msg.type === "message" && msg.data) {
@@ -5245,6 +5309,83 @@ export default function NewLiveMeeting() {
             showSnackbar("Break ended — Social Lounge is closed during the session.", "warning");
           } else {
             showSnackbar("Break has ended. Mic and camera are now enabled.", "info");
+          }
+        } else if (msg.type === "lounge_countdown") {
+          // ✅ NEW: Handle lounge countdown notification
+          console.log("[MainSocket] Lounge countdown:", msg.countdown_seconds, "seconds, transition:", msg.transition);
+          setLoungeCountingDown(true);
+          setLoungeCountdownValue(msg.countdown_seconds);
+          setLoungeCountdownTransition(msg.transition);
+
+          // Show countdown UI in snackbar for non-host participants
+          if (!isHost) {
+            showSnackbar(
+              `The webinar is starting in ${msg.countdown_seconds} seconds. The Social Lounge is closing...`,
+              "info",
+              msg.countdown_seconds * 1000
+            );
+          }
+        } else if (msg.type === "lounge_stopped") {
+          // ✅ NEW: Handle lounge transition completion
+          console.log("[MainSocket] Lounge transition complete:", msg.transition);
+          setLoungeCountingDown(false);
+          setLoungeCountdownValue(0);
+
+          if (!isHost) {
+            if (msg.transition === "to_main_room") {
+              // Participant is now admitted - main room will load
+              setWaitingRoomActive(false);
+              setLoungeOpen(false);
+              setJoinMainRequested(true);
+              setHostChoseLoungeOnly(false);
+              setJoinRequestTick((v) => v + 1);
+              showSnackbar("You've been moved to the Main Room!", "success");
+            } else {
+              // Participant moved to waiting room
+              if (isBreakoutRef.current && applyBreakoutTokenRef.current) {
+                applyBreakoutTokenRef.current(null, null, null, null).catch((e) => {
+                  console.warn("[MainSocket] Failed to return from breakout before waiting room:", e);
+                });
+              }
+              setWaitingRoomActive(true);
+              setLoungeOpen(false);
+              setWaitingRoomStatus("waiting");
+              setJoinMainRequested(false);
+              setHostChoseLoungeOnly(false);
+              showSnackbar("The Social Lounge has closed. Waiting for host admission...", "info");
+            }
+          }
+
+          // Refresh lounge state to clear tables
+          try {
+            const res = await fetch(toApiUrl(`events/${eventId}/lounge-state/`), {
+              headers: authHeader(),
+            });
+            if (res.ok) {
+              const data = await res.json().catch(() => null);
+              if (data?.tables) {
+                setLoungeTables(data.tables);
+              }
+            }
+          } catch (e) {
+            console.warn("[MainSocket] Failed to refresh lounge state:", e);
+          }
+
+          // Refresh lounge participants if host
+          if (isHost) {
+            try {
+              const res = await fetch(toApiUrl(`events/${eventId}/lounge-participants/`), {
+                headers: authHeader(),
+              });
+              if (res.ok) {
+                const data = await res.json().catch(() => null);
+                if (data?.results) {
+                  setPreEventLoungeParticipants(data.results);
+                }
+              }
+            } catch (e) {
+              console.warn("[MainSocket] Failed to refresh lounge participants:", e);
+            }
           }
         } else {
           console.log("[MainSocket] Other message type:", msg.type, msg);
@@ -5540,6 +5681,89 @@ export default function NewLiveMeeting() {
     }
   }, [eventId, showSnackbar]);
 
+  // ✅ NEW: Admit participant from Social Lounge via WebSocket
+  const admitFromLounge = useCallback(async (userIds, transition = "to_main_room") => {
+    if (!userIds?.length) {
+      console.warn("[admitFromLounge] No user IDs provided");
+      return;
+    }
+
+    if (!mainSocketRef.current) {
+      console.error("[admitFromLounge] WebSocket not connected");
+      showSnackbar("WebSocket connection not ready. Please try again.", "error");
+      return;
+    }
+
+    if (mainSocketRef.current.readyState !== WebSocket.OPEN) {
+      console.error("[admitFromLounge] WebSocket not in OPEN state:", mainSocketRef.current.readyState);
+      showSnackbar("WebSocket connection not ready. Please try again.", "error");
+      return;
+    }
+
+    try {
+      const message = JSON.stringify({
+        action: "admit_from_lounge",
+        user_ids: userIds,
+        transition,
+        countdown_seconds: 15,
+      });
+      console.log("[admitFromLounge] Sending message:", message);
+      mainSocketRef.current.send(message);
+      showSnackbar(
+        transition === "to_main_room"
+          ? "Transition to Main Room starts in 15 seconds"
+          : "Transition to Waiting Room starts in 15 seconds",
+        "success"
+      );
+      // Optimistically remove from UI
+      setPreEventLoungeParticipants(prev => prev.filter(p => !userIds.includes(p.user_id)));
+    } catch (e) {
+      console.error("[admitFromLounge] Error:", e);
+      showSnackbar("Failed to admit participant(s)", "error");
+    }
+  }, [showSnackbar]);
+
+  const admitAllFromLounge = useCallback((userIds) => {
+    admitFromLounge(userIds, "to_main_room");
+  }, [admitFromLounge]);
+
+  const admitAllToWaitingFromLounge = useCallback((userIds) => {
+    admitFromLounge(userIds, "to_waiting_room");
+  }, [admitFromLounge]);
+
+  // ✅ NEW: Move participant from Social Lounge to Waiting Room via REST API
+  const moveFromLoungeToWaiting = useCallback(async (userIds) => {
+    if (!eventId || !userIds?.length) {
+      console.warn("[moveFromLoungeToWaiting] Missing eventId or userIds");
+      return;
+    }
+
+    try {
+      console.log("[moveFromLoungeToWaiting] Sending request with userIds:", userIds);
+      const res = await fetch(toApiUrl(`events/${eventId}/waiting-room/admit/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ user_ids: userIds }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("[moveFromLoungeToWaiting] Server error:", err);
+        showSnackbar(err?.detail || "Failed to move to waiting room", "error");
+        return;
+      }
+
+      const data = await res.json();
+      console.log("[moveFromLoungeToWaiting] Success:", data);
+      showSnackbar("Participant(s) moved to waiting room", "success");
+      // Optimistically remove from UI
+      setPreEventLoungeParticipants(prev => prev.filter(p => !userIds.includes(p.user_id)));
+    } catch (e) {
+      console.error("[moveFromLoungeToWaiting] Error:", e);
+      showSnackbar("Failed to move participant(s) to waiting room", "error");
+    }
+  }, [eventId, showSnackbar]);
+
   useEffect(() => {
     if (!eventId || !isHost || !eventData?.waiting_room_enabled) return;
 
@@ -5616,6 +5840,37 @@ export default function NewLiveMeeting() {
     }
     waitingRoomPrevCountRef.current = filteredWaitingRoomCount;
   }, [filteredWaitingRoomCount, isHost, eventData?.waiting_room_enabled, showSnackbar, toggleRightPanel]);
+
+  // ✅ NEW: Fetch lounge participants for host panel (lounge-specific endpoint)
+  useEffect(() => {
+    if (!isHost || !eventData?.lounge_enabled_waiting_room) return;
+
+    let alive = true;
+    const poll = async () => {
+      if (!alive) return;
+      try {
+        const res = await fetch(toApiUrl(`events/${eventId}/lounge-participants/`), {
+          headers: { ...authHeader() },
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (data && Array.isArray(data.results)) {
+          setPreEventLoungeParticipants(
+            data.results.map((lp) => ({
+              ...lp,
+              full_name: lp.user_name || lp.full_name || "User",
+            }))
+          );
+        }
+      } catch { }
+    };
+    poll();
+    const t = setInterval(poll, 5000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [eventId, isHost, eventData?.lounge_enabled_waiting_room]);
 
   useEffect(() => {
     if (!pendingWaitFocus) return;
@@ -5713,6 +5968,39 @@ export default function NewLiveMeeting() {
 
     return () => clearInterval(interval);
   }, [breakoutTimer]);
+
+  // Lounge transition countdown (host admit actions).
+  useEffect(() => {
+    if (!loungeCountingDown) return;
+    if (loungeCountdownValue <= 0) return;
+
+    const interval = setInterval(() => {
+      setLoungeCountdownValue((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [loungeCountingDown, loungeCountdownValue]);
+
+  // Fallback: if countdown completes for waiting-room transition but final socket event is delayed,
+  // immediately switch participant UI to waiting room.
+  useEffect(() => {
+    if (isHost) return;
+    if (!loungeCountingDown) return;
+    if (loungeCountdownValue > 0) return;
+    if (loungeCountdownTransition !== "to_waiting_room") return;
+
+    setWaitingRoomActive(true);
+    setWaitingRoomStatus("waiting");
+    setLoungeOpen(false);
+    setJoinMainRequested(false);
+    setHostChoseLoungeOnly(false);
+  }, [isHost, loungeCountingDown, loungeCountdownValue, loungeCountdownTransition]);
 
   // Break Mode countdown effect
   useEffect(() => {
@@ -5853,6 +6141,7 @@ export default function NewLiveMeeting() {
     // BUT: Allow initialization if already in breakout (joined a lounge table)
     const shouldSkipInitDueToPreEventLounge = preEventLoungeOpen && !joinMainRequested &&
       (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
+      !authToken &&
       !isBreakout;  // ✅ Allow init for users in breakout rooms (joined lounge table)
     if (shouldSkipInitDueToPreEventLounge) {
       console.log("[LiveMeeting] ⏸️ Skipping init - host in pre-event lounge without making a choice");
@@ -6695,13 +6984,13 @@ export default function NewLiveMeeting() {
 
   // ---------- Update DB live-status (start/end) ----------
   const updateLiveStatus = useCallback(
-    async (action) => {
+    async (action, extraParams = {}) => {
       if (!eventId) return;
       try {
         await fetch(toApiUrl(`events/${eventId}/live-status/`), {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify({ action }),
+          body: JSON.stringify({ action, ...extraParams }),
         });
       } catch (e) {
         console.warn("Failed to update live status", e);
@@ -6710,7 +6999,29 @@ export default function NewLiveMeeting() {
     [eventId]
   );
 
-  // Host triggers LIVE on init done
+  // ✅ NEW: Start Webinar with lounge transition options
+  const handleStartWebinar = useCallback(async () => {
+    if (preEventLoungeParticipants.length > 0 && eventData?.lounge_enabled_waiting_room) {
+      // Show dialog for host to choose lounge transition
+      setShowLoungeStartDialog(true);
+    } else {
+      // No lounge participants, start immediately
+      await updateLiveStatus("start");
+      setDbStatus("live");
+    }
+  }, [preEventLoungeParticipants.length, eventData?.lounge_enabled_waiting_room, updateLiveStatus]);
+
+  // ✅ NEW: Confirm and execute lounge transition with countdown
+  const confirmStartWithLoungeTransition = useCallback(async () => {
+    setShowLoungeStartDialog(false);
+    await updateLiveStatus("start", {
+      lounge_transition: loungeTransitionOption,
+      lounge_countdown_seconds: loungeCountdownSeconds,
+    });
+    setDbStatus("live");
+  }, [loungeTransitionOption, loungeCountdownSeconds, updateLiveStatus]);
+
+  // Host triggers LIVE on init done (without dialog - starts immediately)
   useEffect(() => {
     if (!initDone || role !== "publisher") return;
     // Do not reactivate main meeting from lounge/breakout or after it ended
@@ -8984,6 +9295,7 @@ export default function NewLiveMeeting() {
   // Hosts see gate initially (!hostChoiceMade=true) or when they've chosen lounge (hostChoseLoungeOnly=true)
   const shouldShowPreEventLoungeGate =
     preEventLoungeOpen && !joinMainRequested &&
+    !waitingRoomActive &&
     (role !== "publisher" || !hostChoiceMade || hostChoseLoungeOnly) &&
     (!isBreakout || loungeOpen);
 
@@ -12273,6 +12585,58 @@ export default function NewLiveMeeting() {
                     </Paper>
                   </Box>
 
+                  {/* ✅ NEW: Pre-Event Lounge Participants Section */}
+                  {isHost && eventData?.lounge_enabled_waiting_room && preEventLoungeParticipants.length > 0 && (
+                    <Box sx={{ mb: 2 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                        <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
+                          PRE-EVENT LOUNGE ({preEventLoungeParticipants.length})
+                        </Typography>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            sx={{ fontSize: 10, bgcolor: "rgba(34, 197, 94, 0.8)" }}
+                            onClick={() => admitAllFromLounge(preEventLoungeParticipants.map(p => p.user_id))}
+                          >
+                            Admit All to Main Room
+                          </Button>
+                          {eventData?.waiting_room_enabled && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              sx={{ fontSize: 10, borderColor: "rgba(250, 204, 21, 0.7)", color: "rgba(250, 204, 21, 0.95)" }}
+                              onClick={() => admitAllToWaitingFromLounge(preEventLoungeParticipants.map(p => p.user_id))}
+                            >
+                              Admit All to Waiting Room
+                            </Button>
+                          )}
+                        </Stack>
+                      </Stack>
+
+                      <Paper variant="outlined" sx={{ bgcolor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+                        <Stack spacing={0.5} sx={{ p: 1 }}>
+                          {preEventLoungeParticipants.map(p => (
+                            <Stack key={p.user_id} direction="row" alignItems="center" spacing={1} sx={{ py: 0.5, px: 0.75, borderRadius: 1, bgcolor: "rgba(255,255,255,0.02)" }}>
+                              <Avatar sx={{ width: 24, height: 24, fontSize: 10 }}>
+                                {(p.full_name || p.user_name || "U").charAt(0).toUpperCase()}
+                              </Avatar>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography noWrap sx={{ fontWeight: 600, fontSize: 11 }}>
+                                  {p.full_name || p.user_name}
+                                </Typography>
+                              </Box>
+                              <Button size="small" variant="contained" sx={{ fontSize: 9, minWidth: 42, flexShrink: 0, bgcolor: "rgba(34, 197, 94, 0.7)" }}
+                                onClick={() => admitFromLounge([p.user_id])}>
+                                Admit
+                              </Button>
+                            </Stack>
+                          ))}
+                        </Stack>
+                      </Paper>
+                    </Box>
+                  )}
+
                   <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
                     <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
                       AUDIENCE ({(isHost && !isBreakout ? filteredGroupedMembers.audience : groupedMembers.audience).length})
@@ -15456,6 +15820,121 @@ export default function NewLiveMeeting() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* ✅ NEW: Start Webinar Dialog with Lounge Transition Options */}
+        <Dialog
+          open={showLoungeStartDialog}
+          onClose={() => setShowLoungeStartDialog(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              bgcolor: "rgba(15, 23, 42, 0.95)",
+              border: "1px solid rgba(255,255,255,0.10)",
+            },
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 700, color: "#ffffff" }}>
+            Social Lounge has {preEventLoungeParticipants.length} participant(s)
+          </DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
+            <Typography sx={{ mb: 2, color: "#ffffff" }}>
+              How should participants in the Social Lounge be handled when you start the webinar?
+            </Typography>
+            <FormControl component="fieldset" sx={{ mb: 2 }}>
+              <RadioGroup value={loungeTransitionOption} onChange={e => setLoungeTransitionOption(e.target.value)}>
+                <FormControlLabel
+                  value="to_main_room"
+                  control={<Radio />}
+                  label="Move all directly to Main Room (admitted immediately)"
+                  sx={{ "& .MuiFormControlLabel-label": { color: "#ffffff" } }}
+                />
+                {eventData?.waiting_room_enabled && (
+                  <FormControlLabel
+                    value="to_waiting_room"
+                    control={<Radio />}
+                    label="Move to Waiting Room for manual admission"
+                    sx={{ "& .MuiFormControlLabel-label": { color: "#ffffff" } }}
+                  />
+                )}
+              </RadioGroup>
+            </FormControl>
+
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 2 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#ffffff" }}>Countdown:</Typography>
+              <TextField
+                type="number"
+                size="small"
+                value={loungeCountdownSeconds}
+                onChange={e => setLoungeCountdownSeconds(Math.min(30, Math.max(0, parseInt(e.target.value) || 0)))}
+                inputProps={{ min: 0, max: 30 }}
+                sx={{
+                  width: 80,
+                  "& .MuiInputBase-input": { color: "#ffffff" },
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.5)" },
+                  }
+                }}
+              />
+              <Typography sx={{ fontSize: 12, opacity: 0.6, color: "#ffffff" }}>seconds (0 = immediate)</Typography>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => setShowLoungeStartDialog(false)}
+              sx={{ color: "rgba(255,255,255,0.65)", textTransform: "none" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={confirmStartWithLoungeTransition}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              Start Webinar
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Global lounge transition countdown overlay */}
+        <Backdrop
+          open={!isHost && loungeCountingDown && loungeCountdownValue > 0}
+          sx={{
+            zIndex: (theme) => theme.zIndex.modal + 2,
+            backdropFilter: "blur(4px)",
+            bgcolor: "rgba(2, 6, 23, 0.68)",
+          }}
+        >
+          <Box
+            sx={{
+              minWidth: 320,
+              maxWidth: 560,
+              px: 4,
+              py: 3,
+              borderRadius: 3,
+              border: "1px solid rgba(255,255,255,0.18)",
+              bgcolor: "rgba(10, 18, 34, 0.92)",
+              textAlign: "center",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
+            }}
+          >
+            <Typography sx={{ fontSize: 13, letterSpacing: 0.5, opacity: 0.85, mb: 1 }}>
+              TRANSITION STARTING
+            </Typography>
+            <Typography sx={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2, mb: 0.5 }}>
+              {loungeCountdownTransition === "to_main_room"
+                ? "Moving to Main Room"
+                : "Moving to Waiting Room"}
+            </Typography>
+            <Typography sx={{ fontSize: 56, fontWeight: 900, color: "#22d3ee", lineHeight: 1 }}>
+              {loungeCountdownValue}
+            </Typography>
+            <Typography sx={{ fontSize: 13, opacity: 0.78, mt: 1.5 }}>
+              Please wait while participants are moved.
+            </Typography>
+          </Box>
+        </Backdrop>
 
         {/* ✅ Participant More Menu */}
         <Menu
