@@ -7,6 +7,8 @@ const originalFetch = window.fetch;
 
 let isRefreshing = false;
 let failedQueue = [];
+const inFlightGetRequests = new Map();
+const DEFAULT_FETCH_TIMEOUT_MS = 20000;
 
 const processQueue = (error, token = null) => {
     failedQueue.forEach((prom) => {
@@ -21,11 +23,42 @@ const processQueue = (error, token = null) => {
 
 window.fetch = async (...args) => {
     let [resource, config] = args;
+    const requestConfig = config || {};
+    const method = (requestConfig.method || "GET").toUpperCase();
+    const url = typeof resource === "string" ? resource : resource?.url || "";
+    const canDedupeGet = method === "GET" && !!url && !requestConfig.signal;
+
+    // Deduplicate same GET request while in-flight to avoid storms from overlapping pollers.
+    if (canDedupeGet && inFlightGetRequests.has(url)) {
+        return inFlightGetRequests.get(url).then((res) => res.clone());
+    }
+
+    const executeFetch = async () => {
+        // Apply timeout only when no external signal is supplied.
+        if (!requestConfig.signal) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), DEFAULT_FETCH_TIMEOUT_MS);
+            try {
+                return await originalFetch(resource, { ...requestConfig, signal: controller.signal });
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+        return originalFetch(resource, requestConfig);
+    };
 
     // 1. Attempt original request
     let response;
     try {
-        response = await originalFetch(resource, config);
+        if (canDedupeGet) {
+            const sharedPromise = executeFetch().finally(() => {
+                inFlightGetRequests.delete(url);
+            });
+            inFlightGetRequests.set(url, sharedPromise);
+            response = await sharedPromise;
+        } else {
+            response = await executeFetch();
+        }
     } catch (error) {
         return Promise.reject(error);
     }
@@ -40,7 +73,7 @@ window.fetch = async (...args) => {
             })
                 .then((newToken) => {
                     // Retry with new token
-                    const newConfig = { ...config, headers: { ...config?.headers } };
+                    const newConfig = { ...requestConfig, headers: { ...requestConfig?.headers } };
                     newConfig.headers["Authorization"] = `Bearer ${newToken}`;
                     return originalFetch(resource, newConfig);
                 })
@@ -71,12 +104,12 @@ window.fetch = async (...args) => {
                 // Try to get token from header if available, else localStorage
                 // Note: Headers might be headers object or Headers instance
                 let currentToken = getToken();
-                if (!currentToken && config?.headers) {
-                    if (config.headers instanceof Headers) {
-                        const auth = config.headers.get("Authorization");
+                if (!currentToken && requestConfig?.headers) {
+                    if (requestConfig.headers instanceof Headers) {
+                        const auth = requestConfig.headers.get("Authorization");
                         if (auth) currentToken = auth.replace("Bearer ", "");
-                    } else if (config.headers["Authorization"]) {
-                        currentToken = config.headers["Authorization"].replace("Bearer ", "");
+                    } else if (requestConfig.headers["Authorization"]) {
+                        currentToken = requestConfig.headers["Authorization"].replace("Bearer ", "");
                     }
                 }
 
@@ -116,7 +149,7 @@ window.fetch = async (...args) => {
             isRefreshing = false;
 
             // Retry Original Request with new token
-            const newConfig = { ...config, headers: { ...config?.headers } };
+            const newConfig = { ...requestConfig, headers: { ...requestConfig?.headers } };
             newConfig.headers["Authorization"] = `Bearer ${idToken}`;
             const retryResponse = await originalFetch(resource, newConfig);
 

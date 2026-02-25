@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -100,6 +100,9 @@ export default function SpeedNetworkingHostPanel({
     const [wizardOpen, setWizardOpen] = useState(false);
     const [wizardStep, setWizardStep] = useState(0);
     const [tempCriteriaConfig, setTempCriteriaConfig] = useState(null);
+    const fetchInFlightRef = useRef(false);
+    const fetchQueuedRef = useRef(false);
+    const refreshTimerRef = useRef(null);
 
     const mergePastMatches = (incoming, previous = []) => {
         const map = new Map();
@@ -116,11 +119,16 @@ export default function SpeedNetworkingHostPanel({
         });
     };
 
-    const fetchQueue = async () => {
+    const fetchQueue = useCallback(async () => {
         if (!session?.id) {
             console.log('[HostPanel] fetchQueue: session.id not available');
             return;
         }
+        if (fetchInFlightRef.current) {
+            fetchQueuedRef.current = true;
+            return;
+        }
+        fetchInFlightRef.current = true;
         try {
             setLoading(true);
             let queueUrl = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/queue/`.replace(/([^:]\/)\/+/g, "$1");
@@ -160,14 +168,19 @@ export default function SpeedNetworkingHostPanel({
         } catch (err) {
             console.error('[HostPanel] Error fetching data:', err);
         } finally {
+            fetchInFlightRef.current = false;
             setLoading(false);
+            if (fetchQueuedRef.current) {
+                fetchQueuedRef.current = false;
+                fetchQueue();
+            }
         }
-    };
+    }, [eventId, session?.id]);
 
     // Initial fetch
     useEffect(() => {
         fetchQueue();
-    }, [session?.id, eventId]);
+    }, [fetchQueue]);
 
     // Refetch when queue updates via WebSocket
     useEffect(() => {
@@ -201,14 +214,25 @@ export default function SpeedNetworkingHostPanel({
             console.log('[HostPanel] Queue update message matched! Fetching queue...');
             // OPTIMIZATION: Single fetch with delay instead of double fetch
             // Remove the double 100ms and 800ms delay pattern that was causing excessive API calls
-            setTimeout(() => {
+            if (refreshTimerRef.current) {
+                clearTimeout(refreshTimerRef.current);
+            }
+            refreshTimerRef.current = setTimeout(() => {
                 console.log('[HostPanel] Calling fetchQueue() after 300ms delay');
                 fetchQueue();
             }, 300);
         } else {
             console.log('[HostPanel] Message type does not match. Expected "speed_networking_queue_update", got:', messageType);
         }
-    }, [lastMessage]);
+    }, [lastMessage, fetchQueue]);
+
+    useEffect(() => {
+        return () => {
+            if (refreshTimerRef.current) {
+                clearTimeout(refreshTimerRef.current);
+            }
+        };
+    }, []);
 
     const handleRemoveUser = async (userId) => {
         if (!session?.id) return;

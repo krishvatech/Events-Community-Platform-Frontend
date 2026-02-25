@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Typography, Button, CircularProgress } from '@mui/material';
 import SpeedNetworkingMatch from './SpeedNetworkingMatch';
 import SpeedNetworkingTransition from './SpeedNetworkingTransition';
@@ -51,6 +51,11 @@ function isInBufferWindow(match, activeSession) {
     return now >= matchEndAt && now < (matchEndAt + bufferMs);
 }
 
+function isDocumentHidden() {
+    if (typeof document === 'undefined') return false;
+    return document.visibilityState === 'hidden';
+}
+
 export default function SpeedNetworkingZone({
     eventId,
     isAdmin,
@@ -69,6 +74,10 @@ export default function SpeedNetworkingZone({
     const [error, setError] = useState(null);
     const [showInterestSelector, setShowInterestSelector] = useState(false);
     const [hasInterestTags, setHasInterestTags] = useState(null);
+    const myMatchPollInFlightRef = useRef(false);
+    const myMatchAbortRef = useRef(null);
+    const sessionPollInFlightRef = useRef(false);
+    const matchStatusPollInFlightRef = useRef(false);
 
     // Helper to normalize speed networking user shape to member info shape
     const buildMemberObj = (user) => {
@@ -270,6 +279,8 @@ export default function SpeedNetworkingZone({
         if (!currentMatch || !session?.id) return;
 
         const checkMatchStatus = async () => {
+            if (matchStatusPollInFlightRef.current || isDocumentHidden()) return;
+            matchStatusPollInFlightRef.current = true;
             try {
                 // Check if match is still ACTIVE
                 let url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/my-match/`.replace(/([^:]\/)\/+/g, "$1");
@@ -305,6 +316,8 @@ export default function SpeedNetworkingZone({
                 }
             } catch (err) {
                 console.debug('[SpeedNetworking] Error checking match status:', err);
+            } finally {
+                matchStatusPollInFlightRef.current = false;
             }
         };
 
@@ -324,20 +337,25 @@ export default function SpeedNetworkingZone({
     }, [session?.status]);
 
     const fetchMyMatch = useCallback(async () => {
-        if (!session?.id) return false;
+        if (!session?.id) return { matched: false, error: false };
+        if (myMatchPollInFlightRef.current) return { matched: false, error: false };
 
+        myMatchPollInFlightRef.current = true;
+        const controller = new AbortController();
+        myMatchAbortRef.current = controller;
         try {
             let url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/my-match/`.replace(/([^:]\/)\/+/g, "$1");
             url = addCacheBust(url);
             const res = await fetch(url, {
-                headers: authHeader()
+                headers: authHeader(),
+                signal: controller.signal
             });
 
-            if (res.status === 404 || res.status === 400) return false;
-            if (!res.ok) return false;
+            if (res.status === 404 || res.status === 400) return { matched: false, error: false };
+            if (!res.ok) return { matched: false, error: true };
 
             const data = await res.json();
-            if (!data?.id) return false;
+            if (!data?.id) return { matched: false, error: false };
 
             if (isInBufferWindow(data, session) && (session.buffer_seconds || 0) > 0) {
                 setTransitionMatch(data);
@@ -351,10 +369,17 @@ export default function SpeedNetworkingZone({
                     onEnterMatch(data);
                 }
             }
-            return true;
+            return { matched: true, error: false };
         } catch (err) {
-            console.error('[SpeedNetworking] Error fetching my match:', err);
-            return false;
+            if (err?.name !== 'AbortError') {
+                console.error('[SpeedNetworking] Error fetching my match:', err);
+            }
+            return { matched: false, error: err?.name !== 'AbortError' };
+        } finally {
+            myMatchPollInFlightRef.current = false;
+            if (myMatchAbortRef.current === controller) {
+                myMatchAbortRef.current = null;
+            }
         }
     }, [eventId, onEnterMatch, session]);
 
@@ -520,47 +545,52 @@ export default function SpeedNetworkingZone({
     }, [handleNextMatch]);
 
     // Poll for current match when in queue (only if waiting)
-    // WebSocket will notify of matches, but polling is fallback for reliability
+    // Uses recursive setTimeout (not setInterval) to avoid overlap request storms.
     useEffect(() => {
         if (!inQueue || !session?.id) return;
 
-        const pollInterval = setInterval(async () => {
-            try {
-                let url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/my-match/`.replace(/([^:]\/)\/+/g, "$1");
-                url = addCacheBust(url); // Add cache-bust for fresh data
-                const res = await fetch(url, {
-                    headers: authHeader()
-                });
+        let timeoutId;
+        let cancelled = false;
+        let backoffMs = 0;
+        const minPollMs = 3500;
+        const maxPollMs = 20000;
 
-                if (res.status === 404) {
-                    setInQueue(false);
-                    return;
-                }
-                if (!res.ok) return;
+        const scheduleNext = (delayMs) => {
+            if (cancelled) return;
+            timeoutId = window.setTimeout(tick, delayMs);
+        };
 
-                const data = await res.json();
+        const tick = async () => {
+            if (cancelled) return;
 
-                if (data.id) {
-                    if (isInBufferWindow(data, session) && (session.buffer_seconds || 0) > 0) {
-                        setTransitionMatch(data);
-                        setCurrentMatch(data);
-                        setInQueue(false);
-                    } else {
-                        // Match found!
-                        setCurrentMatch(data);
-                        setTransitionMatch(null);
-                        setInQueue(false);
-                        if (onEnterMatch) {
-                            onEnterMatch(data);
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error('[SpeedNetworking] Error polling match:', err);
+            if (isDocumentHidden()) {
+                scheduleNext(maxPollMs);
+                return;
             }
-        }, 15000); // OPTIMIZATION: Increased from 5s to 15s for 100+ user scalability
 
-        return () => clearInterval(pollInterval);
+            const result = await fetchMyMatch();
+            if (cancelled || result.matched) return;
+
+            if (result.error) {
+                backoffMs = Math.min(maxPollMs, backoffMs > 0 ? backoffMs * 2 : minPollMs);
+                scheduleNext(backoffMs);
+                return;
+            }
+
+            backoffMs = 0;
+            scheduleNext(minPollMs);
+        };
+
+        // Fast first check, then adaptive polling.
+        scheduleNext(250);
+
+        return () => {
+            cancelled = true;
+            if (timeoutId) window.clearTimeout(timeoutId);
+            if (myMatchAbortRef.current) {
+                myMatchAbortRef.current.abort();
+            }
+        };
     }, [inQueue, session, eventId, onEnterMatch]);
 
     useEffect(() => {
@@ -574,12 +604,14 @@ export default function SpeedNetworkingZone({
         fetchActiveSession();
     }, [fetchActiveSession]);
 
-    // Poll session status periodically (fallback for WebSocket)
-    // Only check when session might have changed (not in active match)
+    // Poll session status periodically (fallback for WebSocket).
+    // Guard against overlap and pause polling when tab is hidden.
     useEffect(() => {
         if (!session?.id) return;
 
         const pollInterval = setInterval(async () => {
+            if (sessionPollInFlightRef.current || isDocumentHidden()) return;
+            sessionPollInFlightRef.current = true;
             try {
                 let url = `${API_ROOT}/events/${eventId}/speed-networking/`.replace(/([^:]\/)\/+/g, "$1");
                 url = addCacheBust(url); // Add cache-bust for fresh data
@@ -625,6 +657,8 @@ export default function SpeedNetworkingZone({
                 }
             } catch (err) {
                 console.error('[SpeedNetworking] Error polling session status:', err);
+            } finally {
+                sessionPollInFlightRef.current = false;
             }
         }, 20000); // OPTIMIZATION: Increased from 5s to 20s for 100+ user scalability
 
