@@ -2534,7 +2534,7 @@ function EventsPage() {
     setHostingId(ev.id);
     try {
       const livePath = `/live/${ev.slug || ev.id}?id=${ev.id}&role=publisher`;
-      window.open(livePath, "_blank");
+      navigate(livePath);
     } catch (e) {
       setErrMsg(e?.message || "Unable to start live meeting.");
       setErrOpen(true);

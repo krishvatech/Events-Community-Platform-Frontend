@@ -970,7 +970,7 @@ export default function EventManagePage() {
     setHostingId(event.id);
     try {
       const livePath = `/live/${event.slug || event.id}?id=${event.id}&role=publisher`;
-      window.open(livePath, "_blank");
+      navigate(livePath);
     } catch (e) {
       setErrMsg(e?.message || "Unable to start live meeting.");
       setErrOpen(true);
