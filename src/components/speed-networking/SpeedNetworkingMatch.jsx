@@ -56,6 +56,7 @@ export default function SpeedNetworkingMatch({
     const [videoError, setVideoError] = useState(null);
     const [showBreakdown, setShowBreakdown] = useState(false);
     const autoAdvanceTriggeredRef = useRef(false);
+    const matchStartMsRef = useRef(Date.now());
 
     // Inject Dyte UI layout styles
     useEffect(() => {
@@ -128,21 +129,21 @@ export default function SpeedNetworkingMatch({
     // Timer countdown
     useEffect(() => {
         autoAdvanceTriggeredRef.current = false;
-
-        // Calculate total duration including any extension
-        const totalSeconds = session.duration_minutes * 60 + (match?.extended_by_seconds || 0);
-        setTimeRemaining(totalSeconds);
+        const totalSeconds = (session?.duration_minutes || 0) * 60 + (match?.extended_by_seconds || 0);
 
         const rawStart = match?.started_at || match?.created_at;
         const parsedStart = rawStart ? new Date(rawStart).getTime() : NaN;
-        const startTime = Number.isFinite(parsedStart) ? parsedStart : Date.now();
-        const duration = totalSeconds * 1000;
+        if (Number.isFinite(parsedStart)) {
+            matchStartMsRef.current = parsedStart;
+        } else {
+            matchStartMsRef.current = Date.now();
+        }
+        const durationMs = totalSeconds * 1000;
 
-        const interval = setInterval(() => {
+        const tick = () => {
             const now = Date.now();
-            const elapsed = now - startTime;
-            const remaining = Math.max(0, Math.floor((duration - elapsed) / 1000));
-
+            const elapsed = now - matchStartMsRef.current;
+            const remaining = Math.max(0, Math.floor((durationMs - elapsed) / 1000));
             setTimeRemaining(remaining);
 
             if (remaining === 0 && !autoAdvanceTriggeredRef.current) {
@@ -153,10 +154,26 @@ export default function SpeedNetworkingMatch({
                     onNextMatch();
                 }
             }
+        };
+
+        // Run immediately so UI updates instantly instead of waiting for first interval tick.
+        tick();
+
+        const interval = setInterval(() => {
+            tick();
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [match, session, onNextMatch, onMatchTimerExpired]);
+    }, [
+        match?.id,
+        match?.started_at,
+        match?.created_at,
+        match?.extended_by_seconds,
+        session?.duration_minutes,
+        session?.buffer_seconds,
+        onNextMatch,
+        onMatchTimerExpired
+    ]);
 
     // Cleanup on unmount
     useEffect(() => {
