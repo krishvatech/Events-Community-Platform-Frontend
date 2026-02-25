@@ -1509,6 +1509,7 @@ export default function ProfilePage() {
     end_month: "",
     currently_ongoing: false,
     description: "",
+    credential_id: "",
     credential_url: "",
   };
   const EMPTY_CERT_FORM = {
@@ -1526,6 +1527,7 @@ export default function ProfilePage() {
     start_month: "",
     end_month: "",
     ongoing: false,
+    membership_id: "",
     membership_url: "",
   };
   const initialExpForm = {
@@ -2696,6 +2698,7 @@ export default function ProfilePage() {
       end_month: t.end_date ? String(t.end_date).slice(0, 7) : "",
       currently_ongoing: !!t.currently_ongoing,
       description: t.description || "",
+      credential_id: t.credential_id || "",
       credential_url: t.credential_url || "",
     });
     setTrainingOpen(true);
@@ -2740,6 +2743,7 @@ export default function ProfilePage() {
           : (trainingForm.end_month ? `${trainingForm.end_month}-01` : null),
         currently_ongoing: isOngoing,
         description: trainingForm.description || "",
+        credential_id: trainingForm.credential_id || "",
         credential_url: trainingForm.credential_url || "",
       };
       if (editTrainingId) {
@@ -2851,6 +2855,7 @@ export default function ProfilePage() {
       start_month: m.start_date ? String(m.start_date).slice(0, 7) : "",
       end_month: m.end_date ? String(m.end_date).slice(0, 7) : "",
       ongoing: !!m.ongoing,
+      membership_id: m.membership_id || "",
       membership_url: m.membership_url || "",
     });
     setMemberOpen(true);
@@ -2894,6 +2899,7 @@ export default function ProfilePage() {
           ? null
           : (memberForm.end_month ? `${memberForm.end_month}-01` : null),
         ongoing: isOngoing,
+        membership_id: memberForm.membership_id || "",
         membership_url: memberForm.membership_url || "",
       };
       if (editMemberId) {
@@ -5246,6 +5252,12 @@ export default function ProfilePage() {
               onChange={(e) => setTrainingForm((p) => ({ ...p, description: e.target.value }))}
             />
             <TextField
+              label="Credential ID"
+              fullWidth
+              value={trainingForm.credential_id || ""}
+              onChange={(e) => setTrainingForm((p) => ({ ...p, credential_id: e.target.value }))}
+            />
+            <TextField
               label="Credential URL"
               fullWidth
               value={trainingForm.credential_url || ""}
@@ -5411,6 +5423,12 @@ export default function ProfilePage() {
               label="Ongoing"
             />
 
+            <TextField
+              label="Membership ID or Credential No."
+              fullWidth
+              value={memberForm.membership_id || ""}
+              onChange={(e) => setMemberForm((p) => ({ ...p, membership_id: e.target.value }))}
+            />
             <TextField
               label="Membership URL"
               fullWidth
