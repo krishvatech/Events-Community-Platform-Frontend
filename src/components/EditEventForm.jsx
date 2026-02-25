@@ -473,6 +473,10 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
     const onPickLogoImage = (file) => {
         if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            setToast({ open: true, type: "error", msg: "Logo image size must be less than 5MB" });
+            return;
+        }
         setLogoImageFile(file);
         const reader = new FileReader();
         reader.onload = (e) => setLocalLogoImagePreview(String(e.target?.result || ""));
@@ -481,6 +485,10 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
     const onPickCoverImage = (file) => {
         if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            setToast({ open: true, type: "error", msg: "Cover image size must be less than 5MB" });
+            return;
+        }
         setCoverImageFile(file);
         const reader = new FileReader();
         reader.onload = (e) => setLocalCoverImagePreview(String(e.target?.result || ""));
@@ -489,6 +497,10 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
 
     const onPickWaitingRoomImage = (file) => {
         if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            setToast({ open: true, type: "error", msg: "Waiting room image size must be less than 5MB" });
+            return;
+        }
         setWaitingRoomImageFile(file);
         const reader = new FileReader();
         reader.onload = (e) => setLocalWaitingRoomImagePreview(String(e.target?.result || ""));
@@ -820,7 +832,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                         <Box>
                             <Typography variant="subtitle1" className="font-semibold">Logo / Picture</Typography>
                             <Typography variant="caption" className="text-slate-500 block mb-2">
-                                Recommended 650x365px - Max 50 MB
+                                Recommended 200x200px - Max 5 MB
                             </Typography>
 
                             <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
@@ -850,7 +862,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                         <Box>
                             <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
                             <Typography variant="caption" className="text-slate-500 block mb-2">
-                                Recommended 650x365px - Max 50 MB
+                                Recommended 1280x720px - Max 5 MB
                             </Typography>
 
                             <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"
@@ -880,7 +892,7 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                         <Box>
                             <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
                             <Typography variant="caption" className="text-slate-500 block mb-2">
-                                Recommended 650x365px - Max 50 MB
+                                Recommended 1280x720px - Max 5 MB
                             </Typography>
 
                             <Box className="rounded-xl border border-slate-300 bg-slate-100/70 flex items-center justify-center"

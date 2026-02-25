@@ -969,7 +969,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           <Box>
             <Typography variant="subtitle1" className="font-semibold">Logo / Picture</Typography>
             <Typography variant="caption" className="text-slate-500 block mb-2">
-              Recommended 650x365px - Max 50 MB
+              Recommended 200x200px - Max 5 MB
             </Typography>
 
             <Box
@@ -997,6 +997,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
+                  if (f.size > 5 * 1024 * 1024) {
+                    setToast({ open: true, type: "error", msg: "Logo image size must be less than 5MB" });
+                    return;
+                  }
                   setLogoImageFile(f);
                   const r = new FileReader();
                   r.onload = (ev) =>
@@ -1023,7 +1027,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           <Box>
             <Typography variant="subtitle1" className="font-semibold">Cover Image</Typography>
             <Typography variant="caption" className="text-slate-500 block mb-2">
-              Recommended 650x365px - Max 50 MB
+              Recommended 1280x720px - Max 5 MB
             </Typography>
 
             <Box
@@ -1051,6 +1055,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
+                  if (f.size > 5 * 1024 * 1024) {
+                    setToast({ open: true, type: "error", msg: "Cover image size must be less than 5MB" });
+                    return;
+                  }
                   setCoverImageFile(f);
                   const r = new FileReader();
                   r.onload = (ev) =>
@@ -1077,7 +1085,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
           <Box>
             <Typography variant="subtitle1" className="font-semibold">Waiting Room</Typography>
             <Typography variant="caption" className="text-slate-500 block mb-2">
-              Recommended 650x365px - Max 50 MB
+              Recommended 1280x720px - Max 5 MB
             </Typography>
 
             <Box
@@ -1105,6 +1113,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
+                  if (f.size > 5 * 1024 * 1024) {
+                    setToast({ open: true, type: "error", msg: "Waiting room image size must be less than 5MB" });
+                    return;
+                  }
                   setWaitingRoomImageFile(f);
                   const r = new FileReader();
                   r.onload = (ev) =>
