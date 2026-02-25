@@ -1733,10 +1733,12 @@ function WaitingRoomScreen({
 
         {/* Break Indicator Banner */}
         {isOnBreak && (
-          <Box sx={{ bgcolor: "rgba(255,165,0,0.12)", borderRadius: 2, p: 1.5, mb: 2,
-             border: "1px solid rgba(255,165,0,0.3)", display:"flex", gap:1 }}>
-            <CoffeeIcon sx={{ color:"rgba(255,165,0,0.85)", fontSize:18 }} />
-            <Typography sx={{ fontSize:13, color:"rgba(255,255,255,0.8)" }}>
+          <Box sx={{
+            bgcolor: "rgba(255,165,0,0.12)", borderRadius: 2, p: 1.5, mb: 2,
+            border: "1px solid rgba(255,165,0,0.3)", display: "flex", gap: 1
+          }}>
+            <CoffeeIcon sx={{ color: "rgba(255,165,0,0.85)", fontSize: 18 }} />
+            <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.8)" }}>
               The session is currently on a short break.
             </Typography>
           </Box>
@@ -2421,6 +2423,7 @@ export default function NewLiveMeeting() {
   const [isCancellingRecording, setIsCancellingRecording] = useState(false);
   const [cancelRecordingStep, setCancelRecordingStep] = useState(1);
   const [cancelRecordingText, setCancelRecordingText] = useState("");
+  const [autoRecordOnAdmit, setAutoRecordOnAdmit] = useState(true);
   const [activeTableId, setActiveTableId] = useState(null);
   const activeTableIdRef = useRef(null); // ✅ Ref for socket access
   const [activeTableName, setActiveTableName] = useState("");
@@ -4011,6 +4014,12 @@ export default function NewLiveMeeting() {
     }
   }, [eventId, showSnackbar]);
 
+  const triggerAutoRecordingIfEnabled = useCallback(() => {
+    if (autoRecordOnAdmit && !isRecording && !isRecordingPaused) {
+      handleStartRecording();
+    }
+  }, [autoRecordOnAdmit, isRecording, isRecordingPaused, handleStartRecording]);
+
   // Break Mode API Callbacks
   const handleStartBreak = useCallback(async (durationSeconds) => {
     if (!eventId) return;
@@ -5510,6 +5519,7 @@ export default function NewLiveMeeting() {
         return;
       }
       showSnackbar("Admitted all waiting participants", "success");
+      triggerAutoRecordingIfEnabled();
     } catch (e) {
       showSnackbar("Failed to admit waiting participants", "error");
     }
@@ -5530,6 +5540,7 @@ export default function NewLiveMeeting() {
           return;
         }
         showSnackbar("Participant admitted", "success");
+        triggerAutoRecordingIfEnabled();
       } catch {
         showSnackbar("Failed to admit participant", "error");
       }
@@ -5702,6 +5713,7 @@ export default function NewLiveMeeting() {
           : "Transition to Waiting Room starts in 15 seconds",
         "success"
       );
+      triggerAutoRecordingIfEnabled();
       // Optimistically remove from UI
       setPreEventLoungeParticipants(prev => prev.filter(p => !userIds.includes(p.user_id)));
     } catch (e) {
@@ -11134,144 +11146,145 @@ export default function NewLiveMeeting() {
 
                   const m = item.msg;
                   return (
-                  <Stack key={item.key} alignItems={m.mine ? "flex-end" : "flex-start"} spacing={0.25}>
-                    {/* Edit mode */}
-                    {editingMsgId === m.id ? (
-                      <Paper
-                        variant="outlined"
-                        sx={{
-                          p: 1.25,
-                          maxWidth: "85%",
-                          bgcolor: "rgba(20,184,177,0.1)",
-                          borderColor: "rgba(20,184,177,0.4)",
-                          borderRadius: 2,
-                        }}
-                      >
-                        <TextField
-                          fullWidth
-                          multiline
-                          maxRows={4}
-                          size="small"
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          sx={{
-                            mb: 1,
-                            "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.05)" },
-                          }}
-                        />
-                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={handleCancelEdit}
-                            sx={{ fontSize: "11px", px: 1 }}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={() => handleSaveEdit(m.id)}
-                            disabled={!editText.trim()}
-                            sx={{ fontSize: "11px", px: 1 }}
-                          >
-                            Save
-                          </Button>
-                        </Stack>
-                      </Paper>
-                    ) : (
-                      <Box
-                        sx={{
-                          position: "relative",
-                          display: "flex",
-                          justifyContent: m.mine ? "flex-end" : "flex-start",
-                          alignItems: "flex-start",
-                          gap: 0.5,
-                          "&:hover .edit-delete-buttons": {
-                            opacity: 1,
-                          },
-                        }}
-                      >
-                        {/* Edit/Delete menu for own messages (before message on hover) */}
-                        {m.mine && !m.is_deleted && (
-                          <Stack
-                            className="edit-delete-buttons"
-                            direction="row"
-                            spacing={0.25}
-                            sx={{
-                              opacity: 0,
-                              transition: "opacity 0.2s",
-                              pt: 0.25,
-                            }}
-                          >
-                            <IconButton
-                              size="small"
-                              onClick={() => handleStartEdit(m)}
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                p: 0.25,
-                                color: "rgba(255,255,255,0.6)",
-                                "&:hover": { color: "rgba(255,255,255,1)", bgcolor: "rgba(255,255,255,0.1)" },
-                              }}
-                              title="Edit message"
-                            >
-                              <EditRoundedIcon sx={{ fontSize: 14 }} />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteMessage(m.id)}
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                p: 0.25,
-                                color: "rgba(255,255,255,0.6)",
-                                "&:hover": { color: "#f44336", bgcolor: "rgba(244,67,54,0.15)" },
-                              }}
-                              title="Delete message"
-                            >
-                              <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
-                            </IconButton>
-                          </Stack>
-                        )}
-
+                    <Stack key={item.key} alignItems={m.mine ? "flex-end" : "flex-start"} spacing={0.25}>
+                      {/* Edit mode */}
+                      {editingMsgId === m.id ? (
                         <Paper
                           variant="outlined"
                           sx={{
                             p: 1.25,
                             maxWidth: "85%",
-                            bgcolor: m.mine ? "rgba(20,184,177,0.15)" : "rgba(255,255,255,0.03)",
-                            borderColor: m.mine ? "rgba(20,184,177,0.3)" : "rgba(255,255,255,0.08)",
+                            bgcolor: "rgba(20,184,177,0.1)",
+                            borderColor: "rgba(20,184,177,0.4)",
                             borderRadius: 2,
-                            opacity: m.is_deleted ? 0.6 : 1,
                           }}
                         >
-                          {/* Message body with deleted/edited states */}
-                          <Typography
+                          <TextField
+                            fullWidth
+                            multiline
+                            maxRows={4}
+                            size="small"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
                             sx={{
-                              fontSize: 13,
-                              opacity: m.is_deleted ? 0.6 : 0.9,
-                              fontStyle: m.is_deleted ? "italic" : "normal",
-                              color: m.is_deleted ? "#999" : "inherit",
+                              mb: 1,
+                              "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.05)" },
                             }}
-                          >
-                            {m.body}
-                          </Typography>
-
-                          {/* Edited label */}
-                          {!m.is_deleted && m.is_edited && (
-                            <Typography sx={{ fontSize: 9, opacity: 0.5, mt: 0.25 }}>Edited</Typography>
+                          />
+                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={handleCancelEdit}
+                              sx={{ fontSize: "11px", px: 1 }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => handleSaveEdit(m.id)}
+                              disabled={!editText.trim()}
+                              sx={{ fontSize: "11px", px: 1 }}
+                            >
+                              Save
+                            </Button>
+                          </Stack>
+                        </Paper>
+                      ) : (
+                        <Box
+                          sx={{
+                            position: "relative",
+                            display: "flex",
+                            justifyContent: m.mine ? "flex-end" : "flex-start",
+                            alignItems: "flex-start",
+                            gap: 0.5,
+                            "&:hover .edit-delete-buttons": {
+                              opacity: 1,
+                            },
+                          }}
+                        >
+                          {/* Edit/Delete menu for own messages (before message on hover) */}
+                          {m.mine && !m.is_deleted && (
+                            <Stack
+                              className="edit-delete-buttons"
+                              direction="row"
+                              spacing={0.25}
+                              sx={{
+                                opacity: 0,
+                                transition: "opacity 0.2s",
+                                pt: 0.25,
+                              }}
+                            >
+                              <IconButton
+                                size="small"
+                                onClick={() => handleStartEdit(m)}
+                                sx={{
+                                  width: 24,
+                                  height: 24,
+                                  p: 0.25,
+                                  color: "rgba(255,255,255,0.6)",
+                                  "&:hover": { color: "rgba(255,255,255,1)", bgcolor: "rgba(255,255,255,0.1)" },
+                                }}
+                                title="Edit message"
+                              >
+                                <EditRoundedIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteMessage(m.id)}
+                                sx={{
+                                  width: 24,
+                                  height: 24,
+                                  p: 0.25,
+                                  color: "rgba(255,255,255,0.6)",
+                                  "&:hover": { color: "#f44336", bgcolor: "rgba(244,67,54,0.15)" },
+                                }}
+                                title="Delete message"
+                              >
+                                <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </Stack>
                           )}
 
-                          {/* Timestamp */}
-                          <Typography sx={{ fontSize: 10, opacity: 0.5, textAlign: "right", mt: 0.5, whiteSpace: "nowrap" }}>
-                            {formatPrivateMessageTimestamp(m, item.prevMessage)}
-                          </Typography>
-                        </Paper>
-                      </Box>
-                    )}
-                  </Stack>
-                )})}
+                          <Paper
+                            variant="outlined"
+                            sx={{
+                              p: 1.25,
+                              maxWidth: "85%",
+                              bgcolor: m.mine ? "rgba(20,184,177,0.15)" : "rgba(255,255,255,0.03)",
+                              borderColor: m.mine ? "rgba(20,184,177,0.3)" : "rgba(255,255,255,0.08)",
+                              borderRadius: 2,
+                              opacity: m.is_deleted ? 0.6 : 1,
+                            }}
+                          >
+                            {/* Message body with deleted/edited states */}
+                            <Typography
+                              sx={{
+                                fontSize: 13,
+                                opacity: m.is_deleted ? 0.6 : 0.9,
+                                fontStyle: m.is_deleted ? "italic" : "normal",
+                                color: m.is_deleted ? "#999" : "inherit",
+                              }}
+                            >
+                              {m.body}
+                            </Typography>
+
+                            {/* Edited label */}
+                            {!m.is_deleted && m.is_edited && (
+                              <Typography sx={{ fontSize: 9, opacity: 0.5, mt: 0.25 }}>Edited</Typography>
+                            )}
+
+                            {/* Timestamp */}
+                            <Typography sx={{ fontSize: 10, opacity: 0.5, textAlign: "right", mt: 0.5, whiteSpace: "nowrap" }}>
+                              {formatPrivateMessageTimestamp(m, item.prevMessage)}
+                            </Typography>
+                          </Paper>
+                        </Box>
+                      )}
+                    </Stack>
+                  )
+                })}
                 <div ref={privateChatBottomRef} />
               </Stack>
             )}
@@ -12223,6 +12236,32 @@ export default function NewLiveMeeting() {
                         <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
                           WAITING ({filteredWaitingRoomCount})
                         </Typography>
+
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              size="small"
+                              checked={autoRecordOnAdmit}
+                              onChange={(e) => setAutoRecordOnAdmit(e.target.checked)}
+                              sx={{
+                                '& .MuiSwitch-switchBase.Mui-checked': {
+                                  color: '#f44336',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(244, 67, 54, 0.08)',
+                                  },
+                                },
+                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                                  backgroundColor: '#f44336',
+                                },
+                              }}
+                            />
+                          }
+                          label="Auto-record on admit"
+                          sx={{
+                            '& .MuiTypography-root': { fontSize: 11, fontWeight: 700, opacity: 0.8 },
+                            mr: 0
+                          }}
+                        />
                       </Stack>
 
                       {/* Global Waiting Room Actions */}
@@ -12279,7 +12318,7 @@ export default function NewLiveMeeting() {
                             Announce
                           </Button>
                         </Stack>
-                        
+
                       )}
 
                       {/* ✅ NEW: Sent Announcements Panel (Host Management) */}
