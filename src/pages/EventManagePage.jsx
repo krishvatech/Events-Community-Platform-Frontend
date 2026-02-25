@@ -4,6 +4,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import RegisteredActions from "../components/RegisteredActions";
 import InviteUsersDialog from "../components/InviteUsersDialog";
+import InviteEmailsDialog from "../components/InviteEmailsDialog";
 
 import {
   Avatar,
@@ -65,6 +66,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
+import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
@@ -302,6 +304,7 @@ export default function EventManagePage() {
   const [addParticipantEmail, setAddParticipantEmail] = useState("");
   const [addParticipantLoading, setAddParticipantLoading] = useState(false);
   const [inviteUsersOpen, setInviteUsersOpen] = useState(false);
+  const [inviteEmailsOpen, setInviteEmailsOpen] = useState(false);
   const [regsRefresh, setRegsRefresh] = useState(0);
 
   // User Search State
@@ -2051,6 +2054,16 @@ export default function EventManagePage() {
               sx={{ textTransform: "none", borderRadius: 999 }}
             >
               Invite
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              color="secondary"
+              startIcon={<EmailRoundedIcon />}
+              onClick={() => setInviteEmailsOpen(true)}
+              sx={{ textTransform: "none", borderRadius: 999, ml: 1 }}
+            >
+              Invite by Email
             </Button>
           </Stack>
         </Stack>
@@ -3968,11 +3981,19 @@ export default function EventManagePage() {
         </Dialog>
 
         {eventId && (
-          <InviteUsersDialog
-            open={inviteUsersOpen}
-            onClose={() => setInviteUsersOpen(false)}
-            eventId={eventId}
-          />
+          <>
+            <InviteUsersDialog
+              open={inviteUsersOpen}
+              onClose={() => setInviteUsersOpen(false)}
+              eventId={eventId}
+            />
+            <InviteEmailsDialog
+              open={inviteEmailsOpen}
+              onClose={() => setInviteEmailsOpen(false)}
+              mode="event"
+              targetIdOrSlug={eventId}
+            />
+          </>
         )}
 
         {/* Cancel Event Dialog */}

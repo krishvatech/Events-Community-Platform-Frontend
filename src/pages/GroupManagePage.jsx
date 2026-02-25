@@ -34,6 +34,8 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import InviteEmailsDialog from "../components/InviteEmailsDialog";
 
 
 // ---- API helpers (reuse same pattern as AdminGroups.jsx) ----
@@ -3495,6 +3497,7 @@ export default function GroupManagePage() {
     const [memLoading, setMemLoading] = React.useState(true);
     const [memError, setMemError] = React.useState("");
     const [addOpen, setAddOpen] = React.useState(false);
+    const [inviteEmailsOpen, setInviteEmailsOpen] = React.useState(false);
     const [requestAddOpen, setRequestAddOpen] = React.useState(false);
     const [memMenuAnchor, setMemMenuAnchor] = React.useState(null);
     const [activeMember, setActiveMember] = React.useState(null);
@@ -5164,14 +5167,25 @@ export default function GroupManagePage() {
 
                                                 {canAddMembersDirectly && (
                                                     // Owner + Admin → real "Add members" (opens dialog)
-                                                    <Button
-                                                        variant="contained"
-                                                        className="rounded-xl"
-                                                        sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                                                        onClick={() => setAddOpen(true)}
-                                                    >
-                                                        Add members
-                                                    </Button>
+                                                    <>
+                                                        <Button
+                                                            variant="contained"
+                                                            className="rounded-xl"
+                                                            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                                                            onClick={() => setAddOpen(true)}
+                                                        >
+                                                            Add members
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            className="rounded-xl ml-2 text-white"
+                                                            sx={{ textTransform: "none", backgroundColor: "#0ea5e9", "&:hover": { backgroundColor: "#0284c7" }, ml: 1 }}
+                                                            startIcon={<EmailRoundedIcon />}
+                                                            onClick={() => setInviteEmailsOpen(true)}
+                                                        >
+                                                            Invite by Email
+                                                        </Button>
+                                                    </>
                                                 )}
 
                                                 {canRequestMemberChanges && !canAddMembersDirectly && (
@@ -6385,6 +6399,13 @@ export default function GroupManagePage() {
                                 await fetchMembers();
                                 setGroup((prev) => prev ? { ...prev, member_count: (prev.member_count || 0) + n } : prev);
                             }}
+                        />
+
+                        <InviteEmailsDialog
+                            open={inviteEmailsOpen}
+                            onClose={() => setInviteEmailsOpen(false)}
+                            mode="group"
+                            targetIdOrSlug={idOrSlug}
                         />
 
                         <RequestAddMembersDialog

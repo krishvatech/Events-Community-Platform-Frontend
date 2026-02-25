@@ -3737,6 +3737,39 @@ export default function GroupDetailsPage() {
     fetchGroup();
   }, [fetchGroup]);
 
+  // Handle invite_token from URL
+  React.useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const inviteToken = searchParams.get("invite_token");
+    const token = authHeaders().Authorization;
+
+    if (inviteToken && groupId && token) {
+      const acceptInvite = async () => {
+        try {
+          const res = await fetch(toApiUrl(`groups/${groupId}/invite-emails/accept/`), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ token: inviteToken })
+          });
+          const data = await res.json().catch(() => ({}));
+
+          if (res.ok) {
+            setToast({ open: true, msg: "Successfully joined the group!", type: "success" });
+            fetchGroup();
+          } else if (res.status !== 400 || data?.detail !== "Invalid or expired token.") {
+            setToast({ open: true, msg: data?.detail || "Could not accept invite.", type: "error" });
+          }
+
+          const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+          window.history.replaceState({ path: newUrl }, '', newUrl);
+        } catch (e) {
+          console.error("Error accepting invite:", e);
+        }
+      };
+      acceptInvite();
+    }
+  }, [location.search, groupId, fetchGroup]);
+
   const handleJoin = async () => {
     if (!group?.id) return;
     try {

@@ -32,6 +32,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import { formatSessionTimeRange } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
+import { toast } from "react-toastify";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -46,6 +47,45 @@ const toAbs = (u) => {
   return `${API_ORIGIN}${p}`;
 };
 const EARLY_JOIN_MINUTES = 15;
+
+function bumpCartCount(qty = 1) {
+  const prev = Number(localStorage.getItem("cart_count") || "0");
+  const next = prev + qty;
+  localStorage.setItem("cart_count", String(next));
+  window.dispatchEvent(new Event("cart:update"));
+}
+
+async function addToCart(eventId, qty = 1, token) {
+  try {
+    const res = await fetch(`${API_BASE}/cart/items/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ event_id: eventId, quantity: qty }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      toast.error(`Add to cart failed (${res.status}): ${text}`);
+      return null;
+    }
+    const item = await res.json();
+    try {
+      const r2 = await fetch(`${API_BASE}/cart/count/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      const d2 = await r2.json();
+      localStorage.setItem("cart_count", String(d2?.count ?? 0));
+      window.dispatchEvent(new Event("cart:update"));
+    } catch { }
+    return item;
+  } catch {
+    toast.error("Could not add to cart. Please try again.");
+    return null;
+  }
+}
+
 function parseDateSafe(s) {
   if (!s) return null;
   if (typeof s === "string") {
@@ -232,6 +272,60 @@ export default function EventDetailsPage() {
     }
   }, [event?.id, token]);
 
+  // Handle invite_token from URL
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const inviteToken = searchParams.get("invite_token");
+    const eventIdOrSlug = event?.id || slug;
+
+    if (inviteToken && eventIdOrSlug && token) {
+      const acceptInvite = async () => {
+        try {
+          const res = await fetch(urlJoin(API_BASE, `/events/${eventIdOrSlug}/invite-emails/accept/`), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ token: inviteToken })
+          });
+          const data = await res.json().catch(() => ({}));
+
+          if (res.ok) {
+            if (data?.status === "requires_payment") {
+              toast.info("This is a paid event. Adding to cart...");
+              const item = await addToCart(eventIdOrSlug, 1, token);
+              if (item) {
+                bumpCartCount(0);
+              }
+            } else {
+              refreshEventFromServer();
+              // Also refresh registration immediately
+              const mineRes = await fetch(`${API_BASE}/event-registrations/mine/`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (mineRes.ok) {
+                const mineData = await mineRes.json();
+                const results = Array.isArray(mineData) ? mineData : (mineData.results || []);
+                const mineForEvent = results.find((r) => Number(r?.event?.id) === Number(event?.id));
+                setRegistration(mineForEvent || null);
+              }
+            }
+          } else if (res.status !== 400 || data?.detail !== "Invalid or expired token.") {
+            console.error(data?.detail || "Could not accept invite.");
+          }
+
+          const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+          window.history.replaceState({ path: newUrl }, '', newUrl);
+        } catch (e) {
+          console.error("Error accepting event invite:", e);
+        }
+      };
+
+      // We only execute this if we already loaded the event to know its ID
+      if (event?.id) {
+        acceptInvite();
+      }
+    }
+  }, [location.search, event?.id, slug, token, refreshEventFromServer]);
+
   useEffect(() => {
     if (!event?.id) return;
 
@@ -328,6 +422,13 @@ export default function EventDetailsPage() {
     if (!event?.id) return;
     if (!token) {
       navigate(`/signin?next=/events/${slug}`);
+      return;
+    }
+
+    if (!event.is_free) {
+      toast.info("This is a paid event. Adding to cart...");
+      const item = await addToCart(event.id, 1, token);
+      if (item) bumpCartCount(0);
       return;
     }
 
@@ -564,31 +665,34 @@ export default function EventDetailsPage() {
           <main className="col-span-12">
             <div className="flex flex-col gap-6">
 
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-                <Button
-                  startIcon={<ArrowBackRoundedIcon />}
-                  component={Link}
-                  to={backPath}
-                  sx={{
-                    textTransform: "none",
-                    color: "text.primary",
-                    fontWeight: 600,
-                    minWidth: "auto",
-                    px: 1,
-                    "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
-                  }}
-                >
-                  Back
-                </Button>
-                <Breadcrumbs separator="›">
-                  <Link to={backPath} style={{ textDecoration: "none", color: "#666" }}>
-                    {backLabel}
-                  </Link>
-                  <Typography color="text.primary">
-                    {event?.title || "Event"}
-                  </Typography>
-                </Breadcrumbs>
-              </Stack>
+              {/* Only show breadcrumbs to logged-in users */}
+              {token && (
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                  <Button
+                    startIcon={<ArrowBackRoundedIcon />}
+                    component={Link}
+                    to={backPath}
+                    sx={{
+                      textTransform: "none",
+                      color: "text.primary",
+                      fontWeight: 600,
+                      minWidth: "auto",
+                      px: 1,
+                      "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                    }}
+                  >
+                    Back
+                  </Button>
+                  <Breadcrumbs separator="›">
+                    <Link to={backPath} style={{ textDecoration: "none", color: "#666" }}>
+                      {backLabel}
+                    </Link>
+                    <Typography color="text.primary">
+                      {event?.title || "Event"}
+                    </Typography>
+                  </Breadcrumbs>
+                </Stack>
+              )}
 
               {/* TABS HEADER - MOVED TO TOP */}
               {(showSpeedNetworkingTab || showSessionsTab) && (
@@ -950,15 +1054,17 @@ export default function EventDetailsPage() {
                           </Box>
                         )}
 
-                        <Button
-                          component={Link}
-                          to="/account/events"
-                          variant="outlined"
-                          sx={{ textTransform: "none" }}
-                          className="rounded-xl"
-                        >
-                          Back to my events
-                        </Button>
+                        {token && (
+                          <Button
+                            component={Link}
+                            to="/account/events"
+                            variant="outlined"
+                            sx={{ textTransform: "none" }}
+                            className="rounded-xl"
+                          >
+                            Back to my events
+                          </Button>
+                        )}
                       </div>
                     </Box>
                   </Paper>
