@@ -9,6 +9,7 @@ let isRefreshing = false;
 let failedQueue = [];
 const inFlightGetRequests = new Map();
 const DEFAULT_FETCH_TIMEOUT_MS = 20000;
+const MUTATION_FETCH_TIMEOUT_MS = 120000;
 
 const processQueue = (error, token = null) => {
     failedQueue.forEach((prom) => {
@@ -37,7 +38,12 @@ window.fetch = async (...args) => {
         // Apply timeout only when no external signal is supplied.
         if (!requestConfig.signal) {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), DEFAULT_FETCH_TIMEOUT_MS);
+            const hasFormDataBody = typeof FormData !== "undefined" && requestConfig.body instanceof FormData;
+            const timeoutMs =
+                method === "GET" && !hasFormDataBody
+                    ? DEFAULT_FETCH_TIMEOUT_MS
+                    : MUTATION_FETCH_TIMEOUT_MS;
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
             try {
                 return await originalFetch(resource, { ...requestConfig, signal: controller.signal });
             } finally {
