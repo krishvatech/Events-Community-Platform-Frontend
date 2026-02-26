@@ -2297,8 +2297,8 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
   const [shareOpen, setShareOpen] = React.useState(false);
 
   const [likers, setLikers] = React.useState([]);
-  const likeCount = Number(post.metrics?.likes || 0);
-  const shareCount = Number(post.metrics?.shares || 0);
+  const likeCount = Number(local.metrics?.likes || 0);
+  const shareCount = Number(local.metrics?.shares || 0);
 
   // my reaction info
   const myReactionId =
