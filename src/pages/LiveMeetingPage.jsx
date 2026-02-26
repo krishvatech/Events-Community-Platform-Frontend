@@ -12228,7 +12228,10 @@ export default function NewLiveMeeting() {
                                             size="small"
                                             disabled={isOnBreak}
                                             sx={{ color: "#fff" }}
-                                            onClick={() => handleOpenPrivateChat(m)}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleOpenPrivateChat(m);
+                                            }}
                                           >
                                             <Badge
                                               variant="dot"
