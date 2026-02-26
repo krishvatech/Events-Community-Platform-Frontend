@@ -3613,7 +3613,14 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               <Stack spacing={0.5}>
                                 {visibleEmails.map((emailObj, idx) => (
                                   <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                    <Typography variant="body2">{emailObj.email}</Typography>
+                                    <Typography
+                                      variant="body2"
+                                      component="a"
+                                      href={`mailto:${emailObj.email}`}
+                                      sx={{ color: "inherit", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                                    >
+                                      {emailObj.email}
+                                    </Typography>
                                     {emailObj.type && (
                                       <Chip
                                         label={emailObj.type}
@@ -3693,7 +3700,14 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                 {visiblePhones.map((phoneObj, idx) => (
                                   <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                                     <span style={{ fontSize: 18 }}>{getCountryFlag(phoneObj.number)}</span>
-                                    <Typography variant="body2">{phoneObj.number}</Typography>
+                                    <Typography
+                                      variant="body2"
+                                      component="a"
+                                      href={`tel:${phoneObj.number.startsWith('+') ? phoneObj.number : '+' + phoneObj.number}`}
+                                      sx={{ color: "inherit", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                                    >
+                                      {phoneObj.number.startsWith('+') ? phoneObj.number : '+' + phoneObj.number}
+                                    </Typography>
                                     {phoneObj.type && (
                                       <Chip label={phoneObj.type} size="small" sx={{ height: 18, fontSize: 10 }} />
                                     )}
