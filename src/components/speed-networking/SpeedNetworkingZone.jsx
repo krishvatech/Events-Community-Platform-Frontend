@@ -72,6 +72,7 @@ export default function SpeedNetworkingZone({
     onEnterMatch,
     lastMessage,
     onMemberInfo,
+    onPrivateChat,
     autoJoinOnOpen = false
 }) {
     const [session, setSession] = useState(null);
@@ -118,6 +119,15 @@ export default function SpeedNetworkingZone({
             onMemberInfo(memberObj);
         }
     }, [onMemberInfo]);
+
+    // Callback to open private chat using same shape used in main room chat flow
+    const handlePrivateChat = useCallback((user) => {
+        if (!onPrivateChat || !user) return;
+        const memberObj = buildMemberObj(user);
+        if (memberObj) {
+            onPrivateChat(memberObj);
+        }
+    }, [onPrivateChat]);
 
     // Fetch current user (to get integer id)
     useEffect(() => {
@@ -848,6 +858,7 @@ export default function SpeedNetworkingZone({
                         loading={loading}
                         currentUserId={currentUser?.id}
                         onMemberInfo={handleMemberInfo}
+                        onPrivateChat={handlePrivateChat}
                         eventId={eventId}
                     />
                 ) : inQueue ? (
@@ -916,6 +927,7 @@ export default function SpeedNetworkingZone({
                             session={session}
                             lastMessage={lastMessage}
                             onMemberInfo={handleMemberInfo}
+                            onPrivateChat={handlePrivateChat}
                         />
                     )}
                 </Box>

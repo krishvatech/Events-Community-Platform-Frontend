@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button, LinearProgress, Collapse, Chip, Avatar, Divider, IconButton } from '@mui/material';
+import { Box, Typography, Button, LinearProgress, Collapse, Chip, Avatar, Divider, IconButton, TextField, CircularProgress } from '@mui/material';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CloseIcon from '@mui/icons-material/Close';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import SendIcon from '@mui/icons-material/Send';
 import { useDyteClient, DyteProvider } from '@dytesdk/react-web-core';
-import { DyteMeeting } from '@dytesdk/react-ui-kit';
+import { DyteMeeting, defaultConfig } from '@dytesdk/react-ui-kit';
 import InterestDisplay from './InterestDisplay';
 
 // Style to ensure Dyte UI controls don't overflow
@@ -31,9 +33,29 @@ const dyteStyles = `
         min-width: auto !important;
         flex-shrink: 0 !important;
     }
+    /* Hide non-essential features in speed networking */
+    dyte-chat-toggle,
+    dyte-participants-toggle,
+    dyte-polls-toggle,
+    dyte-plugins-toggle {
+        display: none !important;
+    }
 `;
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const HIDDEN_SPEED_NETWORKING_CONTROLS = new Set([
+    'dyte-chat-toggle',
+    'dyte-polls-toggle',
+    'dyte-participants-toggle',
+    'dyte-plugins-toggle'
+]);
+
+function stripHiddenControls(items = []) {
+    return items.filter((item) => {
+        const name = Array.isArray(item) ? item[0] : item;
+        return !HIDDEN_SPEED_NETWORKING_CONTROLS.has(name);
+    });
+}
 
 function authHeader() {
     const token = localStorage.getItem("access") || localStorage.getItem("access_token");
@@ -56,8 +78,28 @@ export default function SpeedNetworkingMatch({
     const [videoError, setVideoError] = useState(null);
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [hasRemoteParticipant, setHasRemoteParticipant] = useState(false);
+    const [showPartnerSidebar, setShowPartnerSidebar] = useState(true);
+    const [chatOpen, setChatOpen] = useState(false);
+    const [chatLoading, setChatLoading] = useState(false);
+    const [chatConversationId, setChatConversationId] = useState(null);
+    const [chatMessages, setChatMessages] = useState([]);
+    const [chatInput, setChatInput] = useState('');
+    const [chatSending, setChatSending] = useState(false);
+    const chatBottomRef = useRef(null);
     const autoAdvanceTriggeredRef = useRef(false);
     const matchStartMsRef = useRef(Date.now());
+    const speedNetworkingUiConfigRef = useRef(null);
+
+    if (!speedNetworkingUiConfigRef.current) {
+        // Start from Dyte defaults and only remove the 4 requested controls.
+        const uiConfig = JSON.parse(JSON.stringify(defaultConfig));
+        if (uiConfig?.root) {
+            uiConfig.root['div#controlbar-right'] = stripHiddenControls(uiConfig.root['div#controlbar-right']);
+            uiConfig.root['dyte-more-toggle.activeMoreMenu.sm'] = stripHiddenControls(uiConfig.root['dyte-more-toggle.activeMoreMenu.sm']);
+            uiConfig.root['dyte-more-toggle.activeMoreMenu.md'] = stripHiddenControls(uiConfig.root['dyte-more-toggle.activeMoreMenu.md']);
+        }
+        speedNetworkingUiConfigRef.current = uiConfig;
+    }
 
     // Inject Dyte UI layout styles
     useEffect(() => {
@@ -235,6 +277,67 @@ export default function SpeedNetworkingMatch({
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+
+    const fetchChatMessages = async (conversationId) => {
+        if (!conversationId) return;
+        const url = `${API_ROOT}/messaging/conversations/${conversationId}/messages/`;
+        const res = await fetch(url, { headers: { ...authHeader(), Accept: 'application/json' } });
+        const data = await res.json().catch(() => []);
+        if (res.ok) {
+            setChatMessages(Array.isArray(data) ? data : []);
+        }
+    };
+
+    const openSpeedNetworkingChat = async () => {
+        if (!partner?.id) return;
+        setChatOpen(true);
+        setChatLoading(true);
+        try {
+            const res = await fetch(`${API_ROOT}/messaging/conversations/ensure-direct/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...authHeader() },
+                body: JSON.stringify({ recipient_id: partner.id }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data?.id) return;
+            setChatConversationId(data.id);
+            await fetchChatMessages(data.id);
+        } finally {
+            setChatLoading(false);
+        }
+    };
+
+    const sendSpeedNetworkingMessage = async () => {
+        const text = chatInput.trim();
+        if (!text || !chatConversationId || chatSending) return;
+        setChatSending(true);
+        try {
+            const res = await fetch(`${API_ROOT}/messaging/conversations/${chatConversationId}/messages/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...authHeader() },
+                body: JSON.stringify({ body: text, event_id: eventId || undefined }),
+            });
+            if (!res.ok) return;
+            const msg = await res.json();
+            setChatMessages((prev) => [...prev, msg]);
+            setChatInput('');
+        } finally {
+            setChatSending(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!chatOpen || !chatConversationId) return;
+        const poll = setInterval(() => {
+            fetchChatMessages(chatConversationId);
+        }, 3000);
+        return () => clearInterval(poll);
+    }, [chatOpen, chatConversationId]);
+
+    useEffect(() => {
+        if (!chatOpen) return;
+        chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [chatMessages, chatOpen]);
 
     // Extension state
     const EXTENSION_WINDOW_SECONDS = 60;
@@ -418,7 +521,7 @@ export default function SpeedNetworkingMatch({
                                 {videoError}
                             </Typography>
                             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                                You can still chat or use audio if available.
+                                You can still use audio if available.
                                 <br />
                                 Please check backend logs/keys if testing.
                             </Typography>
@@ -426,7 +529,12 @@ export default function SpeedNetworkingMatch({
                     ) : meeting ? (
                         <>
                             <DyteProvider value={meeting}>
-                                <DyteMeeting mode="fill" meeting={meeting} showSetupScreen={false} />
+                                <DyteMeeting
+                                    mode="fill"
+                                    meeting={meeting}
+                                    showSetupScreen={false}
+                                    config={speedNetworkingUiConfigRef.current}
+                                />
                             </DyteProvider>
                             {!hasRemoteParticipant && (
                                 <Box
@@ -457,22 +565,118 @@ export default function SpeedNetworkingMatch({
                 </Box>
 
                 {/* Right: Partner Profile Sidebar */}
-                <Box sx={{
-                    width: 300,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    bgcolor: 'rgba(255,255,255,0.03)',
-                    borderLeft: '1px solid rgba(255,255,255,0.08)',
-                    overflow: 'auto'
-                }}>
-                    <PartnerProfileSidebar
-                        partner={partner}
-                        match={match}
-                        onMemberInfo={onMemberInfo}
-                        showBreakdown={showBreakdown}
-                        setShowBreakdown={setShowBreakdown}
-                    />
-                </Box>
+                {showPartnerSidebar ? (
+                    <Box sx={{
+                        width: 300,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        bgcolor: 'rgba(255,255,255,0.03)',
+                        borderLeft: '1px solid rgba(255,255,255,0.08)',
+                        overflow: 'auto'
+                    }}>
+                        <PartnerProfileSidebar
+                            partner={partner}
+                            match={match}
+                            onMemberInfo={onMemberInfo}
+                            onOpenChat={openSpeedNetworkingChat}
+                            onClosePanel={() => setShowPartnerSidebar(false)}
+                            showBreakdown={showBreakdown}
+                            setShowBreakdown={setShowBreakdown}
+                        />
+                    </Box>
+                ) : (
+                    <Box sx={{ width: 52, borderLeft: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', pt: 1 }}>
+                        <IconButton size="small" onClick={() => setShowPartnerSidebar(true)} sx={{ color: 'rgba(255,255,255,0.75)' }}>
+                            <ExpandMoreIcon sx={{ transform: 'rotate(-90deg)' }} />
+                        </IconButton>
+                    </Box>
+                )}
+
+                {/* Right-most: Chat Panel (non-overlay, takes layout space) */}
+                {chatOpen && (
+                    <Box
+                        sx={{
+                            width: { xs: '100%', sm: 360, md: 400 },
+                            bgcolor: '#0b101a',
+                            color: '#fff',
+                            borderLeft: '1px solid rgba(255,255,255,0.12)',
+                            display: 'flex',
+                            flexDirection: 'column'
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                            <Box>
+                                <Typography sx={{ fontWeight: 700, fontSize: 18 }}>
+                                    {[partner?.first_name, partner?.last_name].filter(Boolean).join(' ') || partner?.username || 'Partner'}
+                                </Typography>
+                                <Typography sx={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Private Chat</Typography>
+                            </Box>
+                            <IconButton size="small" onClick={() => setChatOpen(false)} sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                                <CloseIcon fontSize="small" />
+                            </IconButton>
+                        </Box>
+
+                        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 2, py: 1.5 }}>
+                            {chatLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                                    <CircularProgress size={22} />
+                                </Box>
+                            ) : chatMessages.length === 0 ? (
+                                <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>
+                                    No messages yet.
+                                </Typography>
+                            ) : (
+                                chatMessages.map((m) => {
+                                    const mine = !!m?.mine;
+                                    return (
+                                        <Box key={m.id} sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', mb: 1 }}>
+                                            <Box sx={{
+                                                maxWidth: '82%',
+                                                px: 1.2,
+                                                py: 0.8,
+                                                borderRadius: 2,
+                                                bgcolor: mine ? 'rgba(20,184,177,0.22)' : 'rgba(255,255,255,0.08)',
+                                                color: '#fff'
+                                            }}>
+                                                <Typography sx={{ fontSize: 13 }}>{m.body}</Typography>
+                                            </Box>
+                                        </Box>
+                                    );
+                                })
+                            )}
+                            <Box ref={chatBottomRef} />
+                        </Box>
+
+                        <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="Type a message..."
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        sendSpeedNetworkingMessage();
+                                    }
+                                }}
+                                InputProps={{
+                                    endAdornment: (
+                                        <IconButton size="small" onClick={sendSpeedNetworkingMessage} disabled={chatSending || !chatInput.trim()}>
+                                            {chatSending ? <CircularProgress size={16} /> : <SendIcon fontSize="small" />}
+                                        </IconButton>
+                                    )
+                                }}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        color: '#fff',
+                                        bgcolor: 'rgba(255,255,255,0.04)'
+                                    }
+                                }}
+                            />
+                        </Box>
+                    </Box>
+                )}
             </Box>
 
             {/* Bottom Controls */}
@@ -516,18 +720,24 @@ export default function SpeedNetworkingMatch({
                     Leave Session
                 </Button>
             </Box>
+
         </Box>
     );
 }
 
 // Partner Profile Sidebar Component
-function PartnerProfileSidebar({ partner, match, onMemberInfo, showBreakdown, setShowBreakdown }) {
+function PartnerProfileSidebar({ partner, match, onMemberInfo, onOpenChat, onClosePanel, showBreakdown, setShowBreakdown }) {
     return (
         <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             {/* Header label */}
-            <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                Talking With
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    Talking With
+                </Typography>
+                <IconButton size="small" onClick={onClosePanel} sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                    <CloseIcon fontSize="small" />
+                </IconButton>
+            </Box>
 
             {/* Avatar + Name (clickable) */}
             <Box
@@ -642,27 +852,50 @@ function PartnerProfileSidebar({ partner, match, onMemberInfo, showBreakdown, se
                 </Box>
             )}
 
-            {/* View Profile button */}
-            {onMemberInfo && (
+            {/* Profile and Chat actions */}
+            {(onMemberInfo || onOpenChat) && (
                 <>
                     <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
-                    <Button
-                        variant="outlined"
-                        fullWidth
-                        onClick={() => onMemberInfo(partner)}
-                        sx={{
-                            borderColor: 'rgba(90,120,255,0.5)',
-                            color: '#5a78ff',
-                            textTransform: 'none',
-                            borderRadius: 2,
-                            '&:hover': {
-                                borderColor: '#5a78ff',
-                                bgcolor: 'rgba(90,120,255,0.08)'
-                            }
-                        }}
-                    >
-                        View Profile
-                    </Button>
+                    {onMemberInfo && (
+                        <Button
+                            variant="outlined"
+                            fullWidth
+                            onClick={() => onMemberInfo(partner)}
+                            sx={{
+                                borderColor: 'rgba(90,120,255,0.5)',
+                                color: '#5a78ff',
+                                textTransform: 'none',
+                                borderRadius: 2,
+                                '&:hover': {
+                                    borderColor: '#5a78ff',
+                                    bgcolor: 'rgba(90,120,255,0.08)'
+                                }
+                            }}
+                        >
+                            View Profile
+                        </Button>
+                    )}
+                    {onOpenChat && (
+                        <Button
+                            variant="outlined"
+                            fullWidth
+                            startIcon={<ChatBubbleOutlineIcon />}
+                            onClick={onOpenChat}
+                            sx={{
+                                mt: 1,
+                                borderColor: 'rgba(34,197,94,0.5)',
+                                color: '#22c55e',
+                                textTransform: 'none',
+                                borderRadius: 2,
+                                '&:hover': {
+                                    borderColor: '#22c55e',
+                                    bgcolor: 'rgba(34,197,94,0.08)'
+                                }
+                            }}
+                        >
+                            Chat
+                        </Button>
+                    )}
                 </>
             )}
         </Box>
