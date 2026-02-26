@@ -506,11 +506,18 @@ export default function SpeedNetworkingZone({
         }
     }, [eventId, session?.id]);
 
-    // Show interest selector before joining queue (or join directly if no tags)
+    // Show interest selector before joining queue (or join directly if no interest matching)
     const handleJoinQueue = useCallback(async () => {
         if (!session) return;
 
-        // Check if interest tags exist
+        // Only show interest selector if interest matching is enabled in criteria_config
+        const interestMatchingEnabled = session.criteria_config?.interest_based?.enabled;
+        if (!interestMatchingEnabled) {
+            handleJoinQueueWithInterests([]);
+            return;
+        }
+
+        // Interest matching is enabled, check if tags exist
         if (hasInterestTags === null) {
             const tagsExist = await checkInterestTags();
             setHasInterestTags(tagsExist);
@@ -525,7 +532,7 @@ export default function SpeedNetworkingZone({
             return;
         }
 
-        // Tags exist, show selector
+        // Tags exist and interest matching is enabled, show selector
         setShowInterestSelector(true);
     }, [session, hasInterestTags, checkInterestTags, handleJoinQueueWithInterests]);
 

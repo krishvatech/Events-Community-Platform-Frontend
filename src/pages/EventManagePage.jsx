@@ -11,6 +11,8 @@ import {
   Box,
   Button,
   Chip,
+  Checkbox,
+  Slider,
   Container,
   Divider,
   Grid,
@@ -67,6 +69,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import PeopleTwoToneIcon from "@mui/icons-material/PeopleTwoTone";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
@@ -173,7 +176,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Session", "Resources", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
+const EVENT_TAB_LABELS = ["Overview", "Registered Members", "Session", "Resources", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Edit"];
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources", "Breakout Rooms Tables", "Social Lounge"];
 const MEMBERS_PER_PAGE = 10;
 const RESOURCES_PER_PAGE = 5;
@@ -299,6 +302,17 @@ export default function EventManagePage() {
   const [loungeDeleteTarget, setLoungeDeleteTarget] = useState(null);
   const [loungeDeleteSaving, setLoungeDeleteSaving] = useState(false);
 
+  // Speed Networking State
+  const [speedNetworkingSessions, setSpeedNetworkingSessions] = useState([]);
+  const [speedNetworkingLoading, setSpeedNetworkingLoading] = useState(false);
+  const [speedNetworkingError, setSpeedNetworkingError] = useState("");
+  const [speedNetworkingCreateOpen, setSpeedNetworkingCreateOpen] = useState(false);
+  const [speedNetworkingEditOpen, setSpeedNetworkingEditOpen] = useState(false);
+  const [speedNetworkingEditTarget, setSpeedNetworkingEditTarget] = useState(null);
+  const [speedNetworkingDeleteOpen, setSpeedNetworkingDeleteOpen] = useState(false);
+  const [speedNetworkingDeleteTarget, setSpeedNetworkingDeleteTarget] = useState(null);
+  const [speedNetworkingActionLoading, setSpeedNetworkingActionLoading] = useState(false);
+
   // Add Participant Dialog State
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [addParticipantEmail, setAddParticipantEmail] = useState("");
@@ -331,6 +345,30 @@ export default function EventManagePage() {
     show_participants_after_event: false,
     show_speed_networking_match_history: true,
   });
+
+  // Speed Networking Form State
+  const [speedNetworkingFormName, setSpeedNetworkingFormName] = useState("");
+  const [speedNetworkingFormDuration, setSpeedNetworkingFormDuration] = useState("5");
+  const [speedNetworkingFormBuffer, setSpeedNetworkingFormBuffer] = useState("15");
+  const [speedNetworkingFormStrategy, setSpeedNetworkingFormStrategy] = useState("both");
+
+  // Matching Criteria Configuration State
+  const [criteriaConfig, setCriteriaConfig] = useState({
+    skill: { enabled: false, threshold: 50 },
+    location: { enabled: false, threshold: 50 },
+    experience: { enabled: false, threshold: 50 },
+    education: { enabled: false, threshold: 50 },
+    interest_based: {
+      enabled: false,
+      match_mode: "complementary",
+      tags: []
+    }
+  });
+  const [interestTagInput, setInterestTagInput] = useState("");
+  const [showAddTagDialog, setShowAddTagDialog] = useState(false);
+  const [tagLabel, setTagLabel] = useState("");
+  const [tagCategory, setTagCategory] = useState("");
+  const [tagType, setTagType] = useState("both");
 
   const isOwner = isOwnerUser();
   const isStaff = isStaffUser();
@@ -638,6 +676,63 @@ export default function EventManagePage() {
     return () => URL.revokeObjectURL(previewUrl);
   }, [loungeEditIcon]);
 
+  // Fetch speed networking sessions when tab 4 is selected
+  useEffect(() => {
+    if (tab !== 4 || !eventId || !isOwner) return;
+
+    const fetchSpeedNetworkingSessions = async () => {
+      setSpeedNetworkingLoading(true);
+      setSpeedNetworkingError("");
+      try {
+        const token = getToken();
+        const res = await fetch(
+          `${API_ROOT}/events/${eventId}/speed-networking/`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const sessions = Array.isArray(json) ? json : json.results || [];
+        setSpeedNetworkingSessions(sessions);
+      } catch (err) {
+        console.error("Failed to fetch speed networking sessions:", err);
+        setSpeedNetworkingError(
+          err.message || "Failed to load speed networking sessions"
+        );
+      } finally {
+        setSpeedNetworkingLoading(false);
+      }
+    };
+
+    fetchSpeedNetworkingSessions();
+  }, [tab, eventId, isOwner]);
+
+  // Initialize form when editing
+  useEffect(() => {
+    if (speedNetworkingEditTarget) {
+      setSpeedNetworkingFormName(speedNetworkingEditTarget.name || "");
+      setSpeedNetworkingFormDuration(String(speedNetworkingEditTarget.duration_minutes || 5));
+      setSpeedNetworkingFormBuffer(String(speedNetworkingEditTarget.buffer_seconds || 15));
+      setSpeedNetworkingFormStrategy(speedNetworkingEditTarget.matching_strategy || "both");
+
+      if (speedNetworkingEditTarget.criteria_config) {
+        setCriteriaConfig(speedNetworkingEditTarget.criteria_config);
+      } else {
+        setCriteriaConfig({
+          skill: { enabled: false, threshold: 50 },
+          location: { enabled: false, threshold: 50 },
+          experience: { enabled: false, threshold: 50 },
+          education: { enabled: false, threshold: 50 },
+          interest_based: { enabled: false, match_mode: "complementary", tags: [] }
+        });
+      }
+    }
+  }, [speedNetworkingEditTarget]);
+
   const clampSeats = useCallback((value) => Math.max(2, Math.min(30, value || 0)), []);
 
   const normalizeLoungeTables = useCallback(
@@ -819,6 +914,98 @@ export default function EventManagePage() {
       setLoungeError(e?.message || "Failed to delete lounge table");
     } finally {
       setLoungeDeleteSaving(false);
+    }
+  };
+
+  // Speed Networking Handlers
+  const handleCreateOrUpdateSpeedNetworking = async (formData) => {
+    if (!eventId) return;
+    setSpeedNetworkingActionLoading(true);
+    try {
+      const token = getToken();
+      const method = speedNetworkingEditTarget ? "PATCH" : "POST";
+      const url = speedNetworkingEditTarget
+        ? `${API_ROOT}/events/${eventId}/speed-networking/${speedNetworkingEditTarget.id}/`
+        : `${API_ROOT}/events/${eventId}/speed-networking/`;
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+
+      // Update local state
+      if (speedNetworkingEditTarget) {
+        setSpeedNetworkingSessions((prev) =>
+          prev.map((s) =>
+            s.id === speedNetworkingEditTarget.id ? { ...s, ...json } : s
+          )
+        );
+      } else {
+        setSpeedNetworkingSessions((prev) => [...prev, json]);
+      }
+
+      setSpeedNetworkingCreateOpen(false);
+      setSpeedNetworkingEditOpen(false);
+      setSpeedNetworkingEditTarget(null);
+      setSpeedNetworkingFormName("");
+      setSpeedNetworkingFormDuration("5");
+      setSpeedNetworkingFormBuffer("15");
+      setSpeedNetworkingFormStrategy("both");
+      toast.success(
+        speedNetworkingEditTarget
+          ? "Session updated successfully"
+          : "Session created successfully"
+      );
+    } catch (err) {
+      toast.error(err?.message || "Failed to save session");
+      console.error("Speed networking error:", err);
+    } finally {
+      setSpeedNetworkingActionLoading(false);
+    }
+  };
+
+  const handleDeleteSpeedNetworking = async () => {
+    if (!eventId || !speedNetworkingDeleteTarget) return;
+    setSpeedNetworkingActionLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(
+        `${API_ROOT}/events/${eventId}/speed-networking/${speedNetworkingDeleteTarget.id}/`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
+      );
+
+      if (!res.ok && res.status !== 204) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json?.detail || `HTTP ${res.status}`);
+      }
+
+      setSpeedNetworkingSessions((prev) =>
+        prev.filter((s) => s.id !== speedNetworkingDeleteTarget.id)
+      );
+
+      setSpeedNetworkingDeleteOpen(false);
+      setSpeedNetworkingDeleteTarget(null);
+      toast.success("Session deleted successfully");
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete session");
+      console.error("Delete speed networking error:", err);
+    } finally {
+      setSpeedNetworkingActionLoading(false);
     }
   };
 
@@ -2947,6 +3134,748 @@ export default function EventManagePage() {
     </Paper >
   );
 
+  const renderSpeedNetworking = () => (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: 3,
+        border: "1px solid",
+        borderColor: "divider",
+        p: { xs: 2, sm: 3 },
+        bgcolor: "background.paper",
+      }}
+    >
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{ mb: 2 }}
+        spacing={1.5}
+      >
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.25 }}>
+            Speed Networking Sessions
+          </Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Create and manage speed networking rounds during your event.
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setSpeedNetworkingCreateOpen(true)}
+          sx={{
+            textTransform: "none",
+            backgroundColor: "#10b8a6",
+            "&:hover": { backgroundColor: "#0ea5a4" },
+          }}
+        >
+          Create Session
+        </Button>
+      </Stack>
+
+      {speedNetworkingLoading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+          <CircularProgress size={40} />
+        </Box>
+      ) : speedNetworkingError ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {speedNetworkingError}
+        </Alert>
+      ) : speedNetworkingSessions.length === 0 ? (
+        <Paper
+          elevation={0}
+          sx={{
+            border: "1px dashed",
+            borderColor: "divider",
+            borderRadius: 2,
+            p: 3,
+            textAlign: "center",
+          }}
+        >
+          <PeopleTwoToneIcon
+            sx={{ fontSize: 48, color: "text.secondary", mb: 1 }}
+          />
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            No speed networking sessions yet. Click "Create Session" to get started.
+          </Typography>
+        </Paper>
+      ) : (
+        <TableContainer
+          sx={{
+            borderRadius: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            overflow: "hidden",
+          }}
+        >
+          <Table size="small">
+            <TableHead>
+              <TableRow
+                sx={{
+                  bgcolor: "grey.50",
+                  "& th": { fontSize: 13, color: "text.secondary" },
+                }}
+              >
+                <TableCell>Session Name</TableCell>
+                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                  Duration (min)
+                </TableCell>
+                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                  Status
+                </TableCell>
+                <TableCell align="center">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {speedNetworkingSessions.map((session) => (
+                <TableRow key={session.id}>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {session.name || "Unnamed Session"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    {session.duration_minutes || 5} min
+                  </TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                    <Chip
+                      label={session.status || "pending"}
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        textTransform: "capitalize",
+                        borderColor:
+                          session.status === "active"
+                            ? "success.main"
+                            : "default",
+                        color:
+                          session.status === "active"
+                            ? "success.main"
+                            : "text.secondary",
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell align="center">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        setSpeedNetworkingEditTarget(session);
+                        setSpeedNetworkingEditOpen(true);
+                      }}
+                    >
+                      <EditRoundedIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        setSpeedNetworkingDeleteTarget(session);
+                        setSpeedNetworkingDeleteOpen(true);
+                      }}
+                    >
+                      <DeleteOutlineRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* Create/Edit Session Dialog */}
+      <Dialog
+        open={speedNetworkingCreateOpen || speedNetworkingEditOpen}
+        onClose={() => {
+          setSpeedNetworkingCreateOpen(false);
+          setSpeedNetworkingEditOpen(false);
+          setSpeedNetworkingEditTarget(null);
+          setSpeedNetworkingFormName("");
+          setSpeedNetworkingFormDuration("5");
+          setSpeedNetworkingFormBuffer("15");
+          setSpeedNetworkingFormStrategy("both");
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {speedNetworkingEditTarget ? "Edit Session" : "Create Speed Networking Session"}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
+            Configure a speed networking round. Participants will be automatically
+            matched and have timed conversations with different matches each round.
+          </Typography>
+
+          {/* Session Name */}
+          <TextField
+            fullWidth
+            label="Session Name"
+            placeholder="e.g., Round 1, Investor Speed Dating"
+            value={speedNetworkingFormName || speedNetworkingEditTarget?.name || ""}
+            onChange={(e) => setSpeedNetworkingFormName(e.target.value)}
+            sx={{ mb: 2 }}
+            size="small"
+            helperText="Give your session a memorable name"
+          />
+
+          {/* Duration */}
+          <TextField
+            fullWidth
+            label="Duration (minutes)"
+            type="number"
+            inputProps={{ min: "1", max: "30" }}
+            value={speedNetworkingFormDuration || speedNetworkingEditTarget?.duration_minutes || 5}
+            onChange={(e) => setSpeedNetworkingFormDuration(e.target.value)}
+            sx={{ mb: 2 }}
+            size="small"
+            helperText="Duration of each match (1-30 minutes)"
+          />
+
+          {/* Buffer Seconds */}
+          <TextField
+            fullWidth
+            label="Transition Buffer (seconds)"
+            type="number"
+            inputProps={{ min: "0", max: "60" }}
+            value={speedNetworkingFormBuffer || speedNetworkingEditTarget?.buffer_seconds || 15}
+            onChange={(e) => setSpeedNetworkingFormBuffer(e.target.value)}
+            sx={{ mb: 2 }}
+            size="small"
+            helperText="Time to show transition screen between rounds (0 to disable)"
+          />
+
+          {/* Matching Criteria Configuration */}
+          <Box sx={{ mt: 3, pt: 2, borderTop: "1px solid", borderColor: "divider" }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, textTransform: "uppercase" }}>
+              Matching Criteria
+            </Typography>
+
+            {/* Skill */}
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={criteriaConfig.skill.enabled}
+                    onChange={(e) =>
+                      setCriteriaConfig((prev) => ({
+                        ...prev,
+                        skill: { ...prev.skill, enabled: e.target.checked }
+                      }))
+                    }
+                  />
+                }
+                label="Skill"
+              />
+              {criteriaConfig.skill.enabled && (
+                <Box sx={{ ml: 4, mt: 1 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Threshold: {criteriaConfig.skill.threshold}%
+                  </Typography>
+                  <Slider
+                    value={criteriaConfig.skill.threshold}
+                    onChange={(e, val) =>
+                      setCriteriaConfig((prev) => ({
+                        ...prev,
+                        skill: { ...prev.skill, threshold: val }
+                      }))
+                    }
+                    min={0}
+                    max={100}
+                    sx={{ mt: 1 }}
+                  />
+                </Box>
+              )}
+            </Box>
+
+            {/* Location */}
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={criteriaConfig.location.enabled}
+                    onChange={(e) =>
+                      setCriteriaConfig((prev) => ({
+                        ...prev,
+                        location: { ...prev.location, enabled: e.target.checked }
+                      }))
+                    }
+                  />
+                }
+                label="Location"
+              />
+              {criteriaConfig.location.enabled && (
+                <Box sx={{ ml: 4, mt: 1 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Threshold: {criteriaConfig.location.threshold}%
+                  </Typography>
+                  <Slider
+                    value={criteriaConfig.location.threshold}
+                    onChange={(e, val) =>
+                      setCriteriaConfig((prev) => ({
+                        ...prev,
+                        location: { ...prev.location, threshold: val }
+                      }))
+                    }
+                    min={0}
+                    max={100}
+                    sx={{ mt: 1 }}
+                  />
+                </Box>
+              )}
+            </Box>
+
+            {/* Experience */}
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={criteriaConfig.experience.enabled}
+                    onChange={(e) =>
+                      setCriteriaConfig((prev) => ({
+                        ...prev,
+                        experience: { ...prev.experience, enabled: e.target.checked }
+                      }))
+                    }
+                  />
+                }
+                label="Experience"
+              />
+              {criteriaConfig.experience.enabled && (
+                <Box sx={{ ml: 4, mt: 1 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Threshold: {criteriaConfig.experience.threshold}%
+                  </Typography>
+                  <Slider
+                    value={criteriaConfig.experience.threshold}
+                    onChange={(e, val) =>
+                      setCriteriaConfig((prev) => ({
+                        ...prev,
+                        experience: { ...prev.experience, threshold: val }
+                      }))
+                    }
+                    min={0}
+                    max={100}
+                    sx={{ mt: 1 }}
+                  />
+                </Box>
+              )}
+            </Box>
+
+            {/* Education */}
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={criteriaConfig.education.enabled}
+                    onChange={(e) =>
+                      setCriteriaConfig((prev) => ({
+                        ...prev,
+                        education: { ...prev.education, enabled: e.target.checked }
+                      }))
+                    }
+                  />
+                }
+                label="Education"
+              />
+              {criteriaConfig.education.enabled && (
+                <Box sx={{ ml: 4, mt: 1 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Threshold: {criteriaConfig.education.threshold}%
+                  </Typography>
+                  <Slider
+                    value={criteriaConfig.education.threshold}
+                    onChange={(e, val) =>
+                      setCriteriaConfig((prev) => ({
+                        ...prev,
+                        education: { ...prev.education, threshold: val }
+                      }))
+                    }
+                    min={0}
+                    max={100}
+                    sx={{ mt: 1 }}
+                  />
+                </Box>
+              )}
+            </Box>
+
+            {/* Interest-Based Matching */}
+            <Box sx={{ mb: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={criteriaConfig.interest_based.enabled}
+                    onChange={(e) =>
+                      setCriteriaConfig((prev) => ({
+                        ...prev,
+                        interest_based: { ...prev.interest_based, enabled: e.target.checked }
+                      }))
+                    }
+                  />
+                }
+                label="Interest-Based Matching"
+              />
+              {criteriaConfig.interest_based.enabled && (
+                <Box sx={{ ml: 4, mt: 1 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", mb: 1, display: "block", fontWeight: 500 }}>
+                    Match Mode
+                  </Typography>
+                  <Stack spacing={1} sx={{ mb: 2 }}>
+                    <Box
+                      onClick={() =>
+                        setCriteriaConfig((prev) => ({
+                          ...prev,
+                          interest_based: { ...prev.interest_based, match_mode: "complementary" }
+                        }))
+                      }
+                      sx={{
+                        p: 1.2,
+                        border: "2px solid",
+                        borderColor:
+                          criteriaConfig.interest_based.match_mode === "complementary"
+                            ? "#10b8a6"
+                            : "divider",
+                        borderRadius: 1,
+                        cursor: "pointer",
+                        backgroundColor:
+                          criteriaConfig.interest_based.match_mode === "complementary"
+                            ? "rgba(16, 184, 166, 0.05)"
+                            : "transparent",
+                        transition: "all 0.2s",
+                        "&:hover": {
+                          borderColor: "#10b8a6",
+                          backgroundColor: "rgba(16, 184, 166, 0.05)",
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        {criteriaConfig.interest_based.match_mode === "complementary" ? (
+                          <Box sx={{ fontSize: 16 }}>👥</Box>
+                        ) : (
+                          <Box sx={{ fontSize: 16, opacity: 0.5 }}>👥</Box>
+                        )}
+                        <Box>
+                          <Typography variant="caption" sx={{ fontWeight: 500, display: "block" }}>
+                            Complementary (seek ↔ offer)
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "11px" }}>
+                            Match opposites
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    <Box
+                      onClick={() =>
+                        setCriteriaConfig((prev) => ({
+                          ...prev,
+                          interest_based: { ...prev.interest_based, match_mode: "similar" }
+                        }))
+                      }
+                      sx={{
+                        p: 1.2,
+                        border: "2px solid",
+                        borderColor:
+                          criteriaConfig.interest_based.match_mode === "similar"
+                            ? "#10b8a6"
+                            : "divider",
+                        borderRadius: 1,
+                        cursor: "pointer",
+                        backgroundColor:
+                          criteriaConfig.interest_based.match_mode === "similar"
+                            ? "rgba(16, 184, 166, 0.05)"
+                            : "transparent",
+                        transition: "all 0.2s",
+                        "&:hover": {
+                          borderColor: "#10b8a6",
+                          backgroundColor: "rgba(16, 184, 166, 0.05)",
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        {criteriaConfig.interest_based.match_mode === "similar" ? (
+                          <Box sx={{ fontSize: 16 }}>😊</Box>
+                        ) : (
+                          <Box sx={{ fontSize: 16, opacity: 0.5 }}>😊</Box>
+                        )}
+                        <Box>
+                          <Typography variant="caption" sx={{ fontWeight: 500, display: "block" }}>
+                            Similar (same interests)
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "11px" }}>
+                            Match like-minded
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    <Box
+                      onClick={() =>
+                        setCriteriaConfig((prev) => ({
+                          ...prev,
+                          interest_based: { ...prev.interest_based, match_mode: "both" }
+                        }))
+                      }
+                      sx={{
+                        p: 1.2,
+                        border: "2px solid",
+                        borderColor:
+                          criteriaConfig.interest_based.match_mode === "both"
+                            ? "#10b8a6"
+                            : "divider",
+                        borderRadius: 1,
+                        cursor: "pointer",
+                        backgroundColor:
+                          criteriaConfig.interest_based.match_mode === "both"
+                            ? "rgba(16, 184, 166, 0.05)"
+                            : "transparent",
+                        transition: "all 0.2s",
+                        "&:hover": {
+                          borderColor: "#10b8a6",
+                          backgroundColor: "rgba(16, 184, 166, 0.05)",
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        {criteriaConfig.interest_based.match_mode === "both" ? (
+                          <Box sx={{ fontSize: 16 }}>⭐</Box>
+                        ) : (
+                          <Box sx={{ fontSize: 16, opacity: 0.5 }}>⭐</Box>
+                        )}
+                        <Box>
+                          <Typography variant="caption" sx={{ fontWeight: 500, display: "block" }}>
+                            Both (complementary then similar)
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "11px" }}>
+                            Best of both worlds
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+                  </Stack>
+                  <Button
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={() => setShowAddTagDialog(true)}
+                    sx={{ mt: 1, color: "primary.main" }}
+                  >
+                    Add Tags
+                  </Button>
+                  {criteriaConfig.interest_based.tags.length > 0 && (
+                    <Box sx={{ mt: 1 }}>
+                      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                        {criteriaConfig.interest_based.tags.map((tag, idx) => (
+                          <Chip
+                            key={idx}
+                            label={tag.label}
+                            size="small"
+                            onDelete={() =>
+                              setCriteriaConfig((prev) => ({
+                                ...prev,
+                                interest_based: {
+                                  ...prev.interest_based,
+                                  tags: prev.interest_based.tags.filter((_, i) => i !== idx)
+                                }
+                              }))
+                            }
+                          />
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setSpeedNetworkingCreateOpen(false);
+              setSpeedNetworkingEditOpen(false);
+              setSpeedNetworkingEditTarget(null);
+              setSpeedNetworkingFormName("");
+              setSpeedNetworkingFormDuration("5");
+              setSpeedNetworkingFormBuffer("15");
+              setSpeedNetworkingFormStrategy("both");
+              setCriteriaConfig({
+                skill: { enabled: false, threshold: 50 },
+                location: { enabled: false, threshold: 50 },
+                experience: { enabled: false, threshold: 50 },
+                education: { enabled: false, threshold: 50 },
+                interest_based: { enabled: false, match_mode: "complementary", tags: [] }
+              });
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={speedNetworkingActionLoading}
+            onClick={() => {
+              const formData = {
+                name: speedNetworkingFormName || speedNetworkingEditTarget?.name || "",
+                duration_minutes: parseInt(speedNetworkingFormDuration) || 5,
+                buffer_seconds: parseInt(speedNetworkingFormBuffer) || 15,
+                matching_strategy: speedNetworkingFormStrategy || "both",
+                criteria_config: criteriaConfig,
+              };
+              handleCreateOrUpdateSpeedNetworking(formData);
+              setSpeedNetworkingFormName("");
+              setSpeedNetworkingFormDuration("5");
+              setSpeedNetworkingFormBuffer("15");
+              setSpeedNetworkingFormStrategy("both");
+              setCriteriaConfig({
+                skill: { enabled: false, threshold: 50 },
+                location: { enabled: false, threshold: 50 },
+                experience: { enabled: false, threshold: 50 },
+                education: { enabled: false, threshold: 50 },
+                interest_based: { enabled: false, match_mode: "complementary", tags: [] }
+              });
+            }}
+            sx={{
+              backgroundColor: "#10b8a6",
+              "&:hover": { backgroundColor: "#0ea5a4" },
+            }}
+          >
+            {speedNetworkingActionLoading ? (
+              <CircularProgress size={20} />
+            ) : speedNetworkingEditTarget ? (
+              "Update Session"
+            ) : (
+              "Create Session"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={speedNetworkingDeleteOpen}
+        onClose={() => {
+          setSpeedNetworkingDeleteOpen(false);
+          setSpeedNetworkingDeleteTarget(null);
+        }}
+      >
+        <DialogTitle>Delete Session?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete "{speedNetworkingDeleteTarget?.name || 'this session'}"?
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setSpeedNetworkingDeleteOpen(false);
+              setSpeedNetworkingDeleteTarget(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={speedNetworkingActionLoading}
+            onClick={handleDeleteSpeedNetworking}
+          >
+            {speedNetworkingActionLoading ? (
+              <CircularProgress size={20} />
+            ) : (
+              "Delete"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Interest Tag Dialog */}
+      <Dialog
+        open={showAddTagDialog}
+        onClose={() => {
+          setShowAddTagDialog(false);
+          setTagLabel("");
+          setTagCategory("both");
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add Interest Tag</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <TextField
+            fullWidth
+            label="Tag Label"
+            placeholder="e.g., Python, Marketing, Startups"
+            value={tagLabel}
+            onChange={(e) => setTagLabel(e.target.value)}
+            sx={{ mb: 2 }}
+            size="small"
+          />
+          <TextField
+            fullWidth
+            label="Category"
+            placeholder="e.g., investment, recruitment"
+            value={tagCategory}
+            onChange={(e) => setTagCategory(e.target.value)}
+            sx={{ mb: 2 }}
+            size="small"
+          />
+          <FormControl fullWidth size="small">
+            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 500 }}>
+              Type
+            </Typography>
+            <Select
+              value={tagType}
+              onChange={(e) => setTagType(e.target.value)}
+            >
+              <MenuItem value="seeking">🔍 Seeking</MenuItem>
+              <MenuItem value="offering">🏪 Offering</MenuItem>
+              <MenuItem value="both">👥 Both</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setShowAddTagDialog(false);
+              setTagLabel("");
+              setTagCategory("");
+              setTagType("both");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (tagLabel.trim()) {
+                setCriteriaConfig((prev) => ({
+                  ...prev,
+                  interest_based: {
+                    ...prev.interest_based,
+                    tags: [
+                      ...prev.interest_based.tags,
+                      { label: tagLabel.trim(), category: tagCategory, type: tagType }
+                    ]
+                  }
+                }));
+                setShowAddTagDialog(false);
+                setTagLabel("");
+                setTagCategory("");
+                setTagType("both");
+              }
+            }}
+            sx={{
+              backgroundColor: "#10b8a6",
+              "&:hover": { backgroundColor: "#0ea5a4" },
+            }}
+          >
+            Add
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Paper>
+  );
+
   const renderEdit = () => {
     return (
       <Paper
@@ -3216,10 +4145,11 @@ export default function EventManagePage() {
                   {tab === 1 && renderMembers()}
                   {tab === 2 && renderSessions()}
                   {tab === 3 && renderResources()}
-                  {tab === 4 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
-                  {tab === 5 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
-                  {tab === 6 && renderLoungeSettings()}
-                  {tab === 7 && renderEdit()}
+                  {tab === 4 && renderSpeedNetworking()}
+                  {tab === 5 && renderLoungeTables("BREAKOUT", "Breakout Rooms Tables", "Manage specific breakout rooms.")}
+                  {tab === 6 && renderLoungeTables("LOUNGE", "Social Lounge Tables", "Set up lounge tables for networking.")}
+                  {tab === 7 && renderLoungeSettings()}
+                  {tab === 8 && renderEdit()}
                 </>
               ) : (
                 <>
