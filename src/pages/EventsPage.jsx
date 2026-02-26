@@ -655,7 +655,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           <span className="ml-1">•</span>
                           <span className="ml-1">{formatDuration(sessionDuration)}</span>
                         </div>
-                        {sessionDescription ? (
+                        {sessionDescription && (
                           <div className="mt-1">
                             <p className={`text-neutral-600 ${isExpanded ? "" : "line-clamp-2"}`}>
                               {sessionDescription}
@@ -677,8 +677,6 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                               </button>
                             )}
                           </div>
-                        ) : (
-                          <p className="mt-1 text-neutral-400 italic">No description provided.</p>
                         )}
                       </div>
                     );
