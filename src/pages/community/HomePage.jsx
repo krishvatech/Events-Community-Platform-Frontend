@@ -3609,7 +3609,7 @@ function AboutTab({
                               size="small"
                               onClick={() => window.open(cert.credential_url, "_blank")}
                             >
-                              <AttachFileIcon fontSize="small" />
+                              <LinkIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         ) : null}
@@ -3703,7 +3703,7 @@ function AboutTab({
                               size="small"
                               onClick={() => window.open(m.membership_url, "_blank")}
                             >
-                              <AttachFileIcon fontSize="small" />
+                              <LinkIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         ) : null}
@@ -3852,18 +3852,18 @@ function AboutTab({
             </Stack>
           </SectionCard>
 
-            <SectionCard title={socialTitle} action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("socials")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
-              <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-                {socialCount ? (
-                  socialItems.filter((item) => item.url).map((item) => (
-                    <Tooltip key={item.key} title={item.label}>
-                      <Box
-                        component="a"
-                        href={normalizeSocialUrl(item.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${item.label} profile`}
-                        sx={{ color: "inherit", display: "flex" }}
+          <SectionCard title={socialTitle} action={<Tooltip title="Edit"><IconButton size="small" onClick={() => openContactEditor("socials")}><EditOutlinedIcon fontSize="small" /></IconButton></Tooltip>}>
+            <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
+              {socialCount ? (
+                socialItems.filter((item) => item.url).map((item) => (
+                  <Tooltip key={item.key} title={item.label}>
+                    <Box
+                      component="a"
+                      href={normalizeSocialUrl(item.url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${item.label} profile`}
+                      sx={{ color: "inherit", display: "flex" }}
                     >
                       {item.icon}
                     </Box>
@@ -3977,7 +3977,7 @@ function AboutTab({
                               size="small"
                               onClick={() => window.open(t.credential_url, "_blank")}
                             >
-                              <AttachFileIcon fontSize="small" />
+                              <LinkIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         ) : null}
