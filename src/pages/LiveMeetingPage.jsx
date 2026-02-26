@@ -6345,6 +6345,16 @@ export default function NewLiveMeeting() {
           }
         }
       }
+
+      // ✅ Auto-record for direct joins (Waiting Room disabled)
+      if (isHost && autoRecordOnAdmit && !eventData?.waiting_room_enabled) {
+        // dyteMeeting.participants.joined is a MAP-like object (size/length vary by SDK)
+        const participantsCount = dyteMeeting.participants.joined?.size || dyteMeeting.participants.joined?.length || 0;
+        if (participantsCount > 0) {
+          console.log("[LiveMeeting] Auto-recording triggered on Host join (participants already present)");
+          triggerAutoRecordingIfEnabled();
+        }
+      }
     };
     dyteMeeting.self.on?.("roomJoined", onRoomJoined);
 
@@ -7694,6 +7704,12 @@ export default function NewLiveMeeting() {
       }
       if (hostMediaLocks.cam || shouldApplyBreakLock) {
         try { await participant?.disableVideo?.(); } catch { }
+      }
+
+      // ✅ Auto-record for direct joins (Waiting Room disabled)
+      if (autoRecordOnAdmit && !eventData?.waiting_room_enabled) {
+        console.log("[LiveMeeting] Auto-recording triggered by new direct participant join");
+        triggerAutoRecordingIfEnabled();
       }
     };
     dyteMeeting.participants.joined.on("participantJoined", handleParticipantJoined);
