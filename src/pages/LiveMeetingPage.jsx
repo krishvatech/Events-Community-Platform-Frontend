@@ -5854,8 +5854,11 @@ export default function NewLiveMeeting() {
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
         if (data && Array.isArray(data.results)) {
+          const normalized = data.results.filter(
+            (lp) => String(lp?.current_location || "").toLowerCase() === "social_lounge"
+          );
           setPreEventLoungeParticipants(
-            data.results.map((lp) => ({
+            normalized.map((lp) => ({
               ...lp,
               full_name: lp.user_name || lp.full_name || "User",
             }))
@@ -6171,7 +6174,7 @@ export default function NewLiveMeeting() {
         // Initialize active meeting (main or breakout)
         // ✅ CRITICAL FIX: Use user's actual preferences from ref, not hardcoded defaults
         // When entering lounge, respect what the user had set (mic OFF, camera OFF, etc)
-        let audioDefault = role === "publisher" ? true : false;
+        let audioDefault = role === "publisher" ? false : false;
         let videoDefault = role === "publisher" ? false : false; // publishers usually start with video off
 
         if (isBreakout) {
@@ -8661,6 +8664,13 @@ export default function NewLiveMeeting() {
 
   // Pinned “host” view data
   const latestPinnedHost = useMemo(() => {
+    const isInCurrentBreakoutTable = (participant) => {
+      if (!isBreakout || currentLoungeUserIds.size === 0) return true;
+      const key = getParticipantUserKey(participant?._raw || participant);
+      const userId = key.startsWith("id:") ? key.replace("id:", "") : null;
+      return Boolean(userId && currentLoungeUserIds.has(String(userId)));
+    };
+
     if (isLiveEventSocialLounge) {
       if (loungePrimaryUserId) {
         const primaryKey = `id:${String(loungePrimaryUserId)}`;
@@ -9022,6 +9032,14 @@ export default function NewLiveMeeting() {
       }
     }
 
+    if (isBreakout && currentLoungeUserIds.size > 0 && p && !isInCurrentBreakoutTable(p)) {
+      console.log("[LoungePinning] Pinned participant not in current breakout table; selecting in-table fallback");
+      const selfFallback =
+        dyteMeeting?.self && isInCurrentBreakoutTable(dyteMeeting.self) ? dyteMeeting.self : null;
+      const participantFallback = participants.find((x) => x?.id && isInCurrentBreakoutTable(x)) || null;
+      p = selfFallback || participantFallback || null;
+    }
+
     if (!p) return null;
 
     // ✅ FIX: If p is self, return the current dyteMeeting.self which is always fresh
@@ -9067,6 +9085,7 @@ export default function NewLiveMeeting() {
     loungePinnedId,
     loungePrimaryUserId,
     spotlightTarget,
+    currentLoungeUserIds,
   ]);
 
   // Pinned “host” view data
@@ -10744,29 +10763,40 @@ export default function NewLiveMeeting() {
   );
 
   const groupedMembers = useMemo(() => {
+    const isInCurrentBreakoutTable = (p) => {
+      if (!isBreakout || currentLoungeUserIds.size === 0) return true;
+      const key = getParticipantUserKey(p?._raw || p);
+      const userId = key.startsWith("id:") ? key.replace("id:", "") : null;
+      return Boolean(userId && currentLoungeUserIds.has(String(userId)));
+    };
+
+    const scopedParticipants = participants.filter(
+      (p) => p.inMeeting && isInCurrentBreakoutTable(p)
+    );
+
     const hostId = hostIdRef.current || pinnedHost?.id || hostIdHint || (isHost ? dyteMeeting?.self?.id : null);
     const hostUserKey = hostUserKeyRef.current;
     const hostFromKey = hostUserKey
-      ? participants.find((p) => getParticipantUserKey(p?._raw || p) === hostUserKey)
+      ? scopedParticipants.find((p) => getParticipantUserKey(p?._raw || p) === hostUserKey)
       : null;
-    const hostIdExists = hostId ? participants.some((p) => p.id === hostId) : false;
+    const hostIdExists = hostId ? scopedParticipants.some((p) => p.id === hostId) : false;
     const effectiveHostId = hostIdExists ? hostId : (hostFromKey?.id || null);
 
     // ✅ CRITICAL FIX: Apply lounge filter to hosts when not in breakout (main room context)
     // When user is in main room, hosts occupying lounge should be filtered out
     // When user is in breakout, show all participants in that room (lounge filter doesn't apply)
-    let host = participants.filter((p) => p.role === "Host" && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
+    let host = scopedParticipants.filter((p) => p.role === "Host" && (isBreakout || !p.isOccupyingLounge));
     if (host.length === 0 && effectiveHostId) {
-      host = participants.filter((p) => p.id === effectiveHostId && p.inMeeting && (isBreakout || !p.isOccupyingLounge));
+      host = scopedParticipants.filter((p) => p.id === effectiveHostId && (isBreakout || !p.isOccupyingLounge));
     }
 
     const hostIdSet = new Set(host.map((p) => p.id));
     // ✅ PHASE 4: Host in main room should see ALL participants (including those in breakout/lounge)
-    const speakers = participants.filter(
-      (p) => !hostIdSet.has(p.id) && p.role === "Speaker" && p.inMeeting && (isBreakout || isHost || !p.isOccupyingLounge)
+    const speakers = scopedParticipants.filter(
+      (p) => !hostIdSet.has(p.id) && p.role === "Speaker" && (isBreakout || isHost || !p.isOccupyingLounge)
     );
-    const audience = participants.filter(
-      (p) => !hostIdSet.has(p.id) && p.role !== "Speaker" && p.inMeeting && (isBreakout || isHost || !p.isOccupyingLounge)
+    const audience = scopedParticipants.filter(
+      (p) => !hostIdSet.has(p.id) && p.role !== "Speaker" && (isBreakout || isHost || !p.isOccupyingLounge)
     );
 
     // ✅ PHASE 4: For host, enhance with room location
@@ -10809,6 +10839,7 @@ export default function NewLiveMeeting() {
     isHost,
     dyteMeeting?.self?.id,
     isBreakout,
+    currentLoungeUserIds,
     participantRoomMap  // ✅ PHASE 4: Added dependency
   ]);
 
@@ -12618,7 +12649,10 @@ export default function NewLiveMeeting() {
                   </Box>
 
                   {/* ✅ NEW: Pre-Event Lounge Participants Section */}
-                  {isHost && eventData?.lounge_enabled_waiting_room && preEventLoungeParticipants.length > 0 && (
+                  {isHost &&
+                    eventData?.lounge_enabled_waiting_room &&
+                    preEventLoungeParticipants.length > 0 &&
+                    (participantRoomFilter === "all" || participantRoomFilter === "lounge") && (
                     <Box sx={{ mb: 2 }}>
                       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
                         <Typography sx={{ fontWeight: 800, fontSize: 12, opacity: 0.8 }}>
