@@ -675,7 +675,7 @@ function ScreenShareVideo({ participant, meeting }) {
   );
 }
 
-function StageMiniTile({ p, meeting, tileW = 140, tileH = 82 }) {
+function StageMiniTile({ p, meeting, tileW = 140, tileH = 82, onMemberClick }) {
   const isSmall = tileW <= 132 || tileH <= 76;
 
   const raw = p?._raw || null;
@@ -686,6 +686,7 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82 }) {
     <Tooltip title={""} arrow placement="top">
       <Paper
         variant="outlined"
+        onClick={() => onMemberClick?.(p)}
         sx={{
           flex: "0 0 auto",
           width: tileW,
@@ -700,6 +701,7 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82 }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          cursor: "pointer",
           "&:hover": { bgcolor: "rgba(255,255,255,0.05)" },
         }}
       >
@@ -11023,7 +11025,7 @@ export default function NewLiveMeeting() {
               <ArrowBackIosNewIcon fontSize="small" />
             </IconButton>
 
-            <Stack direction="row" spacing={1.5} alignItems="center">
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ cursor: "pointer" }} onClick={() => openMemberInfo(privateChatUser)}>
               <Avatar src={privateChatUser.picture} sx={{ width: 32, height: 32, bgcolor: "rgba(255,255,255,0.14)", fontSize: 13 }}>
                 {initialsFromName(privateChatUser.name)}
               </Avatar>
@@ -14263,6 +14265,7 @@ export default function NewLiveMeeting() {
                     meeting={dyteMeeting}
                     tileW={stageTileW}
                     tileH={stageTileH}
+                    onMemberClick={openMemberInfo}
                   />
 
                 ))}
