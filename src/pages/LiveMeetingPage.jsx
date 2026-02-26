@@ -6829,170 +6829,40 @@ export default function NewLiveMeeting() {
     }
   }, [micOn, camOn, isBreakout, dyteMeeting]);
 
-  // ✅ CRITICAL FIX: Immediately apply media preferences when joining lounge breakout room
-  // The defaults in initMeeting might enable audio/video, so we forcefully apply the user's actual preference
+  // Always default to mic/camera OFF when entering breakout/social lounge.
   useEffect(() => {
     if (!dyteMeeting?.self || !isBreakout || !roomJoined) return;
 
-    const applyMediaPreferences = async () => {
+    const enforceDefaultMediaOffOnBreakoutJoin = async () => {
       try {
-        // ✅ CRITICAL FIX: Skip preference enforcement during lounge + break
-        // User should be able to freely toggle media during break in lounge without
-        // saved preferences overriding their choices
-        if (isOnBreak && isBreakout) {
-          console.log("[LiveMeeting] 🔊 Skipping preference enforcement - user is in lounge during break");
-          return;
-        }
-
-        // Use the saved user preferences from the ref
-        const userMicPreference = userMediaPreferenceRef.current.mic;
-        const userCamPreference = userMediaPreferenceRef.current.cam;
-
         console.log(
-          "[LiveMeeting] LOUNGE ROOM JOINED: Applying user media preferences - Mic:",
-          userMicPreference,
-          "Camera:",
-          userCamPreference,
-          "Current Dyte state - Audio:",
+          "[LiveMeeting] Breakout/lounge joined: enforcing default mic/camera OFF. Current - Audio:",
           dyteMeeting.self.audioEnabled,
           "Video:",
           dyteMeeting.self.videoEnabled
         );
 
-        // If user prefers mic OFF but Dyte has it ON, disable it
-        if (!userMicPreference && dyteMeeting.self.audioEnabled) {
-          console.log("[LiveMeeting] LOUNGE: User prefers mic OFF, disabling audio...");
-          // Try disabling multiple times to ensure it sticks
-          for (let i = 0; i < 3; i++) {
-            try {
-              await dyteMeeting.self.disableAudio?.();
-              console.log("[LiveMeeting] disableAudio attempt", i + 1, "succeeded");
-            } catch (e) {
-              console.warn("[LiveMeeting] disableAudio attempt", i + 1, "failed:", e?.message);
-            }
-            await new Promise((r) => setTimeout(r, 50));
-          }
+        // Immediately reflect desired state in UI toggles.
+        setMicOn(false);
+        setCamOn(false);
 
-          // Wait a bit for SDK to process
-          await new Promise((r) => setTimeout(r, 100));
-
-          // AGGRESSIVELY disable at WebRTC level - this is the nuclear option
-          try {
-            const audioSenders =
-              dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
-                (s) => s.track?.kind === "audio"
-              ) || [];
-            console.log("[LiveMeeting] Found audio senders:", audioSenders.length);
-            for (const sender of audioSenders) {
-              if (sender.track) {
-                sender.track.enabled = false;
-                console.log(
-                  "[LiveMeeting] FORCED: Audio track disabled at WebRTC level"
-                );
-              }
-            }
-          } catch (e) {
-            console.warn("[LiveMeeting] Failed to disable audio at WebRTC level:", e);
+        // Try multiple times because SDK/media tracks can re-enable during room transition.
+        for (let i = 0; i < 3; i++) {
+          try { await dyteMeeting.self.disableAudio?.(); } catch (e) {
+            console.warn("[LiveMeeting] disableAudio failed on breakout join attempt", i + 1, e?.message || e);
           }
+          try { await dyteMeeting.self.disableVideo?.(); } catch (e) {
+            console.warn("[LiveMeeting] disableVideo failed on breakout join attempt", i + 1, e?.message || e);
+          }
+          await new Promise((r) => setTimeout(r, 80));
         }
-
-        // If user prefers camera OFF but Dyte has it ON, disable it
-        if (!userCamPreference && dyteMeeting.self.videoEnabled) {
-          console.log("[LiveMeeting] LOUNGE: User prefers camera OFF, disabling video...");
-          // Try disabling multiple times to ensure it sticks
-          for (let i = 0; i < 3; i++) {
-            try {
-              await dyteMeeting.self.disableVideo?.();
-              console.log("[LiveMeeting] disableVideo attempt", i + 1, "succeeded");
-            } catch (e) {
-              console.warn("[LiveMeeting] disableVideo attempt", i + 1, "failed:", e?.message);
-            }
-            await new Promise((r) => setTimeout(r, 50));
-          }
-
-          // Wait a bit for SDK to process
-          await new Promise((r) => setTimeout(r, 100));
-
-          // AGGRESSIVELY disable at WebRTC level
-          try {
-            const videoSenders =
-              dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
-                (s) => s.track?.kind === "video"
-              ) || [];
-            console.log("[LiveMeeting] Found video senders:", videoSenders.length);
-            for (const sender of videoSenders) {
-              if (sender.track) {
-                sender.track.enabled = false;
-                console.log(
-                  "[LiveMeeting] FORCED: Video track disabled at WebRTC level"
-                );
-              }
-            }
-          } catch (e) {
-            console.warn("[LiveMeeting] Failed to disable video at WebRTC level:", e);
-          }
-        }
-
-        // Wait and verify the state - do this multiple times to be sure
-        await new Promise((r) => setTimeout(r, 200));
-        console.log(
-          "[LiveMeeting] LOUNGE: First verification - Audio enabled:",
-          dyteMeeting.self.audioEnabled,
-          "Video enabled:",
-          dyteMeeting.self.videoEnabled
-        );
-
-        // Second pass - re-enforce if needed
-        await new Promise((r) => setTimeout(r, 300));
-        if (!userMicPreference && dyteMeeting.self.audioEnabled) {
-          console.log("[LiveMeeting] LOUNGE: Audio re-enabled unexpectedly! Forcing mute again...");
-          try {
-            const audioSenders =
-              dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
-                (s) => s.track?.kind === "audio"
-              ) || [];
-            for (const sender of audioSenders) {
-              if (sender.track) {
-                sender.track.enabled = false;
-              }
-            }
-          } catch (e) {
-            console.warn("[LiveMeeting] Second enforcement failed:", e);
-          }
-        }
-
-        if (!userCamPreference && dyteMeeting.self.videoEnabled) {
-          console.log(
-            "[LiveMeeting] LOUNGE: Video re-enabled unexpectedly! Forcing mute again..."
-          );
-          try {
-            const videoSenders =
-              dyteMeeting?.self?.peerConnection?.getSenders?.()?.filter(
-                (s) => s.track?.kind === "video"
-              ) || [];
-            for (const sender of videoSenders) {
-              if (sender.track) {
-                sender.track.enabled = false;
-              }
-            }
-          } catch (e) {
-            console.warn("[LiveMeeting] Second enforcement failed:", e);
-          }
-        }
-
-        console.log(
-          "[LiveMeeting] LOUNGE: Final verification - Audio enabled:",
-          dyteMeeting.self.audioEnabled,
-          "Video enabled:",
-          dyteMeeting.self.videoEnabled
-        );
       } catch (e) {
-        console.warn("[LiveMeeting] Error applying lounge media preferences:", e);
+        console.warn("[LiveMeeting] Error enforcing default media OFF on breakout/lounge join:", e);
       }
     };
 
-    applyMediaPreferences();
-  }, [isBreakout, roomJoined, dyteMeeting]);
+    enforceDefaultMediaOffOnBreakoutJoin();
+  }, [isBreakout, roomJoined, dyteMeeting, activeTableId]);
 
   // ---------- Update DB live-status (start/end) ----------
   const updateLiveStatus = useCallback(
@@ -8111,6 +7981,11 @@ export default function NewLiveMeeting() {
       const participantPresetStr = String(p?.presetName || p?._raw?.presetName || "").toLowerCase();
       const hasHostRoleOrPreset = participantRoleStr.includes("host") || participantRoleStr.includes("publisher") ||
         participantPresetStr.includes("host") || participantPresetStr.includes("publisher");
+      const isSelfParticipant = Boolean(dyteMeeting?.self?.id && p.id === dyteMeeting.self.id);
+      const sdkHostHeuristicMatch =
+        (hostFromMeeting && p.id === hostFromMeeting) ||
+        (dyteMeeting?.host && (p.name === dyteMeeting.host.name || p.id === dyteMeeting.host.id)) ||
+        isInHostSection;
 
       const isHostParticipant =
         isHostLikePreset ||
@@ -8118,9 +7993,8 @@ export default function NewLiveMeeting() {
         (hostIdCurrent && p.id === hostIdCurrent) ||
         (hostUserKeyCurrent && participantUserKey && participantUserKey === hostUserKeyCurrent) ||
         (isHost && dyteMeeting?.self?.id && p.id === dyteMeeting.self.id) ||
-        (hostFromMeeting && p.id === hostFromMeeting) ||  // ✅ Check if participant is the host from dyteMeeting
-        (dyteMeeting?.host && (p.name === dyteMeeting.host.name || p.id === dyteMeeting.host.id)) ||  // ✅ Match by name or ID
-        isInHostSection;  // ✅ Check if participant is in the "host" section of participants map
+        // SDK host collections can be noisy in breakout context; don't let them mark audience self as Host.
+        (sdkHostHeuristicMatch && (isHost || !isSelfParticipant));
 
       const participantEmail = String(
         raw?.email ||
@@ -8150,7 +8024,8 @@ export default function NewLiveMeeting() {
         (participantEmail ? assignedRoleByIdentity.get(`email:${participantEmail}`) : null) ||
         (participantName ? assignedRoleByIdentity.get(`name:${participantName}`) : null) ||
         null;
-      const finalRole = assignedRole || (isHostParticipant ? "Host" : (isSpeakerLikePreset ? "Speaker" : "Audience"));
+      const computedRole = assignedRole || (isHostParticipant ? "Host" : (isSpeakerLikePreset ? "Speaker" : "Audience"));
+      const finalRole = (!isHost && isSelfParticipant) ? "Audience" : computedRole;
 
       const metaProfilePicture =
         typeof parsedMeta?.profilePicture === "object"
@@ -10785,7 +10660,12 @@ export default function NewLiveMeeting() {
     // ✅ CRITICAL FIX: Apply lounge filter to hosts when not in breakout (main room context)
     // When user is in main room, hosts occupying lounge should be filtered out
     // When user is in breakout, show all participants in that room (lounge filter doesn't apply)
-    let host = scopedParticipants.filter((p) => p.role === "Host" && (isBreakout || !p.isOccupyingLounge));
+    let host = scopedParticipants.filter(
+      (p) =>
+        p.role === "Host" &&
+        (isBreakout || !p.isOccupyingLounge) &&
+        (isHost || p.id !== dyteMeeting?.self?.id)
+    );
     if (host.length === 0 && effectiveHostId) {
       host = scopedParticipants.filter((p) => p.id === effectiveHostId && (isBreakout || !p.isOccupyingLounge));
     }
