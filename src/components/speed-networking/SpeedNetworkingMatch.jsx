@@ -55,6 +55,7 @@ export default function SpeedNetworkingMatch({
     const [timeRemaining, setTimeRemaining] = useState(session.duration_minutes * 60);
     const [videoError, setVideoError] = useState(null);
     const [showBreakdown, setShowBreakdown] = useState(false);
+    const [hasRemoteParticipant, setHasRemoteParticipant] = useState(false);
     const autoAdvanceTriggeredRef = useRef(false);
     const matchStartMsRef = useRef(Date.now());
 
@@ -73,7 +74,9 @@ export default function SpeedNetworkingMatch({
         };
     }, []);
 
-    // Initialize Dyte Meeting for this match
+    // Initialize Dyte Meeting for this match.
+    // Important: do not re-init on every match object update (e.g. extension flags),
+    // otherwise Dyte briefly disconnects and shows "You left the meeting."
     useEffect(() => {
         if (match?.dyte_token) {
             console.log("[SpeedNetworkingMatch] Initializing Dyte meeting with token for match:", match.id);
@@ -92,7 +95,7 @@ export default function SpeedNetworkingMatch({
                 : "Video connection unavailable (Server Error)";
             setVideoError(errorMessage);
         }
-    }, [match, initMeeting]);
+    }, [match?.id, match?.dyte_token, initMeeting]);
 
     // Log participants when meeting changes
     useEffect(() => {
@@ -125,6 +128,37 @@ export default function SpeedNetworkingMatch({
             };
         }
     }, [meeting]);
+
+    // Track whether partner has actually joined the Dyte room
+    useEffect(() => {
+        if (!meeting) {
+            setHasRemoteParticipant(false);
+            return;
+        }
+
+        const getJoined = () => {
+            const joinedCollection = meeting.participants?.joined;
+            const arr =
+                typeof joinedCollection?.toArray === 'function'
+                    ? joinedCollection.toArray()
+                    : Array.isArray(joinedCollection?.participants)
+                        ? joinedCollection.participants
+                        : [];
+            return arr || [];
+        };
+
+        const syncRemotePresence = () => {
+            const selfId = meeting?.self?.id != null ? String(meeting.self.id) : null;
+            const joined = getJoined();
+            const remoteExists = joined.some((p) => String(p?.id) !== selfId);
+            setHasRemoteParticipant(remoteExists);
+        };
+
+        syncRemotePresence();
+        const intervalId = setInterval(syncRemotePresence, 1000);
+
+        return () => clearInterval(intervalId);
+    }, [meeting, match?.id]);
 
     // Timer countdown
     useEffect(() => {
@@ -390,9 +424,31 @@ export default function SpeedNetworkingMatch({
                             </Typography>
                         </Box>
                     ) : meeting ? (
-                        <DyteProvider value={meeting}>
-                            <DyteMeeting mode="fill" meeting={meeting} showSetupScreen={false} />
-                        </DyteProvider>
+                        <>
+                            <DyteProvider value={meeting}>
+                                <DyteMeeting mode="fill" meeting={meeting} showSetupScreen={false} />
+                            </DyteProvider>
+                            {!hasRemoteParticipant && (
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 16,
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        px: 2,
+                                        py: 1,
+                                        borderRadius: 2,
+                                        bgcolor: 'rgba(0,0,0,0.55)',
+                                        border: '1px solid rgba(255,255,255,0.15)',
+                                        zIndex: 11
+                                    }}
+                                >
+                                    <Typography sx={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, textAlign: 'center' }}>
+                                        Waiting for {[partner?.first_name, partner?.last_name].filter(Boolean).join(' ') || partner?.username || 'partner'} to join this match...
+                                    </Typography>
+                                </Box>
+                            )}
+                        </>
                     ) : (
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                             <Typography sx={{ color: 'rgba(255,255,255,0.3)' }}>Loading Video...</Typography>

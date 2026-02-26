@@ -30,16 +30,21 @@ export default function SpeedNetworkingControls({
     });
     const [loading, setLoading] = useState(false);
     const [showExtendDialog, setShowExtendDialog] = useState(false);
-    const [newDuration, setNewDuration] = useState('');
+    const [extensionMinutes, setExtensionMinutes] = useState('3');
     const [extendError, setExtendError] = useState('');
     const [showTagDialog, setShowTagDialog] = useState(false);
     const [pendingTags, setPendingTags] = useState([]);
     const [newTag, setNewTag] = useState({ label: '', category: '', side: 'both' });
 
     const handleExtendDuration = async () => {
-        const val = parseInt(newDuration, 10);
-        if (!val || val <= session.duration_minutes) {
-            setExtendError(`Must be greater than current duration (${session.duration_minutes} min)`);
+        const val = parseInt(extensionMinutes, 10);
+        if (!val || val <= 0) {
+            setExtendError('Must be at least 1 minute');
+            return;
+        }
+        const newTotal = session.duration_minutes + val;
+        if (newTotal > 60) {
+            setExtendError(`Cannot exceed 60 min total. Max you can add: ${60 - session.duration_minutes} min`);
             return;
         }
         try {
@@ -48,7 +53,7 @@ export default function SpeedNetworkingControls({
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { ...authHeader(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ duration_minutes: val }),
+                body: JSON.stringify({ extension_minutes: val }),
             });
             if (!res.ok) {
                 const data = await res.json();
@@ -56,7 +61,7 @@ export default function SpeedNetworkingControls({
                 return;
             }
             setShowExtendDialog(false);
-            setNewDuration('');
+            setExtensionMinutes('3');
             setExtendError('');
             if (onSessionUpdated) {
                 onSessionUpdated();
@@ -548,7 +553,7 @@ export default function SpeedNetworkingControls({
                         variant="contained"
                         size="small"
                         startIcon={<AddIcon />}
-                        onClick={() => { setNewDuration(String(session.duration_minutes + 1)); setShowExtendDialog(true); setExtendError(''); }}
+                        onClick={() => { setExtensionMinutes('3'); setShowExtendDialog(true); setExtendError(''); }}
                         disabled={loading}
                         sx={{
                             bgcolor: '#3b82f6',
@@ -584,17 +589,17 @@ export default function SpeedNetworkingControls({
 
             {/* Extend Duration Dialog */}
             <Dialog open={showExtendDialog} onClose={() => setShowExtendDialog(false)} maxWidth="xs" fullWidth>
-                <DialogTitle>Increase Round Duration</DialogTitle>
+                <DialogTitle>Add Time to Round</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" sx={{ mb: 2 }}>
-                        Current: {session?.duration_minutes} min. You can only increase the duration.
+                        Currently set to {session?.duration_minutes} min. Enter minutes to add.
                     </Typography>
                     <TextField
-                        label="New duration (minutes)"
+                        label="Minutes to add"
                         type="number"
-                        value={newDuration}
-                        onChange={e => { setNewDuration(e.target.value); setExtendError(''); }}
-                        inputProps={{ min: (session?.duration_minutes || 1) + 1, max: 60 }}
+                        value={extensionMinutes}
+                        onChange={e => { setExtensionMinutes(e.target.value); setExtendError(''); }}
+                        inputProps={{ min: 1, max: 60 - session?.duration_minutes }}
                         fullWidth
                         size="small"
                         error={!!extendError}

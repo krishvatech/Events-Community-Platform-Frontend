@@ -56,6 +56,14 @@ function isDocumentHidden() {
     return document.visibilityState === 'hidden';
 }
 
+function matchIncludesUser(match, userId) {
+    if (!match || userId == null) return true;
+    const me = String(userId);
+    const p1 = match?.participant_1?.id != null ? String(match.participant_1.id) : null;
+    const p2 = match?.participant_2?.id != null ? String(match.participant_2.id) : null;
+    return p1 === me || p2 === me;
+}
+
 export default function SpeedNetworkingZone({
     eventId,
     isAdmin,
@@ -163,6 +171,11 @@ export default function SpeedNetworkingZone({
 
         const normalizedType = normalizeMessageType(lastMessage.type);
         const messageData = lastMessage.data || {};
+        const messageSessionId = messageData?.session_id ?? messageData?.session?.id ?? lastMessage?.session_id;
+        const isDifferentSession = session?.id && messageSessionId && String(messageSessionId) !== String(session.id);
+        if (isDifferentSession) {
+            return;
+        }
 
         console.log("[SpeedNetworking] WebSocket message received:", {
             original: lastMessage.type,
@@ -174,15 +187,51 @@ export default function SpeedNetworkingZone({
         if (normalizedType === 'speed_networking_match_found') {
             console.log("[SpeedNetworking] ✅ Match found!");
             const wsMatch = lastMessage.match || messageData.match || messageData;
+            if (!matchIncludesUser(wsMatch, currentUser?.id)) {
+                console.log("[SpeedNetworking] Ignoring match_found for different user", {
+                    wsMatchId: wsMatch?.id,
+                    currentUserId: currentUser?.id
+                });
+                return;
+            }
             setCurrentMatch(wsMatch);
             setTransitionMatch(null);
             setInQueue(false);
+            setLoading(false);
             if (onEnterMatch) {
                 onEnterMatch(wsMatch);
+            }
+
+            // WS payload can be partial/stale; fetch authoritative current match (token + participants)
+            if (session?.id) {
+                (async () => {
+                    try {
+                        let url = `${API_ROOT}/events/${eventId}/speed-networking/${session.id}/my-match/`.replace(/([^:]\/)\/+/g, "$1");
+                        url = addCacheBust(url);
+                        const res = await fetch(url, { headers: authHeader() });
+                        if (!res.ok) return;
+                        const freshMatch = await res.json();
+                        if (!freshMatch?.id || !matchIncludesUser(freshMatch, currentUser?.id)) return;
+
+                        setCurrentMatch(freshMatch);
+                        setTransitionMatch(null);
+                        setInQueue(false);
+                    } catch (err) {
+                        console.debug("[SpeedNetworking] Failed to refresh match after WS match_found:", err);
+                    }
+                })();
             }
         }
         // Match ended - CRITICAL: Update UI immediately AND refresh session
         else if (normalizedType === 'speed_networking_match_ended') {
+            const endedMatchId = messageData?.match_id ?? messageData?.id ?? lastMessage?.match?.id;
+            if (currentMatch?.id && endedMatchId && String(endedMatchId) !== String(currentMatch.id)) {
+                console.log("[SpeedNetworking] Ignoring match_ended for stale/non-current match", {
+                    endedMatchId,
+                    currentMatchId: currentMatch.id
+                });
+                return;
+            }
             console.log("[SpeedNetworking] ✅ Match ended! Updating UI...");
             const shouldShowBuffer =
                 currentMatch &&
@@ -274,7 +323,7 @@ export default function SpeedNetworkingZone({
                 }
             });
         }
-    }, [lastMessage, onEnterMatch, fetchActiveSession, currentMatch, session]);
+    }, [lastMessage, onEnterMatch, fetchActiveSession, currentMatch, session, currentUser?.id, eventId]);
 
     // Monitor match status changes (fallback: detect when match ended server-side)
     useEffect(() => {
