@@ -453,7 +453,7 @@ const countryColor = (name) => {
 };
 
 /* -------------------------- Member card (left) -------------------------- */
-function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId, viewerIsStaff, viewerIsVerified }) {
+function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onAcceptFriend, onDeclineFriend, currentUserId, viewerIsStaff, viewerIsVerified }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const email = u?.email || "";
   const usernameFromEmail = email ? email.split("@")[0] : "";
@@ -617,6 +617,23 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, currentUserId
                   <CheckCircleRoundedIcon fontSize="small" color="success" />
                 </IconButton>
               </Tooltip>
+            ) : status === "pending_incoming" ? (
+              <Stack direction="row" spacing={1}>
+                {onAcceptFriend && onDeclineFriend ? (
+                  <>
+                    <Button size="small" variant="contained" color="success" onClick={(e) => { e.stopPropagation(); onAcceptFriend?.(u); }} sx={{ textTransform: "none", borderRadius: 2, minWidth: isMobile ? 'auto' : undefined, px: isMobile ? 1 : undefined }}>
+                      Accept
+                    </Button>
+                    <Button size="small" variant="outlined" color="error" onClick={(e) => { e.stopPropagation(); onDeclineFriend?.(u); }} sx={{ textTransform: "none", borderRadius: 2, minWidth: isMobile ? 'auto' : undefined, px: isMobile ? 1 : undefined }}>
+                      Decline
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="small" variant="outlined" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+                    Pending your approval
+                  </Button>
+                )}
+              </Stack>
             ) : isMobile ? (
               <Tooltip title={blockByVerified ? "Verified members only" : "Request Contact"}>
                 <span>
@@ -912,6 +929,7 @@ export default function MembersPage() {
   const ROWS_PER_PAGE = 5;
 
   const [friendStatusByUser, setFriendStatusByUser] = useState({});
+  const [friendRequestsByUser, setFriendRequestsByUser] = useState({});
 
   const userDisplayName = (u) =>
     u?.profile?.full_name ||
@@ -933,6 +951,11 @@ export default function MembersPage() {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d?.detail || `Failed status for ${id}`);
+
+    if (d?.status === "incoming_pending" && d?.request_id) {
+      setFriendRequestsByUser((prev) => ({ ...prev, [id]: d.request_id }));
+    }
+
     return normalizeFriendStatus(d?.status || d?.friendship || "none");
   }
 
@@ -956,6 +979,33 @@ export default function MembersPage() {
       setFriendStatusByUser((m) => ({ ...m, [id]: status }));
     } catch (e) {
       alert(e?.message || "Failed to send request");
+    }
+  }
+
+  async function respondToRequest(id, action) {
+    const reqId = friendRequestsByUser[id];
+    if (!reqId) {
+      alert("Unable to find request ID. Please refresh.");
+      return;
+    }
+    try {
+      const r = await fetch(`${API_BASE}/friend-requests/${reqId}/${action}/`, {
+        method: "POST",
+        headers: { Accept: "application/json", ...tokenHeader() },
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Failed to " + action);
+
+      const newStatus = action === "accept" ? "friends" : "none";
+      setFriendStatusByUser((m) => ({ ...m, [id]: newStatus }));
+
+      setFriendRequestsByUser((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } catch (e) {
+      alert(e.message);
     }
   }
 
@@ -1710,6 +1760,8 @@ export default function MembersPage() {
                       friendStatus={friendStatusByUser[u.id]}
                       onOpenProfile={handleOpenProfile}
                       onAddFriend={() => sendFriendRequest(u.id)}
+                      onAcceptFriend={() => respondToRequest(u.id, "accept")}
+                      onDeclineFriend={() => respondToRequest(u.id, "decline")}
                       currentUserId={me?.id}
                       viewerIsStaff={viewerIsStaff}
                       viewerIsVerified={viewerIsVerified}

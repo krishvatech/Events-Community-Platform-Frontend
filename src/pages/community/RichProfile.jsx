@@ -2147,18 +2147,21 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   const viewerIsVerified = isVerifiedStatus(me?.profile?.kyc_status || me?.kyc_status);
   const [sharesGroup, setSharesGroup] = useState(false);
 
-  // --- FRIEND BUTTON / STATUS ---
-  const [friendStatus, setFriendStatus] = useState(isMe ? "self" : "none"); // self | none | pending_outgoing | pending_incoming | friends
-  const [friendLoading, setFriendLoading] = useState(!isMe);
-  const [friendSubmitting, setFriendSubmitting] = useState(false);
-  // Per-row friendship status inside Connections dialog
-  const [connFriendStatus, setConnFriendStatus] = useState({}); // { [userId]: "friends" | "pending_outgoing" | "pending_incoming" | "none" }
-  const [connSubmitting, setConnSubmitting] = useState({});     // { [userId]: boolean }
-
   // --- REPORTING ---
   const [reportOpen, setReportOpen] = useState(false);
   const [reportBusy, setReportBusy] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null);
+
+  // Per-row friendship status inside Connections dialog
+  const [connFriendStatus, setConnFriendStatus] = useState({}); // { [userId]: "friends" | "pending_outgoing" | "pending_incoming" | "none" }
+  const [connSubmitting, setConnSubmitting] = useState({});     // { [userId]: boolean }
+  const [connFriendRequests, setConnFriendRequests] = useState({});
+
+  // --- FRIEND BUTTON / STATUS ---
+  const [friendStatus, setFriendStatus] = useState(isMe ? "self" : "none"); // self | none | pending_outgoing | pending_incoming | friends
+  const [friendLoading, setFriendLoading] = useState(!isMe);
+  const [friendSubmitting, setFriendSubmitting] = useState(false);
+  const [friendRequestId, setFriendRequestId] = useState(null);
 
   const handleReportProfile = async (payload) => {
     setReportBusy(true);
@@ -2281,6 +2284,11 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       const d = await r.json().catch(() => ({}));
       // backend may return incoming_pending/outgoing_pending — normalize:
       const map = { incoming_pending: "pending_incoming", outgoing_pending: "pending_outgoing" };
+
+      if (d?.status === "incoming_pending" && d?.request_id) {
+        setConnFriendRequests((prev) => ({ ...prev, [targetId]: d.request_id }));
+      }
+
       return (map[d?.status] || d?.status || "none").toLowerCase();
     } catch {
       return "none";
@@ -2301,6 +2309,33 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       setConnFriendStatus((m) => ({ ...m, [targetId]: (d?.status || "pending_outgoing").toLowerCase() }));
     } catch (e) {
       alert(e?.message || "Failed to send friend request");
+    } finally {
+      setConnSubmitting((m) => ({ ...m, [targetId]: false }));
+    }
+  }
+
+  async function respondToConnRequest(targetId, action) {
+    const reqId = connFriendRequests[targetId];
+    if (!reqId) {
+      alert("Unable to find request ID. Please refresh.");
+      return;
+    }
+    try {
+      setConnSubmitting((m) => ({ ...m, [targetId]: true }));
+      const r = await fetch(`${API_BASE}/friend-requests/${reqId}/${action}/`, {
+        method: "POST",
+        headers: { Accept: "application/json", ...tokenHeader() },
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error(`Failed to ${action}`);
+      setConnFriendStatus((m) => ({ ...m, [targetId]: action === "accept" ? "friends" : "none" }));
+      setConnFriendRequests((prev) => {
+        const next = { ...prev };
+        delete next[targetId];
+        return next;
+      });
+    } catch (e) {
+      alert(e.message);
     } finally {
       setConnSubmitting((m) => ({ ...m, [targetId]: false }));
     }
@@ -2603,6 +2638,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         };
         const s = (map[d?.status] || d?.status || "none");
         setFriendStatus(String(s).toLowerCase());
+        setFriendRequestId(d?.request_id || null);
       } catch {
         if (!alive) return;
         setFriendStatus("none");
@@ -2612,6 +2648,32 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
     })();
     return () => { alive = false; };
   }, [userId, isMe]);
+
+  const respondToRequest = async (action) => {
+    if (!friendRequestId) {
+      alert("Unable to find request ID. Please refresh.");
+      return;
+    }
+    setFriendSubmitting(true);
+    try {
+      const r = await fetch(`${API_BASE}/friend-requests/${friendRequestId}/${action}/`, {
+        method: "POST",
+        headers: { Accept: "application/json", ...tokenHeader() },
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error(`Failed to ${action} request`);
+
+      setFriendStatus(action === "accept" ? "friends" : "none");
+      setFriendRequestId(null);
+      if (action === "accept") {
+        setMutualCount((prev) => prev + 1);
+      }
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setFriendSubmitting(false);
+    }
+  };
 
   const sendFriendRequest = async () => {
     try {
@@ -3302,9 +3364,28 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           </Button>
                         )}
                         {!friendLoading && friendStatus === "pending_incoming" && (
-                          <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-                            Pending your approval
-                          </Button>
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              color="success"
+                              onClick={() => respondToRequest("accept")}
+                              disabled={friendSubmitting}
+                              sx={{ textTransform: "none", borderRadius: 2 }}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              color="error"
+                              onClick={() => respondToRequest("decline")}
+                              disabled={friendSubmitting}
+                              sx={{ textTransform: "none", borderRadius: 2 }}
+                            >
+                              Decline
+                            </Button>
+                          </Stack>
                         )}
                         {!friendLoading && friendStatus === "none" && (
                           <Button
@@ -3788,6 +3869,32 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                     >
                                       Request pending
                                     </Button>
+                                  );
+                                }
+                                if (status === "pending_incoming") {
+                                  return (
+                                    <Stack direction="row" spacing={0.5}>
+                                      <Button
+                                        size="small"
+                                        variant="contained"
+                                        color="success"
+                                        disabled={connSubmitting[String(f.id)]}
+                                        onClick={() => respondToConnRequest(f.id, "accept")}
+                                        sx={{ textTransform: "none", borderRadius: 2, minWidth: 'auto', px: 1 }}
+                                      >
+                                        Accept
+                                      </Button>
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        color="error"
+                                        disabled={connSubmitting[String(f.id)]}
+                                        onClick={() => respondToConnRequest(f.id, "decline")}
+                                        sx={{ textTransform: "none", borderRadius: 2, minWidth: 'auto', px: 1 }}
+                                      >
+                                        Decline
+                                      </Button>
+                                    </Stack>
                                   );
                                 }
                                 // not friends → Add friend
