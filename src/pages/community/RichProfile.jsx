@@ -35,6 +35,8 @@ import {
   Tooltip,
   ListItemButton,
   Skeleton,
+  Snackbar,
+  Alert
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
@@ -2162,6 +2164,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   const [friendLoading, setFriendLoading] = useState(!isMe);
   const [friendSubmitting, setFriendSubmitting] = useState(false);
   const [friendRequestId, setFriendRequestId] = useState(null);
+  const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
 
   const handleReportProfile = async (payload) => {
     setReportBusy(true);
@@ -2175,10 +2178,10 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         const error = await res.json().catch(() => ({}));
         throw new Error(error.detail || "Report failed");
       }
-      alert("Profile reported successfully. Our team will review it.");
+      setToast({ open: true, msg: "Profile reported successfully. Our team will review it.", type: "success" });
       setReportOpen(false);
     } catch (error) {
-      alert(`Failed to report profile: ${error.message}`);
+      setToast({ open: true, msg: `Failed to report profile: ${error.message}`, type: "error" });
     } finally {
       setReportBusy(false);
     }
@@ -2205,7 +2208,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         if (!res.ok) {
           const txt = await res.text().catch(() => "");
           console.error("Poll vote failed:", res.status, txt);
-          alert("Could not register your vote.");
+          setToast({ open: true, msg: "Could not register your vote.", type: "error" });
           return;
         }
 
@@ -2222,7 +2225,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         // }
       } catch (err) {
         console.error("Error voting on poll:", err);
-        alert("Could not register your vote.");
+        setToast({ open: true, msg: "Could not register your vote.", type: "error" });
       }
     };
 
@@ -2305,10 +2308,18 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         body: JSON.stringify({ to_user: Number(targetId) }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok && r.status !== 200) throw new Error(d?.detail || "Failed to send request");
+      if (!r.ok && r.status !== 200) {
+        let msg = d?.detail || d?.non_field_errors?.[0];
+        if (!msg && typeof d === "object") {
+          const firstKey = Object.keys(d)[0];
+          if (firstKey && Array.isArray(d[firstKey])) msg = d[firstKey][0];
+        }
+        throw new Error(msg || "Failed to send request");
+      }
       setConnFriendStatus((m) => ({ ...m, [targetId]: (d?.status || "pending_outgoing").toLowerCase() }));
+      setToast({ open: true, msg: "Contact request sent!", type: "success" });
     } catch (e) {
-      alert(e?.message || "Failed to send friend request");
+      setToast({ open: true, msg: e?.message || "Failed to send friend request", type: "error" });
     } finally {
       setConnSubmitting((m) => ({ ...m, [targetId]: false }));
     }
@@ -2317,7 +2328,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   async function respondToConnRequest(targetId, action) {
     const reqId = connFriendRequests[targetId];
     if (!reqId) {
-      alert("Unable to find request ID. Please refresh.");
+      setToast({ open: true, msg: "Unable to find request ID. Please refresh.", type: "error" });
       return;
     }
     try {
@@ -2334,8 +2345,9 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         delete next[targetId];
         return next;
       });
+      setToast({ open: true, msg: `Request ${action === "accept" ? "accepted" : "declined"}!`, type: "success" });
     } catch (e) {
-      alert(e.message);
+      setToast({ open: true, msg: e.message || "Failed to " + action, type: "error" });
     } finally {
       setConnSubmitting((m) => ({ ...m, [targetId]: false }));
     }
@@ -2638,7 +2650,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         };
         const s = (map[d?.status] || d?.status || "none");
         setFriendStatus(String(s).toLowerCase());
-        setFriendRequestId(d?.request_id || null);
+        setFriendRequestId(d?.request_id || d?.friend_request_id || null);
       } catch {
         if (!alive) return;
         setFriendStatus("none");
@@ -2651,7 +2663,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
   const respondToRequest = async (action) => {
     if (!friendRequestId) {
-      alert("Unable to find request ID. Please refresh.");
+      setToast({ open: true, msg: "Unable to find request ID. Please refresh.", type: "error" });
       return;
     }
     setFriendSubmitting(true);
@@ -2669,7 +2681,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         setMutualCount((prev) => prev + 1);
       }
     } catch (e) {
-      alert(e.message);
+      setToast({ open: true, msg: e.message || "Failed to process request", type: "error" });
     } finally {
       setFriendSubmitting(false);
     }
@@ -2689,11 +2701,42 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
         body: JSON.stringify({ to_user: Number(userId) }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok && r.status !== 200)
-        throw new Error(d?.detail || "Failed to send request");
+      if (!r.ok && r.status !== 200) {
+        let msg = d?.detail || d?.non_field_errors?.[0];
+        if (!msg && typeof d === "object") {
+          const firstKey = Object.keys(d)[0];
+          if (firstKey && Array.isArray(d[firstKey])) msg = d[firstKey][0];
+        }
+        throw new Error(msg || "Failed to send request");
+      }
       setFriendStatus(d?.status || "pending_outgoing");
+      if (d?.request_id) setFriendRequestId(d.request_id);
+      setToast({ open: true, msg: "Contact request sent!", type: "success" });
     } catch (e) {
-      alert(e?.message || "Failed to send friend request");
+      setToast({ open: true, msg: e?.message || "Failed to send friend request", type: "error" });
+    } finally {
+      setFriendSubmitting(false);
+    }
+  };
+
+  const cancelFriendRequest = async () => {
+    if (!friendRequestId) {
+      setToast({ open: true, msg: "Unable to find request ID. Please refresh.", type: "error" });
+      return;
+    }
+    setFriendSubmitting(true);
+    try {
+      const r = await fetch(`${API_BASE}/friend-requests/${friendRequestId}/cancel/`, {
+        method: "POST",
+        headers: { Accept: "application/json", ...tokenHeader() },
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Failed to cancel request");
+      setFriendStatus("none");
+      setFriendRequestId(null);
+      setToast({ open: true, msg: "Request cancelled.", type: "success" });
+    } catch (e) {
+      setToast({ open: true, msg: e.message || "Failed to cancel request", type: "error" });
     } finally {
       setFriendSubmitting(false);
     }
@@ -2705,10 +2748,10 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       if (data?.url) {
         window.location.href = data.url;
       } else {
-        alert("Could not start verification. Please try again.");
+        setToast({ open: true, msg: "Could not start verification. Please try again.", type: "error" });
       }
     } catch (error) {
-      alert(error?.message || "Failed to start verification");
+      setToast({ open: true, msg: error?.message || "Failed to start verification", type: "error" });
     }
   };
 
@@ -3381,9 +3424,21 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           </>
                         )}
                         {!friendLoading && friendStatus === "pending_outgoing" && (
-                          <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
-                            Request sent
-                          </Button>
+                          <Stack direction="row" spacing={1}>
+                            <Button variant="outlined" size="small" disabled sx={{ textTransform: "none", borderRadius: 2 }}>
+                              Request sent
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              color="error"
+                              onClick={cancelFriendRequest}
+                              disabled={friendSubmitting}
+                              sx={{ textTransform: "none", borderRadius: 2 }}
+                            >
+                              Cancel
+                            </Button>
+                          </Stack>
                         )}
                         {!friendLoading && friendStatus === "pending_incoming" && (
                           <Stack direction="row" spacing={1}>
@@ -3465,6 +3520,18 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               sx={{ mt: 2, textTransform: "none", borderRadius: 2 }}
                             >
                               {friendSubmitting ? "Sending…" : "Add as Contact"}
+                            </Button>
+                          )}
+                          {(friendStatus || "").toLowerCase() === "pending_outgoing" && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              color="error"
+                              onClick={cancelFriendRequest}
+                              disabled={friendSubmitting}
+                              sx={{ mt: 2, textTransform: "none", borderRadius: 2 }}
+                            >
+                              Cancel Pending Request
                             </Button>
                           )}
                         </Box>
@@ -3994,6 +4061,21 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
           username: userItem?.username
         }}
       />
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setToast((t) => ({ ...t, open: false }))}
+          severity={toast.type}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {toast.msg}
+        </Alert>
+      </Snackbar>
     </div >
   );
 }

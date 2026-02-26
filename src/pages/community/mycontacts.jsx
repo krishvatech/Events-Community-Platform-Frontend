@@ -20,7 +20,9 @@ import {
     Chip,
     useMediaQuery,
     FormControlLabel,
-    Switch
+    Switch,
+    Snackbar,
+    Alert
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -434,6 +436,7 @@ export default function MyContacts() {
     const [selectedCompanySizes, setSelectedCompanySizes] = useState([]);
 
     const [friendStatusByUser, setFriendStatusByUser] = useState({});
+    const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
 
     const me = useMemo(() => {
         try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
@@ -457,9 +460,17 @@ export default function MyContacts() {
                 body: JSON.stringify({ to_user: Number(id) }),
             });
             const d = await r.json().catch(() => ({}));
-            if (!r.ok && r.status !== 200 && r.status !== 201) throw new Error(d?.detail || "Failed to send request");
+            if (!r.ok && r.status !== 200 && r.status !== 201) {
+                let msg = d?.detail || d?.non_field_errors?.[0];
+                if (!msg && typeof d === "object") {
+                    const firstKey = Object.keys(d)[0];
+                    if (firstKey && Array.isArray(d[firstKey])) msg = d[firstKey][0];
+                }
+                throw new Error(msg || "Failed to send request");
+            }
             setFriendStatusByUser((m) => ({ ...m, [id]: "pending_outgoing" }));
-        } catch (e) { alert(e?.message || "Failed to send request"); }
+            setToast({ open: true, msg: "Contact request sent!", type: "success" });
+        } catch (e) { setToast({ open: true, msg: e?.message || "Failed to send request", type: "error" }); }
     }
 
     // Load Filter Options
@@ -1137,6 +1148,21 @@ export default function MyContacts() {
                     </Paper>
                 </Box>
             )}
+            <Snackbar
+                open={toast.open}
+                autoHideDuration={4000}
+                onClose={() => setToast((t) => ({ ...t, open: false }))}
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            >
+                <Alert
+                    onClose={() => setToast((t) => ({ ...t, open: false }))}
+                    severity={toast.type}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {toast.msg}
+                </Alert>
+            </Snackbar>
         </>
     );
 }

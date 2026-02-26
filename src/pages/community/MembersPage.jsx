@@ -24,7 +24,9 @@ import {
   Checkbox,
   MenuItem,
   ListItemText,
-  Skeleton
+  Skeleton,
+  Snackbar,
+  Alert
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SearchIcon from "@mui/icons-material/Search";
@@ -150,6 +152,16 @@ const normalizeFriendStatus = (s) => {
   if (["pending_outgoing", "outgoing_pending", "requested", "requested_outgoing", "sent", "request_sent"].includes(v)) return "pending_outgoing";
   if (["pending_incoming", "incoming_pending", "received", "request_received"].includes(v)) return "pending_incoming";
   return "none";
+};
+
+const cancelFriendRequestApi = async (reqId) => {
+  const r = await fetch(`${API_BASE}/friend-requests/${reqId}/cancel/`, {
+    method: "POST",
+    headers: { Accept: "application/json", ...tokenHeader() },
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error("Failed to cancel request");
+  return r;
 };
 
 const isAbort = (e) =>
@@ -453,7 +465,7 @@ const countryColor = (name) => {
 };
 
 /* -------------------------- Member card (left) -------------------------- */
-function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onAcceptFriend, onDeclineFriend, currentUserId, viewerIsStaff, viewerIsVerified }) {
+function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onCancelFriend, onAcceptFriend, onDeclineFriend, currentUserId, viewerIsStaff, viewerIsVerified }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const email = u?.email || "";
   const usernameFromEmail = email ? email.split("@")[0] : "";
@@ -612,11 +624,25 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onAcceptFrien
                 </IconButton>
               </Tooltip>
             ) : status === "pending_outgoing" ? (
-              <Tooltip title="Request sent">
-                <IconButton size="small" disabled>
-                  <CheckCircleRoundedIcon fontSize="small" color="success" />
-                </IconButton>
-              </Tooltip>
+              <Stack direction="row" spacing={1}>
+                {onCancelFriend ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    sx={{ textTransform: "none", borderRadius: 2 }}
+                    onClick={(e) => { e.stopPropagation(); onCancelFriend?.(u); }}
+                  >
+                    Cancel
+                  </Button>
+                ) : (
+                  <Tooltip title="Request sent">
+                    <IconButton size="small" disabled>
+                      <CheckCircleRoundedIcon fontSize="small" color="success" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
             ) : status === "pending_incoming" ? (
               <Stack direction="row" spacing={1}>
                 {onAcceptFriend && onDeclineFriend ? (
@@ -930,6 +956,7 @@ export default function MembersPage() {
 
   const [friendStatusByUser, setFriendStatusByUser] = useState({});
   const [friendRequestsByUser, setFriendRequestsByUser] = useState({});
+  const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
 
   const userDisplayName = (u) =>
     u?.profile?.full_name ||
@@ -955,6 +982,9 @@ export default function MembersPage() {
     if (d?.status === "incoming_pending" && d?.request_id) {
       setFriendRequestsByUser((prev) => ({ ...prev, [id]: d.request_id }));
     }
+    if (d?.status === "outgoing_pending" && d?.request_id) {
+      setFriendRequestsByUser((prev) => ({ ...prev, [id]: d.request_id }));
+    }
 
     return normalizeFriendStatus(d?.status || d?.friendship || "none");
   }
@@ -973,19 +1003,29 @@ export default function MembersPage() {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok && r.status !== 200 && r.status !== 201) {
-        throw new Error(d?.detail || "Failed to send request");
+        let msg = d?.detail || d?.non_field_errors?.[0];
+        if (!msg && typeof d === "object") {
+          // Flatten other field errors if available
+          const firstKey = Object.keys(d)[0];
+          if (firstKey && Array.isArray(d[firstKey])) msg = d[firstKey][0];
+        }
+        throw new Error(msg || "Failed to send request");
       }
       const status = normalizeFriendStatus(d?.status || "pending_outgoing");
       setFriendStatusByUser((m) => ({ ...m, [id]: status }));
+      if (d?.request_id) {
+        setFriendRequestsByUser((prev) => ({ ...prev, [id]: d.request_id }));
+      }
+      setToast({ open: true, msg: "Contact request sent!", type: "success" });
     } catch (e) {
-      alert(e?.message || "Failed to send request");
+      setToast({ open: true, msg: e?.message || "Failed to send request", type: "error" });
     }
   }
 
   async function respondToRequest(id, action) {
     const reqId = friendRequestsByUser[id];
     if (!reqId) {
-      alert("Unable to find request ID. Please refresh.");
+      setToast({ open: true, msg: "Unable to find request ID. Please refresh.", type: "error" });
       return;
     }
     try {
@@ -1004,8 +1044,29 @@ export default function MembersPage() {
         delete next[id];
         return next;
       });
+      setToast({ open: true, msg: `Request ${action}ed!`, type: "success" });
     } catch (e) {
-      alert(e.message);
+      setToast({ open: true, msg: e.message || "Failed to " + action, type: "error" });
+    }
+  }
+
+  async function cancelFriendRequest(id) {
+    const reqId = friendRequestsByUser[id];
+    if (!reqId) {
+      setToast({ open: true, msg: "Unable to find request ID. Please refresh.", type: "error" });
+      return;
+    }
+    try {
+      await cancelFriendRequestApi(reqId);
+      setFriendStatusByUser((m) => ({ ...m, [id]: "none" }));
+      setFriendRequestsByUser((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setToast({ open: true, msg: "Request cancelled.", type: "success" });
+    } catch (e) {
+      setToast({ open: true, msg: e.message || "Failed to cancel request", type: "error" });
     }
   }
 
@@ -1760,6 +1821,7 @@ export default function MembersPage() {
                       friendStatus={friendStatusByUser[u.id]}
                       onOpenProfile={handleOpenProfile}
                       onAddFriend={() => sendFriendRequest(u.id)}
+                      onCancelFriend={() => cancelFriendRequest(u.id)}
                       onAcceptFriend={() => respondToRequest(u.id, "accept")}
                       onDeclineFriend={() => respondToRequest(u.id, "decline")}
                       currentUserId={me?.id}
@@ -2017,7 +2079,21 @@ export default function MembersPage() {
           </Paper>
         </Box>
       )}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setToast((t) => ({ ...t, open: false }))}
+          severity={toast.type}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {toast.msg}
+        </Alert>
+      </Snackbar>
     </>
   );
-
 }

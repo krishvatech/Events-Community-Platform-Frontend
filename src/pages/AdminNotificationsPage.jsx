@@ -78,6 +78,7 @@ const ENDPOINTS = {
   verificationRequestDecide: (id) => `${API_ROOT}/users/admin/verification-request/${id}/decide/`,
   acceptContact: (id) => `${API_ROOT}/friend-requests/${id}/accept/`,
   declineContact: (id) => `${API_ROOT}/friend-requests/${id}/decline/`,
+  cancelContact: (id) => `${API_ROOT}/friend-requests/${id}/cancel/`,
 };
 
 // ---- Helpers ----
@@ -295,7 +296,7 @@ async function loadStandardNotifications(onlyUnread, kindFilter) {
 
 async function loadSentRequests() {
   try {
-    const r = await fetch(`${API_ROOT}/friend-requests/?type=outgoing`, {
+    const r = await fetch(`${API_ROOT}/friend-requests/?type=outgoing&status=pending`, {
       headers: { ...authHeader(), Accept: "application/json" },
       credentials: "include",
     });
@@ -336,7 +337,7 @@ function groupHref(n) { return n?.group?.id ? `/community/groups/${n.group.id}` 
 const VERIF_ICON = <BadgeRoundedIcon style={{ fontSize: 12 }} />;
 
 // --- Sub-Component: Notification Row ---
-function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDecideVerif, onMarkRead, onAcceptContact, onDeclineContact }) {
+function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDecideVerif, onMarkRead, onAcceptContact, onDeclineContact, onCancelContact }) {
   // Logic: It's "read" if it has a read_at date AND it is not pending. 
   // Pending items are always highlighted (teal background).
   const isRead = !!n.read_at && n.status !== 'pending';
@@ -484,38 +485,54 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
           )}
 
           {/* ACTION BUTTONS (Only if pending) */}
-          {n.status === 'pending' && (n.type === "name_change" || n.type === "join_request" || n.type === "verification_request" || n.type === "friend_request" || n.type === "connection_request") && (
+          {n.status === 'pending' && (n.type === "name_change" || n.type === "join_request" || n.type === "verification_request" || n.type === "friend_request" || n.type === "connection_request" || n.type === "sent_request") && (
             <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
-              <Button
-                size="small"
-                variant="contained"
-                disabled={busy}
-                onClick={() => {
-                  if (n.type === "name_change") return onDecideName(n, "approved");
-                  if (n.type === "verification_request") return onDecideVerif(n, "approved");
-                  if (n.type === "friend_request" || n.type === "connection_request") return onAcceptContact(n);
-                  return onApprove(n);
-                }}
-                startIcon={<CheckCircleOutlineIcon />}
-                sx={{ textTransform: "none", borderRadius: 2, bgcolor: TEAL, '&:hover': { bgcolor: TEAL }, px: 2 }}
-              >
-                {n.type === "friend_request" || n.type === "connection_request" ? "Accept" : "Approve"}
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                disabled={busy}
-                onClick={() => {
-                  if (n.type === "name_change") return onDecideName(n, "rejected");
-                  if (n.type === "verification_request") return onDecideVerif(n, "rejected");
-                  if (n.type === "friend_request" || n.type === "connection_request") return onDeclineContact(n);
-                  return onReject(n);
-                }}
-                startIcon={<HighlightOffIcon />}
-                sx={{ textTransform: "none", borderRadius: 2, color: 'text.secondary', borderColor: BORDER, '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } }}
-              >
-                {n.type === "friend_request" || n.type === "connection_request" ? "Decline" : "Reject"}
-              </Button>
+              {(n.type !== "sent_request") ? (
+                <>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    disabled={busy}
+                    onClick={() => {
+                      if (n.type === "name_change") return onDecideName(n, "approved");
+                      if (n.type === "verification_request") return onDecideVerif(n, "approved");
+                      if (n.type === "friend_request" || n.type === "connection_request") return onAcceptContact(n);
+                      return onApprove(n);
+                    }}
+                    startIcon={<CheckCircleOutlineIcon />}
+                    sx={{ textTransform: "none", borderRadius: 2, bgcolor: TEAL, '&:hover': { bgcolor: TEAL }, px: 2 }}
+                  >
+                    {n.type === "friend_request" || n.type === "connection_request" ? "Accept" : "Approve"}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={busy}
+                    onClick={() => {
+                      if (n.type === "name_change") return onDecideName(n, "rejected");
+                      if (n.type === "verification_request") return onDecideVerif(n, "rejected");
+                      if (n.type === "friend_request" || n.type === "connection_request") return onDeclineContact(n);
+                      return onReject(n);
+                    }}
+                    startIcon={<HighlightOffIcon />}
+                    sx={{ textTransform: "none", borderRadius: 2, color: 'text.secondary', borderColor: BORDER, '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } }}
+                  >
+                    {n.type === "friend_request" || n.type === "connection_request" ? "Decline" : "Reject"}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  disabled={busy}
+                  onClick={() => onCancelContact(n)}
+                  startIcon={<HighlightOffIcon />}
+                  sx={{ textTransform: "none", borderRadius: 2 }}
+                >
+                  Cancel request
+                </Button>
+              )}
             </Stack>
           )}
         </Box>
@@ -896,6 +913,23 @@ export default function AdminNotificationsPage() {
     } catch { setToast({ open: true, type: "error", msg: "Failed" }); } finally { setBusyId(null); }
   };
 
+  const handleCancelContact = async (n) => {
+    // For sent requests, IDs are usually in n.id or n.data.id
+    // But loadSentRequests maps n.id to n.id (original integer)
+    // Wait, let's check loadSentRequests mapping
+    const frId = n.id.replace("sent-", "");
+    setBusyId(n.id);
+    try {
+      const res = await fetch(ENDPOINTS.cancelContact(frId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!res.ok) throw new Error("Failed");
+      setItems((prev) => prev.filter((x) => x.id !== n.id));
+      setToast({ open: true, type: "success", msg: "Contact request canceled." });
+    } catch { setToast({ open: true, type: "error", msg: "Failed" }); } finally { setBusyId(null); }
+  };
+
   return (
     <Container maxWidth="xl" disableGutters sx={{ px: { xs: 0, sm: 0 }, pt: 6, pb: 6 }}>
 
@@ -986,6 +1020,7 @@ export default function AdminNotificationsPage() {
                   onMarkRead={markRead}
                   onAcceptContact={handleAcceptContact}
                   onDeclineContact={handleDeclineContact}
+                  onCancelContact={handleCancelContact}
                 />
               ))}
             </Stack>

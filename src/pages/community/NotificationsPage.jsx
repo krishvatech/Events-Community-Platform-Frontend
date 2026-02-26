@@ -182,7 +182,7 @@ async function fetchStandardNotifications(url) {
 // 2. Sent Requests (Outgoing)
 async function loadSentRequests() {
   try {
-    const r = await fetch(`${API_BASE}/friend-requests/?type=outgoing`, {
+    const r = await fetch(`${API_BASE}/friend-requests/?type=outgoing&status=pending`, {
       headers: { ...tokenHeader(), Accept: "application/json" },
       credentials: "include",
     });
@@ -347,6 +347,7 @@ function NotificationRow({
   onToggleRead,
   onAcceptRequest,
   onDeclineRequest,
+  onCancelRequest,
   onFollowBack,
   onOpenDigest,
 }) {
@@ -717,7 +718,27 @@ function NotificationRow({
 
   const ActionsByKind = () => {
     if (item.kind === "friend_request" || item.kind === "connection_request") {
-      if (item.source === "sent_request") return null;
+      if (item.source === "sent_request") {
+        if (item.state === "canceled") return null;
+        return (
+          <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancelRequest?.(item.id);
+              }}
+              disabled={!!item._busy}
+              sx={{ textTransform: "none", borderRadius: 2 }}
+              startIcon={<HighlightOffIcon />}
+            >
+              Cancel request
+            </Button>
+          </Stack>
+        );
+      }
       if (item.state === "accepted") return null;
       if (item.state === "declined") return null;
       return (
@@ -1366,6 +1387,27 @@ export default function NotificationsPage({
     } catch { updateItem(id, { _busy: false }); }
   };
 
+  const handleCancelRequest = async (id) => {
+    const n = items.find((x) => x.id === id);
+    if (!n?.context?.friend_request_id) return;
+    updateItem(id, { _busy: true });
+    try {
+      const r = await fetch(`${API_BASE}/friend-requests/${n.context.friend_request_id}/cancel/`, {
+        method: "POST",
+        headers: { ...tokenHeader(), Accept: "application/json" },
+      });
+      if (r.ok) {
+        // Remove from list
+        setGeneralItems((prev) => prev.filter((it) => it.id !== id));
+        setSentRequests((prev) => prev.filter((it) => it.id !== id));
+      } else {
+        updateItem(id, { _busy: false });
+      }
+    } catch {
+      updateItem(id, { _busy: false });
+    }
+  };
+
   const handleFollowBack = async (id) => {
     updateItem(id, { _busy: true });
     setTimeout(() => { updateItem(id, { following_back: true, _busy: false, is_read: true }); onFollowBackUser?.(id); }, 350);
@@ -1430,6 +1472,7 @@ export default function NotificationsPage({
                         onToggleRead={handleToggleRead}
                         onAcceptRequest={handleAcceptRequest}
                         onDeclineRequest={handleDeclineRequest}
+                        onCancelRequest={handleCancelRequest}
                         onFollowBack={handleFollowBack}
                         onOpenDigest={handleOpenDigest}
                       />
