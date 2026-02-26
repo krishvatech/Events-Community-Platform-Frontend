@@ -90,7 +90,7 @@ const VISIBILITY_META = {
 
 const CONTACT_VISIBILITY_OPTIONS = [
   { value: "private", label: "Private (Only Me)" },
-  { value: "request", label: "By Request (Shows a button, not the email)" },
+  { value: "request", label: "By Request (Shows a button)" },
   { value: "contacts", label: "Direct Contacts" },
   { value: "contacts_groups", label: "Contacts & Group Members" },
   { value: "public", label: "Public (Everyone)" },

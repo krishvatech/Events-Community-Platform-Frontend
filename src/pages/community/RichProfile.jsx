@@ -3005,7 +3005,26 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       (userItem?.email || "").trim() ||
       emails.some((e) => (e?.email || "").trim())
     );
-    return { anyEmail, visibility: fallbackVis };
+
+    // Additional fields to check for "request" visibility
+    const phones = Array.isArray(resolvedLinks?.contact?.phones) ? resolvedLinks.contact.phones : [];
+    const phoneHasRequest = phones.some(p => normalizeVisibility(getVisibilityValue(p)) === "request");
+
+    const websites = Array.isArray(resolvedLinks?.contact?.websites) ? resolvedLinks.contact.websites : [];
+    const websiteHasRequest = websites.some(w => normalizeVisibility(getVisibilityValue(w)) === "request");
+
+    const schedulerVis = resolvedLinks?.contact?.scheduler ? normalizeVisibility(getVisibilityValue(resolvedLinks.contact.scheduler)) : "";
+    const schedulerHasRequest = schedulerVis === "request";
+
+    // Determine if ANY field has "request" visibility
+    const anyFieldHasRequest =
+      fallbackVis === "request" ||
+      emails.some(e => normalizeVisibility(getVisibilityValue(e)) === "request") ||
+      phoneHasRequest ||
+      websiteHasRequest ||
+      schedulerHasRequest;
+
+    return { anyEmail, visibility: fallbackVis, anyFieldHasRequest };
   }, [resolvedLinks, userItem]);
 
   const emailBlockedByVerified =
@@ -3015,7 +3034,10 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
     !isMe &&
     !viewerIsStaff &&
     !emailBlockedByVerified &&
-    ["request", "contacts", "contacts_groups"].includes(primaryEmailVisibility) &&
+    (
+      ["request", "contacts", "contacts_groups"].includes(primaryEmailVisibility) ||
+      emailVisibilityInfo.anyFieldHasRequest
+    ) &&
     (friendStatus || "").toLowerCase() !== "friends" &&
     (friendStatus || "").toLowerCase() !== "pending_outgoing";
 
@@ -3576,37 +3598,43 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                             </Box>
                           )}
 
-                          {/* PHONES - display ALL public phones */}
-                          {visiblePhones.length > 0 && (
-                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                                Phone{visiblePhones.length > 1 ? "s" : ""}:
-                              </Typography>
+                          {/* PHONES */}
+                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                              Phone{visiblePhones.length > 1 ? "s" : ""}:
+                            </Typography>
+                            {visiblePhones.length > 0 ? (
                               <Stack spacing={0.5}>
                                 {visiblePhones.map((phoneObj, idx) => (
                                   <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                                     <span style={{ fontSize: 18 }}>{getCountryFlag(phoneObj.number)}</span>
                                     <Typography variant="body2">{phoneObj.number}</Typography>
                                     {phoneObj.type && (
-                                      <Chip
-                                        label={phoneObj.type}
-                                        size="small"
-                                        sx={{ height: 18, fontSize: 10 }}
-                                      />
+                                      <Chip label={phoneObj.type} size="small" sx={{ height: 18, fontSize: 10 }} />
                                     )}
                                     {phoneObj.primary && (
-                                      <Chip
-                                        label="Primary"
-                                        size="small"
-                                        color="primary"
-                                        sx={{ height: 18, fontSize: 10 }}
-                                      />
+                                      <Chip label="Primary" size="small" color="primary" sx={{ height: 18, fontSize: 10 }} />
                                     )}
                                   </Box>
                                 ))}
                               </Stack>
-                            </Box>
-                          )}
+                            ) : (
+                              emailVisibilityInfo.anyFieldHasRequest && canRequestContact && (
+                                <Stack spacing={0.5} sx={{ flex: 1 }}>
+                                  <Typography variant="body2" color="text.secondary">By request</Typography>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={sendFriendRequest}
+                                    disabled={friendSubmitting}
+                                    sx={{ width: "fit-content" }}
+                                  >
+                                    Request Contact
+                                  </Button>
+                                </Stack>
+                              )
+                            )}
+                          </Box>
                           <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
                             <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
                               Company:
@@ -3660,11 +3688,11 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           )}
 
                           {/* Scheduler */}
-                          {visibleScheduler && (
-                            <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
-                              <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                                Schedule:
-                              </Typography>
+                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                              Schedule:
+                            </Typography>
+                            {visibleScheduler ? (
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -3677,8 +3705,23 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               >
                                 {visibleScheduler.label}
                               </Button>
-                            </Box>
-                          )}
+                            ) : (
+                              emailVisibilityInfo.anyFieldHasRequest && canRequestContact && (
+                                <Stack spacing={0.5} sx={{ flex: 1 }}>
+                                  <Typography variant="body2" color="text.secondary">By request</Typography>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={sendFriendRequest}
+                                    disabled={friendSubmitting}
+                                    sx={{ width: "fit-content" }}
+                                  >
+                                    Request Contact
+                                  </Button>
+                                </Stack>
+                              )
+                            )}
+                          </Box>
                         </Section>
 
                         {/* Current role section */}
