@@ -898,6 +898,8 @@ function WaitingForHost({
   onOpenLounge,
   loungeStatusLabel = "",
 }) {
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+
   return (
     <Box
       sx={{
@@ -1140,8 +1142,64 @@ function WaitingForHost({
 
       {/* Footer */}
       <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-        Having trouble? Check your connection or contact support
+        Having trouble? Check your connection or{" "}
+        <Typography
+          component="span"
+          onClick={() => setSupportDialogOpen(true)}
+          sx={{
+            color: "rgba(100, 200, 255, 0.85)",
+            cursor: "pointer",
+            fontWeight: 600,
+            "&:hover": {
+              color: "rgba(150, 220, 255, 1)",
+            },
+          }}
+        >
+          contact support
+        </Typography>
       </Typography>
+
+      {/* Coming Soon Support Dialog */}
+      <Dialog
+        open={supportDialogOpen}
+        onClose={() => setSupportDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "rgba(15, 23, 42, 0.95)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            backdropFilter: "blur(12px)",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 800,
+            fontSize: 18,
+            color: "rgba(255,255,255,0.92)",
+          }}
+        >
+          Support Features Coming Soon
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "rgba(255,255,255,0.70)", mt: 1 }}>
+            We're working on comprehensive support features to help you with any issues. This feature will be available soon!
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setSupportDialogOpen(false)}
+            sx={{
+              color: "rgba(255,255,255,0.85)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.08)",
+              },
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -1166,6 +1224,8 @@ function PreEventLoungeGate({
   onConfirmHostChoice,
   onCancelHostChoice,
 }) {
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+
   return (
     <Box
       sx={{
@@ -1497,8 +1557,64 @@ function PreEventLoungeGate({
 
       {/* Footer */}
       <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-        Having trouble? Check your connection or contact support
+        Having trouble? Check your connection or{" "}
+        <Typography
+          component="span"
+          onClick={() => setSupportDialogOpen(true)}
+          sx={{
+            color: "rgba(100, 200, 255, 0.85)",
+            cursor: "pointer",
+            fontWeight: 600,
+            "&:hover": {
+              color: "rgba(150, 220, 255, 1)",
+            },
+          }}
+        >
+          contact support
+        </Typography>
       </Typography>
+
+      {/* Coming Soon Support Dialog */}
+      <Dialog
+        open={supportDialogOpen}
+        onClose={() => setSupportDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "rgba(15, 23, 42, 0.95)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            backdropFilter: "blur(12px)",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 800,
+            fontSize: 18,
+            color: "rgba(255,255,255,0.92)",
+          }}
+        >
+          Support Features Coming Soon
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "rgba(255,255,255,0.70)", mt: 1 }}>
+            We're working on comprehensive support features to help you with any issues. This feature will be available soon!
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setSupportDialogOpen(false)}
+            sx={{
+              color: "rgba(255,255,255,0.85)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.08)",
+              },
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Host Choice Confirmation Dialog */}
       <Dialog
@@ -1605,6 +1721,8 @@ function WaitingRoomScreen({
   announcementsRef = null,
   isOnBreak = false,
 }) {
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+
   // ✅ NEW: Initialize announcements component
   const announcementHelper = WaitingRoomAnnouncements({});
 
@@ -1869,8 +1987,64 @@ function WaitingRoomScreen({
       </Paper>
 
       <Typography sx={{ mt: 3, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
-        You can network in the Social Lounge while you wait.
+        Having trouble? Check your connection or{" "}
+        <Typography
+          component="span"
+          onClick={() => setSupportDialogOpen(true)}
+          sx={{
+            color: "rgba(100, 200, 255, 0.85)",
+            cursor: "pointer",
+            fontWeight: 600,
+            "&:hover": {
+              color: "rgba(150, 220, 255, 1)",
+            },
+          }}
+        >
+          contact support
+        </Typography>
       </Typography>
+
+      {/* Coming Soon Support Dialog */}
+      <Dialog
+        open={supportDialogOpen}
+        onClose={() => setSupportDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "rgba(15, 23, 42, 0.95)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            backdropFilter: "blur(12px)",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 800,
+            fontSize: 18,
+            color: "rgba(255,255,255,0.92)",
+          }}
+        >
+          Support Features Coming Soon
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "rgba(255,255,255,0.70)", mt: 1 }}>
+            We're working on comprehensive support features to help you with any issues. This feature will be available soon!
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setSupportDialogOpen(false)}
+            sx={{
+              color: "rgba(255,255,255,0.85)",
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.08)",
+              },
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
