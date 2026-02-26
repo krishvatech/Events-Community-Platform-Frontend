@@ -76,6 +76,8 @@ const ENDPOINTS = {
   nameRequestDecide: (id) => `${API_ROOT}/auth/admin/name-requests/${id}/decide/`,
   verificationRequestsList: () => `${API_ROOT}/users/admin/verification-requests/`,
   verificationRequestDecide: (id) => `${API_ROOT}/users/admin/verification-request/${id}/decide/`,
+  acceptContact: (id) => `${API_ROOT}/friend-requests/${id}/accept/`,
+  declineContact: (id) => `${API_ROOT}/friend-requests/${id}/decline/`,
 };
 
 // ---- Helpers ----
@@ -101,7 +103,7 @@ async function loadNameChangeRequests() {
       type: "name_change",
       status: req.status, // 'pending', 'approved', or 'rejected'
       created_at: req.created_at,
-      actor_name: req.username || req.user?.username || "User",
+      actor_name: getUserDisplayName(req?.user_details || req?.user) || req.username || "User",
       actor_avatar: "",
       user_id: req.user,
       data: {
@@ -166,7 +168,7 @@ async function loadJoinRequests() {
             type: "join_request",
             status: req?.status || "pending",
             created_at: req?.joined_at,
-            actor_name: req?.user?.name || "Someone",
+            actor_name: getUserDisplayName(req?.user),
             actor_avatar: req?.user?.avatar || "",
             user_id: req?.user?.id,
             group: { id: g.id, name: g.name },
@@ -195,7 +197,7 @@ async function loadMemberJoined(onlyUnread) {
       type: "member_joined",
       created_at: n.created_at,
       actor_id: n?.actor?.id,
-      actor_name: n?.actor?.display_name || n?.actor?.username || "Someone",
+      actor_name: getUserDisplayName(n?.actor),
       actor_avatar: n?.actor?.avatar_url || "",
       user_id: n?.data?.user_id,
       group: { id: n?.data?.group_id, name: n?.data?.group_name || `#${n?.data?.group_id}` },
@@ -217,7 +219,7 @@ async function loadGroupCreated(onlyUnread) {
       type: "group_created",
       created_at: n.created_at,
       actor_id: n?.actor?.id,
-      actor_name: n?.actor?.display_name || n?.actor?.username || "Someone",
+      actor_name: getUserDisplayName(n?.actor),
       actor_avatar: n?.actor?.avatar_url || "",
       group: { id: n?.data?.group_id ?? n?.group, name: n?.data?.group_name || `#${n?.data?.group_id ?? n?.group}` },
       read_at: n?.is_read ? n.created_at : null,
@@ -239,7 +241,7 @@ async function loadParentLinkNotifications(onlyUnread) {
       status: n.state || (n.is_read ? "read" : "pending"),
       created_at: n.created_at,
       actor_id: n?.actor?.id,
-      actor_name: n?.actor?.display_name || n?.actor?.username || "System",
+      actor_name: getUserDisplayName(n?.actor),
       actor_avatar: n?.actor?.avatar_url || "",
       title: n.title || "",
       description: n.description || "",
@@ -275,7 +277,7 @@ async function loadStandardNotifications(onlyUnread, kindFilter) {
       status: n.state || (n.is_read ? "read" : "unread"),
       created_at: n.created_at,
       actor_id: n?.actor?.id,
-      actor_name: n?.actor?.first_name || n?.actor?.username || n?.actor?.email || "User",
+      actor_name: `${n?.actor?.first_name || ""} ${n?.actor?.last_name || ""}`.trim() || n?.actor?.username || n?.actor?.email || "User",
       actor_avatar: n?.actor?.avatar_url || "",
       data: n.data || {},
       description: n.description,
@@ -287,6 +289,36 @@ async function loadStandardNotifications(onlyUnread, kindFilter) {
     return { items, count: items.length };
   } catch (e) {
     console.warn("Failed to load standard notifications:", e);
+    return { items: [], count: 0 };
+  }
+}
+
+async function loadSentRequests() {
+  try {
+    const r = await fetch(`${API_ROOT}/friend-requests/?type=outgoing`, {
+      headers: { ...authHeader(), Accept: "application/json" },
+      credentials: "include",
+    });
+    if (!r.ok) return { items: [], count: 0 };
+    const j = await r.json();
+    const rows = Array.isArray(j) ? j : j?.results || [];
+
+    const items = rows.map((n) => ({
+      id: `sent-${n.id}`,
+      _source: "sent_request",
+      type: "sent_request",
+      status: "pending",
+      created_at: n.created_at,
+      actor_name: getUserDisplayName(n.to_user),
+      actor_avatar: n.to_user?.avatar_url || "",
+      user_id: n.to_user?.id,
+      title: "Contact Request Sent",
+      description: "",
+      read_at: new Date().toISOString(), // Treat as "read" for background color purposes
+    }));
+    return { items, count: items.length };
+  } catch (e) {
+    console.warn("Failed to load sent requests:", e);
     return { items: [], count: 0 };
   }
 }
@@ -304,7 +336,7 @@ function groupHref(n) { return n?.group?.id ? `/community/groups/${n.group.id}` 
 const VERIF_ICON = <BadgeRoundedIcon style={{ fontSize: 12 }} />;
 
 // --- Sub-Component: Notification Row ---
-function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDecideVerif, onMarkRead }) {
+function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDecideVerif, onMarkRead, onAcceptContact, onDeclineContact }) {
   // Logic: It's "read" if it has a read_at date AND it is not pending. 
   // Pending items are always highlighted (teal background).
   const isRead = !!n.read_at && n.status !== 'pending';
@@ -320,7 +352,9 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
 
     if (s === "approved") return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Approved" sx={{ ...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 } }} />;
     if (s === "rejected") return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Rejected" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
-    if (s === "pending") return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label="Pending" sx={{ ...common.sx, bgcolor: "#fff7ed", borderColor: "#ffedd5", color: "#c2410c", "& .MuiChip-icon": { color: "#c2410c", mr: 0.5 } }} />;
+    if (s === "pending") return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label="Pending" sx={{ ...common.sx, bgcolor: "#fff7ed", borderColor: "#ffedd5", color: "#c2410c", "& :hover": { bgcolor: "#fff7ed" }, "& .MuiChip-icon": { color: "#c2410c", mr: 0.5 } }} />;
+    if (s === "accepted") return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Accepted" sx={{ ...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 } }} />;
+    if (s === "declined") return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Declined" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
     return null;
   };
 
@@ -359,19 +393,19 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
           <Typography variant="body2" sx={{ lineHeight: 1.5, color: '#0f172a' }}>
             {n.type === "name_change" ? (
               <>
-                <Box component="span" fontWeight={700}>{n.actor_name}</Box> requested a name change from <b>{n.data.old_name}</b> to <b>{n.data.new_name}</b>.
+                <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> requested a name change from <b>{n.data.old_name}</b> to <b>{n.data.new_name}</b>.
               </>
             ) : n.type === "verification_request" ? (
               <>
-                <Box component="span" fontWeight={700}>{n.actor_name}</Box> requested verification renewal.
+                <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> requested verification renewal.
               </>
             ) : n.type === "join_request" ? (
               <>
-                <Box component="span" fontWeight={700}>{n.actor_name}</Box> requested to join <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
+                <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> requested to join <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
               </>
             ) : n.type === "member_joined" ? (
               <>
-                <Box component="span" fontWeight={700}>{n.actor_name}</Box> joined <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
+                <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> joined <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
               </>
             ) : n.type === "parent_link_request" ? (
               <>
@@ -381,9 +415,17 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
               <>
                 ✅ Link request from <Box component="span" fontWeight={700}>{n.data?.child_group_name || n.group?.name}</Box> to <Box component={Link} to={n.data?.parent_group_id ? `/community/groups/${n.data.parent_group_id}` : "#"} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n.data?.parent_group_name || "parent group"}</Box> was <b>approved</b>.
               </>
-            ) : n.type === "friend_request" ? (
+            ) : (n.type === "friend_request" || n.type === "connection_request") ? (
               <>
-                <Box component="span" fontWeight={700}>{n.actor_name}</Box> sent you a friend request.
+                {n.status === 'declined' || n.status === 'rejected' ? (
+                  <>Contact request from <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> was declined.</>
+                ) : (
+                  <>{String(n.title || "").toLowerCase().includes("accepted") || n.status === 'accepted' ? (
+                    <><Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> accepted your contact request.</>
+                  ) : (
+                    <><Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> sent you a contact request.</>
+                  )}</>
+                )}
               </>
             ) : n.type === "mention" ? (
               <>
@@ -399,15 +441,23 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
               </>
             ) : n.type === "event" ? (
               <>
-                <Box component="span" fontWeight={700}>{n.title || "Event notification"}</Box>
+                <Box component="span" fontWeight={700}>{String(n.title || "Event notification").replace(/friend/gi, "contact")}</Box>
               </>
             ) : n.type === "system" ? (
               <>
-                <Box component="span" fontWeight={700}>System:</Box> {n.title}
+                <Box component="span" fontWeight={700}>System:</Box> {String(n.title || "").replace(/friend/gi, "contact")}
+              </>
+            ) : n.type === "group_created" ? (
+              <>
+                <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> created group <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
+              </>
+            ) : n.type === "sent_request" ? (
+              <>
+                You sent a contact request to <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box>.
               </>
             ) : (
               <>
-                <Box component="span" fontWeight={700}>{n.actor_name}</Box> created group <Box component={Link} to={groupHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit' }}>{n?.group?.name}</Box>.
+                <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> {String(n.title || "").replace(/friend/gi, "contact")}
               </>
             )}
           </Typography>
@@ -434,7 +484,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
           )}
 
           {/* ACTION BUTTONS (Only if pending) */}
-          {n.status === 'pending' && (n.type === "name_change" || n.type === "join_request" || n.type === "verification_request") && (
+          {n.status === 'pending' && (n.type === "name_change" || n.type === "join_request" || n.type === "verification_request" || n.type === "friend_request" || n.type === "connection_request") && (
             <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
               <Button
                 size="small"
@@ -443,12 +493,13 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
                 onClick={() => {
                   if (n.type === "name_change") return onDecideName(n, "approved");
                   if (n.type === "verification_request") return onDecideVerif(n, "approved");
+                  if (n.type === "friend_request" || n.type === "connection_request") return onAcceptContact(n);
                   return onApprove(n);
                 }}
                 startIcon={<CheckCircleOutlineIcon />}
                 sx={{ textTransform: "none", borderRadius: 2, bgcolor: TEAL, '&:hover': { bgcolor: TEAL }, px: 2 }}
               >
-                Approve
+                {n.type === "friend_request" || n.type === "connection_request" ? "Accept" : "Approve"}
               </Button>
               <Button
                 size="small"
@@ -457,12 +508,13 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
                 onClick={() => {
                   if (n.type === "name_change") return onDecideName(n, "rejected");
                   if (n.type === "verification_request") return onDecideVerif(n, "rejected");
+                  if (n.type === "friend_request" || n.type === "connection_request") return onDeclineContact(n);
                   return onReject(n);
                 }}
                 startIcon={<HighlightOffIcon />}
                 sx={{ textTransform: "none", borderRadius: 2, color: 'text.secondary', borderColor: BORDER, '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } }}
               >
-                Reject
+                {n.type === "friend_request" || n.type === "connection_request" ? "Decline" : "Reject"}
               </Button>
             </Stack>
           )}
@@ -604,9 +656,10 @@ export default function AdminNotificationsPage() {
       else if (tab === "event") out = await loadStandardNotifications(onlyUnread, "event");
       else if (tab === "system") out = await loadStandardNotifications(onlyUnread, "system");
       else if (tab === "parent_link") out = await loadParentLinkNotifications(onlyUnread);
+      else if (tab === "sent_request") out = await loadSentRequests();
       else {
         // "all" tab - load everything
-        const [reqs, joined, created, names, verifs, standard, parentLinks] = await Promise.all([
+        const [reqs, joined, created, names, verifs, standard, parentLinks, sent] = await Promise.all([
           loadJoinRequests(),
           loadMemberJoined(onlyUnread),
           loadGroupCreated(onlyUnread),
@@ -614,6 +667,7 @@ export default function AdminNotificationsPage() {
           loadVerificationRequests(),
           loadStandardNotifications(onlyUnread),
           loadParentLinkNotifications(onlyUnread),
+          loadSentRequests(),
         ]);
         out.items = [
           ...names.items,
@@ -623,6 +677,7 @@ export default function AdminNotificationsPage() {
           ...created.items,
           ...standard.items,
           ...parentLinks.items,
+          ...sent.items,
         ].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
         // Wait, let's fix the array destructuring
         out.count = out.items.length;
@@ -803,6 +858,44 @@ export default function AdminNotificationsPage() {
     } catch { setToast({ open: true, type: "error", msg: "Error" }); } finally { setBusyId(null); }
   };
 
+  const handleAcceptContact = async (n) => {
+    const frId = n.data?.friend_request_id;
+    if (!frId) return;
+    setBusyId(n.id);
+    try {
+      const res = await fetch(ENDPOINTS.acceptContact(frId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!res.ok) throw new Error("Failed");
+      setItems((prev) => {
+        const next = prev.map((x) => (x.id === n.id ? { ...x, status: "accepted", read_at: new Date().toISOString() } : x));
+        syncUnread(next);
+        return next;
+      });
+      setToast({ open: true, type: "success", msg: "Contact request accepted." });
+    } catch { setToast({ open: true, type: "error", msg: "Failed" }); } finally { setBusyId(null); }
+  };
+
+  const handleDeclineContact = async (n) => {
+    const frId = n.data?.friend_request_id;
+    if (!frId) return;
+    setBusyId(n.id);
+    try {
+      const res = await fetch(ENDPOINTS.declineContact(frId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+      });
+      if (!res.ok) throw new Error("Failed");
+      setItems((prev) => {
+        const next = prev.map((x) => (x.id === n.id ? { ...x, status: "declined", read_at: new Date().toISOString() } : x));
+        syncUnread(next);
+        return next;
+      });
+      setToast({ open: true, type: "success", msg: "Contact request declined." });
+    } catch { setToast({ open: true, type: "error", msg: "Failed" }); } finally { setBusyId(null); }
+  };
+
   return (
     <Container maxWidth="xl" disableGutters sx={{ px: { xs: 0, sm: 0 }, pt: 6, pb: 6 }}>
 
@@ -843,7 +936,7 @@ export default function AdminNotificationsPage() {
         <Box sx={{ flexGrow: 1 }} />
         <FormControl size="small" sx={{ minWidth: 180 }}>
           <Select value={tab} onChange={(e) => setTab(e.target.value)} sx={{ borderRadius: 2, bgcolor: 'white', '& .MuiSelect-select': { py: 1, fontSize: '0.9rem', fontWeight: 500 } }}>
-            <MenuItem value="all">All Notifications</MenuItem>
+            <MenuItem value="all">All notifications</MenuItem>
             <MenuItem value="name_change">Identity Requests</MenuItem>
             <MenuItem value="verification_request">Verification Requests</MenuItem>
             <MenuItem value="join_request">Join Requests</MenuItem>
@@ -851,7 +944,8 @@ export default function AdminNotificationsPage() {
             <MenuItem value="group_created">Group Created</MenuItem>
             <MenuItem value="parent_link">🔗 Group Link Requests</MenuItem>
             <Divider />
-            <MenuItem value="friend_request">Friend Requests</MenuItem>
+            <MenuItem value="friend_request">Contact Requests (Inbox)</MenuItem>
+            <MenuItem value="sent_request">Sent Contact Requests</MenuItem>
             <MenuItem value="mention">Mentions</MenuItem>
             <MenuItem value="comment">Comments</MenuItem>
             <MenuItem value="reaction">Reactions</MenuItem>
@@ -890,6 +984,8 @@ export default function AdminNotificationsPage() {
                   onDecideName={decideNameChange}
                   onDecideVerif={decideVerification}
                   onMarkRead={markRead}
+                  onAcceptContact={handleAcceptContact}
+                  onDeclineContact={handleDeclineContact}
                 />
               ))}
             </Stack>

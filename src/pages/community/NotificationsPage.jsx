@@ -46,6 +46,12 @@ const emitUnreadCount = (count) => {
 };
 
 /* ---------------------- helpers ---------------------- */
+const getUserDisplayName = (u) => {
+  if (!u) return "User";
+  const name = `${u.first_name || ""} ${u.last_name || ""}`.trim();
+  return name || u.full_name || u.username || u.email || "User";
+};
+
 function formatWhen(ts) {
   try { return new Date(ts).toLocaleString(); } catch { return ts; }
 }
@@ -98,8 +104,8 @@ const KIND_LABEL = {
   follow: "Follows",
   event: "Events",
   system: "System",
-  friend_request: "Requests",
-  connection_request: "Requests",
+  friend_request: "Contact Requests",
+  connection_request: "Contact Requests",
   join_request: "Group",
   member_joined: "Group",
   member_added: "Group",
@@ -158,7 +164,7 @@ async function fetchStandardNotifications(url) {
       data: n.data || {},
       actor: {
         id: n.actor?.id,
-        name: n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
+        name: getUserDisplayName(n.actor),
         avatar: n.actor?.avatar_url || "",
       },
       context: {
@@ -171,6 +177,44 @@ async function fetchStandardNotifications(url) {
     })),
     next: j?.next || null
   };
+}
+
+// 2. Sent Requests (Outgoing)
+async function loadSentRequests() {
+  try {
+    const r = await fetch(`${API_BASE}/friend-requests/?type=outgoing`, {
+      headers: { ...tokenHeader(), Accept: "application/json" },
+      credentials: "include",
+    });
+    if (!r.ok) return [];
+    const j = await r.json();
+    const raw = Array.isArray(j) ? j : j?.results || [];
+
+    // Map outgoing requests to notification-like objects
+    return raw.map((n) => ({
+      id: `sent-${n.id}`,
+      source: "sent_request",
+      kind: "friend_request",
+      state: "pending", // Always pending if in this list
+      title: "Contact Request Sent",
+      description: "",
+      created_at: n.created_at,
+      is_read: true,
+      data: n,
+      actor: {
+        id: n.to_user?.id,
+        name: getUserDisplayName(n.to_user),
+        avatar: n.to_user?.avatar_url || "",
+      },
+      context: {
+        profile_user_id: n.to_user?.id,
+        friend_request_id: n.id,
+      },
+    }));
+  } catch (e) {
+    console.error("Failed to load sent requests:", e);
+    return [];
+  }
 }
 
 // 1b. Group Notifications (for group admins/mods)
@@ -201,7 +245,7 @@ async function fetchGroupNotifications(url) {
         data: n.data || {},
         actor: {
           id: n.actor?.id,
-          name: n.actor?.name || n.actor?.first_name || n.actor?.username || n.actor?.email || "User",
+          name: getUserDisplayName(n.actor),
           avatar: n.actor?.avatar || n.actor?.avatar_url || "",
         },
         context: {
@@ -412,7 +456,14 @@ function NotificationRow({
     if (item.kind === "join_request") {
       return (
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          <Typography
+            variant="body2"
+            sx={{ fontWeight: 700, cursor: "pointer", "&:hover": { color: "primary.main" } }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAvatarClick?.(item);
+            }}
+          >
             {item.actor?.name || "Someone"}
           </Typography>
           <Typography variant="body2">
@@ -428,7 +479,14 @@ function NotificationRow({
     if (item.kind === "member_joined" || item.kind === "member_added") {
       return (
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          <Typography
+            variant="body2"
+            sx={{ fontWeight: 700, cursor: "pointer", "&:hover": { color: "primary.main" } }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAvatarClick?.(item);
+            }}
+          >
             {item.actor?.name || "Someone"}
           </Typography>
           <Typography variant="body2">
@@ -444,7 +502,14 @@ function NotificationRow({
     if (item.kind === "group_created") {
       return (
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          <Typography
+            variant="body2"
+            sx={{ fontWeight: 700, cursor: "pointer", "&:hover": { color: "primary.main" } }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAvatarClick?.(item);
+            }}
+          >
             {item.actor?.name || "Someone"}
           </Typography>
           <Typography variant="body2">
@@ -535,10 +600,83 @@ function NotificationRow({
       );
     }
 
+    if (item.kind === "friend_request" || item.kind === "connection_request") {
+      const isAccepted = String(item.title || "").toLowerCase().includes("accepted") || item.state === "accepted";
+      const isDeclined = item.state === "declined" || item.state === "rejected";
+      const isSent = item.source === "sent_request";
+
+      if (isSent) {
+        return (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Typography variant="body2">
+              You sent a contact request to
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAvatarClick?.(item);
+              }}
+            >
+              {item.actor?.name || "Someone"}
+            </Typography>
+          </Stack>
+        );
+      }
+
+      if (isDeclined) {
+        return (
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Typography variant="body2">
+              Contact request from
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAvatarClick?.(item);
+              }}
+            >
+              {item.actor?.name || "Someone"}
+            </Typography>
+            <Typography variant="body2">
+              was declined.
+            </Typography>
+          </Stack>
+        );
+      }
+
+      return (
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography
+            variant="body2"
+            sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAvatarClick?.(item);
+            }}
+          >
+            {item.actor?.name || "Someone"}
+          </Typography>
+          <Typography variant="body2">
+            {isAccepted ? "accepted your contact request" : "sent you a contact request"}
+          </Typography>
+        </Stack>
+      );
+    }
     if (item.kind === "event") {
       return (
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          <Typography
+            variant="body2"
+            sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAvatarClick?.(item);
+            }}
+          >
             {item.actor?.name || "System"}
           </Typography>
           <Typography variant="body2">
@@ -557,10 +695,17 @@ function NotificationRow({
     // Default Render
     return (
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: 700, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAvatarClick?.(item);
+          }}
+        >
           {item.actor?.name || "System"}
         </Typography>
-        <Typography variant="body2">{item.title}</Typography>
+        <Typography variant="body2">{String(item.title || "").replace(/friend/gi, "contact")}</Typography>
         {item.context?.group && (
           <Chip size="small" label={item.context.group} variant="outlined" />
         )}
@@ -572,6 +717,7 @@ function NotificationRow({
 
   const ActionsByKind = () => {
     if (item.kind === "friend_request" || item.kind === "connection_request") {
+      if (item.source === "sent_request") return null;
       if (item.state === "accepted") return null;
       if (item.state === "declined") return null;
       return (
@@ -916,9 +1062,19 @@ export default function NotificationsPage({
         system: ["system"],
         identity: ["name_change"],
         suggestions: ["suggestion_digest"],
+        sentrequests: ["friend_request"],
       };
       const keys = norm[k] || [k.slice(0, -1)];
-      arr = arr.filter((i) => keys.includes(i.kind));
+
+      if (k === "sentrequests") {
+        arr = arr.filter((i) => i.source === "sent_request");
+      } else {
+        arr = arr.filter((i) => keys.includes(i.kind));
+        // Exclude sent requests from other filters unless "All"
+        if (k !== "All") {
+          arr = arr.filter((i) => i.source !== "sent_request");
+        }
+      }
     }
     // Re-sort by date (descending)
     arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -944,13 +1100,18 @@ export default function NotificationsPage({
       const fetchingGroups = !isAppend && (kind === "All" || kind === "Group");
       if (fetchingGroups) promises.push(fetchGroupNotifications(`${API_BASE}/groups/group-notifications/?page_size=50`));
 
+      // ✅ Include sent requests when filter is All or SentRequests
+      const fetchingSent = !isAppend && (kind === "All" || kind === "SentRequests");
+      if (fetchingSent) promises.push(loadSentRequests());
+
       const settled = await Promise.all(promises);
       const apiData = settled[0];
-      const identityData = settled.find((x) => Array.isArray(x)) || [];
-      const groupData = settled.find((x) => x?.items && Array.isArray(x.items) && x.items[0]?.source === "group") || { items: [] };
+      const identityData = settled.find((x) => Array.isArray(x) && x.length > 0 && x[0]?.source === "identity") || [];
+      const groupData = settled.find((x) => x?.items && !x?._source) || { items: [] };
+      const sentData = settled.find((x) => Array.isArray(x) && x.length > 0 && x[0]?.source === "sent_request") || [];
 
       // ✅ Keep all API notifications (kind filter will handle display)
-      const newItems = [...(apiData.items || []), ...(identityData || []), ...(groupData.items || [])];
+      const newItems = [...(apiData.items || []), ...(identityData || []), ...(groupData.items || []), ...sentData];
 
       setItems(prev => {
         const combined = isAppend ? [...prev, ...newItems] : newItems;
@@ -1231,7 +1392,8 @@ export default function NotificationsPage({
                   sx={{ minWidth: 160 }}
                 >
                   <MenuItem value="All">All</MenuItem>
-                  <MenuItem value="Requests">Requests</MenuItem>
+                  <MenuItem value="Requests">Contact Requests (Inbox)</MenuItem>
+                  <MenuItem value="SentRequests">Sent Contact Requests</MenuItem>
                   <MenuItem value="Follows">Follows</MenuItem>
                   <MenuItem value="Mentions">Mentions</MenuItem>
                   <MenuItem value="Comments">Comments</MenuItem>
