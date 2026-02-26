@@ -184,6 +184,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/admin/notifications", icon: NotificationsRoundedIcon, badge: "notifications" },
+            { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
         adminItems = [
@@ -205,6 +206,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Cart & Orders", to: "/admin/carts", icon: ShoppingCartRoundedIcon }, // "AdminCarts.jsx"
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" }, // Staff uses Community Notifications per prompt ("Community/NotificationsPage.jsx")
+            { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
         // Prompt says "My Posts - Community/MyPostPage.jsx" for Staff.
@@ -221,6 +223,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Cart & Orders", to: "/account/cart", icon: ShoppingCartRoundedIcon },
             { label: "Messages", to: "/community?view=messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
+            { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
     }
