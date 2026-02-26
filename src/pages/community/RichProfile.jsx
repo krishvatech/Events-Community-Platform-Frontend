@@ -3823,7 +3823,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                           {/* Scheduler */}
                           <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
                             <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
-                              Schedule:
+                              Book an appointment:
                             </Typography>
                             {visibleScheduler ? (
                               <Button
@@ -3836,7 +3836,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                 startIcon={<EventIcon />}
                                 sx={{ textTransform: "none", borderRadius: 2 }}
                               >
-                                {visibleScheduler.label}
+                                {visibleScheduler.label && visibleScheduler.label.toLowerCase() === "calendly" ? "Find a time" : visibleScheduler.label}
                               </Button>
                             ) : (
                               emailVisibilityInfo.anyFieldHasRequest && canRequestContact && (
