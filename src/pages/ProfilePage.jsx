@@ -181,6 +181,27 @@ async function deleteTrainingApi(id) {
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete training");
 }
 
+async function uploadTrainingDocApi(trainingId, file) {
+  const fd = new FormData();
+  fd.append("training", trainingId);
+  fd.append("file", file);
+  const r = await fetch(`${API_BASE}/auth/me/training-documents/`, {
+    method: "POST",
+    headers: tokenHeader(),
+    body: fd
+  });
+  if (!r.ok) throw new Error("Failed to upload document");
+  return await r.json();
+}
+
+async function deleteTrainingDocApi(docId) {
+  const r = await fetch(`${API_BASE}/auth/me/training-documents/${docId}/`, {
+    method: "DELETE",
+    headers: tokenHeader()
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
+}
+
 async function addCertificationApi(payload) {
   const r = await fetch(`${API_BASE}/auth/me/certifications/`, {
     method: "POST",
@@ -235,6 +256,27 @@ async function deleteMembershipApi(id) {
     headers: tokenHeader(),
   });
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete membership");
+}
+
+async function uploadMembershipDocApi(membershipId, file) {
+  const fd = new FormData();
+  fd.append("membership", membershipId);
+  fd.append("file", file);
+  const r = await fetch(`${API_BASE}/auth/me/membership-documents/`, {
+    method: "POST",
+    headers: tokenHeader(),
+    body: fd
+  });
+  if (!r.ok) throw new Error("Failed to upload document");
+  return await r.json();
+}
+
+async function deleteMembershipDocApi(docId) {
+  const r = await fetch(`${API_BASE}/auth/me/membership-documents/${docId}/`, {
+    method: "DELETE",
+    headers: tokenHeader()
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
 }
 
 function parseSkills(value) {
@@ -1511,6 +1553,7 @@ export default function ProfilePage() {
     description: "",
     credential_id: "",
     credential_url: "",
+    documents: [],
   };
   const EMPTY_CERT_FORM = {
     certification_name: "",
@@ -1529,6 +1572,7 @@ export default function ProfilePage() {
     ongoing: false,
     membership_id: "",
     membership_url: "",
+    documents: [],
   };
   const initialExpForm = {
     org: "", position: "", city: "", location: "", timezone: "", start: "", end: "", current: false,
@@ -1552,6 +1596,7 @@ export default function ProfilePage() {
   });
   const [syncProfileLocation, setSyncProfileLocation] = useState(false);
   const [trainingForm, setTrainingForm] = useState(EMPTY_TRAINING_FORM);
+  const [trainingFiles, setTrainingFiles] = useState([]);
   const [trainingReqErrors, setTrainingReqErrors] = useState({
     program_title: "",
     provider: "",
@@ -1566,6 +1611,7 @@ export default function ProfilePage() {
     expiration_month: "",
   });
   const [memberForm, setMemberForm] = useState(EMPTY_MEMBER_FORM);
+  const [memberFiles, setMemberFiles] = useState([]);
   const [memberReqErrors, setMemberReqErrors] = useState({
     organization_name: "",
     role_type: "",
@@ -2700,6 +2746,7 @@ export default function ProfilePage() {
       description: t.description || "",
       credential_id: t.credential_id || "",
       credential_url: t.credential_url || "",
+      documents: t.documents || [],
     });
     setTrainingOpen(true);
   };
@@ -2746,15 +2793,26 @@ export default function ProfilePage() {
         credential_id: trainingForm.credential_id || "",
         credential_url: trainingForm.credential_url || "",
       };
+      let finalTrainingId = editTrainingId;
       if (editTrainingId) {
         await updateTrainingApi(editTrainingId, payload);
       } else {
-        await addTrainingApi(payload);
+        const res = await addTrainingApi(payload);
+        finalTrainingId = res.id;
       }
+
+      // Handle document uploads
+      if (trainingFiles.length > 0 && finalTrainingId) {
+        await Promise.all(
+          trainingFiles.map((file) => uploadTrainingDocApi(finalTrainingId, file))
+        );
+      }
+
       showNotification("success", editTrainingId ? "Training updated" : "Training added");
       setTrainingOpen(false);
       setEditTrainingId(null);
       setTrainingForm(EMPTY_TRAINING_FORM);
+      setTrainingFiles([]);
       await loadMeExtras();
     } catch (e) {
       showNotification("error", e?.message || "Failed to save training");
@@ -2857,6 +2915,7 @@ export default function ProfilePage() {
       ongoing: !!m.ongoing,
       membership_id: m.membership_id || "",
       membership_url: m.membership_url || "",
+      documents: m.documents || [],
     });
     setMemberOpen(true);
   };
@@ -2902,15 +2961,26 @@ export default function ProfilePage() {
         membership_id: memberForm.membership_id || "",
         membership_url: memberForm.membership_url || "",
       };
+      let finalMemberId = editMemberId;
       if (editMemberId) {
         await updateMembershipApi(editMemberId, payload);
       } else {
-        await addMembershipApi(payload);
+        const res = await addMembershipApi(payload);
+        finalMemberId = res.id;
       }
+
+      // Handle document uploads
+      if (memberFiles.length > 0 && finalMemberId) {
+        await Promise.all(
+          memberFiles.map((file) => uploadMembershipDocApi(finalMemberId, file))
+        );
+      }
+
       showNotification("success", editMemberId ? "Membership updated" : "Membership added");
       setMemberOpen(false);
       setEditMemberId(null);
       setMemberForm(EMPTY_MEMBER_FORM);
+      setMemberFiles([]);
       await loadMeExtras();
     } catch (e) {
       showNotification("error", e?.message || "Failed to save membership");
@@ -3567,12 +3637,29 @@ export default function ProfilePage() {
                                     </Typography>
                                   }
                                   secondary={
-                                    <Typography variant="caption" color="text.secondary">
-                                      {m.role_type ? `${m.role_type}` : "Member"}
-                                      {m.start_date || m.end_date
-                                        ? ` - ${rangeLinkedIn(m.start_date, m.end_date, !!m.ongoing)}`
-                                        : ""}
-                                    </Typography>
+                                    <>
+                                      <Typography variant="caption" color="text.secondary" display="block">
+                                        {m.role_type ? `${m.role_type}` : "Member"}
+                                        {m.start_date || m.end_date
+                                          ? ` - ${rangeLinkedIn(m.start_date, m.end_date, !!m.ongoing)}`
+                                          : ""}
+                                      </Typography>
+                                      {/* Show documents if any exist */}
+                                      {m.documents && m.documents.length > 0 && (
+                                        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                                          {m.documents.map(d => (
+                                            <Chip
+                                              key={d.id}
+                                              label={d.filename || "Document"}
+                                              size="small"
+                                              icon={<AttachFileIcon />}
+                                              variant="outlined"
+                                              onClick={() => window.open(d.file, '_blank')}
+                                            />
+                                          ))}
+                                        </Stack>
+                                      )}
+                                    </>
                                   }
                                 />
                               </ListItem>
@@ -3990,6 +4077,21 @@ export default function ProfilePage() {
                                           {t.description}
                                         </Typography>
                                       ) : null}
+                                      {/* Show documents if any exist */}
+                                      {t.documents && t.documents.length > 0 && (
+                                        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                                          {t.documents.map(d => (
+                                            <Chip
+                                              key={d.id}
+                                              label={d.filename || "Document"}
+                                              size="small"
+                                              icon={<AttachFileIcon />}
+                                              variant="outlined"
+                                              onClick={() => window.open(d.file, '_blank')}
+                                            />
+                                          ))}
+                                        </Stack>
+                                      )}
                                     </>
                                   }
                                 />
@@ -5263,6 +5365,76 @@ export default function ProfilePage() {
               value={trainingForm.credential_url || ""}
               onChange={(e) => setTrainingForm((p) => ({ ...p, credential_url: e.target.value }))}
             />
+
+            {/* --- NEW: File Upload Section --- */}
+            <Box sx={{ mt: 2, borderTop: '1px dashed', borderColor: 'divider', pt: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Documents / Certificates</Typography>
+
+              {/* 1. Existing Files (Edit Mode) */}
+              {editTrainingId && trainingForm.documents && trainingForm.documents.length > 0 && (
+                <List dense disablePadding>
+                  {trainingForm.documents.map((doc) => (
+                    <ListItem key={doc.id} disableGutters
+                      secondaryAction={
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={() => {
+                            // Note: Delete functionality requires a custom delete endpoint which is currently assumed the same structure as education documents
+                            // We use a simplified implementation: immediately delete
+                            deleteTrainingDocApi(doc.id)
+                              .then(() => {
+                                setTrainingForm((prev) => ({
+                                  ...prev,
+                                  documents: prev.documents.filter((d) => d.id !== doc.id),
+                                }));
+                                showNotification("success", "File deleted");
+                              })
+                              .catch(() => showNotification("error", "Failed to delete file"));
+                          }}
+                        >
+                          <DeleteOutlineIcon fontSize="small" color="error" />
+                        </IconButton>
+                      }
+                    >
+                      <ListItemAvatar sx={{ minWidth: 32 }}><InsertDriveFileIcon fontSize="small" color="action" /></ListItemAvatar>
+                      <ListItemText
+                        primary={
+                          <Typography
+                            variant="caption"
+                            noWrap
+                            sx={{ maxWidth: 200, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                            onClick={() => window.open(doc.file, '_blank')}
+                          >
+                            {doc.filename}
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+
+              {/* 2. File Selection */}
+              <Button component="label" variant="outlined" size="small" startIcon={<AttachFileIcon />} sx={{ mt: 1, textTransform: 'none' }}>
+                Attach Files
+                <input type="file" multiple hidden onChange={(e) => {
+                  if (e.target.files) {
+                    setTrainingFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                  }
+                }}
+                />
+              </Button>
+
+              {/* 3. Pending Files List */}
+              {trainingFiles.length > 0 && (
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  {trainingFiles.map((f, i) => (
+                    <Chip key={i} label={f.name} onDelete={() => setTrainingFiles(prev => prev.filter((_, idx) => idx !== i))} size="small" variant="outlined" />
+                  ))}
+                </Stack>
+              )}
+            </Box>
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -5435,6 +5607,75 @@ export default function ProfilePage() {
               value={memberForm.membership_url || ""}
               onChange={(e) => setMemberForm((p) => ({ ...p, membership_url: e.target.value }))}
             />
+
+            {/* --- NEW: File Upload Section --- */}
+            <Box sx={{ mt: 2, borderTop: '1px dashed', borderColor: 'divider', pt: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Documents / Certificates</Typography>
+
+              {/* 1. Existing Files (Edit Mode) */}
+              {editMemberId && memberForm.documents && memberForm.documents.length > 0 && (
+                <List dense disablePadding>
+                  {memberForm.documents.map((doc) => (
+                    <ListItem key={doc.id} disableGutters
+                      secondaryAction={
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={() => {
+                            // Note: We use a simplified implementation: immediately delete
+                            deleteMembershipDocApi(doc.id)
+                              .then(() => {
+                                setMemberForm((prev) => ({
+                                  ...prev,
+                                  documents: prev.documents.filter((d) => d.id !== doc.id),
+                                }));
+                                showNotification("success", "File deleted");
+                              })
+                              .catch(() => showNotification("error", "Failed to delete file"));
+                          }}
+                        >
+                          <DeleteOutlineIcon fontSize="small" color="error" />
+                        </IconButton>
+                      }
+                    >
+                      <ListItemAvatar sx={{ minWidth: 32 }}><InsertDriveFileIcon fontSize="small" color="action" /></ListItemAvatar>
+                      <ListItemText
+                        primary={
+                          <Typography
+                            variant="caption"
+                            noWrap
+                            sx={{ maxWidth: 200, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                            onClick={() => window.open(doc.file, '_blank')}
+                          >
+                            {doc.filename}
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+
+              {/* 2. File Selection */}
+              <Button component="label" variant="outlined" size="small" startIcon={<AttachFileIcon />} sx={{ mt: 1, textTransform: 'none' }}>
+                Attach Files
+                <input type="file" multiple hidden onChange={(e) => {
+                  if (e.target.files) {
+                    setMemberFiles(prev => [...prev, ...Array.from(e.target.files)]);
+                  }
+                }}
+                />
+              </Button>
+
+              {/* 3. Pending Files List */}
+              {memberFiles.length > 0 && (
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  {memberFiles.map((f, i) => (
+                    <Chip key={i} label={f.name} onDelete={() => setMemberFiles(prev => prev.filter((_, idx) => idx !== i))} size="small" variant="outlined" />
+                  ))}
+                </Stack>
+              )}
+            </Box>
           </Stack>
         </DialogContent>
         <DialogActions>
