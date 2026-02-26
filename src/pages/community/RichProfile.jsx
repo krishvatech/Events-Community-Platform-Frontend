@@ -353,7 +353,10 @@ const toMonthYear = (d) => {
 const rangeText = (s, e, cur) => {
   const start = toMonthYear(s);
   const end = cur ? "present" : toMonthYear(e);
-  return (start || end) ? `${start} - ${end || ""}` : "";
+  if (start && end) return `${start} - ${end}`;
+  if (start) return start;
+  if (end) return end;
+  return "";
 };
 
 /* --------------------------------------------------------------------------
@@ -2137,6 +2140,9 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   const [loadingBase, setLoadingBase] = useState(!location.state?.user);
   const [experiences, setExperiences] = useState([]);
   const [educations, setEducations] = useState([]);
+  const [trainings, setTrainings] = useState([]);
+  const [certifications, setCertifications] = useState([]);
+  const [memberships, setMemberships] = useState([]);
   const [loadingExtras, setLoadingExtras] = useState(true);
   const [profileLinks, setProfileLinks] = useState({});
 
@@ -2801,13 +2807,19 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       if (!j && isMe) {
         j = await tryJSON(`${API_BASE}/auth/me/profile/`);
         if (!j) {
-          const [e1, e2] = await Promise.all([
+          const [e1, e2, t1, c1, m1] = await Promise.all([
             tryJSON(`${API_BASE}/auth/me/experiences/`),
             tryJSON(`${API_BASE}/auth/me/educations/`),
+            tryJSON(`${API_BASE}/auth/me/trainings/`),
+            tryJSON(`${API_BASE}/auth/me/certifications/`),
+            tryJSON(`${API_BASE}/auth/me/memberships/`),
           ]);
           j = {
             experiences: Array.isArray(e1) ? e1 : [],
             educations: Array.isArray(e2) ? e2 : [],
+            trainings: Array.isArray(t1) ? t1 : [],
+            certifications: Array.isArray(c1) ? c1 : [],
+            memberships: Array.isArray(m1) ? m1 : [],
           };
         }
       }
@@ -2825,6 +2837,9 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
       const exps = Array.isArray(j?.experiences) ? j.experiences : [];
       const edus = Array.isArray(j?.educations) ? j.educations : [];
+      const trns = Array.isArray(j?.trainings) ? j.trainings : [];
+      const certs = Array.isArray(j?.certifications) ? j.certifications : [];
+      const mbms = Array.isArray(j?.memberships) ? j.memberships : [];
       const rawLinks =
         j?.links ||
         j?.profile?.links ||
@@ -2837,6 +2852,9 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
       if (!alive) return;
       setExperiences(exps);
       setEducations(edus);
+      setTrainings(trns);
+      setCertifications(certs);
+      setMemberships(mbms);
       setProfileLinks(links);
       setLoadingExtras(false);
     })();
@@ -3702,6 +3720,54 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               )
                             )}
                           </Box>
+
+                          {/* WEBSITES */}
+                          <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
+                            <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
+                              Website{portfolioLinks.length > 1 ? "s" : ""}:
+                            </Typography>
+                            {portfolioLinks.length > 0 ? (
+                              <Stack spacing={0.5}>
+                                {portfolioLinks.map((p, idx) => (
+                                  <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <LanguageIcon sx={{ fontSize: 16, color: "primary.main" }} />
+                                    <Button
+                                      size="small"
+                                      component="a"
+                                      href={p.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      sx={{
+                                        textTransform: "none",
+                                        p: 0,
+                                        minWidth: 0,
+                                        fontSize: 'inherit',
+                                        color: 'primary.main',
+                                        '&:hover': { textDecoration: 'underline', bgcolor: 'transparent' }
+                                      }}
+                                    >
+                                      {p.label || "Website"}
+                                    </Button>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            ) : (
+                              emailVisibilityInfo.anyFieldHasRequest && canRequestContact && (
+                                <Stack spacing={0.5} sx={{ flex: 1 }}>
+                                  <Typography variant="body2" color="text.secondary">By request</Typography>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={sendFriendRequest}
+                                    disabled={friendSubmitting}
+                                    sx={{ width: "fit-content" }}
+                                  >
+                                    Request Contact
+                                  </Button>
+                                </Stack>
+                              )
+                            )}
+                          </Box>
                           <Box sx={{ display: "flex", gap: 1, py: 0.5 }}>
                             <Typography variant="subtitle2" color="text.secondary" sx={{ width: 120 }}>
                               Company:
@@ -3823,7 +3889,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                   <ListItemText
                                     primary={
                                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                        {x.position || "—"} — {x.community_name || "—"}
+                                        {[x.position, x.community_name].filter(Boolean).join(" — ")}
                                       </Typography>
                                     }
                                     secondary={
@@ -3860,7 +3926,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                   <ListItemText
                                     primary={
                                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                        {e.degree || "—"} — {e.school || "—"}
+                                        {[e.degree, e.school].filter(Boolean).join(" — ")}
                                       </Typography>
                                     }
                                     secondary={
@@ -3880,6 +3946,109 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               {isMe
                                 ? "You haven’t added any education yet."
                                 : "This member hasn’t shared education publicly yet."}
+                            </Typography>
+                          )}
+                        </Section>
+
+                        {/* Trainings section */}
+                        <Section title="Trainings & Executive Education">
+                          {loadingExtras ? (
+                            <LinearProgress />
+                          ) : trainings.length ? (
+                            <List dense disablePadding>
+                              {trainings.map((t) => (
+                                <ListItem key={t.id} disableGutters sx={{ py: 0.5 }}>
+                                  <ListItemText
+                                    primary={
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                        {[t.program_title, t.organization].filter(Boolean).join(" — ")}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <Typography variant="caption" color="text.secondary">
+                                        {rangeText(
+                                          t.start_date || t.start_month,
+                                          t.end_date || t.end_month,
+                                          t.currently_ongoing || t.ongoing
+                                        )}
+                                      </Typography>
+                                    }
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              —
+                            </Typography>
+                          )}
+                        </Section>
+
+                        {/* Certifications section */}
+                        <Section title="Certifications">
+                          {loadingExtras ? (
+                            <LinearProgress />
+                          ) : certifications.length ? (
+                            <List dense disablePadding>
+                              {certifications.map((c) => (
+                                <ListItem key={c.id} disableGutters sx={{ py: 0.5 }}>
+                                  <ListItemText
+                                    primary={
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                        {[c.certification_name, c.issuing_organization].filter(Boolean).join(" — ")}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <Typography variant="caption" color="text.secondary">
+                                        {rangeText(
+                                          c.issue_date || c.issue_month,
+                                          c.expiration_date || c.expiration_month,
+                                          c.no_expiration
+                                        )}
+                                        {c.credential_id ? ` · ID: ${c.credential_id}` : ""}
+                                      </Typography>
+                                    }
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              —
+                            </Typography>
+                          )}
+                        </Section>
+
+                        {/* Memberships section */}
+                        <Section title="Memberships">
+                          {loadingExtras ? (
+                            <LinearProgress />
+                          ) : memberships.length ? (
+                            <List dense disablePadding>
+                              {memberships.map((m) => (
+                                <ListItem key={m.id} disableGutters sx={{ py: 0.5 }}>
+                                  <ListItemText
+                                    primary={
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                        {[m.organization_name, m.role_type || "Member"].filter(Boolean).join(" — ")}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <Typography variant="caption" color="text.secondary">
+                                        {rangeText(
+                                          m.start_date || m.start_month,
+                                          m.end_date || m.end_month,
+                                          m.ongoing
+                                        )}
+                                      </Typography>
+                                    }
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              —
                             </Typography>
                           )}
                         </Section>
