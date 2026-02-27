@@ -1147,6 +1147,9 @@ function WaitingForHost({
           component="span"
           onClick={() => setSupportDialogOpen(true)}
           sx={{
+            fontSize: "inherit",
+            lineHeight: "inherit",
+            whiteSpace: "nowrap",
             color: "rgba(100, 200, 255, 0.85)",
             cursor: "pointer",
             fontWeight: 600,
@@ -1155,6 +1158,7 @@ function WaitingForHost({
             },
           }}
         >
+          <SupportAgentIcon sx={{ fontSize: 14, verticalAlign: "text-bottom", mr: 0.4 }} />
           contact support
         </Typography>
       </Typography>
@@ -1562,6 +1566,9 @@ function PreEventLoungeGate({
           component="span"
           onClick={() => setSupportDialogOpen(true)}
           sx={{
+            fontSize: "inherit",
+            lineHeight: "inherit",
+            whiteSpace: "nowrap",
             color: "rgba(100, 200, 255, 0.85)",
             cursor: "pointer",
             fontWeight: 600,
@@ -1570,6 +1577,7 @@ function PreEventLoungeGate({
             },
           }}
         >
+          <SupportAgentIcon sx={{ fontSize: 14, verticalAlign: "text-bottom", mr: 0.4 }} />
           contact support
         </Typography>
       </Typography>
@@ -1992,6 +2000,9 @@ function WaitingRoomScreen({
           component="span"
           onClick={() => setSupportDialogOpen(true)}
           sx={{
+            fontSize: "inherit",
+            lineHeight: "inherit",
+            whiteSpace: "nowrap",
             color: "rgba(100, 200, 255, 0.85)",
             cursor: "pointer",
             fontWeight: 600,
@@ -2000,6 +2011,7 @@ function WaitingRoomScreen({
             },
           }}
         >
+          <SupportAgentIcon sx={{ fontSize: 14, verticalAlign: "text-bottom", mr: 0.4 }} />
           contact support
         </Typography>
       </Typography>
