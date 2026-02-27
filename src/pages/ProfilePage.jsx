@@ -38,6 +38,7 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import { startKYC, submitNameChangeRequest } from "../utils/api";
 import { isFutureDate, isFutureMonth, isFutureYear } from "../utils/dateValidation";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
@@ -275,6 +276,28 @@ async function deleteMembershipDocApi(docId) {
   const r = await fetch(`${API_BASE}/auth/me/membership-documents/${docId}/`, {
     method: "DELETE",
     headers: tokenHeader()
+  });
+  if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
+}
+
+async function uploadCertificationDocApi(certificationId, file) {
+  const formData = new FormData();
+  formData.append("certification", certificationId);
+  formData.append("file", file);
+
+  const r = await fetch(`${API_BASE}/auth/me/certification-documents/`, {
+    method: "POST",
+    headers: tokenHeader(),
+    body: formData,
+  });
+  if (!r.ok) throw new Error("Failed to upload document");
+  return await r.json();
+}
+
+async function deleteCertificationDocApi(docId) {
+  const r = await fetch(`${API_BASE}/auth/me/certification-documents/${docId}/`, {
+    method: "DELETE",
+    headers: tokenHeader(),
   });
   if (!r.ok && r.status !== 204) throw new Error("Failed to delete document");
 }
@@ -1540,6 +1563,7 @@ export default function ProfilePage() {
   const [deleteDocDialog, setDeleteDocDialog] = useState({
     open: false,
     doc: null,
+    type: null,
   });
   const [deletingDoc, setDeletingDoc] = useState(false);
 
@@ -1563,6 +1587,7 @@ export default function ProfilePage() {
     no_expiration: false,
     credential_id: "",
     credential_url: "",
+    documents: [],
   };
   const EMPTY_MEMBER_FORM = {
     organization_name: "",
@@ -1610,6 +1635,7 @@ export default function ProfilePage() {
     issue_month: "",
     expiration_month: "",
   });
+  const [certFiles, setCertFiles] = useState([]);
   const [memberForm, setMemberForm] = useState(EMPTY_MEMBER_FORM);
   const [memberFiles, setMemberFiles] = useState([]);
   const [memberReqErrors, setMemberReqErrors] = useState({
@@ -2120,8 +2146,8 @@ export default function ProfilePage() {
   }
 
   // --- Education document delete handlers ---
-  function handleAskDeleteDoc(doc) {
-    setDeleteDocDialog({ open: true, doc });
+  function handleAskDeleteDoc(type, doc) {
+    setDeleteDocDialog({ open: true, type, doc });
   }
 
   function handleCloseDeleteDoc() {
@@ -2130,22 +2156,34 @@ export default function ProfilePage() {
   }
 
   async function handleConfirmDeleteDoc() {
-    const doc = deleteDocDialog.doc;
-    if (!doc || deletingDoc) return;
+    const { doc, type } = deleteDocDialog;
+    if (!doc || !type || deletingDoc) return;
 
     try {
       setDeletingDoc(true);
 
-      await deleteEducationDocApi(doc.id);
-
-      // Update local eduForm state so the list refreshes immediately
-      setEduForm((prev) => ({
-        ...prev,
-        documents: (prev.documents || []).filter((d) => d.id !== doc.id),
-      }));
+      if (type === "edu") {
+        await deleteEducationDocApi(doc.id);
+        setEduForm((prev) => ({
+          ...prev,
+          documents: (prev.documents || []).filter((d) => d.id !== doc.id),
+        }));
+      } else if (type === "training") {
+        await deleteTrainingDocApi(doc.id);
+        setTrainingForm((prev) => ({
+          ...prev,
+          documents: (prev.documents || []).filter((d) => d.id !== doc.id),
+        }));
+      } else if (type === "cert") {
+        await deleteCertificationDocApi(doc.id);
+        setCertForm((prev) => ({
+          ...prev,
+          documents: (prev.documents || []).filter((d) => d.id !== doc.id),
+        }));
+      }
 
       showNotification("success", "File deleted");
-      await loadMeExtras(); // background refresh
+      await loadMeExtras();
     } catch (e) {
       console.error(e);
       showNotification("error", "Failed to delete");
@@ -2824,6 +2862,7 @@ export default function ProfilePage() {
   const openAddCert = () => {
     setEditCertId(null);
     setCertForm(EMPTY_CERT_FORM);
+    setCertFiles([]);
     setCertOpen(true);
   };
 
@@ -2837,7 +2876,9 @@ export default function ProfilePage() {
       no_expiration: !!c.no_expiration,
       credential_id: c.credential_id || "",
       credential_url: c.credential_url || "",
+      documents: c.documents || [],
     });
+    setCertFiles([]);
     setCertOpen(true);
   };
 
@@ -2882,15 +2923,25 @@ export default function ProfilePage() {
         credential_id: certForm.credential_id || "",
         credential_url: certForm.credential_url || "",
       };
+      let activeId = editCertId;
       if (editCertId) {
         await updateCertificationApi(editCertId, payload);
       } else {
-        await addCertificationApi(payload);
+        const savedCert = await addCertificationApi(payload);
+        activeId = savedCert.id;
       }
+
+      if (certFiles.length > 0) {
+        for (const file of certFiles) {
+          await uploadCertificationDocApi(activeId, file);
+        }
+      }
+
       showNotification("success", editCertId ? "Certification updated" : "Certification added");
       setCertOpen(false);
       setEditCertId(null);
       setCertForm(EMPTY_CERT_FORM);
+      setCertFiles([]);
       await loadMeExtras();
     } catch (e) {
       showNotification("error", e?.message || "Failed to save certification");
@@ -3534,6 +3585,7 @@ export default function ProfilePage() {
                                     </Tooltip>
                                   </Box>
                                 }
+                                sx={{ display: 'block' }}
                               >
                                 <ListItemText
                                   primary={
@@ -3553,6 +3605,23 @@ export default function ProfilePage() {
                                     </Typography>
                                   }
                                 />
+                                {cert.documents && cert.documents.length > 0 && (
+                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                    {cert.documents.map((doc) => (
+                                      <Chip
+                                        key={doc.id}
+                                        label={doc.filename || 'Document'}
+                                        size="small"
+                                        variant="outlined"
+                                        icon={<DescriptionOutlinedIcon fontSize="small" />}
+                                        onClick={() => window.open(doc.file, '_blank')}
+                                        component="a"
+                                        clickable
+                                        sx={{ fontSize: '0.7rem' }}
+                                      />
+                                    ))}
+                                  </Box>
+                                )}
                               </ListItem>
                             ))}
                           </List>
@@ -5090,7 +5159,7 @@ export default function ProfilePage() {
                       <IconButton
                         edge="end"
                         size="small"
-                        onClick={() => handleAskDeleteDoc(doc)}
+                        onClick={() => handleAskDeleteDoc("edu", doc)}
                       >
                         <DeleteOutlineIcon fontSize="small" color="error" />
                       </IconButton>
@@ -5379,19 +5448,7 @@ export default function ProfilePage() {
                         <IconButton
                           edge="end"
                           size="small"
-                          onClick={() => {
-                            // Note: Delete functionality requires a custom delete endpoint which is currently assumed the same structure as education documents
-                            // We use a simplified implementation: immediately delete
-                            deleteTrainingDocApi(doc.id)
-                              .then(() => {
-                                setTrainingForm((prev) => ({
-                                  ...prev,
-                                  documents: prev.documents.filter((d) => d.id !== doc.id),
-                                }));
-                                showNotification("success", "File deleted");
-                              })
-                              .catch(() => showNotification("error", "Failed to delete file"));
-                          }}
+                          onClick={() => handleAskDeleteDoc("training", doc)}
                         >
                           <DeleteOutlineIcon fontSize="small" color="error" />
                         </IconButton>
@@ -5516,6 +5573,50 @@ export default function ProfilePage() {
               value={certForm.credential_url || ""}
               onChange={(e) => setCertForm((p) => ({ ...p, credential_url: e.target.value }))}
             />
+
+            <Divider sx={{ my: 1 }} />
+            <Typography variant="subtitle2" color="text.secondary">Documents / Certificates</Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, my: 1 }}>
+              {(certForm.documents || []).map((doc) => (
+                <Chip
+                  key={doc.id}
+                  label={doc.filename || "Doc"}
+                  size="small"
+                  variant="outlined"
+                  onDelete={() => handleAskDeleteDoc("cert", doc)}
+                />
+              ))}
+              {certFiles.map((file, idx) => (
+                <Chip
+                  key={idx}
+                  label={file.name}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  onDelete={() => {
+                    setCertFiles(prev => prev.filter((_, i) => i !== idx));
+                  }}
+                />
+              ))}
+            </Box>
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<AttachFileIcon />}
+              size="small"
+              sx={{ width: 'fit-content' }}
+            >
+              Attach Files
+              <input
+                type="file"
+                hidden
+                multiple
+                onChange={(e) => {
+                  const newFiles = Array.from(e.target.files);
+                  setCertFiles(prev => [...prev, ...newFiles]);
+                }}
+              />
+            </Button>
           </Stack>
         </DialogContent>
         <DialogActions>
