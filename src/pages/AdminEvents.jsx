@@ -1844,7 +1844,9 @@ function AdminEventCard({
   const isPreEventLounge = isPreEventLoungeOpen(ev);
 
   // If event is live OR within early-join window OR pre-event lounge, show enabled Join button
-  const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+  const canShowActiveJoin =
+    isPostEventLounge ||
+    (ev.status !== "ended" && (isLive || isWithinEarlyJoinWindow || isPreEventLounge));
   const joinLabel = getJoinButtonText(ev, isLive, false);
   const joinLabelShort =
     joinLabel === "Join Waiting Room"

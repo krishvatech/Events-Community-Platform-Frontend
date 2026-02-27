@@ -417,7 +417,9 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
             // ✅ allow users to join up to 15 minutes before the start time
             const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
             const isPreEventLounge = isPreEventLoungeOpen(ev);
-            const canShowActiveJoin = isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+            const canShowActiveJoin =
+              isPostEventLounge ||
+              (ev.status !== "ended" && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
 
             // ✅ NEW: For multi-day events with sessions, use session-based logic
             // For single-day events, use existing logic
