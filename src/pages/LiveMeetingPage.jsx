@@ -683,7 +683,7 @@ function StageMiniTile({ p, meeting, tileW = 140, tileH = 82, onMemberClick }) {
   const showVideo = Boolean(p?.cam && raw);
 
   return (
-    <Tooltip title={""} arrow placement="top">
+    <Tooltip title="Open Profile" arrow placement="top">
       <Paper
         variant="outlined"
         onClick={() => onMemberClick?.(p)}
@@ -12205,7 +12205,8 @@ export default function NewLiveMeeting() {
                             key={idx}
                             disablePadding
                           >
-                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
+                            <Tooltip title="Open Profile" arrow placement="top">
+                              <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
                               <ListItemAvatar>
                                 {renderMemberAvatar(m)}
                               </ListItemAvatar>
@@ -12291,7 +12292,7 @@ export default function NewLiveMeeting() {
 
                                       {/* Audience can DM Host; Host should NOT see message icon on own name */}
                                       {!isHost && (
-                                        <Tooltip title={isOnBreak ? "Disabled during break" : "Send Message"}>
+                                        <Tooltip title={isOnBreak ? "Disabled during break" : "Send Direct Message"}>
                                           <IconButton
                                             size="small"
                                             disabled={isOnBreak}
@@ -12322,6 +12323,21 @@ export default function NewLiveMeeting() {
                                           </IconButton>
                                         </Tooltip>
                                       )}
+                                      {!isSelfMember(m) && (
+                                        <Tooltip title={isOnBreak ? "Disabled during break" : "Open Profile"}>
+                                          <IconButton
+                                            size="small"
+                                            disabled={isOnBreak}
+                                            sx={{ color: "rgba(255,255,255,0.9)" }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openMemberInfo(m);
+                                            }}
+                                          >
+                                            <InfoOutlinedIcon fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                      )}
 
                                       {/* Host actions for other hosts (Bring to Main Stage / Clear / Kick / Ban) */}
                                       {isHost && !isSelfMember(m) && (
@@ -12341,7 +12357,8 @@ export default function NewLiveMeeting() {
                                   </Stack>
                                 }
                               />
-                            </ListItemButton>
+                              </ListItemButton>
+                            </Tooltip>
                           </ListItem>
                         ))}
                       </List>
@@ -12608,7 +12625,8 @@ export default function NewLiveMeeting() {
                             key={idx}
                             disablePadding
                           >
-                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
+                            <Tooltip title="Open Profile" arrow placement="top">
+                              <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
                               <ListItemAvatar>
                                 {renderMemberAvatar(m)}
                               </ListItemAvatar>
@@ -12712,7 +12730,8 @@ export default function NewLiveMeeting() {
                                 }
                                 secondary={<Typography sx={{ fontSize: 12, opacity: 0.7 }}>Speaker</Typography>}
                               />
-                            </ListItemButton>
+                              </ListItemButton>
+                            </Tooltip>
                           </ListItem>
                         ))}
                       </List>
@@ -12820,7 +12839,8 @@ export default function NewLiveMeeting() {
                           key={idx}
                           disablePadding
                         >
-                          <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
+                          <Tooltip title="Open Profile" arrow placement="top">
+                            <ListItemButton onClick={() => openMemberInfo(m)} sx={{ px: 1.25, py: 1, width: "100%" }}>
                             <ListItemAvatar>
                               {renderMemberAvatar(m)}
                             </ListItemAvatar>
@@ -12908,7 +12928,7 @@ export default function NewLiveMeeting() {
 
                                     {/* MESSAGE ICON */}
                                     {!isSelfMember(m) && (
-                                      <Tooltip title={isOnBreak ? "Disabled during break" : "Send Message"}>
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : "Send Direct Message"}>
                                         <IconButton
                                           size="small"
                                           disabled={isOnBreak}
@@ -12939,6 +12959,21 @@ export default function NewLiveMeeting() {
                                         </IconButton>
                                       </Tooltip>
                                     )}
+                                    {!isSelfMember(m) && (
+                                      <Tooltip title={isOnBreak ? "Disabled during break" : "Open Profile"}>
+                                        <IconButton
+                                          size="small"
+                                          disabled={isOnBreak}
+                                          sx={{ color: "rgba(255,255,255,0.9)" }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openMemberInfo(m);
+                                          }}
+                                        >
+                                          <InfoOutlinedIcon fontSize="small" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    )}
 
                                     {/* KICK/BAN MENU for Host */}
                                     {isHost && !isSelfMember(m) && (
@@ -12958,7 +12993,8 @@ export default function NewLiveMeeting() {
                                 </Stack>
                               }
                             />
-                          </ListItemButton>
+                            </ListItemButton>
+                          </Tooltip>
                         </ListItem>
                       ))}
                     </List>
