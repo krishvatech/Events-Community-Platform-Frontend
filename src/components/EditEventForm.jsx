@@ -163,7 +163,14 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
                 p.participant_type ||
                 p.participantType ||
                 (p.user_id || p.userId || p.user ? "staff" : "guest");
-            const participantType = String(participantTypeRaw || "guest").toLowerCase() === "staff" ? "staff" : "guest";
+            const participantTypeNormalized = String(participantTypeRaw || "guest").toLowerCase();
+            const isNonStaffUser = p?.is_staff === false || p?.user?.is_staff === false;
+            const participantType =
+                participantTypeNormalized === "guest"
+                    ? "guest"
+                    : isNonStaffUser
+                        ? "user"
+                        : "staff";
             const firstName = p.first_name || p.firstName || p.user?.first_name || "";
             const lastName = p.last_name || p.lastName || p.user?.last_name || "";
             const fullName = p.name || p.guestName || `${firstName} ${lastName}`.trim();
@@ -554,8 +561,8 @@ export default function EditEventForm({ event, onUpdated, onCancel }) {
         // Add participants if any
         if (participants.length > 0) {
             const participantsData = participants.map((p, idx) => ({
-                type: p.participantType,
-                user_id: p.participantType === "staff" ? p.userId : undefined,
+                type: p.participantType === "guest" ? "guest" : "staff",
+                user_id: p.participantType !== "guest" ? p.userId : undefined,
                 role: p.role,
                 name: p.participantType === "guest" ? p.guestName : undefined,
                 email: p.participantType === "guest" ? p.guestEmail : undefined,

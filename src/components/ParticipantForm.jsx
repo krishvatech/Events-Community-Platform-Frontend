@@ -49,6 +49,9 @@ const ParticipantForm = ({
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
+  const isAccountParticipant = participantType === "staff" || participantType === "user";
+  const participantSelectLabel =
+    participantType === "staff" ? "Select Staff Member *" : "Select Normal User *";
 
   // Initialize form when dialog opens or initialData changes
   useEffect(() => {
@@ -60,7 +63,7 @@ const ParticipantForm = ({
         setBio(initialData.bio || "");
         setImagePreview(initialData.imageUrl || "");
 
-        if (initialData.participantType === "staff") {
+        if (initialData.participantType === "staff" || initialData.participantType === "user") {
           setSelectedUser({
             id: initialData.userId,
             first_name: initialData.firstName || "",
@@ -88,7 +91,7 @@ const ParticipantForm = ({
 
   // Debounced user search
   useEffect(() => {
-    if (!userSearch.trim() || participantType !== "staff") {
+    if (!userSearch.trim() || !isAccountParticipant) {
       setUserOptions([]);
       return;
     }
@@ -98,19 +101,23 @@ const ParticipantForm = ({
       try {
         const data = await listAdminUsers({
           search: userSearch,
-          is_staff: true,
+          is_staff: participantType === "staff",
         });
-        setUserOptions(data.results || data || []);
+        const users = data.results || data || [];
+        const filteredUsers = users.filter((u) =>
+          participantType === "staff" ? u?.is_staff === true : u?.is_staff === false
+        );
+        setUserOptions(filteredUsers);
       } catch (error) {
-        console.error("Failed to fetch staff users:", error);
-        toast.error("Failed to load staff users");
+        console.error("Failed to fetch users:", error);
+        toast.error("Failed to load users");
       } finally {
         setLoadingUsers(false);
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [userSearch, participantType]);
+  }, [userSearch, participantType, isAccountParticipant]);
 
   const resetForm = () => {
     setParticipantType("staff");
@@ -129,9 +136,12 @@ const ParticipantForm = ({
   const validate = () => {
     const newErrors = {};
 
-    if (participantType === "staff") {
+    if (isAccountParticipant) {
       if (!selectedUser?.id) {
-        newErrors.user = "Please select a staff member";
+        newErrors.user =
+          participantType === "staff"
+            ? "Please select a staff member"
+            : "Please select a normal user";
       }
     } else {
       if (!guestName.trim()) {
@@ -148,7 +158,10 @@ const ParticipantForm = ({
     const isDuplicate = existingParticipants.some((p, idx) => {
       if (editingIndex !== null && idx === editingIndex) return false;
 
-      if (participantType === "staff" && p.participantType === "staff") {
+      if (
+        isAccountParticipant &&
+        (p.participantType === "staff" || p.participantType === "user")
+      ) {
         return p.userId === selectedUser?.id && p.role === role;
       } else if (participantType === "guest" && p.participantType === "guest") {
         return p.guestEmail === guestEmail && p.role === role;
@@ -176,7 +189,7 @@ const ParticipantForm = ({
         bio: bio.trim(),
       };
 
-      if (participantType === "staff") {
+      if (isAccountParticipant) {
         participantData.userId = selectedUser.id;
         participantData.firstName = selectedUser.first_name || "";
         participantData.lastName = selectedUser.last_name || "";
@@ -266,6 +279,7 @@ const ParticipantForm = ({
               control={<Radio />}
               label="Staff Member"
             />
+            <FormControlLabel value="user" control={<Radio />} label="Normal User" />
             <FormControlLabel value="guest" control={<Radio />} label="Guest" />
           </RadioGroup>
         </FormControl>
@@ -284,7 +298,7 @@ const ParticipantForm = ({
         </TextField>
 
         {/* Conditional: Staff User Selection */}
-        {participantType === "staff" && (
+        {isAccountParticipant && (
           <Autocomplete
             freeSolo={false}
             options={userOptions}
@@ -309,7 +323,7 @@ const ParticipantForm = ({
             renderInput={(params) => (
               <TextField
                 {...params}
-                label="Select Staff Member *"
+                label={participantSelectLabel}
                 placeholder="Search by name or email"
                 error={!!errors.user}
                 helperText={errors.user}

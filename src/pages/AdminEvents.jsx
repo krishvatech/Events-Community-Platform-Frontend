@@ -549,8 +549,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
     // Add participants if any
     if (participants.length > 0) {
       const participantsData = participants.map((p, idx) => ({
-        type: p.participantType,
-        user_id: p.participantType === "staff" ? p.userId : undefined,
+        type: p.participantType === "guest" ? "guest" : "staff",
+        user_id: p.participantType !== "guest" ? p.userId : undefined,
         role: p.role,
         name: p.participantType === "guest" ? p.guestName : undefined,
         email: p.participantType === "guest" ? p.guestEmail : undefined,

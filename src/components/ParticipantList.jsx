@@ -43,13 +43,15 @@ const ParticipantList = ({ participants, onEdit, onRemove }) => {
     <Grid container spacing={2}>
       {participants.map((participant, index) => {
         const roleConfig = ROLE_CONFIG[participant.role] || ROLE_CONFIG.speaker;
+        const isAccountParticipant =
+          participant.participantType === "staff" || participant.participantType === "user";
         const name =
-          participant.participantType === "staff"
+          isAccountParticipant
             ? `${participant.firstName || ""} ${participant.lastName || ""}`.trim() ||
               participant.email
             : participant.guestName || "Unknown Guest";
         const email =
-          participant.participantType === "staff"
+          isAccountParticipant
             ? participant.email
             : participant.guestEmail;
         const bio = participant.bio || "";
