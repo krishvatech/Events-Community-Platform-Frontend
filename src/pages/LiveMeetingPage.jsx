@@ -2166,6 +2166,9 @@ export default function NewLiveMeeting() {
   const [banConfirmOpen, setBanConfirmOpen] = useState(false);
   const [actionTargetUser, setActionTargetUser] = useState(null);
   const [spotlightTarget, setSpotlightTarget] = useState(null); // { participantId, participantUserKey, name, byHostId, ts }
+  const [pendingSpotlightInvite, setPendingSpotlightInvite] = useState(null); // { inviteId, participantId, participantUserKey, name, expiresAt, byHostId, ts }
+  const [incomingSpotlightInvite, setIncomingSpotlightInvite] = useState(null); // Same shape as pendingSpotlightInvite
+  const [spotlightInviteSecondsLeft, setSpotlightInviteSecondsLeft] = useState(0);
 
   const [isBreakoutControlsOpen, setIsBreakoutControlsOpen] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -3954,20 +3957,22 @@ export default function NewLiveMeeting() {
     if (!isHost || !p) return;
 
     const payload = {
+      inviteId: `spotlight-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       participantId: p.id || null,
       participantUserKey: getParticipantUserKey(p?._raw || p) || null,
       name: p.name || "Participant",
       byHostId: dyteMeeting?.self?.id || null,
+      expiresAt: Date.now() + 5000,
       ts: Date.now(),
     };
 
-    setSpotlightTarget(payload);
+    setPendingSpotlightInvite(payload);
     try {
-      dyteMeeting?.participants?.broadcastMessage?.("spotlight-user", payload);
+      dyteMeeting?.participants?.broadcastMessage?.("spotlight-invite", payload);
     } catch (e) {
-      console.warn("[Spotlight] Failed to broadcast spotlight-user:", e);
+      console.warn("[Spotlight] Failed to broadcast spotlight-invite:", e);
     }
-    showSnackbar(`${payload.name} moved to main stage`, "success");
+    showSnackbar(`Invitation sent to ${payload.name}`, "info");
   };
 
   const handleClearSpotlight = () => {
@@ -3975,6 +3980,7 @@ export default function NewLiveMeeting() {
     if (!isHost) return;
 
     setSpotlightTarget(null);
+    setPendingSpotlightInvite(null);
     const payload = { byHostId: dyteMeeting?.self?.id || null, ts: Date.now() };
     try {
       dyteMeeting?.participants?.broadcastMessage?.("spotlight-clear", payload);
@@ -3983,6 +3989,83 @@ export default function NewLiveMeeting() {
     }
     showSnackbar("Returned to normal layout", "info");
   };
+
+  const handleRespondSpotlightInvite = useCallback(
+    (status) => {
+      const invite = incomingSpotlightInvite;
+      if (!invite) return;
+
+      const responsePayload = {
+        inviteId: invite.inviteId || null,
+        status, // "accepted" | "declined" | "timeout"
+        participantId: invite.participantId || null,
+        participantUserKey: invite.participantUserKey || null,
+        name: dyteMeeting?.self?.name || invite?.name || "Participant",
+        byParticipantId: dyteMeeting?.self?.id || null,
+        byParticipantUserKey: getParticipantUserKey(dyteMeeting?.self) || null,
+        ts: Date.now(),
+      };
+
+      setIncomingSpotlightInvite(null);
+      setSpotlightInviteSecondsLeft(0);
+
+      if (status === "accepted") {
+        setSpotlightTarget({
+          participantId: invite.participantId || dyteMeeting?.self?.id || null,
+          participantUserKey: invite.participantUserKey || getParticipantUserKey(dyteMeeting?.self) || null,
+          name: dyteMeeting?.self?.name || invite?.name || "Participant",
+          byHostId: invite.byHostId || null,
+          ts: Date.now(),
+        });
+      }
+
+      try {
+        dyteMeeting?.participants?.broadcastMessage?.("spotlight-invite-response", responsePayload);
+      } catch (e) {
+        console.warn("[Spotlight] Failed to broadcast spotlight-invite-response:", e);
+      }
+
+      if (status === "accepted") {
+        showSnackbar("You joined the main stage", "success");
+      } else if (status === "declined") {
+        showSnackbar("Main stage invitation declined", "info");
+      } else if (status === "timeout") {
+        showSnackbar("Main stage invitation expired", "warning");
+      }
+    },
+    [incomingSpotlightInvite, dyteMeeting, showSnackbar]
+  );
+
+  const handleLeaveMainStage = useCallback(() => {
+    const selfParticipant = dyteMeeting?.self;
+    const selfId = selfParticipant?.id ? String(selfParticipant.id) : "";
+    const selfKey = getParticipantUserKey(selfParticipant);
+    if (!selfParticipant || !spotlightTarget) return;
+
+    const spotlightId = spotlightTarget?.participantId ? String(spotlightTarget.participantId) : "";
+    const spotlightKey = spotlightTarget?.participantUserKey ? String(spotlightTarget.participantUserKey) : "";
+    const isSelfSpotlighted =
+      (spotlightId && selfId && spotlightId === selfId) ||
+      (spotlightKey && selfKey && spotlightKey === selfKey);
+
+    if (!isSelfSpotlighted) return;
+
+    setSpotlightTarget(null);
+
+    const payload = {
+      byHostId: dyteMeeting?.self?.id || null,
+      byParticipantId: dyteMeeting?.self?.id || null,
+      byParticipantUserKey: selfKey || null,
+      ts: Date.now(),
+    };
+
+    try {
+      dyteMeeting?.participants?.broadcastMessage?.("spotlight-clear", payload);
+    } catch (e) {
+      console.warn("[Spotlight] Failed to broadcast spotlight-clear from participant:", e);
+    }
+    showSnackbar("You left the main stage", "info");
+  }, [dyteMeeting, spotlightTarget, showSnackbar]);
 
   const handleKickParticipant = () => {
     const p = participantMenuTarget;
@@ -7473,6 +7556,9 @@ export default function NewLiveMeeting() {
       }
 
       if (type === "spotlight-user" && (payload?.participantId || payload?.participantUserKey)) {
+        setPendingSpotlightInvite(null);
+        setIncomingSpotlightInvite(null);
+        setSpotlightInviteSecondsLeft(0);
         setSpotlightTarget({
           participantId: payload?.participantId || null,
           participantUserKey: payload?.participantUserKey || null,
@@ -7483,7 +7569,63 @@ export default function NewLiveMeeting() {
       }
 
       if (type === "spotlight-clear") {
+        setPendingSpotlightInvite(null);
+        setIncomingSpotlightInvite(null);
+        setSpotlightInviteSecondsLeft(0);
         setSpotlightTarget(null);
+      }
+
+      if (type === "spotlight-invite" && (payload?.participantId || payload?.participantUserKey)) {
+        const selfId = dyteMeeting?.self?.id ? String(dyteMeeting.self.id) : "";
+        const selfKey = getParticipantUserKey(dyteMeeting?.self);
+        const targetId = payload?.participantId ? String(payload.participantId) : "";
+        const targetKey = payload?.participantUserKey ? String(payload.participantUserKey) : "";
+        const isForSelf =
+          (targetId && selfId && targetId === selfId) ||
+          (targetKey && selfKey && targetKey === selfKey);
+
+        if (isForSelf && !isHost) {
+          const expiresAt = Number(payload?.expiresAt) || Date.now() + 5000;
+          setIncomingSpotlightInvite({
+            inviteId: payload?.inviteId || `spotlight-${Date.now()}`,
+            participantId: payload?.participantId || null,
+            participantUserKey: payload?.participantUserKey || null,
+            name: payload?.name || "Host invitation",
+            byHostId: payload?.byHostId || null,
+            expiresAt,
+            ts: payload?.ts || Date.now(),
+          });
+        }
+      }
+
+      if (type === "spotlight-invite-response" && payload?.inviteId && isHost) {
+        if (!pendingSpotlightInvite || pendingSpotlightInvite?.inviteId !== payload.inviteId) return;
+
+        const status = payload?.status;
+        const targetName = pendingSpotlightInvite?.name || payload?.name || "Participant";
+        const acceptedPayload = {
+          participantId: pendingSpotlightInvite?.participantId || payload?.participantId || null,
+          participantUserKey: pendingSpotlightInvite?.participantUserKey || payload?.participantUserKey || null,
+          name: targetName,
+          byHostId: dyteMeeting?.self?.id || null,
+          ts: Date.now(),
+        };
+
+        setPendingSpotlightInvite(null);
+
+        if (status === "accepted") {
+          setSpotlightTarget(acceptedPayload);
+          try {
+            dyteMeeting?.participants?.broadcastMessage?.("spotlight-user", acceptedPayload);
+          } catch (e) {
+            console.warn("[Spotlight] Failed to broadcast spotlight-user after accept:", e);
+          }
+          showSnackbar(`${targetName} joined main stage`, "success");
+        } else if (status === "declined") {
+          showSnackbar(`${targetName} declined the invitation`, "info");
+        } else if (status === "timeout") {
+          showSnackbar(`${targetName} did not respond in time`, "warning");
+        }
       }
 
       if (type === "mood-updated" && payload?.userKey) {
@@ -7493,7 +7635,43 @@ export default function NewLiveMeeting() {
 
     dyteMeeting.participants?.on?.("broadcastedMessage", handleBroadcast);
     return () => dyteMeeting.participants?.off?.("broadcastedMessage", handleBroadcast);
-  }, [dyteMeeting, getJoinedParticipants, activeTableId, isLiveEventSocialLounge]);
+  }, [dyteMeeting, getJoinedParticipants, activeTableId, isLiveEventSocialLounge, isHost, pendingSpotlightInvite]);
+
+  useEffect(() => {
+    if (!incomingSpotlightInvite) {
+      setSpotlightInviteSecondsLeft(0);
+      return;
+    }
+
+    const tick = () => {
+      const remainingMs = Math.max(0, Number(incomingSpotlightInvite?.expiresAt || 0) - Date.now());
+      const nextSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+      setSpotlightInviteSecondsLeft(nextSeconds);
+
+      if (remainingMs <= 0) {
+        handleRespondSpotlightInvite("timeout");
+      }
+    };
+
+    tick();
+    const intervalId = setInterval(tick, 250);
+    return () => clearInterval(intervalId);
+  }, [incomingSpotlightInvite, handleRespondSpotlightInvite]);
+
+  useEffect(() => {
+    if (!pendingSpotlightInvite) return;
+
+    const remainingMs = Math.max(0, Number(pendingSpotlightInvite?.expiresAt || 0) - Date.now());
+    const timerId = setTimeout(() => {
+      setPendingSpotlightInvite((prev) => {
+        if (!prev || prev.inviteId !== pendingSpotlightInvite.inviteId) return prev;
+        return null;
+      });
+      showSnackbar(`${pendingSpotlightInvite?.name || "Participant"} did not respond in time`, "warning");
+    }, remainingMs + 100);
+
+    return () => clearTimeout(timerId);
+  }, [pendingSpotlightInvite, showSnackbar]);
 
   useEffect(() => {
     if (!eventId || !roomJoined) return;
@@ -9377,6 +9555,14 @@ export default function NewLiveMeeting() {
 
   const hasScreenshare = !!activeScreenShareParticipant;
   const stageHasVideo = pinnedHasVideo || hasScreenshare;
+  const isSelfSpotlighted = useMemo(() => {
+    if (!spotlightTarget || !dyteMeeting?.self) return false;
+    const selfId = dyteMeeting.self.id ? String(dyteMeeting.self.id) : "";
+    const selfKey = getParticipantUserKey(dyteMeeting.self);
+    const spotlightId = spotlightTarget?.participantId ? String(spotlightTarget.participantId) : "";
+    const spotlightKey = spotlightTarget?.participantUserKey ? String(spotlightTarget.participantUserKey) : "";
+    return (spotlightId && selfId && spotlightId === selfId) || (spotlightKey && selfKey && spotlightKey === selfKey);
+  }, [spotlightTarget, dyteMeeting]);
 
   // If audience and host not live yet
   // ✅ Also show meeting if in breakout/lounge room (post-event)
@@ -14876,6 +15062,26 @@ export default function NewLiveMeeting() {
                     </IconButton>
                   </Tooltip>
 
+                  {!isHost && !isBreakout && isSelfSpotlighted && (
+                    <Button
+                      variant="contained"
+                      onClick={handleLeaveMainStage}
+                      startIcon={<LogoutIcon />}
+                      sx={{
+                        ml: 0.5,
+                        bgcolor: "#ef4444",
+                        color: "white",
+                        borderRadius: 10,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        px: 2,
+                        "&:hover": { bgcolor: "#dc2626" },
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      Leave Main Stage
+                    </Button>
+                  )}
                   {/* ✅ Contextual leave button for breakout/social lounge */}
                   {isBreakout && (
                     <Button
@@ -15256,6 +15462,42 @@ export default function NewLiveMeeting() {
           </DialogActions>
         </Dialog>
 
+        <Dialog
+          open={Boolean(incomingSpotlightInvite)}
+          onClose={() => handleRespondSpotlightInvite("declined")}
+          PaperProps={MODAL_PAPER_PROPS}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 800 }}>Main Stage Invitation</DialogTitle>
+          <DialogContent>
+            <Typography sx={{ mb: 1.25 }}>
+              Host invited you to join the main stage.
+            </Typography>
+            <Typography sx={{ fontSize: 12, opacity: 0.8, mb: 1 }}>
+              This request expires in {spotlightInviteSecondsLeft}s.
+            </Typography>
+            <LinearProgress
+              variant="determinate"
+              value={Math.max(0, Math.min(100, (spotlightInviteSecondsLeft / 5) * 100))}
+              sx={{
+                height: 8,
+                borderRadius: 8,
+                bgcolor: "rgba(255,255,255,0.12)",
+                "& .MuiLinearProgress-bar": { bgcolor: "#22c55e" },
+              }}
+            />
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => handleRespondSpotlightInvite("declined")} sx={{ color: "rgba(255,255,255,0.75)" }}>
+              Decline
+            </Button>
+            <Button onClick={() => handleRespondSpotlightInvite("accepted")} variant="contained">
+              Accept
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* Participant Action Menu */}
         <Menu
           anchorEl={participantMenuAnchor}
@@ -15278,7 +15520,15 @@ export default function NewLiveMeeting() {
         >
           <MenuItem
             onClick={handleSpotlightParticipant}
-            disabled={!participantMenuTarget}
+            disabled={
+              !participantMenuTarget ||
+              !!pendingSpotlightInvite ||
+              (spotlightTarget &&
+                (spotlightTarget?.participantId
+                  ? String(spotlightTarget.participantId) === String(participantMenuTarget?.id)
+                  : spotlightTarget?.participantUserKey &&
+                  spotlightTarget.participantUserKey === getParticipantUserKey(participantMenuTarget?._raw || participantMenuTarget)))
+            }
           >
             <ListItemIcon>
               <AutoAwesomeIcon fontSize="small" sx={{ color: "#22c55e" }} />
@@ -15290,7 +15540,9 @@ export default function NewLiveMeeting() {
                   : spotlightTarget?.participantUserKey &&
                   spotlightTarget.participantUserKey === getParticipantUserKey(participantMenuTarget?._raw || participantMenuTarget))
                 ? "Already On Stage"
-                : "Bring To Main Stage"}
+                : pendingSpotlightInvite
+                  ? "Invitation Pending"
+                  : "Invite To Main Stage"}
             </ListItemText>
           </MenuItem>
           <MenuItem onClick={handleClearSpotlight} disabled={!spotlightTarget}>
@@ -16618,3 +16870,4 @@ function MemberInfoContent({ selectedMember, onClose }) {
     </Box>
   );
 }
+
