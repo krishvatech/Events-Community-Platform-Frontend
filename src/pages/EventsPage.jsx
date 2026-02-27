@@ -42,6 +42,7 @@ import { isStaffUser, isOwnerUser } from "../utils/adminRole.js";
 import { apiClient } from "../utils/api";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
+import { determineJoinState } from "../utils/sessionJoinLogic";
 import { getNextUpcomingSession, formatSessionTimeRange } from "../utils/timezoneUtils";
 
 const API_BASE =
@@ -331,6 +332,17 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   const isPreEventLounge = isPreEventLoungeOpen(ev);
   const isPostEventLounge = isPostEventLoungeOpen(ev);
   const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+  const multiDayJoinState = ev.is_multi_day ? determineJoinState(ev) : null;
+  const canJoinNow = ev.is_multi_day
+    ? (multiDayJoinState?.enabled || isPreEventLounge || isPostEventLounge)
+    : canShowActiveJoin;
+  const joinButtonLabel = ev.is_multi_day
+    ? (
+      isPreEventLounge || isPostEventLounge
+        ? getJoinButtonText(ev, isLive, false, reg)
+        : (multiDayJoinState?.buttonText || "Join (Not Live Yet)")
+    )
+    : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
 
   // State for expandable "Read More" section
   const [expandSessions, setExpandSessions] = React.useState(false);
@@ -714,10 +726,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                   variant="contained"
                   size="medium"
                   onClick={handleJoinCard}
-                  disabled={!canShowActiveJoin}
+                  disabled={!canJoinNow}
                   className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                 >
-                  {canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)"}
+                  {joinButtonLabel}
                 </Button>
               )}
               {/* Show Cancel Registration button only for free events */}
@@ -794,6 +806,17 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   const isPreEventLounge = isPreEventLoungeOpen(ev);
   const isPostEventLounge = isPostEventLoungeOpen(ev);
   const canShowActiveJoin = isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge;
+  const multiDayJoinState = ev.is_multi_day ? determineJoinState(ev) : null;
+  const canJoinNow = ev.is_multi_day
+    ? (multiDayJoinState?.enabled || isPreEventLounge || isPostEventLounge)
+    : canShowActiveJoin;
+  const joinButtonLabel = ev.is_multi_day
+    ? (
+      isPreEventLounge || isPostEventLounge
+        ? getJoinButtonText(ev, isLive, false, reg)
+        : (multiDayJoinState?.buttonText || "Join (Not Live Yet)")
+    )
+    : (canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)");
 
   // Timezone logic
   // Timezone logic
@@ -1029,10 +1052,10 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                         variant="contained"
                         size="medium"
                         onClick={handleJoinRow}
-                        disabled={!canShowActiveJoin}
+                        disabled={!canJoinNow}
                         className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
                       >
-                        {canShowActiveJoin ? getJoinButtonText(ev, isLive, false, reg) : "Join (Not Live Yet)"}
+                        {joinButtonLabel}
                       </Button>
                     )}
                     {/* Show Cancel Registration button only for free events */}
