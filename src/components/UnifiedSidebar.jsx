@@ -1,5 +1,5 @@
 // src/components/UnifiedSidebar.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import {
     Box,
@@ -162,6 +162,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     // --- State for badges ---
     const [notifCount, setNotifCount] = useState(0);
     const [messageCount, setMessageCount] = useState(0);
+    const menuScrollRef = useRef(null);
+    const activeItemRef = useRef(null);
 
     // --- Navigation Config ---
     const discoverItems = [
@@ -286,6 +288,27 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         };
     }, [isSuperUser, isStaffOnly]);
 
+    useEffect(() => {
+        const t = setTimeout(() => {
+            const menuEl = menuScrollRef.current;
+            const activeEl = activeItemRef.current;
+            if (!menuEl || !activeEl) return;
+
+            const menuRect = menuEl.getBoundingClientRect();
+            const activeRect = activeEl.getBoundingClientRect();
+            const activeTop = activeRect.top - menuRect.top + menuEl.scrollTop;
+            const targetTop = activeTop - (menuEl.clientHeight / 2) + (activeRect.height / 2);
+            const maxTop = Math.max(0, menuEl.scrollHeight - menuEl.clientHeight);
+            const clampedTop = Math.min(maxTop, Math.max(0, targetTop));
+
+            menuEl.scrollTo({
+                top: clampedTop,
+                behavior: "smooth",
+            });
+        }, 0);
+        return () => clearTimeout(t);
+    }, [location.pathname, location.search, isMobile, mobileOpen]);
+
 
     // --- Actions ---
     const [openLogoutDialog, setOpenLogoutDialog] = useState(false);
@@ -397,6 +420,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     return (
                         <ListItemButton
                             key={idx}
+                            ref={selected ? activeItemRef : null}
                             selected={selected}
                             onClick={() => {
                                 if (item.action) handleAction(item.action);
@@ -501,7 +525,16 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     const showCart = cartCount > 0 && !isSuperUser; // Owners typically don't shop
 
     const SidebarContent = (
-        <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "#ffffff", borderRight: `1px solid ${CARD_BORDER}` }}>
+        <Box
+            sx={{
+                height: "100%",
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                bgcolor: "#ffffff",
+                borderRight: `1px solid ${CARD_BORDER}`
+            }}
+        >
             {/* Brand area */}
             <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1 }}>
                 {/* Simple Logo */}
@@ -511,15 +544,19 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                 <Typography variant="h6" fontWeight="700" color="text.primary">IMAA Connect</Typography>
             </Box>
 
-            <Box sx={{
-                flex: 1,
-                overflowY: "auto",
-                py: 1,
-                // Hide scrollbar
-                "&::-webkit-scrollbar": { display: "none" },
-                scrollbarWidth: "none",
-                msOverflowStyle: "none"
-            }}>
+            <Box
+                ref={menuScrollRef}
+                sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: "auto",
+                    py: 1,
+                    // Hide scrollbar
+                    "&::-webkit-scrollbar": { display: "none" },
+                    scrollbarWidth: "none",
+                    msOverflowStyle: "none"
+                }}
+            >
                 {renderList(discoverItems, "Discover")}
                 {renderList(manageItems, "Manage")}
                 {adminItems.length > 0 && renderList(adminItems, "Admin")}
@@ -697,7 +734,15 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             onClose={onMobileClose}
             ModalProps={{ keepMounted: true }}
             sx={{
-                "& .MuiDrawer-paper": { boxSizing: "border-box", width: 280 }
+                "& .MuiDrawer-paper": {
+                    boxSizing: "border-box",
+                    width: 280,
+                    height: "100dvh",
+                    maxHeight: "100dvh",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column"
+                }
             }}
         >
             {SidebarContent}
@@ -707,7 +752,18 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             variant="permanent"
             sx={{
                 display: { xs: "none", md: "block" },
-                "& .MuiDrawer-paper": { boxSizing: "border-box", width: 280, position: "fixed", height: "100vh" }
+                "& .MuiDrawer-paper": {
+                    boxSizing: "border-box",
+                    width: 280,
+                    position: "fixed",
+                    top: 0,
+                    bottom: 0,
+                    height: "100dvh",
+                    maxHeight: "100dvh",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column"
+                }
             }}
             open
         >

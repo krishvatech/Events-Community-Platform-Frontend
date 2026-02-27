@@ -42,6 +42,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
+import LinkIcon from "@mui/icons-material/Link";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
@@ -3949,6 +3950,22 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                         <Typography variant="caption" color="text.secondary">
                                           {[(e.start_date || "").slice(0, 4), (e.end_date || "").slice(0, 4)].filter(Boolean).join(" - ")}
                                         </Typography>
+                                        {e.documents && e.documents.length > 0 && (
+                                          <Stack direction="row" spacing={1} sx={{ mt: 0.5, flexWrap: "wrap" }}>
+                                            {e.documents.map(doc => (
+                                              <Chip
+                                                key={doc.id}
+                                                icon={<LinkIcon fontSize="small" />}
+                                                label={doc.filename || "Document"}
+                                                size="small"
+                                                component="a"
+                                                href={doc.file}
+                                                target="_blank"
+                                                clickable
+                                              />
+                                            ))}
+                                          </Stack>
+                                        )}
                                       </Stack>
                                     }
                                   />
@@ -3979,13 +3996,42 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                       </Typography>
                                     }
                                     secondary={
-                                      <Typography variant="caption" color="text.secondary">
-                                        {rangeText(
-                                          t.start_date || t.start_month,
-                                          t.end_date || t.end_month,
-                                          t.currently_ongoing || t.ongoing
+                                      <Stack component="span" spacing={0.5}>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {rangeText(
+                                            t.start_date || t.start_month,
+                                            t.end_date || t.end_month,
+                                            t.currently_ongoing || t.ongoing
+                                          )}
+                                        </Typography>
+                                        {(t.credential_url || (t.documents && t.documents.length > 0)) && (
+                                          <Stack direction="row" spacing={1} sx={{ mt: 0.5, flexWrap: "wrap", rowGap: 1 }}>
+                                            {t.credential_url && (
+                                              <Chip
+                                                icon={<OpenInNewOutlinedIcon fontSize="small" />}
+                                                label="Credential"
+                                                size="small"
+                                                component="a"
+                                                href={t.credential_url}
+                                                target="_blank"
+                                                clickable
+                                              />
+                                            )}
+                                            {t.documents && t.documents.map(doc => (
+                                              <Chip
+                                                key={doc.id}
+                                                icon={<LinkIcon fontSize="small" />}
+                                                label={doc.filename || "Document"}
+                                                size="small"
+                                                component="a"
+                                                href={doc.file}
+                                                target="_blank"
+                                                clickable
+                                              />
+                                            ))}
+                                          </Stack>
                                         )}
-                                      </Typography>
+                                      </Stack>
                                     }
                                   />
                                 </ListItem>
@@ -4013,14 +4059,43 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                       </Typography>
                                     }
                                     secondary={
-                                      <Typography variant="caption" color="text.secondary">
-                                        {rangeText(
-                                          c.issue_date || c.issue_month,
-                                          c.expiration_date || c.expiration_month,
-                                          c.no_expiration
+                                      <Stack component="span" spacing={0.5}>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {rangeText(
+                                            c.issue_date || c.issue_month,
+                                            c.expiration_date || c.expiration_month,
+                                            c.no_expiration
+                                          )}
+                                          {c.credential_id ? ` · ID: ${c.credential_id}` : ""}
+                                        </Typography>
+                                        {(c.credential_url || (c.documents && c.documents.length > 0)) && (
+                                          <Stack direction="row" spacing={1} sx={{ mt: 0.5, flexWrap: "wrap", rowGap: 1 }}>
+                                            {c.credential_url && (
+                                              <Chip
+                                                icon={<OpenInNewOutlinedIcon fontSize="small" />}
+                                                label="Credential"
+                                                size="small"
+                                                component="a"
+                                                href={c.credential_url}
+                                                target="_blank"
+                                                clickable
+                                              />
+                                            )}
+                                            {c.documents && c.documents.map(doc => (
+                                              <Chip
+                                                key={doc.id}
+                                                icon={<LinkIcon fontSize="small" />}
+                                                label={doc.filename || "Document"}
+                                                size="small"
+                                                component="a"
+                                                href={doc.file}
+                                                target="_blank"
+                                                clickable
+                                              />
+                                            ))}
+                                          </Stack>
                                         )}
-                                        {c.credential_id ? ` · ID: ${c.credential_id}` : ""}
-                                      </Typography>
+                                      </Stack>
                                     }
                                   />
                                 </ListItem>
@@ -4048,13 +4123,42 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                       </Typography>
                                     }
                                     secondary={
-                                      <Typography variant="caption" color="text.secondary">
-                                        {rangeText(
-                                          m.start_date || m.start_month,
-                                          m.end_date || m.end_month,
-                                          m.ongoing
+                                      <Stack component="span" spacing={0.5}>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {rangeText(
+                                            m.start_date || m.start_month,
+                                            m.end_date || m.end_month,
+                                            m.ongoing
+                                          )}
+                                        </Typography>
+                                        {(m.membership_url || (m.documents && m.documents.length > 0)) && (
+                                          <Stack direction="row" spacing={1} sx={{ mt: 0.5, flexWrap: "wrap", rowGap: 1 }}>
+                                            {m.membership_url && (
+                                              <Chip
+                                                icon={<OpenInNewOutlinedIcon fontSize="small" />}
+                                                label="Membership Link"
+                                                size="small"
+                                                component="a"
+                                                href={m.membership_url}
+                                                target="_blank"
+                                                clickable
+                                              />
+                                            )}
+                                            {m.documents && m.documents.map(doc => (
+                                              <Chip
+                                                key={doc.id}
+                                                icon={<LinkIcon fontSize="small" />}
+                                                label={doc.filename || "Document"}
+                                                size="small"
+                                                component="a"
+                                                href={doc.file}
+                                                target="_blank"
+                                                clickable
+                                              />
+                                            ))}
+                                          </Stack>
                                         )}
-                                      </Typography>
+                                      </Stack>
                                     }
                                   />
                                 </ListItem>
